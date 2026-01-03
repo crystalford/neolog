@@ -68,7 +68,6 @@ export async function generateMetadata({ params }: Props) {
 export default async function PostPage({ params }: Props) {
   const supabase = createClient()
   
-  // Get profile
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
@@ -77,7 +76,6 @@ export default async function PostPage({ params }: Props) {
   
   if (!profile) notFound()
 
-  // Get post with all fields including fork info
   const { data: post } = await supabase
     .from('posts')
     .select('*')
@@ -88,7 +86,6 @@ export default async function PostPage({ params }: Props) {
 
   if (!post) notFound()
 
-  // Get forked from info if this is a fork
   let forkedFromPost = null
   if (post.forked_from_id) {
     const { data } = await supabase
@@ -105,13 +102,11 @@ export default async function PostPage({ params }: Props) {
     forkedFromPost = data as any
   }
 
-  // Get upvote count
   const { count: upvoteCount } = await supabase
     .from('post_upvotes')
     .select('*', { count: 'exact', head: true })
     .eq('post_id', post.id)
 
-  // Get tags for this post
   const { data: postTags } = await supabase
     .from('post_tags')
     .select('tag:tags(name, slug, color)')
@@ -127,7 +122,6 @@ export default async function PostPage({ params }: Props) {
       })
     : null
 
-  // Check if content is a full HTML document
   const isFullDocument = post.content?.trim().toLowerCase().startsWith('<!doctype')
 
   return (
@@ -135,7 +129,6 @@ export default async function PostPage({ params }: Props) {
       <Header />
       <main className="pt-20">
         {isFullDocument ? (
-          // Render full HTML in iframe
           <div className="max-w-4xl mx-auto px-6 py-8">
             <Link 
               href={`/${params.username}`}
@@ -145,14 +138,12 @@ export default async function PostPage({ params }: Props) {
               Back to {profile.display_name || profile.username}
             </Link>
 
-            {/* Fork attribution */}
             {forkedFromPost && (
               <div className="mb-6">
                 <ForkedFrom originalPost={forkedFromPost} />
               </div>
             )}
 
-            {/* Post actions */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <UpvoteButton 
@@ -185,7 +176,6 @@ export default async function PostPage({ params }: Props) {
               />
             </article>
 
-            {/* Fork tree */}
             {(post.fork_count > 0 || post.forked_from_id) && (
               <div className="mt-8">
                 <ForkTree 
@@ -197,7 +187,6 @@ export default async function PostPage({ params }: Props) {
             )}
           </div>
         ) : (
-          // Render with site styling
           <article className="max-w-2xl mx-auto px-6 py-12 animate-fade-up">
             <header className="mb-8">
               <Link 
@@ -208,7 +197,6 @@ export default async function PostPage({ params }: Props) {
                 Back to {profile.display_name || profile.username}
               </Link>
 
-              {/* Fork attribution */}
               {forkedFromPost && (
                 <div className="mb-6">
                   <ForkedFrom originalPost={forkedFromPost} />
@@ -270,13 +258,14 @@ export default async function PostPage({ params }: Props) {
                   <BookmarkButton postId={post.id} />
                   <AddToListButton postId={post.id} />
                   <ForkButton
-                  postId={post.id}
-                  postTitle={post.title}
-                  postContent={post.content}
-                  postContentType={post.content_type}
-                  allowForks={post.allow_forks ?? true}
-                  forkCount={post.fork_count ?? 0}
-                />
+                    postId={post.id}
+                    postTitle={post.title}
+                    postContent={post.content}
+                    postContentType={post.content_type}
+                    allowForks={post.allow_forks ?? true}
+                    forkCount={post.fork_count ?? 0}
+                  />
+                </div>
               </div>
             </header>
 
@@ -288,7 +277,6 @@ export default async function PostPage({ params }: Props) {
               />
             )}
 
-            {/* Canonical URL notice */}
             {post.canonical_url && (
               <div className="mb-8 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center gap-3">
                 <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
@@ -306,10 +294,8 @@ export default async function PostPage({ params }: Props) {
               </div>
             )}
 
-            {/* Co-authors */}
             <CoAuthorsList postId={post.id} />
 
-            {/* Content with embeds, heading IDs, and footnotes */}
             <div 
               className="prose"
               dangerouslySetInnerHTML={{ 
@@ -317,21 +303,17 @@ export default async function PostPage({ params }: Props) {
               }}
             />
 
-            {/* Share bar */}
             <ShareBar 
               url={`${process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'}/${profile.username}/${post.slug}`}
               title={post.title}
             />
 
-            {/* Reactions */}
             <div className="py-4 flex justify-center">
               <Reactions postId={post.id} />
             </div>
 
-            {/* Webmentions */}
             <Webmentions postId={post.id} />
 
-            {/* Fork tree */}
             {(post.fork_count > 0 || post.forked_from_id) && (
               <div className="mt-12 pt-8 border-t border-[var(--border-light)]">
                 <ForkTree 
@@ -342,13 +324,10 @@ export default async function PostPage({ params }: Props) {
               </div>
             )}
 
-            {/* Related Posts */}
             <RelatedPosts postId={post.id} />
 
-            {/* Comments */}
             <Comments postId={post.id} postAuthorId={post.author_id} />
             
-            {/* Track reading progress */}
             <ReadingTracker postId={post.id} />
           </article>
         )}
