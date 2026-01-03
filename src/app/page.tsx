@@ -300,7 +300,7 @@ export default async function Home() {
             </p>
             <Link 
               href="/signup" 
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[var(--bg-inverse)] rounded-lg font-medium hover:bg-opacity-90 transition-all hover:-translate-y-0.5"
+              className="btn btn-primary btn-lg"
             >
               Create your account
               <ArrowRight size={18} />
@@ -312,7 +312,7 @@ export default async function Home() {
         <footer className="px-6 py-12 border-t border-[var(--border-light)]">
           <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 bg-[var(--accent)] rounded-md flex items-center justify-center font-mono text-xs font-medium text-white">
+              <span className="logo-mark">
                 N
               </span>
               <span className="font-display text-lg">Neolog</span>
@@ -320,9 +320,17 @@ export default async function Home() {
             
             <nav className="flex gap-8 text-sm text-[var(--text-secondary)]">
               <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">Explore</Link>
-              <Link href="/docs" className="hover:text-[var(--text-primary)] transition-colors">Docs</Link>
-              <Link href="/pricing" className="hover:text-[var(--text-primary)] transition-colors">Pricing</Link>
-              <a href="https://twitter.com/neolog" className="hover:text-[var(--text-primary)] transition-colors">Twitter</a>
+              <Link href="/tags" className="hover:text-[var(--text-primary)] transition-colors">Topics</Link>
+              <Link href="/curators" className="hover:text-[var(--text-primary)] transition-colors">Curators</Link>
+              <a href="https://x.com/neologx" className="hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-2">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 1200 1227" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M714.163 519.284L1160.89 0H1055.03L666.689 450.887L357.328 0H0L468.492 681.821L0 1227H105.866L515.439 751.218L842.672 1227H1200L714.163 519.284ZM569.165 687.828L521.797 619.934L144.011 79.694H306.615L611.412 515.685L658.78 583.579L1055.08 1150.3H892.476L569.165 687.828Z"
+                  />
+                </svg>
+                X
+              </a>
             </nav>
             
             <p className="text-sm text-[var(--text-tertiary)]">

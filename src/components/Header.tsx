@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard, BarChart3, Rocket, Rss, Users, Search, Bookmark, History, DollarSign, CreditCard, BookOpen, Layers, UserPlus } from 'lucide-react'
+import { PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard, BarChart3, Rocket, Rss, Users, Search, Bookmark, History, DollarSign, CreditCard, BookOpen, Layers, UserPlus, Paintbrush } from 'lucide-react'
 import { NotificationBell } from './NotificationBell'
 import { ThemeToggle } from './ThemeToggle'
 import { MobileNav } from './MobileNav'
@@ -13,7 +13,10 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [accentIndex, setAccentIndex] = useState(0)
   const supabase = createClient()
+
+  const accentOptions = ['ember', 'ocean', 'plum']
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,7 +31,21 @@ export function Header() {
     )
 
     return () => subscription.unsubscribe()
+    const savedAccent = window.localStorage.getItem('neolog-accent')
+    if (savedAccent && accentOptions.includes(savedAccent)) {
+      const nextIndex = accentOptions.indexOf(savedAccent)
+      setAccentIndex(nextIndex)
+      document.documentElement.dataset.accent = savedAccent
+    }
   }, [])
+
+  const handleAccentCycle = () => {
+    const nextIndex = (accentIndex + 1) % accentOptions.length
+    const nextAccent = accentOptions[nextIndex]
+    setAccentIndex(nextIndex)
+    document.documentElement.dataset.accent = nextAccent
+    window.localStorage.setItem('neolog-accent', nextAccent)
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -45,7 +62,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           <MobileNav />
           <Link href="/" className="flex items-center gap-2.5 group">
-            <span className="w-8 h-8 bg-[var(--accent)] rounded-lg flex items-center justify-center font-mono text-sm font-semibold text-white shadow-sm">
+            <span className="logo-mark logo-mark-lg">
               N
             </span>
             <span className="font-display text-xl tracking-tight group-hover:text-[var(--accent)] transition-colors hidden sm:inline">
@@ -79,6 +96,15 @@ export function Header() {
           >
             <Search size={16} className="text-[var(--text-secondary)]" />
           </Link>
+
+          <button
+            type="button"
+            onClick={handleAccentCycle}
+            className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
+            title="Change color theme"
+          >
+            <Paintbrush size={16} className="text-[var(--text-secondary)]" />
+          </button>
 
           <ThemeToggle />
 
