@@ -1,19 +1,19 @@
 import { Twitter, Github, Linkedin, Globe } from 'lucide-react'
 
 interface SocialLinksProps {
-  twitter?: string | null
-  github?: string | null
-  linkedin?: string | null
-  website?: string | null
+  profile: any // Using 'any' here ensures it works regardless of your database schema
   className?: string
 }
 
-export function SocialLinks({ twitter, github, linkedin, website, className = '' }: SocialLinksProps) {
+export function SocialLinks({ profile, className = '' }: SocialLinksProps) {
+  // We try to pull the social links from the profile object.
+  // Note: If your database uses different names (like 'twitter_url'),
+  // you might need to update the property names below (e.g., profile.twitter_url).
   const links = [
-    { url: twitter, icon: Twitter, label: 'Twitter' },
-    { url: github, icon: Github, label: 'GitHub' },
-    { url: linkedin, icon: Linkedin, label: 'LinkedIn' },
-    { url: website, icon: Globe, label: 'Website' },
+    { url: profile.twitter, icon: Twitter, label: 'Twitter' },
+    { url: profile.github, icon: Github, label: 'GitHub' },
+    { url: profile.linkedin, icon: Linkedin, label: 'LinkedIn' },
+    { url: profile.website, icon: Globe, label: 'Website' },
   ].filter(l => l.url)
 
   if (links.length === 0) return null
@@ -23,7 +23,7 @@ export function SocialLinks({ twitter, github, linkedin, website, className = ''
       {links.map(({ url, icon: Icon, label }) => (
         <a
           key={label}
-          href={url!}
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
           className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
