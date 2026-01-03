@@ -77,14 +77,14 @@ export default function DashboardPage() {
 
   return (
     <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto animate-fade-up">
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="font-serif text-3xl tracking-tight text-gray-900 mb-1">Your posts</h1>
-          <p className="font-sans text-sm text-gray-600">
+          <h1 className="font-serif text-3xl tracking-tight text-gray-900">Your posts</h1>
+          <p className="font-sans text-sm text-gray-600 mt-1">
             {posts.length} {posts.length === 1 ? 'post' : 'posts'}
           </p>
         </div>
-        <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+        <Link href="/write" className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
           <PenLine size={16} />
           New post
         </Link>
