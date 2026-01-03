@@ -1,7 +1,3 @@
-/**
- * Simple in-memory rate limiter
- * For production, use Redis or similar
- */
 type RateLimitEntry = {
   count: number
   resetAt: number
