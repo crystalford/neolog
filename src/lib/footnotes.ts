@@ -1,23 +1,15 @@
 /**
- * Footnotes Parser
- * 
- * Supports markdown-style footnotes:
- * - Inline reference: [^1] or [^note]
- * - Definition: [^1]: This is the footnote content
- * 
- * Also supports inline footnotes:
- * - ^[This is an inline footnote]
+ * Process footnotes in content
+ * Supports markdown-style footnotes: [^1] and [^1]: Definition
  */
 
-type Footnote = {
-  id: string
-  content: string
-  index: number
-}
+export function processFootnotes(html: string): string {
+  if (!html) return ''
 
-export function parseFootnotes(html: string): { html: string; footnotes: Footnote[] } {
-  const footnotes: Footnote[] = []
+  // Map to store footnote definitions
+  const footnotes = new Map<string, string>()
   let footnoteIndex = 0
+  const footnoteOrder: string[] = []
 
   // First pass: collect all footnote definitions
   const definitionPattern = /\[\^([^\]]+)\]:\s*([\s\S]+?)(?=\n\[\^|\n\n|$)/g
@@ -28,123 +20,67 @@ export function parseFootnotes(html: string): { html: string; footnotes: Footnot
     definitions.set(match[1], match[2].trim())
   }
 
-  // Remove footnote definitions from content
-  let processedHtml = html.replace(definitionPattern, '')
+  // Remove definitions from content
+  let content = html.replace(/\[\^([^\]]+)\]:\s*([\s\S]+?)(?=\n\[\^|\n\n|$)/g, '')
 
   // Second pass: replace inline references with superscript links
-  const referencePattern = /\[\^([^\]]+)\]/g
-  processedHtml = processedHtml.replace(referencePattern, (_, id) => {
-    footnoteIndex++
-    const content = definitions.get(id) || `[Missing footnote: ${id}]`
+  content = content.replace(/\[\^([^\]]+)\]/g, (_, id) => {
+    if (!footnoteOrder.includes(id)) {
+      footnoteOrder.push(id)
+    }
+    const index = footnoteOrder.indexOf(id) + 1
+    const definition = definitions.get(id) || ''
+    footnotes.set(id, definition)
     
-    footnotes.push({
-      id,
-      content,
-      index: footnoteIndex,
-    })
-
-    return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}">[${footnoteIndex}]</a></sup>`
+    return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}" data-footnote-ref aria-describedby="footnote-label">[${index}]</a></sup>`
   })
 
-  // Third pass: handle inline footnotes ^[content]
-  const inlinePattern = /\^\[([^\]]+)\]/g
-  processedHtml = processedHtml.replace(inlinePattern, (_, content) => {
-    footnoteIndex++
-    const id = `inline-${footnoteIndex}`
+  // If there are footnotes, add the footnotes section
+  if (footnotes.size > 0) {
+    content += `
+      <section class="footnotes mt-12 pt-8 border-t border-[var(--border-light)]" data-footnotes>
+        <h2 id="footnote-label" class="sr-only">Footnotes</h2>
+        <ol class="list-decimal list-inside space-y-2 text-sm text-[var(--text-secondary)]">
+    `
     
-    footnotes.push({
-      id,
-      content,
-      index: footnoteIndex,
+    footnoteOrder.forEach((id, index) => {
+      const definition = footnotes.get(id) || ''
+      content += `
+        <li id="fn-${id}" class="footnote-item">
+          ${definition}
+          <a href="#fnref-${id}" class="footnote-backref ml-2 text-[var(--accent)]" aria-label="Back to reference ${index + 1}">↩</a>
+        </li>
+      `
     })
+    
+    content += `
+        </ol>
+      </section>
+    `
+  }
 
-    return `<sup class="footnote-ref"><a href="#fn-${id}" id="fnref-${id}">[${footnoteIndex}]</a></sup>`
-  })
-
-  return { html: processedHtml, footnotes }
-}
-
-export function renderFootnotes(footnotes: Footnote[]): string {
-  if (footnotes.length === 0) return ''
-
-  const items = footnotes.map(fn => `
-    <li id="fn-${fn.id}" class="footnote-item">
-      <p>
-        ${fn.content}
-        <a href="#fnref-${fn.id}" class="footnote-backref" title="Back to reference">↩</a>
-      </p>
-    </li>
-  `).join('')
-
-  return `
-    <section class="footnotes">
-      <hr class="footnotes-sep" />
-      <ol class="footnotes-list">
-        ${items}
-      </ol>
-    </section>
-  `
+  return content
 }
 
 /**
- * Process content with footnotes and return complete HTML
+ * Extract footnotes without rendering
  */
-export function processFootnotes(html: string): string {
-  const { html: processedHtml, footnotes } = parseFootnotes(html)
-  return processedHtml + renderFootnotes(footnotes)
+export function extractFootnotes(content: string): Map<string, string> {
+  const footnotes = new Map<string, string>()
+  const pattern = /\[\^([^\]]+)\]:\s*([\s\S]+?)(?=\n\[\^|\n\n|$)/g
+  
+  let match
+  while ((match = pattern.exec(content)) !== null) {
+    footnotes.set(match[1], match[2].trim())
+  }
+  
+  return footnotes
 }
 
 /**
- * CSS for footnotes (add to globals.css)
+ * Count footnotes in content
  */
-export const footnoteStyles = `
-  .footnote-ref {
-    font-size: 0.75em;
-    vertical-align: super;
-    line-height: 0;
-  }
-  
-  .footnote-ref a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  
-  .footnote-ref a:hover {
-    text-decoration: underline;
-  }
-  
-  .footnotes {
-    margin-top: 3rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-  
-  .footnotes-sep {
-    border: none;
-    border-top: 1px solid var(--border-light);
-    margin-bottom: 1.5rem;
-  }
-  
-  .footnotes-list {
-    padding-left: 1.5rem;
-    margin: 0;
-  }
-  
-  .footnote-item {
-    margin-bottom: 0.5rem;
-  }
-  
-  .footnote-item p {
-    margin: 0;
-  }
-  
-  .footnote-backref {
-    margin-left: 0.25rem;
-    color: var(--accent);
-    text-decoration: none;
-  }
-  
-  .footnote-backref:hover {
-    text-decoration: underline;
-  }
-`
+export function countFootnotes(content: string): number {
+  const refs = content.match(/\[\^[^\]]+\](?!:)/g)
+  return refs ? new Set(refs).size : 0
+}
