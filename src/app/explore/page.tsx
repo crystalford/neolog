@@ -84,8 +84,8 @@ export default function ExplorePage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-6xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
           <div className="flex items-center justify-between pt-8 mb-8">
             <div>

@@ -69,8 +69,8 @@ export default async function TagPage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-3xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Back link */}
           <Link 
             href="/explore"

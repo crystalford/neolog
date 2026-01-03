@@ -55,7 +55,7 @@ export default function ImportPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <div className="pt-8 mb-8">
             <h1 className="font-display text-3xl mb-2">Import Your Content</h1>

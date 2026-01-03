@@ -208,7 +208,7 @@ export default function NewCampaignPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           {/* Header */}
           <div className="flex items-center gap-4 pt-8 mb-8">

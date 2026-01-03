@@ -115,8 +115,8 @@ export default function ListDetailPage({ params }: Props) {
     return (
       <>
         <Header />
-        <main className="pt-20 pb-16">
-          <div className="max-w-3xl mx-auto px-6">
+        <main className="pt-16 pb-16">
+          <div className="max-w-7xl mx-auto px-6 lg:px-12">
             <div className="pt-8 space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <PostCardListSkeleton key={i} />
@@ -133,8 +133,8 @@ export default function ListDetailPage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-3xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="pt-8 mb-8">
             <Link 
               href="/lists" 

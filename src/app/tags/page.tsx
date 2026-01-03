@@ -20,8 +20,8 @@ export default async function TagsPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-4xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
           <div className="pt-8 mb-8">
             <h1 className="font-display text-4xl mb-2">Browse Topics</h1>

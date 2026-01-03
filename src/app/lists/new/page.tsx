@@ -57,7 +57,7 @@ export default function NewListPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <div className="pt-8 mb-8">
             <Link 

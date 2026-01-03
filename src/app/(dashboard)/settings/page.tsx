@@ -213,7 +213,7 @@ export default function SettingsPage() {
     return (
       <>
         <Header />
-        <main className="pt-20 pb-16">
+        <main className="pt-16 pb-16">
           <div className="max-w-2xl mx-auto px-6 pt-8">
             <div className="h-8 w-32 skeleton rounded mb-8" />
             <div className="space-y-4">
@@ -229,7 +229,7 @@ export default function SettingsPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <h1 className="font-display text-3xl pt-8 mb-8">Settings</h1>
 
