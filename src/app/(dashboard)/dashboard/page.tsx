@@ -1,0 +1,204 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Header } from '@/components/Header'
+import { ShareDraftButton } from '@/components/ShareDraftButton'
+import type { Post, Profile } from '@/types/database'
+import { 
+  PenLine, MoreHorizontal, Eye, Edit2, Trash2, 
+  Globe, FileText, Clock 
+} from 'lucide-react'
+
+export default function DashboardPage() {
+  const [posts, setPosts] = useState<Post[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
+    // Load profile
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+    
+    setProfile(profileData)
+
+    // Load posts
+    const { data: postsData } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('author_id', session.user.id)
+      .order('updated_at', { ascending: false })
+    
+    setPosts(postsData || [])
+    setLoading(false)
+  }
+
+  const handleDelete = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post?')) return
+
+    await supabase.from('posts').delete().eq('id', postId)
+    setPosts(posts.filter(p => p.id !== postId))
+    setActiveMenu(null)
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="pt-20 px-6 py-12 max-w-4xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 w-48 bg-surface rounded" />
+            <div className="h-4 w-32 bg-surface rounded" />
+            <div className="mt-8 space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-surface rounded-xl" />
+              ))}
+            </div>
+          </div>
+        </main>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="pt-20 px-6 py-12 max-w-4xl mx-auto animate-fade-up">
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h1 className="font-display text-3xl mb-1">Your posts</h1>
+            <p className="text-text-muted">
+              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+            </p>
+          </div>
+          <Link href="/write" className="btn btn-primary flex items-center gap-2">
+            <PenLine size={16} />
+            New post
+          </Link>
+        </div>
+
+        {posts.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-surface-elevated flex items-center justify-center mx-auto mb-4">
+              <FileText size={28} className="text-text-muted" />
+            </div>
+            <h2 className="font-display text-xl mb-2">No posts yet</h2>
+            <p className="text-text-muted mb-6">Create your first post to get started</p>
+            <Link href="/write" className="btn btn-primary inline-flex items-center gap-2">
+              <PenLine size={16} />
+              Write your first post
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {posts.map((post) => (
+              <div 
+                key={post.id} 
+                className="bg-surface border border-border rounded-xl p-5 hover:border-border/80 transition-colors"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {post.status === 'published' ? (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                          <Globe size={12} />
+                          Published
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs text-text-muted">
+                          <FileText size={12} />
+                          Draft
+                        </span>
+                      )}
+                      <span className="text-text-muted">·</span>
+                      <span className="text-xs text-text-muted flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(post.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    
+                    <h2 className="font-display text-lg truncate">
+                      {post.title || 'Untitled'}
+                    </h2>
+                    
+                    {post.excerpt && (
+                      <p className="text-sm text-text-muted line-clamp-1 mt-1">
+                        {post.excerpt}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    {post.status === 'draft' && (
+                      <ShareDraftButton 
+                        postId={post.id} 
+                        existingToken={(post as any).preview_token}
+                        expiresAt={(post as any).preview_expires_at}
+                      />
+                    )}
+                    
+                    <div className="relative">
+                      <button
+                        onClick={() => setActiveMenu(activeMenu === post.id ? null : post.id)}
+                        className="w-8 h-8 rounded-lg hover:bg-surface-elevated flex items-center justify-center transition-colors"
+                      >
+                        <MoreHorizontal size={18} className="text-text-muted" />
+                      </button>
+
+                      {activeMenu === post.id && (
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-surface-elevated border border-border rounded-lg shadow-xl z-10 py-1">
+                          {post.status === 'published' && profile && (
+                            <Link
+                              href={`/${profile.username}/${post.slug}`}
+                              className="flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+                            >
+                              <Eye size={14} />
+                              View
+                            </Link>
+                          )}
+                          <Link
+                            href={`/write?edit=${post.id}`}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+                          >
+                            <Edit2 size={14} />
+                            Edit
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(post.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-surface transition-colors"
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </>
+  )
+}

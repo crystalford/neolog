@@ -1,0 +1,64 @@
+import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
+
+// This endpoint should be called by a cron job (e.g., Vercel Cron, Supabase Edge Functions)
+// Add to vercel.json: { "crons": [{ "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" }] }
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export async function GET(request: NextRequest) {
+  // Verify cron secret to prevent unauthorized calls
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    // Get all scheduled posts that should be published
+    const { data: scheduledPosts, error: fetchError } = await supabase
+      .from('posts')
+      .select('id, author_id, title')
+      .eq('status', 'scheduled')
+      .lte('scheduled_at', new Date().toISOString())
+
+    if (fetchError) throw fetchError
+
+    if (!scheduledPosts || scheduledPosts.length === 0) {
+      return NextResponse.json({ published: 0 })
+    }
+
+    // Publish each post
+    const postIds = scheduledPosts.map(p => p.id)
+    
+    const { error: updateError } = await supabase
+      .from('posts')
+      .update({
+        status: 'published',
+        published_at: new Date().toISOString(),
+      })
+      .in('id', postIds)
+
+    if (updateError) throw updateError
+
+    // Send notifications for each published post
+    for (const post of scheduledPosts) {
+      // Trigger the publish notification flow
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/posts/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id, notify: true }),
+      })
+    }
+
+    return NextResponse.json({ 
+      published: scheduledPosts.length,
+      posts: scheduledPosts.map(p => ({ id: p.id, title: p.title })),
+    })
+  } catch (error) {
+    console.error('Cron error:', error)
+    return NextResponse.json({ error: 'Failed to publish scheduled posts' }, { status: 500 })
+  }
+}
