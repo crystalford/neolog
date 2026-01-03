@@ -65,37 +65,58 @@ export default function OnboardingPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setSaveError('Image size must be less than 5MB')
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setSaveError('Please upload an image file')
+      return
+    }
+
     setUploadingAvatar(true)
+    setSaveError(null)
 
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
+    try {
+      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      if (!currentProfile) {
+        setSaveError('Unable to load your profile. Please try again.')
+        setUploadingAvatar(false)
+        return
+      }
+
+      if (!profile) {
+        setProfile(currentProfile)
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${currentProfile.id}/avatar.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        setSaveError(`Failed to upload image: ${uploadError.message}`)
+        setUploadingAvatar(false)
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      setAvatarUrl(publicUrl)
+    } catch (err) {
+      console.error('Avatar upload error:', err)
+      setSaveError('An unexpected error occurred while uploading. Please try again.')
+    } finally {
       setUploadingAvatar(false)
-      return
     }
-
-    if (!profile) {
-      setProfile(currentProfile)
-    }
-
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${currentProfile.id}/avatar.${fileExt}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file, { upsert: true })
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      setUploadingAvatar(false)
-      return
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
-
-    setAvatarUrl(publicUrl)
-    setUploadingAvatar(false)
   }
 
   const handleNext = async () => {

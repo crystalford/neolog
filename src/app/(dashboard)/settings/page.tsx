@@ -40,6 +40,8 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -49,91 +51,138 @@ export default function SettingsPage() {
   }, [])
 
   const loadProfile = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      router.push('/login')
-      return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      setUser(session.user)
+
+      const data = await ensureProfile(supabase, session.user)
+
+      if (data) {
+        setProfile(data)
+        setFormData({
+          display_name: data.display_name || '',
+          bio: data.bio || '',
+          website_url: data.website_url || '',
+          avatar_url: data.avatar_url || '',
+          twitter_url: data.twitter_url || '',
+          github_url: data.github_url || '',
+          linkedin_url: data.linkedin_url || '',
+        })
+        setError(null)
+      } else {
+        setError('Unable to load your profile. Please try refreshing the page or contact support.')
+      }
+    } catch (err) {
+      console.error('Profile load error:', err)
+      setError('An error occurred while loading your profile. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    setUser(session.user)
-
-    const data = await ensureProfile(supabase, session.user)
-
-    if (data) {
-      setProfile(data)
-      setFormData({
-        display_name: data.display_name || '',
-        bio: data.bio || '',
-        website_url: data.website_url || '',
-        avatar_url: data.avatar_url || '',
-        twitter_url: data.twitter_url || '',
-        github_url: data.github_url || '',
-        linkedin_url: data.linkedin_url || '',
-      })
-    }
-    setLoading(false)
   }
 
   const handleSave = async () => {
     if (!profile) return
     setSaving(true)
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        display_name: formData.display_name || null,
-        bio: formData.bio || null,
-        website_url: formData.website_url || null,
-        avatar_url: formData.avatar_url || null,
-        twitter_url: formData.twitter_url || null,
-        github_url: formData.github_url || null,
-        linkedin_url: formData.linkedin_url || null,
-      })
-      .eq('id', profile.id)
+    setError(null)
+    setSuccess(null)
 
-    if (!error) {
-      setProfile({ ...profile, ...formData })
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          display_name: formData.display_name || null,
+          bio: formData.bio || null,
+          website_url: formData.website_url || null,
+          avatar_url: formData.avatar_url || null,
+          twitter_url: formData.twitter_url || null,
+          github_url: formData.github_url || null,
+          linkedin_url: formData.linkedin_url || null,
+        })
+        .eq('id', profile.id)
+
+      if (error) {
+        setError('Failed to save profile. Please try again.')
+        console.error('Save error:', error)
+      } else {
+        setProfile({ ...profile, ...formData })
+        setSuccess('Profile saved successfully!')
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.')
+      console.error('Save error:', err)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !profile) return
 
-    setUploadingAvatar(true)
-
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${profile.id}/avatar.${fileExt}`
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file, { upsert: true })
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      setUploadingAvatar(false)
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB')
       return
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
-
-    // Update profile
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_url: publicUrl })
-      .eq('id', profile.id)
-
-    if (!updateError) {
-      setFormData({ ...formData, avatar_url: publicUrl })
-      setProfile({ ...profile, avatar_url: publicUrl })
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
     }
 
-    setUploadingAvatar(false)
+    setUploadingAvatar(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${profile.id}/avatar.${fileExt}`
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        setError(`Failed to upload image: ${uploadError.message}. Make sure the storage bucket exists.`)
+        setUploadingAvatar(false)
+        return
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id)
+
+      if (updateError) {
+        console.error('Update error:', updateError)
+        setError('Failed to update profile with new avatar')
+      } else {
+        setFormData({ ...formData, avatar_url: publicUrl })
+        setProfile({ ...profile, avatar_url: publicUrl })
+        setSuccess('Profile picture updated successfully!')
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      console.error('Avatar upload error:', err)
+      setError('An unexpected error occurred while uploading. Please try again.')
+    } finally {
+      setUploadingAvatar(false)
+    }
   }
 
   const copyToClipboard = (text: string, key: string) => {
@@ -183,6 +232,18 @@ export default function SettingsPage() {
       <main className="pt-20 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <h1 className="font-display text-3xl pt-8 mb-8">Settings</h1>
+
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="mb-6 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
+              <p className="text-sm font-medium">{success}</p>
+            </div>
+          )}
 
           {/* Profile Settings */}
           <section className="mb-12">
