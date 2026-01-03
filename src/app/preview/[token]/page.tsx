@@ -49,10 +49,10 @@ export default async function PreviewPage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         {/* Preview banner */}
         <div className="bg-[var(--warning)]/10 border-b border-[var(--warning)]/20">
-          <div className="max-w-3xl mx-auto px-6 py-3 flex items-center gap-3">
+          <div className="max-w-7xl mx-auto px-6 lg:px-12 py-3 flex items-center gap-3">
             <Eye size={18} className="text-[var(--warning)]" />
             <div className="flex-1">
               <p className="text-sm font-medium">Preview Mode</p>
@@ -68,7 +68,7 @@ export default async function PreviewPage({ params }: Props) {
           </div>
         </div>
 
-        <article className="max-w-3xl mx-auto px-6 py-12">
+        <article className="max-w-7xl mx-auto px-6 lg:px-12 py-12">
           {/* Cover image */}
           {post.cover_image_url && (
             <img 

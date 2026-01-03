@@ -73,8 +73,8 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-4xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Profile Header */}
           <div className="pt-8 pb-8 border-b border-[var(--border-light)]">
             <div className="flex items-start gap-6">

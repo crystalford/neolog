@@ -5,8 +5,8 @@ export default function PrivacyPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-3xl mx-auto px-6 pt-20">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-20">
           <div className="mb-10">
             <p className="text-sm uppercase tracking-wider text-[var(--text-tertiary)] mb-3">
               Legal

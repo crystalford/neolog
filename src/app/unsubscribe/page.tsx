@@ -44,7 +44,7 @@ export default function UnsubscribePage() {
     return (
       <>
         <Header />
-        <main className="pt-20 pb-16">
+        <main className="pt-16 pb-16">
           <div className="max-w-md mx-auto px-6 pt-20 text-center">
             <AlertCircle size={48} className="mx-auto mb-4 text-[var(--error)]" />
             <h1 className="font-display text-2xl mb-2">Invalid Link</h1>
@@ -64,7 +64,7 @@ export default function UnsubscribePage() {
     return (
       <>
         <Header />
-        <main className="pt-20 pb-16">
+        <main className="pt-16 pb-16">
           <div className="max-w-md mx-auto px-6 pt-20 text-center">
             <div className="w-16 h-16 rounded-full bg-[var(--success)]/10 flex items-center justify-center mx-auto mb-6">
               <Check size={32} className="text-[var(--success)]" />
@@ -85,7 +85,7 @@ export default function UnsubscribePage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
+      <main className="pt-16 pb-16">
         <div className="max-w-md mx-auto px-6 pt-20 text-center">
           <div className="w-16 h-16 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center mx-auto mb-6">
             <UserMinus size={32} className="text-[var(--text-tertiary)]" />

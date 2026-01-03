@@ -77,8 +77,8 @@ export default function CuratorsPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-5xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
           <div className="pt-8 mb-12">
             <div className="flex items-center gap-3 mb-4">

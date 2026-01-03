@@ -64,7 +64,7 @@ export default function DashboardPage() {
     return (
       <>
         <Header />
-        <main className="pt-20 px-6 py-12 max-w-4xl mx-auto">
+        <main className="pt-16 px-6 lg:px-12 py-12 max-w-7xl mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-surface rounded" />
             <div className="h-4 w-32 bg-surface rounded" />
@@ -82,7 +82,7 @@ export default function DashboardPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 px-6 py-12 max-w-4xl mx-auto animate-fade-up">
+      <main className="pt-16 px-6 lg:px-12 py-12 max-w-7xl mx-auto animate-fade-up">
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="font-display text-3xl mb-1">Your posts</h1>

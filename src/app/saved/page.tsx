@@ -78,8 +78,8 @@ export default function SavedPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-3xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
           <div className="flex items-center gap-4 pt-8 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">

@@ -153,7 +153,7 @@ export default function AdminPage() {
     return (
       <>
         <Header />
-        <main className="pt-20 pb-16 flex items-center justify-center min-h-screen">
+        <main className="pt-16 pb-16 flex items-center justify-center min-h-screen">
           <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
         </main>
       </>
@@ -165,8 +165,8 @@ export default function AdminPage() {
   return (
     <>
       <Header />
-      <main className="pt-20 pb-16">
-        <div className="max-w-6xl mx-auto px-6">
+      <main className="pt-16 pb-16">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center gap-4 pt-8 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
               <Shield size={24} className="text-[var(--accent)]" />

@@ -129,7 +129,7 @@ export default async function PostPage({ params }: Props) {
       <Header />
       <main className="pt-20">
         {isFullDocument ? (
-          <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="max-w-7xl mx-auto px-6 lg:px-12 py-8">
             <Link 
               href={`/${params.username}`}
               className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-6 transition-colors"
