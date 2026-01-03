@@ -8,6 +8,9 @@ export type Profile = {
   bio: string | null
   avatar_url: string | null
   website_url: string | null
+  twitter_url: string | null
+  github_url: string | null
+  linkedin_url: string | null
   created_at: string
   updated_at: string
 }
@@ -155,6 +158,9 @@ export type CreateProfileInput = {
   bio?: string
   avatar_url?: string
   website_url?: string
+  twitter_url?: string
+  github_url?: string
+  linkedin_url?: string
 }
 
 export type UpdateProfileInput = Partial<CreateProfileInput>
