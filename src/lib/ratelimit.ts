@@ -2,7 +2,6 @@
  * Simple in-memory rate limiter
  * For production, use Redis or similar
  */
-
 type RateLimitEntry = {
   count: number
   resetAt: number
@@ -24,45 +23,48 @@ export interface RateLimitConfig {
   /** Maximum number of requests in the window */
   limit: number
   /** Window size in seconds */
-  windowSeconds: number
+  window: number
 }
 
 export interface RateLimitResult {
   success: boolean
   limit: number
   remaining: number
-  resetAt: number
+  reset: number
 }
 
 /**
- * Check rate limit for a given identifier
+ * Simple in-memory rate limiter
+ * For production, consider using Redis or Upstash
  */
-export function checkRateLimit(
+export function rateLimit(
   identifier: string,
   config: RateLimitConfig
 ): RateLimitResult {
   const now = Date.now()
+  const windowMs = config.window * 1000
   const key = identifier
-  const entry = store.get(key)
+
+  let entry = store.get(key)
 
   // If no entry or expired, create new one
   if (!entry || entry.resetAt < now) {
-    const newEntry: RateLimitEntry = {
+    entry = {
       count: 1,
-      resetAt: now + config.windowSeconds * 1000,
+      resetAt: now + windowMs,
     }
-    store.set(key, newEntry)
-    
+    store.set(key, entry)
     return {
       success: true,
       limit: config.limit,
       remaining: config.limit - 1,
-      resetAt: newEntry.resetAt,
+      reset: entry.resetAt,
     }
   }
 
-  // Increment counter
+  // Increment count
   entry.count++
+  store.set(key, entry)
 
   // Check if over limit
   if (entry.count > config.limit) {
@@ -70,7 +72,7 @@ export function checkRateLimit(
       success: false,
       limit: config.limit,
       remaining: 0,
-      resetAt: entry.resetAt,
+      reset: entry.resetAt,
     }
   }
 
@@ -78,76 +80,83 @@ export function checkRateLimit(
     success: true,
     limit: config.limit,
     remaining: config.limit - entry.count,
-    resetAt: entry.resetAt,
+    reset: entry.resetAt,
   }
 }
 
 /**
- * Rate limit presets for common use cases
+ * Rate limit by IP address
  */
-export const rateLimits = {
-  // General API: 100 requests per minute
-  api: { limit: 100, windowSeconds: 60 },
-  
-  // Auth endpoints: 10 per minute
-  auth: { limit: 10, windowSeconds: 60 },
-  
-  // Write operations: 30 per minute
-  write: { limit: 30, windowSeconds: 60 },
-  
-  // Search: 30 per minute
-  search: { limit: 30, windowSeconds: 60 },
-  
-  // Upload: 10 per minute
-  upload: { limit: 10, windowSeconds: 60 },
-  
-  // Email: 5 per minute
-  email: { limit: 5, windowSeconds: 60 },
-  
-  // Webhooks: 100 per second (high throughput)
-  webhook: { limit: 100, windowSeconds: 1 },
-}
-
-/**
- * Get client identifier from request
- */
-export function getClientIdentifier(request: Request): string {
-  // Try to get real IP from various headers
+export function rateLimitByIP(
+  request: Request,
+  config: RateLimitConfig
+): RateLimitResult {
   const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded) {
-    return forwarded.split(',')[0].trim()
-  }
-  
-  const realIp = request.headers.get('x-real-ip')
-  if (realIp) {
-    return realIp
-  }
-  
-  // Fallback to a hash of user agent (not ideal but better than nothing)
-  const ua = request.headers.get('user-agent') || 'unknown'
-  return `ua-${hashString(ua)}`
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
+  return rateLimit(`ip:${ip}`, config)
 }
 
 /**
- * Simple string hash for fallback identification
+ * Rate limit by user ID
  */
-function hashString(str: string): string {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
-  }
-  return Math.abs(hash).toString(36)
+export function rateLimitByUser(
+  userId: string,
+  config: RateLimitConfig
+): RateLimitResult {
+  return rateLimit(`user:${userId}`, config)
 }
 
 /**
- * Create rate limit headers for response
+ * Combined rate limit - checks both IP and user
  */
-export function rateLimitHeaders(result: RateLimitResult): Record<string, string> {
-  return {
-    'X-RateLimit-Limit': result.limit.toString(),
-    'X-RateLimit-Remaining': result.remaining.toString(),
-    'X-RateLimit-Reset': Math.ceil(result.resetAt / 1000).toString(),
+export function rateLimitCombined(
+  request: Request,
+  userId: string | null,
+  config: RateLimitConfig
+): RateLimitResult {
+  // Check IP limit first
+  const ipResult = rateLimitByIP(request, config)
+  if (!ipResult.success) {
+    return ipResult
   }
+
+  // If user is logged in, also check user limit
+  if (userId) {
+    const userResult = rateLimitByUser(userId, config)
+    if (!userResult.success) {
+      return userResult
+    }
+    // Return the more restrictive result
+    return userResult.remaining < ipResult.remaining ? userResult : ipResult
+  }
+
+  return ipResult
 }
+
+// Preset configurations
+export const RATE_LIMITS = {
+  // API endpoints
+  api: { limit: 100, window: 60 },           // 100 requests per minute
+  apiStrict: { limit: 10, window: 60 },      // 10 requests per minute
+  
+  // Auth
+  login: { limit: 5, window: 300 },          // 5 attempts per 5 minutes
+  signup: { limit: 3, window: 3600 },        // 3 signups per hour
+  passwordReset: { limit: 3, window: 3600 }, // 3 resets per hour
+  
+  // Content creation
+  post: { limit: 10, window: 3600 },         // 10 posts per hour
+  comment: { limit: 30, window: 3600 },      // 30 comments per hour
+  upload: { limit: 20, window: 3600 },       // 20 uploads per hour
+  
+  // Interactions
+  upvote: { limit: 100, window: 3600 },      // 100 upvotes per hour
+  follow: { limit: 50, window: 3600 },       // 50 follows per hour
+  
+  // Search
+  search: { limit: 30, window: 60 },         // 30 searches per minute
+  
+  // Email
+  subscribe: { limit: 5, window: 3600 },     // 5 subscriptions per hour
+  sendEmail: { limit: 10, window: 3600 },    // 10 emails per hour
+} as const
