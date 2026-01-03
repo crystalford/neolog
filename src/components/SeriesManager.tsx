@@ -92,12 +92,15 @@ export function SeriesManager() {
       if (error) throw error
 
       if (data) {
-        setSeriesPosts(data.map(sp => ({
-          id: sp.post.id,
-          title: sp.post.title,
-          slug: sp.post.slug,
-          position: sp.position,
-        })))
+        setSeriesPosts(data.map(sp => {
+          const post = Array.isArray(sp.post) ? sp.post[0] : sp.post
+          return {
+            id: post?.id || '',
+            title: post?.title || '',
+            slug: post?.slug || '',
+            position: sp.position,
+          }
+        }))
       }
     } catch (error) {
       console.error('Error loading series posts:', error)
