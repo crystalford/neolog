@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
-import { Header } from '@/components/Header'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import {
@@ -383,10 +382,8 @@ export default function WritePage() {
   }
 
   return (
-    <>
-      <Header />
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12 lg:px-12">
+    <main className="pb-16">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Error/Success Messages */}
           {hasNoPublications && (
             <div className="mb-4 p-6 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
@@ -623,8 +620,7 @@ export default function WritePage() {
             placeholder="Tell your story..."
             onImageUpload={handleImageUpload}
           />
-        </div>
-      </main>
-    </>
+      </div>
+    </main>
   )
 }

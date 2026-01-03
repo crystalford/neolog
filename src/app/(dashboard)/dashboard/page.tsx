@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { ShareDraftButton } from '@/components/ShareDraftButton'
 import type { Post, Profile } from '@/types/database'
-import { 
-  PenLine, MoreHorizontal, Eye, Edit2, Trash2, 
-  Globe, FileText, Clock 
+import {
+  PenLine, MoreHorizontal, Eye, Edit2, Trash2,
+  Globe, FileText, Clock
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -62,143 +61,137 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <>
-        <Header />
-        <main className="pt-16 px-6 lg:px-12 py-12 max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-48 bg-surface rounded" />
-            <div className="h-4 w-32 bg-surface rounded" />
-            <div className="mt-8 space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-surface rounded-xl" />
-              ))}
-            </div>
+      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 bg-gray-100 rounded" />
+          <div className="h-4 w-32 bg-gray-100 rounded" />
+          <div className="mt-8 space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-24 bg-gray-100 rounded-md" />
+            ))}
           </div>
-        </main>
-      </>
+        </div>
+      </main>
     )
   }
 
   return (
-    <>
-      <Header />
-      <main className="pt-16 px-6 lg:px-12 py-12 max-w-7xl mx-auto animate-fade-up">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="font-display text-3xl mb-1">Your posts</h1>
-            <p className="text-text-muted">
-              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-            </p>
+    <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto animate-fade-up">
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="font-serif text-3xl tracking-tight text-gray-900 mb-1">Your posts</h1>
+          <p className="font-sans text-sm text-gray-600">
+            {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+          </p>
+        </div>
+        <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+          <PenLine size={16} />
+          New post
+        </Link>
+      </div>
+
+      {posts.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-md bg-gray-100 flex items-center justify-center mx-auto mb-4 border border-gray-200">
+            <FileText size={28} className="text-gray-400" />
           </div>
-          <Link href="/write" className="btn btn-primary flex items-center gap-2">
+          <h2 className="font-serif text-xl tracking-tight text-gray-900 mb-2">No posts yet</h2>
+          <p className="font-sans text-sm text-gray-600 mb-6">Create your first post to get started</p>
+          <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
             <PenLine size={16} />
-            New post
+            Write your first post
           </Link>
         </div>
-
-        {posts.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-surface-elevated flex items-center justify-center mx-auto mb-4">
-              <FileText size={28} className="text-text-muted" />
-            </div>
-            <h2 className="font-display text-xl mb-2">No posts yet</h2>
-            <p className="text-text-muted mb-6">Create your first post to get started</p>
-            <Link href="/write" className="btn btn-primary inline-flex items-center gap-2">
-              <PenLine size={16} />
-              Write your first post
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {posts.map((post) => (
-              <div 
-                key={post.id} 
-                className="bg-surface border border-border rounded-xl p-5 hover:border-border/80 transition-colors"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {post.status === 'published' ? (
-                        <span className="flex items-center gap-1 text-xs text-success">
-                          <Globe size={12} />
-                          Published
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs text-text-muted">
-                          <FileText size={12} />
-                          Draft
-                        </span>
-                      )}
-                      <span className="text-text-muted">·</span>
-                      <span className="text-xs text-text-muted flex items-center gap-1">
-                        <Clock size={12} />
-                        {new Date(post.updated_at).toLocaleDateString()}
+      ) : (
+        <div className="space-y-3">
+          {posts.map((post) => (
+            <div
+              key={post.id}
+              className="bg-white border border-gray-200 rounded-md p-5 hover:border-gray-300 transition-colors"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    {post.status === 'published' ? (
+                      <span className="flex items-center gap-1 font-sans text-xs font-medium text-green-600">
+                        <Globe size={12} />
+                        Published
                       </span>
-                    </div>
-                    
-                    <h2 className="font-display text-lg truncate">
-                      {post.title || 'Untitled'}
-                    </h2>
-                    
-                    {post.excerpt && (
-                      <p className="text-sm text-text-muted line-clamp-1 mt-1">
-                        {post.excerpt}
-                      </p>
+                    ) : (
+                      <span className="flex items-center gap-1 font-sans text-xs font-medium text-gray-500">
+                        <FileText size={12} />
+                        Draft
+                      </span>
                     )}
+                    <span className="text-gray-400">·</span>
+                    <span className="font-sans text-xs text-gray-500 flex items-center gap-1">
+                      <Clock size={12} />
+                      {new Date(post.updated_at).toLocaleDateString()}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-4">
-                    {post.status === 'draft' && (
-                      <ShareDraftButton 
-                        postId={post.id} 
-                        existingToken={(post as any).preview_token}
-                        expiresAt={(post as any).preview_expires_at}
-                      />
-                    )}
-                    
-                    <div className="relative">
-                      <button
-                        onClick={() => setActiveMenu(activeMenu === post.id ? null : post.id)}
-                        className="w-8 h-8 rounded-lg hover:bg-surface-elevated flex items-center justify-center transition-colors"
-                      >
-                        <MoreHorizontal size={18} className="text-text-muted" />
-                      </button>
+                  <h2 className="font-serif text-lg tracking-tight text-gray-900 truncate">
+                    {post.title || 'Untitled'}
+                  </h2>
 
-                      {activeMenu === post.id && (
-                        <div className="absolute right-0 top-full mt-1 w-40 bg-surface-elevated border border-border rounded-lg shadow-xl z-10 py-1">
-                          {post.status === 'published' && profile && (
-                            <Link
-                              href={`/${profile.username}/${post.slug}`}
-                              className="flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
-                            >
-                              <Eye size={14} />
-                              View
-                            </Link>
-                          )}
+                  {post.excerpt && (
+                    <p className="font-sans text-sm text-gray-600 line-clamp-1 mt-1">
+                      {post.excerpt}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 ml-4">
+                  {post.status === 'draft' && (
+                    <ShareDraftButton
+                      postId={post.id}
+                      existingToken={(post as any).preview_token}
+                      expiresAt={(post as any).preview_expires_at}
+                    />
+                  )}
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setActiveMenu(activeMenu === post.id ? null : post.id)}
+                      className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center transition-colors"
+                    >
+                      <MoreHorizontal size={18} className="text-gray-500" />
+                    </button>
+
+                    {activeMenu === post.id && (
+                      <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1">
+                        {post.status === 'published' && profile && (
                           <Link
-                            href={`/write?edit=${post.id}`}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+                            href={`/${profile.username}/${post.slug}`}
+                            className="flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
                           >
-                            <Edit2 size={14} />
-                            Edit
+                            <Eye size={14} />
+                            View
                           </Link>
-                          <button
-                            onClick={() => handleDelete(post.id)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-surface transition-colors"
-                          >
-                            <Trash2 size={14} />
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                        <Link
+                          href={`/write?edit=${post.id}`}
+                          className="flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                        >
+                          <Edit2 size={14} />
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(post.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-red-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
-    </>
+            </div>
+          ))}
+        </div>
+      )}
+    </main>
   )
 }
