@@ -110,9 +110,11 @@ export default function DashboardLayout({
         <div>
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 mb-8">
-            <span className="logo-mark">N</span>
+            <div className="w-7 h-7 bg-black rounded-sm flex items-center justify-center">
+              <span className="text-white font-bold text-sm">N</span>
+            </div>
             <span className="font-serif text-xl tracking-tight text-gray-900">
-              neolog
+              Neolog
             </span>
           </Link>
 
