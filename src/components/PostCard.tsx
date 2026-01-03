@@ -44,19 +44,17 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
     )
   }
 
-  // List variant
   if (variant === 'list') {
     return (
       <article className="group py-6 border-b border-[var(--border-light)] last:border-0">
         <Link href={`/${post.author.username}/${post.slug}`} className="block">
-           {/* Content omitted for brevity, but logic is same as default */}
            <h2 className="font-display text-xl mb-2">{post.title}</h2>
         </Link>
       </article>
     )
   }
 
-  // Default variant - REMOVED NESTED LINK
+  // Default variant - CLEAN VERSION (No nested Links, no onClick)
   return (
     <article className="group relative">
       <Link 
@@ -75,7 +73,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
         </div>
         
-        {/* FIXED: Replaced nested Link with a span. The whole card is clickable anyway. */}
+        {/* REPLACED NESTED LINK WITH SPAN to prevent errors */}
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
