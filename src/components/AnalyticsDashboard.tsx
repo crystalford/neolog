@@ -109,7 +109,7 @@ export function AnalyticsDashboard({ postId }: { postId?: string }) {
       }, {} as Record<string, number>)
 
       const locationBreakdown = Object.entries(locationCounts)
-        .map(([country, count]) => ({ country, count }))
+        .map(([country, count]) => ({ country, count: count as number }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
 
@@ -121,7 +121,7 @@ export function AnalyticsDashboard({ postId }: { postId?: string }) {
       }, {} as Record<string, number>)
 
       const viewsOverTime = Object.entries(viewsByDate)
-        .map(([date, views]) => ({ date, views }))
+        .map(([date, views]) => ({ date, views: views as number }))
         .sort((a, b) => a.date.localeCompare(b.date))
 
       // Fetch reading progress for completion rate
