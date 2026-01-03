@@ -98,7 +98,7 @@ export function AnalyticsDashboard({ postId }: { postId?: string }) {
 
       const deviceBreakdown = Object.entries(deviceCounts).map(([name, value]) => ({
         name,
-        value,
+        value: value as number,
       }))
 
       // Location breakdown
