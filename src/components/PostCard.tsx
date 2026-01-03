@@ -54,6 +54,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
     )
   }
 
+  // Default variant - CLEAN VERSION (No nested Links)
   return (
     <article className="group relative">
       <Link 
@@ -72,6 +73,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
         </div>
         
+        {/* FIXED: Replaced nested Link with a div/span since the parent Link covers the whole card */}
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
@@ -85,6 +87,13 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               {post.author.display_name || post.author.username}
             </span>
           </div>
+          
+          {publishedDate && (
+            <>
+              <span className="text-[var(--text-tertiary)]">·</span>
+              <time className="text-sm text-[var(--text-tertiary)]">{publishedDate}</time>
+            </>
+          )}
         </div>
 
         <h2 className="font-display text-xl md:text-2xl mb-2 group-hover:text-[var(--accent)] transition-colors leading-snug">
