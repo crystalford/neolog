@@ -27,9 +27,11 @@ export async function GET(request: NextRequest) {
         .eq('id', postId)
         .single()
 
-      if (post) {
+      if (post && post.author) {
         postTitle = post.title
-        authorName = post.author.display_name || post.author.username
+        // Handle author as either array or object
+        const authorData = Array.isArray(post.author) ? post.author[0] : post.author
+        authorName = authorData?.display_name || authorData?.username
       }
     }
 
