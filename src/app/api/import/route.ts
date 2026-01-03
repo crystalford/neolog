@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const source = formData.get('source') as string // 'substack', 'medium', 'wordpress'
+    const source = formData.get('source') as string
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
     const results = { success: 0, failed: 0, errors: [] as string[] }
 
     if (source === 'substack') {
-      // Substack exports as ZIP containing HTML files
       const zip = await JSZip.loadAsync(arrayBuffer)
       const htmlFiles = Object.keys(zip.files).filter(f => f.endsWith('.html'))
 
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
               content_html: parsed.content,
               content_type: 'html',
               excerpt: parsed.excerpt,
-              status: 'draft', // Import as draft so user can review
+              status: 'draft',
               created_at: parsed.date || new Date().toISOString(),
             })
             results.success++
@@ -52,7 +51,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (source === 'medium') {
-      // Medium exports as ZIP with posts/ folder containing HTML
       const zip = await JSZip.loadAsync(arrayBuffer)
       const postFiles = Object.keys(zip.files).filter(f => 
         f.includes('posts/') && f.endsWith('.html')
@@ -82,7 +80,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else if (source === 'wordpress') {
-      // WordPress exports as XML
       const decoder = new TextDecoder()
       const xml = decoder.decode(arrayBuffer)
       const posts = parseWordPressXml(xml)
@@ -116,21 +113,17 @@ export async function POST(request: NextRequest) {
 }
 
 function parseSubstackHtml(html: string) {
-  // Extract title from <h1> or <title>
   const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || 
                      html.match(/<title>([\s\S]*?)<\/title>/i)
   const title = titleMatch ? stripHtml(titleMatch[1]) : ''
 
-  // Extract date
   const dateMatch = html.match(/<time[^>]*datetime="([^"]+)"/i)
   const date = dateMatch ? dateMatch[1] : null
 
-  // Extract body content
   const bodyMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
                     html.match(/<div class="body[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
   const content = bodyMatch ? bodyMatch[1].trim() : html
 
-  // Generate excerpt
   const excerpt = stripHtml(content).substring(0, 160) + '...'
 
   return { title, content, excerpt, date }
@@ -140,12 +133,10 @@ function parseMediumHtml(html: string) {
   const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
   const title = titleMatch ? stripHtml(titleMatch[1]) : ''
 
-  // Medium uses <article> or <section> for content
   const contentMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||
                        html.match(/<section[^>]*>([\s\S]*?)<\/section>/i)
   let content = contentMatch ? contentMatch[1] : html
 
-  // Remove Medium-specific cruft
   content = content.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
   content = content.replace(/class="[^"]*"/gi, '')
 
@@ -157,14 +148,12 @@ function parseMediumHtml(html: string) {
 function parseWordPressXml(xml: string) {
   const posts: Array<{title: string; slug: string; content: string; excerpt: string; date: string}> = []
   
-  // Simple regex-based parsing (a full XML parser would be better)
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi
   let match
 
   while ((match = itemRegex.exec(xml)) !== null) {
     const item = match[1]
     
-    // Only get posts (not pages, attachments, etc.)
     const postType = item.match(/<wp:post_type><!\[CDATA\[(.*?)\]\]><\/wp:post_type>/i)
     if (postType && postType[1] !== 'post') continue
 
