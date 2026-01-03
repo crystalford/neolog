@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ensureProfile } from '@/lib/profile'
 import { Header } from '@/components/Header'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
@@ -56,12 +57,8 @@ export default function WritePage() {
     
     setUser(session.user)
     
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-    
+    const profileData = await ensureProfile(supabase, session.user)
+
     if (profileData) {
       setProfile(profileData)
     }
@@ -170,6 +167,15 @@ export default function WritePage() {
     
     setPublishing(true)
 
+    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+    if (!currentProfile) {
+      setPublishing(false)
+      return
+    }
+    if (!profile) {
+      setProfile(currentProfile)
+    }
+
     const slug = generateSlug(title)
     const readingTime = calculateReadingTime(content)
     
@@ -237,8 +243,8 @@ export default function WritePage() {
       }
 
       // Redirect to published post
-      if (profile) {
-        router.push(`/${profile.username}/${finalSlug}`)
+      if (currentProfile) {
+        router.push(`/${currentProfile.username}/${finalSlug}`)
       }
     } catch (error) {
       console.error('Publish error:', error)

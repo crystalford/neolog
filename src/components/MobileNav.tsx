@@ -44,9 +44,9 @@ export function MobileNav() {
   const NavLink = ({ href, icon: Icon, children }: { href: string; icon: any; children: React.ReactNode }) => (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+      className={`nav-link nav-link-block ${
         pathname === href 
-          ? 'bg-[var(--accent-soft)] text-[var(--accent)]' 
+          ? 'bg-[var(--accent-soft)] text-[var(--accent)] border-transparent' 
           : 'hover:bg-[var(--bg-secondary)]'
       }`}
     >
