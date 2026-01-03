@@ -413,8 +413,8 @@ export default function WritePage() {
           )}
 
           {/* Header actions */}
-          <div className="flex items-center justify-between py-3 mb-6 sticky top-16 bg-[var(--bg-primary)] z-10 border-b border-[var(--border-light)]">
-            <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
+          <div className="flex items-center justify-between py-4 mb-8 sticky top-0 bg-gray-50 z-10 border-b border-gray-200">
+            <div className="flex items-center gap-3 text-sm text-gray-600">
               {saving && (
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={14} className="animate-spin" />
@@ -601,7 +601,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-4xl font-serif font-bold bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 text-gray-900 mb-2 px-0"
+            className="w-full text-4xl font-serif font-bold bg-white border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 text-gray-900 mb-4 px-0 pt-2"
             autoFocus
           />
 
