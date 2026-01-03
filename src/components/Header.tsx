@@ -4,9 +4,13 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard } from 'lucide-react'
+import {
+  PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard, BookOpen,
+  BarChart3, Mail, Layers, Gift, Zap, DollarSign, Users
+} from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { MobileNav } from './MobileNav'
+import { PublicationSwitcher } from './PublicationSwitcher'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
@@ -99,6 +103,8 @@ export function Header() {
             <div className="w-24 h-10 skeleton rounded-xl" />
           ) : user ? (
             <>
+              <PublicationSwitcher />
+
               <Link href="/write" className="btn btn-primary">
                 <PenLine size={18} />
                 <span className="hidden sm:inline">Write</span>
@@ -153,6 +159,79 @@ export function Header() {
                         <LayoutDashboard size={16} />
                         Dashboard
                       </Link>
+                      <Link
+                        href="/publications"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <BookOpen size={16} />
+                        Publications
+                      </Link>
+
+                      <div className="h-px bg-[var(--border-light)] my-1" />
+
+                      <Link
+                        href="/analytics"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <BarChart3 size={16} />
+                        Analytics
+                      </Link>
+                      <Link
+                        href="/subscribers"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <Mail size={16} />
+                        Subscribers
+                      </Link>
+                      <Link
+                        href="/series"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <Layers size={16} />
+                        Series
+                      </Link>
+                      <Link
+                        href="/referrals"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <Gift size={16} />
+                        Referrals
+                      </Link>
+
+                      <div className="h-px bg-[var(--border-light)] my-1" />
+
+                      <Link
+                        href="/boost"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <Zap size={16} />
+                        Boost
+                      </Link>
+                      <Link
+                        href="/earnings"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <DollarSign size={16} />
+                        Earnings
+                      </Link>
+                      <Link
+                        href="/curators"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <Users size={16} />
+                        Curators
+                      </Link>
+
+                      <div className="h-px bg-[var(--border-light)] my-1" />
+
                       <Link
                         href="/settings"
                         onClick={() => setMenuOpen(false)}
