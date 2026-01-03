@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ensureProfile } from '@/lib/profile'
 import { Header } from '@/components/Header'
 import { 
   User, Download, Rss, Shield, Loader2, Camera,
@@ -56,11 +57,7 @@ export default function SettingsPage() {
 
     setUser(session.user)
 
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
+    const data = await ensureProfile(supabase, session.user)
 
     if (data) {
       setProfile(data)
@@ -78,6 +75,7 @@ export default function SettingsPage() {
   }
 
   const handleSave = async () => {
+    if (!profile) return
     setSaving(true)
     
     const { error } = await supabase
@@ -101,7 +99,7 @@ export default function SettingsPage() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !profile) return
 
     setUploadingAvatar(true)
 

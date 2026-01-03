@@ -69,7 +69,7 @@ export function Header() {
               N
             </span>
             <span className="font-display text-xl tracking-tight group-hover:text-[var(--accent)] transition-colors hidden sm:inline">
-              Neolog
+              neolog
             </span>
           </Link>
         </div>
@@ -78,13 +78,13 @@ export function Header() {
         <nav className="hidden md:flex items-center gap-1">
           <Link 
             href="/explore" 
-            className="px-4 py-2 text-[0.9375rem] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            className="nav-link text-[0.9375rem]"
           >
             Explore
           </Link>
           <Link 
             href="/tags" 
-            className="px-4 py-2 text-[0.9375rem] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            className="nav-link text-[0.9375rem]"
           >
             Topics
           </Link>

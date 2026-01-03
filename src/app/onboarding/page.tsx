@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ensureProfile } from '@/lib/profile'
 import { 
   ArrowRight, Loader2, Camera, Check, Sparkles, 
   PenLine, Users, Rss
@@ -21,6 +22,7 @@ export default function OnboardingPage() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [interests, setInterests] = useState<string[]>([])
+  const [saveError, setSaveError] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -39,12 +41,7 @@ export default function OnboardingPage() {
 
     setUser(session.user)
 
-    // Get profile
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
+    const profileData = await ensureProfile(supabase, session.user)
 
     if (profileData) {
       setProfile(profileData)
@@ -66,12 +63,22 @@ export default function OnboardingPage() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !profile) return
+    if (!file) return
 
     setUploadingAvatar(true)
 
+    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+    if (!currentProfile) {
+      setUploadingAvatar(false)
+      return
+    }
+
+    if (!profile) {
+      setProfile(currentProfile)
+    }
+
     const fileExt = file.name.split('.').pop()
-    const fileName = `${profile.id}/avatar.${fileExt}`
+    const fileName = `${currentProfile.id}/avatar.${fileExt}`
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -100,16 +107,33 @@ export default function OnboardingPage() {
       setStep(3)
     } else if (step === 3) {
       // Save and finish
-      setSaving(true)
+    setSaving(true)
+    setSaveError(null)
+
+    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+    if (!currentProfile) {
+      setSaveError('Unable to load your profile. Please try again.')
+      setSaving(false)
+      return
+    }
+    if (!profile) {
+      setProfile(currentProfile)
+    }
       
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({
           display_name: displayName,
           bio: bio || null,
           avatar_url: avatarUrl || null,
         })
-        .eq('id', profile.id)
+        .eq('id', currentProfile.id)
+
+      if (error) {
+        setSaveError('Unable to finish setup. Please try again.')
+        setSaving(false)
+        return
+      }
 
       router.push('/dashboard')
     }
@@ -357,6 +381,9 @@ export default function OnboardingPage() {
             )}
           </button>
         </div>
+        {saveError && (
+          <p className="mt-4 text-center text-sm text-red-500">{saveError}</p>
+        )}
 
         {/* Skip */}
         {step < 3 && (
