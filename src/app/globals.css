@@ -34,15 +34,15 @@
   --warning: #eab308;
   --error: #dc2626;
 
-  /* Borders - more defined */
-  --border-light: rgba(0, 0, 0, 0.06);
-  --border-medium: rgba(0, 0, 0, 0.12);
-  --border-heavy: rgba(0, 0, 0, 0.24);
+  /* Borders - subtle and refined */
+  --border-light: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --border-heavy: rgba(0, 0, 0, 0.3);
 
-  /* Surfaces - stronger shadows */
-  --surface-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
-  --surface-shadow-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.1);
-  --surface-shadow-xl: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+  /* Surfaces - softer shadows */
+  --surface-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --surface-shadow-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+  --surface-shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
 
   /* Typography - modern sans-serif focus */
   --font-display: 'Newsreader', Georgia, serif;
@@ -267,13 +267,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
+  padding: 0.625rem 1.5rem;
   font-family: var(--font-body);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.9375rem;
+  font-weight: 500;
   line-height: 1.5;
   letter-spacing: -0.01em;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--transition-fast);
   border: 1px solid transparent;
@@ -289,41 +289,41 @@ body {
 
 /* Primary Button - Bold and prominent */
 .btn-primary {
-  background: var(--accent);
-  color: white;
+  background: var(--bg-inverse);
+  color: var(--text-inverse);
   border: none;
-  box-shadow: var(--surface-shadow);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  box-shadow: var(--surface-shadow-hover);
+  background: var(--text-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: var(--surface-shadow);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Secondary Button - Crisp and defined */
 .btn-secondary {
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-primary);
   border: 1.5px solid var(--border-medium);
-  box-shadow: var(--surface-shadow);
+  box-shadow: none;
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--border-heavy);
-  box-shadow: var(--surface-shadow-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transform: translateY(-1px);
 }
 
 .btn-secondary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: var(--surface-shadow);
+  box-shadow: none;
 }
 
 /* Ghost Button - Minimal with subtle hover */
@@ -364,15 +364,15 @@ body {
 /* Size Variants */
 .btn-sm {
   padding: 0.5rem 1rem;
-  font-size: 0.8125rem;
-  border-radius: 8px;
+  font-size: 0.875rem;
+  border-radius: 6px;
 }
 
 .btn-lg {
-  padding: 0.875rem 1.75rem;
-  font-size: 0.9375rem;
-  border-radius: 12px;
-  font-weight: 600;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
 /* Focus State - Clean and accessible */
