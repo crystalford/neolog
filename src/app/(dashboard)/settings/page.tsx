@@ -57,20 +57,33 @@ export default function SettingsPage() {
 
     setUser(session.user)
 
-    const data = await ensureProfile(supabase, session.user)
+    try {
+      const data = await ensureProfile(supabase, session.user)
 
-    if (data) {
-      setProfile(data)
-      setFormData({
-        display_name: data.display_name || '',
-        bio: data.bio || '',
-        website_url: data.website_url || '',
-        avatar_url: data.avatar_url || '',
-        twitter_url: data.twitter_url || '',
-        github_url: data.github_url || '',
-        linkedin_url: data.linkedin_url || '',
-      })
+      if (data) {
+        setProfile(data)
+        setFormData({
+          display_name: data.display_name || '',
+          bio: data.bio || '',
+          website_url: data.website_url || '',
+          avatar_url: data.avatar_url || '',
+          twitter_url: data.twitter_url || '',
+          github_url: data.github_url || '',
+          linkedin_url: data.linkedin_url || '',
+        })
+      } else {
+        console.error('Failed to load profile: ensureProfile returned null')
+        // Redirect to onboarding if profile can't be loaded
+        router.push('/onboarding')
+        return
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error)
+      // Redirect to onboarding on error
+      router.push('/onboarding')
+      return
     }
+
     setLoading(false)
   }
 

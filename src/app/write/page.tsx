@@ -49,20 +49,28 @@ export default function WritePage() {
 
   const loadUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login?redirect=/write')
       return
     }
-    
-    setUser(session.user)
-    
-    const profileData = await ensureProfile(supabase, session.user)
 
-    if (profileData) {
-      setProfile(profileData)
+    setUser(session.user)
+
+    try {
+      const profileData = await ensureProfile(supabase, session.user)
+
+      if (profileData) {
+        setProfile(profileData)
+      } else {
+        console.error('Failed to load profile: ensureProfile returned null')
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error)
+      // Continue loading the page even if profile fails
+      // The user can still write, we just won't have profile data
     }
-    
+
     setLoading(false)
   }
 
@@ -164,16 +172,24 @@ export default function WritePage() {
   // Publish
   const handlePublish = async () => {
     if (!user || !title || !content) return
-    
+
     setPublishing(true)
 
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
+    try {
+      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      if (!currentProfile) {
+        console.error('Unable to load profile')
+        setPublishing(false)
+        return
+      }
+      if (!profile) {
+        setProfile(currentProfile)
+      }
+    } catch (error) {
+      console.error('Error ensuring profile:', error)
+      alert('Failed to load profile. Please try again.')
       setPublishing(false)
       return
-    }
-    if (!profile) {
-      setProfile(currentProfile)
     }
 
     const slug = generateSlug(title)

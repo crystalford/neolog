@@ -315,16 +315,16 @@ export default async function Home() {
               <span className="logo-mark">
                 N
               </span>
-              <span className="font-display text-lg">neolog</span>
+              <span className="font-display text-lg">Neolog</span>
             </div>
             
             <nav className="flex gap-8 text-sm text-[var(--text-secondary)]">
-              <Link href="/explore" className="nav-link text-sm">Explore</Link>
-              <Link href="/tags" className="nav-link text-sm">Topics</Link>
-              <Link href="/curators" className="nav-link text-sm">Curators</Link>
-              <Link href="/tos" className="nav-link text-sm">Terms</Link>
-              <Link href="/privacy" className="nav-link text-sm">Privacy</Link>
-              <a href="https://x.com/neologx" className="nav-link text-sm inline-flex items-center gap-2">
+              <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">Explore</Link>
+              <Link href="/tags" className="hover:text-[var(--text-primary)] transition-colors">Topics</Link>
+              <Link href="/curators" className="hover:text-[var(--text-primary)] transition-colors">Curators</Link>
+              <Link href="/tos" className="hover:text-[var(--text-primary)] transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-[var(--text-primary)] transition-colors">Privacy</Link>
+              <a href="https://x.com/neologx" className="hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-2">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 1200 1227" aria-hidden="true">
                   <path
                     fill="currentColor"

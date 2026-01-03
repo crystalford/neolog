@@ -33,7 +33,7 @@ export default function OnboardingPage() {
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login')
       return
@@ -41,21 +41,28 @@ export default function OnboardingPage() {
 
     setUser(session.user)
 
-    const profileData = await ensureProfile(supabase, session.user)
+    try {
+      const profileData = await ensureProfile(supabase, session.user)
 
-    if (profileData) {
-      setProfile(profileData)
-      
-      // If profile is already complete, redirect to dashboard
-      if (profileData.display_name && profileData.bio) {
-        router.push('/dashboard')
-        return
+      if (profileData) {
+        setProfile(profileData)
+
+        // If profile is already complete, redirect to dashboard
+        if (profileData.display_name && profileData.bio) {
+          router.push('/dashboard')
+          return
+        }
+
+        // Pre-fill existing data
+        setDisplayName(profileData.display_name || '')
+        setBio(profileData.bio || '')
+        setAvatarUrl(profileData.avatar_url || '')
+      } else {
+        setSaveError('Unable to load your profile. Please refresh the page.')
       }
-      
-      // Pre-fill existing data
-      setDisplayName(profileData.display_name || '')
-      setBio(profileData.bio || '')
-      setAvatarUrl(profileData.avatar_url || '')
+    } catch (error) {
+      console.error('Error loading profile:', error)
+      setSaveError(error instanceof Error ? error.message : 'Failed to load profile')
     }
 
     setLoading(false)
@@ -67,35 +74,43 @@ export default function OnboardingPage() {
 
     setUploadingAvatar(true)
 
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
+    try {
+      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      if (!currentProfile) {
+        setSaveError('Unable to load your profile. Please try again.')
+        setUploadingAvatar(false)
+        return
+      }
+
+      if (!profile) {
+        setProfile(currentProfile)
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${currentProfile.id}/avatar.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        setSaveError('Failed to upload avatar. Please try again.')
+        setUploadingAvatar(false)
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      setAvatarUrl(publicUrl)
       setUploadingAvatar(false)
-      return
-    }
-
-    if (!profile) {
-      setProfile(currentProfile)
-    }
-
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${currentProfile.id}/avatar.${fileExt}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file, { upsert: true })
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      setSaveError(error instanceof Error ? error.message : 'Failed to upload avatar')
       setUploadingAvatar(false)
-      return
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
-
-    setAvatarUrl(publicUrl)
-    setUploadingAvatar(false)
   }
 
   const handleNext = async () => {
@@ -107,35 +122,41 @@ export default function OnboardingPage() {
       setStep(3)
     } else if (step === 3) {
       // Save and finish
-    setSaving(true)
-    setSaveError(null)
+      setSaving(true)
+      setSaveError(null)
 
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
-      setSaveError('Unable to load your profile. Please try again.')
-      setSaving(false)
-      return
-    }
-    if (!profile) {
-      setProfile(currentProfile)
-    }
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          display_name: displayName,
-          bio: bio || null,
-          avatar_url: avatarUrl || null,
-        })
-        .eq('id', currentProfile.id)
+      try {
+        const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+        if (!currentProfile) {
+          setSaveError('Unable to load your profile. Please try again.')
+          setSaving(false)
+          return
+        }
+        if (!profile) {
+          setProfile(currentProfile)
+        }
 
-      if (error) {
-        setSaveError('Unable to finish setup. Please try again.')
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            display_name: displayName,
+            bio: bio || null,
+            avatar_url: avatarUrl || null,
+          })
+          .eq('id', currentProfile.id)
+
+        if (error) {
+          setSaveError('Unable to finish setup. Please try again.')
+          setSaving(false)
+          return
+        }
+
+        router.push('/dashboard')
+      } catch (error) {
+        console.error('Error saving profile:', error)
+        setSaveError(error instanceof Error ? error.message : 'Failed to save profile')
         setSaving(false)
-        return
       }
-
-      router.push('/dashboard')
     }
   }
 
