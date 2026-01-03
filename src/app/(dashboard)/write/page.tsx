@@ -386,15 +386,15 @@ export default function WritePage() {
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Error/Success Messages */}
           {hasNoPublications && (
-            <div className="mb-4 p-6 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+            <div className="mb-6 p-5 rounded-md bg-gray-50 border border-gray-300">
+              <h3 className="font-serif text-lg font-semibold text-gray-900 mb-2">
                 Create a Publication First
               </h3>
-              <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-4">
+              <p className="font-sans text-sm text-gray-700 mb-4">
                 Before you can write posts, you need to create at least one publication.
                 Publications are like separate blogs that you can manage.
               </p>
-              <Link href="/publications" className="btn btn-primary">
+              <Link href="/publications" className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
                 <BookOpen size={16} />
                 Create Your First Publication
               </Link>
@@ -402,13 +402,13 @@ export default function WritePage() {
           )}
 
           {error && (
-            <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
-              <p className="text-sm font-medium">{error}</p>
+            <div className="mb-6 p-4 rounded-md bg-white border-2 border-black">
+              <p className="font-sans text-sm font-medium text-gray-900">{error}</p>
             </div>
           )}
           {success && (
-            <div className="mb-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
-              <p className="text-sm font-medium">{success}</p>
+            <div className="mb-6 p-4 rounded-md bg-black text-white">
+              <p className="font-sans text-sm font-medium">{success}</p>
             </div>
           )}
 
@@ -601,7 +601,8 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-4xl font-display font-bold bg-transparent border-none outline-none placeholder:text-[var(--text-tertiary)] mb-2"
+            className="w-full text-4xl font-serif font-bold bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 text-gray-900 mb-2 px-0"
+            autoFocus
           />
 
           {/* Subtitle */}
@@ -610,7 +611,7 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Subtitle (optional)"
-            className="w-full text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none placeholder:text-[var(--text-tertiary)] mb-8"
+            className="w-full text-xl font-sans text-gray-600 bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 mb-8 px-0"
           />
 
           {/* Rich Editor */}

@@ -235,13 +235,13 @@ export default function SettingsPage() {
 
           {/* Error/Success Messages */}
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
-              <p className="text-sm font-medium">{error}</p>
+            <div className="mb-6 p-4 rounded-md bg-white border-2 border-black">
+              <p className="font-sans text-sm font-medium text-gray-900">{error}</p>
             </div>
           )}
           {success && (
-            <div className="mb-6 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
-              <p className="text-sm font-medium">{success}</p>
+            <div className="mb-6 p-4 rounded-md bg-black text-white">
+              <p className="font-sans text-sm font-medium">{success}</p>
             </div>
           )}
 
@@ -298,17 +298,20 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                <label className="block text-sm font-medium text-gray-600 mb-2">
                   Username
                 </label>
                 <input
                   type="text"
                   value={profile?.username || ''}
                   disabled
-                  className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
+                  className="input bg-gray-50 text-gray-500 cursor-not-allowed"
                 />
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Your profile URL: {baseUrl}/{profile?.username}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Username cannot be changed after account creation
                 </p>
               </div>
 
