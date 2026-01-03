@@ -17,6 +17,8 @@ export function Header() {
   const supabase = createClient()
 
   const accentOptions = ['ember', 'ocean', 'plum']
+  const isAccentOption = (value: string | null): value is (typeof accentOptions)[number] =>
+    value !== null && accentOptions.includes(value)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -30,13 +32,14 @@ export function Header() {
       }
     )
 
-    return () => subscription.unsubscribe()
     const savedAccent = window.localStorage.getItem('neolog-accent')
-    if (savedAccent && accentOptions.includes(savedAccent)) {
+    if (isAccentOption(savedAccent)) {
       const nextIndex = accentOptions.indexOf(savedAccent)
       setAccentIndex(nextIndex)
       document.documentElement.dataset.accent = savedAccent
     }
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const handleAccentCycle = () => {
