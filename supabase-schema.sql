@@ -17,9 +17,12 @@ create table public.profiles (
   bio text,
   avatar_url text,
   website_url text,
+  twitter_url text,
+  github_url text,
+  linkedin_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  
+
   -- Constraints
   constraint username_length check (char_length(username) >= 3 and char_length(username) <= 30),
   constraint username_format check (username ~* '^[a-z0-9_]+$')
