@@ -14,7 +14,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
-  
+   
   const { data: profile } = await supabase
     .from('profiles')
     .select('display_name, username, bio, avatar_url')
@@ -89,7 +89,7 @@ export default async function ProfilePage({ params }: Props) {
                   {(profile.display_name || profile.username)[0].toUpperCase()}
                 </div>
               )}
-              
+               
               <div className="flex-1">
                 <div className="flex items-start justify-between">
                   <div>
@@ -98,27 +98,31 @@ export default async function ProfilePage({ params }: Props) {
                     </h1>
                     <p className="text-[var(--text-secondary)]">@{profile.username}</p>
                   </div>
-                  
-                  <SubscribeButton authorId={profile.id} />
+                   
+                  {/* FIXED: Renamed authorId to creatorId and added creatorUsername */}
+                  <SubscribeButton 
+                    creatorId={profile.id} 
+                    creatorUsername={profile.username} 
+                  />
                 </div>
-                
+                 
                 {profile.bio && (
                   <p className="mt-4 text-[var(--text-secondary)]">{profile.bio}</p>
                 )}
-                
+                 
                 <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-[var(--text-tertiary)]">
                   <span className="flex items-center gap-1">
                     <Calendar size={14} />
                     Joined {joinedDate}
                   </span>
-                  
+                   
                   {profile.location && (
                     <span className="flex items-center gap-1">
                       <MapPin size={14} />
                       {profile.location}
                     </span>
                   )}
-                  
+                   
                   {profile.website && (
                     <a 
                       href={profile.website}
@@ -130,7 +134,7 @@ export default async function ProfilePage({ params }: Props) {
                       {profile.website.replace(/^https?:\/\//, '')}
                     </a>
                   )}
-                  
+                   
                   <span className="flex items-center gap-1">
                     <Users size={14} />
                     {followerCount || 0} followers · {subscriberCount || 0} subscribers
@@ -148,7 +152,7 @@ export default async function ProfilePage({ params }: Props) {
           {/* Posts */}
           <section className="mt-8">
             <h2 className="font-display text-xl mb-6">Posts</h2>
-            
+             
             {postsWithAuthor.length === 0 ? (
               <p className="text-[var(--text-secondary)] text-center py-12">
                 No posts yet
