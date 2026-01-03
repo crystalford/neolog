@@ -6,14 +6,11 @@ interface SocialLinksProps {
 }
 
 export function SocialLinks({ profile, className = '' }: SocialLinksProps) {
-  // We try to pull the social links from the profile object.
-  // Note: If your database uses different names (like 'twitter_url'),
-  // you might need to update the property names below (e.g., profile.twitter_url).
   const links = [
-    { url: profile.twitter, icon: Twitter, label: 'Twitter' },
-    { url: profile.github, icon: Github, label: 'GitHub' },
-    { url: profile.linkedin, icon: Linkedin, label: 'LinkedIn' },
-    { url: profile.website, icon: Globe, label: 'Website' },
+    { url: profile.twitter_url || profile.twitter, icon: Twitter, label: 'Twitter' },
+    { url: profile.github_url || profile.github, icon: Github, label: 'GitHub' },
+    { url: profile.linkedin_url || profile.linkedin, icon: Linkedin, label: 'LinkedIn' },
+    { url: profile.website_url || profile.website, icon: Globe, label: 'Website' },
   ].filter(l => l.url)
 
   if (links.length === 0) return null

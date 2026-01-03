@@ -123,15 +123,15 @@ export default async function ProfilePage({ params }: Props) {
                     </span>
                   )}
                    
-                  {profile.website && (
+                  {(profile.website_url || profile.website) && (
                     <a 
-                      href={profile.website}
+                      href={profile.website_url || profile.website}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
                     >
                       <LinkIcon size={14} />
-                      {profile.website.replace(/^https?:\/\//, '')}
+                      {(profile.website_url || profile.website).replace(/^https?:\/\//, '')}
                     </a>
                   )}
                    
