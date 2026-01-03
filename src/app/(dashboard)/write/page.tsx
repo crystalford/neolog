@@ -596,12 +596,16 @@ export default function WritePage() {
           )}
 
           {/* Title */}
+          <label htmlFor="post-title" className="block text-sm font-medium text-[var(--text-tertiary)] mb-2">
+            Article title
+          </label>
           <input
+            id="post-title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title"
-            className="w-full text-4xl font-display font-bold bg-transparent border-none outline-none placeholder:text-[var(--text-tertiary)] mb-2"
+            placeholder="Enter your title"
+            className="w-full text-4xl font-display font-bold text-[var(--text-primary)] bg-transparent border-none outline-none placeholder:text-[var(--text-tertiary)] mb-6"
           />
 
           {/* Subtitle */}

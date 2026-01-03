@@ -74,6 +74,16 @@ export const ensureProfile = async (supabase: SupabaseClient, user: User) => {
   }
 
   if (insertError) {
+    const { data: existingAfterInsert } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (existingAfterInsert) {
+      return existingAfterInsert
+    }
+
     const fallbackUsername = getFallbackUsername(user.id)
     const { data: fallbackProfile, error: fallbackError } = await supabase
       .from('profiles')
