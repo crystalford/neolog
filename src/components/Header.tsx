@@ -4,259 +4,65 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import {
-  PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard, BookOpen,
-  BarChart3, Mail, Layers, Gift, Zap, DollarSign, Users
-} from 'lucide-react'
-import { ThemeToggle } from './ThemeToggle'
-import { MobileNav } from './MobileNav'
-import { PublicationSwitcher } from './PublicationSwitcher'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
-    loadUserAndProfile()
+    loadUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null)
-        if (session?.user) {
-          loadProfile(session.user.id)
-        } else {
-          setProfile(null)
-        }
       }
     )
 
     return () => subscription.unsubscribe()
   }, [])
 
-  const loadUserAndProfile = async () => {
+  const loadUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     setUser(session?.user ?? null)
-
-    if (session?.user) {
-      await loadProfile(session.user.id)
-    }
-
     setLoading(false)
   }
 
-  const loadProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('username, display_name, avatar_url')
-      .eq('id', userId)
-      .single()
-
-    if (data) {
-      setProfile(data)
-    }
-  }
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    setMenuOpen(false)
-  }
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-light)]">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
-        {/* Mobile nav + Logo */}
-        <div className="flex items-center gap-4">
-          <MobileNav />
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <span className="logo-mark">
-              N
-            </span>
-            <span className="font-display text-xl tracking-tight group-hover:text-[var(--accent)] transition-colors hidden sm:inline">
-              neolog
-            </span>
-          </Link>
-        </div>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-black rounded-sm flex items-center justify-center">
+            <span className="text-white font-bold text-xs">N</span>
+          </div>
+          <span className="font-serif text-lg tracking-tight text-gray-900">
+            Neolog
+          </span>
+        </Link>
 
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-2">
-          <Link href="/explore" className="nav-link px-4 py-2 text-sm">
-            Manifesto
-          </Link>
-          <Link href="/tags" className="nav-link px-4 py-2 text-sm">
-            Pricing
-          </Link>
-        </nav>
-
-        {/* Auth section */}
+        {/* Auth buttons */}
         <div className="flex items-center gap-3">
-          <ThemeToggle />
-
-          {loading ? (
-            <div className="w-24 h-10 skeleton rounded-xl" />
-          ) : user ? (
-            <>
-              <PublicationSwitcher />
-
-              <Link href="/write" className="btn btn-primary">
-                <PenLine size={18} />
-                <span className="hidden sm:inline">Write</span>
-              </Link>
-
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-all"
-                >
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name || profile.username}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                  ) : (
-                    <UserIcon size={18} className="text-[var(--text-secondary)]" />
-                  )}
-                  <span className="text-sm font-medium hidden md:inline">
-                    {profile?.display_name || profile?.username || 'Menu'}
-                  </span>
-                </button>
-
-                {menuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setMenuOpen(false)}
-                    />
-
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-20 py-2 animate-scale-in origin-top-right">
-                      {profile?.username && (
-                        <>
-                          <Link
-                            href={`/${profile.username}`}
-                            onClick={() => setMenuOpen(false)}
-                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                          >
-                            <UserIcon size={16} />
-                            Profile
-                          </Link>
-                          <div className="h-px bg-[var(--border-light)] my-1" />
-                        </>
-                      )}
-
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <LayoutDashboard size={16} />
-                        Dashboard
-                      </Link>
-                      <Link
-                        href="/publications"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <BookOpen size={16} />
-                        Publications
-                      </Link>
-
-                      <div className="h-px bg-[var(--border-light)] my-1" />
-
-                      <Link
-                        href="/analytics"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <BarChart3 size={16} />
-                        Analytics
-                      </Link>
-                      <Link
-                        href="/subscribers"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Mail size={16} />
-                        Subscribers
-                      </Link>
-                      <Link
-                        href="/series"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Layers size={16} />
-                        Series
-                      </Link>
-                      <Link
-                        href="/referrals"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Gift size={16} />
-                        Referrals
-                      </Link>
-
-                      <div className="h-px bg-[var(--border-light)] my-1" />
-
-                      <Link
-                        href="/boost"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Zap size={16} />
-                        Boost
-                      </Link>
-                      <Link
-                        href="/earnings"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <DollarSign size={16} />
-                        Earnings
-                      </Link>
-                      <Link
-                        href="/curators"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Users size={16} />
-                        Curators
-                      </Link>
-
-                      <div className="h-px bg-[var(--border-light)] my-1" />
-
-                      <Link
-                        href="/settings"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <Settings size={16} />
-                        Settings
-                      </Link>
-
-                      <div className="h-px bg-[var(--border-light)] my-1" />
-
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
-                      >
-                        <LogOut size={16} />
-                        Sign out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
+          {loading ? null : user ? (
+            <Link
+              href="/dashboard"
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              Dashboard
+            </Link>
           ) : (
             <>
-              <Link href="/login" className="btn btn-ghost hidden sm:inline-flex text-sm">
+              <Link
+                href="/login"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
                 Sign in
               </Link>
-              <Link href="/signup" className="btn btn-primary">
-                Start Writing
+              <Link
+                href="/signup"
+                className="px-3 py-1.5 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+              >
+                Sign up
               </Link>
             </>
           )}

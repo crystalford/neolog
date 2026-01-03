@@ -55,9 +55,9 @@ export default async function Home() {
     <>
       <Header />
 
-      <main className="pt-16">
-        {/* Hero - Wide, spacious, modern */}
-        <section className="relative px-6 lg:px-12 pt-40 pb-48 overflow-hidden">
+      <main className="pt-14">
+        {/* Hero - Compact and professional */}
+        <section className="relative px-6 lg:px-12 pt-20 pb-20 overflow-hidden">
           {/* Subtle gradient background */}
           <div
             className="absolute top-0 right-0 w-[1000px] h-[1000px] opacity-[0.02] pointer-events-none blur-3xl"
@@ -67,77 +67,43 @@ export default async function Home() {
             }}
           />
 
-          <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-12 gap-20 items-center">
-              <div className="lg:col-span-7 animate-fade-up">
-                {/* Eyebrow */}
-                <div className="flex items-center gap-3 mb-12">
-                  <span className="doc-badge doc-badge-live">
-                    V1.0 IS LIVE
-                  </span>
-                </div>
-
+          <div className="max-w-6xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div className="animate-fade-up">
                 {/* Main headline */}
-                <h1 className="font-display text-6xl md:text-7xl lg:text-8xl leading-[1.05] tracking-tight mb-12">
-                  The web,{' '}
-                  <span className="italic text-[var(--text-secondary)]">unformatted.</span>
+                <h1 className="font-serif text-5xl md:text-6xl leading-tight tracking-tight text-gray-900 mb-6">
+                  Publish raw HTML.{' '}
+                  <span className="text-gray-500">No friction.</span>
                 </h1>
 
                 {/* Subheadline */}
-                <p className="text-xl md:text-2xl leading-relaxed text-[var(--text-secondary)] mb-16 max-w-2xl">
-                  Stop fighting the CMS. Write in raw HTML. We render it exactly as you intended. Your CSS, your scripts, your design.
+                <p className="text-lg leading-relaxed text-gray-600 mb-8 max-w-xl">
+                  A publishing platform that respects your code. Drop HTML, paste markdown, publish instantly.
                 </p>
 
                 {/* CTA */}
-                <div className="flex flex-wrap gap-4 items-center mb-16">
-                  <Link href="/signup" className="btn btn-primary btn-lg">
-                    Start Publishing
+                <div className="flex flex-wrap gap-3 items-center">
+                  <Link href="/signup" className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+                    Start writing
                   </Link>
-                  <Link href="/explore" className="btn btn-secondary btn-lg">
-                    Read the Docs
+                  <Link href="/explore" className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                    Explore
                   </Link>
                 </div>
-
-                {/* Trust indicators */}
-                <p className="text-sm text-[var(--text-tertiary)]">
-                  Free forever. No credit card required.
-                </p>
               </div>
 
               {/* Visual element - Code preview */}
-              <div className="lg:col-span-5 hidden lg:block">
-                <div className="relative">
-                  <div className="relative bg-[var(--bg-inverse)] rounded-2xl p-8 shadow-2xl overflow-hidden">
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-2 pb-6">
-                        <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                        <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                        <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                      </div>
-                      <div className="font-mono text-sm leading-relaxed">
-                        <div className="text-[#a855f7]">&lt;article&gt;</div>
-                        <div className="pl-4 text-[#6366f1]">&lt;style&gt;</div>
-                        <div className="pl-8">
-                          <span className="text-[#fbbf24]">h1</span>
-                          <span className="text-[#ffffff]"> &#123; </span>
-                          <span className="text-[#fbbf24]">font-family</span>
-                          <span className="text-[#ffffff]">: </span>
-                          <span className="text-[#34d399]">'Newsreader'</span>
-                          <span className="text-[#ffffff]">; &#125;</span>
-                        </div>
-                        <div className="pl-4 text-[#6366f1]">&lt;/style&gt;</div>
-                        <div className="pl-4 mt-4 text-[#6366f1]">&lt;h1&gt;</div>
-                        <div className="pl-8 text-[#ffffff]">Hello World</div>
-                        <div className="pl-4 text-[#6366f1]">&lt;/h1&gt;</div>
-                        <div className="text-[#a855f7] mt-4">&lt;/article&gt;</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Output preview */}
-                  <div className="mt-8 bg-[var(--bg-primary)] rounded-2xl p-8 border-2 border-[var(--border-light)]">
-                    <h2 className="font-display text-4xl">Hello World.</h2>
-                    <p className="text-[var(--text-secondary)] mt-3">This is how the web was meant to be read.</p>
+              <div className="hidden lg:block">
+                <div className="relative bg-gray-900 rounded-lg p-6 border border-gray-800">
+                  <div className="font-mono text-sm leading-relaxed">
+                    <div className="text-purple-400">&lt;article&gt;</div>
+                    <div className="pl-4 text-blue-400">&lt;h1&gt;</div>
+                    <div className="pl-8 text-gray-300">Publish HTML</div>
+                    <div className="pl-4 text-blue-400">&lt;/h1&gt;</div>
+                    <div className="pl-4 text-blue-400 mt-2">&lt;p&gt;</div>
+                    <div className="pl-8 text-gray-300">No friction.</div>
+                    <div className="pl-4 text-blue-400">&lt;/p&gt;</div>
+                    <div className="text-purple-400 mt-2">&lt;/article&gt;</div>
                   </div>
                 </div>
               </div>
@@ -147,28 +113,24 @@ export default async function Home() {
 
         {/* Stats */}
         {(stats.posts > 0 || stats.creators > 0) && (
-          <section className="px-6 lg:px-12 pb-24">
-            <div className="max-w-7xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
-                <div className="text-center p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all">
-                  <BookOpen size={28} className="mx-auto mb-4 text-[var(--accent)]" />
-                  <p className="font-display text-4xl mb-2">{stats.posts.toLocaleString()}</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">Posts published</p>
+          <section className="px-6 lg:px-12 py-12 bg-gray-50 border-y border-gray-200">
+            <div className="max-w-6xl mx-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div className="text-center">
+                  <p className="font-serif text-3xl text-gray-900 mb-1">{stats.posts.toLocaleString()}</p>
+                  <p className="text-sm text-gray-600">Posts published</p>
                 </div>
-                <div className="text-center p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all">
-                  <Users size={28} className="mx-auto mb-4 text-[var(--accent)]" />
-                  <p className="font-display text-4xl mb-2">{stats.creators.toLocaleString()}</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">Writers</p>
+                <div className="text-center">
+                  <p className="font-serif text-3xl text-gray-900 mb-1">{stats.creators.toLocaleString()}</p>
+                  <p className="text-sm text-gray-600">Writers</p>
                 </div>
-                <div className="text-center p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all">
-                  <TrendingUp size={28} className="mx-auto mb-4 text-[var(--accent)]" />
-                  <p className="font-display text-4xl mb-2">100%</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">Your content</p>
+                <div className="text-center">
+                  <p className="font-serif text-3xl text-gray-900 mb-1">100%</p>
+                  <p className="text-sm text-gray-600">Your content</p>
                 </div>
-                <div className="text-center p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all">
-                  <Zap size={28} className="mx-auto mb-4 text-[var(--accent)]" />
-                  <p className="font-display text-4xl mb-2">&lt;1s</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">To publish</p>
+                <div className="text-center">
+                  <p className="font-serif text-3xl text-gray-900 mb-1">&lt;1s</p>
+                  <p className="text-sm text-gray-600">To publish</p>
                 </div>
               </div>
             </div>
@@ -177,16 +139,16 @@ export default async function Home() {
 
         {/* Featured Posts */}
         {featuredPosts.length > 0 && (
-          <section className="px-6 lg:px-12 py-24 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-12">
+          <section className="px-6 lg:px-12 py-16 bg-white">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="font-display text-3xl md:text-4xl mb-2">Latest from the community</h2>
-                  <p className="text-[var(--text-secondary)]">See what writers are creating on Neolog</p>
+                  <h2 className="font-serif text-2xl text-gray-900 mb-1">Latest posts</h2>
+                  <p className="text-sm text-gray-600">From the community</p>
                 </div>
-                <Link href="/explore" className="btn btn-secondary hidden sm:inline-flex">
+                <Link href="/explore" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors hidden sm:inline-flex items-center gap-1">
                   View all
-                  <ArrowRight size={16} />
+                  <ArrowRight size={14} />
                 </Link>
               </div>
 
@@ -196,10 +158,10 @@ export default async function Home() {
                 ))}
               </div>
 
-              <div className="mt-12 text-center sm:hidden">
-                <Link href="/explore" className="btn btn-secondary">
+              <div className="mt-8 text-center sm:hidden">
+                <Link href="/explore" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors inline-flex items-center gap-1">
                   View all posts
-                  <ArrowRight size={16} />
+                  <ArrowRight size={14} />
                 </Link>
               </div>
             </div>
@@ -358,69 +320,59 @@ export default async function Home() {
         </section>
 
         {/* Final CTA */}
-        <section className="relative px-6 lg:px-12 py-32 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
+        <section className="relative px-6 lg:px-12 py-20 bg-gray-50 border-t border-gray-200">
           <div className="relative max-w-4xl mx-auto text-center">
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl mb-6 leading-tight">
-              Ready to publish{' '}
-              <span className="italic text-[var(--text-secondary)]">your way?</span>
+            <h2 className="font-serif text-3xl md:text-4xl text-gray-900 mb-4 leading-tight">
+              Ready to start publishing?
             </h2>
 
-            <p className="text-xl text-[var(--text-secondary)] mb-12 max-w-2xl mx-auto">
-              Join creators who want their work rendered exactly as intended.
+            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+              Join writers who want their work rendered exactly as intended.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/signup" className="btn btn-primary btn-lg">
-                Start Publishing
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              <Link href="/signup" className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+                Start writing
               </Link>
-              <Link href="/explore" className="btn btn-secondary btn-lg">
-                Explore Examples
+              <Link href="/explore" className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                Explore
               </Link>
             </div>
-
-            <p className="mt-8 text-sm text-[var(--text-tertiary)]">
-              Free forever. No credit card required.
-            </p>
           </div>
         </section>
 
         {/* Footer */}
-        <footer className="px-6 lg:px-12 py-16 bg-[var(--bg-primary)]">
-          <div className="max-w-7xl mx-auto">
+        <footer className="px-6 lg:px-12 py-12 bg-white border-t border-gray-200">
+          <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="logo-mark logo-mark-lg">N</span>
-                  <span className="font-display text-xl">Neolog</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 bg-black rounded-sm flex items-center justify-center">
+                    <span className="text-white font-bold text-xs">N</span>
+                  </div>
+                  <span className="font-sans text-base font-semibold text-gray-900">Neolog</span>
                 </div>
-                <p className="text-sm text-[var(--text-tertiary)] max-w-md">
-                  The publishing platform that respects your code.
+                <p className="text-sm text-gray-600 max-w-md">
+                  Publish raw HTML. No friction.
                 </p>
               </div>
 
-              <nav className="flex flex-wrap gap-8">
-                <div className="flex flex-col gap-3">
-                  <Link href="/explore" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                    Explore
-                  </Link>
-                  <Link href="/write" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                    Start Writing
-                  </Link>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <Link href="/tos" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                    Terms
-                  </Link>
-                  <Link href="/privacy" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-                    Privacy
-                  </Link>
-                </div>
+              <nav className="flex gap-8">
+                <Link href="/explore" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                  Explore
+                </Link>
+                <Link href="/tos" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                  Terms
+                </Link>
+                <Link href="/privacy" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                  Privacy
+                </Link>
               </nav>
             </div>
 
-            <div className="mt-12 pt-8 border-t border-[var(--border-light)] text-center">
-              <p className="text-xs text-[var(--text-tertiary)]">
-                © 2025 Neolog. Made with care for the web.
+            <div className="mt-8 pt-8 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                © 2025 Neolog
               </p>
             </div>
           </div>
