@@ -108,20 +108,25 @@ export default function WritePage() {
 
   const loadUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login?redirect=/write')
       return
     }
-    
+
     setUser(session.user)
-    
+
+    console.log('Loading profile for user:', session.user.id)
     const profileData = await ensureProfile(supabase, session.user)
 
     if (profileData) {
+      console.log('Profile loaded successfully:', profileData.username)
       setProfile(profileData)
+    } else {
+      console.error('Failed to load or create profile')
+      setError('Failed to load your profile. Please check database permissions.')
     }
-    
+
     setLoading(false)
   }
 
@@ -228,19 +233,35 @@ export default function WritePage() {
       return
     }
 
+    if (!publicationId) {
+      setError('Please select a publication or create one first')
+      return
+    }
+
     setPublishing(true)
     setError(null)
     setSuccess(null)
 
     try {
-      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      // Try to load profile if not already loaded
+      let currentProfile = profile
+
+      if (!currentProfile && user) {
+        console.log('Loading profile for user:', user.id)
+        currentProfile = await ensureProfile(supabase, user)
+
+        if (currentProfile) {
+          console.log('Profile loaded:', currentProfile.username)
+          setProfile(currentProfile)
+        } else {
+          console.error('Failed to load/create profile')
+        }
+      }
+
       if (!currentProfile) {
-        setError('Unable to load your profile. Please try refreshing the page.')
+        setError('Unable to load your profile. This might be a database permissions issue. Check the browser console for details.')
         setPublishing(false)
         return
-      }
-      if (!profile) {
-        setProfile(currentProfile)
       }
 
       const slug = generateSlug(title)
@@ -405,13 +426,13 @@ export default function WritePage() {
           )}
 
           {error && (
-            <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
-              <p className="text-sm font-medium">{error}</p>
+            <div className="mb-4 p-4 rounded-xl bg-red-100 dark:bg-red-900/30 border-2 border-red-500 dark:border-red-500">
+              <p className="text-sm font-semibold text-red-900 dark:text-red-100">{error}</p>
             </div>
           )}
           {success && (
-            <div className="mb-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
-              <p className="text-sm font-medium">{success}</p>
+            <div className="mb-4 p-4 rounded-xl bg-green-100 dark:bg-green-900/30 border-2 border-green-500 dark:border-green-500">
+              <p className="text-sm font-semibold text-green-900 dark:text-green-100">{success}</p>
             </div>
           )}
 
