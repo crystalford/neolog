@@ -1,7 +1,19 @@
 import { Resend } from 'resend'
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resendClient: Resend | null = null
+
+const getResendClient = () => {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    return null
+  }
+
+  if (!resendClient) {
+    resendClient = new Resend(apiKey)
+  }
+
+  return resendClient
+}
 
 // Base URL for links
 const getBaseUrl = () => {
@@ -244,6 +256,12 @@ export async function sendEmail(
   data: Record<string, any>
 ) {
   if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set, skipping email send')
+    return { success: false, error: 'Email not configured' }
+  }
+
+  const resend = getResendClient()
+  if (!resend) {
     console.warn('RESEND_API_KEY not set, skipping email send')
     return { success: false, error: 'Email not configured' }
   }

@@ -4,10 +4,8 @@ import { MetadataRoute } from 'next'
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   // Static pages
   const staticPages = [
@@ -16,6 +14,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/tags`, lastModified: new Date(), changeFrequency: 'daily' as const, priority: 0.8 },
     { url: `${BASE_URL}/curators`, lastModified: new Date(), changeFrequency: 'daily' as const, priority: 0.7 },
   ]
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return staticPages
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   // Get all published posts
   const { data: posts } = await supabase

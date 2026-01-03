@@ -4,6 +4,8 @@ import './globals.css'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Neolog — Write Without Friction',
   description: 'A publishing platform that respects your code. Drop HTML, paste markdown, publish instantly.',
