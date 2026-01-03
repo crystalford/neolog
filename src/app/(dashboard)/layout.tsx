@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
-  Zap, DollarSign, Users, Settings, LogOut, User as UserIcon
+  Zap, DollarSign, Users, Settings, LogOut, User as UserIcon,
+  PenLine, Bell, Radio, List, Bookmark, Clock, Upload, UserPlus
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -71,15 +72,19 @@ export default function DashboardLayout({
   }
 
   const navLinks = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/write', icon: PenLine, label: 'Write' },
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
+    { href: '/feed', icon: Radio, label: 'Feed' },
+    { href: '/notifications', icon: Bell, label: 'Notifications' },
+    { href: '/lists', icon: List, label: 'Lists' },
+    { href: '/saved', icon: Bookmark, label: 'Saved' },
     { href: '/publications', icon: BookOpen, label: 'Publications' },
     { href: '/analytics', icon: BarChart3, label: 'Analytics' },
     { href: '/subscribers', icon: Mail, label: 'Subscribers' },
     { href: '/series', icon: Layers, label: 'Series' },
     { href: '/referrals', icon: Gift, label: 'Referrals' },
     { href: '/boost', icon: Zap, label: 'Boost' },
-    { href: '/earnings', icon: DollarSign, label: 'Earnings' },
-    { href: '/curators', icon: Users, label: 'Curators' },
+    { href: '/history', icon: Clock, label: 'History' },
   ]
 
   if (loading) {
