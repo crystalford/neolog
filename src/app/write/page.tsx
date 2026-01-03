@@ -32,6 +32,8 @@ export default function WritePage() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -163,61 +165,81 @@ export default function WritePage() {
 
   // Publish
   const handlePublish = async () => {
-    if (!user || !title || !content) return
-    
-    setPublishing(true)
-
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
-      setPublishing(false)
+    if (!user || !title || !content) {
+      setError('Please add a title and content before publishing')
       return
     }
-    if (!profile) {
-      setProfile(currentProfile)
-    }
 
-    const slug = generateSlug(title)
-    const readingTime = calculateReadingTime(content)
-    
-    // Generate excerpt
-    const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-    const excerpt = textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
-
-    const postData = {
-      author_id: user.id,
-      title,
-      subtitle: subtitle || null,
-      slug,
-      content,
-      content_html: content,
-      content_type: 'html',
-      cover_image_url: coverImage || null,
-      reading_time_minutes: readingTime,
-      excerpt,
-      status: 'published',
-      published_at: new Date().toISOString(),
-    }
+    setPublishing(true)
+    setError(null)
+    setSuccess(null)
 
     try {
+      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      if (!currentProfile) {
+        setError('Unable to load your profile. Please try refreshing the page.')
+        setPublishing(false)
+        return
+      }
+      if (!profile) {
+        setProfile(currentProfile)
+      }
+
+      const slug = generateSlug(title)
+      const readingTime = calculateReadingTime(content)
+
+      // Generate excerpt
+      const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+      const excerpt = textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
+
+      const postData = {
+        author_id: user.id,
+        title,
+        subtitle: subtitle || null,
+        slug,
+        content,
+        content_html: content,
+        content_type: 'html',
+        cover_image_url: coverImage || null,
+        reading_time_minutes: readingTime,
+        excerpt,
+        status: 'published',
+        published_at: new Date().toISOString(),
+      }
+
       let finalSlug = slug
       let finalPostId = postId
-      
+
       if (postId) {
-        const { data } = await supabase
+        const { data, error: updateError } = await supabase
           .from('posts')
           .update(postData)
           .eq('id', postId)
           .select('id, slug')
           .single()
-        
+
+        if (updateError) {
+          console.error('Update error:', updateError)
+          setError(`Failed to publish: ${updateError.message}`)
+          setPublishing(false)
+          return
+        }
+
         if (data) finalSlug = data.slug
       } else {
-        const { data } = await supabase
+        const { data, error: insertError } = await supabase
           .from('posts')
           .insert(postData)
           .select('id, slug')
           .single()
-        
+
+        if (insertError) {
+          console.error('Insert error:', insertError)
+          setError(`Failed to publish: ${insertError.message}`)
+          setPublishing(false)
+          return
+        }
+
         if (data) {
           setPostId(data.id)
           finalPostId = data.id
@@ -227,27 +249,47 @@ export default function WritePage() {
 
       // Send notifications via API
       if (finalPostId) {
-        await fetch('/api/posts/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId: finalPostId, notify: true }),
-        })
-
-        // Save tags
-        if (tags.length > 0) {
-          await supabase.rpc('set_post_tags', {
-            p_post_id: finalPostId,
-            p_tag_names: tags,
+        try {
+          const response = await fetch('/api/posts/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId: finalPostId, notify: true }),
           })
+
+          if (!response.ok) {
+            console.error('Notification API error:', await response.text())
+            // Don't fail publishing if notifications fail
+          }
+
+          // Save tags
+          if (tags.length > 0) {
+            const { error: tagsError } = await supabase.rpc('set_post_tags', {
+              p_post_id: finalPostId,
+              p_tag_names: tags,
+            })
+
+            if (tagsError) {
+              console.error('Tags error:', tagsError)
+              // Don't fail publishing if tags fail
+            }
+          }
+        } catch (notifyError) {
+          console.error('Notification error:', notifyError)
+          // Don't fail publishing if notifications fail
         }
       }
 
-      // Redirect to published post
-      if (currentProfile) {
-        router.push(`/${currentProfile.username}/${finalSlug}`)
-      }
+      // Show success and redirect to published post
+      setSuccess('Post published successfully! Redirecting...')
+
+      setTimeout(() => {
+        if (currentProfile) {
+          router.push(`/${currentProfile.username}/${finalSlug}`)
+        }
+      }, 1000)
     } catch (error) {
       console.error('Publish error:', error)
+      setError('An unexpected error occurred while publishing. Please try again.')
     } finally {
       setPublishing(false)
     }
@@ -286,6 +328,18 @@ export default function WritePage() {
       <Header />
       <main className="pt-20 pb-16">
         <div className="max-w-3xl mx-auto px-6">
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200">
+              <p className="text-sm font-medium">{success}</p>
+            </div>
+          )}
+
           {/* Header actions */}
           <div className="flex items-center justify-between py-4 mb-4 sticky top-16 bg-[var(--bg-primary)] z-10 border-b border-[var(--border-light)]">
             <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
