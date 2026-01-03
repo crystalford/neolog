@@ -65,8 +65,8 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-light)]">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border-light)]">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
         {/* Mobile nav + Logo */}
         <div className="flex items-center gap-4">
           <MobileNav />
@@ -81,18 +81,13 @@ export function Header() {
         </div>
 
         {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
-          <Link href="/explore" className="nav-link px-4 py-2">
-            Explore
+        <nav className="hidden md:flex items-center gap-2">
+          <Link href="/explore" className="nav-link px-4 py-2 text-sm">
+            Manifesto
           </Link>
-          <Link href="/tags" className="nav-link px-4 py-2">
-            Topics
+          <Link href="/tags" className="nav-link px-4 py-2 text-sm">
+            Pricing
           </Link>
-          {user && (
-            <Link href="/feed" className="nav-link px-4 py-2">
-              Feed
-            </Link>
-          )}
         </nav>
 
         {/* Auth section */}
@@ -257,11 +252,11 @@ export function Header() {
             </>
           ) : (
             <>
-              <Link href="/login" className="btn btn-ghost hidden sm:inline-flex">
+              <Link href="/login" className="btn btn-ghost hidden sm:inline-flex text-sm">
                 Sign in
               </Link>
               <Link href="/signup" className="btn btn-primary">
-                Get started
+                Start Writing
               </Link>
             </>
           )}
