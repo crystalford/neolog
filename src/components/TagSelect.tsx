@@ -20,8 +20,9 @@ interface TagSelectProps {
 
 export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProps) {
   const [availableTags, setAvailableTags] = useState<Tag[]>([])
-  const [search, setSearch] = useState('')
-  const [showDropdown, setShowDropdown] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
   
   const supabase = createClient()
 
@@ -39,69 +40,74 @@ export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProp
     if (data) {
       setAvailableTags(data)
     }
+    setLoading(false)
   }
 
   const filteredTags = availableTags.filter(tag => 
-    tag.name.toLowerCase().includes(search.toLowerCase()) &&
+    tag.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
     !selectedTags.includes(tag.name)
   )
 
   const addTag = (tagName: string) => {
-    if (selectedTags.length >= maxTags) return
-    if (!selectedTags.includes(tagName)) {
+    if (selectedTags.length < maxTags && !selectedTags.includes(tagName)) {
       onChange([...selectedTags, tagName])
     }
-    setSearch('')
-    setShowDropdown(false)
+    setSearchTerm('')
+    setIsOpen(false)
   }
 
   const removeTag = (tagName: string) => {
     onChange(selectedTags.filter(t => t !== tagName))
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && search.trim()) {
-      e.preventDefault()
-      addTag(search.trim())
+  const createTag = async () => {
+    if (!searchTerm.trim() || selectedTags.length >= maxTags) return
+    
+    const newTagName = searchTerm.trim()
+    
+    // Check if tag already exists
+    const existing = availableTags.find(t => 
+      t.name.toLowerCase() === newTagName.toLowerCase()
+    )
+    
+    if (existing) {
+      addTag(existing.name)
+      return
     }
-    if (e.key === 'Backspace' && !search && selectedTags.length > 0) {
-      removeTag(selectedTags[selectedTags.length - 1])
+
+    // Create new tag
+    const slug = newTagName.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const { data } = await supabase
+      .from('tags')
+      .insert({ name: newTagName, slug })
+      .select()
+      .single()
+
+    if (data) {
+      setAvailableTags([...availableTags, data])
+      addTag(newTagName)
     }
   }
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium mb-2">
-        Tags
-        <span className="text-[var(--text-tertiary)] font-normal ml-2">
-          ({selectedTags.length}/{maxTags})
-        </span>
-      </label>
-      
       {/* Selected tags */}
       <div className="flex flex-wrap gap-2 mb-2">
-        {selectedTags.map(tag => {
-          const tagData = availableTags.find(t => t.name === tag)
-          return (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm"
-              style={{
-                backgroundColor: `${tagData?.color || '#6b7280'}15`,
-                color: tagData?.color || '#6b7280',
-              }}
+        {selectedTags.map(tag => (
+          <span 
+            key={tag}
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-sm"
+          >
+            <Hash size={12} />
+            {tag}
+            <button 
+              onClick={() => removeTag(tag)}
+              className="ml-1 hover:text-[var(--accent-hover)]"
             >
-              <Hash size={12} />
-              {tag}
-              <button
-                onClick={() => removeTag(tag)}
-                className="hover:opacity-70 transition-opacity"
-              >
-                <X size={14} />
-              </button>
-            </span>
-          )
-        })}
+              <X size={14} />
+            </button>
+          </span>
+        ))}
       </div>
 
       {/* Input */}
@@ -109,58 +115,61 @@ export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProp
         <div className="relative">
           <input
             type="text"
-            value={search}
+            value={searchTerm}
             onChange={(e) => {
-              setSearch(e.target.value)
-              setShowDropdown(true)
+              setSearchTerm(e.target.value)
+              setIsOpen(true)
             }}
-            onFocus={() => setShowDropdown(true)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add a tag..."
-            className="input"
+            onFocus={() => setIsOpen(true)}
+            placeholder={`Add tags (${selectedTags.length}/${maxTags})`}
+            className="w-full input"
           />
-          
+
           {/* Dropdown */}
-          {showDropdown && (search || filteredTags.length > 0) && (
-            <>
-              <div 
-                className="fixed inset-0 z-10" 
-                onClick={() => setShowDropdown(false)} 
-              />
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
-                {search && !availableTags.find(t => t.name.toLowerCase() === search.toLowerCase()) && (
-                  <button
-                    onClick={() => addTag(search.trim())}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--bg-secondary)] transition-colors text-left"
-                  >
-                    <Plus size={14} />
-                    Create "{search}"
-                  </button>
-                )}
-                
-                {filteredTags.map(tag => (
-                  <button
-                    key={tag.id}
-                    onClick={() => addTag(tag.name)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--bg-secondary)] transition-colors text-left"
-                  >
-                    <Hash size={14} style={{ color: tag.color }} />
+          {isOpen && (searchTerm || filteredTags.length > 0) && (
+            <div className="absolute z-10 w-full mt-1 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {filteredTags.map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => addTag(tag.name)}
+                  className="w-full px-4 py-2 text-left hover:bg-[var(--bg-secondary)] flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Hash size={14} className="text-[var(--text-tertiary)]" />
                     {tag.name}
-                    <span className="text-[var(--text-tertiary)] text-xs ml-auto">
-                      {tag.post_count} posts
-                    </span>
-                  </button>
-                ))}
-                
-                {filteredTags.length === 0 && !search && (
-                  <p className="px-3 py-2 text-sm text-[var(--text-tertiary)]">
-                    Type to search or create tags
-                  </p>
-                )}
-              </div>
-            </>
+                  </span>
+                  <span className="text-[var(--text-tertiary)] text-xs">
+                    {tag.post_count} posts
+                  </span>
+                </button>
+              ))}
+              
+              {searchTerm && !filteredTags.find(t => t.name.toLowerCase() === searchTerm.toLowerCase()) && (
+                <button
+                  onClick={createTag}
+                  className="w-full px-4 py-2 text-left hover:bg-[var(--bg-secondary)] flex items-center gap-2 text-[var(--accent)]"
+                >
+                  <Plus size={14} />
+                  Create "{searchTerm}"
+                </button>
+              )}
+
+              {!searchTerm && filteredTags.length === 0 && !loading && (
+                <div className="px-4 py-2 text-[var(--text-tertiary)] text-sm">
+                  No tags available
+                </div>
+              )}
+            </div>
           )}
         </div>
+      )}
+
+      {/* Click outside to close */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-0" 
+          onClick={() => setIsOpen(false)}
+        />
       )}
     </div>
   )
@@ -168,15 +177,13 @@ export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProp
 
 // Display-only tag pills
 export function TagPills({ tags }: { tags: string[] }) {
-  if (tags.length === 0) return null
-  
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {tags.map(tag => (
         <a
           key={tag}
           href={`/tag/${tag.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs hover:bg-[var(--bg-tertiary)] transition-colors"
         >
           <Hash size={10} />
           {tag}
