@@ -56,8 +56,8 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)] border-b border-[var(--border-light)]">
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur-md border-b border-[var(--border-light)]">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12 h-20 flex items-center justify-between">
         {/* Mobile nav + Logo */}
         <div className="flex items-center gap-2">
           <MobileNav />
@@ -72,62 +72,68 @@ export function Header() {
         </div>
 
         {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
-          <Link 
-            href="/explore" 
-            className="nav-link text-[0.9375rem]"
+        <nav className="hidden md:flex items-center gap-2">
+          <Link
+            href="/explore"
+            className="nav-link text-[0.9375rem] px-4"
           >
             Explore
           </Link>
-          <Link 
-            href="/tags" 
-            className="nav-link text-[0.9375rem]"
+          <Link
+            href="/tags"
+            className="nav-link text-[0.9375rem] px-4"
           >
             Topics
+          </Link>
+          <Link
+            href="/feed"
+            className="nav-link text-[0.9375rem] px-4"
+          >
+            Feed
           </Link>
         </nav>
 
         {/* Auth section */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {/* Search button */}
           <Link
             href="/search"
-            className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
+            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-all"
           >
-            <Search size={16} className="text-[var(--text-secondary)]" />
+            <Search size={18} className="text-[var(--text-secondary)]" />
           </Link>
 
           <button
             type="button"
             onClick={handleAccentCycle}
-            className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
+            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-all"
             title="Change color theme"
           >
-            <Paintbrush size={16} className="text-[var(--text-secondary)]" />
+            <Paintbrush size={18} className="text-[var(--text-secondary)]" />
           </button>
 
           <ThemeToggle />
 
           {loading ? (
-            <div className="w-20 h-9 skeleton rounded-lg" />
+            <div className="w-24 h-10 skeleton rounded-xl" />
           ) : user ? (
             <>
-              <Link 
-                href="/write" 
-                className="btn btn-primary"
+              <Link
+                href="/write"
+                className="btn btn-primary hidden sm:inline-flex"
               >
-                <PenLine size={16} />
+                <PenLine size={18} />
                 Write
               </Link>
               
               <NotificationBell />
               
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="w-9 h-9 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
+                  className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-all"
                 >
-                  <UserIcon size={16} className="text-[var(--text-secondary)]" />
+                  <UserIcon size={18} className="text-[var(--text-secondary)]" />
                 </button>
                 
                 {menuOpen && (
