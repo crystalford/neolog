@@ -322,6 +322,8 @@ export default async function Home() {
               <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">Explore</Link>
               <Link href="/tags" className="hover:text-[var(--text-primary)] transition-colors">Topics</Link>
               <Link href="/curators" className="hover:text-[var(--text-primary)] transition-colors">Curators</Link>
+              <Link href="/tos" className="hover:text-[var(--text-primary)] transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-[var(--text-primary)] transition-colors">Privacy</Link>
               <a href="https://x.com/neologx" className="hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-2">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 1200 1227" aria-hidden="true">
                   <path
