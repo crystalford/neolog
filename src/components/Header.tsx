@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard } from 'lucide-react'
+import { PenLine, LogOut, User as UserIcon, Settings, LayoutDashboard, BookOpen } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { MobileNav } from './MobileNav'
+import { PublicationSwitcher } from './PublicationSwitcher'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
@@ -99,6 +100,8 @@ export function Header() {
             <div className="w-24 h-10 skeleton rounded-xl" />
           ) : user ? (
             <>
+              <PublicationSwitcher />
+
               <Link href="/write" className="btn btn-primary">
                 <PenLine size={18} />
                 <span className="hidden sm:inline">Write</span>
@@ -152,6 +155,14 @@ export function Header() {
                       >
                         <LayoutDashboard size={16} />
                         Dashboard
+                      </Link>
+                      <Link
+                        href="/publications"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                      >
+                        <BookOpen size={16} />
+                        Publications
                       </Link>
                       <Link
                         href="/settings"

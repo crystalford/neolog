@@ -2,14 +2,15 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
 import { Header } from '@/components/Header'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
-import { 
+import {
   Save, Send, Loader2, Eye, Settings, Image as ImageIcon,
-  ChevronDown, Clock
+  ChevronDown, Clock, BookOpen
 } from 'lucide-react'
 
 export default function WritePage() {
@@ -34,20 +35,76 @@ export default function WritePage() {
   const [originalSource, setOriginalSource] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  
+  const [publicationId, setPublicationId] = useState<string | null>(null)
+  const [hasNoPublications, setHasNoPublications] = useState(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
     loadUser()
-    
+    loadSelectedPublication()
+
     // Load existing post if editing
     const editId = searchParams.get('edit')
     if (editId) {
       loadPost(editId)
     }
   }, [searchParams])
+
+  const loadSelectedPublication = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      // Check if user has any publications
+      const { data: publications, error } = await supabase
+        .from('publications')
+        .select('id')
+        .eq('owner_id', session.user.id)
+        .eq('is_active', true)
+        .limit(1)
+
+      if (error) {
+        console.error('Error loading publications:', error)
+        return
+      }
+
+      if (!publications || publications.length === 0) {
+        setHasNoPublications(true)
+        return
+      }
+
+      // Try to get selected publication from localStorage
+      const selectedId = typeof window !== 'undefined'
+        ? localStorage.getItem('selectedPublicationId')
+        : null
+
+      if (selectedId) {
+        // Verify this publication exists and belongs to user
+        const { data: pub } = await supabase
+          .from('publications')
+          .select('id')
+          .eq('id', selectedId)
+          .eq('owner_id', session.user.id)
+          .eq('is_active', true)
+          .single()
+
+        if (pub) {
+          setPublicationId(selectedId)
+          return
+        }
+      }
+
+      // If no valid selection, use first publication
+      if (publications[0]) {
+        setPublicationId(publications[0].id)
+      }
+    } catch (error) {
+      console.error('Error loading publication:', error)
+    }
+  }
 
   const loadUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -115,6 +172,7 @@ export default function WritePage() {
     
     const postData = {
       author_id: user.id,
+      publication_id: publicationId,
       title,
       subtitle: subtitle || null,
       slug,
@@ -194,6 +252,7 @@ export default function WritePage() {
 
       const postData = {
         author_id: user.id,
+        publication_id: publicationId,
         title,
         subtitle: subtitle || null,
         slug,
@@ -329,6 +388,22 @@ export default function WritePage() {
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 lg:px-12">
           {/* Error/Success Messages */}
+          {hasNoPublications && (
+            <div className="mb-4 p-6 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                Create a Publication First
+              </h3>
+              <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-4">
+                Before you can write posts, you need to create at least one publication.
+                Publications are like separate blogs that you can manage.
+              </p>
+              <Link href="/publications" className="btn btn-primary">
+                <BookOpen size={16} />
+                Create Your First Publication
+              </Link>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200">
               <p className="text-sm font-medium">{error}</p>
