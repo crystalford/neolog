@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
-// REMOVED: import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
+// import { KeyboardShortcuts } from '@/components/KeyboardShortcuts'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
@@ -36,7 +36,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         {children}
-        {/* REMOVED: <KeyboardShortcuts /> */}
+        {/* <KeyboardShortcuts /> */}
       </body>
     </html>
   )

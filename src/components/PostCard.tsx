@@ -54,7 +54,6 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
     )
   }
 
-  // Default variant - CLEAN VERSION (No nested Links, no onClick)
   return (
     <article className="group relative">
       <Link 
@@ -73,7 +72,6 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
         </div>
         
-        {/* REPLACED NESTED LINK WITH SPAN to prevent errors */}
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
