@@ -4,13 +4,6 @@ import { Resend } from 'resend'
 
 // Run weekly: { "crons": [{ "path": "/api/cron/weekly-digest", "schedule": "0 9 * * 0" }] }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -18,6 +11,35 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const resendApiKey = process.env.RESEND_API_KEY
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { error: 'Missing Supabase configuration' },
+        { status: 500 }
+      )
+    }
+
+    if (!resendApiKey) {
+      return NextResponse.json(
+        { error: 'Missing Resend API key configuration' },
+        { status: 500 }
+      )
+    }
+
+    if (!appUrl) {
+      return NextResponse.json(
+        { error: 'Missing NEXT_PUBLIC_APP_URL configuration' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const resend = new Resend(resendApiKey)
+
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
@@ -50,7 +72,7 @@ export async function GET(request: NextRequest) {
       const postList = posts.map((p: any) => `
         <tr>
           <td style="padding: 16px 0; border-bottom: 1px solid #eee;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/${p.author_username}/${p.slug}" 
+            <a href="${appUrl}/${p.author_username}/${p.slug}" 
                style="color: #1a1816; text-decoration: none;">
               <strong style="font-size: 16px;">${p.title}</strong>
             </a>
@@ -81,18 +103,18 @@ export async function GET(request: NextRequest) {
           </table>
           
           <div style="text-align: center; margin-top: 32px; padding-top: 24px; border-top: 1px solid #eee;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/feed" 
+            <a href="${appUrl}/feed" 
                style="display: inline-block; background: #c45d3a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
               View Your Feed
             </a>
           </div>
           
           <p style="color: #999; font-size: 12px; text-align: center; margin-top: 32px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/settings" style="color: #999;">
+            <a href="${appUrl}/settings" style="color: #999;">
               Manage email preferences
             </a>
             &nbsp;·&nbsp;
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe?email=${encodeURIComponent(authUser.user.email)}&type=digest" style="color: #999;">
+            <a href="${appUrl}/unsubscribe?email=${encodeURIComponent(authUser.user.email)}&type=digest" style="color: #999;">
               Unsubscribe
             </a>
           </p>

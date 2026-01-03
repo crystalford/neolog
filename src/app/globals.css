@@ -28,6 +28,10 @@
   --accent-hover: #a84d2e;
   --accent-soft: rgba(196, 93, 58, 0.08);
   --accent-softer: rgba(196, 93, 58, 0.04);
+  --logo-start: #f6821f;
+  --logo-end: #f9b96c;
+  --logo-border: rgba(246, 130, 31, 0.35);
+  --logo-shadow: rgba(246, 130, 31, 0.25);
   
   /* Semantic */
   --success: #3d7c47;
@@ -77,10 +81,47 @@
   --accent-hover: #c45d3a;
   --accent-soft: rgba(224, 122, 85, 0.12);
   --accent-softer: rgba(224, 122, 85, 0.06);
+  --logo-start: #f6821f;
+  --logo-end: #f9b96c;
+  --logo-border: rgba(246, 130, 31, 0.35);
+  --logo-shadow: rgba(246, 130, 31, 0.25);
   
   --border-light: rgba(240, 237, 232, 0.06);
   --border-medium: rgba(240, 237, 232, 0.1);
   --border-heavy: rgba(240, 237, 232, 0.16);
+}
+
+[data-accent="ember"] {
+  --accent: #c45d3a;
+  --accent-hover: #a84d2e;
+  --accent-soft: rgba(196, 93, 58, 0.08);
+  --accent-softer: rgba(196, 93, 58, 0.04);
+  --logo-start: #f6821f;
+  --logo-end: #f9b96c;
+  --logo-border: rgba(246, 130, 31, 0.35);
+  --logo-shadow: rgba(246, 130, 31, 0.25);
+}
+
+[data-accent="ocean"] {
+  --accent: #2563eb;
+  --accent-hover: #1e4fd4;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --accent-softer: rgba(37, 99, 235, 0.06);
+  --logo-start: #38bdf8;
+  --logo-end: #60a5fa;
+  --logo-border: rgba(59, 130, 246, 0.35);
+  --logo-shadow: rgba(59, 130, 246, 0.25);
+}
+
+[data-accent="plum"] {
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.12);
+  --accent-softer: rgba(124, 58, 237, 0.06);
+  --logo-start: #a78bfa;
+  --logo-end: #c084fc;
+  --logo-border: rgba(124, 58, 237, 0.35);
+  --logo-shadow: rgba(124, 58, 237, 0.25);
 }
 
 * {
@@ -320,6 +361,32 @@ body::after {
   border-radius: 8px;
   transition: all var(--transition-fast);
   outline: none;
+}
+
+.input-with-icon {
+  padding-left: 2.75rem;
+}
+
+.logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1a1816;
+  background: linear-gradient(135deg, var(--logo-start) 0%, var(--logo-end) 100%);
+  box-shadow: 0 6px 16px var(--logo-shadow);
+  border: 1px solid var(--logo-border);
+}
+
+.logo-mark-lg {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.8125rem;
 }
 
 .input::placeholder {

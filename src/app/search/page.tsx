@@ -133,7 +133,7 @@ export default function SearchPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search posts and people..."
-                className="input pl-12 pr-12 py-3 text-lg"
+                className="input input-with-icon pr-12 py-3 text-lg"
                 autoFocus
               />
               {query && (
