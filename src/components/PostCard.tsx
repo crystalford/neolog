@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { Clock, ArrowUpRight, Code, Sparkles } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
@@ -18,7 +20,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
 
   // Detect if post has interactive content (scripts)
   const hasInteractiveContent = post.content?.includes('<script') || 
-                                 post.content_type === 'html' && post.content?.includes('<!doctype')
+                                 (post.content_type === 'html' && post.content?.includes('<!doctype'))
 
   // Compact grid card for homepage
   if (variant === 'compact') {
@@ -37,17 +39,17 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               />
             </div>
           )}
-          
+           
           <h2 className="font-display text-lg mb-2 group-hover:text-[var(--accent)] transition-colors line-clamp-2">
             {post.title}
           </h2>
-          
+           
           {post.excerpt && (
             <p className="text-[var(--text-secondary)] text-sm line-clamp-2 mb-3">
               {post.excerpt}
             </p>
           )}
-          
+           
           <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
             {post.author.avatar_url ? (
               <img 
