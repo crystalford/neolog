@@ -341,7 +341,7 @@ export default function WritePage() {
           )}
 
           {/* Header actions */}
-          <div className="flex items-center justify-between py-4 mb-4 sticky top-16 bg-[var(--bg-primary)] z-10 border-b border-[var(--border-light)]">
+          <div className="flex items-center justify-between py-3 mb-6 sticky top-16 bg-[var(--bg-primary)] z-10 border-b border-[var(--border-light)]">
             <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
               {saving && (
                 <span className="flex items-center gap-1.5">
@@ -360,23 +360,23 @@ export default function WritePage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-ghost btn-sm"
               >
                 <Settings size={16} />
                 Settings
               </button>
-              
+
               {profile && postId && (
                 <a
                   href={`/${profile.username}/${generateSlug(title)}?preview=true`}
                   target="_blank"
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-ghost btn-sm"
                 >
                   <Eye size={16} />
                   Preview
                 </a>
               )}
-              
+
               <button
                 onClick={handlePublish}
                 disabled={publishing || !title || !content}
@@ -399,8 +399,8 @@ export default function WritePage() {
 
           {/* Settings panel */}
           {showSettings && (
-            <div className="mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <h3 className="font-medium mb-4">Post Settings</h3>
+            <div className="mb-6 p-6 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+              <h3 className="font-semibold text-lg mb-4">Post Settings</h3>
               
               <div className="space-y-4">
                 <div>

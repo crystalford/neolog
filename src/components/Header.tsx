@@ -56,11 +56,8 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50">
-      {/* Blur backdrop */}
-      <div className="absolute inset-0 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-light)]" />
-       
-      <div className="relative max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)] border-b border-[var(--border-light)]">
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Mobile nav + Logo */}
         <div className="flex items-center gap-2">
           <MobileNav />
@@ -141,7 +138,7 @@ export function Header() {
                       onClick={() => setMenuOpen(false)} 
                     />
                     
-                    <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-xl z-20 py-2 animate-scale-in origin-top-right">
+                    <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg shadow-lg z-20 py-2 animate-scale-in origin-top-right">
                       <div className="px-4 py-2 border-b border-[var(--border-light)] mb-1">
                         <p className="text-sm font-medium truncate">{user.email}</p>
                       </div>

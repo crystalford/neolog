@@ -145,11 +145,11 @@ export function RichEditor({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`p-2 rounded transition-colors ${
-        active 
-          ? 'bg-[var(--accent)] text-white' 
-          : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`p-2 rounded-md transition-all ${
+        active
+          ? 'bg-[var(--accent)] text-white'
+          : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'
+      } ${disabled ? 'opacity-38 cursor-not-allowed' : ''}`}
     >
       {children}
     </button>
@@ -159,7 +159,7 @@ export function RichEditor({
     <div className={`rich-editor ${className}`}>
       {/* Toolbar */}
       {editable && (
-        <div className="flex flex-wrap items-center gap-1 p-2 mb-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-light)] sticky top-20 z-10">
+        <div className="flex flex-wrap items-center gap-1 p-2 mb-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-light)] sticky top-24 z-10">
           {/* Text formatting */}
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
