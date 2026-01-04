@@ -48,8 +48,34 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
   if (variant === 'list') {
     return (
       <article className="group py-6 border-b border-[var(--border-light)] last:border-0">
-        <Link href={`/${post.author.username}/${post.slug}`} className="block">
-           <h2 className="font-display text-xl mb-2">{post.title}</h2>
+        <Link href={`/${post.author.username}/${post.slug}`} className="flex flex-col gap-3 md:flex-row md:items-center">
+          {post.cover_image_url && (
+            <div className="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex-shrink-0">
+              <img
+                src={post.cover_image_url}
+                alt=""
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+          )}
+          <div className="flex-1">
+            <h2 className="font-display text-xl mb-2">{post.title}</h2>
+            {post.excerpt && (
+              <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{post.excerpt}</p>
+            )}
+            <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+              <span>{post.author.display_name || post.author.username}</span>
+              {publishedDate && (
+                <>
+                  <span>•</span>
+                  <time>{publishedDate}</time>
+                </>
+              )}
+              {post.content_type === 'pulse' && (
+                <span className="doc-badge doc-badge-pulse">Pulse</span>
+              )}
+            </div>
+          </div>
         </Link>
       </article>
     )

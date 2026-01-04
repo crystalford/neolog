@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { processEmbeds } from '@/lib/embeds'
 
 type Density = 'summary' | 'full'
 
@@ -27,13 +28,14 @@ export function PostDensityToggle({ postId, summary, bullets, html, model }: Pos
   }, [summaryBullets])
 
   const processed = useMemo(() => {
+    const embedHtml = processEmbeds(html)
     if (typeof window === 'undefined') {
-      return { html, toc: [] as Array<{ id: string; text: string }> }
+      return { html: embedHtml, toc: [] as Array<{ id: string; text: string }> }
     }
 
     try {
       const parser = new DOMParser()
-      const doc = parser.parseFromString(html, 'text/html')
+      const doc = parser.parseFromString(embedHtml, 'text/html')
       const toc: Array<{ id: string; text: string }> = []
       const usedIds = new Set<string>()
 
@@ -64,7 +66,7 @@ export function PostDensityToggle({ postId, summary, bullets, html, model }: Pos
       return { html: doc.body.innerHTML, toc }
     } catch (error) {
       console.error('Density HTML parse error:', error)
-      return { html, toc: [] as Array<{ id: string; text: string }> }
+      return { html: embedHtml, toc: [] as Array<{ id: string; text: string }> }
     }
   }, [html])
 

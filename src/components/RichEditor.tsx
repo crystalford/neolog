@@ -10,10 +10,11 @@ import Typography from '@tiptap/extension-typography'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import { useCallback, useEffect, useState } from 'react'
+import { getEmbedHtml } from '@/lib/embeds'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Code, Link as LinkIcon, Image as ImageIcon, List, ListOrdered,
-  Quote, Minus, Heading1, Heading2, Heading3, Undo, Redo,
+  Quote, Minus, Heading1, Heading2, Heading3, Undo, Redo, Video,
   AlignLeft, Code2, X, Check, Upload
 } from 'lucide-react'
 
@@ -39,6 +40,9 @@ export function RichEditor({
   const [linkUrl, setLinkUrl] = useState('')
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [showImageUpload, setShowImageUpload] = useState(false)
+  const [showEmbedInput, setShowEmbedInput] = useState(false)
+  const [embedUrl, setEmbedUrl] = useState('')
+  const [embedError, setEmbedError] = useState('')
 
   const editor = useEditor({
     extensions: [
@@ -130,6 +134,19 @@ export function RichEditor({
     editor.chain().focus().setImage({ src: url }).run()
     setShowImageUpload(false)
   }, [editor])
+
+  const addEmbed = useCallback(() => {
+    if (!editor || !embedUrl) return
+    const html = getEmbedHtml(embedUrl)
+    if (!html) {
+      setEmbedError('Unsupported embed URL. Use YouTube, Vimeo, Spotify, Loom, Figma, or Gist.')
+      return
+    }
+    editor.chain().focus().insertContent(html).run()
+    setEmbedUrl('')
+    setEmbedError('')
+    setShowEmbedInput(false)
+  }, [editor, embedUrl])
 
   if (!editor) {
     return (
@@ -364,6 +381,63 @@ export function RichEditor({
                     <X size={16} />
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Embed */}
+          <div className="relative">
+            <ToolbarButton
+              onClick={() => {
+                setShowEmbedInput(!showEmbedInput)
+                setEmbedError('')
+              }}
+              active={showEmbedInput}
+              title="Embed media"
+            >
+              <Video size={18} />
+            </ToolbarButton>
+
+            {showEmbedInput && (
+              <div className="absolute top-full left-0 mt-2 p-3 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-lg shadow-lg z-20 w-72">
+                <p className="text-sm font-medium mb-2">Embed media</p>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={embedUrl}
+                    onChange={(e) => setEmbedUrl(e.target.value)}
+                    placeholder="Paste media URL"
+                    className="input py-1.5 text-sm flex-1"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addEmbed()
+                      }
+                      if (e.key === 'Escape') {
+                        setShowEmbedInput(false)
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={addEmbed}
+                    className="p-1.5 rounded bg-[var(--accent)] text-white"
+                  >
+                    <Check size={16} />
+                  </button>
+                  <button
+                    onClick={() => setShowEmbedInput(false)}
+                    className="p-1.5 rounded hover:bg-[var(--bg-tertiary)]"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                {embedError && (
+                  <p className="text-xs text-[var(--error)] mt-2">{embedError}</p>
+                )}
+                <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                  Supports YouTube, Vimeo, Spotify, Loom, Figma, and Gist.
+                </p>
               </div>
             )}
           </div>
