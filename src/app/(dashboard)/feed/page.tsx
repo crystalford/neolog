@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { ContinueReading } from '@/components/ContinueReading'
 import { PostCardListSkeleton } from '@/components/Skeleton'
@@ -111,7 +110,6 @@ export default function FeedPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -198,3 +196,5 @@ export default function FeedPage() {
     </>
   )
 }
+
+

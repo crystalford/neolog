@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Header } from '@/components/Header'
 import { Upload, FileText, AlertCircle, Check, Loader2, ExternalLink } from 'lucide-react'
 
 export default function ImportPage() {
@@ -54,121 +53,125 @@ export default function ImportPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
-        <div className="max-w-2xl mx-auto px-6">
-          <div className="pt-8 mb-8">
+        <div className="max-w-6xl mx-auto px-6 lg:px-12">
+          <div className="pt-8 mb-10">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+              Import
+            </p>
             <h1 className="font-display text-3xl mb-2">Import Your Content</h1>
-            <p className="text-[var(--text-secondary)]">
-              Bring your existing posts from Substack, Medium, or WordPress
+            <p className="text-[var(--text-secondary)] max-w-2xl">
+              Bring your existing posts from Substack, Medium, or WordPress.
             </p>
           </div>
 
-          <div className="space-y-6">
-            {/* Substack */}
-            <div className="p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                  <span className="text-xl font-bold text-orange-500">S</span>
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-medium text-lg mb-1">Import from Substack</h2>
-                  <p className="text-sm text-[var(--text-secondary)] mb-4">
-                    Export your Substack posts and upload the ZIP file here
-                  </p>
-                  
-                  <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to Substack &gt; Settings &gt; Export</li>
-                    <li>2. Download your posts as a ZIP file</li>
-                    <li>3. Upload the ZIP file below</li>
-                  </ol>
+          <div className="space-y-8">
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Substack */}
+              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <span className="text-xl font-bold text-orange-500">S</span>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-medium text-lg mb-1">Import from Substack</h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                      Export your Substack posts and upload the ZIP file here
+                    </p>
 
-                  <label className="btn btn-secondary cursor-pointer inline-flex">
-                    {importing ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={16} />
-                        Upload Substack Export
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept=".zip"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={importing}
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
+                    <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
+                      <li>1. Go to Substack &gt; Settings &gt; Export</li>
+                      <li>2. Download your posts as a ZIP file</li>
+                      <li>3. Upload the ZIP file below</li>
+                    </ol>
 
-            {/* Medium */}
-            <div className="p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#00ab6c]/10 flex items-center justify-center">
-                  <span className="text-xl font-bold text-[#00ab6c]">M</span>
-                </div>
-                <div className="flex-1">
-                  <h2 className="font-medium text-lg mb-1">Import from Medium</h2>
-                  <p className="text-sm text-[var(--text-secondary)] mb-4">
-                    Download your Medium posts and upload the HTML files
-                  </p>
-                  
-                  <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to Medium &gt; Settings &gt; Security &gt; Download your information</li>
-                    <li>2. Wait for the export email (can take a few minutes)</li>
-                    <li>3. Upload the ZIP file below</li>
-                  </ol>
-
-                  <label className="btn btn-secondary cursor-pointer inline-flex">
-                    <Upload size={16} />
-                    Upload Medium Export
-                    <input
-                      type="file"
-                      accept=".zip"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={importing}
-                    />
-                  </label>
+                    <label className="btn btn-secondary cursor-pointer inline-flex">
+                      {importing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={16} />
+                          Upload Substack Export
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* WordPress */}
-            <div className="p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#21759b]/10 flex items-center justify-center">
-                  <span className="text-xl font-bold text-[#21759b]">W</span>
+              {/* Medium */}
+              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-[#00ab6c]/10 flex items-center justify-center">
+                    <span className="text-xl font-bold text-[#00ab6c]">M</span>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-medium text-lg mb-1">Import from Medium</h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                      Download your Medium posts and upload the HTML files
+                    </p>
+
+                    <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
+                      <li>1. Go to Medium &gt; Settings &gt; Security &gt; Download your information</li>
+                      <li>2. Wait for the export email (can take a few minutes)</li>
+                      <li>3. Upload the ZIP file below</li>
+                    </ol>
+
+                    <label className="btn btn-secondary cursor-pointer inline-flex">
+                      <Upload size={16} />
+                      Upload Medium Export
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                    </label>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h2 className="font-medium text-lg mb-1">Import from WordPress</h2>
-                  <p className="text-sm text-[var(--text-secondary)] mb-4">
-                    Export your WordPress posts as XML and upload here
-                  </p>
-                  
-                  <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to WordPress &gt; Tools &gt; Export</li>
-                    <li>2. Choose "Posts" and download the XML</li>
-                    <li>3. Upload the XML file below</li>
-                  </ol>
+              </div>
 
-                  <label className="btn btn-secondary cursor-pointer inline-flex">
-                    <Upload size={16} />
-                    Upload WordPress Export
-                    <input
-                      type="file"
-                      accept=".xml"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      disabled={importing}
-                    />
-                  </label>
+              {/* WordPress */}
+              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-[#21759b]/10 flex items-center justify-center">
+                    <span className="text-xl font-bold text-[#21759b]">W</span>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-medium text-lg mb-1">Import from WordPress</h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                      Export your WordPress posts as XML and upload here
+                    </p>
+
+                    <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
+                      <li>1. Go to WordPress &gt; Tools &gt; Export</li>
+                      <li>2. Choose "Posts" and download the XML</li>
+                      <li>3. Upload the XML file below</li>
+                    </ol>
+
+                    <label className="btn btn-secondary cursor-pointer inline-flex">
+                      <Upload size={16} />
+                      Upload WordPress Export
+                      <input
+                        type="file"
+                        accept=".xml"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -207,4 +210,6 @@ export default function ImportPage() {
     </>
   )
 }
+
+
 

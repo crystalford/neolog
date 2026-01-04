@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   Bell, UserPlus, MessageSquare, ChevronUp, GitFork,
   Rocket, DollarSign, Check, Loader2
@@ -133,7 +132,6 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           {/* Header */}
@@ -231,3 +229,5 @@ export default function NotificationsPage() {
     </>
   )
 }
+
+

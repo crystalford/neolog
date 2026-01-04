@@ -150,11 +150,11 @@ export function ReferralSystem() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
+          <h1 className="text-3xl font-display flex items-center gap-3">
             <Gift size={32} className="text-[var(--accent)]" />
             Referral Program
           </h1>

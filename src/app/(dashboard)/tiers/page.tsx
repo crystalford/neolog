@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   CreditCard, Plus, Loader2, Edit2, Trash2, Check, 
   DollarSign, Users, ToggleLeft, ToggleRight 
@@ -98,7 +97,6 @@ export default function TiersPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center justify-between pt-8 mb-8">
@@ -227,3 +225,5 @@ export default function TiersPage() {
     </>
   )
 }
+
+

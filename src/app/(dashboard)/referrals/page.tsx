@@ -1,15 +1,15 @@
 'use client'
 
 import { ReferralSystem } from '@/components/ReferralSystem'
-import { Header } from '@/components/Header'
 
 export default function ReferralsPage() {
   return (
-    <>
-      <Header />
-      <main className="pt-16 pb-16">
+    <main className="pt-16 pb-16">
+      <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-8">
         <ReferralSystem />
-      </main>
-    </>
+      </div>
+    </main>
   )
 }
+
+

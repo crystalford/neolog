@@ -7,8 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
-  Zap, DollarSign, Users, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, Upload, UserPlus
+  Zap, Settings, LogOut, User as UserIcon,
+  PenLine, Bell, Radio, List, Bookmark, Clock
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -71,126 +71,159 @@ export default function DashboardLayout({
     router.push('/')
   }
 
-  const navLinks = [
-    { href: '/write', icon: PenLine, label: 'Write' },
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
-    { href: '/feed', icon: Radio, label: 'Feed' },
-    { href: '/notifications', icon: Bell, label: 'Notifications' },
-    { href: '/lists', icon: List, label: 'Lists' },
-    { href: '/saved', icon: Bookmark, label: 'Saved' },
-    { href: '/publications', icon: BookOpen, label: 'Publications' },
-    { href: '/analytics', icon: BarChart3, label: 'Analytics' },
-    { href: '/subscribers', icon: Mail, label: 'Subscribers' },
-    { href: '/series', icon: Layers, label: 'Series' },
-    { href: '/referrals', icon: Gift, label: 'Referrals' },
-    { href: '/boost', icon: Zap, label: 'Boost' },
-    { href: '/history', icon: Clock, label: 'History' },
+  const navSections = [
+    {
+      title: 'Create',
+      items: [
+        { href: '/write', icon: PenLine, label: 'Write' },
+        { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
+        { href: '/series', icon: Layers, label: 'Series' },
+        { href: '/publications', icon: BookOpen, label: 'Publications' },
+      ],
+    },
+    {
+      title: 'Audience',
+      items: [
+        { href: '/subscribers', icon: Mail, label: 'Subscribers' },
+        { href: '/lists', icon: List, label: 'Lists' },
+        { href: '/notifications', icon: Bell, label: 'Notifications' },
+        { href: '/saved', icon: Bookmark, label: 'Saved' },
+      ],
+    },
+    {
+      title: 'Growth',
+      items: [
+        { href: '/analytics', icon: BarChart3, label: 'Analytics' },
+        { href: '/referrals', icon: Gift, label: 'Referrals' },
+        { href: '/boost', icon: Zap, label: 'Boost' },
+      ],
+    },
+    {
+      title: 'Workspace',
+      items: [
+        { href: '/feed', icon: Radio, label: 'Feed' },
+        { href: '/history', icon: Clock, label: 'History' },
+      ],
+    },
   ]
 
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
-        <div className="w-56 bg-white border-r border-gray-200 p-4 hidden md:flex flex-col">
-          <div className="h-6 w-28 bg-gray-100 rounded animate-pulse mb-6" />
+      <div className="flex h-screen bg-[var(--bg-secondary)] overflow-hidden">
+        <div className="w-56 bg-[var(--bg-primary)] border-r border-[var(--border-light)] p-4 hidden md:flex flex-col">
+          <div className="h-6 w-28 skeleton rounded mb-6" />
           <div className="space-y-1">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-7 bg-gray-100 rounded animate-pulse" />
+              <div key={i} className="h-7 skeleton rounded" />
             ))}
           </div>
         </div>
         <div className="flex-1 flex flex-col overflow-y-auto">
           <div className="p-8">
-            <div className="h-8 w-48 bg-gray-100 rounded animate-pulse" />
+            <div className="h-8 w-48 skeleton rounded" />
           </div>
         </div>
       </div>
     )
   }
 
+  const activeLabel =
+    navSections
+      .flatMap((section) => section.items)
+      .find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))
+      ?.label || (pathname.startsWith('/settings') ? 'Settings' : 'Dashboard')
+
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar - Cloudflare style */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col p-4 hidden md:flex">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 px-2 mb-6">
-          <div className="w-6 h-6 bg-black rounded-sm flex items-center justify-center">
-            <span className="text-white font-bold text-xs">N</span>
-          </div>
-          <span className="font-sans text-base font-semibold text-gray-900">
-            Neolog
-          </span>
-        </Link>
+    <div className="flex min-h-screen bg-[var(--bg-secondary)]">
+      {/* Sidebar */}
+      <aside className="w-[264px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
+        <div className="px-5 pt-6">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] flex items-center justify-center font-bold text-xs">
+              N
+            </div>
+            <span className="font-display text-xl">Neolog</span>
+          </Link>
 
-        {/* Primary Navigation */}
-        <nav className="flex-1 space-y-0.5">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-            const Icon = link.icon
+          <Link
+            href="/write"
+            className="mt-6 inline-flex items-center justify-between w-full gap-2 px-3 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium shadow-sm hover:bg-[var(--accent-hover)] transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <PenLine size={16} />
+              New post
+            </span>
+            <span className="text-xs opacity-80">Ctrl+N</span>
+          </Link>
+        </div>
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`
-                  flex items-center gap-2.5 px-2 py-1.5 rounded
-                  text-sm transition-colors
-                  ${isActive
-                    ? 'bg-gray-100 text-gray-900 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                `}
-              >
-                <Icon size={16} className="flex-shrink-0" />
-                <span>{link.label}</span>
-              </Link>
-            )
-          })}
+        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                {section.title}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((link) => {
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                  const Icon = link.icon
+
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                    >
+                      <Icon size={16} className="flex-shrink-0" />
+                      <span>{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        {/* Bottom section */}
-        <div className="border-t border-gray-200 pt-4 space-y-0.5">
-
-          {/* Settings */}
+        <div className="border-t border-[var(--border-light)] px-4 py-4 space-y-1">
           <Link
             href="/settings"
-            className={`
-              flex items-center gap-2.5 px-2 py-1.5 rounded
-              text-sm transition-colors
-              ${pathname === '/settings'
-                ? 'bg-gray-100 text-gray-900 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-            `}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname === '/settings'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+            }`}
           >
             <Settings size={16} />
             <span>Settings</span>
           </Link>
 
-          {/* User Profile */}
           {profile && (
             <Link
               href={`/${profile.username}`}
-              className="flex items-center gap-2.5 px-2 py-1.5 rounded text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt={profile.display_name || profile.username}
-                  className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                  className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                 />
               ) : (
                 <UserIcon size={16} className="flex-shrink-0" />
               )}
-              <span className="truncate text-xs">
+              <span className="truncate text-sm">
                 {profile.display_name || profile.username}
               </span>
             </Link>
           )}
 
-          {/* Sign Out */}
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded text-sm text-gray-600 hover:bg-gray-50 hover:text-red-600 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
           >
             <LogOut size={16} />
             <span>Sign out</span>
@@ -199,8 +232,46 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        {children}
+      <div className="flex-1 flex flex-col">
+        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)]">
+          <div className="h-16 px-6 lg:px-12 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                Publisher workspace
+              </p>
+              <p className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/write"
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+              >
+                <PenLine size={16} />
+                New post
+              </Link>
+              {profile && (
+                <Link
+                  href={`/${profile.username}`}
+                  className="w-9 h-9 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                >
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || profile.username}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <UserIcon size={16} />
+                  )}
+                </Link>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto">
+          {children}
+        </div>
       </div>
     </div>
   )

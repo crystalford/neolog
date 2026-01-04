@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { Bookmark, Loader2, Compass } from 'lucide-react'
 
@@ -77,7 +76,6 @@ export default function SavedPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -124,3 +122,5 @@ export default function SavedPage() {
     </>
   )
 }
+
+

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
-import { Header } from '@/components/Header'
 import { 
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
@@ -212,7 +211,6 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <>
-        <Header />
         <main className="pt-16 pb-16">
           <div className="max-w-2xl mx-auto px-6 pt-8">
             <div className="h-8 w-32 skeleton rounded mb-8" />
@@ -227,355 +225,356 @@ export default function SettingsPage() {
   }
 
   return (
-    <>
-      <Header />
-      <main className="pt-16 pb-16">
-        <div className="max-w-2xl mx-auto px-6">
-          <h1 className="font-display text-3xl pt-8 mb-8">Settings</h1>
+    <main className="pt-16 pb-16">
+      <div className="max-w-6xl mx-auto px-6 lg:px-12">
+        <div className="pt-8 mb-10">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+            Publisher settings
+          </p>
+          <h1 className="font-display text-3xl">Settings</h1>
+          <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
+            Manage your profile, notifications, and exports for your publication.
+          </p>
+        </div>
 
-          {/* Error/Success Messages */}
-          {error && (
-            <div className="mb-6 p-4 rounded-md bg-white border-2 border-black">
-              <p className="font-sans text-sm font-medium text-gray-900">{error}</p>
-            </div>
-          )}
-          {success && (
-            <div className="mb-6 p-4 rounded-md bg-black text-white">
-              <p className="font-sans text-sm font-medium">{success}</p>
-            </div>
-          )}
+        {error && (
+          <div className="mb-6 p-4 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 text-sm text-[var(--error)]">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-6 p-4 rounded-xl border border-[var(--success)]/30 bg-[var(--success)]/10 text-sm text-[var(--success)]">
+            {success}
+          </div>
+        )}
 
-          {/* Profile Settings */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                <User size={20} className="text-[var(--accent)]" />
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+          <div className="space-y-8">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <User size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-xl">Profile</h2>
               </div>
-              <h2 className="font-display text-xl">Profile</h2>
-            </div>
 
-            <div className="space-y-6">
-              {/* Avatar */}
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
-                  Profile Picture
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    {formData.avatar_url ? (
-                      <img 
-                        src={formData.avatar_url}
-                        alt="Avatar"
-                        className="w-20 h-20 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl text-white font-medium">
-                        {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
-                      </div>
-                    )}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
+                    Profile Picture
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      {formData.avatar_url ? (
+                        <img 
+                          src={formData.avatar_url}
+                          alt="Avatar"
+                          className="w-20 h-20 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl text-white font-medium">
+                          {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
+                        </div>
+                      )}
+                      
+                      <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
+                        {uploadingAvatar ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Camera size={14} className="text-[var(--text-secondary)]" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                          disabled={uploadingAvatar}
+                        />
+                      </label>
+                    </div>
                     
-                    <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
-                      {uploadingAvatar ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Camera size={14} className="text-[var(--text-secondary)]" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarUpload}
-                        className="hidden"
-                        disabled={uploadingAvatar}
-                      />
+                    <div className="text-sm text-[var(--text-tertiary)]">
+                      <p>Click the camera icon to upload</p>
+                      <p>JPG, PNG, or GIF. Max 2MB.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={profile?.username || ''}
+                    disabled
+                    className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)] cursor-not-allowed"
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Your profile URL: {baseUrl}/{profile?.username}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Username cannot be changed after account creation
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.display_name}
+                    onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                    className="input"
+                    placeholder="Your display name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Bio
+                  </label>
+                  <textarea
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    className="input min-h-[100px] resize-y"
+                    placeholder="Tell readers about yourself"
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
+                    {formData.bio.length}/500
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Website
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.website_url}
+                    onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                    className="input"
+                    placeholder="https://yoursite.com"
+                  />
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Twitter
                     </label>
+                    <input
+                      type="url"
+                      value={formData.twitter_url}
+                      onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
+                      className="input"
+                      placeholder="https://twitter.com/..."
+                    />
                   </div>
-                  
-                  <div className="text-sm text-[var(--text-tertiary)]">
-                    <p>Click the camera icon to upload</p>
-                    <p>JPG, PNG, or GIF. Max 2MB.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={profile?.username || ''}
-                  disabled
-                  className="input bg-gray-50 text-gray-500 cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Your profile URL: {baseUrl}/{profile?.username}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Username cannot be changed after account creation
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.display_name}
-                  onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                  className="input"
-                  placeholder="Your display name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Bio
-                </label>
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="input min-h-[100px] resize-y"
-                  placeholder="Tell readers about yourself"
-                  maxLength={500}
-                />
-                <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                  {formData.bio.length}/500
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Website
-                </label>
-                <input
-                  type="url"
-                  value={formData.website_url}
-                  onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                  className="input"
-                  placeholder="https://yoursite.com"
-                />
-              </div>
-
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Twitter
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.twitter_url}
-                    onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
-                    className="input"
-                    placeholder="https://twitter.com/..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    GitHub
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.github_url}
-                    onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                    className="input"
-                    placeholder="https://github.com/..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    LinkedIn
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.linkedin_url}
-                    onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                    className="input"
-                    placeholder="https://linkedin.com/in/..."
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn btn-primary"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check size={16} />
-                    Save Profile
-                  </>
-                )}
-              </button>
-            </div>
-          </section>
-
-          {/* Email Preferences */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                <Bell size={20} className="text-[var(--accent)]" />
-              </div>
-              <h2 className="font-display text-xl">Email Notifications</h2>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
-                { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
-                { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
-                { key: 'email_post_upvote', label: 'Upvotes', desc: 'When someone upvotes your post' },
-                { key: 'email_weekly_digest', label: 'Weekly digest', desc: 'Summary of activity on your posts' },
-              ].map(({ key, label, desc }) => (
-                <label 
-                  key={key}
-                  className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
-                >
                   <div>
-                    <p className="font-medium">{label}</p>
-                    <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      GitHub
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.github_url}
+                      onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
+                      className="input"
+                      placeholder="https://github.com/..."
+                    />
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={(emailPrefs as any)[key]}
-                    onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
-                    className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-                  />
-                </label>
-              ))}
-            </div>
-          </section>
-
-          {/* RSS Feeds */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                <Rss size={20} className="text-[var(--accent)]" />
-              </div>
-              <h2 className="font-display text-xl">Your Feeds</h2>
-            </div>
-
-            <p className="text-[var(--text-secondary)] mb-4">
-              Your content is available in multiple formats. Share these with your audience.
-            </p>
-
-            <div className="space-y-3">
-              {[
-                { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
-                { label: 'Atom Feed', url: `${baseUrl}/${profile?.username}/feed?format=atom` },
-                { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
-              ].map(({ label, url }) => (
-                <div 
-                  key={label}
-                  className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm">{label}</p>
-                    <p className="text-xs text-[var(--text-tertiary)] truncate">
-                      {url}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 ml-3">
-                    <button
-                      onClick={() => copyToClipboard(url, label)}
-                      className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                      title="Copy URL"
-                    >
-                      {copied === label ? (
-                        <Check size={16} className="text-[var(--success)]" />
-                      ) : (
-                        <Copy size={16} className="text-[var(--text-tertiary)]" />
-                      )}
-                    </button>
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                      title="Open feed"
-                    >
-                      <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
-                    </a>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      LinkedIn
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.linkedin_url}
+                      onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                      className="input"
+                      placeholder="https://linkedin.com/in/..."
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
 
-          {/* Export */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                <Download size={20} className="text-[var(--accent)]" />
-              </div>
-              <h2 className="font-display text-xl">Export Your Data</h2>
-            </div>
-
-            <p className="text-[var(--text-secondary)] mb-4">
-              Download all your content. Your data is yours - no lock-in.
-            </p>
-
-            <div className="grid gap-3">
-              {[
-                { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data: posts, drafts, settings' },
-                { format: 'markdown', label: 'Markdown Export', desc: 'All posts as markdown files' },
-                { format: 'html', label: 'HTML Archive', desc: 'Self-contained HTML with all posts' },
-              ].map(({ format, label, desc }) => (
-                <a
-                  key={format}
-                  href={`/api/export?format=${format}`}
-                  className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="btn btn-primary"
                 >
-                  <div>
-                    <p className="font-medium">{label}</p>
-                    <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                  {saving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      Save Profile
+                    </>
+                  )}
+                </button>
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Bell size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-xl">Email Notifications</h2>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
+                  { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
+                  { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
+                  { key: 'email_post_upvote', label: 'Upvotes', desc: 'When someone upvotes your post' },
+                  { key: 'email_weekly_digest', label: 'Weekly digest', desc: 'Summary of activity on your posts' },
+                ].map(({ key, label, desc }) => (
+                  <label 
+                    key={key}
+                    className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{label}</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={(emailPrefs as any)[key]}
+                      onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
+                      className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                    />
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Rss size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-xl">Your Feeds</h2>
+              </div>
+
+              <p className="text-[var(--text-secondary)] mb-4">
+                Your content is available in multiple formats. Share these with your audience.
+              </p>
+
+              <div className="space-y-3">
+                {[
+                  { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
+                  { label: 'Atom Feed', url: `${baseUrl}/${profile?.username}/feed?format=atom` },
+                  { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
+                ].map(({ label, url }) => (
+                  <div 
+                    key={label}
+                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{label}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] truncate">
+                        {url}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3">
+                      <button
+                        onClick={() => copyToClipboard(url, label)}
+                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                        title="Copy URL"
+                      >
+                        {copied === label ? (
+                          <Check size={16} className="text-[var(--success)]" />
+                        ) : (
+                          <Copy size={16} className="text-[var(--text-tertiary)]" />
+                        )}
+                      </button>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                        title="Open feed"
+                      >
+                        <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
+                      </a>
+                    </div>
                   </div>
-                  <Download size={18} className="text-[var(--text-tertiary)]" />
-                </a>
-              ))}
-            </div>
-          </section>
-
-          {/* Account Info */}
-          <section className="mb-12">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center">
-                <Mail size={20} className="text-[var(--text-tertiary)]" />
+                ))}
               </div>
-              <h2 className="font-display text-xl">Account</h2>
-            </div>
+            </section>
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
-                />
+          <div className="space-y-8">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Download size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-xl">Export Your Data</h2>
               </div>
-            </div>
-          </section>
 
-          {/* Danger Zone */}
-          <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
-                <Shield size={20} className="text-[var(--error)]" />
+              <p className="text-[var(--text-secondary)] mb-4">
+                Download all your content. Your data is yours - no lock-in.
+              </p>
+
+              <div className="grid gap-3">
+                {[
+                  { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data: posts, drafts, settings' },
+                  { format: 'markdown', label: 'Markdown Export', desc: 'All posts as markdown files' },
+                  { format: 'html', label: 'HTML Archive', desc: 'Self-contained HTML with all posts' },
+                ].map(({ format, label, desc }) => (
+                  <a
+                    key={format}
+                    href={`/api/export?format=${format}`}
+                    className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{label}</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                    </div>
+                    <Download size={18} className="text-[var(--text-tertiary)]" />
+                  </a>
+                ))}
               </div>
-              <h2 className="font-display text-xl">Danger Zone</h2>
-            </div>
+            </section>
 
-            <div className="p-5 rounded-xl border border-[var(--error)]/20 bg-[var(--error)]/5">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center">
+                  <Mail size={20} className="text-[var(--text-tertiary)]" />
+                </div>
+                <h2 className="font-display text-xl">Account</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
+                  <Shield size={20} className="text-[var(--error)]" />
+                </div>
+                <h2 className="font-display text-xl">Danger Zone</h2>
+              </div>
+
               <div className="flex items-start gap-3 mb-4">
                 <AlertTriangle size={20} className="text-[var(--error)] flex-shrink-0 mt-0.5" />
                 <div>
@@ -635,11 +634,10 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   )
 }
-

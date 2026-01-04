@@ -137,41 +137,39 @@ export function PublicationsManager() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
+    <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-8 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-            <BookOpen size={32} />
-            My Publications
-          </h1>
-          <p className="text-[var(--text-secondary)] mt-2">
-            Manage all your blogs and publications in one place
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workspace</p>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Publications</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Manage all your blogs and publications in one place.
           </p>
         </div>
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="btn btn-primary"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
         >
           <Plus size={16} />
-          New Publication
+          New publication
         </button>
       </div>
 
       {/* Publications grid */}
       {publications.length === 0 ? (
-        <div className="text-center py-16 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
+        <div className="text-center py-16 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)] shadow-sm">
           <BookOpen size={48} className="mx-auto mb-4 text-[var(--text-tertiary)] opacity-50" />
-          <h3 className="font-semibold text-lg mb-2">No publications yet</h3>
+          <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">No publications yet</h3>
           <p className="text-sm text-[var(--text-secondary)] mb-6">
             Create your first publication to start publishing
           </p>
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="btn btn-primary"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
           >
             <Plus size={16} />
-            Create Publication
+            Create publication
           </button>
         </div>
       ) : (
@@ -179,7 +177,7 @@ export function PublicationsManager() {
           {publications.map(pub => (
             <div
               key={pub.id}
-              className="group relative p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-lg transition-all"
+              className="group relative p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-lg transition-all"
             >
               {/* Cover/Logo */}
               <div className="mb-4">
@@ -201,7 +199,7 @@ export function PublicationsManager() {
 
               {/* Info */}
               <div className="mb-4">
-                <h3 className="font-semibold text-lg mb-1">{pub.name}</h3>
+                <h3 className="font-semibold text-lg mb-1 text-[var(--text-primary)]">{pub.name}</h3>
                 <p className="text-sm text-[var(--text-tertiary)] mb-2">
                   @{pub.slug}
                 </p>
@@ -215,15 +213,15 @@ export function PublicationsManager() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-[var(--border-light)]">
                 <div>
-                  <p className="text-2xl font-bold">{pub.total_posts}</p>
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_posts}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{pub.total_subscribers}</p>
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_subscribers}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{pub.total_views}</p>
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_views}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Views</p>
                 </div>
               </div>

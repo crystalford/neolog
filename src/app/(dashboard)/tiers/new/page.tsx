@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { ArrowLeft, Plus, X, Loader2, DollarSign } from 'lucide-react'
 import Link from 'next/link'
 
@@ -106,7 +105,6 @@ export default function NewTierPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <div className="pt-8 mb-8">
@@ -235,3 +233,5 @@ export default function NewTierPage() {
     </>
   )
 }
+
+

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   ArrowLeft, ArrowRight, Rocket, Target, DollarSign,
   Users, MousePointer, BookOpen, Check, Loader2,
@@ -207,7 +206,6 @@ export default function NewCampaignPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           {/* Header */}
@@ -589,5 +587,7 @@ export default function NewCampaignPage() {
     </>
   )
 }
+
+
 
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { ArrowLeft, Loader2, Globe, Lock, Trash2 } from 'lucide-react'
 
 interface Props {
@@ -99,7 +98,6 @@ export default function EditListPage({ params }: Props) {
   if (loading) {
     return (
       <>
-        <Header />
         <main className="pt-16 pb-16 flex items-center justify-center min-h-screen">
           <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
         </main>
@@ -109,7 +107,6 @@ export default function EditListPage({ params }: Props) {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <div className="pt-8 mb-8">
@@ -227,3 +224,5 @@ export default function EditListPage({ params }: Props) {
     </>
   )
 }
+
+

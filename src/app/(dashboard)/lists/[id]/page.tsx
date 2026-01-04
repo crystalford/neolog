@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { PostCardListSkeleton } from '@/components/Skeleton'
 import { 
@@ -114,7 +113,6 @@ export default function ListDetailPage({ params }: Props) {
   if (loading) {
     return (
       <>
-        <Header />
         <main className="pt-16 pb-16">
           <div className="max-w-7xl mx-auto px-6 lg:px-12">
             <div className="pt-8 space-y-4">
@@ -132,7 +130,6 @@ export default function ListDetailPage({ params }: Props) {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="pt-8 mb-8">
@@ -222,3 +219,5 @@ export default function ListDetailPage({ params }: Props) {
     </>
   )
 }
+
+

@@ -527,15 +527,15 @@ export default function WritePage() {
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Error/Success Messages */}
           {hasNoPublications && (
-            <div className="mb-6 p-5 rounded-md bg-gray-50 border border-gray-300">
-              <h3 className="font-serif text-lg font-semibold text-gray-900 mb-2">
+            <div className="mb-6 p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+              <h3 className="font-display text-lg mb-2">
                 Create a Publication First
               </h3>
-              <p className="font-sans text-sm text-gray-700 mb-4">
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
                 Before you can write posts, you need to create at least one publication.
                 Publications are like separate blogs that you can manage.
               </p>
-              <Link href="/publications" className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+              <Link href="/publications" className="btn btn-primary">
                 <BookOpen size={16} />
                 Create Your First Publication
               </Link>
@@ -543,20 +543,20 @@ export default function WritePage() {
           )}
 
           {error && (
-            <div className="mb-6 p-4 rounded-md bg-white border-2 border-black">
-              <p className="font-sans text-sm font-medium text-gray-900">{error}</p>
+            <div className="mb-6 p-4 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 text-sm text-[var(--error)]">
+              {error}
             </div>
           )}
           {success && (
-            <div className="mb-6 p-4 rounded-md bg-black text-white">
-              <p className="font-sans text-sm font-medium">{success}</p>
+            <div className="mb-6 p-4 rounded-xl border border-[var(--success)]/30 bg-[var(--success)]/10 text-sm text-[var(--success)]">
+              {success}
             </div>
           )}
 
           {/* Publication selector */}
           {publications.length > 0 && (
             <div className="mb-6">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+              <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
                 Publishing to
               </label>
               <select
@@ -568,7 +568,7 @@ export default function WritePage() {
                     localStorage.setItem('selectedPublicationId', newId)
                   }
                 }}
-                className="w-full max-w-md px-4 py-2 bg-white border border-gray-300 rounded-md font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                className="input max-w-md"
               >
                 {publications.map((pub) => (
                   <option key={pub.id} value={pub.id}>
@@ -580,8 +580,8 @@ export default function WritePage() {
           )}
 
           {/* Header actions */}
-          <div className="flex items-center justify-between py-3 mb-8 sticky top-0 bg-gray-50 z-10">
-            <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center justify-between py-3 mb-8 sticky top-0 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)] z-10">
+            <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
               {saving && (
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={12} className="animate-spin" />
@@ -598,7 +598,7 @@ export default function WritePage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowImport((prev) => !prev)}
-                className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                className="btn btn-ghost btn-sm"
               >
                 Import HTML
               </button>
@@ -606,7 +606,7 @@ export default function WritePage() {
                 <a
                   href={`/${profile.username}/${generateSlug(title)}?preview=true`}
                   target="_blank"
-                  className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+                  className="btn btn-ghost btn-sm"
                 >
                   Preview
                 </a>
@@ -615,7 +615,7 @@ export default function WritePage() {
               <button
                 onClick={handlePublish}
                 disabled={publishing || !title || !content || !publicationId}
-                className="px-4 py-1.5 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="btn btn-primary btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {publishing ? 'Publishing...' : 'Publish'}
               </button>
@@ -623,17 +623,17 @@ export default function WritePage() {
           </div>
 
           {showImport && (
-            <div className="mb-8 p-5 rounded-md bg-white border border-gray-200">
+            <div className="mb-8 p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-serif text-lg font-semibold text-gray-900">Import HTML</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-display text-lg">Import HTML</h3>
+                  <p className="text-sm text-[var(--text-secondary)]">
                     Upload an HTML file or paste raw HTML to convert it into a post.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowImport(false)}
-                  className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
                   aria-label="Close import panel"
                 >
                   <X size={16} />
@@ -641,20 +641,20 @@ export default function WritePage() {
               </div>
 
               {importError && (
-                <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
+                <div className="mb-4 p-3 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20 text-sm text-[var(--error)]">
                   {importError}
                 </div>
               )}
               {importNotice && (
-                <div className="mb-4 p-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-700">
+                <div className="mb-4 p-3 rounded-lg bg-[var(--success)]/10 border border-[var(--success)]/20 text-sm text-[var(--success)]">
                   {importNotice}
                 </div>
               )}
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div>
-                  <p className="text-sm font-medium text-gray-900 mb-2">Upload HTML file</p>
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-gray-500 transition-colors text-sm text-gray-600">
+                  <p className="text-sm font-medium text-[var(--text-primary)] mb-2">Upload HTML file</p>
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border-light)] rounded-xl cursor-pointer hover:border-[var(--border-medium)] transition-colors text-sm text-[var(--text-secondary)] bg-[var(--bg-secondary)]">
                     <Upload size={16} />
                     Choose HTML file
                     <input
@@ -664,21 +664,21 @@ export default function WritePage() {
                       className="hidden"
                     />
                   </label>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-[var(--text-tertiary)] mt-2">
                     Tip: HTML with inline CSS works best. External assets may need absolute URLs.
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900 mb-2">Paste HTML</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)] mb-2">Paste HTML</p>
                   <textarea
                     value={importHtml}
                     onChange={(e) => setImportHtml(e.target.value)}
                     placeholder="Paste full HTML here..."
-                    className="w-full min-h-[140px] p-3 border border-gray-300 rounded-md text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    className="input font-mono min-h-[140px]"
                   />
                   <button
                     onClick={handlePasteImport}
-                    className="mt-3 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+                    className="mt-3 btn btn-primary btn-sm"
                   >
                     Import from paste
                   </button>
@@ -693,7 +693,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-4xl font-serif font-bold bg-white border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 text-gray-900 mb-4 px-0 pt-2"
+            className="w-full text-4xl font-display bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-4 px-0 pt-2"
             autoFocus
           />
 
@@ -703,11 +703,11 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Subtitle (optional)"
-            className="w-full text-xl font-sans text-gray-600 bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 mb-8 px-0"
+            className="w-full text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-8 px-0"
           />
 
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Editor mode: {htmlMode ? 'HTML' : 'Visual'}
             </span>
             <button
@@ -720,21 +720,21 @@ export default function WritePage() {
                 }
                 setHtmlMode(!htmlMode)
               }}
-              className="text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              className="btn btn-ghost btn-sm"
             >
               Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
             </button>
           </div>
 
           {htmlMode ? (
-            <div className="border border-gray-300 rounded-md p-3 bg-white">
+            <div className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)]">
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Paste or write raw HTML..."
-                className="w-full min-h-[360px] font-mono text-sm text-gray-800 focus:outline-none"
+                className="editor-textarea min-h-[360px]"
               />
-              <p className="mt-2 text-xs text-gray-500">
+              <p className="mt-2 text-xs text-[var(--text-tertiary)]">
                 Raw HTML mode preserves scripts and styles. Preview to verify the final layout.
               </p>
             </div>

@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { ArrowLeft, Loader2, Image as ImageIcon } from 'lucide-react'
 
 export default function NewSeriesPage() {
@@ -71,7 +70,6 @@ export default function NewSeriesPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-2xl mx-auto px-6">
           <div className="pt-8 mb-8">
@@ -164,3 +162,5 @@ export default function NewSeriesPage() {
     </>
   )
 }
+
+

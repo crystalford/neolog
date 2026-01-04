@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   ArrowLeft, Plus, DollarSign, Rss, FileText,
   Sparkles, Check, Trash2, Settings, Loader2
@@ -146,7 +145,6 @@ export default function PlacementsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -412,3 +410,5 @@ export default function PlacementsPage() {
     </>
   )
 }
+
+

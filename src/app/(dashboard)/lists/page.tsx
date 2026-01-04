@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   List, Plus, Lock, Globe, BookOpen, 
   MoreHorizontal, Edit, Trash2, Share2
@@ -70,7 +69,6 @@ export default function ListsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -198,3 +196,5 @@ export default function ListsPage() {
     </>
   )
 }
+
+

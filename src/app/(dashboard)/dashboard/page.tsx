@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ShareDraftButton } from '@/components/ShareDraftButton'
 import type { Post, Profile } from '@/types/database'
 import {
-  PenLine, MoreHorizontal, Eye, Edit2, Trash2,
+  PenLine, Eye, Edit2, Trash2,
   Globe, FileText, Clock
 } from 'lucide-react'
 
@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all')
   const router = useRouter()
   const supabase = createClient()
 
@@ -56,18 +56,17 @@ export default function DashboardPage() {
 
     await supabase.from('posts').delete().eq('id', postId)
     setPosts(posts.filter(p => p.id !== postId))
-    setActiveMenu(null)
   }
 
   if (loading) {
     return (
       <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-gray-100 rounded" />
-          <div className="h-4 w-32 bg-gray-100 rounded" />
+          <div className="h-8 w-48 skeleton rounded" />
+          <div className="h-4 w-32 skeleton rounded" />
           <div className="mt-8 space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-gray-100 rounded-md" />
+              <div key={i} className="h-24 skeleton rounded-md" />
             ))}
           </div>
         </div>
@@ -75,73 +74,124 @@ export default function DashboardPage() {
     )
   }
 
+  const publishedCount = posts.filter((post) => post.status === 'published').length
+  const draftCount = posts.filter((post) => post.status !== 'published').length
+  const filteredPosts = posts.filter((post) => {
+    if (filter === 'published') return post.status === 'published'
+    if (filter === 'draft') return post.status !== 'published'
+    return true
+  })
+
   return (
-    <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto animate-fade-up">
-      <div className="flex justify-between items-start gap-4 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="font-serif text-3xl tracking-tight text-gray-900">Your posts</h1>
-          <p className="font-sans text-sm text-gray-600 mt-1">
-            {posts.length} {posts.length === 1 ? 'post' : 'posts'}
-          </p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Posts</p>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Your content pipeline</h1>
         </div>
-        <Link href="/write" className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors flex-shrink-0">
-          <PenLine size={16} />
-          New post
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/write"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+          >
+            <PenLine size={16} />
+            New post
+          </Link>
+        </div>
       </div>
 
-      {posts.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-md bg-gray-100 flex items-center justify-center mx-auto mb-4 border border-gray-200">
-            <FileText size={28} className="text-gray-400" />
+      <div className="grid gap-4 md:grid-cols-3 mb-8">
+        {[
+          { label: 'Total posts', value: posts.length },
+          { label: 'Published', value: publishedCount },
+          { label: 'Drafts', value: draftCount },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-4 shadow-sm"
+          >
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">{stat.label}</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{stat.value}</p>
           </div>
-          <h2 className="font-serif text-xl tracking-tight text-gray-900 mb-2">No posts yet</h2>
-          <p className="font-sans text-sm text-gray-600 mb-6">Create your first post to get started</p>
-          <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white font-sans text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'published', label: 'Published' },
+            { id: 'draft', label: 'Drafts' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setFilter(item.id as typeof filter)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === item.id
+                  ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-[var(--text-secondary)]">
+          {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
+        </p>
+      </div>
+
+      {filteredPosts.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
+            <FileText size={28} className="text-[var(--text-tertiary)]" />
+          </div>
+          <h2 className="font-display text-xl tracking-tight text-[var(--text-primary)] mb-2">No posts yet</h2>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">Create your first post to get started</p>
+          <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
             <PenLine size={16} />
             Write your first post
           </Link>
         </div>
       ) : (
         <div className="space-y-3">
-          {posts.map((post) => (
+          {filteredPosts.map((post) => (
             <div
               key={post.id}
-              className="bg-white border border-gray-200 rounded-md p-5 hover:border-gray-300 transition-colors"
+              className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-5 hover:border-[var(--border-medium)] hover:shadow-sm transition-all"
             >
-              <div className="flex justify-between items-start">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     {post.status === 'published' ? (
-                      <span className="flex items-center gap-1 font-sans text-xs font-medium text-green-600">
+                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--success)] bg-[var(--success)]/10 px-2 py-0.5 rounded-full">
                         <Globe size={12} />
                         Published
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 font-sans text-xs font-medium text-gray-500">
+                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
                         <FileText size={12} />
                         Draft
                       </span>
                     )}
-                    <span className="text-gray-400"> - </span>
-                    <span className="font-sans text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
                       <Clock size={12} />
                       {new Date(post.updated_at).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <h2 className="font-serif text-lg tracking-tight text-gray-900 truncate">
+                  <h2 className="font-display text-lg tracking-tight text-[var(--text-primary)] truncate">
                     {post.title || 'Untitled'}
                   </h2>
 
                   {post.excerpt && (
-                    <p className="font-sans text-sm text-gray-600 line-clamp-1 mt-1">
+                    <p className="text-sm text-[var(--text-secondary)] line-clamp-1 mt-1">
                       {post.excerpt}
                     </p>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex flex-wrap items-center gap-2">
                   {post.status === 'draft' && (
                     <ShareDraftButton
                       postId={post.id}
@@ -150,42 +200,29 @@ export default function DashboardPage() {
                     />
                   )}
 
-                  <div className="relative">
-                    <button
-                      onClick={() => setActiveMenu(activeMenu === post.id ? null : post.id)}
-                      className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  {post.status === 'published' && profile && (
+                    <Link
+                      href={`/${profile.username}/${post.slug}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
                     >
-                      <MoreHorizontal size={18} className="text-gray-500" />
-                    </button>
-
-                    {activeMenu === post.id && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1">
-                        {post.status === 'published' && profile && (
-                          <Link
-                            href={`/${profile.username}/${post.slug}`}
-                            className="flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
-                          >
-                            <Eye size={14} />
-                            View
-                          </Link>
-                        )}
-                        <Link
-                          href={`/write?edit=${post.id}`}
-                          className="flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
-                        >
-                          <Edit2 size={14} />
-                          Edit
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(post.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-red-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                      <Eye size={14} />
+                      View
+                    </Link>
+                  )}
+                  <Link
+                    href={`/write?edit=${post.id}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                  >
+                    <Edit2 size={14} />
+                    Edit
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(post.id)}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>

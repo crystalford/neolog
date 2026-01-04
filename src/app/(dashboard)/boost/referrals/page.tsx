@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   ArrowLeft, Plus, Users, DollarSign, Link as LinkIcon,
   Copy, Check, Loader2, ExternalLink, Trash2
@@ -187,7 +186,6 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -502,3 +500,5 @@ export default function ReferralsPage() {
     </>
   )
 }
+
+

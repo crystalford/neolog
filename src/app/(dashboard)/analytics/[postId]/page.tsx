@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Header } from '@/components/Header'
 import { 
   ArrowLeft, Eye, Clock, Users, Target,
   TrendingUp, TrendingDown, Minus
@@ -156,7 +155,6 @@ export default function PostAnalyticsPage() {
 
   return (
     <>
-      <Header />
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
@@ -405,4 +403,6 @@ export default function PostAnalyticsPage() {
     </>
   )
 }
+
+
 
