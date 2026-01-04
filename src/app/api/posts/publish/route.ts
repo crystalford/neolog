@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { sendNewPostNotifications } from '@/lib/email'
+import { resolveProviderKey } from '@/lib/ai-provider'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Publish a post and notify subscribers
@@ -90,19 +91,23 @@ export async function POST(request: NextRequest) {
       // For now, we only send to email subscribers
       // User subscribers would need their email from auth.users (requires service role)
       if (emailSubscribers && emailSubscribers.length > 0) {
-        notificationResult = await sendNewPostNotifications(
-          emailSubscribers.map(s => ({
-            email: s.email,
-            unsubscribeToken: s.unsubscribe_token,
-          })),
-          {
-            creatorName: post.author.display_name || post.author.username,
-            creatorUsername: post.author.username,
-            postTitle: post.title,
-            postSlug: post.slug,
-            postExcerpt: post.excerpt,
-          }
-        )
+        const resendKey = await resolveProviderKey(session.user.id, 'resend')
+        if (resendKey) {
+          notificationResult = await sendNewPostNotifications(
+            emailSubscribers.map(s => ({
+              email: s.email,
+              unsubscribeToken: s.unsubscribe_token,
+            })),
+            {
+              creatorName: post.author.display_name || post.author.username,
+              creatorUsername: post.author.username,
+              postTitle: post.title,
+              postSlug: post.slug,
+              postExcerpt: post.excerpt,
+            },
+            { apiKey: resendKey.key }
+          )
+        }
       }
     }
 

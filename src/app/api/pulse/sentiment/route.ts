@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getIntegrationKey } from '@/lib/integrations'
+import { resolveProviderKey } from '@/lib/ai-provider'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
     .eq('id', session.user.id)
     .single()
 
-  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY || ''
+  const keyResult = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = keyResult?.key || ''
 
   if (!apiKey) {
     return NextResponse.json({

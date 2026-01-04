@@ -43,13 +43,29 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [integrationKeys, setIntegrationKeys] = useState<{ provider: string; label: string | null }[]>([])
+  const [integrationKeys, setIntegrationKeys] = useState<{
+    id: string
+    provider: string
+    label: string | null
+    is_active: boolean
+    created_at?: string | null
+  }[]>([])
   const [integrationDrafts, setIntegrationDrafts] = useState<Record<string, string>>({})
+  const [integrationLabels, setIntegrationLabels] = useState<Record<string, string>>({})
   const [integrationSaving, setIntegrationSaving] = useState<string | null>(null)
   const [apiKeys, setApiKeys] = useState<{ id: string; label: string | null; last_used_at: string | null }[]>([])
   const [apiKeyLabel, setApiKeyLabel] = useState('')
   const [apiKeyCreated, setApiKeyCreated] = useState<string | null>(null)
   const [apiKeySaving, setApiKeySaving] = useState(false)
+  const [storageConfig, setStorageConfig] = useState({
+    provider: 'r2',
+    access_key_id: '',
+    bucket: '',
+    region: '',
+    endpoint: '',
+    public_base_url: '',
+  })
+  const [storageSaving, setStorageSaving] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
@@ -58,6 +74,7 @@ export default function SettingsPage() {
     loadProfile()
     loadIntegrations()
     loadApiKeys()
+    loadStorage()
   }, [])
 
   const aiProviders = [
@@ -65,7 +82,15 @@ export default function SettingsPage() {
     { id: 'anthropic', label: 'Anthropic (Claude)' },
     { id: 'perplexity', label: 'Perplexity' },
     { id: 'grok', label: 'Grok' },
-    { id: 'stability', label: 'Stability / Image API' },
+    { id: 'groq', label: 'Groq (Speed)' },
+    { id: 'replicate', label: 'Replicate (Flux)' },
+    { id: 'elevenlabs', label: 'ElevenLabs (Voice)' },
+    { id: 'resend', label: 'Resend (Newsletter)' },
+    { id: 'posthog', label: 'PostHog (Analytics)' },
+    { id: 'r2', label: 'Cloudflare R2 (Storage)' },
+    { id: 's3', label: 'Amazon S3 (Storage)' },
+    { id: 'heygen', label: 'HeyGen (Video Avatar)' },
+    { id: 'stability', label: 'Stability (Legacy)' },
   ]
 
   const loadIntegrations = async () => {
@@ -87,6 +112,26 @@ export default function SettingsPage() {
       setApiKeys(data.keys || [])
     } catch (err) {
       console.error('API key load error:', err)
+    }
+  }
+
+  const loadStorage = async () => {
+    try {
+      const response = await fetch('/api/storage/get')
+      if (!response.ok) return
+      const data = await response.json()
+      if (data.connection) {
+        setStorageConfig({
+          provider: data.connection.provider || 'r2',
+          access_key_id: data.connection.access_key_id || '',
+          bucket: data.connection.bucket || '',
+          region: data.connection.region || '',
+          endpoint: data.connection.endpoint || '',
+          public_base_url: data.connection.public_base_url || '',
+        })
+      }
+    } catch (err) {
+      console.error('Storage load error:', err)
     }
   }
 
@@ -143,7 +188,11 @@ export default function SettingsPage() {
       const response = await fetch('/api/integrations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey }),
+        body: JSON.stringify({
+          provider,
+          apiKey,
+          label: integrationLabels[provider]?.trim() || null,
+        }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -151,6 +200,7 @@ export default function SettingsPage() {
       }
       setSuccess('Integration saved.')
       setIntegrationDrafts((prev) => ({ ...prev, [provider]: '' }))
+      setIntegrationLabels((prev) => ({ ...prev, [provider]: '' }))
       await loadIntegrations()
     } catch (err: any) {
       setError(err.message || 'Failed to save integration.')
@@ -160,7 +210,63 @@ export default function SettingsPage() {
   }
 
   const isConnected = (provider: string) =>
-    integrationKeys.some((key) => key.provider === provider)
+    integrationKeys.some((key) => key.provider === provider && key.is_active)
+
+  const getProviderKeys = (provider: string) =>
+    integrationKeys.filter((key) => key.provider === provider)
+
+  const setActiveIntegration = async (id: string) => {
+    setError(null)
+    const response = await fetch('/api/integrations/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      setError(data.error || 'Failed to update integration.')
+      return
+    }
+    await loadIntegrations()
+  }
+
+  const deleteIntegration = async (id: string) => {
+    setError(null)
+    const response = await fetch('/api/integrations/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      setError(data.error || 'Failed to delete integration.')
+      return
+    }
+    await loadIntegrations()
+  }
+
+  const saveStorage = async () => {
+    setStorageSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const response = await fetch('/api/storage/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storageConfig),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save storage config.')
+      }
+      setSuccess('Storage settings saved.')
+      await loadStorage()
+    } catch (err: any) {
+      setError(err.message || 'Failed to save storage config.')
+    } finally {
+      setStorageSaving(false)
+    }
+  }
 
   const loadProfile = async () => {
     try {
@@ -687,41 +793,203 @@ export default function SettingsPage() {
               <p className="text-sm text-[var(--text-secondary)] mb-4">
                 Add your own keys to unlock AI summaries, expansions, and research tools.
               </p>
+              <p className="text-xs text-[var(--text-tertiary)] mb-6">
+                Active keys are used first. Pro users can fall back to managed keys when no active key is set.
+              </p>
 
               <div className="space-y-4">
-                {aiProviders.map((provider) => (
-                  <div key={provider.id} className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">
-                        {provider.label}
-                      </p>
-                      <p className="text-xs text-[var(--text-tertiary)]">
-                        {isConnected(provider.id) ? 'Connected' : 'Not connected'}
-                      </p>
+                {aiProviders.map((provider) => {
+                  const providerKeys = getProviderKeys(provider.id)
+                  return (
+                    <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">
+                            {provider.label}
+                          </p>
+                          <p className="text-xs text-[var(--text-tertiary)]">
+                            {isConnected(provider.id) ? 'Active' : 'Not connected'}
+                          </p>
+                        </div>
+                        {isConnected(provider.id) && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] bg-[var(--accent-soft)] text-[var(--accent)]">
+                            Active
+                          </span>
+                        )}
+                      </div>
+
+                      {providerKeys.length > 0 ? (
+                        <div className="space-y-2 mb-4">
+                          {providerKeys.map((key, index) => (
+                            <div key={key.id} className="flex items-center justify-between text-xs">
+                              <div>
+                                <p className="text-[var(--text-primary)] font-medium">
+                                  {key.label || `Key ${providerKeys.length - index}`}
+                                </p>
+                                <p className="text-[var(--text-tertiary)]">
+                                  {key.is_active ? 'Active' : 'Inactive'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {!key.is_active && (
+                                  <button
+                                    onClick={() => setActiveIntegration(key.id)}
+                                    className="btn btn-secondary btn-sm"
+                                  >
+                                    Set active
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteIntegration(key.id)}
+                                  className="btn btn-secondary btn-sm text-[var(--error)]"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[var(--text-tertiary)] mb-4">
+                          No keys saved yet.
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          value={integrationLabels[provider.id] || ''}
+                          onChange={(event) =>
+                            setIntegrationLabels((prev) => ({
+                              ...prev,
+                              [provider.id]: event.target.value,
+                            }))
+                          }
+                          placeholder="Label (optional)"
+                          className="input flex-1 min-w-[160px]"
+                        />
+                        <input
+                          type="password"
+                          value={integrationDrafts[provider.id] || ''}
+                          onChange={(event) =>
+                            setIntegrationDrafts((prev) => ({
+                              ...prev,
+                              [provider.id]: event.target.value,
+                            }))
+                          }
+                          placeholder={isConnected(provider.id) ? '************' : 'Paste API key'}
+                          className="input flex-1 min-w-[200px]"
+                        />
+                        <button
+                          onClick={() => saveIntegration(provider.id)}
+                          disabled={integrationSaving === provider.id}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          {integrationSaving === provider.id ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                      <input
-                        type="password"
-                        value={integrationDrafts[provider.id] || ''}
-                        onChange={(event) =>
-                          setIntegrationDrafts((prev) => ({
-                            ...prev,
-                            [provider.id]: event.target.value,
-                          }))
-                        }
-                        placeholder={isConnected(provider.id) ? '••••••••••' : 'Paste API key'}
-                        className="input md:w-[240px]"
-                      />
-                      <button
-                        onClick={() => saveIntegration(provider.id)}
-                        disabled={integrationSaving === provider.id}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        {integrationSaving === provider.id ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Shield size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-lg">Sovereign storage</h2>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                Store large assets in your own bucket. Add the secret key in the AI Vault under R2/S3.
+              </p>
+
+              <div className="grid gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Provider
+                    <select
+                      value={storageConfig.provider}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, provider: event.target.value }))
+                      }
+                      className="input mt-2"
+                    >
+                      <option value="r2">Cloudflare R2</option>
+                      <option value="s3">Amazon S3</option>
+                    </select>
+                  </label>
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Access key ID
+                    <input
+                      value={storageConfig.access_key_id}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, access_key_id: event.target.value }))
+                      }
+                      className="input mt-2"
+                      placeholder="R2/S3 access key id"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Bucket
+                    <input
+                      value={storageConfig.bucket}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, bucket: event.target.value }))
+                      }
+                      className="input mt-2"
+                      placeholder="my-neolog-assets"
+                    />
+                  </label>
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Region
+                    <input
+                      value={storageConfig.region}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, region: event.target.value }))
+                      }
+                      className="input mt-2"
+                      placeholder="auto or us-east-1"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Endpoint (optional)
+                    <input
+                      value={storageConfig.endpoint}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, endpoint: event.target.value }))
+                      }
+                      className="input mt-2"
+                      placeholder="https://<account>.r2.cloudflarestorage.com"
+                    />
+                  </label>
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Public base URL (optional)
+                    <input
+                      value={storageConfig.public_base_url}
+                      onChange={(event) =>
+                        setStorageConfig((prev) => ({ ...prev, public_base_url: event.target.value }))
+                      }
+                      className="input mt-2"
+                      placeholder="https://cdn.yoursite.com"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  onClick={saveStorage}
+                  disabled={storageSaving}
+                  className="btn btn-secondary btn-sm"
+                >
+                  {storageSaving ? 'Saving...' : 'Save storage settings'}
+                </button>
               </div>
             </section>
 

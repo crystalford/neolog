@@ -21,6 +21,7 @@ create table public.profiles (
   github_url text,
   linkedin_url text,
   context_md text,
+  is_pro boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
@@ -3902,6 +3903,8 @@ create table public.integration_keys (
   user_id uuid references public.profiles(id) on delete cascade not null,
   provider text not null,
   label text,
+  is_active boolean default true,
+  quota_limit_usd numeric(10,2),
   encrypted_key text not null,
   iv text not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -3912,11 +3915,17 @@ create table public.integration_keys (
 
 create index integration_keys_user_idx on public.integration_keys(user_id);
 create index integration_keys_provider_idx on public.integration_keys(provider);
+create index integration_keys_active_idx on public.integration_keys(user_id, provider) where is_active = true;
 
--- =============================================
--- FEED SOURCES (RSS, X, etc.)
--- =============================================
-create table public.feed_sources (
+-- Allow existing databases to add BYOK columns
+alter table public.profiles add column if not exists is_pro boolean default false;
+alter table public.integration_keys add column if not exists is_active boolean default true;
+alter table public.integration_keys add column if not exists quota_limit_usd numeric(10,2);
+
+  -- =============================================
+  -- FEED SOURCES (RSS, X, etc.)
+  -- =============================================
+  create table public.feed_sources (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
   source_type text not null check (source_type in ('rss', 'x', 'youtube', 'grok', 'linkedin', 'hn', 'trends')),
@@ -3928,7 +3937,28 @@ create table public.feed_sources (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
-create index feed_sources_user_idx on public.feed_sources(user_id);
+  create index feed_sources_user_idx on public.feed_sources(user_id);
+
+  -- =============================================
+  -- STORAGE CONNECTIONS (R2/S3)
+  -- =============================================
+  create table public.storage_connections (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references public.profiles(id) on delete cascade not null,
+    provider text not null check (provider in ('r2', 's3')),
+    access_key_id text not null,
+    bucket text not null,
+    region text,
+    endpoint text,
+    public_base_url text,
+    is_active boolean default true,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    constraint unique_storage_connection unique (user_id, provider)
+  );
+
+  create index storage_connections_user_idx on public.storage_connections(user_id);
+  create index storage_connections_active_idx on public.storage_connections(user_id, provider) where is_active = true;
 create index feed_sources_type_idx on public.feed_sources(source_type);
 create index feed_sources_active_idx on public.feed_sources(is_active);
 
@@ -3956,12 +3986,19 @@ create index inbox_items_source_type_idx on public.inbox_items(source_type);
 -- =============================================
 -- RLS: integration keys
 -- =============================================
-alter table public.integration_keys enable row level security;
+  alter table public.integration_keys enable row level security;
 
-create policy "Users manage their integration keys"
-  on public.integration_keys for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  alter table public.storage_connections enable row level security;
+
+  create policy "Users manage their integration keys"
+    on public.integration_keys for all
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+  create policy "Users manage their storage connections"
+    on public.storage_connections for all
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
 
 -- =============================================
 -- AUTOMATION API KEYS

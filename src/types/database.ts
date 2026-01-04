@@ -11,6 +11,7 @@ export type Profile = {
   twitter_url: string | null
   github_url: string | null
   linkedin_url: string | null
+  is_pro?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -504,4 +505,18 @@ export type FeedPost = {
   author_username: string
   author_display_name: string | null
   author_avatar_url: string | null
+}
+
+export type StorageConnection = {
+  id: string
+  user_id: string
+  provider: 'r2' | 's3'
+  access_key_id: string
+  bucket: string
+  region: string | null
+  endpoint: string | null
+  public_base_url: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }

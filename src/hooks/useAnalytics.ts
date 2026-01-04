@@ -49,6 +49,24 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
   const maxScrollRef = useRef<number>(0)
   const lastProgressUpdateRef = useRef<number>(0)
   const isTrackingRef = useRef<boolean>(false)
+  const trackedStartRef = useRef<boolean>(false)
+
+  const trackExternal = useCallback(async (event: string, properties: Record<string, any> = {}) => {
+    try {
+      await fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId,
+          event,
+          sessionId: getSessionId(),
+          properties,
+        }),
+      })
+    } catch {
+      // Ignore analytics failures
+    }
+  }, [postId])
 
   // Create view record on mount
   useEffect(() => {
@@ -68,6 +86,14 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
 
       if (existingView) {
         viewIdRef.current = existingView.id
+        if (!trackedStartRef.current) {
+          trackedStartRef.current = true
+          trackExternal('post_view_start', {
+            referrer: document.referrer || null,
+            referrer_domain: getReferrerDomain(),
+            device_type: getDeviceType(),
+          })
+        }
         return
       }
 
@@ -89,6 +115,15 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
 
       if (!error && data) {
         viewIdRef.current = data.id
+      }
+
+      if (!trackedStartRef.current) {
+        trackedStartRef.current = true
+        trackExternal('post_view_start', {
+          referrer: document.referrer || null,
+          referrer_domain: getReferrerDomain(),
+          device_type: getDeviceType(),
+        })
       }
     }
 
@@ -158,6 +193,12 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
           ended_at: new Date().toISOString(),
         })
         .eq('id', viewIdRef.current)
+
+      trackExternal('post_view_end', {
+        time_on_page: timeOnPage,
+        scroll_depth: maxScrollRef.current,
+        read_complete: readComplete,
+      })
     }
 
     // Update on visibility change (tab switch)
@@ -189,7 +230,8 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
       .from('post_views')
       .update({ shared: true })
       .eq('id', viewIdRef.current)
-  }, [])
+    trackExternal('post_share')
+  }, [supabase, trackExternal])
 
   const trackHighlight = useCallback(async () => {
     if (!viewIdRef.current) return
@@ -197,7 +239,8 @@ export function useAnalytics({ postId, contentRef }: UseAnalyticsOptions) {
       .from('post_views')
       .update({ highlighted: true })
       .eq('id', viewIdRef.current)
-  }, [])
+    trackExternal('post_highlight')
+  }, [supabase, trackExternal])
 
   return {
     trackShare,

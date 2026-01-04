@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getIntegrationKey } from '@/lib/integrations'
+import { resolveProviderKey } from '@/lib/ai-provider'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -44,7 +44,15 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY
+  const groqKey = await resolveProviderKey(session.user.id, 'groq')
+  const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = groqKey?.key || openaiKey?.key || ''
+  const apiUrl = groqKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions'
+  const model = groqKey
+    ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+    : MODEL
   if (!apiKey) {
     return NextResponse.json({
       expansion: `Add more detail on "${heading}". This is a placeholder until AI is enabled.`,
@@ -52,14 +60,14 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       temperature: 0.6,
       messages: [
         {
@@ -89,5 +97,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No expansion produced' }, { status: 500 })
   }
 
-  return NextResponse.json({ expansion: content, model: MODEL })
+  return NextResponse.json({ expansion: content, model })
 }

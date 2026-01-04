@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Subscribe via email (for non-logged-in users)
@@ -88,11 +90,21 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const confirmUrl = `${baseUrl}/api/subscribe/confirm?token=${confirmationToken}`
 
-    const emailResult = await sendEmail(email, 'confirmation', {
-      creatorName: creator.display_name || creator.username,
-      creatorUsername: creator.username,
-      confirmUrl,
-    })
+    const admin = createAdminClient()
+    const resendKey = admin
+      ? await resolveProviderKeyWithClient(admin as any, creatorId, 'resend')
+      : null
+
+    const emailResult = await sendEmail(
+      email,
+      'confirmation',
+      {
+        creatorName: creator.display_name || creator.username,
+        creatorUsername: creator.username,
+        confirmUrl,
+      },
+      resendKey ? { apiKey: resendKey.key } : undefined
+    )
 
     if (!emailResult.success) {
       console.error('Email send failed:', emailResult.error)

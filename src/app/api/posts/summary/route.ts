@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getIntegrationKey } from '@/lib/integrations'
+import { resolveProviderKey } from '@/lib/ai-provider'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -104,7 +104,25 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY || ''
+  const keyResult = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = keyResult?.key || ''
+
+  if (!apiKey) {
+    const fallback = getFallbackSummary(base)
+    const payload = {
+      post_id: post.id,
+      author_id: post.author_id,
+      summary: fallback.summary,
+      bullets: fallback.bullets,
+      model: fallback.model,
+    }
+
+    await supabase
+      .from('post_summaries')
+      .upsert(payload, { onConflict: 'post_id' })
+
+    return NextResponse.json({ summary: payload })
+  }
 
   let result = await getAiSummary(base, apiKey, profile?.context_md)
   if (!result) {

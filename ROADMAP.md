@@ -1,6 +1,6 @@
 # Neolog Roadmap
 
-Last updated: 2026-01-04
+Last updated: 2026-01-05
 
 ## Phase 1 - Distribution Pack (shipping)
 - [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
@@ -27,6 +27,12 @@ Last updated: 2026-01-04
 - [x] AI summaries (requires OPENAI_API_KEY)
 - [x] Expand sections (requires OPENAI_API_KEY)
 
+## Phase 5 - BYOK Vault + Cost Router (shipping)
+- [x] Integration key encryption at rest
+- [x] Provider vault UI (labels, active key, rotation)
+- [x] Cost router (user key -> managed key if Pro)
+- [ ] Usage tracking per provider (optional caps)
+
 ## Optional / Future
 - [x] Post health system (freshness score + revive queue)
 - [ ] Auto-post syndication (requires platform APIs)
@@ -46,3 +52,10 @@ Last updated: 2026-01-04
 - AI summaries (OpenAI)
 - AI distribution pack
 - X import (paid API)
+
+## Heavy Hitters (planned)
+- [x] Resend (newsletter delivery, BYOK)
+- [x] PostHog (analytics, BYOK)
+- [x] Groq (speed, BYOK for expand)
+- [x] R2/S3 (sovereign storage, BYOK settings)
+- [ ] HeyGen/Synthesia (video avatar, BYOK)

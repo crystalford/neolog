@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getIntegrationKey } from '@/lib/integrations'
+import { resolveProviderKey } from '@/lib/ai-provider'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY
+  const keyResult = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = keyResult?.key || ''
 
   const buildFallback = () => {
     const plain = stripHtml(post.content_html || post.content || '')

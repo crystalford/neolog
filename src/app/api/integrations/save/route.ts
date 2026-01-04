@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const provider = typeof body.provider === 'string' ? body.provider : ''
   const apiKey = typeof body.apiKey === 'string' ? body.apiKey : ''
-  const label = typeof body.label === 'string' ? body.label : null
+  const label = typeof body.label === 'string' ? body.label.trim() || null : null
 
   if (!provider || !apiKey) {
     return NextResponse.json({ error: 'Provider and API key are required.' }, { status: 400 })
@@ -47,14 +47,31 @@ export async function POST(request: NextRequest) {
       label,
       encrypted_key: `${encrypted.encrypted}:${encrypted.tag}`,
       iv: encrypted.iv,
+      is_active: true,
     }
 
-    const { error } = await supabase
+    const { data: saved, error } = await supabase
       .from('integration_keys')
       .upsert(payload, { onConflict: 'user_id,provider,label' })
+      .select('id')
+      .single()
 
     if (error) {
       return NextResponse.json({ error: 'Failed to save integration.' }, { status: 500 })
+    }
+
+    if (saved?.id) {
+      await supabase
+        .from('integration_keys')
+        .update({ is_active: false })
+        .eq('user_id', session.user.id)
+        .eq('provider', provider)
+        .neq('id', saved.id)
+
+      await supabase
+        .from('integration_keys')
+        .update({ is_active: true })
+        .eq('id', saved.id)
     }
 
     return NextResponse.json({ ok: true })

@@ -2,17 +2,20 @@ import { Resend } from 'resend'
 
 let resendClient: Resend | null = null
 
-const getResendClient = () => {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
+const getResendClient = (apiKey?: string) => {
+  const key = apiKey || process.env.RESEND_API_KEY
+  if (!key) {
     return null
   }
 
-  if (!resendClient) {
-    resendClient = new Resend(apiKey)
+  if (!apiKey) {
+    if (!resendClient) {
+      resendClient = new Resend(key)
+    }
+    return resendClient
   }
 
-  return resendClient
+  return new Resend(key)
 }
 
 // Base URL for links
@@ -253,14 +256,15 @@ export const emailTemplates = {
 export async function sendEmail(
   to: string,
   template: EmailType,
-  data: Record<string, any>
+  data: Record<string, any>,
+  options?: { apiKey?: string; from?: string }
 ) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!options?.apiKey && !process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set, skipping email send')
     return { success: false, error: 'Email not configured' }
   }
 
-  const resend = getResendClient()
+  const resend = getResendClient(options?.apiKey)
   if (!resend) {
     console.warn('RESEND_API_KEY not set, skipping email send')
     return { success: false, error: 'Email not configured' }
@@ -272,7 +276,7 @@ export async function sendEmail(
   }
 
   const { subject, html } = templateFn(data as any)
-  const fromAddress = process.env.EMAIL_FROM || 'Neolog <noreply@neolog.ai>'
+  const fromAddress = options?.from || process.env.EMAIL_FROM || 'Neolog <noreply@neolog.ai>'
 
   try {
     const result = await resend.emails.send({
@@ -298,14 +302,15 @@ export async function sendNewPostNotifications(
     postTitle: string
     postSlug: string
     postExcerpt: string | null
-  }
+  },
+  options?: { apiKey?: string; from?: string }
 ) {
   const results = await Promise.allSettled(
     subscribers.map(sub =>
       sendEmail(sub.email, 'new_post', {
         ...postData,
         unsubscribeUrl: `${getBaseUrl()}/unsubscribe?token=${sub.unsubscribeToken}`,
-      })
+      }, options)
     )
   )
 
