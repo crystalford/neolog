@@ -36,6 +36,7 @@ export default function WritePage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [hasNoPublications, setHasNoPublications] = useState(false)
+  const [publications, setPublications] = useState<any[]>([])
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -57,23 +58,25 @@ export default function WritePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Check if user has any publications
-      const { data: publications, error } = await supabase
+      // Load all user publications
+      const { data: pubs, error } = await supabase
         .from('publications')
-        .select('id')
+        .select('id, name, slug')
         .eq('owner_id', session.user.id)
         .eq('is_active', true)
-        .limit(1)
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error loading publications:', error)
         return
       }
 
-      if (!publications || publications.length === 0) {
+      if (!pubs || pubs.length === 0) {
         setHasNoPublications(true)
         return
       }
+
+      setPublications(pubs)
 
       // Try to get selected publication from localStorage
       const selectedId = typeof window !== 'undefined'
@@ -81,15 +84,8 @@ export default function WritePage() {
         : null
 
       if (selectedId) {
-        // Verify this publication exists and belongs to user
-        const { data: pub } = await supabase
-          .from('publications')
-          .select('id')
-          .eq('id', selectedId)
-          .eq('owner_id', session.user.id)
-          .eq('is_active', true)
-          .single()
-
+        // Verify this publication exists in the list
+        const pub = pubs.find(p => p.id === selectedId)
         if (pub) {
           setPublicationId(selectedId)
           return
@@ -97,8 +93,11 @@ export default function WritePage() {
       }
 
       // If no valid selection, use first publication
-      if (publications[0]) {
-        setPublicationId(publications[0].id)
+      if (pubs[0]) {
+        setPublicationId(pubs[0].id)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('selectedPublicationId', pubs[0].id)
+        }
       }
     } catch (error) {
       console.error('Error loading publication:', error)
@@ -412,188 +411,68 @@ export default function WritePage() {
             </div>
           )}
 
+          {/* Publication selector */}
+          {publications.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                Publishing to
+              </label>
+              <select
+                value={publicationId || ''}
+                onChange={(e) => {
+                  const newId = e.target.value
+                  setPublicationId(newId)
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('selectedPublicationId', newId)
+                  }
+                }}
+                className="w-full max-w-md px-4 py-2 bg-white border border-gray-300 rounded-md font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+              >
+                {publications.map((pub) => (
+                  <option key={pub.id} value={pub.id}>
+                    {pub.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Header actions */}
-          <div className="flex items-center justify-between py-4 mb-8 sticky top-0 bg-gray-50 z-10 border-b border-gray-200">
-            <div className="flex items-center gap-3 text-sm text-gray-600">
+          <div className="flex items-center justify-between py-3 mb-8 sticky top-0 bg-gray-50 z-10">
+            <div className="flex items-center gap-3 text-xs text-gray-500">
               {saving && (
                 <span className="flex items-center gap-1.5">
-                  <Loader2 size={14} className="animate-spin" />
+                  <Loader2 size={12} className="animate-spin" />
                   Saving...
                 </span>
               )}
               {!saving && lastSaved && (
                 <span className="flex items-center gap-1.5">
-                  <Clock size={14} />
-                  Saved {lastSaved.toLocaleTimeString()}
+                  Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="btn btn-ghost btn-sm"
-              >
-                <Settings size={16} />
-                Settings
-              </button>
-
               {profile && postId && (
                 <a
                   href={`/${profile.username}/${generateSlug(title)}?preview=true`}
                   target="_blank"
-                  className="btn btn-ghost btn-sm"
+                  className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
                 >
-                  <Eye size={16} />
                   Preview
                 </a>
               )}
 
               <button
                 onClick={handlePublish}
-                disabled={publishing || !title || !content}
-                className="btn btn-primary btn-sm"
+                disabled={publishing || !title || !content || !publicationId}
+                className="px-4 py-1.5 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {publishing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Publishing...
-                  </>
-                ) : (
-                  <>
-                    <Send size={16} />
-                    Publish
-                  </>
-                )}
+                {publishing ? 'Publishing...' : 'Publish'}
               </button>
             </div>
           </div>
-
-          {/* Settings panel */}
-          {showSettings && (
-            <div className="mb-6 p-6 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <h3 className="font-semibold text-lg mb-4">Post Settings</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Cover Image</label>
-                  <div className="flex gap-3">
-                    <input
-                      type="url"
-                      value={coverImage}
-                      onChange={(e) => setCoverImage(e.target.value)}
-                      placeholder="https://... or upload"
-                      className="input flex-1"
-                    />
-                    <label className="btn btn-secondary cursor-pointer">
-                      <ImageIcon size={16} />
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            try {
-                              const url = await handleImageUpload(file)
-                              setCoverImage(url)
-                            } catch (error) {
-                              console.error('Upload failed:', error)
-                            }
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  {coverImage && (
-                    <img 
-                      src={coverImage} 
-                      alt="Cover preview" 
-                      className="mt-3 rounded-lg max-h-40 object-cover"
-                    />
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">URL Slug</label>
-                  <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
-                    <span>/{profile?.username}/</span>
-                    <code className="px-2 py-1 bg-[var(--bg-tertiary)] rounded">
-                      {generateSlug(title) || 'your-post-title'}
-                    </code>
-                  </div>
-                </div>
-
-                <TagSelect 
-                  selectedTags={tags}
-                  onChange={setTags}
-                  maxTags={5}
-                />
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Schedule</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={scheduledAt}
-                    min={new Date().toISOString().slice(0, 16)}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                  />
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    Leave empty to publish immediately
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Canonical URL
-                    <span className="font-normal text-[var(--text-tertiary)] ml-1">(optional)</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={canonicalUrl}
-                    onChange={(e) => setCanonicalUrl(e.target.value)}
-                    placeholder="https://... (original publication URL)"
-                    className="input"
-                  />
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    If cross-posting, link to the original
-                  </p>
-                </div>
-
-                {canonicalUrl && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Original Source</label>
-                    <input
-                      type="text"
-                      value={originalSource}
-                      onChange={(e) => setOriginalSource(e.target.value)}
-                      placeholder="e.g., Medium, Substack, My Blog"
-                      className="input"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isPremium}
-                      onChange={(e) => setIsPremium(e.target.checked)}
-                      className="w-5 h-5 rounded"
-                    />
-                    <div>
-                      <span className="font-medium">Premium post</span>
-                      <p className="text-xs text-[var(--text-tertiary)]">
-                        Only paid subscribers can read the full post
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Title */}
           <input
