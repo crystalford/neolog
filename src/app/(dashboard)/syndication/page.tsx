@@ -47,6 +47,10 @@ export default function SyndicationPage() {
           { name: 'X (Threads)', desc: 'Post a 5-6 tweet thread on publish.' },
           { name: 'LinkedIn', desc: 'Publish a short case study post.' },
           { name: 'Reddit', desc: 'Submit to a chosen subreddit.' },
+          { name: 'Threads (Meta)', desc: 'Publish a threaded summary post.' },
+          { name: 'Medium', desc: 'Syndicate with canonical URL for SEO.' },
+          { name: 'Dev.to', desc: 'Cross-post to the developer community.' },
+          { name: 'Newsletter (Resend)', desc: 'Email your subscribers on publish.' },
         ].map((item) => (
           <div key={item.name} className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-sm">
             <div className="flex items-center justify-between">

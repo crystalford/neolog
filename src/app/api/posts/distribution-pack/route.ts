@@ -98,8 +98,15 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const keyResult = await resolveProviderKey(session.user.id, 'openai')
-  const apiKey = keyResult?.key || ''
+  const groqKey = await resolveProviderKey(session.user.id, 'groq')
+  const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = groqKey?.key || openaiKey?.key || ''
+  const apiUrl = groqKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions'
+  const model = groqKey
+    ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+    : MODEL
 
   const buildFallback = () => {
     const plain = stripHtml(post.content_html || post.content || '')
@@ -154,14 +161,14 @@ export async function POST(request: NextRequest) {
     const authorUsername = authorProfile?.username || 'unknown'
     const link = `${BASE_URL}/${authorUsername}/${post.slug}`
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         temperature: 0.6,
       messages: [
         {
@@ -197,7 +204,7 @@ export async function POST(request: NextRequest) {
         reddit_title: String(parsed.reddit_title || post.title),
         reddit_body: String(parsed.reddit_body || ''),
         hooks: Array.isArray(parsed.hooks) ? parsed.hooks : [],
-        model: MODEL,
+        model,
         link,
       }
     } catch {

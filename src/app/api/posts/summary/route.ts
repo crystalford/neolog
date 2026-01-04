@@ -26,19 +26,25 @@ function getFallbackSummary(text: string) {
   }
 }
 
-async function getAiSummary(text: string, apiKey: string, context?: string | null) {
+async function getAiSummary(
+  text: string,
+  apiKey: string,
+  context: string | null | undefined,
+  apiUrl: string,
+  model: string
+) {
   if (!apiKey) return null
 
   const contextBlock = context ? `\nWriter context:\n${context}` : ''
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       temperature: 0.4,
       messages: [
         {
@@ -65,7 +71,7 @@ async function getAiSummary(text: string, apiKey: string, context?: string | nul
     const summary = String(parsed.summary || '').trim()
     const bullets = Array.isArray(parsed.bullets) ? parsed.bullets.map((b: any) => String(b).trim()).filter(Boolean) : []
     if (!summary || bullets.length === 0) return null
-    return { summary, bullets, model: MODEL }
+    return { summary, bullets, model }
   } catch {
     return null
   }
@@ -104,8 +110,15 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const keyResult = await resolveProviderKey(session.user.id, 'openai')
-  const apiKey = keyResult?.key || ''
+  const groqKey = await resolveProviderKey(session.user.id, 'groq')
+  const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+  const apiKey = groqKey?.key || openaiKey?.key || ''
+  const apiUrl = groqKey
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions'
+  const model = groqKey
+    ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+    : MODEL
 
   if (!apiKey) {
     const fallback = getFallbackSummary(base)
@@ -124,7 +137,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ summary: payload })
   }
 
-  let result = await getAiSummary(base, apiKey, profile?.context_md)
+  let result = await getAiSummary(base, apiKey, profile?.context_md, apiUrl, model)
   if (!result) {
     result = getFallbackSummary(base)
   }

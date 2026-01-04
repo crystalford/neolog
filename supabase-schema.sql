@@ -3959,6 +3959,26 @@ alter table public.integration_keys add column if not exists quota_limit_usd num
 
   create index storage_connections_user_idx on public.storage_connections(user_id);
   create index storage_connections_active_idx on public.storage_connections(user_id, provider) where is_active = true;
+
+  -- =============================================
+  -- VIDEO BRIEFS (HEYGEN/SYNTHESIA)
+  -- =============================================
+  create table public.video_briefs (
+    id uuid default uuid_generate_v4() primary key,
+    post_id uuid references public.posts(id) on delete cascade,
+    author_id uuid references public.profiles(id) on delete cascade not null,
+    provider text not null check (provider in ('heygen', 'synthesia')),
+    script text not null,
+    status text not null default 'queued' check (status in ('queued', 'ready', 'error')),
+    provider_payload jsonb,
+    provider_response jsonb,
+    error_message text,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+    updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  );
+
+  create index video_briefs_author_idx on public.video_briefs(author_id);
+  create index video_briefs_post_idx on public.video_briefs(post_id);
 create index feed_sources_type_idx on public.feed_sources(source_type);
 create index feed_sources_active_idx on public.feed_sources(is_active);
 
@@ -3989,6 +4009,7 @@ create index inbox_items_source_type_idx on public.inbox_items(source_type);
   alter table public.integration_keys enable row level security;
 
   alter table public.storage_connections enable row level security;
+  alter table public.video_briefs enable row level security;
 
   create policy "Users manage their integration keys"
     on public.integration_keys for all
@@ -3999,6 +4020,11 @@ create index inbox_items_source_type_idx on public.inbox_items(source_type);
     on public.storage_connections for all
     using (auth.uid() = user_id)
     with check (auth.uid() = user_id);
+
+  create policy "Users manage their video briefs"
+    on public.video_briefs for all
+    using (auth.uid() = author_id)
+    with check (auth.uid() = author_id);
 
 -- =============================================
 -- AUTOMATION API KEYS

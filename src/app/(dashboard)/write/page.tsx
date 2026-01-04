@@ -18,7 +18,7 @@ import {
   pulseExcerpt,
 } from '@/lib/pulse'
 import {
-  Loader2, Settings, BookOpen, Upload, X, CheckCircle2
+  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy
 } from 'lucide-react'
 
 export default function WritePage() {
@@ -35,6 +35,13 @@ export default function WritePage() {
   const [subtitle, setSubtitle] = useState('')
   const [content, setContent] = useState('')
   const [coverImage, setCoverImage] = useState('')
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingAsset, setUploadingAsset] = useState(false)
+  const [assetUrl, setAssetUrl] = useState<string | null>(null)
+  const [videoBrief, setVideoBrief] = useState<any>(null)
+  const [videoBriefLoading, setVideoBriefLoading] = useState(false)
+  const [videoBriefError, setVideoBriefError] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [showSettings, setShowSettings] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
@@ -63,7 +70,7 @@ export default function WritePage() {
   const [packLoading, setPackLoading] = useState(false)
   const [packError, setPackError] = useState<string | null>(null)
   const [pack, setPack] = useState<any>(null)
-  const [packTab, setPackTab] = useState<'x' | 'linkedin' | 'reddit' | 'hooks' | 'og'>('x')
+  const [packTab, setPackTab] = useState<'x' | 'linkedin' | 'reddit' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
   const [commentUrl, setCommentUrl] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
@@ -372,6 +379,96 @@ export default function WritePage() {
       await navigator.clipboard.writeText(value)
     } catch (error) {
       console.error('Clipboard error:', error)
+    }
+  }
+
+  const uploadToStorage = async (file: File) => {
+    setUploadNotice(null)
+    try {
+      const response = await fetch('/api/storage/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sign upload.')
+      }
+
+      const putRes = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      })
+
+      if (!putRes.ok) {
+        throw new Error('Upload failed.')
+      }
+
+      return data.publicUrl as string
+    } catch (error: any) {
+      setUploadNotice(error.message || 'Upload failed.')
+      return null
+    }
+  }
+
+  const stripHtml = (input: string) =>
+    input
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const handleCoverUpload = async (file: File | null) => {
+    if (!file) return
+    setUploadingCover(true)
+    const url = await uploadToStorage(file)
+    if (url) {
+      setCoverImage(url)
+    }
+    setUploadingCover(false)
+  }
+
+  const handleAssetUpload = async (file: File | null) => {
+    if (!file) return
+    setUploadingAsset(true)
+    const url = await uploadToStorage(file)
+    if (url) {
+      setAssetUrl(url)
+      try {
+        await navigator.clipboard.writeText(url)
+      } catch {
+        // ignore clipboard errors
+      }
+    }
+    setUploadingAsset(false)
+  }
+
+  const generateVideoBrief = async () => {
+    if (!postId) return
+    setVideoBriefLoading(true)
+    setVideoBriefError(null)
+    try {
+      const response = await fetch('/api/video/brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, provider: 'heygen' }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate brief.')
+      }
+      setVideoBrief(data.brief)
+    } catch (error: any) {
+      setVideoBriefError(error.message || 'Failed to generate brief.')
+    } finally {
+      setVideoBriefLoading(false)
     }
   }
 
@@ -871,6 +968,9 @@ export default function WritePage() {
     return publicUrl
   }
 
+  const markdownExport = postType === 'pulse' ? '' : stripHtml(content)
+  const htmlExport = postType === 'pulse' ? '' : content
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1139,11 +1239,101 @@ export default function WritePage() {
                       placeholder="https://..."
                       className="input"
                     />
+                    <div className="flex items-center gap-3 mt-3">
+                      <label className="btn btn-secondary btn-sm cursor-pointer">
+                        <Upload size={16} />
+                        {uploadingCover ? 'Uploading...' : 'Upload cover'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => handleCoverUpload(event.target.files?.[0] || null)}
+                          disabled={uploadingCover}
+                        />
+                      </label>
+                      <span className="text-xs text-[var(--text-tertiary)]">
+                        Uses your R2/S3 settings.
+                      </span>
+                    </div>
+                    {uploadNotice && (
+                      <p className="text-xs text-[var(--error)] mt-2">{uploadNotice}</p>
+                    )}
                     {coverImage && (
                       <img
                         src={coverImage}
                         alt="Cover preview"
                         className="mt-3 rounded-lg border border-[var(--border-light)]"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Upload asset
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <label className="btn btn-secondary btn-sm cursor-pointer">
+                        <Upload size={16} />
+                        {uploadingAsset ? 'Uploading...' : 'Upload file'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(event) => handleAssetUpload(event.target.files?.[0] || null)}
+                          disabled={uploadingAsset}
+                        />
+                      </label>
+                      {assetUrl && (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => assetUrl && navigator.clipboard.writeText(assetUrl)}
+                        >
+                          <Copy size={16} />
+                          Copy URL
+                        </button>
+                      )}
+                    </div>
+                    {assetUrl && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2 break-all">
+                        {assetUrl}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Daily brief video
+                    </label>
+                    <p className="text-xs text-[var(--text-tertiary)] mb-3">
+                      Generate a 60-90 second script for HeyGen or Synthesia.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={generateVideoBrief}
+                        disabled={!postId || videoBriefLoading}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        {videoBriefLoading ? 'Generating...' : 'Generate brief'}
+                      </button>
+                      {videoBrief?.script && (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => navigator.clipboard.writeText(videoBrief.script)}
+                        >
+                          <Copy size={16} />
+                          Copy script
+                        </button>
+                      )}
+                    </div>
+                    {videoBriefError && (
+                      <p className="text-xs text-[var(--error)] mt-2">{videoBriefError}</p>
+                    )}
+                    {videoBrief?.script && (
+                      <textarea
+                        className="input mt-3 min-h-[140px]"
+                        value={videoBrief.script}
+                        onChange={(event) =>
+                          setVideoBrief((prev: any) => ({ ...prev, script: event.target.value }))
+                        }
                       />
                     )}
                   </div>
@@ -1615,6 +1805,8 @@ export default function WritePage() {
                     { id: 'linkedin', label: 'LinkedIn' },
                     { id: 'reddit', label: 'Reddit' },
                     { id: 'hooks', label: 'Hooks' },
+                    { id: 'markdown', label: 'Markdown' },
+                    { id: 'html', label: 'HTML' },
                     { id: 'og', label: 'OG Image' },
                   ] as const).map((item) => (
                     <button
@@ -1709,6 +1901,36 @@ export default function WritePage() {
                           className="mt-3 btn btn-secondary btn-sm"
                         >
                           Copy hooks
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'markdown' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[200px]"
+                          value={markdownExport}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(markdownExport)}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy markdown
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'html' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[200px]"
+                          value={htmlExport}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(htmlExport)}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy HTML
                         </button>
                       </div>
                     )}

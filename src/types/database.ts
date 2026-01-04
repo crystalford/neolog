@@ -520,3 +520,17 @@ export type StorageConnection = {
   created_at: string
   updated_at: string
 }
+
+export type VideoBrief = {
+  id: string
+  post_id: string | null
+  author_id: string
+  provider: 'heygen' | 'synthesia'
+  script: string
+  status: 'queued' | 'ready' | 'error'
+  provider_payload: Record<string, any> | null
+  provider_response: Record<string, any> | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
