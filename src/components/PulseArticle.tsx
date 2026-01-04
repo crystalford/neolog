@@ -11,6 +11,18 @@ const labelClass = (label: PulseContent['cards'][number]['label']) => {
   return 'pulse-label pulse-label--neutral'
 }
 
+const sentimentClass = (sentiment?: PulseContent['cards'][number]['sentiment']) => {
+  if (sentiment === 'positive') return 'pulse-sentiment pulse-sentiment--positive'
+  if (sentiment === 'negative') return 'pulse-sentiment pulse-sentiment--negative'
+  return 'pulse-sentiment pulse-sentiment--neutral'
+}
+
+const sourceLabel = (source: string) => {
+  if (source === 'x') return 'X'
+  if (source === 'reddit') return 'Reddit'
+  return 'Link'
+}
+
 export function PulseArticle({ pulse }: PulseArticleProps) {
   return (
     <section className="pulse-article">
@@ -33,9 +45,24 @@ export function PulseArticle({ pulse }: PulseArticleProps) {
             <article key={card.id} className="pulse-card">
               <div className="pulse-card__meta">
                 <span className={labelClass(card.label)}>{card.label}</span>
-                <span className="pulse-source">{card.source.toUpperCase()}</span>
+                <span className={sentimentClass(card.sentiment)}>{card.sentiment || 'neutral'}</span>
+                <span className="pulse-source">{sourceLabel(card.source)}</span>
               </div>
-              <div className="pulse-card__author">{card.author || 'Source'}</div>
+              <div className="pulse-card__header">
+                <div className="pulse-avatar">
+                  {card.avatar_url ? (
+                    <img src={card.avatar_url} alt="" />
+                  ) : (
+                    <span>{(card.author || 'S').slice(0, 1).toUpperCase()}</span>
+                  )}
+                </div>
+                <div>
+                  <div className="pulse-card__author">{card.author || 'Source'}</div>
+                  {card.timestamp && (
+                    <div className="pulse-card__time">{card.timestamp}</div>
+                  )}
+                </div>
+              </div>
               <p className="pulse-card__body">{card.body}</p>
               {card.url && (
                 <Link href={card.url} className="pulse-card__link" target="_blank" rel="noreferrer">

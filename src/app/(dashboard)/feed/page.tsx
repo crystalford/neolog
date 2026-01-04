@@ -19,6 +19,7 @@ type FeedPost = {
   cover_image_url: string | null
   published_at: string
   reading_time_minutes: number | null
+  content_type: string | null
   author_id: string
   author_username: string
   author_display_name: string | null
@@ -28,25 +29,28 @@ type FeedPost = {
 export default function FeedPage() {
   const [subscriptionCount, setSubscriptionCount] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'standard' | 'pulse'>('all')
   
   const router = useRouter()
   const supabase = createClient()
 
   const fetchPosts = useCallback(async (offset: number, limit: number) => {
     if (!userId) return { data: [], hasMore: false }
+    const contentType = typeFilter === 'pulse' ? 'pulse' : null
     
     const { data } = await supabase
       .rpc('get_subscription_feed', {
         p_user_id: userId,
         p_limit: limit,
         p_offset: offset,
+        p_content_type: contentType,
       })
 
     return {
       data: (data || []) as FeedPost[],
       hasMore: (data?.length || 0) === limit,
     }
-  }, [userId, supabase])
+  }, [userId, supabase, typeFilter])
 
   const {
     data: posts,
@@ -68,7 +72,7 @@ export default function FeedPage() {
     if (userId) {
       loadInitial()
     }
-  }, [userId])
+  }, [userId, typeFilter])
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -100,6 +104,7 @@ export default function FeedPage() {
     published_at: post.published_at,
     reading_time_minutes: post.reading_time_minutes,
     status: 'published' as const,
+    content_type: post.content_type || 'html',
     author: {
       id: post.author_id,
       username: post.author_username,
@@ -133,6 +138,25 @@ export default function FeedPage() {
               <Compass size={16} />
               Explore
             </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mb-8">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'standard', label: 'Standard' },
+              { id: 'pulse', label: 'Pulse' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setTypeFilter(item.id as typeof typeFilter)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  typeFilter === item.id
+                    ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
+                    : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
           {/* Continue Reading section */}

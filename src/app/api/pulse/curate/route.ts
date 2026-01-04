@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
         cards.push({
           source: 'reddit',
           label: 'Hype',
+          sentiment: 'positive',
           author: post.author ? `u/${post.author}` : '',
           body: post.title,
           url: `https://www.reddit.com${post.permalink || ''}`,
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
         cards.push({
           source: 'link',
           label: 'Neutral',
+          sentiment: 'neutral',
           author: hit.author || '',
           body: hit.title,
           url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,

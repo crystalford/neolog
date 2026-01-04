@@ -1903,7 +1903,8 @@ $$ language plpgsql security definer;
 create or replace function public.get_subscription_feed(
   p_user_id uuid,
   p_limit integer default 20,
-  p_offset integer default 0
+  p_offset integer default 0,
+  p_content_type text default null
 )
 returns table (
   post_id uuid,
@@ -1914,6 +1915,7 @@ returns table (
   cover_image_url text,
   published_at timestamp with time zone,
   reading_time_minutes integer,
+  content_type text,
   author_id uuid,
   author_username text,
   author_display_name text,
@@ -1930,6 +1932,7 @@ begin
     p.cover_image_url,
     p.published_at,
     p.reading_time_minutes,
+    p.content_type,
     pr.id as author_id,
     pr.username as author_username,
     pr.display_name as author_display_name,
@@ -1939,6 +1942,7 @@ begin
   join public.subscriptions s on s.creator_id = p.author_id
   where s.subscriber_id = p_user_id
     and p.status = 'published'
+    and (p_content_type is null or p.content_type = p_content_type)
   order by p.published_at desc
   limit p_limit
   offset p_offset;

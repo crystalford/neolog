@@ -11,6 +11,7 @@ import { VersionHistory } from '@/components/VersionHistory'
 import { PulseEditor } from '@/components/PulseEditor'
 import {
   createEmptyPulse,
+  createPulseTemplate,
   parsePulseContent,
   serializePulseContent,
   pulseWordCount,
@@ -1437,6 +1438,18 @@ export default function WritePage() {
               >
                 Pulse
               </button>
+              {postType !== 'pulse' && (
+                <button
+                  onClick={() => {
+                    setPostType('pulse')
+                    setPulse(createPulseTemplate())
+                    setHtmlMode(false)
+                  }}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Start Pulse
+                </button>
+              )}
               <span className="text-xs text-[var(--text-tertiary)]">
                 Pulse posts are capped at 6 cards.
               </span>

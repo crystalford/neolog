@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { PulseContent, PulseCard, MAX_PULSE_CARDS } from '@/lib/pulse'
+import { PulseContent, PulseCard, MAX_PULSE_CARDS, createPulseTemplate } from '@/lib/pulse'
 
 type PulseEditorProps = {
   pulse: PulseContent
@@ -12,6 +12,7 @@ const createCard = (): PulseCard => ({
   id: `pulse_${Date.now()}_${Math.random().toString(16).slice(2)}`,
   label: 'Neutral',
   source: 'x',
+  sentiment: 'neutral',
   author: '',
   body: '',
   url: '',
@@ -22,6 +23,9 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
   const [curating, setCurating] = useState(false)
   const [resolvingId, setResolvingId] = useState<string | null>(null)
   const [summarizing, setSummarizing] = useState(false)
+  const [bulkUrls, setBulkUrls] = useState('')
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [sentimentLoading, setSentimentLoading] = useState(false)
 
   const update = (patch: Partial<PulseContent>) => {
     onChange({ ...pulse, ...patch })
@@ -57,9 +61,12 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
       updateCard(card.id, {
         source: data.card?.source || card.source,
         label: data.card?.label || card.label,
+        sentiment: data.card?.sentiment || card.sentiment || 'neutral',
         author: data.card?.author || card.author,
         body: data.card?.body || card.body,
         url: data.card?.url || card.url,
+        avatar_url: data.card?.avatar_url || card.avatar_url || '',
+        timestamp: data.card?.timestamp || card.timestamp || '',
       })
     } catch (error) {
       console.error('Resolve error:', error)
@@ -99,15 +106,7 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
   }
 
   const applyTemplate = () => {
-    onChange({
-      summary: 'Write a 150-word brief that captures the core facts, players, and stakes.',
-      takeaway: 'Summarize why this matters and what readers should watch next.',
-      cards: [
-        { ...createCard(), label: 'Hype', source: 'x', author: '@source', body: 'Key supportive quote or insight.', url: '' },
-        { ...createCard(), label: 'Critic', source: 'reddit', author: 'u/source', body: 'Pushback, critique, or cautionary take.', url: '' },
-        { ...createCard(), label: 'Neutral', source: 'link', author: 'Reporter', body: 'A factual update or data point.', url: '' },
-      ],
-    })
+    onChange(createPulseTemplate())
   }
 
   const generateSummary = async () => {
@@ -132,6 +131,75 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
       console.error('Pulse summary error:', error)
     } finally {
       setSummarizing(false)
+    }
+  }
+
+  const applyBulkUrls = async () => {
+    const urls = bulkUrls
+      .split(/\n|,/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .slice(0, MAX_PULSE_CARDS)
+
+    if (urls.length === 0) return
+    setBulkLoading(true)
+    try {
+      const results: PulseCard[] = []
+      for (const url of urls) {
+        const response = await fetch('/api/pulse/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Resolve failed')
+        }
+        const card = data.card || {}
+        results.push({
+          id: createCard().id,
+          label: card.label || 'Neutral',
+          source: card.source || 'link',
+          sentiment: card.sentiment || 'neutral',
+          author: card.author || '',
+          body: card.body || '',
+          url: card.url || url,
+          avatar_url: card.avatar_url || '',
+          timestamp: card.timestamp || '',
+        })
+      }
+      onChange({ ...pulse, cards: results })
+      setBulkUrls('')
+    } catch (error) {
+      console.error('Bulk URL error:', error)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const autoLabelSentiment = async () => {
+    if (pulse.cards.length === 0) return
+    setSentimentLoading(true)
+    try {
+      const response = await fetch('/api/pulse/sentiment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cards: pulse.cards }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Sentiment failed')
+      }
+      const sentiments = Array.isArray(data.sentiments) ? data.sentiments : []
+      const nextCards = pulse.cards.map((card, index) => ({
+        ...card,
+        sentiment: sentiments[index] || card.sentiment || 'neutral',
+      }))
+      onChange({ ...pulse, cards: nextCards })
+    } catch (error) {
+      console.error('Sentiment error:', error)
+    } finally {
+      setSentimentLoading(false)
     }
   }
 
@@ -170,6 +238,28 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
           Pulls recent Reddit + Hacker News sources and fills up to six cards.
         </p>
       </div>
+
+      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+        <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+          Bulk URL paste
+        </label>
+        <textarea
+          value={bulkUrls}
+          onChange={(e) => setBulkUrls(e.target.value)}
+          placeholder="Paste up to 6 URLs (X, Reddit, or web links), one per line."
+          className="editor-textarea min-h-[120px]"
+        />
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-xs text-[var(--text-tertiary)]">Auto-fills cards from URLs.</span>
+          <button
+            onClick={applyBulkUrls}
+            className="btn btn-secondary btn-sm"
+            disabled={bulkLoading || !bulkUrls.trim()}
+          >
+            {bulkLoading ? 'Filling...' : 'Auto-fill URLs'}
+          </button>
+        </div>
+      </div>
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <label className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
@@ -196,13 +286,22 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
           <label className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
             The discourse ({pulse.cards.length}/{MAX_PULSE_CARDS})
           </label>
-          <button
-            onClick={addCard}
-            className="btn btn-secondary btn-sm"
-            disabled={pulse.cards.length >= MAX_PULSE_CARDS}
-          >
-            Add card
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={autoLabelSentiment}
+              className="btn btn-ghost btn-sm"
+              disabled={sentimentLoading || pulse.cards.length === 0}
+            >
+              {sentimentLoading ? 'Tagging...' : 'Auto sentiment'}
+            </button>
+            <button
+              onClick={addCard}
+              className="btn btn-secondary btn-sm"
+              disabled={pulse.cards.length >= MAX_PULSE_CARDS}
+            >
+              Add card
+            </button>
+          </div>
         </div>
         <div className="space-y-4">
           {pulse.cards.map((card) => (
@@ -218,6 +317,17 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
                   <option value="Hype">Hype</option>
                   <option value="Critic">Critic</option>
                   <option value="Neutral">Neutral</option>
+                </select>
+                <select
+                  className="input"
+                  value={card.sentiment || 'neutral'}
+                  onChange={(e) =>
+                    updateCard(card.id, { sentiment: e.target.value as PulseCard['sentiment'] })
+                  }
+                >
+                  <option value="positive">Positive</option>
+                  <option value="negative">Negative</option>
+                  <option value="neutral">Neutral</option>
                 </select>
                 <select
                   className="input"
@@ -243,6 +353,12 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
                 onChange={(e) => updateCard(card.id, { author: e.target.value })}
                 placeholder="Author handle"
               />
+              <input
+                className="input"
+                value={card.timestamp || ''}
+                onChange={(e) => updateCard(card.id, { timestamp: e.target.value })}
+                placeholder="Timestamp (optional)"
+              />
               <textarea
                 className="editor-textarea min-h-[120px]"
                 value={card.body}
@@ -254,6 +370,12 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
                 value={card.url}
                 onChange={(e) => updateCard(card.id, { url: e.target.value })}
                 placeholder="Source URL (X, Reddit, or link)"
+              />
+              <input
+                className="input"
+                value={card.avatar_url || ''}
+                onChange={(e) => updateCard(card.id, { avatar_url: e.target.value })}
+                placeholder="Avatar URL (optional)"
               />
               <div className="flex items-center justify-end">
                 <button

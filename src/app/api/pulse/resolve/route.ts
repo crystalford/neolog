@@ -47,9 +47,13 @@ export async function POST(request: NextRequest) {
         card: {
           source: 'reddit',
           label: 'Hype',
+          sentiment: 'positive',
           author: post.author ? `u/${post.author}` : '',
           body: post.selftext || post.title || '',
           url: `https://www.reddit.com${post.permalink || ''}`,
+          timestamp: post.created_utc
+            ? new Date(post.created_utc * 1000).toLocaleString()
+            : '',
         },
       })
     }
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest) {
         card: {
           source: 'x',
           label: 'Neutral',
+          sentiment: 'neutral',
           author: data.author_name || '',
           body,
           url: targetUrl,
@@ -86,6 +91,7 @@ export async function POST(request: NextRequest) {
       card: {
         source: 'link',
         label: 'Neutral',
+        sentiment: 'neutral',
         author: '',
         body: description || title,
         url: targetUrl,
