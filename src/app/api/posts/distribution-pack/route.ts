@@ -88,7 +88,11 @@ export async function POST(request: NextRequest) {
     const plain = stripHtml(post.content_html || post.content || '')
     const summary = post.excerpt || getSentences(plain, 2).join(' ')
     const sentenceList = getSentences(plain, 4)
-    const link = `${BASE_URL}/${post.author.username}/${post.slug}`
+    const authorProfile = Array.isArray((post as any).author)
+      ? (post as any).author[0]
+      : (post as any).author
+    const authorUsername = authorProfile?.username || 'unknown'
+    const link = `${BASE_URL}/${authorUsername}/${post.slug}`
 
     const hooks = [
       `The hidden point in "${post.title}" most people miss:`,
