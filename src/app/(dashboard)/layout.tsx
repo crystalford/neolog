@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
   Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, ChevronDown, Command
+  PenLine, Bell, Radio, List, Bookmark, Clock, Command
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 
@@ -20,7 +20,6 @@ export default function DashboardLayout({
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [expandedSection, setExpandedSection] = useState<string | 'all' | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -122,16 +121,6 @@ export default function DashboardLayout({
     },
   ]
 
-  const activeSection = navSections.find((section) =>
-    section.items.some((item) => pathname === item.href || pathname.startsWith(item.href + '/'))
-  )
-
-  useEffect(() => {
-    if (activeSection) {
-      setExpandedSection(activeSection.title)
-    }
-  }, [activeSection?.title])
-
   const commandItems = useMemo(() => {
     const items = navSections.flatMap((section) =>
       section.items.map((item) => ({
@@ -198,49 +187,30 @@ export default function DashboardLayout({
         <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
           {navSections.map((section) => (
             <div key={section.title}>
-              <button
-                type="button"
-                onClick={() => {
-                  setExpandedSection((prev) =>
-                    prev === section.title ? 'all' : section.title
-                  )
-                }}
-                className="w-full flex items-center justify-between px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2 hover:text-[var(--text-secondary)] transition-colors"
-                aria-expanded={expandedSection === section.title || expandedSection === 'all'}
-              >
-                <span>{section.title}</span>
-                <ChevronDown
-                  size={12}
-                  className={`transition-transform ${
-                    expandedSection === section.title || expandedSection === 'all'
-                      ? 'rotate-180'
-                      : ''
-                  }`}
-                />
-              </button>
-              {(expandedSection === section.title || expandedSection === 'all') && (
-                <div className="space-y-1">
-                  {section.items.map((link) => {
-                    const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-                    const Icon = link.icon
+              <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                {section.title}
+              </p>
+              <div className="space-y-1">
+                {section.items.map((link) => {
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                  const Icon = link.icon
 
-                    return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                          isActive
-                            ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                        }`}
-                      >
-                        <Icon size={16} className="flex-shrink-0" />
-                        <span>{link.label}</span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                    >
+                      <Icon size={16} className="flex-shrink-0" />
+                      <span>{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
           ))}
         </nav>

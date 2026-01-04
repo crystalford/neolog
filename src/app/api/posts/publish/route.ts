@@ -49,9 +49,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to publish' }, { status: 500 })
     }
 
-    // Create a version snapshot
+    // Create a version snapshot with a safe version number
+    const { data: latestVersion } = await supabase
+      .from('post_versions')
+      .select('version_number')
+      .eq('post_id', postId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const nextVersionNumber = (latestVersion?.version_number || 0) + 1
+
     await supabase.from('post_versions').insert({
       post_id: postId,
+      version_number: nextVersionNumber,
       title: post.title,
       content: post.content,
       content_html: post.content_html,

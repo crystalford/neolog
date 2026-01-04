@@ -144,6 +144,66 @@ export default function SubscribersPage() {
     }
   }
 
+  const toggleEmailDigest = async (subscriber: Subscriber) => {
+    await supabase
+      .from('email_subscribers')
+      .update({ email_weekly_digest: !subscriber.email_weekly_digest })
+      .eq('id', subscriber.id)
+
+    setEmailSubscribers((prev) =>
+      prev.map((item) =>
+        item.id === subscriber.id
+          ? { ...item, email_weekly_digest: !subscriber.email_weekly_digest }
+          : item
+      )
+    )
+  }
+
+  const toggleEmailUpdates = async (subscriber: Subscriber) => {
+    await supabase
+      .from('email_subscribers')
+      .update({ email_new_posts: !subscriber.email_new_posts })
+      .eq('id', subscriber.id)
+
+    setEmailSubscribers((prev) =>
+      prev.map((item) =>
+        item.id === subscriber.id
+          ? { ...item, email_new_posts: !subscriber.email_new_posts }
+          : item
+      )
+    )
+  }
+
+  const unsubscribeEmail = async (subscriber: Subscriber) => {
+    await supabase
+      .from('email_subscribers')
+      .update({ status: 'unsubscribed' })
+      .eq('id', subscriber.id)
+
+    setEmailSubscribers((prev) =>
+      prev.map((item) =>
+        item.id === subscriber.id
+          ? { ...item, status: 'unsubscribed' }
+          : item
+      )
+    )
+  }
+
+  const toggleUserUpdates = async (subscriber: UserSubscriber) => {
+    await supabase
+      .from('subscriptions')
+      .update({ email_new_posts: !subscriber.email_new_posts })
+      .eq('id', subscriber.id)
+
+    setUserSubscribers((prev) =>
+      prev.map((item) =>
+        item.id === subscriber.id
+          ? { ...item, email_new_posts: !subscriber.email_new_posts }
+          : item
+      )
+    )
+  }
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
@@ -321,6 +381,13 @@ export default function SubscribersPage() {
                         >
                           <ExternalLink size={14} />
                         </Link>
+                        <button
+                          onClick={() => toggleUserUpdates(sub)}
+                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          title={sub.email_new_posts ? 'Mute email updates' : 'Enable email updates'}
+                        >
+                          {sub.email_new_posts ? <Mail size={14} /> : <UserMinus size={14} />}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -378,6 +445,27 @@ export default function SubscribersPage() {
                             title={copied === sub.id ? 'Copied' : 'Copy email'}
                           >
                             {copied === sub.id ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                          <button
+                            onClick={() => toggleEmailUpdates(sub)}
+                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            title={sub.email_new_posts ? 'Mute new post emails' : 'Enable new post emails'}
+                          >
+                            <Mail size={14} />
+                          </button>
+                          <button
+                            onClick={() => toggleEmailDigest(sub)}
+                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            title={sub.email_weekly_digest ? 'Disable weekly digest' : 'Enable weekly digest'}
+                          >
+                            <Clock size={14} />
+                          </button>
+                          <button
+                            onClick={() => unsubscribeEmail(sub)}
+                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                            title="Unsubscribe"
+                          >
+                            <UserMinus size={14} />
                           </button>
                         </div>
                       </div>

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
+import { VersionHistory } from '@/components/VersionHistory'
 import {
   Loader2, Settings, BookOpen, Upload, X, CheckCircle2
 } from 'lucide-react'
@@ -42,6 +43,8 @@ export default function WritePage() {
   const [showImport, setShowImport] = useState(false)
   const [importHtml, setImportHtml] = useState('')
   const [htmlMode, setHtmlMode] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -599,6 +602,12 @@ export default function WritePage() {
     )
   }
 
+  const publishLabel = existingStatus === 'published'
+    ? 'Update'
+    : scheduledAt
+    ? 'Schedule'
+    : 'Publish'
+
   return (
     <main className="pb-16">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
@@ -686,6 +695,14 @@ export default function WritePage() {
               <Settings size={14} />
               Publish settings
             </button>
+            {postId && (
+              <button
+                onClick={() => setShowHistory(true)}
+                className="btn btn-ghost btn-sm"
+              >
+                History
+              </button>
+            )}
             {profile && postId && (
               <a
                 href={`/${profile.username}/${generateSlug(title)}?preview=true`}
@@ -697,11 +714,11 @@ export default function WritePage() {
             )}
 
               <button
-                onClick={handlePublish}
+                onClick={() => setShowPublishConfirm(true)}
                 disabled={publishing || !title || !content || !publicationId}
                 className="btn btn-primary btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {publishing ? 'Publishing...' : existingStatus === 'published' ? 'Update' : scheduledAt ? 'Schedule' : 'Publish'}
+                {publishing ? 'Publishing...' : publishLabel}
               </button>
             </div>
           </div>
@@ -919,6 +936,106 @@ export default function WritePage() {
                   </div>
                 </div>
               </aside>
+            </div>
+          )}
+
+          {showHistory && postId && (
+            <div className="fixed inset-0 z-40">
+              <div
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setShowHistory(false)}
+              />
+              <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)]">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                      History
+                    </p>
+                    <h2 className="font-display text-xl">Versions</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+                    aria-label="Close history"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="px-6 py-6">
+                  <VersionHistory
+                    postId={postId}
+                    onRestore={(version) => {
+                      setTitle(version.title)
+                      setContent(version.content_html || version.content || '')
+                      setHtmlMode(shouldUseHtmlMode(version.content_html || version.content || ''))
+                      setShowHistory(false)
+                      setSuccess('Version restored. Review changes before publishing.')
+                    }}
+                  />
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {showPublishConfirm && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
+              <div
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setShowPublishConfirm(false)}
+              />
+              <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
+                <h3 className="font-display text-xl text-[var(--text-primary)] mb-2">
+                  {publishLabel} post
+                </h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Confirm the details before you {publishLabel.toLowerCase()}.
+                </p>
+                <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+                  <div className="flex items-center justify-between">
+                    <span>Title</span>
+                    <span className="text-[var(--text-primary)] font-medium truncate max-w-[220px]">
+                      {title || 'Untitled'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Status</span>
+                    <span className="text-[var(--text-primary)] font-medium">
+                      {existingStatus === 'published' ? 'Published' : scheduledAt ? 'Scheduled' : 'Draft'}
+                    </span>
+                  </div>
+                  {scheduledAt && (
+                    <div className="flex items-center justify-between">
+                      <span>Schedule time</span>
+                      <span className="text-[var(--text-primary)] font-medium">
+                        {new Date(scheduledAt).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span>Tags</span>
+                    <span className="text-[var(--text-primary)] font-medium">
+                      {tags.length} selected
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 mt-6">
+                  <button
+                    onClick={() => setShowPublishConfirm(false)}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPublishConfirm(false)
+                      handlePublish()
+                    }}
+                    className="btn btn-primary btn-sm"
+                  >
+                    {publishLabel}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all')
+  const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const router = useRouter()
@@ -69,6 +69,32 @@ export default function DashboardPage() {
     setSelectedIds([])
   }
 
+  const handleBulkArchive = async () => {
+    if (selectedIds.length === 0) return
+    await supabase
+      .from('posts')
+      .update({ status: 'archived' })
+      .in('id', selectedIds)
+
+    setPosts(posts.map((post) =>
+      selectedIds.includes(post.id) ? { ...post, status: 'archived' as any } : post
+    ))
+    setSelectedIds([])
+  }
+
+  const handleBulkRestore = async () => {
+    if (selectedIds.length === 0) return
+    await supabase
+      .from('posts')
+      .update({ status: 'draft' })
+      .in('id', selectedIds)
+
+    setPosts(posts.map((post) =>
+      selectedIds.includes(post.id) ? { ...post, status: 'draft' as any } : post
+    ))
+    setSelectedIds([])
+  }
+
   if (loading) {
     return (
       <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
@@ -86,10 +112,12 @@ export default function DashboardPage() {
   }
 
   const publishedCount = posts.filter((post) => post.status === 'published').length
-  const draftCount = posts.filter((post) => post.status !== 'published').length
+  const draftCount = posts.filter((post) => post.status === 'draft').length
+  const archivedCount = posts.filter((post) => post.status === 'archived').length
   const filteredPosts = posts.filter((post) => {
     if (filter === 'published') return post.status === 'published'
-    if (filter === 'draft') return post.status !== 'published'
+    if (filter === 'draft') return post.status === 'draft'
+    if (filter === 'archived') return post.status === 'archived'
     return true
   }).filter((post) => {
     if (!search.trim()) return true
@@ -125,6 +153,7 @@ export default function DashboardPage() {
           { label: 'Total posts', value: posts.length },
           { label: 'Published', value: publishedCount },
           { label: 'Drafts', value: draftCount },
+          { label: 'Archived', value: archivedCount },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -142,6 +171,7 @@ export default function DashboardPage() {
             { id: 'all', label: 'All' },
             { id: 'published', label: 'Published' },
             { id: 'draft', label: 'Drafts' },
+            { id: 'archived', label: 'Archived' },
           ].map((item) => (
             <button
               key={item.id}
@@ -211,13 +241,27 @@ export default function DashboardPage() {
               <span className="text-[var(--text-secondary)]">
                 {selectedIds.length} selected
               </span>
-              <button
-                onClick={handleBulkDelete}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10 transition-colors"
-              >
-                <Trash2 size={14} />
-                Delete
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBulkArchive}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                >
+                  Archive
+                </button>
+                <button
+                  onClick={handleBulkRestore}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                >
+                  Restore
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              </div>
             </div>
           )}
           <div className="divide-y divide-[var(--border-light)]">
@@ -258,6 +302,10 @@ export default function DashboardPage() {
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)] bg-[var(--success)]/10 px-2 py-0.5 rounded-full">
                       <Globe size={12} />
                       Published
+                    </span>
+                  ) : post.status === 'archived' ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
+                      Archived
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">

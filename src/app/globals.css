@@ -115,24 +115,24 @@
    ================================ */
 
 .dashboard-shell {
-  --bg-primary: #fffdf8;
-  --bg-secondary: #f5f1ea;
-  --bg-tertiary: #efe8de;
-  --bg-inverse: #13110f;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f7f9;
+  --bg-tertiary: #eef1f4;
+  --bg-inverse: #0f1115;
 
-  --text-primary: #1f1b16;
-  --text-secondary: #5a5046;
-  --text-tertiary: #a3998e;
-  --text-inverse: #fffdf8;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
 
-  --accent: #0f766e;
-  --accent-hover: #0f5f58;
-  --accent-soft: rgba(15, 118, 110, 0.12);
-  --accent-softer: rgba(15, 118, 110, 0.06);
+  --accent: #0070f3;
+  --accent-hover: #0057c2;
+  --accent-soft: rgba(0, 112, 243, 0.12);
+  --accent-softer: rgba(0, 112, 243, 0.06);
 
-  --border-light: rgba(31, 27, 22, 0.08);
-  --border-medium: rgba(31, 27, 22, 0.16);
-  --border-heavy: rgba(31, 27, 22, 0.28);
+  --border-light: rgba(17, 24, 39, 0.08);
+  --border-medium: rgba(17, 24, 39, 0.14);
+  --border-heavy: rgba(17, 24, 39, 0.28);
 
   --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -148,10 +148,10 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(31, 27, 22, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31, 27, 22, 0.035) 1px, transparent 1px);
-  background-size: 24px 24px;
-  opacity: 0.4;
+    linear-gradient(rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 24, 39, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.2;
   pointer-events: none;
   z-index: 0;
 }
@@ -163,6 +163,24 @@
 
 .dashboard-shell svg.lucide {
   stroke-width: 1.75;
+}
+
+.dashboard-shell .btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+}
+
+.dashboard-shell .btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+.dashboard-shell .btn-lg {
+  padding: 0.7rem 1.4rem;
+  font-size: 0.9375rem;
+  border-radius: 12px;
 }
 
 * {
