@@ -258,3 +258,56 @@ Check these common problems:
 4. Start writing!
 
 The publishing should now work end-to-end once you complete these steps.
+
+---
+
+## Headless Setup (Beginner Guide)
+
+This adds the new "AI Vault" and automation features (BYOK keys, sources inbox, and webhooks).
+
+### 1. Add the env var locally
+
+Open `.env.local` and add this line:
+
+```
+INTEGRATION_KEY_SECRET=your_64_char_hex_string
+```
+
+You can generate a 64-char hex value with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 2. Add the env var to Vercel
+
+In Vercel:
+1. Project Settings -> Environment Variables
+2. Add `INTEGRATION_KEY_SECRET` with the same value
+3. Redeploy
+
+### 3. Run the SQL (Supabase SQL Editor)
+
+In Supabase -> SQL Editor, run these blocks from `supabase-schema.sql`:
+
+1. `ALTER TABLE public.profiles ADD COLUMN context_md text;`
+2. `CREATE TABLE public.api_keys (...)` + RLS policies
+3. `CREATE TABLE public.integration_keys (...)` + RLS policies
+4. `CREATE TABLE public.feed_sources (...)` + RLS policies
+5. `CREATE TABLE public.inbox_items (...)` + RLS policies
+
+If you're unsure, just open `supabase-schema.sql` and run the newest blocks near the bottom in order.
+
+### 4. Quick smoke tests
+
+1. **AI Vault:** Dashboard -> Settings -> AI Vault -> Save an OpenAI key.
+2. **Automation API key:** Create a key, then POST to:
+   `POST /api/v1/inbox/{api_key}`
+   with body:
+   ```json
+   { "title": "Test draft", "content": "Hello from webhook" }
+   ```
+3. **llms.txt:** Visit `https://your-domain.com/{username}/llms.txt`
+4. **JSON mode:** Visit `https://your-domain.com/{username}/{slug}?format=json`
+
+If all four work, the headless stack is live.

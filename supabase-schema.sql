@@ -48,7 +48,7 @@ create table public.posts (
   subtitle text,
   content text, -- The HTML/markdown content
   content_html text, -- Rendered HTML for display
-  content_type text default 'html' check (content_type in ('html', 'markdown', 'rich')),
+  content_type text default 'html' check (content_type in ('html', 'markdown', 'rich', 'pulse')),
   
   -- Metadata
   cover_image_url text,
@@ -3828,6 +3828,11 @@ $$ language plpgsql;
 alter table public.posts add column if not exists canonical_url text;
 alter table public.posts add column if not exists originally_published_at timestamp with time zone;
 alter table public.posts add column if not exists original_source text; -- e.g., 'Medium', 'Substack', 'Personal Blog'
+-- Allow pulse content type for existing databases
+alter table public.posts drop constraint if exists posts_content_type_check;
+alter table public.posts
+  add constraint posts_content_type_check
+  check (content_type in ('html', 'markdown', 'rich', 'pulse'));
 
 -- =============================================
 -- WEBMENTIONS

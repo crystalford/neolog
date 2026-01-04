@@ -32,6 +32,16 @@ Last updated: 2026-01-04
 - [ ] Auto-post syndication (requires platform APIs)
 - [ ] Programmatic visuals engine
 
+## Neolog for Robots (prioritized)
+1. AI Vault (BYOK) + context.md injection (now)
+2. Sources + Inbox (RSS pull) (now)
+3. Headless Inbox webhook (now)
+4. llms.txt + ?format=json (now)
+5. Agent-scoped API keys + automation triggers (next)
+6. Accept: text/markdown responses (next)
+7. Vector search endpoint (later)
+8. MCP server integration (later)
+
 ## Cost-Gated Features
 - AI summaries (OpenAI)
 - AI distribution pack

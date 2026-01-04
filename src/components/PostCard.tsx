@@ -18,8 +18,9 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
       })
     : null
 
-  const hasInteractiveContent = post.content?.includes('<script') || 
+  const hasInteractiveContent = post.content?.includes('<script') ||
                                  (post.content_type === 'html' && post.content?.includes('<!doctype'))
+  const isPulse = post.content_type === 'pulse'
 
   if (variant === 'compact') {
     return (
@@ -70,6 +71,9 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         <div className="flex items-center gap-2 mb-2">
           {hasInteractiveContent && (
             <span className="doc-badge doc-badge-interactive"><Code size={10} /> Interactive</span>
+          )}
+          {isPulse && (
+            <span className="doc-badge doc-badge-pulse">Pulse</span>
           )}
         </div>
         

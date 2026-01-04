@@ -8,6 +8,14 @@ import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { VersionHistory } from '@/components/VersionHistory'
+import { PulseEditor } from '@/components/PulseEditor'
+import {
+  createEmptyPulse,
+  parsePulseContent,
+  serializePulseContent,
+  pulseWordCount,
+  pulseExcerpt,
+} from '@/lib/pulse'
 import {
   Loader2, Settings, BookOpen, Upload, X, CheckCircle2
 } from 'lucide-react'
@@ -44,6 +52,8 @@ export default function WritePage() {
   const [showImport, setShowImport] = useState(false)
   const [importHtml, setImportHtml] = useState('')
   const [htmlMode, setHtmlMode] = useState(false)
+  const [postType, setPostType] = useState<'post' | 'pulse'>('post')
+  const [pulse, setPulse] = useState(createEmptyPulse())
   const [showHistory, setShowHistory] = useState(false)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [lastVersion, setLastVersion] = useState<{ title: string; content: string | null } | null>(null)
@@ -190,7 +200,12 @@ export default function WritePage() {
       setOriginalSource(post.original_source || '')
       setIsPremium(post.is_premium || false)
       setScheduledAt(scheduledValue)
-      setHtmlMode(shouldUseHtmlMode(post.content || ''))
+      const loadedType = post.content_type === 'pulse' ? 'pulse' : 'post'
+      setPostType(loadedType)
+      if (loadedType === 'pulse') {
+        setPulse(parsePulseContent(post.content || post.content_html || ''))
+      }
+      setHtmlMode(loadedType === 'pulse' ? false : shouldUseHtmlMode(post.content || ''))
       setExistingStatus(post.status || null)
       if (post.status === 'published') {
         setPublishIntent('publish')
@@ -389,6 +404,17 @@ export default function WritePage() {
     return text.trim().split(' ').filter(Boolean).length
   }
 
+  const calculateReadingTimeFromWords = (words: number) => {
+    return Math.max(1, Math.ceil(words / 200))
+  }
+
+  const getCurrentWordCount = () => {
+    if (postType === 'pulse') {
+      return pulseWordCount(pulse)
+    }
+    return getWordCount(content)
+  }
+
   const shouldUseHtmlMode = (html: string) => {
     return /<(html|head|body|style|script|link[^>]+rel=["']stylesheet["'])/i.test(html)
   }
@@ -492,6 +518,7 @@ export default function WritePage() {
     setSubtitle(parsed.subtitle || subtitle)
     setCoverImage(parsed.coverImage || coverImage)
     setContent(parsed.contentHtml)
+    setPostType('post')
     setHtmlMode(shouldUseHtmlMode(parsed.contentHtml) || html.includes('<html') || html.includes('<head'))
     setImportNotice('HTML imported. Review the content before publishing.')
   }
@@ -523,7 +550,11 @@ export default function WritePage() {
     setSaving(true)
 
     const slug = generateSlug(title)
-    const readingTime = calculateReadingTime(content)
+    const wordCount = getCurrentWordCount()
+    const readingTime = calculateReadingTimeFromWords(wordCount)
+    const resolvedContent = postType === 'pulse' ? serializePulseContent(pulse) : content
+    const resolvedContentHtml = postType === 'pulse' ? null : content
+    const resolvedContentType = postType === 'pulse' ? 'pulse' : 'html'
     let liveStatus = existingStatus
     if (postId) {
       const { data: latestPost } = await supabase
@@ -547,9 +578,9 @@ export default function WritePage() {
       title,
       subtitle: subtitle || null,
       slug,
-      content,
-      content_html: content,
-      content_type: 'html',
+      content: resolvedContent,
+      content_html: resolvedContentHtml,
+      content_type: resolvedContentType,
       cover_image_url: coverImage || null,
       reading_time_minutes: readingTime,
       status: statusValue,
@@ -583,7 +614,7 @@ export default function WritePage() {
     } finally {
       setSaving(false)
     }
-  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent])
+  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent, postType, pulse])
 
   // Debounced auto-save
   useEffect(() => {
@@ -591,11 +622,11 @@ export default function WritePage() {
     
     const timer = setTimeout(autoSave, 2000)
     return () => clearTimeout(timer)
-  }, [title, subtitle, content, coverImage])
+  }, [title, subtitle, content, coverImage, postType, pulse])
 
   // Publish
   const handlePublish = async () => {
-    if (!user || !title || !content) {
+    if (!user || !title || (postType === 'post' && !content)) {
       setError('Please add a title and content before publishing')
       return
     }
@@ -604,11 +635,17 @@ export default function WritePage() {
     const intent = isAlreadyPublished ? 'publish' : publishIntent
     const isScheduling = intent === 'schedule'
 
-    const preflight = [
-      { label: 'Title added', ok: title.trim().length >= 5, required: true },
-      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
-      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
-    ]
+    const preflight = postType === 'pulse'
+      ? [
+          { label: 'Summary added', ok: pulse.summary.trim().length >= 40, required: true },
+          { label: 'At least 2 cards', ok: pulse.cards.length >= 2, required: true },
+          { label: 'Takeaway added', ok: pulse.takeaway.trim().length >= 20, required: false },
+        ]
+      : [
+          { label: 'Title added', ok: title.trim().length >= 5, required: true },
+          { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
+          { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
+        ]
 
     const missingRequired = preflight.filter((item) => item.required && !item.ok)
     if (missingRequired.length > 0) {
@@ -655,16 +692,21 @@ export default function WritePage() {
       }
 
       const slug = generateSlug(title)
-      const readingTime = calculateReadingTime(content)
+      const wordCount = getCurrentWordCount()
+      const readingTime = calculateReadingTimeFromWords(wordCount)
 
       // Generate excerpt
-      const textContent = content
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-      const excerpt = textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
+      const textContent = postType === 'pulse'
+        ? pulseExcerpt(pulse)
+        : content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+      const excerpt = textContent
+        ? textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
+        : ''
 
       const postData: any = {
         author_id: user.id,
@@ -672,9 +714,9 @@ export default function WritePage() {
         title,
         subtitle: subtitle || null,
         slug,
-        content,
-        content_html: content,
-        content_type: 'html',
+        content: postType === 'pulse' ? serializePulseContent(pulse) : content,
+        content_html: postType === 'pulse' ? null : content,
+        content_type: postType === 'pulse' ? 'pulse' : 'html',
         cover_image_url: coverImage || null,
         reading_time_minutes: readingTime,
         excerpt,
@@ -845,9 +887,11 @@ export default function WritePage() {
     : 'Publish'
 
   const previousWordCount = lastVersion?.content
-    ? getWordCount(lastVersion.content)
+    ? postType === 'pulse'
+      ? pulseWordCount(parsePulseContent(lastVersion.content))
+      : getWordCount(lastVersion.content)
     : 0
-  const currentWordCount = getWordCount(content)
+  const currentWordCount = getCurrentWordCount()
   const wordDelta = lastVersion ? currentWordCount - previousWordCount : null
   const titleChanged = lastVersion ? lastVersion.title !== title : false
 
@@ -1342,12 +1386,19 @@ export default function WritePage() {
 
                   <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
                     <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Preflight checks</h3>
-                    {[
-                      { label: 'Title added', ok: title.trim().length >= 5, required: true },
-                      { label: 'Subtitle added', ok: subtitle.trim().length >= 5, required: false },
-                      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
-                      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
-                    ].map((item) => (
+                    {(postType === 'pulse'
+                      ? [
+                          { label: 'Summary added', ok: pulse.summary.trim().length >= 40, required: true },
+                          { label: 'At least 2 cards', ok: pulse.cards.length >= 2, required: true },
+                          { label: 'Takeaway added', ok: pulse.takeaway.trim().length >= 20, required: false },
+                        ]
+                      : [
+                          { label: 'Title added', ok: title.trim().length >= 5, required: true },
+                          { label: 'Subtitle added', ok: subtitle.trim().length >= 5, required: false },
+                          { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
+                          { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
+                        ]
+                    ).map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-sm text-[var(--text-secondary)] mb-2 last:mb-0">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 size={14} className={item.ok ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'} />
@@ -1365,6 +1416,32 @@ export default function WritePage() {
               </aside>
             </div>
           )}
+
+          <div className="mb-6">
+            <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+              Post type
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setPostType('post')}
+                className={postType === 'post' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => {
+                  setPostType('pulse')
+                  setHtmlMode(false)
+                }}
+                className={postType === 'pulse' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+              >
+                Pulse
+              </button>
+              <span className="text-xs text-[var(--text-tertiary)]">
+                Pulse posts are capped at 6 cards.
+              </span>
+            </div>
+          </div>
 
           {showHistory && postId && (
             <div className="fixed inset-0 z-40">
@@ -1664,28 +1741,32 @@ export default function WritePage() {
 
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-              Editor mode: {htmlMode ? 'HTML' : 'Visual'}
+              Editor mode: {postType === 'pulse' ? 'Pulse' : htmlMode ? 'HTML' : 'Visual'}
             </span>
             <span className="text-xs text-[var(--text-tertiary)]">
-              {getWordCount(content).toLocaleString()} words
+              {getCurrentWordCount().toLocaleString()} words
             </span>
-            <button
-              onClick={() => {
-                if (htmlMode) {
-                  const confirmSwitch = window.confirm(
-                    'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
-                  )
-                  if (!confirmSwitch) return
-                }
-                setHtmlMode(!htmlMode)
-              }}
-              className="btn btn-ghost btn-sm"
-            >
-              Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
-            </button>
+            {postType !== 'pulse' && (
+              <button
+                onClick={() => {
+                  if (htmlMode) {
+                    const confirmSwitch = window.confirm(
+                      'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
+                    )
+                    if (!confirmSwitch) return
+                  }
+                  setHtmlMode(!htmlMode)
+                }}
+                className="btn btn-ghost btn-sm"
+              >
+                Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
+              </button>
+            )}
           </div>
 
-          {htmlMode ? (
+          {postType === 'pulse' ? (
+            <PulseEditor pulse={pulse} onChange={setPulse} />
+          ) : htmlMode ? (
             <div className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)]">
               <textarea
                 value={content}
