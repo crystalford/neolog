@@ -9,7 +9,7 @@ import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import {
   Save, Send, Loader2, Eye, Settings, Image as ImageIcon,
-  ChevronDown, Clock, BookOpen
+  ChevronDown, Clock, BookOpen, Upload, X
 } from 'lucide-react'
 
 export default function WritePage() {
@@ -34,9 +34,14 @@ export default function WritePage() {
   const [originalSource, setOriginalSource] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importNotice, setImportNotice] = useState<string | null>(null)
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [hasNoPublications, setHasNoPublications] = useState(false)
   const [publications, setPublications] = useState<any[]>([])
+  const [showImport, setShowImport] = useState(false)
+  const [importHtml, setImportHtml] = useState('')
+  const [htmlMode, setHtmlMode] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -139,6 +144,7 @@ export default function WritePage() {
       setCanonicalUrl(post.canonical_url || '')
       setOriginalSource(post.original_source || '')
       setIsPremium(post.is_premium || false)
+      setHtmlMode(shouldUseHtmlMode(post.content || ''))
     }
   }
 
@@ -154,9 +160,103 @@ export default function WritePage() {
 
   // Calculate reading time
   const calculateReadingTime = (html: string) => {
-    const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
     const words = text.trim().split(' ').length
     return Math.max(1, Math.ceil(words / 200))
+  }
+
+  const shouldUseHtmlMode = (html: string) => {
+    return /<(html|head|body|style|script|link[^>]+rel=["']stylesheet["'])/i.test(html)
+  }
+
+  const extractHtmlContent = (html: string) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+
+    const cleanText = (value?: string | null) => {
+      if (!value) return ''
+      return value.replace(/\s+/g, ' ').trim()
+    }
+
+    const titleFromMeta = doc.querySelector('meta[property="og:title"]')?.getAttribute('content')
+    const titleFromDoc = doc.querySelector('title')?.textContent
+    const titleFromH1 = doc.querySelector('h1')?.textContent
+    const descriptionMeta = doc.querySelector('meta[name="description"]')?.getAttribute('content')
+      || doc.querySelector('meta[property="og:description"]')?.getAttribute('content')
+    const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
+    const firstImage = doc.querySelector('img')?.getAttribute('src')
+
+    const tailwindCdn = doc.querySelector('script[src*="cdn.tailwindcss.com"]')
+    const tailwindConfig = Array.from(doc.querySelectorAll('script'))
+      .find((script) => !script.src && script.textContent?.includes('tailwind.config'))
+    if (tailwindCdn && tailwindConfig && tailwindConfig.compareDocumentPosition(tailwindCdn) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      tailwindCdn.parentNode?.insertBefore(tailwindConfig, tailwindCdn)
+    }
+
+    const normalizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`
+
+    return {
+      title: cleanText(titleFromMeta || titleFromDoc || titleFromH1),
+      subtitle: cleanText(descriptionMeta),
+      coverImage: ogImage || firstImage || '',
+      contentHtml: normalizedHtml,
+    }
+  }
+
+  const applyHtmlImport = (html: string) => {
+    setImportError(null)
+    setImportNotice(null)
+
+    if (!html.trim()) {
+      setImportError('Please provide HTML to import.')
+      return
+    }
+
+    const hasExisting = Boolean(title || subtitle || content || coverImage)
+    if (hasExisting) {
+      const confirmReplace = window.confirm(
+        'Importing HTML will replace your current title, content, and cover image. Continue?'
+      )
+      if (!confirmReplace) return
+    }
+
+    const parsed = extractHtmlContent(html)
+
+    if (!parsed.contentHtml) {
+      setImportError('Could not find any content to import.')
+      return
+    }
+
+    setTitle(parsed.title || title)
+    setSubtitle(parsed.subtitle || subtitle)
+    setCoverImage(parsed.coverImage || coverImage)
+    setContent(parsed.contentHtml)
+    setHtmlMode(shouldUseHtmlMode(parsed.contentHtml) || html.includes('<html') || html.includes('<head'))
+    setImportNotice('HTML imported. Review the content before publishing.')
+  }
+
+  const handleHtmlFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const html = typeof reader.result === 'string' ? reader.result : ''
+      applyHtmlImport(html)
+      setImportHtml('')
+    }
+    reader.onerror = () => {
+      setImportError('Unable to read that file. Please try again.')
+    }
+    reader.readAsText(file)
+  }
+
+  const handlePasteImport = () => {
+    applyHtmlImport(importHtml)
   }
 
   // Auto-save
@@ -245,7 +345,12 @@ export default function WritePage() {
       const readingTime = calculateReadingTime(content)
 
       // Generate excerpt
-      const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+      const textContent = content
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
       const excerpt = textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
 
       const postData = {
@@ -454,6 +559,12 @@ export default function WritePage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowImport((prev) => !prev)}
+                className="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+              >
+                Import HTML
+              </button>
               {profile && postId && (
                 <a
                   href={`/${profile.username}/${generateSlug(title)}?preview=true`}
@@ -474,6 +585,71 @@ export default function WritePage() {
             </div>
           </div>
 
+          {showImport && (
+            <div className="mb-8 p-5 rounded-md bg-white border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-gray-900">Import HTML</h3>
+                  <p className="text-sm text-gray-600">
+                    Upload an HTML file or paste raw HTML to convert it into a post.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  aria-label="Close import panel"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {importError && (
+                <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
+                  {importError}
+                </div>
+              )}
+              {importNotice && (
+                <div className="mb-4 p-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-700">
+                  {importNotice}
+                </div>
+              )}
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">Upload HTML file</p>
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-gray-500 transition-colors text-sm text-gray-600">
+                    <Upload size={16} />
+                    Choose HTML file
+                    <input
+                      type="file"
+                      accept=".html,.htm,.txt"
+                      onChange={handleHtmlFileImport}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Tip: HTML with inline CSS works best. External assets may need absolute URLs.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">Paste HTML</p>
+                  <textarea
+                    value={importHtml}
+                    onChange={(e) => setImportHtml(e.target.value)}
+                    placeholder="Paste full HTML here..."
+                    className="w-full min-h-[140px] p-3 border border-gray-300 rounded-md text-sm font-mono text-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  />
+                  <button
+                    onClick={handlePasteImport}
+                    className="mt-3 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+                  >
+                    Import from paste
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Title */}
           <input
             type="text"
@@ -493,13 +669,46 @@ export default function WritePage() {
             className="w-full text-xl font-sans text-gray-600 bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-gray-400 mb-8 px-0"
           />
 
-          {/* Rich Editor */}
-          <RichEditor
-            content={content}
-            onChange={setContent}
-            placeholder="Tell your story..."
-            onImageUpload={handleImageUpload}
-          />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Editor mode: {htmlMode ? 'HTML' : 'Visual'}
+            </span>
+            <button
+              onClick={() => {
+                if (htmlMode) {
+                  const confirmSwitch = window.confirm(
+                    'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
+                  )
+                  if (!confirmSwitch) return
+                }
+                setHtmlMode(!htmlMode)
+              }}
+              className="text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
+            </button>
+          </div>
+
+          {htmlMode ? (
+            <div className="border border-gray-300 rounded-md p-3 bg-white">
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Paste or write raw HTML..."
+                className="w-full min-h-[360px] font-mono text-sm text-gray-800 focus:outline-none"
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                Raw HTML mode preserves scripts and styles. Preview to verify the final layout.
+              </p>
+            </div>
+          ) : (
+            <RichEditor
+              content={content}
+              onChange={setContent}
+              placeholder="Tell your story..."
+              onImageUpload={handleImageUpload}
+            />
+          )}
       </div>
     </main>
   )
