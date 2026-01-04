@@ -151,21 +151,21 @@ export default async function PostPage({ params, searchParams }: Props) {
             <header className="mb-8">
               <Link
                 href={`/${params.username}`}
-                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-6 transition-colors"
               >
                 <ArrowLeft size={16} />
                 Back to {profile.display_name || profile.username}
               </Link>
 
-              <h1 className="font-serif text-4xl md:text-5xl mb-4 leading-tight text-gray-900">
+              <h1 className="font-display text-4xl md:text-5xl mb-4 leading-tight text-[var(--text-primary)]">
                 {post.title}
               </h1>
 
               {post.subtitle && (
-                <p className="text-xl text-gray-600 mb-6">{post.subtitle}</p>
+                <p className="text-xl text-[var(--text-secondary)] mb-6">{post.subtitle}</p>
               )}
 
-              <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-4 pt-4 border-t border-[var(--border-light)]">
                 <Link href={`/${params.username}`} className="flex items-center gap-3 group">
                   {profile.avatar_url ? (
                     <img
@@ -174,15 +174,15 @@ export default async function PostPage({ params, searchParams }: Props) {
                       className="w-10 h-10 rounded-full"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-sm font-medium text-white">
+                    <div className="w-10 h-10 rounded-full bg-[var(--text-primary)] flex items-center justify-center text-sm font-medium text-[var(--text-inverse)]">
                       {(profile.display_name || profile.username)[0].toUpperCase()}
                     </div>
                   )}
                   <div>
-                    <p className="font-medium text-gray-900 group-hover:text-black transition-colors">
+                    <p className="font-medium text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors">
                       {profile.display_name || profile.username}
                     </p>
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
                       {publishedDate && <time>{publishedDate}</time>}
                       {post.reading_time_minutes && (
                         <span className="flex items-center gap-1">
@@ -193,6 +193,21 @@ export default async function PostPage({ params, searchParams }: Props) {
                     </div>
                   </div>
                 </Link>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                <span className="px-2.5 py-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                  Source of truth
+                </span>
+                <span className="px-2.5 py-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                  Ingest
+                </span>
+                <span className="px-2.5 py-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                  Core
+                </span>
+                <span className="px-2.5 py-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                  Broadcast
+                </span>
               </div>
             </header>
 
@@ -226,15 +241,15 @@ export default async function PostPage({ params, searchParams }: Props) {
           )}
 
           {tags.length > 0 && (
-            <div className="max-w-4xl mx-auto mt-12 border-t border-gray-200 pt-8">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-6">
-                <h2 className="font-serif text-2xl mb-4 text-gray-900">Where this fits</h2>
+            <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
+              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-6">
+                <h2 className="font-display text-2xl mb-4 text-[var(--text-primary)]">Where this fits</h2>
                 <div className="flex flex-wrap gap-2 mb-6">
                   {tags.map((tag: any) => (
                     <Link
                       key={tag.id}
                       href={`/tag/${tag.slug}`}
-                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors bg-white"
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors bg-[var(--bg-primary)]"
                     >
                       #{tag.name}
                     </Link>
@@ -246,14 +261,14 @@ export default async function PostPage({ params, searchParams }: Props) {
                       <Link
                         key={related.id}
                         href={`/${related.author_username}/${related.slug}`}
-                        className="block p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-400 transition-colors"
+                        className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
                       >
-                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">
+                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
                           More on #{primaryTag?.name}
                         </p>
-                        <p className="text-lg font-medium text-gray-900">{related.title}</p>
+                        <p className="text-lg font-medium text-[var(--text-primary)]">{related.title}</p>
                         {related.excerpt && (
-                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{related.excerpt}</p>
+                          <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">{related.excerpt}</p>
                         )}
                       </Link>
                     ))}
@@ -264,12 +279,12 @@ export default async function PostPage({ params, searchParams }: Props) {
           )}
 
           {curatedComments && curatedComments.length > 0 && (
-            <div className="max-w-4xl mx-auto mt-12 border-t border-gray-200 pt-8">
-              <h2 className="font-serif text-2xl mb-4 text-gray-900">Community highlights</h2>
+            <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
+              <h2 className="font-display text-2xl mb-4 text-[var(--text-primary)]">Community highlights</h2>
               <div className="space-y-4">
                 {curatedComments.map((comment) => (
-                  <div key={comment.id} className="p-4 rounded-xl border border-gray-200 bg-white">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                  <div key={comment.id} className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mb-2">
                       <div className="flex items-center gap-2">
                         <span>{comment.author_name || 'Contributor'}</span>
                         {comment.score ? <span>{comment.score} upvotes</span> : null}
@@ -279,13 +294,13 @@ export default async function PostPage({ params, searchParams }: Props) {
                           href={comment.source_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-gray-500 hover:text-gray-900"
+                          className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
                         >
                           View on {comment.source}
                         </a>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.body}</p>
+                    <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{comment.body}</p>
                   </div>
                 ))}
               </div>

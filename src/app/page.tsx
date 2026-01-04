@@ -72,13 +72,13 @@ export default async function Home() {
               <div className="animate-fade-up">
                 {/* Main headline */}
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
-                  Publish raw HTML.{' '}
-                  <span className="text-[var(--text-tertiary)]">No friction.</span>
+                  Build a sovereign node{' '}
+                  <span className="text-[var(--text-tertiary)]">for ideas.</span>
                 </h1>
 
                 {/* Subheadline */}
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
-                  A publishing platform that respects your code. Drop HTML, paste markdown, publish instantly.
+                  Ingest signals. Shape knowledge. Broadcast everywhere. HTML-native, BYOK, and versioned by default.
                 </p>
 
                 {/* CTA */}
@@ -108,6 +108,27 @@ export default async function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Signal flow */}
+        <section className="px-6 lg:px-12 py-8">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
+            {[
+              { title: 'Ingest', copy: 'Pull from feeds, URLs, or voice notes.' },
+              { title: 'Core', copy: 'Versioned posts + knowledge graph.' },
+              { title: 'Broadcast', copy: 'Distribute to channels + email.' },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5"
+              >
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                  {item.title}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -178,11 +199,11 @@ export default async function Home() {
                     The problem
                   </span>
                   <h3 className="font-display text-3xl md:text-4xl lg:text-5xl mb-6 leading-tight">
-                    You spent hours crafting an HTML document. Then Medium destroyed it.
+                    Publishing tools turn your work into their format and their feed.
                   </h3>
                   <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                    Stripped your CSS. Mangled your code blocks. Broke your embeds.
-                    Forced everything into their template. Your work, their format.
+                    Your writing becomes a destination link, throttled by algorithms and trapped in templates.
+                    The result is content without a true source of truth.
                   </p>
                 </div>
 
@@ -212,11 +233,11 @@ export default async function Home() {
                     The solution
                   </span>
                   <h3 className="font-display text-3xl md:text-4xl lg:text-5xl mb-6 leading-tight">
-                    Neolog renders your HTML exactly as you wrote it. Full stop.
+                    Neolog is the core node. Everything else is a broadcast.
                   </h3>
                   <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                    Drag. Drop. Publish. Your CSS runs. Your scripts execute.
-                    Interactive demos work. It's your document, just on the web.
+                    Your content lives in a structured, versioned core, then ships outward as feeds,
+                    threads, newsletters, and integrations.
                   </p>
                 </div>
 
@@ -353,7 +374,7 @@ export default async function Home() {
                   <span className="font-display text-base font-semibold text-[var(--text-primary)]">Neolog</span>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] max-w-md">
-                  Publish raw HTML. No friction.
+                  The sovereign node for ideas. Ingest, shape, broadcast.
                 </p>
               </div>
 
