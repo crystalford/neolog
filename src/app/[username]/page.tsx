@@ -190,22 +190,29 @@ export default async function ProfilePage({ params }: Props) {
 
           {topicTags.length > 0 && (
             <section className="mt-10 border-t border-[var(--border-light)] pt-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display text-xl">Topic map</h2>
-                <Link href="/explore" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
-                  Explore tags
-                </Link>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {topicTags.map((tag) => (
-                  <Link
-                    key={tag.id}
-                    href={`/tag/${tag.slug}`}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
-                  >
-                    #{tag.name} - {tag.count}
+              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/60 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-display text-xl">Topic map</h2>
+                    <p className="text-sm text-[var(--text-tertiary)]">
+                      The subjects this writer comes back to the most.
+                    </p>
+                  </div>
+                  <Link href="/explore" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
+                    Explore tags
                   </Link>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {topicTags.map((tag) => (
+                    <Link
+                      key={tag.id}
+                      href={`/tag/${tag.slug}`}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                    >
+                      #{tag.name} - {tag.count}
+                    </Link>
+                  ))}
+                </div>
               </div>
             </section>
           )}

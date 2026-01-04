@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { HtmlIframe } from '@/components/HtmlIframe'
+import { PostDensityToggle } from '@/components/PostDensityToggle'
 import { generateSEO } from '@/lib/seo'
 import { Clock, ArrowLeft } from 'lucide-react'
 
@@ -114,6 +115,14 @@ export default async function PostPage({ params, searchParams }: Props) {
     : null
   const htmlContent = post.content_html || post.content || ''
   const isFullHtml = /<!doctype/i.test(htmlContent) || /<html[\s>]/i.test(htmlContent)
+  const plainText = htmlContent
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const summarySentences = plainText.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 4)
+  const summaryText = post.excerpt || summarySentences.join(' ')
 
   return (
     <>
@@ -189,46 +198,49 @@ export default async function PostPage({ params, searchParams }: Props) {
             </div>
           ) : (
             <div className="max-w-4xl mx-auto">
-              <div
-                className="prose prose-lg max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: htmlContent
-                }}
+              <PostDensityToggle
+                summary={summaryText}
+                bullets={summarySentences}
+                html={htmlContent}
               />
             </div>
           )}
 
           {tags.length > 0 && (
             <div className="max-w-4xl mx-auto mt-12 border-t border-gray-200 pt-8">
-              <h2 className="font-serif text-2xl mb-4 text-gray-900">Where this fits</h2>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {tags.map((tag: any) => (
-                  <Link
-                    key={tag.id}
-                    href={`/tag/${tag.slug}`}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors"
-                  >
-                    #{tag.name}
-                  </Link>
-                ))}
-              </div>
-              {relatedPosts.length > 0 && (
-                <div className="space-y-3">
-                  {relatedPosts.map((related: any) => (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-6">
+                <h2 className="font-serif text-2xl mb-4 text-gray-900">Where this fits</h2>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {tags.map((tag: any) => (
                     <Link
-                      key={related.id}
-                      href={`/${related.author_username}/${related.slug}`}
-                      className="block p-4 rounded-xl border border-gray-200 hover:border-gray-400 transition-colors"
+                      key={tag.id}
+                      href={`/tag/${tag.slug}`}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors bg-white"
                     >
-                      <p className="text-sm text-gray-500 mb-1">More on #{primaryTag?.name}</p>
-                      <p className="text-lg font-medium text-gray-900">{related.title}</p>
-                      {related.excerpt && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{related.excerpt}</p>
-                      )}
+                      #{tag.name}
                     </Link>
                   ))}
                 </div>
-              )}
+                {relatedPosts.length > 0 && (
+                  <div className="grid gap-3">
+                    {relatedPosts.map((related: any) => (
+                      <Link
+                        key={related.id}
+                        href={`/${related.author_username}/${related.slug}`}
+                        className="block p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-400 transition-colors"
+                      >
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">
+                          More on #{primaryTag?.name}
+                        </p>
+                        <p className="text-lg font-medium text-gray-900">{related.title}</p>
+                        {related.excerpt && (
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{related.excerpt}</p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
