@@ -189,6 +189,20 @@ export default function WritePage() {
       || doc.querySelector('meta[property="og:description"]')?.getAttribute('content')
     const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
     const firstImage = doc.querySelector('img')?.getAttribute('src')
+    const contentRoot = doc.querySelector('article') || doc.querySelector('main') || doc.body
+    const titleText = cleanText(titleFromMeta || titleFromDoc || titleFromH1)
+    const findSubtitle = () => {
+      if (!contentRoot) return ''
+      const headerText = contentRoot.querySelector('header h2, header p')?.textContent
+      if (headerText) return cleanText(headerText)
+      const paragraphs = Array.from(contentRoot.querySelectorAll('p'))
+      const candidate = paragraphs.find((p) => {
+        const text = cleanText(p.textContent)
+        return text.length >= 40 && text.length <= 180
+      })
+      return candidate ? cleanText(candidate.textContent) : ''
+    }
+    const subtitleText = cleanText(descriptionMeta) || findSubtitle()
 
     const stripSelectors = ['nav', '[role="navigation"]', 'header']
     doc.querySelectorAll(stripSelectors.join(',')).forEach((node) => {
@@ -197,6 +211,21 @@ export default function WritePage() {
         node.remove()
       }
     })
+
+    doc.body?.querySelectorAll('meta, title, base, link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach((node) => {
+      node.remove()
+    })
+
+    const forceWhite = doc.createElement('style')
+    forceWhite.setAttribute('data-neolog', 'force-white-bg')
+    forceWhite.textContent = 'html, body { background: #ffffff !important; }'
+    doc.head.appendChild(forceWhite)
+    if (doc.body) {
+      doc.body.style.backgroundColor = '#ffffff'
+    }
+    if (doc.documentElement) {
+      doc.documentElement.style.backgroundColor = '#ffffff'
+    }
 
     const tailwindCdn = doc.querySelector('script[src*="cdn.tailwindcss.com"]')
     const tailwindConfig = Array.from(doc.querySelectorAll('script'))
@@ -208,8 +237,8 @@ export default function WritePage() {
     const normalizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`
 
     return {
-      title: cleanText(titleFromMeta || titleFromDoc || titleFromH1),
-      subtitle: cleanText(descriptionMeta),
+      title: titleText,
+      subtitle: subtitleText && subtitleText !== titleText ? subtitleText : '',
       coverImage: ogImage || firstImage || '',
       contentHtml: normalizedHtml,
     }
