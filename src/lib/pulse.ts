@@ -69,8 +69,14 @@ export const parsePulseContent = (raw?: string | null): PulseContent => {
       ? crypto.randomUUID()
       : `pulse_${Date.now()}_${Math.random().toString(16).slice(2)}`
   try {
-    const parsed = JSON.parse(raw)
-    const cards = Array.isArray(parsed.cards) ? parsed.cards.slice(0, MAX_PULSE_CARDS) : []
+    const parsed = JSON.parse(raw) as {
+      summary?: unknown
+      takeaway?: unknown
+      cards?: unknown
+    }
+    const cards: unknown[] = Array.isArray(parsed.cards)
+      ? parsed.cards.slice(0, MAX_PULSE_CARDS)
+      : []
     const isRecord = (value: unknown): value is Record<string, unknown> =>
       !!value && typeof value === 'object'
     return {
