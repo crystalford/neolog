@@ -190,6 +190,14 @@ export default function WritePage() {
     const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content')
     const firstImage = doc.querySelector('img')?.getAttribute('src')
 
+    const stripSelectors = ['nav', '[role="navigation"]', 'header']
+    doc.querySelectorAll(stripSelectors.join(',')).forEach((node) => {
+      const inContent = node.closest('article, main')
+      if (!inContent) {
+        node.remove()
+      }
+    })
+
     const tailwindCdn = doc.querySelector('script[src*="cdn.tailwindcss.com"]')
     const tailwindConfig = Array.from(doc.querySelectorAll('script'))
       .find((script) => !script.src && script.textContent?.includes('tailwind.config'))
