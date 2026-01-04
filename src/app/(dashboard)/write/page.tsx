@@ -489,6 +489,24 @@ export default function WritePage() {
 
         if (updateError) {
           console.error('Update error:', updateError)
+          if (updateError.message.includes('unique_post_version')) {
+            const { data: livePost } = await supabase
+              .from('posts')
+              .select('status, slug')
+              .eq('id', postId)
+              .single()
+            if (livePost?.status === 'published') {
+              setExistingStatus('published')
+              setSuccess('Post updated successfully! Redirecting...')
+              setTimeout(() => {
+                if (currentProfile) {
+                  router.push(`/${currentProfile.username}/${livePost.slug || finalSlug}`)
+                }
+              }, 1000)
+              setPublishing(false)
+              return
+            }
+          }
           setError(`Failed to publish: ${updateError.message}`)
           setPublishing(false)
           return

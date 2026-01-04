@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       content: post.content,
       content_html: post.content_html,
       change_summary: 'Published',
-      created_by: session.user.id,
+      changed_by: session.user.id,
     })
 
     // Send notifications if requested
