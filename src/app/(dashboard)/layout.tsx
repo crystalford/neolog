@@ -44,6 +44,18 @@ export default function DashboardLayout({
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isModifier = event.metaKey || event.ctrlKey
+      if (isModifier && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        router.push('/write')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [router])
+
   const loadUserAndProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     setUser(session?.user ?? null)
@@ -294,6 +306,13 @@ export default function DashboardLayout({
                 <Command size={14} />
                 Quick switch
                 <span className="text-[10px] uppercase tracking-[0.2em]">Ctrl K</span>
+              </button>
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="inline-flex md:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                aria-label="Quick switch"
+              >
+                <Command size={16} />
               </button>
               <Link
                 href="/write"

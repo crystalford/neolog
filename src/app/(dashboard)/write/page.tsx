@@ -31,6 +31,7 @@ export default function WritePage() {
   const [scheduledAt, setScheduledAt] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
+  const [existingStatus, setExistingStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -135,6 +136,9 @@ export default function WritePage() {
       .single()
     
     if (post) {
+      const scheduledValue = post.scheduled_at
+        ? new Date(post.scheduled_at).toISOString().slice(0, 16)
+        : ''
       setPostId(post.id)
       setTitle(post.title)
       setSubtitle(post.subtitle || '')
@@ -143,7 +147,9 @@ export default function WritePage() {
       setCanonicalUrl(post.canonical_url || '')
       setOriginalSource(post.original_source || '')
       setIsPremium(post.is_premium || false)
+      setScheduledAt(scheduledValue)
       setHtmlMode(shouldUseHtmlMode(post.content || ''))
+      setExistingStatus(post.status || null)
     }
   }
 
@@ -312,6 +318,21 @@ export default function WritePage() {
 
     const slug = generateSlug(title)
     const readingTime = calculateReadingTime(content)
+    let liveStatus = existingStatus
+    if (postId) {
+      const { data: latestPost } = await supabase
+        .from('posts')
+        .select('status')
+        .eq('id', postId)
+        .single()
+      if (latestPost?.status) {
+        liveStatus = latestPost.status
+      }
+    }
+
+    const isAlreadyPublished = liveStatus === 'published'
+    const isScheduling = Boolean(scheduledAt) && !isAlreadyPublished
+    const statusValue = isScheduling ? 'scheduled' : isAlreadyPublished ? 'published' : 'draft'
     
     const postData = {
       author_id: user.id,
@@ -324,7 +345,8 @@ export default function WritePage() {
       content_type: 'html',
       cover_image_url: coverImage || null,
       reading_time_minutes: readingTime,
-      status: 'draft',
+      status: statusValue,
+      scheduled_at: isScheduling ? new Date(scheduledAt).toISOString() : null,
       canonical_url: canonicalUrl || null,
       original_source: originalSource || null,
       is_premium: isPremium,
@@ -354,7 +376,7 @@ export default function WritePage() {
     } finally {
       setSaving(false)
     }
-  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium])
+  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId])
 
   // Debounced auto-save
   useEffect(() => {
@@ -368,6 +390,34 @@ export default function WritePage() {
   const handlePublish = async () => {
     if (!user || !title || !content) {
       setError('Please add a title and content before publishing')
+      return
+    }
+
+    const isAlreadyPublished = existingStatus === 'published'
+    const isScheduling = Boolean(scheduledAt) && !isAlreadyPublished
+
+    const preflight = [
+      { label: 'Title added', ok: title.trim().length >= 5, required: true },
+      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
+      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
+    ]
+
+    const missingRequired = preflight.filter((item) => item.required && !item.ok)
+    if (missingRequired.length > 0) {
+      setError('Add a longer title and some content before publishing.')
+      return
+    }
+
+    const missingOptional = preflight.filter((item) => !item.required && !item.ok)
+    if (missingOptional.length > 0) {
+      const proceed = window.confirm(
+        `Publish anyway? Missing: ${missingOptional.map((item) => item.label).join(', ')}`
+      )
+      if (!proceed) return
+    }
+
+    if (isScheduling && new Date(scheduledAt) <= new Date()) {
+      setError('Schedule time must be in the future.')
       return
     }
 
@@ -398,7 +448,7 @@ export default function WritePage() {
         .trim()
       const excerpt = textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
 
-      const postData = {
+      const postData: any = {
         author_id: user.id,
         publication_id: publicationId,
         title,
@@ -410,8 +460,17 @@ export default function WritePage() {
         cover_image_url: coverImage || null,
         reading_time_minutes: readingTime,
         excerpt,
-        status: 'published',
-        published_at: new Date().toISOString(),
+      }
+
+      if (isScheduling) {
+        postData.status = 'scheduled'
+        postData.scheduled_at = new Date(scheduledAt).toISOString()
+      } else if (!isAlreadyPublished) {
+        postData.status = 'published'
+        postData.published_at = new Date().toISOString()
+      }
+      if (!isScheduling) {
+        postData.scheduled_at = null
       }
 
       let finalSlug = slug
@@ -454,8 +513,21 @@ export default function WritePage() {
         }
       }
 
-      // Send notifications via API
-      if (finalPostId) {
+      // Save tags
+      if (finalPostId && tags.length > 0) {
+        const { error: tagsError } = await supabase.rpc('set_post_tags', {
+          p_post_id: finalPostId,
+          p_tag_names: tags,
+        })
+
+        if (tagsError) {
+          console.error('Tags error:', tagsError)
+          // Don't fail publishing if tags fail
+        }
+      }
+
+      // Send notifications via API for first publish only
+      if (finalPostId && !isAlreadyPublished && !isScheduling) {
         try {
           const response = await fetch('/api/posts/publish', {
             method: 'POST',
@@ -467,19 +539,6 @@ export default function WritePage() {
             console.error('Notification API error:', await response.text())
             // Don't fail publishing if notifications fail
           }
-
-          // Save tags
-          if (tags.length > 0) {
-            const { error: tagsError } = await supabase.rpc('set_post_tags', {
-              p_post_id: finalPostId,
-              p_tag_names: tags,
-            })
-
-            if (tagsError) {
-              console.error('Tags error:', tagsError)
-              // Don't fail publishing if tags fail
-            }
-          }
         } catch (notifyError) {
           console.error('Notification error:', notifyError)
           // Don't fail publishing if notifications fail
@@ -487,11 +546,21 @@ export default function WritePage() {
       }
 
       // Show success and redirect to published post
-      setSuccess('Post published successfully! Redirecting...')
+      const successMessage = isScheduling
+        ? 'Post scheduled successfully! Redirecting...'
+        : isAlreadyPublished
+        ? 'Post updated successfully! Redirecting...'
+        : 'Post published successfully! Redirecting...'
+
+      setSuccess(successMessage)
 
       setTimeout(() => {
         if (currentProfile) {
-          router.push(`/${currentProfile.username}/${finalSlug}`)
+          if (isScheduling) {
+            router.push('/dashboard')
+          } else {
+            router.push(`/${currentProfile.username}/${finalSlug}`)
+          }
         }
       }, 1000)
     } catch (error) {
@@ -632,7 +701,7 @@ export default function WritePage() {
                 disabled={publishing || !title || !content || !publicationId}
                 className="btn btn-primary btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {publishing ? 'Publishing...' : 'Publish'}
+                {publishing ? 'Publishing...' : existingStatus === 'published' ? 'Update' : scheduledAt ? 'Schedule' : 'Publish'}
               </button>
             </div>
           </div>
@@ -809,17 +878,42 @@ export default function WritePage() {
                     />
                   </label>
 
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Schedule publish
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      disabled={existingStatus === 'published'}
+                      className="input"
+                    />
+                    {existingStatus === 'published' && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                        Scheduling is only available for drafts.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
                     <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Preflight checks</h3>
                     {[
-                      { label: 'Title added', ok: title.trim().length >= 5 },
-                      { label: 'Subtitle added', ok: subtitle.trim().length >= 5 },
-                      { label: 'Cover image set', ok: coverImage.trim().length > 0 },
-                      { label: 'At least 200 words', ok: getWordCount(content) >= 200 },
+                      { label: 'Title added', ok: title.trim().length >= 5, required: true },
+                      { label: 'Subtitle added', ok: subtitle.trim().length >= 5, required: false },
+                      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
+                      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
                     ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-2 last:mb-0">
-                        <CheckCircle2 size={14} className={item.ok ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'} />
-                        <span className={item.ok ? 'text-[var(--text-primary)]' : ''}>{item.label}</span>
+                      <div key={item.label} className="flex items-center justify-between text-sm text-[var(--text-secondary)] mb-2 last:mb-0">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={14} className={item.ok ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'} />
+                          <span className={item.ok ? 'text-[var(--text-primary)]' : ''}>{item.label}</span>
+                        </div>
+                        {item.required && (
+                          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                            Required
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>

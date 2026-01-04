@@ -102,6 +102,12 @@ export function DashboardCommandPalette({
             </ul>
           )}
         </div>
+        <div className="px-4 py-3 border-t border-[var(--border-light)] text-xs text-[var(--text-tertiary)] flex flex-wrap items-center gap-4">
+          <span>Shortcuts</span>
+          <span>Ctrl+K · Open switcher</span>
+          <span>Ctrl+N · New post</span>
+          <span>Esc · Close</span>
+        </div>
       </div>
     </div>
   )

@@ -42,6 +42,7 @@ export default function SubscribersPage() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<'all' | 'users' | 'email'>('all')
   const [copied, setCopied] = useState<string | null>(null)
+  const [emailSegment, setEmailSegment] = useState<'all' | 'active' | 'pending' | 'unsubscribed' | 'bounced' | 'complained'>('all')
   
   const router = useRouter()
   const supabase = createClient()
@@ -88,9 +89,11 @@ export default function SubscribersPage() {
   const totalCount = emailSubscribers.filter(s => s.status === 'active').length + userSubscribers.length
   const pendingCount = emailSubscribers.filter(s => s.status === 'pending').length
 
-  const filteredEmailSubs = emailSubscribers.filter(s => 
-    !search || s.email.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredEmailSubs = emailSubscribers.filter(s => {
+    const matchesSearch = !search || s.email.toLowerCase().includes(search.toLowerCase())
+    const matchesSegment = emailSegment === 'all' || s.status === emailSegment
+    return matchesSearch && matchesSegment
+  })
 
   const filteredUserSubs = userSubscribers.filter(s =>
     !search || 
@@ -188,38 +191,63 @@ export default function SubscribersPage() {
         </div>
 
           {/* Search and filters */}
-        <div className="flex flex-wrap items-center gap-4 mb-6">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search subscribers..."
-              className="input pl-10"
-            />
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search subscribers..."
+                className="input pl-10"
+              />
+            </div>
+            
+            <div className="flex gap-1 p-1 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'users', label: 'Users' },
+                { id: 'email', label: 'Email' },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setTab(id as typeof tab)}
+                  className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                    tab === id
+                      ? 'bg-[var(--accent)] text-[var(--text-inverse)] font-medium'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          
-          <div className="flex gap-1 p-1 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'users', label: 'Users' },
-              { id: 'email', label: 'Email' },
-            ].map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id as typeof tab)}
-                className={`px-4 py-2 text-sm rounded-lg transition-all ${
-                  tab === id
-                    ? 'bg-[var(--accent)] text-[var(--text-inverse)] font-medium'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+
+          {(tab === 'all' || tab === 'email') && (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'active', label: 'Active' },
+                { id: 'pending', label: 'Pending' },
+                { id: 'unsubscribed', label: 'Unsubscribed' },
+                { id: 'bounced', label: 'Bounced' },
+                { id: 'complained', label: 'Complained' },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setEmailSegment(id as typeof emailSegment)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    emailSegment === id
+                      ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
+                      : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
