@@ -20,6 +20,7 @@ create table public.profiles (
   twitter_url text,
   github_url text,
   linkedin_url text,
+  context_md text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
@@ -3883,3 +3884,114 @@ create policy "Public newsletters visible" on public.newsletters
 
 create policy "Authors manage own newsletters" on public.newsletters
   for all using (auth.uid() = author_id);
+
+-- =============================================
+-- INTEGRATION KEYS (BYOK)
+-- =============================================
+create table public.integration_keys (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  provider text not null,
+  label text,
+  encrypted_key text not null,
+  iv text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint unique_integration_key unique (user_id, provider, label)
+);
+
+create index integration_keys_user_idx on public.integration_keys(user_id);
+create index integration_keys_provider_idx on public.integration_keys(provider);
+
+-- =============================================
+-- FEED SOURCES (RSS, X, etc.)
+-- =============================================
+create table public.feed_sources (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  source_type text not null check (source_type in ('rss', 'x', 'youtube', 'grok', 'linkedin', 'hn', 'trends')),
+  name text,
+  url text not null,
+  is_active boolean default true,
+  last_fetched_at timestamp with time zone,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index feed_sources_user_idx on public.feed_sources(user_id);
+create index feed_sources_type_idx on public.feed_sources(source_type);
+create index feed_sources_active_idx on public.feed_sources(is_active);
+
+-- =============================================
+-- INBOX ITEMS (Pulled content awaiting review)
+-- =============================================
+create table public.inbox_items (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  source_type text not null,
+  source_url text,
+  title text,
+  canonical_url text,
+  raw_data jsonb not null default '{}'::jsonb,
+  status text default 'new' check (status in ('new', 'imported', 'ignored')),
+  published_at timestamp with time zone,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index inbox_items_user_idx on public.inbox_items(user_id);
+create index inbox_items_status_idx on public.inbox_items(status);
+create index inbox_items_source_type_idx on public.inbox_items(source_type);
+
+-- =============================================
+-- RLS: integration keys
+-- =============================================
+alter table public.integration_keys enable row level security;
+
+create policy "Users manage their integration keys"
+  on public.integration_keys for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =============================================
+-- AUTOMATION API KEYS
+-- =============================================
+create table public.api_keys (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  label text,
+  key_hash text not null,
+  last_used_at timestamp with time zone,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index api_keys_user_idx on public.api_keys(user_id);
+
+alter table public.api_keys enable row level security;
+
+create policy "Users manage their api keys"
+  on public.api_keys for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =============================================
+-- RLS: feed sources
+-- =============================================
+alter table public.feed_sources enable row level security;
+
+create policy "Users manage their feed sources"
+  on public.feed_sources for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =============================================
+-- RLS: inbox items
+-- =============================================
+alter table public.inbox_items enable row level security;
+
+create policy "Users manage their inbox items"
+  on public.inbox_items for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

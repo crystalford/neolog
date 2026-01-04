@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getIntegrationKey } from '@/lib/integrations'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -25,9 +26,10 @@ function getFallbackSummary(text: string) {
   }
 }
 
-async function getAiSummary(text: string) {
-  const apiKey = process.env.OPENAI_API_KEY
+async function getAiSummary(text: string, apiKey: string, context?: string | null) {
   if (!apiKey) return null
+
+  const contextBlock = context ? `\nWriter context:\n${context}` : ''
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -41,11 +43,11 @@ async function getAiSummary(text: string) {
       messages: [
         {
           role: 'system',
-          content: 'Summarize posts for a reader. Output JSON only.',
+          content: 'Summarize posts for a reader. Follow the writer context when provided. Output JSON only.',
         },
         {
           role: 'user',
-          content: `Return JSON with keys summary (1-2 sentences) and bullets (3-5 short bullets). Text:\n${text}`,
+          content: `Return JSON with keys summary (1-2 sentences) and bullets (3-5 short bullets).${contextBlock}\n\nText:\n${text}`,
         },
       ],
       response_format: { type: 'json_object' },
@@ -96,7 +98,15 @@ export async function POST(request: NextRequest) {
   const plain = stripHtml(post.content_html || post.content || '')
   const base = plain || post.excerpt || post.title
 
-  let result = await getAiSummary(base)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('context_md')
+    .eq('id', post.author_id)
+    .single()
+
+  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY || ''
+
+  let result = await getAiSummary(base, apiKey, profile?.context_md)
   if (!result) {
     result = getFallbackSummary(base)
   }

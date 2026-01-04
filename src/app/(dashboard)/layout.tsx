@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
   Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash
+  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 
@@ -110,6 +110,8 @@ export default function DashboardLayout({
       items: [
         { href: '/analytics', icon: BarChart3, label: 'Analytics' },
         { href: '/syndication', icon: Radio, label: 'Syndication' },
+        { href: '/sources', icon: Globe, label: 'Sources' },
+        { href: '/inbox', icon: Mail, label: 'Inbox' },
         { href: '/referrals', icon: Gift, label: 'Referrals' },
         { href: '/boost', icon: Zap, label: 'Boost' },
       ],

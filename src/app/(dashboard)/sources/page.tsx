@@ -1,0 +1,199 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Plus, RefreshCw, Trash2, Rss } from 'lucide-react'
+
+type FeedSource = {
+  id: string
+  name: string | null
+  url: string
+  source_type: string
+  last_fetched_at: string | null
+  created_at: string
+}
+
+export default function SourcesPage() {
+  const [loading, setLoading] = useState(true)
+  const [sources, setSources] = useState<FeedSource[]>([])
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadSources()
+  }, [])
+
+  const loadSources = async () => {
+    setLoading(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
+    const { data } = await supabase
+      .from('feed_sources')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    setSources((data || []) as FeedSource[])
+    setLoading(false)
+  }
+
+  const addSource = async () => {
+    setError(null)
+    setSuccess(null)
+    if (!url.trim()) {
+      setError('Enter a valid RSS URL.')
+      return
+    }
+    setSaving(true)
+    try {
+      const response = await fetch('/api/sources/rss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() || null, url: url.trim() }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add source.')
+      }
+      setName('')
+      setUrl('')
+      setSuccess('Source added.')
+      await loadSources()
+    } catch (err: any) {
+      setError(err.message || 'Failed to add source.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeSource = async (id: string) => {
+    setError(null)
+    setSuccess(null)
+    const response = await fetch('/api/sources/rss', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      setError(data.error || 'Failed to remove source.')
+      return
+    }
+    setSources((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  const fetchNow = async (id?: string) => {
+    setError(null)
+    setSuccess(null)
+    const response = await fetch('/api/sources/rss/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceId: id || null }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      setError(data.error || 'Fetch failed.')
+      return
+    }
+    setSuccess(`Fetched ${data.inserted || 0} new item(s).`)
+    await loadSources()
+  }
+
+  return (
+    <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-6">
+      <div>
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Sources</p>
+        <h1 className="font-display text-3xl text-[var(--text-primary)]">Pull content in</h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Connect RSS feeds to populate your inbox automatically.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-2xl bg-[var(--error)]/10 border border-[var(--error)]/20 p-4 text-sm text-[var(--error)]">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-2xl bg-[var(--success)]/10 border border-[var(--success)]/20 p-4 text-sm text-[var(--success)]">
+          {success}
+        </div>
+      )}
+
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 space-y-4">
+        <h2 className="font-display text-lg text-[var(--text-primary)]">Add RSS feed</h2>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Feed name (optional)"
+            className="input"
+          />
+          <input
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://example.com/rss.xml"
+            className="input"
+          />
+          <button onClick={addSource} className="btn btn-primary btn-sm" disabled={saving}>
+            <Plus size={14} />
+            {saving ? 'Adding...' : 'Add'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Connected feeds</p>
+          <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm">
+            <RefreshCw size={14} />
+            Fetch all
+          </button>
+        </div>
+        {loading ? (
+          <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading sources...</div>
+        ) : sources.length === 0 ? (
+          <div className="p-6 text-sm text-[var(--text-tertiary)]">No sources connected yet.</div>
+        ) : (
+          <div className="divide-y divide-[var(--border-light)]">
+            {sources.map((source) => (
+              <div key={source.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                    {source.name || source.url}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] truncate">
+                    {source.url}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Last fetched: {source.last_fetched_at ? new Date(source.last_fetched_at).toLocaleString() : 'Never'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => fetchNow(source.id)} className="btn btn-secondary btn-sm">
+                    <Rss size={14} />
+                    Fetch
+                  </button>
+                  <button onClick={() => removeSource(source.id)} className="btn btn-secondary btn-sm text-[var(--error)]">
+                    <Trash2 size={14} />
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}

@@ -7,6 +7,7 @@ import { ensureProfile } from '@/lib/profile'
 import { 
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
+  KeyRound,
   AlertTriangle
 } from 'lucide-react'
 
@@ -25,6 +26,7 @@ export default function SettingsPage() {
     twitter_url: '',
     github_url: '',
     linkedin_url: '',
+    context_md: '',
   })
   
   const [emailPrefs, setEmailPrefs] = useState({
@@ -41,13 +43,124 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [integrationKeys, setIntegrationKeys] = useState<{ provider: string; label: string | null }[]>([])
+  const [integrationDrafts, setIntegrationDrafts] = useState<Record<string, string>>({})
+  const [integrationSaving, setIntegrationSaving] = useState<string | null>(null)
+  const [apiKeys, setApiKeys] = useState<{ id: string; label: string | null; last_used_at: string | null }[]>([])
+  const [apiKeyLabel, setApiKeyLabel] = useState('')
+  const [apiKeyCreated, setApiKeyCreated] = useState<string | null>(null)
+  const [apiKeySaving, setApiKeySaving] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     loadProfile()
+    loadIntegrations()
+    loadApiKeys()
   }, [])
+
+  const aiProviders = [
+    { id: 'openai', label: 'OpenAI' },
+    { id: 'anthropic', label: 'Anthropic (Claude)' },
+    { id: 'perplexity', label: 'Perplexity' },
+    { id: 'grok', label: 'Grok' },
+    { id: 'stability', label: 'Stability / Image API' },
+  ]
+
+  const loadIntegrations = async () => {
+    try {
+      const response = await fetch('/api/integrations/list')
+      if (!response.ok) return
+      const data = await response.json()
+      setIntegrationKeys(data.keys || [])
+    } catch (err) {
+      console.error('Integration load error:', err)
+    }
+  }
+
+  const loadApiKeys = async () => {
+    try {
+      const response = await fetch('/api/keys/list')
+      if (!response.ok) return
+      const data = await response.json()
+      setApiKeys(data.keys || [])
+    } catch (err) {
+      console.error('API key load error:', err)
+    }
+  }
+
+  const createApiKey = async () => {
+    setApiKeySaving(true)
+    setError(null)
+    setSuccess(null)
+    setApiKeyCreated(null)
+    try {
+      const response = await fetch('/api/keys/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: apiKeyLabel.trim() || null }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create key.')
+      }
+      setApiKeyCreated(data.key)
+      setApiKeyLabel('')
+      await loadApiKeys()
+    } catch (err: any) {
+      setError(err.message || 'Failed to create key.')
+    } finally {
+      setApiKeySaving(false)
+    }
+  }
+
+  const revokeApiKey = async (id: string) => {
+    setError(null)
+    const response = await fetch('/api/keys/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      setError(data.error || 'Failed to revoke key.')
+      return
+    }
+    setApiKeys((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  const saveIntegration = async (provider: string) => {
+    const apiKey = integrationDrafts[provider]?.trim()
+    if (!apiKey) {
+      setError('Enter an API key before saving.')
+      return
+    }
+    setIntegrationSaving(provider)
+    setError(null)
+    setSuccess(null)
+    try {
+      const response = await fetch('/api/integrations/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save integration.')
+      }
+      setSuccess('Integration saved.')
+      setIntegrationDrafts((prev) => ({ ...prev, [provider]: '' }))
+      await loadIntegrations()
+    } catch (err: any) {
+      setError(err.message || 'Failed to save integration.')
+    } finally {
+      setIntegrationSaving(null)
+    }
+  }
+
+  const isConnected = (provider: string) =>
+    integrationKeys.some((key) => key.provider === provider)
 
   const loadProfile = async () => {
     try {
@@ -71,6 +184,7 @@ export default function SettingsPage() {
           twitter_url: data.twitter_url || '',
           github_url: data.github_url || '',
           linkedin_url: data.linkedin_url || '',
+          context_md: data.context_md || '',
         })
         setError(null)
       } else {
@@ -101,6 +215,7 @@ export default function SettingsPage() {
           twitter_url: formData.twitter_url || null,
           github_url: formData.github_url || null,
           linkedin_url: formData.linkedin_url || null,
+          context_md: formData.context_md || null,
         })
         .eq('id', profile.id)
 
@@ -422,6 +537,24 @@ export default function SettingsPage() {
             <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Globe size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-lg">Context memory</h2>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                This context is injected into AI prompts to keep tone and facts consistent.
+              </p>
+              <textarea
+                value={formData.context_md}
+                onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
+                placeholder="e.g. My tone is concise, data-first, skeptical of hype. Avoid the word 'delve'."
+                className="input min-h-[160px] font-mono"
+              />
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <Bell size={20} className="text-[var(--accent)]" />
                 </div>
                 <h2 className="font-display text-lg">Email Notifications</h2>
@@ -541,6 +674,111 @@ export default function SettingsPage() {
                     <Download size={18} className="text-[var(--text-tertiary)]" />
                   </a>
                 ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <KeyRound size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-lg">AI Vault (BYOK)</h2>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                Add your own keys to unlock AI summaries, expansions, and research tools.
+              </p>
+
+              <div className="space-y-4">
+                {aiProviders.map((provider) => (
+                  <div key={provider.id} className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
+                        {provider.label}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        {isConnected(provider.id) ? 'Connected' : 'Not connected'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <input
+                        type="password"
+                        value={integrationDrafts[provider.id] || ''}
+                        onChange={(event) =>
+                          setIntegrationDrafts((prev) => ({
+                            ...prev,
+                            [provider.id]: event.target.value,
+                          }))
+                        }
+                        placeholder={isConnected(provider.id) ? '••••••••••' : 'Paste API key'}
+                        className="input md:w-[240px]"
+                      />
+                      <button
+                        onClick={() => saveIntegration(provider.id)}
+                        disabled={integrationSaving === provider.id}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        {integrationSaving === provider.id ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <KeyRound size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-lg">Automation API keys</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={apiKeyLabel}
+                    onChange={(event) => setApiKeyLabel(event.target.value)}
+                    placeholder="Key label (e.g. n8n)"
+                    className="input flex-1 min-w-[200px]"
+                  />
+                  <button
+                    onClick={createApiKey}
+                    className="btn btn-secondary btn-sm"
+                    disabled={apiKeySaving}
+                  >
+                    {apiKeySaving ? 'Creating...' : 'Create key'}
+                  </button>
+                </div>
+
+                {apiKeyCreated && (
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3 text-xs text-[var(--text-secondary)]">
+                    <p className="text-[var(--text-primary)] font-medium">Copy this key now (shown once)</p>
+                    <p className="font-mono mt-2 break-all">{apiKeyCreated}</p>
+                  </div>
+                )}
+
+                {apiKeys.length === 0 ? (
+                  <p className="text-xs text-[var(--text-tertiary)]">No keys created yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {apiKeys.map((key) => (
+                      <div key={key.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <p className="text-[var(--text-primary)] font-medium">{key.label || 'Untitled key'}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">
+                            Last used: {key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => revokeApiKey(key.id)}
+                          className="btn btn-secondary btn-sm text-[var(--error)]"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
 

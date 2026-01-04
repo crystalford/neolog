@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getIntegrationKey } from '@/lib/integrations'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -37,7 +38,13 @@ export async function POST(request: NextRequest) {
   }
 
   const plain = stripHtml(post.content_html || post.content || '')
-  const apiKey = process.env.OPENAI_API_KEY
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('context_md')
+    .eq('id', post.author_id)
+    .single()
+
+  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY
   if (!apiKey) {
     return NextResponse.json({
       expansion: `Add more detail on "${heading}". This is a placeholder until AI is enabled.`,
@@ -57,15 +64,16 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: 'Write a concise expansion paragraph. Avoid hallucinations.',
+          content: 'Write a concise expansion paragraph. Avoid hallucinations. Follow the writer context when provided.',
         },
         {
           role: 'user',
           content: [
             `Expand on the section heading: ${heading}`,
             'Return 2-3 sentences max.',
-            `Context:\n${plain.slice(0, 3000)}`,
-          ].join('\n'),
+            profile?.context_md ? `Writer context:\n${profile.context_md}` : '',
+            `Post context:\n${plain.slice(0, 3000)}`,
+          ].filter(Boolean).join('\n'),
         },
       ],
     }),

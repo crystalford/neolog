@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getIntegrationKey } from '@/lib/integrations'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -91,7 +92,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('context_md')
+    .eq('id', post.author_id)
+    .single()
+
+  const apiKey = (await getIntegrationKey(session.user.id, 'openai')) || process.env.OPENAI_API_KEY
 
   const buildFallback = () => {
     const plain = stripHtml(post.content_html || post.content || '')
@@ -155,23 +162,24 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: MODEL,
         temperature: 0.6,
-        messages: [
-          {
-            role: 'system',
-            content: 'You create distribution copy. Output JSON only.',
-          },
-          {
-            role: 'user',
-            content: [
-              'Return JSON with keys: x_thread (array of 4-6 tweets), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5).',
-              `Post title: ${post.title}`,
-              `Subtitle: ${post.subtitle || ''}`,
-              `Excerpt: ${post.excerpt || ''}`,
-              `Content: ${plain.slice(0, 4000)}`,
-              `Link: ${link}`,
-            ].join('\n'),
-          },
-        ],
+      messages: [
+        {
+          role: 'system',
+          content: 'You create distribution copy. Follow the writer context when provided. Output JSON only.',
+        },
+        {
+          role: 'user',
+          content: [
+            'Return JSON with keys: x_thread (array of 4-6 tweets), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5).',
+            profile?.context_md ? `Writer context:\n${profile.context_md}` : '',
+            `Post title: ${post.title}`,
+            `Subtitle: ${post.subtitle || ''}`,
+            `Excerpt: ${post.excerpt || ''}`,
+            `Content: ${plain.slice(0, 4000)}`,
+            `Link: ${link}`,
+          ].filter(Boolean).join('\n'),
+        },
+      ],
         response_format: { type: 'json_object' },
       }),
     })
