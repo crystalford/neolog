@@ -176,7 +176,7 @@ export default function DashboardLayout({
 
           <Link
             href="/write"
-            className="mt-5 inline-flex items-center justify-between w-full gap-2 px-3 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium shadow-sm hover:bg-[var(--accent-hover)] transition-colors"
+            className="mt-5 btn btn-primary btn-sm w-full justify-between"
           >
             <span className="flex items-center gap-2">
               <PenLine size={16} />
@@ -263,7 +263,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="dashboard-surface flex-1 flex flex-col">
         <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)]">
-          <div className="h-14 px-6 lg:px-12 flex items-center justify-between">
+          <div className="h-12 px-6 lg:px-12 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                 Publisher workspace
@@ -273,7 +273,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCommandOpen(true)}
-                className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                className="hidden md:inline-flex btn btn-secondary btn-sm"
               >
                 <Command size={14} />
                 Quick switch
@@ -281,14 +281,14 @@ export default function DashboardLayout({
               </button>
               <button
                 onClick={() => setCommandOpen(true)}
-                className="inline-flex md:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                className="inline-flex md:hidden items-center justify-center w-8 h-8 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
                 aria-label="Quick switch"
               >
                 <Command size={16} />
               </button>
               <Link
                 href="/write"
-                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+                className="hidden sm:inline-flex btn btn-primary btn-sm"
               >
                 <PenLine size={16} />
                 New post
@@ -296,7 +296,7 @@ export default function DashboardLayout({
               {profile && (
                 <Link
                   href={`/${profile.username}`}
-                  className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className="hidden sm:inline-flex btn btn-secondary btn-sm"
                 >
                   View site
                 </Link>
@@ -304,7 +304,7 @@ export default function DashboardLayout({
               {profile && (
                 <Link
                   href={`/${profile.username}`}
-                  className="w-9 h-9 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                  className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
                 >
                   {profile.avatar_url ? (
                     <img

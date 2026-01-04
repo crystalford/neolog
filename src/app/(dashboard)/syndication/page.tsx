@@ -56,7 +56,7 @@ export default function SyndicationPage() {
               </div>
               <button
                 disabled
-                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-light)] text-[var(--text-tertiary)] cursor-not-allowed"
+                className="btn btn-secondary btn-sm cursor-not-allowed text-[var(--text-tertiary)]"
               >
                 Connect
               </button>

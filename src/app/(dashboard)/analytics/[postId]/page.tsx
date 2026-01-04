@@ -346,7 +346,7 @@ export default function PostAnalyticsPage() {
                   <h2 className="font-display text-lg">Recent Readers</h2>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full data-table">
                     <thead>
                       <tr className="border-b border-[var(--border-light)] text-sm text-[var(--text-tertiary)]">
                         <th className="text-left p-4 font-medium">Time</th>

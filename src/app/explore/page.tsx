@@ -84,10 +84,10 @@ export default function ExplorePage() {
   return (
     <>
       <Header />
-      <main className="pt-16 pb-16">
+      <main className="pt-16 pb-14">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="flex items-center justify-between pt-8 mb-8">
+          <div className="flex items-center justify-between pt-6 mb-6">
             <div>
               <h1 className="font-display text-3xl mb-2">Explore</h1>
               <p className="text-[var(--text-secondary)]">
@@ -98,18 +98,18 @@ export default function ExplorePage() {
             {/* Curators link */}
             <Link 
               href="/curators"
-              className="btn btn-secondary"
+              className="btn btn-secondary btn-sm"
             >
               <Award size={16} />
               Top Curators
             </Link>
           </div>
 
-          <div className="grid lg:grid-cols-4 gap-8">
+          <div className="grid lg:grid-cols-4 gap-6">
             {/* Main content */}
             <div className="lg:col-span-3">
               {/* Filters */}
-              <div className="flex gap-2 mb-6">
+              <div className="flex gap-2 mb-5">
                 {[
                   { id: 'latest', label: 'Latest', icon: Clock },
                   { id: 'popular', label: 'Most Forked', icon: Sparkles },
@@ -119,9 +119,9 @@ export default function ExplorePage() {
                     key={id}
                     onClick={() => setFilter(id as typeof filter)}
                     className={`
-                      flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                      flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                       ${filter === id
-                        ? 'bg-[var(--accent)] text-white'
+                        ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
                         : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }
                     `}
@@ -140,7 +140,7 @@ export default function ExplorePage() {
                   ))}
                 </div>
               ) : posts.length === 0 ? (
-                <div className="text-center py-20 rounded-xl bg-[var(--bg-secondary)]">
+                <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)]">
                   <Sparkles size={32} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
                   <p className="text-[var(--text-secondary)]">No posts yet</p>
                 </div>
@@ -168,7 +168,7 @@ export default function ExplorePage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Rising posts */}
-              <div className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden">
+              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden">
                 <div className="p-4 border-b border-[var(--border-light)] flex items-center gap-2">
                   <TrendingUp size={18} className="text-[var(--accent)]" />
                   <h2 className="font-display text-lg">Rising Now</h2>
@@ -206,12 +206,12 @@ export default function ExplorePage() {
               </div>
 
               {/* Call to action */}
-              <div className="p-6 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/20">
+              <div className="p-5 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)]/20">
                 <h3 className="font-display text-lg mb-2">Got something to share?</h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
                   Publish your HTML, markdown, or rich text. We render it exactly as you wrote it.
                 </p>
-                <Link href="/write" className="btn btn-primary w-full">
+                <Link href="/write" className="btn btn-primary btn-sm w-full">
                   Start writing
                 </Link>
               </div>

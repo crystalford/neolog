@@ -18,9 +18,9 @@ export default async function VisualsPage() {
   return (
     <>
       <Header />
-      <main className="pt-16 pb-16">
+      <main className="pt-16 pb-14">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="pt-8 mb-8">
+          <div className="pt-6 mb-6">
             <div className="flex items-center gap-3 text-[var(--text-tertiary)] text-xs uppercase tracking-[0.2em]">
               <Sparkles size={14} />
               Visuals
@@ -32,7 +32,7 @@ export default async function VisualsPage() {
           </div>
 
           {!posts || posts.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+            <div className="text-center py-16 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
               <Sparkles size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">No visuals yet</h2>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -43,7 +43,7 @@ export default async function VisualsPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {posts.map((post) => (
                 <PostCard key={post.id} post={post as any} />
               ))}

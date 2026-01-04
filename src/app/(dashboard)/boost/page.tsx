@@ -209,7 +209,7 @@ export default function BoostPage() {
             </div>
           ) : (
             <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-              <div className="hidden lg:grid grid-cols-[minmax(0,1.4fr)_120px_140px_140px_140px_160px_140px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+              <div className="hidden lg:grid grid-cols-[minmax(0,1.4fr)_110px_120px_120px_120px_140px_120px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
                 <span>Campaign</span>
                 <span>Status</span>
                 <span>Budget</span>
@@ -222,7 +222,7 @@ export default function BoostPage() {
                 {campaigns.map((campaign) => (
                   <div
                     key={campaign.id}
-                    className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_120px_140px_140px_140px_160px_140px] gap-4 px-5 py-4 items-start lg:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                    className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_110px_120px_120px_120px_140px_120px] gap-3 px-4 py-3 items-start lg:items-center hover:bg-[var(--bg-secondary)] transition-colors"
                   >
                     <div>
                       <p className="font-medium text-[var(--text-primary)]">{campaign.name}</p>
@@ -268,7 +268,7 @@ export default function BoostPage() {
                     <div className="flex items-center gap-2 lg:justify-end">
                       <button
                         onClick={() => toggleCampaignStatus(campaign)}
-                        className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        className="btn-icon"
                         title={campaign.status === 'active' ? 'Pause' : 'Resume'}
                       >
                         {campaign.status === 'active' ? (
@@ -279,7 +279,7 @@ export default function BoostPage() {
                       </button>
                       <Link
                         href={`/boost/${campaign.id}`}
-                        className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        className="btn-icon"
                         title="Campaign settings"
                       >
                         <Settings size={16} />

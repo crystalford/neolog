@@ -68,13 +68,13 @@ export default function ImportPage() {
           <div className="space-y-8">
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Substack */}
-              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
                     <span className="text-xl font-bold text-orange-500">S</span>
                   </div>
                   <div className="flex-1">
-                    <h2 className="font-medium text-lg mb-1">Import from Substack</h2>
+                    <h2 className="font-medium text-base mb-1">Import from Substack</h2>
                     <p className="text-sm text-[var(--text-secondary)] mb-4">
                       Export your Substack posts and upload the ZIP file here
                     </p>
@@ -110,13 +110,13 @@ export default function ImportPage() {
               </div>
 
               {/* Medium */}
-              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-lg bg-[#00ab6c]/10 flex items-center justify-center">
                     <span className="text-xl font-bold text-[#00ab6c]">M</span>
                   </div>
                   <div className="flex-1">
-                    <h2 className="font-medium text-lg mb-1">Import from Medium</h2>
+                    <h2 className="font-medium text-base mb-1">Import from Medium</h2>
                     <p className="text-sm text-[var(--text-secondary)] mb-4">
                       Download your Medium posts and upload the HTML files
                     </p>
@@ -143,13 +143,13 @@ export default function ImportPage() {
               </div>
 
               {/* WordPress */}
-              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-lg bg-[#21759b]/10 flex items-center justify-center">
                     <span className="text-xl font-bold text-[#21759b]">W</span>
                   </div>
                   <div className="flex-1">
-                    <h2 className="font-medium text-lg mb-1">Import from WordPress</h2>
+                    <h2 className="font-medium text-base mb-1">Import from WordPress</h2>
                     <p className="text-sm text-[var(--text-secondary)] mb-4">
                       Export your WordPress posts as XML and upload here
                     </p>
@@ -199,7 +199,7 @@ export default function ImportPage() {
               <p className="text-sm text-[var(--text-tertiary)] mb-2">
                 Prefer to copy-paste? You can also create posts manually
               </p>
-              <a href="/write" className="btn btn-primary">
+              <a href="/write" className="btn btn-primary btn-sm">
                 <FileText size={16} />
                 Write a Post
               </a>

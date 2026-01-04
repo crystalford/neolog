@@ -407,7 +407,7 @@ export default function AnalyticsPage() {
                     </Link>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full data-table">
                       <thead>
                         <tr className="border-b border-[var(--border-light)] text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                           <th className="text-left p-4 font-medium">Post</th>

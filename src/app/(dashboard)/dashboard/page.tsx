@@ -285,7 +285,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/write"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+            className="btn btn-primary btn-sm"
           >
             <PenLine size={16} />
             New post
@@ -336,7 +336,7 @@ export default function DashboardPage() {
                 </div>
                 <Link
                   href={`/write?edit=${post.id}&revive=1`}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+                  className="btn btn-secondary btn-sm"
                 >
                   Revive
                 </Link>
@@ -411,14 +411,14 @@ export default function DashboardPage() {
           </div>
           <h2 className="font-display text-xl tracking-tight text-[var(--text-primary)] mb-2">No posts yet</h2>
           <p className="text-sm text-[var(--text-secondary)] mb-6">Create your first post to get started</p>
-          <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
+          <Link href="/write" className="btn btn-primary btn-sm">
             <PenLine size={16} />
             Write your first post
           </Link>
         </div>
       ) : (
-        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[40px_minmax(0,1fr)_120px_140px_120px_120px_180px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+          <div className="hidden md:grid grid-cols-[36px_minmax(0,1fr)_110px_120px_100px_100px_150px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
             <div className="flex items-center justify-center">
               <input
                 type="checkbox"
@@ -441,20 +441,20 @@ export default function DashboardPage() {
             <span className="text-right">Actions</span>
           </div>
           {selectedIds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
               <span className="text-[var(--text-secondary)]">
                 {selectedIds.length} selected
               </span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowBulkActions(true)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)] transition-colors"
+                  className="btn btn-primary btn-sm"
                 >
                   Bulk actions
                 </button>
                 <button
                   onClick={() => setSelectedIds([])}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                  className="btn btn-secondary btn-sm"
                 >
                   Clear
                 </button>
@@ -465,7 +465,7 @@ export default function DashboardPage() {
             {visiblePosts.map((post) => (
               <div
                 key={post.id}
-                className="grid grid-cols-1 md:grid-cols-[40px_minmax(0,1fr)_120px_140px_120px_120px_180px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                className="grid grid-cols-1 md:grid-cols-[36px_minmax(0,1fr)_110px_120px_100px_100px_150px] gap-2 md:gap-3 px-4 py-3 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
               >
                 <div className="hidden md:flex items-center justify-center">
                   <input
@@ -482,7 +482,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-[var(--text-primary)] truncate">
+                  <p className="font-medium text-[var(--text-primary)] truncate text-sm">
                     {post.title || 'Untitled'}
                   </p>
                   {post.excerpt && (
@@ -509,7 +509,7 @@ export default function DashboardPage() {
                       }
                       updatePostStatus(post, nextStatus)
                     }}
-                    className={`text-xs font-medium px-3 py-1 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${getStatusClasses(post.status)}`}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-md border border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${getStatusClasses(post.status)}`}
                   >
                     <option value="draft">Draft</option>
                     <option value="published">Published</option>
@@ -538,7 +538,7 @@ export default function DashboardPage() {
                     visible comments
                   </p>
                 </div>
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1.5">
                   {post.status === 'draft' && (
                     <ShareDraftButton
                       postId={post.id}
@@ -549,7 +549,7 @@ export default function DashboardPage() {
                   {post.status === 'published' && profile && (
                     <Link
                       href={`/${profile.username}/${post.slug}`}
-                      className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                      className="btn-icon"
                       title="View post"
                     >
                       <Eye size={14} />
@@ -557,28 +557,28 @@ export default function DashboardPage() {
                   )}
                   <button
                     onClick={() => setAnalyticsPost(post)}
-                    className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                    className="btn-icon"
                     title="View analytics"
                   >
                     <BarChart3 size={14} />
                   </button>
                   <Link
                     href={`/write?edit=${post.id}`}
-                    className="p-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                    className="btn-icon"
                     title="Edit post"
                   >
                     <Edit2 size={14} />
                   </Link>
                   <Link
                     href={`/write?edit=${post.id}&pack=1`}
-                    className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                    className="btn-icon"
                     title="Distribution pack"
                   >
                     <Share2 size={14} />
                   </Link>
                   <button
                     onClick={() => handleDelete(post.id)}
-                    className="p-2 rounded-lg text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                    className="btn-icon text-[var(--error)] hover:bg-[var(--error)]/10"
                     title="Delete post"
                   >
                     <Trash2 size={14} />

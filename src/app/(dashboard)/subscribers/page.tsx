@@ -486,13 +486,13 @@ export default function SubscribersPage() {
             </p>
           </div>
           
-          <button
-            onClick={exportSubscribers}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-sm font-medium text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
-          >
-            <Download size={16} />
-            Export CSV
-          </button>
+        <button
+          onClick={exportSubscribers}
+          className="btn btn-secondary btn-sm"
+        >
+          <Download size={16} />
+          Export CSV
+        </button>
         </div>
 
         {/* Stats */}
@@ -519,13 +519,13 @@ export default function SubscribersPage() {
                 <div key={segment.id} className="flex items-center gap-1">
                   <button
                     onClick={() => applySegment(segment)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
                   >
                     {segment.label}
                   </button>
                   <button
                     onClick={() => removeSegment(segment.id)}
-                    className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                    className="text-[11px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
                     title="Remove segment"
                   >
                     X
@@ -557,7 +557,7 @@ export default function SubscribersPage() {
                 <button
                   key={id}
                   onClick={() => setTab(id as typeof tab)}
-                  className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-all ${
                     tab === id
                       ? 'bg-[var(--accent)] text-[var(--text-inverse)] font-medium'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -570,7 +570,7 @@ export default function SubscribersPage() {
 
             <button
               onClick={saveCurrentSegment}
-              className="px-4 py-2 rounded-lg text-sm border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
+              className="btn btn-secondary btn-sm"
             >
               Save segment
             </button>
@@ -589,7 +589,7 @@ export default function SubscribersPage() {
                 <button
                   key={id}
                   onClick={() => setEmailSegment(id as typeof emailSegment)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
                     emailSegment === id
                       ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
                       : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
@@ -620,7 +620,7 @@ export default function SubscribersPage() {
                 <div className="p-4 border-b border-[var(--border-light)]">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">User subscribers</p>
                 </div>
-                <div className="hidden md:grid grid-cols-[32px_minmax(0,1fr)_160px_160px] gap-4 px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_140px_140px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
                   <div className="flex items-center justify-center">
                     <input
                       type="checkbox"
@@ -640,26 +640,26 @@ export default function SubscribersPage() {
                   <span className="text-right">Actions</span>
                 </div>
                 {selectedUserIds.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
                     <span className="text-[var(--text-secondary)]">
                       {selectedUserIds.length} selected
                     </span>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => applyUserBulkUpdate({ email_new_posts: true })}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                        className="btn btn-secondary btn-sm"
                       >
                         Enable updates
                       </button>
                       <button
                         onClick={() => applyUserBulkUpdate({ email_new_posts: false })}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                        className="btn btn-secondary btn-sm"
                       >
                         Mute updates
                       </button>
                       <button
                         onClick={() => openTagModal('user', selectedUserIds)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                        className="btn btn-secondary btn-sm"
                       >
                         Tag
                       </button>
@@ -671,7 +671,7 @@ export default function SubscribersPage() {
                   {filteredUserSubs.map((sub) => (
                     <div 
                       key={sub.id}
-                      className="grid grid-cols-1 md:grid-cols-[32px_minmax(0,1fr)_160px_160px] gap-4 px-4 py-4 items-center"
+                      className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_140px_140px] gap-3 px-4 py-3 items-center"
                     >
                       <div className="hidden md:flex items-center justify-center">
                         <input
@@ -740,21 +740,21 @@ export default function SubscribersPage() {
                       <div className="flex items-center gap-2 md:justify-end">
                         <Link
                           href={`/${sub.subscriber.username}`}
-                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn-icon"
                           title="View profile"
                         >
                           <ExternalLink size={14} />
                         </Link>
                         <button
                           onClick={() => toggleUserUpdates(sub)}
-                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn-icon"
                           title={sub.email_new_posts ? 'Mute email updates' : 'Enable email updates'}
                         >
                           {sub.email_new_posts ? <Mail size={14} /> : <UserMinus size={14} />}
                         </button>
                         <button
                           onClick={() => openNote(sub.subscriber.id, sub.subscriber.display_name || sub.subscriber.username, 'user')}
-                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn-icon"
                           title="Add note"
                         >
                           <MessageSquare size={14} />
@@ -772,7 +772,7 @@ export default function SubscribersPage() {
                   <div className="p-4 border-b border-[var(--border-light)]">
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Email subscribers</p>
                   </div>
-                  <div className="hidden md:grid grid-cols-[32px_minmax(0,1fr)_140px_180px] gap-4 px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                  <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_120px_160px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -792,44 +792,44 @@ export default function SubscribersPage() {
                     <span className="text-right">Actions</span>
                   </div>
                   {selectedEmailIds.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
                       <span className="text-[var(--text-secondary)]">
                         {selectedEmailIds.length} selected
                       </span>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => applyEmailBulkUpdate({ email_new_posts: true })}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn btn-secondary btn-sm"
                         >
                           Enable updates
                         </button>
                         <button
                           onClick={() => applyEmailBulkUpdate({ email_new_posts: false })}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn btn-secondary btn-sm"
                         >
                           Mute updates
                         </button>
                         <button
                           onClick={() => applyEmailBulkUpdate({ email_weekly_digest: true })}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn btn-secondary btn-sm"
                         >
                           Enable digest
                         </button>
                         <button
                           onClick={() => applyEmailBulkUpdate({ email_weekly_digest: false })}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn btn-secondary btn-sm"
                         >
                           Mute digest
                         </button>
                         <button
                           onClick={() => applyEmailBulkUpdate({ status: 'unsubscribed' })}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10 transition-colors"
+                          className="btn btn-secondary btn-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10"
                         >
                           Unsubscribe
                         </button>
                         <button
                           onClick={() => openTagModal('email', selectedEmailIds)}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                          className="btn btn-secondary btn-sm"
                         >
                           Tag
                         </button>
@@ -838,10 +838,10 @@ export default function SubscribersPage() {
                   )}
                   <div className="divide-y divide-[var(--border-light)]">
                     {filteredEmailSubs.map((sub) => (
-                      <div 
-                        key={sub.id}
-                        className="grid grid-cols-1 md:grid-cols-[32px_minmax(0,1fr)_140px_180px] gap-4 px-4 py-4 items-center"
-                      >
+                    <div 
+                      key={sub.id}
+                      className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_120px_160px] gap-3 px-4 py-3 items-center"
+                    >
                         <div className="hidden md:flex items-center justify-center">
                           <input
                             type="checkbox"
@@ -902,35 +902,35 @@ export default function SubscribersPage() {
                         <div className="flex items-center gap-2 md:justify-end">
                           <button
                             onClick={() => copyValue(sub.email, sub.id)}
-                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            className="btn-icon"
                             title={copied === sub.id ? 'Copied' : 'Copy email'}
                           >
                             {copied === sub.id ? <Check size={14} /> : <Copy size={14} />}
                           </button>
                           <button
                             onClick={() => toggleEmailUpdates(sub)}
-                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            className="btn-icon"
                             title={sub.email_new_posts ? 'Mute new post emails' : 'Enable new post emails'}
                           >
                             <Mail size={14} />
                           </button>
                           <button
                             onClick={() => toggleEmailDigest(sub)}
-                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            className="btn-icon"
                             title={sub.email_weekly_digest ? 'Disable weekly digest' : 'Enable weekly digest'}
                           >
                             <Clock size={14} />
                           </button>
                           <button
                             onClick={() => unsubscribeEmail(sub)}
-                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                            className="btn-icon text-[var(--error)] hover:bg-[var(--error)]/10"
                             title="Unsubscribe"
                           >
                             <UserMinus size={14} />
                           </button>
                           <button
                             onClick={() => openNote(sub.id, sub.email, 'email')}
-                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            className="btn-icon"
                             title="Add note"
                           >
                             <MessageSquare size={14} />

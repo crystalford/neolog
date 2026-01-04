@@ -248,14 +248,14 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
           <div className="space-y-8">
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <User size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-xl">Profile</h2>
+                <h2 className="font-display text-lg">Profile</h2>
               </div>
 
               <div className="space-y-6">
@@ -419,12 +419,12 @@ export default function SettingsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <Bell size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-xl">Email Notifications</h2>
+                <h2 className="font-display text-lg">Email Notifications</h2>
               </div>
 
               <div className="space-y-3">
@@ -454,12 +454,12 @@ export default function SettingsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <Rss size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-xl">Your Feeds</h2>
+                <h2 className="font-display text-lg">Your Feeds</h2>
               </div>
 
               <p className="text-[var(--text-secondary)] mb-4">
@@ -511,12 +511,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-8">
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <Download size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-xl">Export Your Data</h2>
+                <h2 className="font-display text-lg">Export Your Data</h2>
               </div>
 
               <p className="text-[var(--text-secondary)] mb-4">
@@ -544,12 +544,12 @@ export default function SettingsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6">
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center">
                   <Mail size={20} className="text-[var(--text-tertiary)]" />
                 </div>
-                <h2 className="font-display text-xl">Account</h2>
+                <h2 className="font-display text-lg">Account</h2>
               </div>
 
               <div className="space-y-4">
@@ -567,12 +567,12 @@ export default function SettingsPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-6">
+            <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
                   <Shield size={20} className="text-[var(--error)]" />
                 </div>
-                <h2 className="font-display text-xl">Danger Zone</h2>
+                <h2 className="font-display text-lg">Danger Zone</h2>
               </div>
 
               <div className="flex items-start gap-3 mb-4">

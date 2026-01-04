@@ -149,7 +149,7 @@ export function PublicationsManager() {
         </div>
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+          className="btn btn-primary btn-sm"
         >
           <Plus size={16} />
           New publication
@@ -166,7 +166,7 @@ export function PublicationsManager() {
           </p>
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+            className="btn btn-primary btn-sm"
           >
             <Plus size={16} />
             Create publication
@@ -213,15 +213,15 @@ export function PublicationsManager() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-[var(--border-light)]">
                 <div>
-                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_posts}</p>
+                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_posts}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_subscribers}</p>
+                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_subscribers}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-[var(--text-primary)]">{pub.total_views}</p>
+                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_views}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Views</p>
                 </div>
               </div>
@@ -229,21 +229,21 @@ export function PublicationsManager() {
               {/* Actions */}
               <div className="flex items-center gap-2">
                 <Link
-                  href={`/pub/${pub.slug}`}
+                  href={`/publications/${pub.slug}`}
                   className="flex-1 btn btn-secondary btn-sm"
                 >
                   <BookOpen size={14} />
                   View
                 </Link>
                 <Link
-                  href={`/pub/${pub.slug}/settings`}
+                  href={`/publications/${pub.slug}/settings`}
                   className="btn btn-secondary btn-sm"
                   title="Settings"
                 >
                   <Settings size={14} />
                 </Link>
                 <Link
-                  href={`/pub/${pub.slug}/analytics`}
+                  href={`/publications/${pub.slug}/analytics`}
                   className="btn btn-secondary btn-sm"
                   title="Analytics"
                 >
@@ -317,10 +317,10 @@ export function PublicationsManager() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Slug * (URL: /pub/your-slug)
+                    Slug * (URL: /publications/your-slug)
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-[var(--text-tertiary)]">/pub/</span>
+                    <span className="text-sm text-[var(--text-tertiary)]">/publications/</span>
                     <input
                       type="text"
                       value={newPub.slug}

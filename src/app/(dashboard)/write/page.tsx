@@ -852,7 +852,7 @@ export default function WritePage() {
   const titleChanged = lastVersion ? lastVersion.title !== title : false
 
   return (
-    <main className="pb-16">
+    <main className="pb-16 pt-6">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Error/Success Messages */}
           {hasNoPublications && (
@@ -909,7 +909,7 @@ export default function WritePage() {
           )}
 
           {/* Header actions */}
-          <div className="flex items-center justify-between py-3 mb-8 sticky top-0 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)] z-10">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-2 px-3 mb-6 sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-light)] rounded-xl shadow-sm z-10">
             <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
               {saving && (
                 <span className="flex items-center gap-1.5">
@@ -924,50 +924,50 @@ export default function WritePage() {
               )}
             </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowImport((prev) => !prev)}
-              className="btn btn-ghost btn-sm"
-            >
-              Import HTML
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="btn btn-ghost btn-sm"
-            >
-              <Settings size={14} />
-              Publish settings
-            </button>
-            {postId && (
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setShowHistory(true)}
+                onClick={() => setShowImport((prev) => !prev)}
                 className="btn btn-ghost btn-sm"
               >
-                History
+                Import HTML
               </button>
-            )}
-            {postId && (
               <button
-                onClick={() => {
-                  setShowPack(true)
-                  if (!pack && !packLoading) {
-                    loadDistributionPack()
-                  }
-                }}
+                onClick={() => setShowSettings(true)}
                 className="btn btn-ghost btn-sm"
               >
-                Distribution pack
+                <Settings size={14} />
+                Publish settings
               </button>
-            )}
-            {profile && postId && (
-              <a
-                href={`/${profile.username}/${generateSlug(title)}?preview=true`}
-                target="_blank"
-                className="btn btn-ghost btn-sm"
-              >
-                Preview
-              </a>
-            )}
+              {postId && (
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="btn btn-ghost btn-sm"
+                >
+                  History
+                </button>
+              )}
+              {postId && (
+                <button
+                  onClick={() => {
+                    setShowPack(true)
+                    if (!pack && !packLoading) {
+                      loadDistributionPack()
+                    }
+                  }}
+                  className="btn btn-ghost btn-sm"
+                >
+                  Distribution pack
+                </button>
+              )}
+              {profile && postId && (
+                <a
+                  href={`/${profile.username}/${generateSlug(title)}?preview=true`}
+                  target="_blank"
+                  className="btn btn-ghost btn-sm"
+                >
+                  Preview
+                </a>
+              )}
 
               <button
                 onClick={() => setShowPublishConfirm(true)}
@@ -980,7 +980,7 @@ export default function WritePage() {
           </div>
 
           {showImport && (
-            <div className="mb-8 p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+            <div className="mb-8 p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="font-display text-lg">Import HTML</h3>
@@ -1410,7 +1410,7 @@ export default function WritePage() {
                 className="absolute inset-0 bg-black/30"
                 onClick={() => setShowPublishConfirm(false)}
               />
-              <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
+              <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-5">
                 <h3 className="font-display text-xl text-[var(--text-primary)] mb-2">
                   {publishLabel} post
                 </h3>
@@ -1475,7 +1475,7 @@ export default function WritePage() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center justify-end gap-2 mt-6">
+                <div className="flex items-center justify-end gap-2 mt-5">
                   <button
                     onClick={() => setShowPublishConfirm(false)}
                     className="btn btn-secondary btn-sm"
@@ -1502,7 +1502,7 @@ export default function WritePage() {
                 className="absolute inset-0 bg-black/30"
                 onClick={() => setShowPack(false)}
               />
-              <div className="relative w-full max-w-3xl rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
+              <div className="relative w-full max-w-3xl rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Distribution pack</p>
@@ -1649,7 +1649,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-4xl font-display bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-4 px-0 pt-2"
+            className="w-full text-3xl md:text-4xl font-display tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-2 px-0 pt-2"
             autoFocus
           />
 
@@ -1659,12 +1659,15 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Subtitle (optional)"
-            className="w-full text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-8 px-0"
+            className="w-full text-lg md:text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-5 px-0"
           />
 
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Editor mode: {htmlMode ? 'HTML' : 'Visual'}
+            </span>
+            <span className="text-xs text-[var(--text-tertiary)]">
+              {getWordCount(content).toLocaleString()} words
             </span>
             <button
               onClick={() => {
@@ -1695,12 +1698,14 @@ export default function WritePage() {
               </p>
             </div>
           ) : (
-            <RichEditor
-              content={content}
-              onChange={setContent}
-              placeholder="Tell your story..."
-              onImageUpload={handleImageUpload}
-            />
+            <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+              <RichEditor
+                content={content}
+                onChange={setContent}
+                placeholder="Tell your story..."
+                onImageUpload={handleImageUpload}
+              />
+            </div>
           )}
       </div>
     </main>

@@ -57,7 +57,7 @@ export default async function Home() {
 
       <main className="pt-14">
         {/* Hero - Compact and professional */}
-        <section className="relative px-6 lg:px-12 pt-20 pb-20 overflow-hidden">
+        <section className="relative px-6 lg:px-12 pt-16 pb-16 overflow-hidden">
           {/* Subtle gradient background */}
           <div
             className="absolute top-0 right-0 w-[1000px] h-[1000px] opacity-[0.02] pointer-events-none blur-3xl"
@@ -68,25 +68,25 @@ export default async function Home() {
           />
 
           <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="grid lg:grid-cols-2 gap-10 items-center">
               <div className="animate-fade-up">
                 {/* Main headline */}
-                <h1 className="font-serif text-5xl md:text-6xl leading-tight tracking-tight text-gray-900 mb-6">
+                <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
                   Publish raw HTML.{' '}
-                  <span className="text-gray-500">No friction.</span>
+                  <span className="text-[var(--text-tertiary)]">No friction.</span>
                 </h1>
 
                 {/* Subheadline */}
-                <p className="text-lg leading-relaxed text-gray-600 mb-8 max-w-xl">
+                <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
                   A publishing platform that respects your code. Drop HTML, paste markdown, publish instantly.
                 </p>
 
                 {/* CTA */}
                 <div className="flex flex-wrap gap-3 items-center">
-                  <Link href="/signup" className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+                  <Link href="/signup" className="btn btn-primary">
                     Start writing
                   </Link>
-                  <Link href="/explore" className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                  <Link href="/explore" className="btn btn-secondary">
                     Explore
                   </Link>
                 </div>
@@ -94,7 +94,7 @@ export default async function Home() {
 
               {/* Visual element - Code preview */}
               <div className="hidden lg:block">
-                <div className="relative bg-gray-900 rounded-lg p-6 border border-gray-800">
+                <div className="relative bg-[var(--bg-inverse)] rounded-lg p-6 border border-[var(--border-heavy)]">
                   <div className="font-mono text-sm leading-relaxed">
                     <div className="text-purple-400">&lt;article&gt;</div>
                     <div className="pl-4 text-blue-400">&lt;h1&gt;</div>
@@ -113,24 +113,24 @@ export default async function Home() {
 
         {/* Stats */}
         {(stats.posts > 0 || stats.creators > 0) && (
-          <section className="px-6 lg:px-12 py-12 bg-gray-50 border-y border-gray-200">
+          <section className="px-6 lg:px-12 py-10 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
             <div className="max-w-6xl mx-auto">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                 <div className="text-center">
-                  <p className="font-serif text-3xl text-gray-900 mb-1">{stats.posts.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">Posts published</p>
+                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.posts.toLocaleString()}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Posts published</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-serif text-3xl text-gray-900 mb-1">{stats.creators.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">Writers</p>
+                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.creators.toLocaleString()}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Writers</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-serif text-3xl text-gray-900 mb-1">100%</p>
-                  <p className="text-sm text-gray-600">Your content</p>
+                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">100%</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Your content</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-serif text-3xl text-gray-900 mb-1">&lt;1s</p>
-                  <p className="text-sm text-gray-600">To publish</p>
+                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">&lt;1s</p>
+                  <p className="text-sm text-[var(--text-secondary)]">To publish</p>
                 </div>
               </div>
             </div>
@@ -139,14 +139,14 @@ export default async function Home() {
 
         {/* Featured Posts */}
         {featuredPosts.length > 0 && (
-          <section className="px-6 lg:px-12 py-16 bg-white">
+          <section className="px-6 lg:px-12 py-14 bg-[var(--bg-primary)]">
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="font-serif text-2xl text-gray-900 mb-1">Latest posts</h2>
-                  <p className="text-sm text-gray-600">From the community</p>
+                  <h2 className="font-display text-2xl text-[var(--text-primary)] mb-1">Latest posts</h2>
+                  <p className="text-sm text-[var(--text-secondary)]">From the community</p>
                 </div>
-                <Link href="/explore" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors hidden sm:inline-flex items-center gap-1">
+                <Link href="/explore" className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors hidden sm:inline-flex items-center gap-1">
                   View all
                   <ArrowRight size={14} />
                 </Link>
@@ -159,7 +159,7 @@ export default async function Home() {
               </div>
 
               <div className="mt-8 text-center sm:hidden">
-                <Link href="/explore" className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors inline-flex items-center gap-1">
+                <Link href="/explore" className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1">
                   View all posts
                   <ArrowRight size={14} />
                 </Link>
@@ -169,9 +169,9 @@ export default async function Home() {
         )}
 
         {/* The Problem / Solution */}
-        <section className="px-6 lg:px-12 py-32">
+        <section className="px-6 lg:px-12 py-24">
           <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-20 items-center">
+            <div className="grid lg:grid-cols-2 gap-14 items-center">
               <div className="space-y-12">
                 <div>
                   <span className="inline-flex items-center gap-2 text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-6 px-3 py-1.5 bg-[var(--bg-secondary)] rounded-full">
@@ -244,9 +244,9 @@ export default async function Home() {
         </section>
 
         {/* Features - Clean grid */}
-        <section className="px-6 lg:px-12 py-32 bg-[var(--bg-primary)]">
+        <section className="px-6 lg:px-12 py-24 bg-[var(--bg-primary)]">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-20">
+            <div className="text-center mb-16">
               <h2 className="font-display text-4xl md:text-5xl lg:text-6xl mb-6 leading-tight">
                 Everything you need.{' '}
                 <span className="italic text-[var(--text-secondary)]">Nothing you don't.</span>
@@ -256,7 +256,7 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
                 {
                   icon: Code,
@@ -297,7 +297,7 @@ export default async function Home() {
               ].map((feature, i) => (
                 <div
                   key={i}
-                  className="group p-10 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-xl transition-all duration-300"
+                  className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-xl transition-all duration-300"
                 >
                   <div className="flex items-start justify-between mb-8">
                     <div className="w-14 h-14 rounded-2xl bg-[var(--accent-softer)] flex items-center justify-center group-hover:bg-[var(--accent-soft)] group-hover:scale-110 transition-all duration-300">
@@ -309,7 +309,7 @@ export default async function Home() {
                       </span>
                     )}
                   </div>
-                  <h3 className="font-display text-2xl mb-4">{feature.title}</h3>
+                  <h3 className="font-display text-xl mb-3">{feature.title}</h3>
                   <p className="text-[var(--text-secondary)] text-base leading-relaxed">
                     {feature.description}
                   </p>
@@ -320,21 +320,21 @@ export default async function Home() {
         </section>
 
         {/* Final CTA */}
-        <section className="relative px-6 lg:px-12 py-20 bg-gray-50 border-t border-gray-200">
+        <section className="relative px-6 lg:px-12 py-16 bg-[var(--bg-secondary)] border-t border-[var(--border-light)]">
           <div className="relative max-w-4xl mx-auto text-center">
-            <h2 className="font-serif text-3xl md:text-4xl text-gray-900 mb-4 leading-tight">
+            <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4 leading-tight">
               Ready to start publishing?
             </h2>
 
-            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+            <p className="text-lg text-[var(--text-secondary)] mb-8 max-w-2xl mx-auto">
               Join writers who want their work rendered exactly as intended.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link href="/signup" className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors">
+              <Link href="/signup" className="btn btn-primary">
                 Start writing
               </Link>
-              <Link href="/explore" className="px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+              <Link href="/explore" className="btn btn-secondary">
                 Explore
               </Link>
             </div>
@@ -342,36 +342,36 @@ export default async function Home() {
         </section>
 
         {/* Footer */}
-        <footer className="px-6 lg:px-12 py-12 bg-white border-t border-gray-200">
+        <footer className="px-6 lg:px-12 py-12 bg-[var(--bg-primary)] border-t border-[var(--border-light)]">
           <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 bg-black rounded-sm flex items-center justify-center">
-                    <span className="text-white font-bold text-xs">N</span>
+                  <div className="w-5 h-5 bg-[var(--accent)] rounded-sm flex items-center justify-center">
+                    <span className="text-[var(--text-inverse)] font-bold text-xs">N</span>
                   </div>
-                  <span className="font-sans text-base font-semibold text-gray-900">Neolog</span>
+                  <span className="font-display text-base font-semibold text-[var(--text-primary)]">Neolog</span>
                 </div>
-                <p className="text-sm text-gray-600 max-w-md">
+                <p className="text-sm text-[var(--text-secondary)] max-w-md">
                   Publish raw HTML. No friction.
                 </p>
               </div>
 
               <nav className="flex gap-8">
-                <Link href="/explore" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                <Link href="/explore" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                   Explore
                 </Link>
-                <Link href="/tos" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                <Link href="/tos" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                   Terms
                 </Link>
-                <Link href="/privacy" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                <Link href="/privacy" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                   Privacy
                 </Link>
               </nav>
             </div>
 
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <p className="text-xs text-gray-500 text-center">
+            <div className="mt-8 pt-8 border-t border-[var(--border-light)]">
+              <p className="text-xs text-[var(--text-tertiary)] text-center">
                 (c) 2025 Neolog
               </p>
             </div>

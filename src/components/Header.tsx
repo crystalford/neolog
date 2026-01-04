@@ -29,23 +29,23 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-black rounded-sm flex items-center justify-center">
-            <span className="text-white font-bold text-xs">N</span>
+          <div className="w-6 h-6 bg-[var(--accent)] rounded-md flex items-center justify-center">
+            <span className="text-[var(--text-inverse)] font-bold text-xs">N</span>
           </div>
-          <span className="font-serif text-lg tracking-tight text-gray-900">
+          <span className="font-display text-lg tracking-tight text-[var(--text-primary)]">
             Neolog
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-4 text-sm text-gray-600">
-          <Link href="/explore" className="hover:text-gray-900 transition-colors">
+        <nav className="hidden md:flex items-center gap-4 text-sm text-[var(--text-secondary)]">
+          <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">
             Explore
           </Link>
-          <Link href="/visuals" className="hover:text-gray-900 transition-colors">
+          <Link href="/visuals" className="hover:text-[var(--text-primary)] transition-colors">
             Visuals
           </Link>
         </nav>
@@ -55,7 +55,7 @@ export function Header() {
           {loading ? null : user ? (
             <Link
               href="/dashboard"
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              className="btn btn-secondary btn-sm"
             >
               Dashboard
             </Link>
@@ -63,13 +63,13 @@ export function Header() {
             <>
               <Link
                 href="/login"
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                className="btn btn-secondary btn-sm"
               >
                 Sign in
               </Link>
               <Link
                 href="/signup"
-                className="px-3 py-1.5 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+                className="btn btn-primary btn-sm"
               >
                 Sign up
               </Link>

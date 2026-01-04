@@ -166,21 +166,55 @@
 }
 
 .dashboard-shell .btn {
-  padding: 0.45rem 0.9rem;
-  font-size: 0.8125rem;
-  border-radius: 10px;
-}
-
-.dashboard-shell .btn-sm {
-  padding: 0.35rem 0.7rem;
+  padding: 0.38rem 0.75rem;
   font-size: 0.75rem;
   border-radius: 8px;
 }
 
+.dashboard-shell .btn-sm {
+  padding: 0.28rem 0.6rem;
+  font-size: 0.6875rem;
+  border-radius: 7px;
+}
+
 .dashboard-shell .btn-lg {
-  padding: 0.7rem 1.4rem;
-  font-size: 0.9375rem;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.875rem;
+  border-radius: 10px;
+}
+
+.dashboard-shell .input {
+  padding: 0.55rem 0.8rem;
+  font-size: 0.875rem;
+  border-radius: 7px;
+}
+
+.dashboard-shell .btn-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+}
+
+.dashboard-shell .card {
   border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.dashboard-shell .card h2,
+.dashboard-shell .card h3 {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.dashboard-shell .card p {
+  font-size: 0.875rem;
+}
+
+.dashboard-shell .section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 * {
@@ -446,6 +480,30 @@ body {
   font-size: 1rem;
   border-radius: 10px;
   font-weight: 500;
+}
+
+/* Icon-only buttons */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+  background: var(--bg-secondary);
+}
+
+.btn-icon:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 /* Focus State - Clean and accessible */
@@ -770,6 +828,33 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
 
 .editor-textarea::placeholder {
   color: var(--text-tertiary);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.data-table tbody td {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-light);
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-secondary);
 }
 
 .rich-editor {
