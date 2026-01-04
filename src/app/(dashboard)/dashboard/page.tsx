@@ -9,7 +9,7 @@ import { BulkPostActions } from '@/components/BulkPostActions'
 import type { Post, Profile } from '@/types/database'
 import {
   PenLine, Eye, Edit2, Trash2,
-  Globe, FileText, Clock, Search, BarChart3, Calendar
+  Globe, FileText, Clock, Search, BarChart3, Calendar, Share2
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -520,6 +520,13 @@ export default function DashboardPage() {
                     title="Edit post"
                   >
                     <Edit2 size={14} />
+                  </Link>
+                  <Link
+                    href={`/write?edit=${post.id}&pack=1`}
+                    className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                    title="Distribution pack"
+                  >
+                    <Share2 size={14} />
                   </Link>
                   <button
                     onClick={() => handleDelete(post.id)}

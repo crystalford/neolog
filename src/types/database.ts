@@ -75,6 +75,22 @@ export type PostVersionWithAuthor = PostVersion & {
   changed_by_profile?: Profile | null
 }
 
+export type PostDistributionPack = {
+  id: string
+  post_id: string
+  author_id: string
+  status: 'pending' | 'ready' | 'error'
+  x_thread: string[]
+  linkedin_post: string | null
+  reddit_title: string | null
+  reddit_body: string | null
+  hooks: string[]
+  og_image_url: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type PostCollaborator = {
   id: string
   post_id: string

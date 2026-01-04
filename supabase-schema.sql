@@ -97,6 +97,28 @@ create table public.post_versions (
 );
 
 -- =============================================
+-- POST DISTRIBUTION PACKS
+-- Generated share-ready assets (threads, hooks, OG)
+-- =============================================
+create table public.post_distribution_packs (
+  id uuid default uuid_generate_v4() primary key,
+  post_id uuid references public.posts(id) on delete cascade not null,
+  author_id uuid references public.profiles(id) on delete cascade not null,
+  status text default 'pending' check (status in ('pending', 'ready', 'error')),
+  x_thread text[] default '{}',
+  linkedin_post text,
+  reddit_title text,
+  reddit_body text,
+  hooks text[] default '{}',
+  og_image_url text,
+  error_message text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint unique_post_distribution_pack unique (post_id)
+);
+
+-- =============================================
 -- POST_COLLABORATORS TABLE
 -- Multiple authors on a single post
 -- =============================================
@@ -277,6 +299,8 @@ create index posts_slug_idx on public.posts(slug);
 create index posts_forked_from_idx on public.posts(forked_from_id);
 create index posts_root_post_idx on public.posts(root_post_id);
 create index post_versions_post_id_idx on public.post_versions(post_id);
+create index post_distribution_packs_post_id_idx on public.post_distribution_packs(post_id);
+create index post_distribution_packs_author_id_idx on public.post_distribution_packs(author_id);
 create index post_collaborators_post_id_idx on public.post_collaborators(post_id);
 create index post_collaborators_user_id_idx on public.post_collaborators(user_id);
 create index drafts_author_id_idx on public.drafts(author_id);
@@ -302,6 +326,7 @@ create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
+alter table public.post_distribution_packs enable row level security;
 alter table public.post_collaborators enable row level security;
 alter table public.tags enable row level security;
 alter table public.post_tags enable row level security;
@@ -382,6 +407,15 @@ create policy "Post authors and collaborators can create versions"
       )
     )
   );
+
+-- POST_DISTRIBUTION_PACKS policies
+create policy "Authors can view distribution packs"
+  on public.post_distribution_packs for select
+  using (auth.uid() = author_id);
+
+create policy "Authors can manage distribution packs"
+  on public.post_distribution_packs for all
+  using (auth.uid() = author_id);
 
 -- POST_COLLABORATORS policies
 create policy "Collaborators viewable by post viewers"
@@ -485,6 +519,10 @@ create trigger profiles_updated_at
 
 create trigger posts_updated_at
   before update on public.posts
+  for each row execute procedure public.handle_updated_at();
+
+create trigger post_distribution_packs_updated_at
+  before update on public.post_distribution_packs
   for each row execute procedure public.handle_updated_at();
 
 create trigger subscriber_notes_updated_at

@@ -48,6 +48,11 @@ export default function WritePage() {
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [lastVersion, setLastVersion] = useState<{ title: string; content: string | null } | null>(null)
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([])
+  const [showPack, setShowPack] = useState(false)
+  const [packLoading, setPackLoading] = useState(false)
+  const [packError, setPackError] = useState<string | null>(null)
+  const [pack, setPack] = useState<any>(null)
+  const [packTab, setPackTab] = useState<'x' | 'linkedin' | 'reddit' | 'hooks' | 'og'>('x')
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -63,6 +68,19 @@ export default function WritePage() {
       loadPost(editId)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const openPack = searchParams.get('pack')
+    if (openPack === '1') {
+      setShowPack(true)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (showPack && postId && !pack && !packLoading) {
+      loadDistributionPack()
+    }
+  }, [showPack, postId, pack, packLoading])
 
   useEffect(() => {
     if (!user || !publicationId) return
@@ -197,6 +215,38 @@ export default function WritePage() {
       .limit(5)
 
     setScheduledPosts(data || [])
+  }
+
+  const loadDistributionPack = async () => {
+    if (!postId) return
+    setPackLoading(true)
+    setPackError(null)
+    try {
+      const response = await fetch('/api/posts/distribution-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setPackError(data.error || 'Failed to generate pack')
+        return
+      }
+      setPack(data.pack)
+    } catch (error) {
+      console.error('Distribution pack error:', error)
+      setPackError('Failed to generate pack')
+    } finally {
+      setPackLoading(false)
+    }
+  }
+
+  const copyPack = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch (error) {
+      console.error('Clipboard error:', error)
+    }
   }
 
   // Generate slug from title
@@ -786,6 +836,19 @@ export default function WritePage() {
                 History
               </button>
             )}
+            {postId && (
+              <button
+                onClick={() => {
+                  setShowPack(true)
+                  if (!pack && !packLoading) {
+                    loadDistributionPack()
+                  }
+                }}
+                className="btn btn-ghost btn-sm"
+              >
+                Distribution pack
+              </button>
+            )}
             {profile && postId && (
               <a
                 href={`/${profile.username}/${generateSlug(title)}?preview=true`}
@@ -1207,6 +1270,153 @@ export default function WritePage() {
                     {publishLabel}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {showPack && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
+              <div
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setShowPack(false)}
+              />
+              <div className="relative w-full max-w-3xl rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Distribution pack</p>
+                    <h3 className="font-display text-xl text-[var(--text-primary)]">
+                      {title || 'Untitled'}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowPack(false)}
+                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+                    aria-label="Close pack"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {([
+                    { id: 'x', label: 'X Thread' },
+                    { id: 'linkedin', label: 'LinkedIn' },
+                    { id: 'reddit', label: 'Reddit' },
+                    { id: 'hooks', label: 'Hooks' },
+                    { id: 'og', label: 'OG Image' },
+                  ] as const).map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setPackTab(item.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        packTab === item.id
+                          ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
+                          : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={loadDistributionPack}
+                    disabled={!postId || packLoading}
+                    className="ml-auto px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+
+                {!postId && (
+                  <div className="py-6 text-sm text-[var(--text-tertiary)]">
+                    Save this post first to generate a distribution pack.
+                  </div>
+                )}
+                {packLoading && (
+                  <div className="py-10 text-center text-sm text-[var(--text-tertiary)]">
+                    Generating pack...
+                  </div>
+                )}
+                {packError && (
+                  <div className="mb-4 p-3 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20 text-sm text-[var(--error)]">
+                    {packError}
+                  </div>
+                )}
+                {!packLoading && postId && pack && (
+                  <div className="space-y-4">
+                    {packTab === 'x' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[180px]"
+                          value={(pack.x_thread || []).map((tweet: string, index: number) => `${index + 1}. ${tweet}`).join('\n\n')}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack((pack.x_thread || []).join('\n\n'))}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy thread
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'linkedin' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[180px]"
+                          value={pack.linkedin_post || ''}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(pack.linkedin_post || '')}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy LinkedIn
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'reddit' && (
+                      <div className="space-y-3">
+                        <input className="input" value={pack.reddit_title || ''} readOnly />
+                        <textarea className="input min-h-[180px]" value={pack.reddit_body || ''} readOnly />
+                        <button
+                          onClick={() => copyPack(`${pack.reddit_title}\n\n${pack.reddit_body}`)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Copy Reddit
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'hooks' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[160px]"
+                          value={(pack.hooks || []).join('\n')}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack((pack.hooks || []).join('\n'))}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy hooks
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'og' && (
+                      <div className="space-y-3">
+                        {pack.og_image_url ? (
+                          <img src={pack.og_image_url} alt="OG preview" className="rounded-xl border border-[var(--border-light)]" />
+                        ) : (
+                          <p className="text-sm text-[var(--text-tertiary)]">No OG image generated.</p>
+                        )}
+                        <button
+                          onClick={() => copyPack(pack.og_image_url || '')}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Copy OG image URL
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
