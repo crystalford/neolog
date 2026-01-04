@@ -482,9 +482,14 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-[var(--text-primary)] truncate text-sm">
-                    {post.title || 'Untitled'}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-[var(--text-primary)] truncate text-sm">
+                      {post.title || 'Untitled'}
+                    </p>
+                    {post.content_type === 'pulse' && (
+                      <span className="doc-badge doc-badge-pulse">Pulse</span>
+                    )}
+                  </div>
                   {post.excerpt && (
                     <p className="text-xs text-[var(--text-secondary)] truncate mt-1">
                       {post.excerpt}
@@ -696,6 +701,9 @@ export default function DashboardPage() {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(analyticsPost.status)}`}>
                     {analyticsPost.status}
                   </span>
+                  {analyticsPost.content_type === 'pulse' && (
+                    <span className="doc-badge doc-badge-pulse">Pulse</span>
+                  )}
                   {analyticsPost.status === 'scheduled' && analyticsPost.scheduled_at && (
                     <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
                       <Calendar size={12} />
