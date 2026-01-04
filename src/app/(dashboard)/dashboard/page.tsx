@@ -123,7 +123,7 @@ export default function DashboardPage() {
                         Draft
                       </span>
                     )}
-                    <span className="text-gray-400">·</span>
+                    <span className="text-gray-400"> - </span>
                     <span className="font-sans text-xs text-gray-500 flex items-center gap-1">
                       <Clock size={12} />
                       {new Date(post.updated_at).toLocaleDateString()}
@@ -195,3 +195,4 @@ export default function DashboardPage() {
     </main>
   )
 }
+

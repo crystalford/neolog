@@ -518,7 +518,7 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-[var(--text-secondary)] mb-4">
-              Download all your content. Your data is yours—no lock-in.
+              Download all your content. Your data is yours - no lock-in.
             </p>
 
             <div className="grid gap-3">
@@ -642,3 +642,4 @@ export default function SettingsPage() {
     </>
   )
 }
+

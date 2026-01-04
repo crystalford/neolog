@@ -195,7 +195,7 @@ export default function ExplorePage() {
                               {post.title}
                             </h3>
                             <p className="text-xs text-[var(--text-tertiary)]">
-                              {post.author_display_name || post.author_username} · {formatTimeAgo(post.published_at)}
+                              {post.author_display_name || post.author_username} - {formatTimeAgo(post.published_at)}
                             </p>
                           </div>
                         </div>
@@ -222,3 +222,5 @@ export default function ExplorePage() {
     </>
   )
 }
+
+

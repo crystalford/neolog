@@ -193,7 +193,7 @@ export default function CuratorsPage() {
                             <span>@{curator.username}</span>
                             {curator.early_upvotes > 0 && (
                               <>
-                                <span>•</span>
+                                <span>-</span>
                                 <span>{curator.early_upvotes} early finds</span>
                               </>
                             )}
@@ -258,7 +258,7 @@ export default function CuratorsPage() {
                         </div>
                         <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
                           <span>{post.author_display_name || post.author_username}</span>
-                          <span>•</span>
+                          <span>-</span>
                           <span className="flex items-center gap-1">
                             <Clock size={10} />
                             {formatTimeAgo(post.published_at)}
@@ -296,3 +296,4 @@ export default function CuratorsPage() {
     </>
   )
 }
+

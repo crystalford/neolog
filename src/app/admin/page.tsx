@@ -232,7 +232,7 @@ export default function AdminPage() {
                             {report.reason.replace('_', ' ')}
                           </span>
                           <span className="text-xs text-[var(--text-tertiary)]">
-                            {report.content_type} · {new Date(report.created_at).toLocaleDateString()}
+                            {report.content_type} - {new Date(report.created_at).toLocaleDateString()}
                           </span>
                         </div>
                         {report.description && (
@@ -375,3 +375,5 @@ function StatCard({ icon: Icon, label, value, subvalue, accent }: {
     </div>
   )
 }
+
+

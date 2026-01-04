@@ -27,7 +27,7 @@ export function generateSEO({
   tags,
   noindex = false,
 }: SEOProps): Metadata {
-  const fullTitle = title.includes('Neolog') ? title : `${title} — Neolog`
+  const fullTitle = title.includes('Neolog') ? title : `${title} - Neolog`
   const fullUrl = url ? `${BASE_URL}${url}` : BASE_URL
   const imageUrl = image || `${BASE_URL}/og-default.png`
 
@@ -140,3 +140,5 @@ export function generateProfileSchema({
     sameAs: [`${BASE_URL}/${username}`],
   }
 }
+
+

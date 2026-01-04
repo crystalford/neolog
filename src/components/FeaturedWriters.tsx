@@ -79,7 +79,7 @@ export function FeaturedWriters() {
                 {writer.display_name || writer.username}
               </p>
               <p className="text-sm text-[var(--text-tertiary)]">
-                @{writer.username} · {writer.post_count} posts
+                @{writer.username} - {writer.post_count} posts
               </p>
             </div>
           </Link>
@@ -88,3 +88,5 @@ export function FeaturedWriters() {
     </section>
   )
 }
+
+

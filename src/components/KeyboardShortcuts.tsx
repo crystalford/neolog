@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Command, X } from 'lucide-react'
 
 const SHORTCUTS = [
-  { keys: ['⌘', 'K'], action: 'Search', path: '/search' },
-  { keys: ['⌘', 'N'], action: 'New post', path: '/write' },
-  { keys: ['⌘', 'D'], action: 'Dashboard', path: '/dashboard' },
-  { keys: ['⌘', 'E'], action: 'Explore', path: '/explore' },
-  { keys: ['⌘', '/'], action: 'Show shortcuts', path: null },
+  { keys: ['Cmd', 'K'], action: 'Search', path: '/search' },
+  { keys: ['Cmd', 'N'], action: 'New post', path: '/write' },
+  { keys: ['Cmd', 'D'], action: 'Dashboard', path: '/dashboard' },
+  { keys: ['Cmd', 'E'], action: 'Explore', path: '/explore' },
+  { keys: ['Cmd', '/'], action: 'Show shortcuts', path: null },
   { keys: ['Esc'], action: 'Close dialogs', path: null },
 ]
 

@@ -206,7 +206,7 @@ export function tipReceivedEmail(
     subject: `You received a ${amount} tip!`,
     html: wrapInLayout(`
       <div style="text-align: center;">
-        <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+        <div style="font-size: 48px; margin-bottom: 16px;">TIP</div>
         
         <h1 style="font-size: 24px; margin: 0 0 8px;">You received a tip!</h1>
         
@@ -233,3 +233,4 @@ export function tipReceivedEmail(
     `, `${tipperName} sent you ${amount}`)
   }
 }
+

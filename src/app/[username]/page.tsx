@@ -137,7 +137,7 @@ export default async function ProfilePage({ params }: Props) {
                    
                   <span className="flex items-center gap-1">
                     <Users size={14} />
-                    {followerCount || 0} followers · {subscriberCount || 0} subscribers
+                    {followerCount || 0} followers - {subscriberCount || 0} subscribers
                   </span>
                 </div>
 
@@ -170,3 +170,5 @@ export default async function ProfilePage({ params }: Props) {
     </>
   )
 }
+
+

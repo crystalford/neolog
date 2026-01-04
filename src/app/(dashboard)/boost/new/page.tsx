@@ -465,7 +465,7 @@ export default function NewCampaignPage() {
 
                 {selectedTopics.length === 0 && (
                   <p className="text-sm text-[var(--text-tertiary)] mt-4">
-                    No topics selected — your campaign will reach all readers
+                    No topics selected - your campaign will reach all readers
                   </p>
                 )}
               </div>
@@ -589,3 +589,5 @@ export default function NewCampaignPage() {
     </>
   )
 }
+
+

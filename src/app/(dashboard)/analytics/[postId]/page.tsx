@@ -258,7 +258,7 @@ export default function PostAnalyticsPage() {
                               {d.percentage}% still reading
                               {isSignificantDrop && (
                                 <span className="text-red-300 block">
-                                  ⚠️ High drop-off here
+                                   High drop-off here
                                 </span>
                               )}
                             </div>
@@ -377,7 +377,7 @@ export default function PostAnalyticsPage() {
                             {view.referrer_domain || 'Direct'}
                           </td>
                           <td className="p-4 text-sm text-[var(--text-secondary)] capitalize">
-                            {view.device_type || '—'}
+                            {view.device_type || ' - '}
                           </td>
                           <td className="p-4 text-right font-mono text-sm">
                             {formatTime(view.time_on_page || 0)}
@@ -387,9 +387,9 @@ export default function PostAnalyticsPage() {
                           </td>
                           <td className="p-4 text-right">
                             {view.read_complete ? (
-                              <span className="text-[var(--success)]">✓</span>
+                              <span className="text-[var(--success)]">OK</span>
                             ) : (
-                              <span className="text-[var(--text-tertiary)]">—</span>
+                              <span className="text-[var(--text-tertiary)]"> - </span>
                             )}
                           </td>
                         </tr>
@@ -405,3 +405,4 @@ export default function PostAnalyticsPage() {
     </>
   )
 }
+

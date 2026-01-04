@@ -108,7 +108,7 @@ export function ContinueReading() {
               <p className="text-sm text-[var(--text-tertiary)]">
                 {post.author_display_name || post.author_username}
                 {post.reading_time_minutes && (
-                  <> · {Math.ceil(post.reading_time_minutes * (1 - post.progress))} min left</>
+                  <> - {Math.ceil(post.reading_time_minutes * (1 - post.progress))} min left</>
                 )}
               </p>
             </div>
@@ -120,3 +120,5 @@ export function ContinueReading() {
     </section>
   )
 }
+
+

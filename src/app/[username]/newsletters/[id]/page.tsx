@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props) {
   if (!newsletter) return { title: 'Not Found' }
 
   return {
-    title: `${newsletter.subject} — Neolog`,
+    title: `${newsletter.subject} - Neolog`,
   }
 }
 
@@ -119,3 +119,5 @@ export default async function NewsletterDetailPage({ params }: Props) {
     </>
   )
 }
+
+

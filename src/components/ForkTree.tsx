@@ -123,7 +123,7 @@ export function ForkTree({ postId, rootPostId, currentPostId }: ForkTreeProps) {
                             <span>{node.author_display_name || node.author_username}</span>
                             {node.fork_count > 0 && (
                               <>
-                                <span>•</span>
+                                <span>-</span>
                                 <span className="flex items-center gap-1">
                                   <GitFork size={10} />
                                   {node.fork_count}
@@ -147,3 +147,4 @@ export function ForkTree({ postId, rootPostId, currentPostId }: ForkTreeProps) {
     </div>
   )
 }
+

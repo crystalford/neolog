@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props) {
   if (!profile) return { title: 'Not Found' }
 
   return {
-    title: `Newsletter Archive — ${profile.display_name || profile.username} — Neolog`,
+    title: `Newsletter Archive - ${profile.display_name || profile.username} - Neolog`,
     description: `Past newsletters from ${profile.display_name || profile.username}`,
   }
 }
@@ -130,3 +130,5 @@ export default async function NewsletterArchivePage({ params }: Props) {
     </>
   )
 }
+
+

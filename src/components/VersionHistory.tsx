@@ -139,7 +139,7 @@ export function VersionHistory({ postId, onRestore, onPreview }: VersionHistoryP
                     <span>{formatDate(version.created_at)}</span>
                     {version.changed_by_profile && (
                       <>
-                        <span>•</span>
+                        <span>-</span>
                         <span className="flex items-center gap-1">
                           <User size={10} />
                           {version.changed_by_profile.display_name || version.changed_by_profile.username}
@@ -180,3 +180,4 @@ export function VersionHistory({ postId, onRestore, onPreview }: VersionHistoryP
     </div>
   )
 }
+

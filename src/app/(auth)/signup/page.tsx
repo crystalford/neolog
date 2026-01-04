@@ -153,7 +153,7 @@ export default function SignupPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="********"
               className="input input-with-icon"
               required
               minLength={8}
@@ -202,3 +202,4 @@ export default function SignupPage() {
     </div>
   )
 }
+

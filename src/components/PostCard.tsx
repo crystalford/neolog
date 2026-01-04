@@ -90,7 +90,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           
           {publishedDate && (
             <>
-              <span className="text-[var(--text-tertiary)]">·</span>
+              <span className="text-[var(--text-tertiary)]"> - </span>
               <time className="text-sm text-[var(--text-tertiary)]">{publishedDate}</time>
             </>
           )}

@@ -208,7 +208,7 @@ export default function EarningsPage() {
                   <AlertCircle size={18} className="text-[var(--text-tertiary)] mt-0.5" />
                   <div className="text-sm text-[var(--text-secondary)]">
                     <p className="font-medium mb-1">Platform fees</p>
-                    <p>Neolog takes a 10% platform fee on all transactions. Stripe processing fees (2.9% + 30¢) are additional and handled by Stripe.</p>
+                    <p>Neolog takes a 10% platform fee on all transactions. Stripe processing fees (2.9% + 30c) are additional and handled by Stripe.</p>
                   </div>
                 </div>
               </div>
@@ -219,3 +219,4 @@ export default function EarningsPage() {
     </>
   )
 }
+

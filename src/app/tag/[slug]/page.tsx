@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props) {
   if (!tag) return { title: 'Tag Not Found' }
   
   return {
-    title: `#${tag.name} — Neolog`,
+    title: `#${tag.name} - Neolog`,
     description: tag.description || `Posts tagged with ${tag.name}`,
   }
 }
@@ -123,3 +123,5 @@ export default async function TagPage({ params }: Props) {
     </>
   )
 }
+
+

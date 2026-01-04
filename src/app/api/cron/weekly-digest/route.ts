@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
             <a href="${appUrl}/settings" style="color: #999;">
               Manage email preferences
             </a>
-            &nbsp;·&nbsp;
+            &nbsp; - &nbsp;
             <a href="${appUrl}/unsubscribe?email=${encodeURIComponent(authUser.user.email)}&type=digest" style="color: #999;">
               Unsubscribe
             </a>
@@ -149,3 +149,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to send digests' }, { status: 500 })
   }
 }
+

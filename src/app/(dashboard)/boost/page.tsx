@@ -297,7 +297,7 @@ export default function BoostPage() {
                       <p className="font-mono text-sm">
                         {campaign.conversions > 0 
                           ? formatCents(Math.round(campaign.spent_cents / campaign.conversions))
-                          : '—'
+                          : ' - '
                         }
                       </p>
                     </div>
@@ -344,3 +344,4 @@ export default function BoostPage() {
     </>
   )
 }
+

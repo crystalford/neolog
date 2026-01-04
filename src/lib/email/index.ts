@@ -210,7 +210,7 @@ export const emailTemplates = {
           ${post.excerpt ? `<p>${post.excerpt}</p>` : ''}
           <p class="meta">
             By ${post.authorName}
-            ${post.readingTime ? ` · ${post.readingTime} min read` : ''}
+            ${post.readingTime ? ` - ${post.readingTime} min read` : ''}
           </p>
         </div>
       `).join('')}
@@ -233,7 +233,7 @@ export const emailTemplates = {
       <p>You've joined a platform built for writers who care about their craft and their audience.</p>
       <p><strong>Here's what makes Neolog different:</strong></p>
       <ul style="color: #4a4a4a; padding-left: 20px;">
-        <li>Your content stays yours — export anytime</li>
+        <li>Your content stays yours - export anytime</li>
         <li>HTML-native publishing for true creative control</li>
         <li>Fork and remix ideas (with attribution)</li>
         <li>Real analytics that help you improve</li>
@@ -314,3 +314,5 @@ export async function sendNewPostNotifications(
 
   return { sent: succeeded, failed }
 }
+
+

@@ -9,7 +9,7 @@ interface Props {
 }
 
 export const metadata = {
-  title: 'Preview — Neolog',
+  title: 'Preview - Neolog',
   robots: 'noindex, nofollow',
 }
 
@@ -109,7 +109,7 @@ export default async function PreviewPage({ params }: Props) {
                   {post.author.display_name || post.author.username}
                 </p>
                 <p className="text-sm text-[var(--text-tertiary)]">
-                  Draft · {post.reading_time_minutes || 1} min read
+                  Draft - {post.reading_time_minutes || 1} min read
                 </p>
               </div>
             </Link>
@@ -136,3 +136,5 @@ export default async function PreviewPage({ params }: Props) {
     </>
   )
 }
+
+

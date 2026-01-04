@@ -188,19 +188,19 @@ export default async function Home() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">❌</p>
+                    <p className="text-2xl mb-1">X</p>
                     <p className="text-sm text-[var(--text-secondary)]">Custom CSS stripped</p>
                   </div>
                   <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">❌</p>
+                    <p className="text-2xl mb-1">X</p>
                     <p className="text-sm text-[var(--text-secondary)]">Scripts blocked</p>
                   </div>
                   <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">❌</p>
+                    <p className="text-2xl mb-1">X</p>
                     <p className="text-sm text-[var(--text-secondary)]">Format destroyed</p>
                   </div>
                   <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">❌</p>
+                    <p className="text-2xl mb-1">X</p>
                     <p className="text-sm text-[var(--text-secondary)]">Lock-in forever</p>
                   </div>
                 </div>
@@ -222,19 +222,19 @@ export default async function Home() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">✓</p>
+                    <p className="text-2xl mb-1">OK</p>
                     <p className="text-sm text-[var(--text-primary)]">Full CSS support</p>
                   </div>
                   <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">✓</p>
+                    <p className="text-2xl mb-1">OK</p>
                     <p className="text-sm text-[var(--text-primary)]">Scripts allowed</p>
                   </div>
                   <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">✓</p>
+                    <p className="text-2xl mb-1">OK</p>
                     <p className="text-sm text-[var(--text-primary)]">Perfect rendering</p>
                   </div>
                   <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">✓</p>
+                    <p className="text-2xl mb-1">OK</p>
                     <p className="text-sm text-[var(--text-primary)]">Export anytime</p>
                   </div>
                 </div>
@@ -261,7 +261,7 @@ export default async function Home() {
                 {
                   icon: Code,
                   title: 'Native HTML',
-                  description: 'Full document support. Your CSS, your scripts, your formatting—rendered exactly.',
+                  description: 'Full document support. Your CSS, your scripts, your formatting - rendered exactly.',
                   badge: null,
                 },
                 {
@@ -372,7 +372,7 @@ export default async function Home() {
 
             <div className="mt-8 pt-8 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center">
-                © 2025 Neolog
+                (c) 2025 Neolog
               </p>
             </div>
           </div>
@@ -381,3 +381,4 @@ export default async function Home() {
     </>
   )
 }
+

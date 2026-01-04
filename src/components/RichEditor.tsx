@@ -174,21 +174,21 @@ export function RichEditor({
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive('bold')}
-            title="Bold (⌘B)"
+            title="Bold (CmdB)"
           >
             <Bold size={18} />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             active={editor.isActive('italic')}
-            title="Italic (⌘I)"
+            title="Italic (CmdI)"
           >
             <Italic size={18} />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             active={editor.isActive('underline')}
-            title="Underline (⌘U)"
+            title="Underline (CmdU)"
           >
             <UnderlineIcon size={18} />
           </ToolbarButton>
@@ -374,14 +374,14 @@ export function RichEditor({
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             disabled={!editor.can().undo()}
-            title="Undo (⌘Z)"
+            title="Undo (CmdZ)"
           >
             <Undo size={18} />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().redo().run()}
             disabled={!editor.can().redo()}
-            title="Redo (⌘⇧Z)"
+            title="Redo (Cmd+ShiftZ)"
           >
             <Redo size={18} />
           </ToolbarButton>
@@ -535,3 +535,4 @@ export function RichEditor({
     </div>
   )
 }
+

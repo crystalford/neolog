@@ -155,10 +155,10 @@ export function ForkButton({
                   <strong className="text-[var(--text-primary)]">What happens when you fork:</strong>
                 </p>
                 <ul className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
-                  <li>• A copy is created in your drafts</li>
-                  <li>• You can edit it freely</li>
-                  <li>• It links back to the original</li>
-                  <li>• The author is credited automatically</li>
+                  <li>- A copy is created in your drafts</li>
+                  <li>- You can edit it freely</li>
+                  <li>- It links back to the original</li>
+                  <li>- The author is credited automatically</li>
                 </ul>
               </div>
 
@@ -195,3 +195,4 @@ export function ForkButton({
     </>
   )
 }
+

@@ -48,7 +48,7 @@ export function processFootnotes(html: string): string {
       content += `
         <li id="fn-${id}" class="footnote-item">
           ${definition}
-          <a href="#fnref-${id}" class="footnote-backref ml-2 text-[var(--accent)]" aria-label="Back to reference ${index + 1}">↩</a>
+          <a href="#fnref-${id}" class="footnote-backref ml-2 text-[var(--accent)]" aria-label="Back to reference ${index + 1}">back</a>
         </li>
       `
     })
@@ -84,3 +84,4 @@ export function countFootnotes(content: string): number {
   const refs = content.match(/\[\^[^\]]+\](?!:)/g)
   return refs ? new Set(refs).size : 0
 }
+

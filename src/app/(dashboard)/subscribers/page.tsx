@@ -153,7 +153,7 @@ export default function SubscribersPage() {
                 <h1 className="font-display text-3xl">Subscribers</h1>
                 <p className="text-[var(--text-secondary)]">
                   {totalCount.toLocaleString()} subscriber{totalCount !== 1 ? 's' : ''}
-                  {pendingCount > 0 && ` · ${pendingCount} pending`}
+                  {pendingCount > 0 && ` - ${pendingCount} pending`}
                 </p>
               </div>
             </div>
@@ -315,3 +315,5 @@ export default function SubscribersPage() {
     </>
   )
 }
+
+

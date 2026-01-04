@@ -20,11 +20,11 @@ export default function AuthLayout({
           <blockquote className="font-display text-3xl leading-relaxed mb-6">
             "Finally, a publishing platform that doesn't mangle my code."
           </blockquote>
-          <p className="text-white/60">— Every developer who's tried to publish HTML on Medium</p>
+          <p className="text-white/60"> -  Every developer who's tried to publish HTML on Medium</p>
         </div>
         
         <p className="text-sm text-white/40">
-          © 2025 Neolog. Write without compromise.
+          (c) 2025 Neolog. Write without compromise.
         </p>
       </div>
       
@@ -46,3 +46,4 @@ export default function AuthLayout({
     </div>
   )
 }
+

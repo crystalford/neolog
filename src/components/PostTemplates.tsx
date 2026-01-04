@@ -220,7 +220,7 @@ function example() {
       content: `
 <h1>[Product Name] Review</h1>
 
-<p><strong>Rating:</strong> ⭐⭐⭐⭐☆ (4/5)</p>
+<p><strong>Rating:</strong> 4/5 (4/5)</p>
 
 <h2>Overview</h2>
 <p>Quick summary of what this product is and who it's for...</p>
@@ -382,3 +382,4 @@ function example() {
     </div>
   )
 }
+

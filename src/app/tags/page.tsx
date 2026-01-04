@@ -4,7 +4,7 @@ import { Header } from '@/components/Header'
 import { Hash, TrendingUp } from 'lucide-react'
 
 export const metadata = {
-  title: 'Browse Tags — Neolog',
+  title: 'Browse Tags - Neolog',
   description: 'Explore topics and discover posts by category',
 }
 
@@ -81,3 +81,5 @@ export default async function TagsPage() {
     </>
   )
 }
+
+

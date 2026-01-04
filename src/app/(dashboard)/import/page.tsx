@@ -78,7 +78,7 @@ export default function ImportPage() {
                   </p>
                   
                   <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to Substack → Settings → Export</li>
+                    <li>1. Go to Substack  >  Settings  >  Export</li>
                     <li>2. Download your posts as a ZIP file</li>
                     <li>3. Upload the ZIP file below</li>
                   </ol>
@@ -120,7 +120,7 @@ export default function ImportPage() {
                   </p>
                   
                   <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to Medium → Settings → Security → Download your information</li>
+                    <li>1. Go to Medium  >  Settings  >  Security  >  Download your information</li>
                     <li>2. Wait for the export email (can take a few minutes)</li>
                     <li>3. Upload the ZIP file below</li>
                   </ol>
@@ -153,7 +153,7 @@ export default function ImportPage() {
                   </p>
                   
                   <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
-                    <li>1. Go to WordPress → Tools → Export</li>
+                    <li>1. Go to WordPress  >  Tools  >  Export</li>
                     <li>2. Choose "Posts" and download the XML</li>
                     <li>3. Upload the XML file below</li>
                   </ol>
@@ -207,3 +207,4 @@ export default function ImportPage() {
     </>
   )
 }
+
