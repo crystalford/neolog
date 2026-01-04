@@ -91,6 +91,20 @@ export type PostDistributionPack = {
   updated_at: string
 }
 
+export type CuratedComment = {
+  id: string
+  post_id: string
+  author_id: string
+  source: 'reddit' | 'x' | 'manual'
+  source_url: string | null
+  author_name: string | null
+  author_url: string | null
+  body: string
+  score: number
+  created_at: string | null
+  imported_at: string
+}
+
 export type PostCollaborator = {
   id: string
   post_id: string

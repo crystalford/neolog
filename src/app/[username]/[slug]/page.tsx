@@ -77,6 +77,13 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   if (!post) notFound()
 
+  const { data: curatedComments } = await supabase
+    .from('curated_comments')
+    .select('id, source, author_name, author_url, body, score, source_url, created_at')
+    .eq('post_id', post.id)
+    .order('score', { ascending: false })
+    .limit(5)
+
   const publishedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString('en-US', {
         month: 'long',
@@ -167,6 +174,35 @@ export default async function PostPage({ params, searchParams }: Props) {
                   __html: htmlContent
                 }}
               />
+            </div>
+          )}
+
+          {curatedComments && curatedComments.length > 0 && (
+            <div className="max-w-4xl mx-auto mt-12 border-t border-gray-200 pt-8">
+              <h2 className="font-serif text-2xl mb-4 text-gray-900">Community highlights</h2>
+              <div className="space-y-4">
+                {curatedComments.map((comment) => (
+                  <div key={comment.id} className="p-4 rounded-xl border border-gray-200 bg-white">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span>{comment.author_name || 'Contributor'}</span>
+                        {comment.score ? <span>{comment.score} upvotes</span> : null}
+                      </div>
+                      {comment.source_url && (
+                        <a
+                          href={comment.source_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-gray-500 hover:text-gray-900"
+                        >
+                          View on {comment.source}
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.body}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </article>

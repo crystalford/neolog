@@ -53,6 +53,10 @@ export default function WritePage() {
   const [packError, setPackError] = useState<string | null>(null)
   const [pack, setPack] = useState<any>(null)
   const [packTab, setPackTab] = useState<'x' | 'linkedin' | 'reddit' | 'hooks' | 'og'>('x')
+  const [commentUrl, setCommentUrl] = useState('')
+  const [commentLoading, setCommentLoading] = useState(false)
+  const [commentError, setCommentError] = useState<string | null>(null)
+  const [curatedComments, setCuratedComments] = useState<any[]>([])
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -81,6 +85,12 @@ export default function WritePage() {
       loadDistributionPack()
     }
   }, [showPack, postId, pack, packLoading])
+
+  useEffect(() => {
+    if (postId) {
+      loadCuratedComments(postId)
+    }
+  }, [postId])
 
   useEffect(() => {
     if (!user || !publicationId) return
@@ -215,6 +225,59 @@ export default function WritePage() {
       .limit(5)
 
     setScheduledPosts(data || [])
+  }
+
+  const loadCuratedComments = async (id: string) => {
+    const { data } = await supabase
+      .from('curated_comments')
+      .select('id, source, author_name, author_url, body, score, source_url, created_at')
+      .eq('post_id', id)
+      .order('score', { ascending: false })
+
+    setCuratedComments(data || [])
+  }
+
+  const importComments = async () => {
+    if (!postId || !commentUrl.trim()) return
+    setCommentLoading(true)
+    setCommentError(null)
+    try {
+      const response = await fetch('/api/comments/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, url: commentUrl.trim() }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setCommentError(data.error || 'Failed to import comments')
+        return
+      }
+      await loadCuratedComments(postId)
+    } catch (error) {
+      console.error('Import comments error:', error)
+      setCommentError('Failed to import comments')
+    } finally {
+      setCommentLoading(false)
+    }
+  }
+
+  const clearCuratedComments = async () => {
+    if (!postId) return
+    setCommentLoading(true)
+    setCommentError(null)
+    try {
+      await supabase
+        .from('curated_comments')
+        .delete()
+        .eq('post_id', postId)
+        .eq('author_id', user?.id || '')
+      await loadCuratedComments(postId)
+    } catch (error) {
+      console.error('Clear comments error:', error)
+      setCommentError('Failed to clear comments')
+    } finally {
+      setCommentLoading(false)
+    }
   }
 
   const loadDistributionPack = async () => {
@@ -1112,6 +1175,53 @@ export default function WritePage() {
                             <span className="text-xs text-[var(--text-tertiary)]">
                               {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : 'TBD'}
                             </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] space-y-3">
+                    <div>
+                      <h3 className="text-sm font-medium text-[var(--text-primary)]">Community highlights</h3>
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        Import top Reddit comments for this post.
+                      </p>
+                    </div>
+                    <input
+                      type="url"
+                      value={commentUrl}
+                      onChange={(e) => setCommentUrl(e.target.value)}
+                      placeholder="https://www.reddit.com/r/.../comments/..."
+                      className="input"
+                    />
+                    {commentError && (
+                      <p className="text-xs text-[var(--error)]">{commentError}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={importComments}
+                        disabled={!postId || commentLoading || !commentUrl.trim()}
+                        className="btn btn-secondary btn-sm disabled:opacity-60"
+                      >
+                        {commentLoading ? 'Importing...' : 'Import Reddit'}
+                      </button>
+                      <button
+                        onClick={clearCuratedComments}
+                        disabled={!postId || commentLoading || curatedComments.length === 0}
+                        className="btn btn-ghost btn-sm disabled:opacity-50"
+                      >
+                        Clear highlights
+                      </button>
+                    </div>
+                    {curatedComments.length > 0 && (
+                      <div className="space-y-2">
+                        {curatedComments.map((comment) => (
+                          <div key={comment.id} className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                              {comment.author_name || 'reddit user'} · {comment.score || 0} upvotes
+                            </p>
+                            <p className="text-sm text-[var(--text-secondary)]">{comment.body}</p>
                           </div>
                         ))}
                       </div>
