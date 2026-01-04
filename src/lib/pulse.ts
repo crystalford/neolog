@@ -71,11 +71,13 @@ export const parsePulseContent = (raw?: string | null): PulseContent => {
   try {
     const parsed = JSON.parse(raw)
     const cards = Array.isArray(parsed.cards) ? parsed.cards.slice(0, MAX_PULSE_CARDS) : []
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      !!value && typeof value === 'object'
     return {
       summary: typeof parsed.summary === 'string' ? parsed.summary : '',
       takeaway: typeof parsed.takeaway === 'string' ? parsed.takeaway : '',
       cards: cards
-        .filter((card) => card && typeof card === 'object')
+        .filter((card): card is Record<string, unknown> => isRecord(card))
         .map((card) => ({
           id: typeof card.id === 'string' ? card.id : createId(),
           label: card.label === 'Hype' || card.label === 'Critic' ? card.label : 'Neutral',
