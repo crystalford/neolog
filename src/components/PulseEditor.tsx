@@ -21,6 +21,7 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
   const [topic, setTopic] = useState('')
   const [curating, setCurating] = useState(false)
   const [resolvingId, setResolvingId] = useState<string | null>(null)
+  const [summarizing, setSummarizing] = useState(false)
 
   const update = (patch: Partial<PulseContent>) => {
     onChange({ ...pulse, ...patch })
@@ -109,6 +110,31 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
     })
   }
 
+  const generateSummary = async () => {
+    if (pulse.cards.length === 0) return
+    setSummarizing(true)
+    try {
+      const response = await fetch('/api/pulse/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cards: pulse.cards }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Summary failed')
+      }
+      onChange({
+        ...pulse,
+        summary: data.summary || pulse.summary,
+        takeaway: data.takeaway || pulse.takeaway,
+      })
+    } catch (error) {
+      console.error('Pulse summary error:', error)
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
@@ -145,9 +171,18 @@ export function PulseEditor({ pulse, onChange }: PulseEditorProps) {
         </p>
       </div>
       <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
-        <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-          The brief
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <label className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+            The brief
+          </label>
+          <button
+            onClick={generateSummary}
+            className="btn btn-ghost btn-sm"
+            disabled={summarizing || pulse.cards.length === 0}
+          >
+            {summarizing ? 'Generating...' : 'Generate brief'}
+          </button>
+        </div>
         <textarea
           value={pulse.summary}
           onChange={(e) => update({ summary: e.target.value })}
