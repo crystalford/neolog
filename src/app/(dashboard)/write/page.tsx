@@ -57,6 +57,7 @@ export default function WritePage() {
   const [commentLoading, setCommentLoading] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
   const [curatedComments, setCuratedComments] = useState<any[]>([])
+  const [manualHighlight, setManualHighlight] = useState('')
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -275,6 +276,32 @@ export default function WritePage() {
     } catch (error) {
       console.error('Clear comments error:', error)
       setCommentError('Failed to clear comments')
+    } finally {
+      setCommentLoading(false)
+    }
+  }
+
+  const addManualHighlight = async () => {
+    if (!postId || !manualHighlight.trim()) return
+    setCommentLoading(true)
+    setCommentError(null)
+    try {
+      await supabase
+        .from('curated_comments')
+        .insert({
+          post_id: postId,
+          author_id: user?.id,
+          source: 'manual',
+          author_name: profile?.display_name || profile?.username || 'You',
+          body: manualHighlight.trim(),
+          score: 0,
+          created_at: new Date().toISOString(),
+        })
+      setManualHighlight('')
+      await loadCuratedComments(postId)
+    } catch (error) {
+      console.error('Manual highlight error:', error)
+      setCommentError('Failed to add highlight')
     } finally {
       setCommentLoading(false)
     }
@@ -1207,6 +1234,13 @@ export default function WritePage() {
                         {commentLoading ? 'Importing...' : 'Import Reddit'}
                       </button>
                       <button
+                        disabled
+                        className="btn btn-ghost btn-sm opacity-50 cursor-not-allowed"
+                        title="X import requires API access"
+                      >
+                        Import X (soon)
+                      </button>
+                      <button
                         onClick={clearCuratedComments}
                         disabled={!postId || commentLoading || curatedComments.length === 0}
                         className="btn btn-ghost btn-sm disabled:opacity-50"
@@ -1214,12 +1248,31 @@ export default function WritePage() {
                         Clear highlights
                       </button>
                     </div>
+                    <div className="grid gap-2">
+                      <label className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                        Add manual highlight
+                      </label>
+                      <textarea
+                        value={manualHighlight}
+                        onChange={(e) => setManualHighlight(e.target.value)}
+                        placeholder="Paste a highlight you want to feature..."
+                        className="input min-h-[120px]"
+                      />
+                      <button
+                        onClick={addManualHighlight}
+                        disabled={!postId || commentLoading || !manualHighlight.trim()}
+                        className="btn btn-secondary btn-sm disabled:opacity-60"
+                      >
+                        Add highlight
+                      </button>
+                    </div>
                     {curatedComments.length > 0 && (
                       <div className="space-y-2">
                         {curatedComments.map((comment) => (
                           <div key={comment.id} className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                             <p className="text-xs text-[var(--text-tertiary)] mb-2">
-                              {comment.author_name || 'reddit user'} · {comment.score || 0} upvotes
+                              {comment.author_name || (comment.source === 'manual' ? 'Manual highlight' : 'reddit user')}
+                              {comment.score ? ` - ${comment.score} upvotes` : ''}
                             </p>
                             <p className="text-sm text-[var(--text-secondary)]">{comment.body}</p>
                           </div>

@@ -198,9 +198,20 @@ export default async function ProfilePage({ params }: Props) {
                       The subjects this writer comes back to the most.
                     </p>
                   </div>
-                  <Link href="/explore" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
-                    Explore tags
-                  </Link>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Link
+                      href={`/${profile.username}/topics`}
+                      className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    >
+                      View topics
+                    </Link>
+                    <Link
+                      href="/explore"
+                      className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    >
+                      Explore tags
+                    </Link>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {topicTags.map((tag) => (
