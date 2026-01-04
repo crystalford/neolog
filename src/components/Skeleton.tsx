@@ -14,7 +14,7 @@ export function Skeleton({ className = '' }: SkeletonProps) {
 
 export function PostCardSkeleton() {
   return (
-    <div className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+    <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
       <div className="flex gap-4">
         <div className="flex-1 space-y-3">
           <Skeleton className="h-6 w-3/4" />
