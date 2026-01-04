@@ -154,44 +154,55 @@ export default function DashboardPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredPosts.map((post) => (
-            <div
-              key={post.id}
-              className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-5 hover:border-[var(--border-medium)] hover:shadow-sm transition-all"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    {post.status === 'published' ? (
-                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--success)] bg-[var(--success)]/10 px-2 py-0.5 rounded-full">
-                        <Globe size={12} />
-                        Published
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
-                        <FileText size={12} />
-                        Draft
-                      </span>
-                    )}
-                    <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
-                      <Clock size={12} />
-                      {new Date(post.updated_at).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  <h2 className="font-display text-lg tracking-tight text-[var(--text-primary)] truncate">
+        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+          <div className="hidden md:grid grid-cols-[minmax(0,1fr)_140px_160px_220px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+            <span>Post</span>
+            <span>Status</span>
+            <span>Updated</span>
+            <span className="text-right">Actions</span>
+          </div>
+          <div className="divide-y divide-[var(--border-light)]">
+            {filteredPosts.map((post) => (
+              <div
+                key={post.id}
+                className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px_160px_220px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-[var(--text-primary)] truncate">
                     {post.title || 'Untitled'}
-                  </h2>
-
+                  </p>
                   {post.excerpt && (
-                    <p className="text-sm text-[var(--text-secondary)] line-clamp-1 mt-1">
+                    <p className="text-xs text-[var(--text-secondary)] truncate mt-1">
                       {post.excerpt}
                     </p>
                   )}
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 md:block">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
+                    Status
+                  </span>
+                  {post.status === 'published' ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)] bg-[var(--success)]/10 px-2 py-0.5 rounded-full">
+                      <Globe size={12} />
+                      Published
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
+                      <FileText size={12} />
+                      Draft
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-[var(--text-tertiary)] flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
+                    Updated
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock size={12} />
+                    {new Date(post.updated_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-end gap-2">
                   {post.status === 'draft' && (
                     <ShareDraftButton
                       postId={post.id}
@@ -199,34 +210,33 @@ export default function DashboardPage() {
                       expiresAt={(post as any).preview_expires_at}
                     />
                   )}
-
                   {post.status === 'published' && profile && (
                     <Link
                       href={`/${profile.username}/${post.slug}`}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                      className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                      title="View post"
                     >
                       <Eye size={14} />
-                      View
                     </Link>
                   )}
                   <Link
                     href={`/write?edit=${post.id}`}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                    className="p-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                    title="Edit post"
                   >
                     <Edit2 size={14} />
-                    Edit
                   </Link>
                   <button
                     onClick={() => handleDelete(post.id)}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                    className="p-2 rounded-lg text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                    title="Delete post"
                   >
                     <Trash2 size={14} />
-                    Delete
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </main>

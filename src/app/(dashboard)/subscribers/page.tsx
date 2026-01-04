@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Users, Mail, Download, Search, UserPlus,
-  Check, Clock, AlertCircle, UserMinus, Loader2
+  Check, Clock, AlertCircle, UserMinus, Loader2,
+  Copy, ExternalLink
 } from 'lucide-react'
 
 type Subscriber = {
@@ -40,6 +41,7 @@ export default function SubscribersPage() {
   const [userSubscribers, setUserSubscribers] = useState<UserSubscriber[]>([])
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<'all' | 'users' | 'email'>('all')
+  const [copied, setCopied] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -127,6 +129,16 @@ export default function SubscribersPage() {
     a.download = `subscribers-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const copyValue = async (value: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1500)
+    } catch (error) {
+      console.error('Clipboard error:', error)
+    }
   }
 
   const formatDate = (dateStr: string) => {
@@ -224,16 +236,21 @@ export default function SubscribersPage() {
         ) : (
           <div className="space-y-6">
             {(tab === 'all' || tab === 'users') && (
-              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+              <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-[var(--border-light)]">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">User subscribers</p>
+                </div>
+                <div className="hidden md:grid grid-cols-[minmax(0,1fr)_160px_140px] gap-4 px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                  <span>Subscriber</span>
+                  <span>Tier</span>
+                  <span className="text-right">Actions</span>
                 </div>
                 <div className="divide-y divide-[var(--border-light)]">
                   {/* User subscribers */}
                   {filteredUserSubs.map((sub) => (
                     <div 
                       key={sub.id}
-                      className="flex flex-wrap items-center justify-between gap-4 p-4"
+                      className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_160px_140px] gap-4 px-4 py-4 items-center"
                     >
                       <div className="flex items-center gap-3">
                         {sub.subscriber.avatar_url ? (
@@ -259,7 +276,7 @@ export default function SubscribersPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div>
                         <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
                           <Users size={12} />
                           {sub.tier}
@@ -267,6 +284,15 @@ export default function SubscribersPage() {
                         <p className="text-xs text-[var(--text-tertiary)] mt-1">
                           {formatDate(sub.created_at)}
                         </p>
+                      </div>
+                      <div className="flex items-center gap-2 md:justify-end">
+                        <Link
+                          href={`/${sub.subscriber.username}`}
+                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          title="View profile"
+                        >
+                          <ExternalLink size={14} />
+                        </Link>
                       </div>
                     </div>
                   ))}
@@ -276,15 +302,20 @@ export default function SubscribersPage() {
 
               {/* Email subscribers */}
               {(tab === 'all' || tab === 'email') && (
-                <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+                <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
                   <div className="p-4 border-b border-[var(--border-light)]">
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Email subscribers</p>
+                  </div>
+                  <div className="hidden md:grid grid-cols-[minmax(0,1fr)_140px_140px] gap-4 px-4 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                    <span>Email</span>
+                    <span>Status</span>
+                    <span className="text-right">Actions</span>
                   </div>
                   <div className="divide-y divide-[var(--border-light)]">
                     {filteredEmailSubs.map((sub) => (
                       <div 
                         key={sub.id}
-                        className="flex flex-wrap items-center justify-between gap-4 p-4"
+                        className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px_140px] gap-4 px-4 py-4 items-center"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
@@ -297,7 +328,7 @@ export default function SubscribersPage() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div>
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full ${
                             sub.status === 'active' 
                               ? 'bg-[var(--success)]/10 text-[var(--success)]'
@@ -311,6 +342,15 @@ export default function SubscribersPage() {
                           <p className="text-xs text-[var(--text-tertiary)] mt-1">
                             {formatDate(sub.created_at)}
                           </p>
+                        </div>
+                        <div className="flex items-center gap-2 md:justify-end">
+                          <button
+                            onClick={() => copyValue(sub.email, sub.id)}
+                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            title={copied === sub.id ? 'Copied' : 'Copy email'}
+                          >
+                            {copied === sub.id ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
                         </div>
                       </div>
                     ))}

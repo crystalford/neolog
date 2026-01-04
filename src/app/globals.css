@@ -8,7 +8,7 @@
  * Think: Linear meets Notion meets Financial Times
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400;1,6..72,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400;1,6..72,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
   /* Core palette - crisp and bold */
@@ -108,6 +108,61 @@
   --accent-hover: #6d28d9;
   --accent-soft: rgba(124, 58, 237, 0.12);
   --accent-softer: rgba(124, 58, 237, 0.06);
+}
+
+/* ================================
+   DASHBOARD THEME
+   ================================ */
+
+.dashboard-shell {
+  --bg-primary: #fffdf8;
+  --bg-secondary: #f5f1ea;
+  --bg-tertiary: #efe8de;
+  --bg-inverse: #13110f;
+
+  --text-primary: #1f1b16;
+  --text-secondary: #5a5046;
+  --text-tertiary: #a3998e;
+  --text-inverse: #fffdf8;
+
+  --accent: #0f766e;
+  --accent-hover: #0f5f58;
+  --accent-soft: rgba(15, 118, 110, 0.12);
+  --accent-softer: rgba(15, 118, 110, 0.06);
+
+  --border-light: rgba(31, 27, 22, 0.08);
+  --border-medium: rgba(31, 27, 22, 0.16);
+  --border-heavy: rgba(31, 27, 22, 0.28);
+
+  --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.dashboard-surface {
+  position: relative;
+  background: var(--bg-secondary);
+}
+
+.dashboard-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(31, 27, 22, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 27, 22, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dashboard-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-shell svg.lucide {
+  stroke-width: 1.75;
 }
 
 * {

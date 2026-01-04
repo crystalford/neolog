@@ -2,14 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
   Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock
+  PenLine, Bell, Radio, List, Bookmark, Clock, ChevronDown, Command
 } from 'lucide-react'
+import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 
 export default function DashboardLayout({
   children,
@@ -19,6 +20,8 @@ export default function DashboardLayout({
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [expandedSection, setExpandedSection] = useState<string | 'all' | null>(null)
+  const [commandOpen, setCommandOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -107,6 +110,29 @@ export default function DashboardLayout({
     },
   ]
 
+  const activeSection = navSections.find((section) =>
+    section.items.some((item) => pathname === item.href || pathname.startsWith(item.href + '/'))
+  )
+
+  useEffect(() => {
+    if (activeSection) {
+      setExpandedSection(activeSection.title)
+    }
+  }, [activeSection?.title])
+
+  const commandItems = useMemo(() => {
+    const items = navSections.flatMap((section) =>
+      section.items.map((item) => ({
+        label: item.label,
+        href: item.href,
+        description: section.title,
+      }))
+    )
+    items.push({ label: 'Settings', href: '/settings', description: 'Workspace' })
+    items.push({ label: 'Import', href: '/import', description: 'Create' })
+    return items
+  }, [navSections])
+
   if (loading) {
     return (
       <div className="flex h-screen bg-[var(--bg-secondary)] overflow-hidden">
@@ -134,7 +160,7 @@ export default function DashboardLayout({
       ?.label || (pathname.startsWith('/settings') ? 'Settings' : 'Dashboard')
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-secondary)]">
+    <div className="dashboard-shell flex min-h-screen bg-[var(--bg-secondary)]">
       {/* Sidebar */}
       <aside className="w-[264px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-5 pt-6">
@@ -160,30 +186,49 @@ export default function DashboardLayout({
         <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
           {navSections.map((section) => (
             <div key={section.title}>
-              <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-                {section.title}
-              </p>
-              <div className="space-y-1">
-                {section.items.map((link) => {
-                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-                  const Icon = link.icon
-
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                      }`}
-                    >
-                      <Icon size={16} className="flex-shrink-0" />
-                      <span>{link.label}</span>
-                    </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setExpandedSection((prev) =>
+                    prev === section.title ? 'all' : section.title
                   )
-                })}
-              </div>
+                }}
+                className="w-full flex items-center justify-between px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2 hover:text-[var(--text-secondary)] transition-colors"
+                aria-expanded={expandedSection === section.title || expandedSection === 'all'}
+              >
+                <span>{section.title}</span>
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform ${
+                    expandedSection === section.title || expandedSection === 'all'
+                      ? 'rotate-180'
+                      : ''
+                  }`}
+                />
+              </button>
+              {(expandedSection === section.title || expandedSection === 'all') && (
+                <div className="space-y-1">
+                  {section.items.map((link) => {
+                    const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                    const Icon = link.icon
+
+                    return (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          isActive
+                            ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                        }`}
+                      >
+                        <Icon size={16} className="flex-shrink-0" />
+                        <span>{link.label}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           ))}
         </nav>
@@ -232,7 +277,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="dashboard-surface flex-1 flex flex-col">
         <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)]">
           <div className="h-16 px-6 lg:px-12 flex items-center justify-between">
             <div>
@@ -242,6 +287,14 @@ export default function DashboardLayout({
               <p className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+              >
+                <Command size={14} />
+                Quick switch
+                <span className="text-[10px] uppercase tracking-[0.2em]">Ctrl K</span>
+              </button>
               <Link
                 href="/write"
                 className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
@@ -273,6 +326,13 @@ export default function DashboardLayout({
           {children}
         </div>
       </div>
+
+      <DashboardCommandPalette
+        items={commandItems}
+        isOpen={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        onOpen={() => setCommandOpen(true)}
+      />
     </div>
   )
 }

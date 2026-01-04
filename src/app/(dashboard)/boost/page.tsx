@@ -208,58 +208,41 @@ export default function BoostPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {campaigns.map((campaign) => (
-                <div 
-                  key={campaign.id}
-                  className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]"
-                >
-                  <div className="flex items-start justify-between mb-4">
+            <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+              <div className="hidden lg:grid grid-cols-[minmax(0,1.4fr)_120px_140px_140px_140px_160px_140px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                <span>Campaign</span>
+                <span>Status</span>
+                <span>Budget</span>
+                <span>Impressions</span>
+                <span>Clicks</span>
+                <span>Conversions</span>
+                <span className="text-right">Actions</span>
+              </div>
+              <div className="divide-y divide-[var(--border-light)]">
+                {campaigns.map((campaign) => (
+                  <div
+                    key={campaign.id}
+                    className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_120px_140px_140px_140px_160px_140px] gap-4 px-5 py-4 items-start lg:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                  >
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{campaign.name}</h3>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          campaign.status === 'active' 
-                            ? 'bg-[var(--success)]/10 text-[var(--success)]'
-                            : campaign.status === 'paused'
-                            ? 'bg-[var(--warning)]/10 text-[var(--warning)]'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
-                        }`}>
-                          {campaign.status}
-                        </span>
-                      </div>
-                      <p className="text-sm text-[var(--text-secondary)]">
+                      <p className="font-medium text-[var(--text-primary)]">{campaign.name}</p>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 truncate">
                         Promoting: {campaign.post?.title || 'Unknown post'}
                       </p>
                     </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleCampaignStatus(campaign)}
-                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                        title={campaign.status === 'active' ? 'Pause' : 'Resume'}
-                      >
-                        {campaign.status === 'active' ? (
-                          <Pause size={16} className="text-[var(--text-tertiary)]" />
-                        ) : (
-                          <Play size={16} className="text-[var(--text-tertiary)]" />
-                        )}
-                      </button>
-                      <Link
-                        href={`/boost/${campaign.id}`}
-                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                      >
-                        <Settings size={16} className="text-[var(--text-tertiary)]" />
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-5 gap-4">
                     <div>
-                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Spent</p>
-                      <p className="font-mono text-sm">
-                        {formatCents(campaign.spent_cents)} / {formatCents(campaign.total_budget_cents)}
-                      </p>
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                        campaign.status === 'active' 
+                          ? 'bg-[var(--success)]/10 text-[var(--success)]'
+                          : campaign.status === 'paused'
+                          ? 'bg-[var(--warning)]/10 text-[var(--warning)]'
+                          : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+                      }`}>
+                        {campaign.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)]">
+                      {formatCents(campaign.spent_cents)} / {formatCents(campaign.total_budget_cents)}
                       <div className="mt-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-[var(--accent)] rounded-full"
@@ -267,40 +250,44 @@ export default function BoostPage() {
                         />
                       </div>
                     </div>
-                    
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Impressions</p>
-                      <p className="font-mono text-sm">{campaign.impressions.toLocaleString()}</p>
+                    <div className="text-sm text-[var(--text-primary)]">
+                      {campaign.impressions.toLocaleString()}
                     </div>
-                    
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Clicks</p>
-                      <p className="font-mono text-sm">{campaign.clicks.toLocaleString()}</p>
-                      <p className="text-[10px] text-[var(--text-tertiary)]">
+                    <div className="text-sm text-[var(--text-primary)]">
+                      {campaign.clicks.toLocaleString()}
+                      <span className="block text-[10px] text-[var(--text-tertiary)]">
                         {getCTR(campaign.clicks, campaign.impressions)} CTR
-                      </p>
+                      </span>
                     </div>
-                    
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Conversions</p>
-                      <p className="font-mono text-sm">{campaign.conversions.toLocaleString()}</p>
-                      <p className="text-[10px] text-[var(--text-tertiary)]">
+                    <div className="text-sm text-[var(--text-primary)]">
+                      {campaign.conversions.toLocaleString()}
+                      <span className="block text-[10px] text-[var(--text-tertiary)]">
                         {getConversionRate(campaign.conversions, campaign.clicks)} CVR
-                      </p>
+                      </span>
                     </div>
-                    
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] mb-1">Cost per {campaign.objective.slice(0, -1)}</p>
-                      <p className="font-mono text-sm">
-                        {campaign.conversions > 0 
-                          ? formatCents(Math.round(campaign.spent_cents / campaign.conversions))
-                          : ' - '
-                        }
-                      </p>
+                    <div className="flex items-center gap-2 lg:justify-end">
+                      <button
+                        onClick={() => toggleCampaignStatus(campaign)}
+                        className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        title={campaign.status === 'active' ? 'Pause' : 'Resume'}
+                      >
+                        {campaign.status === 'active' ? (
+                          <Pause size={16} />
+                        ) : (
+                          <Play size={16} />
+                        )}
+                      </button>
+                      <Link
+                        href={`/boost/${campaign.id}`}
+                        className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        title="Campaign settings"
+                      >
+                        <Settings size={16} />
+                      </Link>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
