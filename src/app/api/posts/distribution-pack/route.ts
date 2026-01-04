@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
 function stripHtml(input: string): string {
   return input
@@ -48,9 +49,15 @@ function createOgDataUrl(title: string, subtitle?: string | null) {
       <stop offset="0%" stop-color="#0f172a"/>
       <stop offset="100%" stop-color="#1e293b"/>
     </linearGradient>
+    <radialGradient id="glow" cx="20%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect x="80" y="80" width="1040" height="470" rx="28" fill="#111827" opacity="0.65"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="80" y="80" width="1040" height="470" rx="28" fill="#111827" opacity="0.75"/>
+  <rect x="110" y="120" width="980" height="390" rx="24" fill="#111827" stroke="#1f2937" stroke-width="1" opacity="0.9"/>
   <text x="140" y="200" fill="#22d3ee" font-family="Inter, Arial, sans-serif" font-size="28" letter-spacing="4">NEOLOG</text>
   <text x="140" y="280" fill="#f8fafc" font-family="Georgia, serif" font-size="58" font-weight="700">${safeTitle}</text>
   <text x="140" y="360" fill="#cbd5f5" font-family="Inter, Arial, sans-serif" font-size="28">${safeSubtitle}</text>
@@ -84,7 +91,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
-  try {
+  const apiKey = process.env.OPENAI_API_KEY
+
+  const buildFallback = () => {
     const plain = stripHtml(post.content_html || post.content || '')
     const summary = post.excerpt || getSentences(plain, 2).join(' ')
     const sentenceList = getSentences(plain, 4)
@@ -103,42 +112,107 @@ export async function POST(request: NextRequest) {
     ]
 
     const threadBody = chunkText(summary, 260)
-    const x_thread = [
-      ...threadBody,
-      `Full post: ${link}`,
-    ]
+    return {
+      x_thread: [...threadBody, `Full post: ${link}`],
+      linkedin_post: [
+        post.title,
+        '',
+        summary,
+        '',
+        sentenceList.slice(0, 3).map((s) => `- ${s}`).join('\n'),
+        '',
+        `Read more: ${link}`,
+      ].filter(Boolean).join('\n'),
+      reddit_title: post.title,
+      reddit_body: [
+        `**TL;DR:** ${summary}`,
+        '',
+        sentenceList.map((s) => `- ${s}`).join('\n'),
+        '',
+        `Source: ${link}`,
+      ].join('\n'),
+      hooks,
+      model: 'fallback',
+      link,
+    }
+  }
 
-    const linkedin_post = [
-      post.title,
-      '',
-      summary,
-      '',
-      sentenceList.slice(0, 3).map((s) => `- ${s}`).join('\n'),
-      '',
-      `Read more: ${link}`,
-    ].filter(Boolean).join('\n')
+  const buildAiPack = async () => {
+    if (!apiKey) return null
+    const plain = stripHtml(post.content_html || post.content || '')
+    const authorProfile = Array.isArray((post as any).author)
+      ? (post as any).author[0]
+      : (post as any).author
+    const authorUsername = authorProfile?.username || 'unknown'
+    const link = `${BASE_URL}/${authorUsername}/${post.slug}`
 
-    const reddit_title = post.title
-    const reddit_body = [
-      `**TL;DR:** ${summary}`,
-      '',
-      sentenceList.map((s) => `- ${s}`).join('\n'),
-      '',
-      `Source: ${link}`,
-    ].join('\n')
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.6,
+        messages: [
+          {
+            role: 'system',
+            content: 'You create distribution copy. Output JSON only.',
+          },
+          {
+            role: 'user',
+            content: [
+              'Return JSON with keys: x_thread (array of 4-6 tweets), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5).',
+              `Post title: ${post.title}`,
+              `Subtitle: ${post.subtitle || ''}`,
+              `Excerpt: ${post.excerpt || ''}`,
+              `Content: ${plain.slice(0, 4000)}`,
+              `Link: ${link}`,
+            ].join('\n'),
+          },
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    })
 
+    if (!response.ok) return null
+    const data = await response.json()
+    const content = data?.choices?.[0]?.message?.content
+    if (!content) return null
+    try {
+      const parsed = JSON.parse(content)
+      return {
+        x_thread: Array.isArray(parsed.x_thread) ? parsed.x_thread : [],
+        linkedin_post: String(parsed.linkedin_post || ''),
+        reddit_title: String(parsed.reddit_title || post.title),
+        reddit_body: String(parsed.reddit_body || ''),
+        hooks: Array.isArray(parsed.hooks) ? parsed.hooks : [],
+        model: MODEL,
+        link,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  try {
+    const aiPack = await buildAiPack()
+    const fallback = buildFallback()
+    const pack = aiPack && aiPack.x_thread.length > 0 ? aiPack : fallback
     const og_image_url = createOgDataUrl(post.title, post.subtitle)
 
     const payload = {
       post_id: post.id,
       author_id: post.author_id,
       status: 'ready',
-      x_thread,
-      linkedin_post,
-      reddit_title,
-      reddit_body,
-      hooks,
+      x_thread: pack.x_thread,
+      linkedin_post: pack.linkedin_post,
+      reddit_title: pack.reddit_title,
+      reddit_body: pack.reddit_body,
+      hooks: pack.hooks,
       og_image_url,
+      model: pack.model,
       error_message: null,
     }
 

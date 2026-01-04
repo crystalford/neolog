@@ -58,6 +58,8 @@ export default function WritePage() {
   const [commentError, setCommentError] = useState<string | null>(null)
   const [curatedComments, setCuratedComments] = useState<any[]>([])
   const [manualHighlight, setManualHighlight] = useState('')
+  const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'manual'>('all')
+  const [commentSort, setCommentSort] = useState<'score' | 'recent'>('score')
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -231,9 +233,11 @@ export default function WritePage() {
   const loadCuratedComments = async (id: string) => {
     const { data } = await supabase
       .from('curated_comments')
-      .select('id, source, author_name, author_url, body, score, source_url, created_at')
+      .select('id, source, author_name, author_url, body, score, source_url, created_at, is_pinned')
       .eq('post_id', id)
+      .order('is_pinned', { ascending: false })
       .order('score', { ascending: false })
+      .order('created_at', { ascending: false })
 
     setCuratedComments(data || [])
   }
@@ -302,6 +306,22 @@ export default function WritePage() {
     } catch (error) {
       console.error('Manual highlight error:', error)
       setCommentError('Failed to add highlight')
+    } finally {
+      setCommentLoading(false)
+    }
+  }
+
+  const togglePin = async (commentId: string, pinned: boolean) => {
+    if (!postId) return
+    setCommentLoading(true)
+    try {
+      await supabase
+        .from('curated_comments')
+        .update({ is_pinned: !pinned })
+        .eq('id', commentId)
+      await loadCuratedComments(postId)
+    } catch (error) {
+      console.error('Pin update error:', error)
     } finally {
       setCommentLoading(false)
     }
@@ -1226,6 +1246,27 @@ export default function WritePage() {
                       <p className="text-xs text-[var(--error)]">{commentError}</p>
                     )}
                     <div className="flex items-center gap-2">
+                      <div className="ml-auto flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                        <span>Filter</span>
+                        <select
+                          value={commentFilter}
+                          onChange={(e) => setCommentFilter(e.target.value as typeof commentFilter)}
+                          className="input py-1 px-2 text-xs"
+                        >
+                          <option value="all">All</option>
+                          <option value="reddit">Reddit</option>
+                          <option value="manual">Manual</option>
+                        </select>
+                        <span>Sort</span>
+                        <select
+                          value={commentSort}
+                          onChange={(e) => setCommentSort(e.target.value as typeof commentSort)}
+                          className="input py-1 px-2 text-xs"
+                        >
+                          <option value="score">Top</option>
+                          <option value="recent">Recent</option>
+                        </select>
+                      </div>
                       <button
                         onClick={importComments}
                         disabled={!postId || commentLoading || !commentUrl.trim()}
@@ -1268,13 +1309,31 @@ export default function WritePage() {
                     </div>
                     {curatedComments.length > 0 && (
                       <div className="space-y-2">
-                        {curatedComments.map((comment) => (
+                        {curatedComments
+                          .filter((comment) => commentFilter === 'all' || comment.source === commentFilter)
+                          .sort((a, b) => {
+                            if (a.is_pinned && !b.is_pinned) return -1
+                            if (!a.is_pinned && b.is_pinned) return 1
+                            if (commentSort === 'recent') {
+                              return new Date(b.created_at || b.imported_at).getTime() - new Date(a.created_at || a.imported_at).getTime()
+                            }
+                            return (b.score || 0) - (a.score || 0)
+                          })
+                          .map((comment) => (
                           <div key={comment.id} className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                             <p className="text-xs text-[var(--text-tertiary)] mb-2">
                               {comment.author_name || (comment.source === 'manual' ? 'Manual highlight' : 'reddit user')}
                               {comment.score ? ` - ${comment.score} upvotes` : ''}
                             </p>
                             <p className="text-sm text-[var(--text-secondary)]">{comment.body}</p>
+                            <div className="flex items-center justify-end mt-2">
+                              <button
+                                onClick={() => togglePin(comment.id, Boolean(comment.is_pinned))}
+                                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                              >
+                                {comment.is_pinned ? 'Unpin' : 'Pin'}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

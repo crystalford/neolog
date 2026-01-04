@@ -87,6 +87,7 @@ export type PostDistributionPack = {
   hooks: string[]
   og_image_url: string | null
   error_message: string | null
+  model: string | null
   created_at: string
   updated_at: string
 }
@@ -101,8 +102,21 @@ export type CuratedComment = {
   author_url: string | null
   body: string
   score: number
+  is_pinned: boolean
+  manual_rank: number
   created_at: string | null
   imported_at: string
+}
+
+export type PostSummary = {
+  id: string
+  post_id: string
+  author_id: string
+  summary: string | null
+  bullets: string[]
+  model: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type PostCollaborator = {

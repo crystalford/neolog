@@ -5,17 +5,24 @@ import { useMemo, useState } from 'react'
 type Density = 'summary' | 'full'
 
 interface PostDensityToggleProps {
+  postId: string
   summary: string
   bullets: string[]
   html: string
+  model?: string | null
 }
 
-export function PostDensityToggle({ summary, bullets, html }: PostDensityToggleProps) {
+export function PostDensityToggle({ postId, summary, bullets, html, model }: PostDensityToggleProps) {
   const [density, setDensity] = useState<Density>('full')
+  const [summaryText, setSummaryText] = useState(summary)
+  const [summaryBullets, setSummaryBullets] = useState(bullets)
+  const [summaryModel, setSummaryModel] = useState(model || 'fallback')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const cleanedBullets = useMemo(() => {
-    return bullets.filter((sentence) => sentence.length >= 40).slice(0, 4)
-  }, [bullets])
+    return summaryBullets.filter((sentence) => sentence.length >= 20).slice(0, 5)
+  }, [summaryBullets])
 
   const processed = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -85,7 +92,48 @@ export function PostDensityToggle({ summary, bullets, html }: PostDensityToggleP
 
       {density === 'summary' ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
-          <p className="text-lg text-gray-800 leading-relaxed">{summary || 'Summary unavailable.'}</p>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-400">AI summary</p>
+              <p className="text-sm text-gray-600">
+                Model: {summaryModel || 'fallback'}
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setLoading(true)
+                setError(null)
+                try {
+                  const response = await fetch('/api/posts/summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ postId }),
+                  })
+                  const data = await response.json()
+                  if (!response.ok) {
+                    setError(data.error || 'Failed to generate summary')
+                  } else {
+                    setSummaryText(data.summary.summary || summaryText)
+                    setSummaryBullets(data.summary.bullets || summaryBullets)
+                    setSummaryModel(data.summary.model || summaryModel)
+                  }
+                } catch (err) {
+                  console.error('Summary error:', err)
+                  setError('Failed to generate summary')
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors disabled:opacity-60"
+            >
+              {loading ? 'Generating...' : 'Regenerate'}
+            </button>
+          </div>
+          {error && (
+            <p className="text-xs text-red-500 mb-3">{error}</p>
+          )}
+          <p className="text-lg text-gray-800 leading-relaxed">{summaryText || 'Summary unavailable.'}</p>
           {cleanedBullets.length > 0 && (
             <div className="mt-5">
               <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">Key takeaways</p>

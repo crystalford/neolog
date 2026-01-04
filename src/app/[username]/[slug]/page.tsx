@@ -103,8 +103,15 @@ export default async function PostPage({ params, searchParams }: Props) {
     .from('curated_comments')
     .select('id, source, author_name, author_url, body, score, source_url, created_at')
     .eq('post_id', post.id)
+    .order('is_pinned', { ascending: false })
     .order('score', { ascending: false })
     .limit(5)
+
+  const { data: summaryRow } = await supabase
+    .from('post_summaries')
+    .select('summary, bullets, model')
+    .eq('post_id', post.id)
+    .maybeSingle()
 
   const publishedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString('en-US', {
@@ -199,8 +206,10 @@ export default async function PostPage({ params, searchParams }: Props) {
           ) : (
             <div className="max-w-4xl mx-auto">
               <PostDensityToggle
+                postId={post.id}
                 summary={summaryText}
-                bullets={summarySentences}
+                bullets={summaryRow?.bullets || summarySentences}
+                model={summaryRow?.model || null}
                 html={htmlContent}
               />
             </div>

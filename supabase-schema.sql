@@ -112,6 +112,7 @@ create table public.post_distribution_packs (
   hooks text[] default '{}',
   og_image_url text,
   error_message text,
+  model text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
@@ -131,8 +132,26 @@ create table public.curated_comments (
   author_url text,
   body text not null,
   score integer default 0,
+  is_pinned boolean default false,
+  manual_rank integer default 0,
   created_at timestamp with time zone,
   imported_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- =============================================
+-- POST SUMMARIES (AI-generated)
+-- =============================================
+create table public.post_summaries (
+  id uuid default uuid_generate_v4() primary key,
+  post_id uuid references public.posts(id) on delete cascade not null,
+  author_id uuid references public.profiles(id) on delete cascade not null,
+  summary text,
+  bullets text[] default '{}',
+  model text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint unique_post_summary unique (post_id)
 );
 
 -- =============================================
@@ -320,6 +339,9 @@ create index post_distribution_packs_post_id_idx on public.post_distribution_pac
 create index post_distribution_packs_author_id_idx on public.post_distribution_packs(author_id);
 create index curated_comments_post_id_idx on public.curated_comments(post_id);
 create index curated_comments_author_id_idx on public.curated_comments(author_id);
+create index curated_comments_pinned_idx on public.curated_comments(post_id, is_pinned);
+create index post_summaries_post_id_idx on public.post_summaries(post_id);
+create index post_summaries_author_id_idx on public.post_summaries(author_id);
 create index post_collaborators_post_id_idx on public.post_collaborators(post_id);
 create index post_collaborators_user_id_idx on public.post_collaborators(user_id);
 create index drafts_author_id_idx on public.drafts(author_id);
@@ -347,6 +369,7 @@ alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
 alter table public.curated_comments enable row level security;
+alter table public.post_summaries enable row level security;
 alter table public.post_collaborators enable row level security;
 alter table public.tags enable row level security;
 alter table public.post_tags enable row level security;
@@ -450,6 +473,21 @@ create policy "Curated comments visible for published posts"
 
 create policy "Authors can manage curated comments"
   on public.curated_comments for all
+  using (auth.uid() = author_id);
+
+-- POST_SUMMARIES policies
+create policy "Summaries visible for published posts"
+  on public.post_summaries for select
+  using (
+    exists (
+      select 1 from public.posts
+      where posts.id = post_id and posts.status = 'published'
+    )
+    or auth.uid() = author_id
+  );
+
+create policy "Authors can manage summaries"
+  on public.post_summaries for all
   using (auth.uid() = author_id);
 
 -- POST_COLLABORATORS policies
@@ -558,6 +596,10 @@ create trigger posts_updated_at
 
 create trigger post_distribution_packs_updated_at
   before update on public.post_distribution_packs
+  for each row execute procedure public.handle_updated_at();
+
+create trigger post_summaries_updated_at
+  before update on public.post_summaries
   for each row execute procedure public.handle_updated_at();
 
 create trigger subscriber_notes_updated_at

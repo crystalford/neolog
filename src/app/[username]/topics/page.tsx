@@ -39,13 +39,25 @@ export default async function TopicsPage({ params }: Props) {
   })
 
   const topics = Array.from(tagMap.values())
-    .map((topic) => ({
-      ...topic,
-      posts: topic.posts
+    .map((topic) => {
+      const sorted = topic.posts
         .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
-        .slice(0, 3),
-      count: topic.posts.length,
-    }))
+      const yearMap = new Map<string, number>()
+      sorted.forEach((post) => {
+        const year = post.published_at ? new Date(post.published_at).getFullYear().toString() : 'Unknown'
+        yearMap.set(year, (yearMap.get(year) || 0) + 1)
+      })
+      const years = Array.from(yearMap.entries())
+        .sort((a, b) => Number(b[0]) - Number(a[0]))
+        .slice(0, 4)
+      return {
+        ...topic,
+        posts: sorted.slice(0, 3),
+        featured: sorted[0],
+        count: topic.posts.length,
+        years,
+      }
+    })
     .sort((a, b) => b.count - a.count)
 
   return (
@@ -96,6 +108,20 @@ export default async function TopicsPage({ params }: Props) {
                       {topic.count} post{topic.count !== 1 ? 's' : ''}
                     </span>
                   </div>
+                  {topic.featured?.excerpt && (
+                    <p className="text-sm text-[var(--text-tertiary)] mb-4 line-clamp-3">
+                      {topic.featured.excerpt}
+                    </p>
+                  )}
+                  {topic.years.length > 0 && (
+                    <div className="flex flex-wrap gap-2 text-xs text-[var(--text-tertiary)] mb-4">
+                      {topic.years.map(([year, count]) => (
+                        <span key={year} className="px-2 py-1 rounded-full border border-[var(--border-light)]">
+                          {year}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {topic.posts.map((post) => (
                       <Link
@@ -103,7 +129,14 @@ export default async function TopicsPage({ params }: Props) {
                         href={`/${profile.username}/${post.slug}`}
                         className="block rounded-xl border border-[var(--border-light)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
                       >
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{post.title}</p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{post.title}</p>
+                          {post.id === topic.featured?.id && (
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                              Featured
+                            </span>
+                          )}
+                        </div>
                         {post.excerpt && (
                           <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-2">
                             {post.excerpt}
