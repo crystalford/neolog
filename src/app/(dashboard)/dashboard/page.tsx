@@ -255,6 +255,19 @@ export default function DashboardPage() {
     visiblePosts.length > 0 &&
     visiblePosts.every((post) => selectedIds.includes(post.id))
 
+  const healthQueue = visiblePosts
+    .map((post) => {
+      const updatedAt = new Date(post.updated_at || post.published_at || post.created_at)
+      const daysSinceUpdate = Math.floor((Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24))
+      const recentViews = metrics[post.id]?.recentViews || 0
+      const needsAttention = post.status === 'published' && daysSinceUpdate > 90 && recentViews < 10
+      const score = Math.max(0, 100 - daysSinceUpdate) + recentViews * 2
+      return { post, daysSinceUpdate, recentViews, needsAttention, score }
+    })
+    .filter((item) => item.needsAttention)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 5)
+
   const getStatusClasses = (status: Post['status']) => {
     if (status === 'published') return 'text-[var(--success)] bg-[var(--success)]/10'
     if (status === 'scheduled') return 'text-[var(--warning)] bg-[var(--warning)]/10'
@@ -297,6 +310,41 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {healthQueue.length > 0 && (
+        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Post health</p>
+              <h2 className="font-display text-xl text-[var(--text-primary)]">Needs attention</h2>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Posts older than 90 days with low recent views.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {healthQueue.map(({ post, daysSinceUpdate, recentViews }) => (
+              <div
+                key={post.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4"
+              >
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{post.title || 'Untitled'}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    {daysSinceUpdate} days since update - {recentViews} views in last 7d
+                  </p>
+                </div>
+                <Link
+                  href={`/write?edit=${post.id}&revive=1`}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)]"
+                >
+                  Revive
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">

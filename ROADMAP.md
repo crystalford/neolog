@@ -6,7 +6,7 @@ Last updated: 2026-01-04
 - [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
 - [x] OG image data URL (SVG)
 - [x] Editor modal + dashboard entry point
-- [ ] AI pack generation (requires OPENAI_API_KEY)
+- [x] AI pack generation (requires OPENAI_API_KEY)
 
 ## Phase 2 - Comment Curator (shipping)
 - [x] Reddit import (top comments)
@@ -18,17 +18,17 @@ Last updated: 2026-01-04
 - [x] "Where this fits" on post pages (tags + related posts)
 - [x] Profile topic map
 - [x] /@user/topics hub
-- [ ] Topic intro editor (custom per tag per author)
+- [x] Topic intro editor (custom per tag per author)
 
 ## Phase 4 - Variable Density Reading (shipping)
 - [x] Summary vs Full toggle
 - [x] Key takeaways bullets
 - [x] "On this page" anchors
-- [ ] AI summaries (requires OPENAI_API_KEY)
-- [ ] Expand sections (AI-based)
+- [x] AI summaries (requires OPENAI_API_KEY)
+- [x] Expand sections (requires OPENAI_API_KEY)
 
 ## Optional / Future
-- [ ] Post health system (freshness score + revive queue)
+- [x] Post health system (freshness score + revive queue)
 - [ ] Auto-post syndication (requires platform APIs)
 - [ ] Programmatic visuals engine
 

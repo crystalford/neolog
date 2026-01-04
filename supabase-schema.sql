@@ -155,6 +155,21 @@ create table public.post_summaries (
 );
 
 -- =============================================
+-- AUTHOR TOPIC INTROS
+-- Per-author descriptions for topics
+-- =============================================
+create table public.author_topic_intros (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade not null,
+  tag_id uuid references public.tags(id) on delete cascade not null,
+  intro text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint unique_author_topic_intro unique (creator_id, tag_id)
+);
+
+-- =============================================
 -- POST_COLLABORATORS TABLE
 -- Multiple authors on a single post
 -- =============================================
@@ -342,6 +357,8 @@ create index curated_comments_author_id_idx on public.curated_comments(author_id
 create index curated_comments_pinned_idx on public.curated_comments(post_id, is_pinned);
 create index post_summaries_post_id_idx on public.post_summaries(post_id);
 create index post_summaries_author_id_idx on public.post_summaries(author_id);
+create index author_topic_intros_creator_idx on public.author_topic_intros(creator_id);
+create index author_topic_intros_tag_idx on public.author_topic_intros(tag_id);
 create index post_collaborators_post_id_idx on public.post_collaborators(post_id);
 create index post_collaborators_user_id_idx on public.post_collaborators(user_id);
 create index drafts_author_id_idx on public.drafts(author_id);
@@ -370,6 +387,7 @@ alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
 alter table public.curated_comments enable row level security;
 alter table public.post_summaries enable row level security;
+alter table public.author_topic_intros enable row level security;
 alter table public.post_collaborators enable row level security;
 alter table public.tags enable row level security;
 alter table public.post_tags enable row level security;
@@ -490,6 +508,15 @@ create policy "Authors can manage summaries"
   on public.post_summaries for all
   using (auth.uid() = author_id);
 
+-- AUTHOR_TOPIC_INTROS policies
+create policy "Topic intros visible for published posts"
+  on public.author_topic_intros for select
+  using (true);
+
+create policy "Authors can manage topic intros"
+  on public.author_topic_intros for all
+  using (auth.uid() = creator_id);
+
 -- POST_COLLABORATORS policies
 create policy "Collaborators viewable by post viewers"
   on public.post_collaborators for select
@@ -600,6 +627,10 @@ create trigger post_distribution_packs_updated_at
 
 create trigger post_summaries_updated_at
   before update on public.post_summaries
+  for each row execute procedure public.handle_updated_at();
+
+create trigger author_topic_intros_updated_at
+  before update on public.author_topic_intros
   for each row execute procedure public.handle_updated_at();
 
 create trigger subscriber_notes_updated_at

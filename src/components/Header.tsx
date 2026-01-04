@@ -41,6 +41,15 @@ export function Header() {
           </span>
         </Link>
 
+        <nav className="hidden md:flex items-center gap-4 text-sm text-gray-600">
+          <Link href="/explore" className="hover:text-gray-900 transition-colors">
+            Explore
+          </Link>
+          <Link href="/visuals" className="hover:text-gray-900 transition-colors">
+            Visuals
+          </Link>
+        </nav>
+
         {/* Auth buttons */}
         <div className="flex items-center gap-3">
           {loading ? null : user ? (

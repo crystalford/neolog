@@ -101,7 +101,7 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   const { data: curatedComments } = await supabase
     .from('curated_comments')
-    .select('id, source, author_name, author_url, body, score, source_url, created_at')
+    .select('id, source, author_name, author_url, body, score, source_url, created_at, is_pinned')
     .eq('post_id', post.id)
     .order('is_pinned', { ascending: false })
     .order('score', { ascending: false })
@@ -129,7 +129,7 @@ export default async function PostPage({ params, searchParams }: Props) {
     .replace(/\s+/g, ' ')
     .trim()
   const summarySentences = plainText.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 4)
-  const summaryText = post.excerpt || summarySentences.join(' ')
+  const summaryText = summaryRow?.summary || post.excerpt || summarySentences.join(' ')
 
   return (
     <>

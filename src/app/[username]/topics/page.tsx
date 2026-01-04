@@ -23,6 +23,16 @@ export default async function TopicsPage({ params }: Props) {
     .from('post_tags')
     .select('tag:tags(id, name, slug, color), post:posts(id, title, slug, published_at, excerpt, author_id, status)')
 
+  const { data: introRows } = await supabase
+    .from('author_topic_intros')
+    .select('tag_id, intro')
+    .eq('creator_id', profile.id)
+
+  const introMap = new Map<string, string>()
+  ;(introRows || []).forEach((row: any) => {
+    introMap.set(row.tag_id, row.intro || '')
+  })
+
   const tagMap = new Map<string, { id: string; name: string; slug: string; color: string; posts: any[] }>()
 
   ;(tagRows || []).forEach((row: any) => {
@@ -56,6 +66,7 @@ export default async function TopicsPage({ params }: Props) {
         featured: sorted[0],
         count: topic.posts.length,
         years,
+        intro: introMap.get(topic.id) || '',
       }
     })
     .sort((a, b) => b.count - a.count)
@@ -108,6 +119,11 @@ export default async function TopicsPage({ params }: Props) {
                       {topic.count} post{topic.count !== 1 ? 's' : ''}
                     </span>
                   </div>
+                  {topic.intro && (
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                      {topic.intro}
+                    </p>
+                  )}
                   {topic.featured?.excerpt && (
                     <p className="text-sm text-[var(--text-tertiary)] mb-4 line-clamp-3">
                       {topic.featured.excerpt}

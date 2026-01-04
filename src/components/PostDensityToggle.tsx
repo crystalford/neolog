@@ -19,6 +19,8 @@ export function PostDensityToggle({ postId, summary, bullets, html, model }: Pos
   const [summaryModel, setSummaryModel] = useState(model || 'fallback')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [expansions, setExpansions] = useState<Record<string, string>>({})
+  const [expanding, setExpanding] = useState<string | null>(null)
 
   const cleanedBullets = useMemo(() => {
     return summaryBullets.filter((sentence) => sentence.length >= 20).slice(0, 5)
@@ -145,6 +147,48 @@ export function PostDensityToggle({ postId, summary, bullets, html, model }: Pos
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {processed.toc.length > 0 && (
+            <div className="mt-6">
+              <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">Expand sections</p>
+              <div className="space-y-3">
+                {processed.toc.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-gray-200 bg-gray-50/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-gray-700">{item.text}</span>
+                      <button
+                        onClick={async () => {
+                          if (expansions[item.id]) return
+                          setExpanding(item.id)
+                          try {
+                            const response = await fetch('/api/posts/expand-section', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ postId, heading: item.text }),
+                            })
+                            const data = await response.json()
+                            if (response.ok && data.expansion) {
+                              setExpansions((prev) => ({ ...prev, [item.id]: data.expansion }))
+                            }
+                          } catch (err) {
+                            console.error('Expand error:', err)
+                          } finally {
+                            setExpanding(null)
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors"
+                        disabled={expanding === item.id}
+                      >
+                        {expanding === item.id ? 'Expanding...' : expansions[item.id] ? 'Expanded' : 'Expand'}
+                      </button>
+                    </div>
+                    {expansions[item.id] && (
+                      <p className="text-sm text-gray-600 mt-3">{expansions[item.id]}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

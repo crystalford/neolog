@@ -119,6 +119,15 @@ export type PostSummary = {
   updated_at: string
 }
 
+export type AuthorTopicIntro = {
+  id: string
+  creator_id: string
+  tag_id: string
+  intro: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type PostCollaborator = {
   id: string
   post_id: string
