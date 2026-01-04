@@ -156,7 +156,9 @@ export default async function PostPage({ params, searchParams }: Props) {
           </div>
 
           {isFullHtml ? (
-            <HtmlIframe html={htmlContent} className="mt-6" />
+            <div className="max-w-2xl mx-auto">
+              <HtmlIframe html={htmlContent} className="mt-6" />
+            </div>
           ) : (
             <div className="max-w-2xl mx-auto">
               <div
