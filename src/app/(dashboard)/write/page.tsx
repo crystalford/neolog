@@ -8,8 +8,7 @@ import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import {
-  Save, Send, Loader2, Eye, Settings, Image as ImageIcon,
-  ChevronDown, Clock, BookOpen, Upload, X
+  Loader2, Settings, BookOpen, Upload, X, CheckCircle2
 } from 'lucide-react'
 
 export default function WritePage() {
@@ -167,6 +166,15 @@ export default function WritePage() {
       .replace(/\s+/g, ' ')
     const words = text.trim().split(' ').length
     return Math.max(1, Math.ceil(words / 200))
+  }
+
+  const getWordCount = (html: string) => {
+    const text = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+    return text.trim().split(' ').filter(Boolean).length
   }
 
   const shouldUseHtmlMode = (html: string) => {
@@ -595,22 +603,29 @@ export default function WritePage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowImport((prev) => !prev)}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport((prev) => !prev)}
+              className="btn btn-ghost btn-sm"
+            >
+              Import HTML
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="btn btn-ghost btn-sm"
+            >
+              <Settings size={14} />
+              Publish settings
+            </button>
+            {profile && postId && (
+              <a
+                href={`/${profile.username}/${generateSlug(title)}?preview=true`}
+                target="_blank"
                 className="btn btn-ghost btn-sm"
               >
-                Import HTML
-              </button>
-              {profile && postId && (
-                <a
-                  href={`/${profile.username}/${generateSlug(title)}?preview=true`}
-                  target="_blank"
-                  className="btn btn-ghost btn-sm"
-                >
-                  Preview
-                </a>
-              )}
+                Preview
+              </a>
+            )}
 
               <button
                 onClick={handlePublish}
@@ -684,6 +699,132 @@ export default function WritePage() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {showSettings && (
+            <div className="fixed inset-0 z-40">
+              <div
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setShowSettings(false)}
+              />
+              <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)]">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                      Publish
+                    </p>
+                    <h2 className="font-display text-xl">Post settings</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="px-6 py-6 space-y-6">
+                  <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)]">
+                      <span>Words</span>
+                      <span>{getWordCount(content).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)] mt-2">
+                      <span>Reading time</span>
+                      <span>{calculateReadingTime(content)} min</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)] mt-2">
+                      <span>Editor</span>
+                      <span>{htmlMode ? 'HTML' : 'Visual'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Cover image URL
+                    </label>
+                    <input
+                      type="url"
+                      value={coverImage}
+                      onChange={(e) => setCoverImage(e.target.value)}
+                      placeholder="https://..."
+                      className="input"
+                    />
+                    {coverImage && (
+                      <img
+                        src={coverImage}
+                        alt="Cover preview"
+                        className="mt-3 rounded-lg border border-[var(--border-light)]"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Tags
+                    </label>
+                    <TagSelect selectedTags={tags} onChange={setTags} />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Canonical URL
+                    </label>
+                    <input
+                      type="url"
+                      value={canonicalUrl}
+                      onChange={(e) => setCanonicalUrl(e.target.value)}
+                      placeholder="https://original.com/post"
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Original source
+                    </label>
+                    <input
+                      type="text"
+                      value={originalSource}
+                      onChange={(e) => setOriginalSource(e.target.value)}
+                      placeholder="Publication name"
+                      className="input"
+                    />
+                  </div>
+
+                  <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                    <div>
+                      <p className="font-medium text-[var(--text-primary)]">Premium only</p>
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        Restrict this post to paid subscribers
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isPremium}
+                      onChange={(e) => setIsPremium(e.target.checked)}
+                      className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                    />
+                  </label>
+
+                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Preflight checks</h3>
+                    {[
+                      { label: 'Title added', ok: title.trim().length >= 5 },
+                      { label: 'Subtitle added', ok: subtitle.trim().length >= 5 },
+                      { label: 'Cover image set', ok: coverImage.trim().length > 0 },
+                      { label: 'At least 200 words', ok: getWordCount(content) >= 200 },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-2 last:mb-0">
+                        <CheckCircle2 size={14} className={item.ok ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'} />
+                        <span className={item.ok ? 'text-[var(--text-primary)]' : ''}>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </aside>
             </div>
           )}
 

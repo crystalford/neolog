@@ -8,7 +8,7 @@ import { ShareDraftButton } from '@/components/ShareDraftButton'
 import type { Post, Profile } from '@/types/database'
 import {
   PenLine, Eye, Edit2, Trash2,
-  Globe, FileText, Clock
+  Globe, FileText, Clock, Search
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -16,6 +16,8 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all')
+  const [search, setSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -58,6 +60,15 @@ export default function DashboardPage() {
     setPosts(posts.filter(p => p.id !== postId))
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`Delete ${selectedIds.length} post(s)?`)) return
+
+    await supabase.from('posts').delete().in('id', selectedIds)
+    setPosts(posts.filter(p => !selectedIds.includes(p.id)))
+    setSelectedIds([])
+  }
+
   if (loading) {
     return (
       <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
@@ -80,7 +91,16 @@ export default function DashboardPage() {
     if (filter === 'published') return post.status === 'published'
     if (filter === 'draft') return post.status !== 'published'
     return true
+  }).filter((post) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (post.title || '').toLowerCase().includes(q) ||
+      (post.excerpt || '').toLowerCase().includes(q)
   })
+
+  const allVisibleSelected =
+    filteredPosts.length > 0 &&
+    filteredPosts.every((post) => selectedIds.includes(post.id))
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
@@ -136,9 +156,20 @@ export default function DashboardPage() {
             </button>
           ))}
         </div>
-        <p className="text-sm text-[var(--text-secondary)]">
-          {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search posts..."
+              className="input w-56 pl-10"
+            />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          </div>
+          <p className="text-sm text-[var(--text-secondary)]">
+            {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
+          </p>
+        </div>
       </div>
 
       {filteredPosts.length === 0 ? (
@@ -155,18 +186,60 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[minmax(0,1fr)_140px_160px_220px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+          <div className="hidden md:grid grid-cols-[40px_minmax(0,1fr)_140px_160px_220px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    setSelectedIds(filteredPosts.map((post) => post.id))
+                  } else {
+                    setSelectedIds([])
+                  }
+                }}
+                className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+              />
+            </div>
             <span>Post</span>
             <span>Status</span>
             <span>Updated</span>
             <span className="text-right">Actions</span>
           </div>
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
+              <span className="text-[var(--text-secondary)]">
+                {selectedIds.length} selected
+              </span>
+              <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10 transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </div>
+          )}
           <div className="divide-y divide-[var(--border-light)]">
             {filteredPosts.map((post) => (
               <div
                 key={post.id}
-                className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_140px_160px_220px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                className="grid grid-cols-1 md:grid-cols-[40px_minmax(0,1fr)_140px_160px_220px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
               >
+                <div className="hidden md:flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(post.id)}
+                    onChange={(event) => {
+                      setSelectedIds((prev) =>
+                        event.target.checked
+                          ? [...prev, post.id]
+                          : prev.filter((id) => id !== post.id)
+                      )
+                    }}
+                    className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                </div>
                 <div className="min-w-0">
                   <p className="font-medium text-[var(--text-primary)] truncate">
                     {post.title || 'Untitled'}

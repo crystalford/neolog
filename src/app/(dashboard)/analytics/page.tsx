@@ -222,6 +222,16 @@ export default function AnalyticsPage() {
     )
   }
 
+  const getTrend = () => {
+    if (dailyData.length < 7) return { change: 0, direction: 'flat' as const }
+    const recent = dailyData.slice(-7).reduce((sum, day) => sum + day.views, 0)
+    const previous = dailyData.slice(-14, -7).reduce((sum, day) => sum + day.views, 0)
+    if (previous === 0) return { change: 0, direction: 'flat' as const }
+    const change = Math.round(((recent - previous) / previous) * 100)
+    const direction = change > 5 ? 'up' : change < -5 ? 'down' : 'flat'
+    return { change, direction }
+  }
+
   return (
     <main className="pb-16">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
@@ -320,6 +330,65 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-[var(--text-tertiary)] mt-2">
                   Readers who finish
                 </p>
+              </div>
+            </div>
+
+            {/* Narrative insights */}
+            <div className="grid lg:grid-cols-3 gap-6 mb-8">
+              <div className="lg:col-span-2 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">Insights</p>
+                <h2 className="font-display text-xl text-[var(--text-primary)] mb-4">What to focus on next</h2>
+                <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+                  {(() => {
+                    const trend = getTrend()
+                    if (trend.direction === 'up') {
+                      return (
+                        <p>
+                          Momentum is up. Views are <span className="text-[var(--text-primary)] font-medium">{Math.abs(trend.change)}%</span> higher than the previous week.
+                        </p>
+                      )
+                    }
+                    if (trend.direction === 'down') {
+                      return (
+                        <p>
+                          Views dipped <span className="text-[var(--text-primary)] font-medium">{Math.abs(trend.change)}%</span> versus last week. Consider republishing a top performer or sharing to a new channel.
+                        </p>
+                      )
+                    }
+                    return (
+                      <p>
+                        Views are steady. Try shipping a shorter post or adding a stronger hook to lift completion.
+                      </p>
+                    )
+                  })()}
+                  <p>
+                    Average completion sits at <span className="text-[var(--text-primary)] font-medium">{totals.avgCompletion}%</span>. If it’s under 50%, tighten intros or add subheads every 2–3 paragraphs.
+                  </p>
+                  <p>
+                    Your strongest referrer is <span className="text-[var(--text-primary)] font-medium">{referrers[0]?.domain || 'Direct'}</span>. Double down there with a tailored share.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">Spotlight</p>
+                <h3 className="font-display text-lg text-[var(--text-primary)] mb-3">Top post</h3>
+                {posts[0] ? (
+                  <div className="space-y-2">
+                    <p className="font-medium text-[var(--text-primary)]">{posts[0].title}</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">
+                      {posts[0].total_views.toLocaleString()} views · {posts[0].completion_rate}% completion
+                    </p>
+                    <Link
+                      href={`/analytics/${posts[0].id}`}
+                      className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]"
+                    >
+                      Deep dive
+                      <ExternalLink size={12} />
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-tertiary)]">No data yet.</p>
+                )}
               </div>
             </div>
 
