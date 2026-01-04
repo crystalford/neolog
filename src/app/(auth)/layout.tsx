@@ -13,6 +13,7 @@ export default function AuthLayout({
           <span className="w-9 h-9 bg-white rounded-lg flex items-center justify-center font-mono text-sm font-semibold text-[var(--bg-inverse)]">
             N
           </span>
+          <span className="logo-mark logo-mark-lg">N</span>
           <span className="font-display text-2xl">Neolog</span>
         </Link>
         
@@ -35,6 +36,7 @@ export default function AuthLayout({
             <span className="w-9 h-9 bg-[var(--accent)] rounded-lg flex items-center justify-center font-mono text-sm font-semibold text-white">
               N
             </span>
+            <span className="logo-mark logo-mark-lg">N</span>
             <span className="font-display text-2xl">Neolog</span>
           </Link>
         </div>

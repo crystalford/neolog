@@ -592,7 +592,7 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: white;
-  background: #000000;
+  background: var(--accent);
   border: none;
 }
 

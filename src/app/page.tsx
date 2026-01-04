@@ -368,9 +368,7 @@ export default async function Home() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 bg-[var(--accent)] rounded-sm flex items-center justify-center">
-                    <span className="text-[var(--text-inverse)] font-bold text-xs">N</span>
-                  </div>
+                  <span className="logo-mark">N</span>
                   <span className="font-display text-base font-semibold text-[var(--text-primary)]">Neolog</span>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] max-w-md">

@@ -33,9 +33,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-[var(--accent)] rounded-md flex items-center justify-center">
-            <span className="text-[var(--text-inverse)] font-bold text-xs">N</span>
-          </div>
+          <span className="logo-mark">N</span>
           <span className="font-display text-lg tracking-tight text-[var(--text-primary)]">
             Neolog
           </span>

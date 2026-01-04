@@ -170,9 +170,7 @@ export default function DashboardLayout({
       <aside className="w-[248px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-4 pt-5">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] flex items-center justify-center font-bold text-xs">
-              N
-            </div>
+            <span className="logo-mark logo-mark-lg">N</span>
             <span className="font-display text-xl">Neolog</span>
           </Link>
 
@@ -271,6 +269,11 @@ export default function DashboardLayout({
                 Publisher workspace
               </p>
               <p className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</p>
+              <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Ingest</span>
+                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Core</span>
+                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Broadcast</span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
