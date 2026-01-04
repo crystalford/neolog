@@ -65,8 +65,10 @@ export function RichEditor({
       CodeBlockLowlight.configure({
         lowlight,
         HTMLAttributes: {
-          class: 'bg-[var(--bg-tertiary)] rounded-lg p-4 my-4 overflow-x-auto text-sm font-mono',
+          class: 'bg-gray-100 text-gray-900 rounded-lg p-4 my-4 overflow-x-auto text-sm font-mono border border-gray-200',
         },
+        exitOnTripleEnter: true,
+        exitOnArrowDown: true,
       }),
     ],
     content,
