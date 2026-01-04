@@ -15,9 +15,11 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
+  const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'scheduled'>('all')
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [sortBy, setSortBy] = useState<'latest' | 'trending' | 'discussed' | 'views'>('latest')
+  const [metrics, setMetrics] = useState<Record<string, { views: number; recentViews: number; comments: number }>>({})
   const router = useRouter()
   const supabase = createClient()
 
@@ -50,6 +52,47 @@ export default function DashboardPage() {
       .order('updated_at', { ascending: false })
     
     setPosts(postsData || [])
+    const postIds = (postsData || []).map((post) => post.id)
+
+    if (postIds.length > 0) {
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+      const { data: viewRows } = await supabase
+        .from('post_views')
+        .select('post_id, started_at')
+        .in('post_id', postIds)
+
+      const { data: recentRows } = await supabase
+        .from('post_views')
+        .select('post_id')
+        .in('post_id', postIds)
+        .gte('started_at', sevenDaysAgo.toISOString())
+
+      const { data: commentRows } = await supabase
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('status', 'visible')
+
+      const nextMetrics: Record<string, { views: number; recentViews: number; comments: number }> = {}
+      postIds.forEach((id) => {
+        nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
+      })
+
+      viewRows?.forEach((row: any) => {
+        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views += 1
+      })
+      recentRows?.forEach((row: any) => {
+        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].recentViews += 1
+      })
+      commentRows?.forEach((row: any) => {
+        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].comments += 1
+      })
+
+      setMetrics(nextMetrics)
+    }
+
     setLoading(false)
   }
 
@@ -114,10 +157,12 @@ export default function DashboardPage() {
   const publishedCount = posts.filter((post) => post.status === 'published').length
   const draftCount = posts.filter((post) => post.status === 'draft').length
   const archivedCount = posts.filter((post) => post.status === 'archived').length
+  const scheduledCount = posts.filter((post) => post.status === 'scheduled').length
   const filteredPosts = posts.filter((post) => {
     if (filter === 'published') return post.status === 'published'
     if (filter === 'draft') return post.status === 'draft'
     if (filter === 'archived') return post.status === 'archived'
+    if (filter === 'scheduled') return post.status === 'scheduled'
     return true
   }).filter((post) => {
     if (!search.trim()) return true
@@ -126,9 +171,27 @@ export default function DashboardPage() {
       (post.excerpt || '').toLowerCase().includes(q)
   })
 
+  const sortedPosts = [...filteredPosts].sort((a, b) => {
+    if (sortBy === 'latest') {
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    }
+    if (sortBy === 'views') {
+      return (metrics[b.id]?.views || 0) - (metrics[a.id]?.views || 0)
+    }
+    if (sortBy === 'discussed') {
+      return (metrics[b.id]?.comments || 0) - (metrics[a.id]?.comments || 0)
+    }
+    if (sortBy === 'trending') {
+      return (metrics[b.id]?.recentViews || 0) - (metrics[a.id]?.recentViews || 0)
+    }
+    return 0
+  })
+
+  const visiblePosts = sortedPosts
+
   const allVisibleSelected =
-    filteredPosts.length > 0 &&
-    filteredPosts.every((post) => selectedIds.includes(post.id))
+    visiblePosts.length > 0 &&
+    visiblePosts.every((post) => selectedIds.includes(post.id))
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
@@ -153,6 +216,7 @@ export default function DashboardPage() {
           { label: 'Total posts', value: posts.length },
           { label: 'Published', value: publishedCount },
           { label: 'Drafts', value: draftCount },
+          { label: 'Scheduled', value: scheduledCount },
           { label: 'Archived', value: archivedCount },
         ].map((stat) => (
           <div
@@ -171,6 +235,7 @@ export default function DashboardPage() {
             { id: 'all', label: 'All' },
             { id: 'published', label: 'Published' },
             { id: 'draft', label: 'Drafts' },
+            { id: 'scheduled', label: 'Scheduled' },
             { id: 'archived', label: 'Archived' },
           ].map((item) => (
             <button
@@ -196,13 +261,33 @@ export default function DashboardPage() {
             />
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
           </div>
+          <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
+            {[
+              { id: 'latest', label: 'Latest' },
+              { id: 'trending', label: 'Trending' },
+              { id: 'discussed', label: 'Discussed' },
+              { id: 'views', label: 'Views' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setSortBy(item.id as typeof sortBy)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  sortBy === item.id
+                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
           <p className="text-sm text-[var(--text-secondary)]">
-            {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
+            {visiblePosts.length} {visiblePosts.length === 1 ? 'post' : 'posts'}
           </p>
         </div>
       </div>
 
-      {filteredPosts.length === 0 ? (
+      {visiblePosts.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
             <FileText size={28} className="text-[var(--text-tertiary)]" />
@@ -216,14 +301,14 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[40px_minmax(0,1fr)_140px_160px_220px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+          <div className="hidden md:grid grid-cols-[40px_minmax(0,1fr)_120px_140px_120px_120px_180px] gap-4 px-5 py-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
             <div className="flex items-center justify-center">
               <input
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setSelectedIds(filteredPosts.map((post) => post.id))
+                    setSelectedIds(visiblePosts.map((post) => post.id))
                   } else {
                     setSelectedIds([])
                   }
@@ -234,6 +319,8 @@ export default function DashboardPage() {
             <span>Post</span>
             <span>Status</span>
             <span>Updated</span>
+            <span>Views</span>
+            <span>Comments</span>
             <span className="text-right">Actions</span>
           </div>
           {selectedIds.length > 0 && (
@@ -265,10 +352,10 @@ export default function DashboardPage() {
             </div>
           )}
           <div className="divide-y divide-[var(--border-light)]">
-            {filteredPosts.map((post) => (
+            {visiblePosts.map((post) => (
               <div
                 key={post.id}
-                className="grid grid-cols-1 md:grid-cols-[40px_minmax(0,1fr)_140px_160px_220px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                className="grid grid-cols-1 md:grid-cols-[40px_minmax(0,1fr)_120px_140px_120px_120px_180px] gap-3 md:gap-4 px-5 py-4 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
               >
                 <div className="hidden md:flex items-center justify-center">
                   <input
@@ -303,6 +390,10 @@ export default function DashboardPage() {
                       <Globe size={12} />
                       Published
                     </span>
+                  ) : post.status === 'scheduled' ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded-full">
+                      Scheduled
+                    </span>
                   ) : post.status === 'archived' ? (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
                       Archived
@@ -322,6 +413,18 @@ export default function DashboardPage() {
                     <Clock size={12} />
                     {new Date(post.updated_at).toLocaleDateString()}
                   </span>
+                </div>
+                <div className="text-sm text-[var(--text-primary)]">
+                  {(metrics[post.id]?.views || 0).toLocaleString()}
+                  <p className="text-[10px] text-[var(--text-tertiary)]">
+                    {(metrics[post.id]?.recentViews || 0).toLocaleString()} last 7d
+                  </p>
+                </div>
+                <div className="text-sm text-[var(--text-primary)]">
+                  {(metrics[post.id]?.comments || 0).toLocaleString()}
+                  <p className="text-[10px] text-[var(--text-tertiary)]">
+                    visible comments
+                  </p>
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   {post.status === 'draft' && (

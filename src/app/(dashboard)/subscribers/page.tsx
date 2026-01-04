@@ -7,8 +7,10 @@ import { createClient } from '@/lib/supabase/client'
 import { 
   Users, Mail, Download, Search, UserPlus,
   Check, Clock, AlertCircle, UserMinus, Loader2,
-  Copy, ExternalLink
+  Copy, ExternalLink, MessageSquare, X
 } from 'lucide-react'
+
+const NOTES_STORAGE_KEY = 'neolog_subscriber_notes_v1'
 
 type Subscriber = {
   id: string
@@ -43,12 +45,29 @@ export default function SubscribersPage() {
   const [tab, setTab] = useState<'all' | 'users' | 'email'>('all')
   const [copied, setCopied] = useState<string | null>(null)
   const [emailSegment, setEmailSegment] = useState<'all' | 'active' | 'pending' | 'unsubscribed' | 'bounced' | 'complained'>('all')
+  const [notes, setNotes] = useState<Record<string, { text: string; updatedAt: string }>>({})
+  const [noteTarget, setNoteTarget] = useState<{ id: string; label: string; type: 'user' | 'email' } | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
   
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     loadSubscribers()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const raw = window.localStorage.getItem(NOTES_STORAGE_KEY)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        setNotes(parsed)
+      }
+    } catch (error) {
+      console.error('Failed to load subscriber notes', error)
+    }
   }, [])
 
   const loadSubscribers = async () => {
@@ -212,6 +231,44 @@ export default function SubscribersPage() {
     })
   }
 
+  const getNoteKey = (type: 'user' | 'email', id: string) => `${type}:${id}`
+
+  const openNote = (id: string, label: string, type: 'user' | 'email') => {
+    const key = getNoteKey(type, id)
+    setNoteTarget({ id, label, type })
+    setNoteDraft(notes[key]?.text || '')
+  }
+
+  const saveNote = () => {
+    if (!noteTarget) return
+    const key = getNoteKey(noteTarget.type, noteTarget.id)
+    const next = {
+      ...notes,
+      [key]: {
+        text: noteDraft.trim(),
+        updatedAt: new Date().toISOString(),
+      },
+    }
+    setNotes(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(next))
+    }
+    setNoteTarget(null)
+  }
+
+  const clearNote = () => {
+    if (!noteTarget) return
+    const key = getNoteKey(noteTarget.type, noteTarget.id)
+    const next = { ...notes }
+    delete next[key]
+    setNotes(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(next))
+    }
+    setNoteTarget(null)
+    setNoteDraft('')
+  }
+
   return (
     <main className="pb-16">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
@@ -362,6 +419,11 @@ export default function SubscribersPage() {
                           <p className="text-sm text-[var(--text-tertiary)]">
                             @{sub.subscriber.username}
                           </p>
+                          {notes[getNoteKey('user', sub.subscriber.id)]?.text && (
+                            <p className="text-xs text-[var(--text-secondary)] mt-1 truncate">
+                              Note: {notes[getNoteKey('user', sub.subscriber.id)]?.text}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div>
@@ -387,6 +449,13 @@ export default function SubscribersPage() {
                           title={sub.email_new_posts ? 'Mute email updates' : 'Enable email updates'}
                         >
                           {sub.email_new_posts ? <Mail size={14} /> : <UserMinus size={14} />}
+                        </button>
+                        <button
+                          onClick={() => openNote(sub.subscriber.id, sub.subscriber.display_name || sub.subscriber.username, 'user')}
+                          className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                          title="Add note"
+                        >
+                          <MessageSquare size={14} />
                         </button>
                       </div>
                     </div>
@@ -417,9 +486,14 @@ export default function SubscribersPage() {
                             <Mail size={18} className="text-[var(--text-tertiary)]" />
                           </div>
                           <div>
-                            <p className="font-medium text-[var(--text-primary)]">{sub.email}</p>
+                          <p className="font-medium text-[var(--text-primary)]">{sub.email}</p>
                             {sub.name && (
                               <p className="text-sm text-[var(--text-tertiary)]">{sub.name}</p>
+                            )}
+                            {notes[getNoteKey('email', sub.id)]?.text && (
+                              <p className="text-xs text-[var(--text-secondary)] mt-1 truncate">
+                                Note: {notes[getNoteKey('email', sub.id)]?.text}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -467,6 +541,13 @@ export default function SubscribersPage() {
                           >
                             <UserMinus size={14} />
                           </button>
+                          <button
+                            onClick={() => openNote(sub.id, sub.email, 'email')}
+                            className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                            title="Add note"
+                          >
+                            <MessageSquare size={14} />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -476,6 +557,59 @@ export default function SubscribersPage() {
           </div>
         )}
       </div>
+
+      {noteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)]">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Subscriber note</p>
+                <p className="text-base font-medium text-[var(--text-primary)]">{noteTarget.label}</p>
+              </div>
+              <button
+                onClick={() => setNoteTarget(null)}
+                className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                title="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <textarea
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Add context, preferences, or follow-ups..."
+                className="input min-h-[140px] resize-none"
+              />
+              <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                Notes are saved locally in this browser.
+              </p>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4 border-t border-[var(--border-light)]">
+              <button
+                onClick={clearNote}
+                className="text-sm text-[var(--error)] hover:underline"
+              >
+                Clear note
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setNoteTarget(null)}
+                  className="px-4 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNote}
+                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium hover:bg-[var(--accent-hover)] transition-colors"
+                >
+                  Save note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
