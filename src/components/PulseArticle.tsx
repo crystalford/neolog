@@ -23,6 +23,12 @@ const sourceLabel = (source: string) => {
   return 'Link'
 }
 
+const sourceBadge = (source: string) => {
+  if (source === 'x') return 'pulse-platform pulse-platform--x'
+  if (source === 'reddit') return 'pulse-platform pulse-platform--reddit'
+  return 'pulse-platform pulse-platform--link'
+}
+
 export function PulseArticle({ pulse }: PulseArticleProps) {
   return (
     <section className="pulse-article">
@@ -44,9 +50,9 @@ export function PulseArticle({ pulse }: PulseArticleProps) {
           {pulse.cards.map((card) => (
             <article key={card.id} className="pulse-card">
               <div className="pulse-card__meta">
+                <span className={sourceBadge(card.source)}>{sourceLabel(card.source)}</span>
                 <span className={labelClass(card.label)}>{card.label}</span>
                 <span className={sentimentClass(card.sentiment)}>{card.sentiment || 'neutral'}</span>
-                <span className="pulse-source">{sourceLabel(card.source)}</span>
               </div>
               <div className="pulse-card__header">
                 <div className="pulse-avatar">

@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
           author: post.author ? `u/${post.author}` : '',
           body: post.selftext || post.title || '',
           url: `https://www.reddit.com${post.permalink || ''}`,
+          avatar_url: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : '',
           timestamp: post.created_utc
             ? new Date(post.created_utc * 1000).toLocaleString()
             : '',

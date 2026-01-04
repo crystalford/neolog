@@ -927,6 +927,7 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pulse-label {
@@ -956,11 +957,33 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   background: var(--bg-secondary);
 }
 
-.pulse-source {
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+.pulse-platform {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.pulse-platform--x {
+  background: #0a0a0a;
+  color: #ffffff;
+  border-color: #0a0a0a;
+}
+
+.pulse-platform--reddit {
+  background: rgba(255, 69, 0, 0.12);
+  color: #ea580c;
+  border-color: rgba(255, 69, 0, 0.25);
+}
+
+.pulse-platform--link {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.2);
 }
 
 .pulse-sentiment {

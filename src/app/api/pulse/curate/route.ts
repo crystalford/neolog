@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
           author: post.author ? `u/${post.author}` : '',
           body: post.title,
           url: `https://www.reddit.com${post.permalink || ''}`,
+          avatar_url: post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : '',
         })
       })
     }
