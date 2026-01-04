@@ -153,7 +153,7 @@ export function Webmentions({ postId }: WebmentionsProps) {
                     rel="noopener noreferrer"
                     className="text-xs text-[var(--accent)] hover:underline mt-2 inline-block"
                   >
-                    View original  > 
+                    View original &gt;
                   </a>
                 </div>
               </div>
