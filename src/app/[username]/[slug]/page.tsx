@@ -77,6 +77,27 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   if (!post) notFound()
 
+  const { data: tagRows } = await supabase
+    .from('post_tags')
+    .select('tag:tags(id, name, slug, color)')
+    .eq('post_id', post.id)
+
+  const tags = (tagRows || [])
+    .map((row: any) => row.tag)
+    .filter(Boolean)
+
+  const primaryTag = tags[0]
+  let relatedPosts: any[] = []
+  if (primaryTag?.slug) {
+    const { data: related } = await supabase
+      .rpc('get_posts_by_tag', {
+        p_tag_slug: primaryTag.slug,
+        p_limit: 6,
+        p_offset: 0,
+      })
+    relatedPosts = (related || []).filter((item: any) => item.id !== post.id).slice(0, 3)
+  }
+
   const { data: curatedComments } = await supabase
     .from('curated_comments')
     .select('id, source, author_name, author_url, body, score, source_url, created_at')
@@ -174,6 +195,40 @@ export default async function PostPage({ params, searchParams }: Props) {
                   __html: htmlContent
                 }}
               />
+            </div>
+          )}
+
+          {tags.length > 0 && (
+            <div className="max-w-4xl mx-auto mt-12 border-t border-gray-200 pt-8">
+              <h2 className="font-serif text-2xl mb-4 text-gray-900">Where this fits</h2>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {tags.map((tag: any) => (
+                  <Link
+                    key={tag.id}
+                    href={`/tag/${tag.slug}`}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors"
+                  >
+                    #{tag.name}
+                  </Link>
+                ))}
+              </div>
+              {relatedPosts.length > 0 && (
+                <div className="space-y-3">
+                  {relatedPosts.map((related: any) => (
+                    <Link
+                      key={related.id}
+                      href={`/${related.author_username}/${related.slug}`}
+                      className="block p-4 rounded-xl border border-gray-200 hover:border-gray-400 transition-colors"
+                    >
+                      <p className="text-sm text-gray-500 mb-1">More on #{primaryTag?.name}</p>
+                      <p className="text-lg font-medium text-gray-900">{related.title}</p>
+                      {related.excerpt && (
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">{related.excerpt}</p>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

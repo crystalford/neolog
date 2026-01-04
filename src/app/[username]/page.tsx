@@ -60,6 +60,28 @@ export default async function ProfilePage({ params }: Props) {
     .eq('author_id', profile.id)
     .eq('status', 'active')
 
+  let topicTags: Array<{ id: string; name: string; slug: string; color: string; count: number }> = []
+  if (posts && posts.length > 0) {
+    const postIds = posts.map((post) => post.id)
+    const { data: tagRows } = await supabase
+      .from('post_tags')
+      .select('tag:tags(id, name, slug, color), post_id')
+      .in('post_id', postIds)
+
+    const tagMap = new Map<string, { id: string; name: string; slug: string; color: string; count: number }>()
+    ;(tagRows || []).forEach((row: any) => {
+      const tag = row.tag
+      if (!tag) return
+      const existing = tagMap.get(tag.id)
+      if (existing) {
+        existing.count += 1
+      } else {
+        tagMap.set(tag.id, { id: tag.id, name: tag.name, slug: tag.slug, color: tag.color, count: 1 })
+      }
+    })
+    topicTags = Array.from(tagMap.values()).sort((a, b) => b.count - a.count).slice(0, 8)
+  }
+
   const joinedDate = new Date(profile.created_at).toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric'
@@ -165,6 +187,28 @@ export default async function ProfilePage({ params }: Props) {
               </div>
             )}
           </section>
+
+          {topicTags.length > 0 && (
+            <section className="mt-10 border-t border-[var(--border-light)] pt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-xl">Topic map</h2>
+                <Link href="/explore" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
+                  Explore tags
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {topicTags.map((tag) => (
+                  <Link
+                    key={tag.id}
+                    href={`/tag/${tag.slug}`}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  >
+                    #{tag.name} - {tag.count}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </main>
     </>
