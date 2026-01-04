@@ -75,6 +75,14 @@ export function RichEditor({
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none min-h-[300px]',
       },
+      // Enable HTML pasting - preserve formatting when pasting HTML
+      transformPastedHTML(html) {
+        return html
+      },
+      // Also handle pasted text
+      transformPastedText(text) {
+        return text
+      },
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
