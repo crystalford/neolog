@@ -10,6 +10,9 @@ interface Props {
     username: string
     slug: string
   }
+  searchParams: {
+    preview?: string
+  }
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -45,8 +48,9 @@ export async function generateMetadata({ params }: Props) {
   })
 }
 
-export default async function PostPage({ params }: Props) {
+export default async function PostPage({ params, searchParams }: Props) {
   const supabase = createClient()
+  const isPreview = searchParams?.preview === 'true'
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -56,13 +60,19 @@ export default async function PostPage({ params }: Props) {
 
   if (!profile) notFound()
 
-  const { data: post } = await supabase
+  // If preview mode, don't filter by status
+  const postQuery = supabase
     .from('posts')
     .select('*')
     .eq('author_id', profile.id)
     .eq('slug', params.slug)
-    .eq('status', 'published')
-    .single()
+
+  // Only filter by published status if not in preview mode
+  if (!isPreview) {
+    postQuery.eq('status', 'published')
+  }
+
+  const { data: post } = await postQuery.single()
 
   if (!post) notFound()
 
@@ -78,6 +88,11 @@ export default async function PostPage({ params }: Props) {
     <>
       <Header />
       <main className="pt-20">
+        {isPreview && (
+          <div className="bg-black text-white py-2 px-4 text-center text-sm font-medium">
+            Preview Mode - This is a draft post
+          </div>
+        )}
         <article className="max-w-2xl mx-auto px-6 py-12">
           <header className="mb-8">
             <Link
