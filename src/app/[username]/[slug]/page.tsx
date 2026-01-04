@@ -97,7 +97,7 @@ export default async function PostPage({ params, searchParams }: Props) {
           </div>
         )}
         <article className="px-6 py-12">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <header className="mb-8">
               <Link
                 href={`/${params.username}`}
@@ -156,11 +156,11 @@ export default async function PostPage({ params, searchParams }: Props) {
           </div>
 
           {isFullHtml ? (
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               <HtmlIframe html={htmlContent} className="mt-6" />
             </div>
           ) : (
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               <div
                 className="prose prose-lg max-w-none"
                 dangerouslySetInnerHTML={{
