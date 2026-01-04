@@ -40,8 +40,9 @@ export type Post = {
   reading_time_minutes: number | null
   
   // Status
-  status: 'draft' | 'published' | 'archived'
+  status: 'draft' | 'published' | 'archived' | 'scheduled'
   published_at: string | null
+  scheduled_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -415,6 +416,25 @@ export type EmailSubscriber = {
   unsubscribe_token: string
   unsubscribed_at: string | null
   source: string | null
+  created_at: string
+}
+
+export type SubscriberNote = {
+  id: string
+  creator_id: string
+  subscriber_id: string | null
+  email_subscriber_id: string | null
+  note: string
+  created_at: string
+  updated_at: string
+}
+
+export type SubscriberTag = {
+  id: string
+  creator_id: string
+  subscriber_id: string | null
+  email_subscriber_id: string | null
+  tag: string
   created_at: string
 }
 

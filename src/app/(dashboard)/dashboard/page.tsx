@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ShareDraftButton } from '@/components/ShareDraftButton'
+import { BulkPostActions } from '@/components/BulkPostActions'
 import type { Post, Profile } from '@/types/database'
 import {
   PenLine, Eye, Edit2, Trash2,
-  Globe, FileText, Clock, Search
+  Globe, FileText, Clock, Search, BarChart3, Calendar
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -20,6 +21,10 @@ export default function DashboardPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'latest' | 'trending' | 'discussed' | 'views'>('latest')
   const [metrics, setMetrics] = useState<Record<string, { views: number; recentViews: number; comments: number }>>({})
+  const [showBulkActions, setShowBulkActions] = useState(false)
+  const [scheduleTarget, setScheduleTarget] = useState<Post | null>(null)
+  const [scheduleDraft, setScheduleDraft] = useState('')
+  const [analyticsPost, setAnalyticsPost] = useState<Post | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -138,6 +143,63 @@ export default function DashboardPage() {
     setSelectedIds([])
   }
 
+  const updatePostStatus = async (post: Post, nextStatus: Post['status']) => {
+    const updates: Record<string, any> = { status: nextStatus }
+
+    if (nextStatus === 'published') {
+      updates.published_at = post.published_at || new Date().toISOString()
+      updates.scheduled_at = null
+    }
+
+    if (nextStatus === 'draft') {
+      updates.published_at = null
+      updates.scheduled_at = null
+    }
+
+    if (nextStatus === 'archived') {
+      updates.scheduled_at = null
+    }
+
+    await supabase
+      .from('posts')
+      .update(updates)
+      .eq('id', post.id)
+
+    setPosts((prev) =>
+      prev.map((item) =>
+        item.id === post.id
+          ? {
+              ...item,
+              ...updates,
+            }
+          : item
+      )
+    )
+  }
+
+  const handleSchedule = async () => {
+    if (!scheduleTarget || !scheduleDraft) return
+    const scheduledAtIso = new Date(scheduleDraft).toISOString()
+
+    await supabase
+      .from('posts')
+      .update({
+        status: 'scheduled',
+        scheduled_at: scheduledAtIso,
+      })
+      .eq('id', scheduleTarget.id)
+
+    setPosts((prev) =>
+      prev.map((item) =>
+        item.id === scheduleTarget.id
+          ? { ...item, status: 'scheduled', scheduled_at: scheduledAtIso }
+          : item
+      )
+    )
+    setScheduleTarget(null)
+    setScheduleDraft('')
+  }
+
   if (loading) {
     return (
       <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
@@ -192,6 +254,13 @@ export default function DashboardPage() {
   const allVisibleSelected =
     visiblePosts.length > 0 &&
     visiblePosts.every((post) => selectedIds.includes(post.id))
+
+  const getStatusClasses = (status: Post['status']) => {
+    if (status === 'published') return 'text-[var(--success)] bg-[var(--success)]/10'
+    if (status === 'scheduled') return 'text-[var(--warning)] bg-[var(--warning)]/10'
+    if (status === 'archived') return 'text-[var(--text-tertiary)] bg-[var(--bg-tertiary)]'
+    return 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)]'
+  }
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
@@ -330,23 +399,16 @@ export default function DashboardPage() {
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleBulkArchive}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                  onClick={() => setShowBulkActions(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-[var(--accent)] text-[var(--text-inverse)] hover:bg-[var(--accent-hover)] transition-colors"
                 >
-                  Archive
+                  Bulk actions
                 </button>
                 <button
-                  onClick={handleBulkRestore}
+                  onClick={() => setSelectedIds([])}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
                 >
-                  Restore
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[var(--error)] border border-[var(--error)]/30 hover:bg-[var(--error)]/10 transition-colors"
-                >
-                  <Trash2 size={14} />
-                  Delete
+                  Clear
                 </button>
               </div>
             </div>
@@ -385,25 +447,27 @@ export default function DashboardPage() {
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
                     Status
                   </span>
-                  {post.status === 'published' ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--success)] bg-[var(--success)]/10 px-2 py-0.5 rounded-full">
-                      <Globe size={12} />
-                      Published
-                    </span>
-                  ) : post.status === 'scheduled' ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--warning)] bg-[var(--warning)]/10 px-2 py-0.5 rounded-full">
-                      Scheduled
-                    </span>
-                  ) : post.status === 'archived' ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
-                      Archived
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
-                      <FileText size={12} />
-                      Draft
-                    </span>
-                  )}
+                  <select
+                    value={post.status}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value as Post['status']
+                      if (nextStatus === 'scheduled') {
+                        setScheduleTarget(post)
+                        const nextValue = post.scheduled_at
+                          ? new Date(post.scheduled_at).toISOString().slice(0, 16)
+                          : new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 16)
+                        setScheduleDraft(nextValue)
+                        return
+                      }
+                      updatePostStatus(post, nextStatus)
+                    }}
+                    className={`text-xs font-medium px-3 py-1 rounded-full border border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${getStatusClasses(post.status)}`}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="archived">Archived</option>
+                  </select>
                 </div>
                 <div className="text-xs text-[var(--text-tertiary)] flex items-center gap-2">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
@@ -443,6 +507,13 @@ export default function DashboardPage() {
                       <Eye size={14} />
                     </Link>
                   )}
+                  <button
+                    onClick={() => setAnalyticsPost(post)}
+                    className="p-2 rounded-lg border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                    title="View analytics"
+                  >
+                    <BarChart3 size={14} />
+                  </button>
                   <Link
                     href={`/write?edit=${post.id}`}
                     className="p-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
@@ -461,6 +532,142 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {showBulkActions && (
+        <BulkPostActions
+          selectedPostIds={selectedIds}
+          onComplete={() => {
+            setShowBulkActions(false)
+            setSelectedIds([])
+            loadData()
+          }}
+          onCancel={() => setShowBulkActions(false)}
+        />
+      )}
+
+      {scheduleTarget && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setScheduleTarget(null)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
+            <h3 className="font-display text-xl text-[var(--text-primary)] mb-2">
+              Schedule post
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              Choose when "{scheduleTarget.title || 'Untitled'}" should go live.
+            </p>
+            <div className="space-y-3">
+              <label className="block text-sm text-[var(--text-secondary)]">
+                Publish date
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduleDraft}
+                onChange={(event) => setScheduleDraft(event.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="input w-full"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button
+                onClick={() => setScheduleTarget(null)}
+                className="btn btn-secondary btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSchedule}
+                disabled={!scheduleDraft}
+                className="btn btn-primary btn-sm disabled:opacity-60"
+              >
+                Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analyticsPost && (
+        <div className="fixed inset-0 z-40">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setAnalyticsPost(null)}
+          />
+          <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)]">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                  Analytics
+                </p>
+                <h2 className="font-display text-xl text-[var(--text-primary)]">
+                  {analyticsPost.title || 'Untitled'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setAnalyticsPost(null)}
+                className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+                aria-label="Close analytics"
+              >
+                X
+              </button>
+            </div>
+            <div className="px-6 py-6 space-y-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Views</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+                    {(metrics[analyticsPost.id]?.views || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    {(metrics[analyticsPost.id]?.recentViews || 0).toLocaleString()} in last 7 days
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Comments</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+                    {(metrics[analyticsPost.id]?.comments || 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">Visible comments</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Status</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(analyticsPost.status)}`}>
+                    {analyticsPost.status}
+                  </span>
+                  {analyticsPost.status === 'scheduled' && analyticsPost.scheduled_at && (
+                    <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
+                      <Calendar size={12} />
+                      {new Date(analyticsPost.scheduled_at).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {analyticsPost.status === 'published' && profile && (
+                  <Link
+                    href={`/${profile.username}/${analyticsPost.slug}`}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    View post
+                  </Link>
+                )}
+                <Link
+                  href={`/write?edit=${analyticsPost.id}`}
+                  className="btn btn-primary btn-sm"
+                >
+                  Edit post
+                </Link>
+              </div>
+            </div>
+          </aside>
         </div>
       )}
     </main>

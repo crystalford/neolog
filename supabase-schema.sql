@@ -232,6 +232,41 @@ create table public.email_subscribers (
   constraint unique_email_subscriber unique (creator_id, email)
 );
 
+-- Subscriber notes (creator-only notes for audience management)
+create table public.subscriber_notes (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade not null,
+  subscriber_id uuid references public.profiles(id) on delete cascade,
+  email_subscriber_id uuid references public.email_subscribers(id) on delete cascade,
+  note text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint subscriber_note_target check (
+    (subscriber_id is not null and email_subscriber_id is null)
+    or (subscriber_id is null and email_subscriber_id is not null)
+  ),
+  constraint unique_user_subscriber_note unique (creator_id, subscriber_id),
+  constraint unique_email_subscriber_note unique (creator_id, email_subscriber_id)
+);
+
+-- Subscriber tags (lightweight labeling for audience management)
+create table public.subscriber_tags (
+  id uuid default uuid_generate_v4() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade not null,
+  subscriber_id uuid references public.profiles(id) on delete cascade,
+  email_subscriber_id uuid references public.email_subscribers(id) on delete cascade,
+  tag text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint subscriber_tag_target check (
+    (subscriber_id is not null and email_subscriber_id is null)
+    or (subscriber_id is null and email_subscriber_id is not null)
+  ),
+  constraint unique_user_subscriber_tag unique (creator_id, subscriber_id, tag),
+  constraint unique_email_subscriber_tag unique (creator_id, email_subscriber_id, tag)
+);
+
 -- =============================================
 -- INDEXES FOR PERFORMANCE
 -- =============================================
@@ -250,6 +285,13 @@ create index subscriptions_subscriber_idx on public.subscriptions(subscriber_id)
 create index subscriptions_creator_idx on public.subscriptions(creator_id);
 create index email_subscribers_creator_idx on public.email_subscribers(creator_id);
 create index email_subscribers_email_idx on public.email_subscribers(email);
+create index subscriber_notes_creator_idx on public.subscriber_notes(creator_id);
+create index subscriber_notes_subscriber_idx on public.subscriber_notes(subscriber_id);
+create index subscriber_notes_email_subscriber_idx on public.subscriber_notes(email_subscriber_id);
+create index subscriber_tags_creator_idx on public.subscriber_tags(creator_id);
+create index subscriber_tags_subscriber_idx on public.subscriber_tags(subscriber_id);
+create index subscriber_tags_email_subscriber_idx on public.subscriber_tags(email_subscriber_id);
+create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 
 -- =============================================
 -- ROW LEVEL SECURITY (RLS)
@@ -266,6 +308,8 @@ alter table public.post_tags enable row level security;
 alter table public.drafts enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.email_subscribers enable row level security;
+alter table public.subscriber_notes enable row level security;
+alter table public.subscriber_tags enable row level security;
 
 -- PROFILES policies
 create policy "Public profiles are viewable by everyone"
@@ -443,6 +487,10 @@ create trigger posts_updated_at
   before update on public.posts
   for each row execute procedure public.handle_updated_at();
 
+create trigger subscriber_notes_updated_at
+  before update on public.subscriber_notes
+  for each row execute procedure public.handle_updated_at();
+
 -- Function to calculate reading time
 create or replace function public.calculate_reading_time(content text)
 returns integer as $$
@@ -484,7 +532,8 @@ returns trigger as $$
 begin
   if new.status = 'published' and (old.status is null or old.status != 'published') then
     insert into public.post_versions (post_id, version_number, title, content, content_html, changed_by, change_summary)
-    values (new.id, 1, new.title, new.content, new.content_html, new.author_id, 'Initial publication');
+    values (new.id, 1, new.title, new.content, new.content_html, new.author_id, 'Initial publication')
+    on conflict (post_id, version_number) do nothing;
   end if;
   return new;
 end;
@@ -1769,6 +1818,22 @@ create policy "Creators can view their email subscribers"
 
 create policy "Creators can manage their email subscribers"
   on public.email_subscribers for all
+  using (auth.uid() = creator_id);
+
+create policy "Creators can view subscriber notes"
+  on public.subscriber_notes for select
+  using (auth.uid() = creator_id);
+
+create policy "Creators can manage subscriber notes"
+  on public.subscriber_notes for all
+  using (auth.uid() = creator_id);
+
+create policy "Creators can view subscriber tags"
+  on public.subscriber_tags for select
+  using (auth.uid() = creator_id);
+
+create policy "Creators can manage subscriber tags"
+  on public.subscriber_tags for all
   using (auth.uid() = creator_id);
 
 -- =============================================

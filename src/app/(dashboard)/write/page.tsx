@@ -33,6 +33,7 @@ export default function WritePage() {
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
+  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('draft')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -45,6 +46,8 @@ export default function WritePage() {
   const [htmlMode, setHtmlMode] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
+  const [lastVersion, setLastVersion] = useState<{ title: string; content: string | null } | null>(null)
+  const [scheduledPosts, setScheduledPosts] = useState<any[]>([])
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -60,6 +63,11 @@ export default function WritePage() {
       loadPost(editId)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (!user || !publicationId) return
+    loadScheduledQueue(user.id, publicationId)
+  }, [user, publicationId])
 
   const loadSelectedPublication = async () => {
     try {
@@ -153,7 +161,42 @@ export default function WritePage() {
       setScheduledAt(scheduledValue)
       setHtmlMode(shouldUseHtmlMode(post.content || ''))
       setExistingStatus(post.status || null)
+      if (post.status === 'published') {
+        setPublishIntent('publish')
+      } else if (post.status === 'scheduled') {
+        setPublishIntent('schedule')
+      } else {
+        setPublishIntent('draft')
+      }
+
+      const { data: version } = await supabase
+        .from('post_versions')
+        .select('title, content, content_html')
+        .eq('post_id', post.id)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (version) {
+        setLastVersion({
+          title: version.title,
+          content: version.content_html || version.content,
+        })
+      }
     }
+  }
+
+  const loadScheduledQueue = async (userId: string, publication: string) => {
+    const { data } = await supabase
+      .from('posts')
+      .select('id, title, scheduled_at, status')
+      .eq('author_id', userId)
+      .eq('publication_id', publication)
+      .eq('status', 'scheduled')
+      .order('scheduled_at', { ascending: true })
+      .limit(5)
+
+    setScheduledPosts(data || [])
   }
 
   // Generate slug from title
@@ -334,7 +377,8 @@ export default function WritePage() {
     }
 
     const isAlreadyPublished = liveStatus === 'published'
-    const isScheduling = Boolean(scheduledAt) && !isAlreadyPublished
+    const intent = isAlreadyPublished ? 'publish' : publishIntent
+    const isScheduling = intent === 'schedule' && Boolean(scheduledAt)
     const statusValue = isScheduling ? 'scheduled' : isAlreadyPublished ? 'published' : 'draft'
     
     const postData = {
@@ -379,7 +423,7 @@ export default function WritePage() {
     } finally {
       setSaving(false)
     }
-  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId])
+  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent])
 
   // Debounced auto-save
   useEffect(() => {
@@ -397,7 +441,8 @@ export default function WritePage() {
     }
 
     const isAlreadyPublished = existingStatus === 'published'
-    const isScheduling = Boolean(scheduledAt) && !isAlreadyPublished
+    const intent = isAlreadyPublished ? 'publish' : publishIntent
+    const isScheduling = intent === 'schedule'
 
     const preflight = [
       { label: 'Title added', ok: title.trim().length >= 5, required: true },
@@ -417,6 +462,16 @@ export default function WritePage() {
         `Publish anyway? Missing: ${missingOptional.map((item) => item.label).join(', ')}`
       )
       if (!proceed) return
+    }
+
+    if (intent === 'draft') {
+      setError('This post is still set to Draft. Switch the status to Publish or Schedule.')
+      return
+    }
+
+    if (isScheduling && !scheduledAt) {
+      setError('Pick a schedule time to schedule this post.')
+      return
     }
 
     if (isScheduling && new Date(scheduledAt) <= new Date()) {
@@ -574,6 +629,7 @@ export default function WritePage() {
         : 'Post published successfully! Redirecting...'
 
       setSuccess(successMessage)
+      setExistingStatus(isScheduling ? 'scheduled' : 'published')
 
       setTimeout(() => {
         if (currentProfile) {
@@ -620,11 +676,20 @@ export default function WritePage() {
     )
   }
 
+  const resolvedIntent = existingStatus === 'published' ? 'publish' : publishIntent
+
   const publishLabel = existingStatus === 'published'
     ? 'Update'
-    : scheduledAt
+    : resolvedIntent === 'schedule'
     ? 'Schedule'
     : 'Publish'
+
+  const previousWordCount = lastVersion?.content
+    ? getWordCount(lastVersion.content)
+    : 0
+  const currentWordCount = getWordCount(content)
+  const wordDelta = lastVersion ? currentWordCount - previousWordCount : null
+  const titleChanged = lastVersion ? lastVersion.title !== title : false
 
   return (
     <main className="pb-16">
@@ -898,6 +963,43 @@ export default function WritePage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Status
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { value: 'draft', label: 'Draft' },
+                        { value: 'publish', label: 'Publish' },
+                        { value: 'schedule', label: 'Schedule' },
+                      ] as const).map((item) => (
+                        <button
+                          key={item.value}
+                          onClick={() => {
+                            if (existingStatus === 'published' && item.value !== 'publish') return
+                            setPublishIntent(item.value)
+                            if (item.value !== 'schedule') {
+                              setScheduledAt('')
+                            }
+                          }}
+                          className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+                            resolvedIntent === item.value
+                              ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
+                              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                          } ${existingStatus === 'published' && item.value !== 'publish' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          type="button"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    {existingStatus === 'published' && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                        Published posts stay live. Use Update to publish revisions.
+                      </p>
+                    )}
+                  </div>
+
                   <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                     <div>
                       <p className="font-medium text-[var(--text-primary)]">Premium only</p>
@@ -921,13 +1023,35 @@ export default function WritePage() {
                       type="datetime-local"
                       value={scheduledAt}
                       onChange={(e) => setScheduledAt(e.target.value)}
-                      disabled={existingStatus === 'published'}
+                      disabled={existingStatus === 'published' || resolvedIntent !== 'schedule'}
                       className="input"
                     />
                     {existingStatus === 'published' && (
                       <p className="text-xs text-[var(--text-tertiary)] mt-2">
                         Scheduling is only available for drafts.
                       </p>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">Scheduled queue</h3>
+                    {scheduledPosts.length === 0 ? (
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        No scheduled posts for this publication.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {scheduledPosts.map((post) => (
+                          <div key={post.id} className="flex items-center justify-between text-sm">
+                            <span className="text-[var(--text-secondary)] truncate max-w-[180px]">
+                              {post.title || 'Untitled'}
+                            </span>
+                            <span className="text-xs text-[var(--text-tertiary)]">
+                              {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : 'TBD'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
 
@@ -1018,10 +1142,16 @@ export default function WritePage() {
                   <div className="flex items-center justify-between">
                     <span>Status</span>
                     <span className="text-[var(--text-primary)] font-medium">
-                      {existingStatus === 'published' ? 'Published' : scheduledAt ? 'Scheduled' : 'Draft'}
+                      {existingStatus === 'published'
+                        ? 'Published'
+                        : resolvedIntent === 'schedule'
+                        ? 'Scheduled'
+                        : resolvedIntent === 'publish'
+                        ? 'Publish'
+                        : 'Draft'}
                     </span>
                   </div>
-                  {scheduledAt && (
+                  {resolvedIntent === 'schedule' && scheduledAt && (
                     <div className="flex items-center justify-between">
                       <span>Schedule time</span>
                       <span className="text-[var(--text-primary)] font-medium">
@@ -1036,6 +1166,30 @@ export default function WritePage() {
                     </span>
                   </div>
                 </div>
+                {lastVersion && (
+                  <div className="mt-4 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-sm text-[var(--text-secondary)]">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                      Changes since last version
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span>Title</span>
+                      <span className="text-[var(--text-primary)] font-medium">
+                        {titleChanged ? 'Updated' : 'No change'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span>Word count</span>
+                      <span className="text-[var(--text-primary)] font-medium">
+                        {currentWordCount.toLocaleString()}
+                        {wordDelta !== null && (
+                          <span className="text-[var(--text-tertiary)]">
+                            {' '}({wordDelta >= 0 ? '+' : ''}{wordDelta})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-end gap-2 mt-6">
                   <button
                     onClick={() => setShowPublishConfirm(false)}

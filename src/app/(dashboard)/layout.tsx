@@ -163,8 +163,8 @@ export default function DashboardLayout({
   return (
     <div className="dashboard-shell flex min-h-screen bg-[var(--bg-secondary)]">
       {/* Sidebar */}
-      <aside className="w-[264px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
-        <div className="px-5 pt-6">
+      <aside className="w-[248px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
+        <div className="px-4 pt-5">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] flex items-center justify-center font-bold text-xs">
               N
@@ -174,7 +174,7 @@ export default function DashboardLayout({
 
           <Link
             href="/write"
-            className="mt-6 inline-flex items-center justify-between w-full gap-2 px-3 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium shadow-sm hover:bg-[var(--accent-hover)] transition-colors"
+            className="mt-5 inline-flex items-center justify-between w-full gap-2 px-3 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium shadow-sm hover:bg-[var(--accent-hover)] transition-colors"
           >
             <span className="flex items-center gap-2">
               <PenLine size={16} />
@@ -184,10 +184,10 @@ export default function DashboardLayout({
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-4">
           {navSections.map((section) => (
             <div key={section.title}>
-              <p className="px-3 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+              <p className="px-2 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
                 {section.title}
               </p>
               <div className="space-y-1">
@@ -199,7 +199,7 @@ export default function DashboardLayout({
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                         isActive
                           ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
@@ -215,10 +215,10 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        <div className="border-t border-[var(--border-light)] px-4 py-4 space-y-1">
+        <div className="border-t border-[var(--border-light)] px-3 py-4 space-y-1">
           <Link
             href="/settings"
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               pathname === '/settings'
                 ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
@@ -231,7 +231,7 @@ export default function DashboardLayout({
           {profile && (
             <Link
               href={`/${profile.username}`}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
               {profile.avatar_url ? (
                 <img
@@ -250,7 +250,7 @@ export default function DashboardLayout({
 
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
           >
             <LogOut size={16} />
             <span>Sign out</span>
@@ -261,7 +261,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="dashboard-surface flex-1 flex flex-col">
         <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)]">
-          <div className="h-16 px-6 lg:px-12 flex items-center justify-between">
+          <div className="h-14 px-6 lg:px-12 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                 Publisher workspace
@@ -291,6 +291,14 @@ export default function DashboardLayout({
                 <PenLine size={16} />
                 New post
               </Link>
+              {profile && (
+                <Link
+                  href={`/${profile.username}`}
+                  className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                >
+                  View site
+                </Link>
+              )}
               {profile && (
                 <Link
                   href={`/${profile.username}`}

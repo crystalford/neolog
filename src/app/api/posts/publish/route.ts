@@ -31,44 +31,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    // Check if already published
-    if (post.status === 'published') {
-      return NextResponse.json({ error: 'Post already published' }, { status: 400 })
+    const alreadyPublished = post.status === 'published'
+
+    if (!alreadyPublished) {
+      const { error: publishError } = await supabase
+        .from('posts')
+        .update({
+          status: 'published',
+          published_at: new Date().toISOString(),
+        })
+        .eq('id', postId)
+
+      if (publishError) {
+        return NextResponse.json({ error: 'Failed to publish' }, { status: 500 })
+      }
+
+      const { data: latestVersion } = await supabase
+        .from('post_versions')
+        .select('version_number')
+        .eq('post_id', postId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const nextVersionNumber = (latestVersion?.version_number || 0) + 1
+
+      await supabase
+        .from('post_versions')
+        .upsert({
+          post_id: postId,
+          version_number: nextVersionNumber,
+          title: post.title,
+          content: post.content,
+          content_html: post.content_html,
+          change_summary: 'Published',
+          changed_by: session.user.id,
+        }, { onConflict: 'post_id,version_number' })
     }
-
-    // Publish the post
-    const { error: publishError } = await supabase
-      .from('posts')
-      .update({
-        status: 'published',
-        published_at: new Date().toISOString(),
-      })
-      .eq('id', postId)
-
-    if (publishError) {
-      return NextResponse.json({ error: 'Failed to publish' }, { status: 500 })
-    }
-
-    // Create a version snapshot with a safe version number
-    const { data: latestVersion } = await supabase
-      .from('post_versions')
-      .select('version_number')
-      .eq('post_id', postId)
-      .order('version_number', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const nextVersionNumber = (latestVersion?.version_number || 0) + 1
-
-    await supabase.from('post_versions').insert({
-      post_id: postId,
-      version_number: nextVersionNumber,
-      title: post.title,
-      content: post.content,
-      content_html: post.content_html,
-      change_summary: 'Published',
-      changed_by: session.user.id,
-    })
 
     // Send notifications if requested
     let notificationResult = { sent: 0, failed: 0 }
