@@ -62,19 +62,19 @@ export default function DashboardPage() {
     const postIds = (postsData || []).map((post) => post.id)
 
     if (postIds.length > 0) {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      const nextMetrics: Record<string, { views: number; recentViews: number; comments: number }> = {}
+      postIds.forEach((id) => {
+        nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
+      })
 
-      const { data: viewRows } = await supabase
-        .from('post_views')
-        .select('post_id, started_at')
+      const { data: statsRows } = await supabase
+        .from('post_stats')
+        .select('post_id, total_views')
         .in('post_id', postIds)
 
-      const { data: recentRows } = await supabase
-        .from('post_views')
-        .select('post_id')
-        .in('post_id', postIds)
-        .gte('started_at', sevenDaysAgo.toISOString())
+      statsRows?.forEach((row: any) => {
+        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views = row.total_views || 0
+      })
 
       const { data: commentRows } = await supabase
         .from('comments')
@@ -82,17 +82,6 @@ export default function DashboardPage() {
         .in('post_id', postIds)
         .eq('status', 'visible')
 
-      const nextMetrics: Record<string, { views: number; recentViews: number; comments: number }> = {}
-      postIds.forEach((id) => {
-        nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
-      })
-
-      viewRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views += 1
-      })
-      recentRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].recentViews += 1
-      })
       commentRows?.forEach((row: any) => {
         if (nextMetrics[row.post_id]) nextMetrics[row.post_id].comments += 1
       })
