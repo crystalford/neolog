@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAutomationKey } from "@/lib/apiKeyAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logProviderUsage } from "@/lib/usage";
 import { resolveProviderKeyWithClient } from "@/lib/ai-provider";
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from "@/lib/embeddings";
 
@@ -159,7 +160,21 @@ export async function POST(req: NextRequest) {
           });
 
           if (text) {
-            const embedding = await embedTextWithOpenAI({ apiKey: provider.key, text });
+            const embedding = await embedTextWithOpenAI({
+              apiKey: provider.key,
+              text,
+              onUsage: (u) => {
+                void logProviderUsage({
+                  userId: auth.userId,
+                  provider: "openai",
+                  model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+                  route: "/api/agent/ingest",
+                  operation: "embeddings",
+                  usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+                  metadata: { post_id: created.id },
+                });
+              },
+            });
             await supabase
               .from("post_embeddings")
               .upsert(

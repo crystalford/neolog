@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -95,6 +96,19 @@ export async function POST(request: NextRequest) {
   const content = data?.choices?.[0]?.message?.content?.trim()
   if (!content) {
     return NextResponse.json({ error: 'No expansion produced' }, { status: 500 })
+  }
+
+  const usage = extractOpenAIStyleUsage(data)
+  if (usage) {
+    const provider = groqKey ? 'groq' : 'openai'
+    await logProviderUsage({
+      userId: session.user.id,
+      provider,
+      model,
+      route: '/api/posts/expand-section',
+      operation: 'chat.completions',
+      usage,
+    })
   }
 
   return NextResponse.json({ expansion: content, model })

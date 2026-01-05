@@ -3,6 +3,7 @@ import { sendNewPostNotifications } from '@/lib/email'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
+import { logProviderUsage } from '@/lib/usage'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Publish a post and notify subscribers
@@ -86,7 +87,21 @@ export async function POST(request: NextRequest) {
           })
 
           if (text) {
-            const embedding = await embedTextWithOpenAI({ apiKey: openaiKey.key, text })
+            const embedding = await embedTextWithOpenAI({
+              apiKey: openaiKey.key,
+              text,
+              onUsage: (u) => {
+                void logProviderUsage({
+                  userId: session.user.id,
+                  provider: 'openai',
+                  model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+                  route: '/api/posts/publish',
+                  operation: 'embeddings',
+                  usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+                  metadata: { post_id: postId },
+                })
+              },
+            })
             await admin
               .from('post_embeddings')
               .upsert(

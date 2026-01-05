@@ -10,6 +10,7 @@ import {
 } from "@/lib/embeddings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { logProviderUsage } from "@/lib/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -149,6 +150,17 @@ export async function GET(req: NextRequest) {
           const embedding = await embedTextWithOpenAI({
             apiKey: actor.openaiKey,
             text: item.text,
+            onUsage: (u) => {
+              void logProviderUsage({
+                userId: actor.userId,
+                provider: "openai",
+                model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+                route: "/api/agent/vector-search",
+                operation: "embeddings",
+                usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+                metadata: { kind: "seed", post_id: item.post_id },
+              });
+            },
           });
           const embeddingValue = vectorLiteral(embedding);
 
@@ -170,7 +182,21 @@ export async function GET(req: NextRequest) {
     }
 
     // Embed the query.
-    const queryEmbedding = await embedTextWithOpenAI({ apiKey: actor.openaiKey, text: q });
+    const queryEmbedding = await embedTextWithOpenAI({
+      apiKey: actor.openaiKey,
+      text: q,
+      onUsage: (u) => {
+        void logProviderUsage({
+          userId: actor.userId,
+          provider: "openai",
+          model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+          route: "/api/agent/vector-search",
+          operation: "embeddings",
+          usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+          metadata: { kind: "query" },
+        });
+      },
+    });
 
     const { data: matches, error: matchError } = await supabase.rpc("match_posts", {
       query_embedding: vectorLiteral(queryEmbedding),

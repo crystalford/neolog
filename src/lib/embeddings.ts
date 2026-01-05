@@ -2,6 +2,10 @@ import crypto from 'crypto'
 
 type EmbeddingResponse = {
   data: Array<{ embedding: number[] }>
+  usage?: {
+    prompt_tokens?: number
+    total_tokens?: number
+  }
 }
 
 export const EMBEDDING_DIM = 1536
@@ -14,6 +18,7 @@ export async function embedTextWithOpenAI(opts: {
   apiKey: string
   text: string
   model?: string
+  onUsage?: (usage: { prompt_tokens?: number; total_tokens?: number }) => void
 }) {
   const apiKey = opts.apiKey
   const text = opts.text
@@ -37,6 +42,12 @@ export async function embedTextWithOpenAI(opts: {
   }
 
   const json = (await res.json()) as EmbeddingResponse
+  if (opts.onUsage && json.usage) {
+    opts.onUsage({
+      prompt_tokens: json.usage.prompt_tokens,
+      total_tokens: json.usage.total_tokens,
+    })
+  }
   const embedding = json.data?.[0]?.embedding
 
   if (!embedding || !Array.isArray(embedding)) {

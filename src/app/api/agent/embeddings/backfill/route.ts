@@ -4,6 +4,7 @@ import { requireAutomationKey } from '@/lib/apiKeyAuth'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
+import { logProviderUsage } from '@/lib/usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,7 +102,21 @@ export async function POST(request: NextRequest) {
 
   let upserted = 0
   for (const item of toUpsert.slice(0, maxUpserts)) {
-    const embedding = await embedTextWithOpenAI({ apiKey: provider.key, text: item.text })
+    const embedding = await embedTextWithOpenAI({
+      apiKey: provider.key,
+      text: item.text,
+      onUsage: (u) => {
+        void logProviderUsage({
+          userId: auth.userId,
+          provider: 'openai',
+          model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+          route: '/api/agent/embeddings/backfill',
+          operation: 'embeddings',
+          usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+          metadata: { post_id: item.post_id },
+        })
+      },
+    })
     const { error: upsertError } = await admin
       .from('post_embeddings')
       .upsert(

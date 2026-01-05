@@ -4,6 +4,7 @@ import { requireAutomationKey } from '@/lib/apiKeyAuth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
+import { logProviderUsage } from '@/lib/usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,21 @@ export async function POST(request: NextRequest) {
         content_html: post.content_html,
       })
       if (text) {
-        const embedding = await embedTextWithOpenAI({ apiKey: provider.key, text })
+        const embedding = await embedTextWithOpenAI({
+          apiKey: provider.key,
+          text,
+          onUsage: (u) => {
+            void logProviderUsage({
+              userId: auth.userId,
+              provider: 'openai',
+              model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+              route: '/api/agent/draft/publish',
+              operation: 'embeddings',
+              usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+              metadata: { post_id: post.id },
+            })
+          },
+        })
         await admin
           .from('post_embeddings')
           .upsert(
@@ -78,6 +93,7 @@ export async function POST(request: NextRequest) {
             },
             { onConflict: 'post_id' },
           )
+
       }
     }
   } catch {

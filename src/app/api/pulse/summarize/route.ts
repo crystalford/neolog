@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -8,7 +9,7 @@ const fallbackSummary = (cards: any[]) => {
   const bodies = cards.map((card) => card.body).filter(Boolean)
   const summary = bodies[0] || 'Summary pending.'
   const takeaway = bodies[1] ? `Key takeaway: ${bodies[1]}` : 'Key takeaway pending.'
-  return { summary, takeaway, model: 'fallback' }
+  return { summary, takeaway, model: 'fallback', usage: null }
 }
 
 async function getAiSummary(cards: any[], apiKey: string, context?: string | null) {
@@ -43,6 +44,7 @@ async function getAiSummary(cards: any[], apiKey: string, context?: string | nul
 
   if (!response.ok) return null
   const data = await response.json()
+  const usage = extractOpenAIStyleUsage(data)
   const content = data?.choices?.[0]?.message?.content
   if (!content) return null
   try {
@@ -50,7 +52,7 @@ async function getAiSummary(cards: any[], apiKey: string, context?: string | nul
     const summary = String(parsed.summary || '').trim()
     const takeaway = String(parsed.takeaway || '').trim()
     if (!summary) return null
-    return { summary, takeaway, model: MODEL }
+    return { summary, takeaway, model: MODEL, usage }
   } catch {
     return null
   }
@@ -81,6 +83,17 @@ export async function POST(request: NextRequest) {
   let result = await getAiSummary(cards, apiKey, profile?.context_md)
   if (!result) {
     result = fallbackSummary(cards)
+  }
+
+  if ((result as any)?.usage) {
+    await logProviderUsage({
+      userId: session.user.id,
+      provider: 'openai',
+      model: MODEL,
+      route: '/api/pulse/summarize',
+      operation: 'chat.completions',
+      usage: (result as any).usage,
+    })
   }
 
   return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -82,9 +83,23 @@ export async function POST(request: NextRequest) {
 
       if (response.ok) {
         const data = await response.json()
+        const usage = extractOpenAIStyleUsage(data)
         const content = data?.choices?.[0]?.message?.content?.trim()
         if (content) {
           script = content
+        }
+
+        if (usage) {
+          const providerName = groqKey ? 'groq' : 'openai'
+          await logProviderUsage({
+            userId: session.user.id,
+            provider: providerName,
+            model,
+            route: '/api/video/brief',
+            operation: 'chat.completions',
+            usage,
+            metadata: { video_provider: provider },
+          })
         }
       }
     } catch {

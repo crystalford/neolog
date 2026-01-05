@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -23,6 +24,7 @@ function getFallbackSummary(text: string) {
     summary: sentences.slice(0, 2).join(' '),
     bullets: sentences.slice(0, 4),
     model: 'fallback',
+    usage: null,
   }
 }
 
@@ -71,7 +73,7 @@ async function getAiSummary(
     const summary = String(parsed.summary || '').trim()
     const bullets = Array.isArray(parsed.bullets) ? parsed.bullets.map((b: any) => String(b).trim()).filter(Boolean) : []
     if (!summary || bullets.length === 0) return null
-    return { summary, bullets, model }
+    return { summary, bullets, model, usage: extractOpenAIStyleUsage(data) }
   } catch {
     return null
   }
@@ -140,6 +142,19 @@ export async function POST(request: NextRequest) {
   let result = await getAiSummary(base, apiKey, profile?.context_md, apiUrl, model)
   if (!result) {
     result = getFallbackSummary(base)
+  }
+
+  if ((result as any)?.usage) {
+    const provider = groqKey ? 'groq' : 'openai'
+    await logProviderUsage({
+      userId: session.user.id,
+      provider,
+      model,
+      route: '/api/posts/summary',
+      operation: 'chat.completions',
+      usage: (result as any).usage,
+      metadata: { fallback: false },
+    })
   }
 
   const payload = {

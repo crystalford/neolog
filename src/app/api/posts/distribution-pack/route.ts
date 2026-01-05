@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -258,6 +259,20 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) return null
     const data = await response.json()
+
+    const usage = extractOpenAIStyleUsage(data)
+    if (usage) {
+      const provider = groqKey ? 'groq' : 'openai'
+      await logProviderUsage({
+        userId: session.user.id,
+        provider,
+        model,
+        route: '/api/posts/distribution-pack',
+        operation: 'chat.completions',
+        usage,
+      })
+    }
+
     const content = data?.choices?.[0]?.message?.content
     if (!content) return null
     try {
