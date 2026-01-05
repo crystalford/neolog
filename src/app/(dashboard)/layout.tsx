@@ -357,15 +357,15 @@ export default function DashboardLayout({
               <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
                 Workspace
               </span>
+              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <div className="hidden sm:block">
                 <PublicationSwitcher
                   currentPublicationId={selectedPublicationId}
                   onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
                 />
               </div>
-              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCaptureOpen(true)}
                 className="hidden md:inline-flex btn btn-secondary btn-sm"

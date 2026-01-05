@@ -124,7 +124,7 @@ export function PublicationSwitcher({
             onClick={() => setMenuOpen(false)}
           />
 
-          <div className="absolute left-0 top-full mt-2 w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-20 py-2 animate-scale-in origin-top-left">
+          <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-20 py-2 animate-scale-in origin-top-right">
             <div className="px-3 py-2 text-xs font-medium text-[var(--text-tertiary)] uppercase">
               Your Publications
             </div>
