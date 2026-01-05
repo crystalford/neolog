@@ -130,6 +130,16 @@ API-key authenticated trigger endpoint (same Automation API key as above):
   - `{"event":"inbox.create", ...}` (creates an inbox item)
   - `{"event":"rss.pull"}` (pulls RSS sources for that key's user)
 
+## Automation: Required Vercel Env Vars
+
+To use the headless webhook, automation triggers, and cron RSS pull in production, set these in Vercel → Project → Settings → Environment Variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CRON_SECRET`
+
+After changing env vars, redeploy (Vercel Deployments → Redeploy) so the new values take effect.
+
 ### 3. Make Yourself Admin
 ```sql
 UPDATE profiles SET is_admin = true WHERE username = 'your-username';
