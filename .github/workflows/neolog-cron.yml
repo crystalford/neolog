@@ -1,0 +1,42 @@
+name: Neolog cron
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # publish-scheduled
+    - cron: '*/15 * * * *'  # rss-pull
+    - cron: '0 9 * * 0'     # weekly-digest (Sun 09:00 UTC)
+  workflow_dispatch: {}
+
+concurrency:
+  group: neolog-cron
+  cancel-in-progress: true
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Call publish-scheduled (every 5 min)
+        if: ${{ github.event.schedule == '*/5 * * * *' }}
+        run: |
+          curl -fsSL -H "Authorization: Bearer $CRON_SECRET" "$NEOLOG_BASE_URL/api/cron/publish-scheduled"
+        env:
+          NEOLOG_BASE_URL: ${{ secrets.NEOLOG_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Call rss-pull (every 15 min)
+        if: ${{ github.event.schedule == '*/15 * * * *' }}
+        run: |
+          curl -fsSL -H "Authorization: Bearer $CRON_SECRET" "$NEOLOG_BASE_URL/api/cron/rss-pull"
+        env:
+          NEOLOG_BASE_URL: ${{ secrets.NEOLOG_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Call weekly-digest (weekly)
+        if: ${{ github.event.schedule == '0 9 * * 0' }}
+        run: |
+          curl -fsSL -H "Authorization: Bearer $CRON_SECRET" "$NEOLOG_BASE_URL/api/cron/weekly-digest"
+        env:
+          NEOLOG_BASE_URL: ${{ secrets.NEOLOG_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

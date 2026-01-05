@@ -96,6 +96,17 @@ Notes:
 
 Vercel Cron Jobs are plan-gated. If you're on the Hobby plan, keep the cron routes but trigger them from an external scheduler (GitHub Actions, cron-job.org, UptimeRobot, etc.) using `CRON_SECRET`.
 
+Recommended (free): GitHub Actions scheduled cron
+
+- A workflow is included at `.github/workflows/neolog-cron.yml`.
+- Set GitHub repo secrets:
+  - `NEOLOG_BASE_URL` (example: `https://your-app.vercel.app`)
+  - `CRON_SECRET` (must match the env var in your deployment)
+- The workflow calls:
+  - `/api/cron/publish-scheduled` (every 5 minutes)
+  - `/api/cron/rss-pull` (every 15 minutes)
+  - `/api/cron/weekly-digest` (weekly)
+
 Cron routes:
 - `/api/cron/publish-scheduled`
 - `/api/cron/rss-pull`
