@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BookOpen, ChevronDown, Plus, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
+import { createPortal } from 'react-dom'
 
 interface Publication {
   id: string
@@ -27,6 +28,9 @@ export function PublicationSwitcher({
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [menuTop, setMenuTop] = useState<number>(0)
+  const [menuLeft, setMenuLeft] = useState<number>(0)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
 
   const supabase = createClient()
   const router = useRouter()
@@ -54,6 +58,28 @@ export function PublicationSwitcher({
       onPublicationChange?.(selectedPub.id)
     }
   }, [currentPublicationId, onPublicationChange, selectedPub])
+
+  useLayoutEffect(() => {
+    if (!menuOpen) return
+
+    const updatePosition = () => {
+      const el = buttonRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      // Match the old layout: dropdown opens below the button with a small gap.
+      setMenuTop(Math.round(rect.bottom + 8))
+      setMenuLeft(Math.round(rect.left))
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    return () => window.removeEventListener('resize', updatePosition)
+  }, [menuOpen])
+
+  const menuPortalTarget = useMemo(() => {
+    if (typeof document === 'undefined') return null
+    return document.body
+  }, [])
 
   const loadPublications = async () => {
     setLoading(true)
@@ -94,6 +120,7 @@ export function PublicationSwitcher({
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setMenuOpen(!menuOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-all"
       >
@@ -117,75 +144,81 @@ export function PublicationSwitcher({
         <ChevronDown size={16} className="text-[var(--text-tertiary)]" />
       </button>
 
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-[70]"
-            onClick={() => setMenuOpen(false)}
-          />
+      {menuOpen && menuPortalTarget
+        ? createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-[9998]"
+                onClick={() => setMenuOpen(false)}
+              />
 
-          <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-[80] py-2 animate-scale-in origin-top-right">
-            <div className="px-3 py-2 text-xs font-medium text-[var(--text-tertiary)] uppercase">
-              Your Publications
-            </div>
+              <div
+                className="fixed z-[9999] w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl py-2 animate-scale-in origin-top-left"
+                style={{ top: menuTop, left: menuLeft }}
+              >
+                <div className="px-3 py-2 text-xs font-medium text-[var(--text-tertiary)] uppercase">
+                  Your Publications
+                </div>
 
-            <div className="max-h-64 overflow-y-auto">
-              {publications.map(pub => (
-                <button
-                  key={pub.id}
-                  onClick={() => selectPublication(pub)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-secondary)] transition-colors"
-                >
-                  {pub.logo_url ? (
-                    <img
-                      src={pub.logo_url}
-                      alt={pub.name}
-                      className="w-6 h-6 rounded object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div
-                      className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                      style={{ backgroundColor: pub.primary_color }}
+                <div className="max-h-64 overflow-y-auto">
+                  {publications.map(pub => (
+                    <button
+                      key={pub.id}
+                      onClick={() => selectPublication(pub)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-secondary)] transition-colors"
                     >
-                      {pub.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="flex-1 text-left truncate">
-                    {pub.name}
-                  </span>
-                  {selectedPub?.id === pub.id && (
-                    <Check size={16} className="text-[var(--accent)] flex-shrink-0" />
-                  )}
+                      {pub.logo_url ? (
+                        <img
+                          src={pub.logo_url}
+                          alt={pub.name}
+                          className="w-6 h-6 rounded object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          style={{ backgroundColor: pub.primary_color }}
+                        >
+                          {pub.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="flex-1 text-left truncate">
+                        {pub.name}
+                      </span>
+                      {selectedPub?.id === pub.id && (
+                        <Check size={16} className="text-[var(--accent)] flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="h-px bg-[var(--border-light)] my-1" />
+
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    router.push('/publications')
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-colors"
+                >
+                  <Plus size={16} />
+                  New Publication
                 </button>
-              ))}
-            </div>
 
-            <div className="h-px bg-[var(--border-light)] my-1" />
-
-            <button
-              onClick={() => {
-                setMenuOpen(false)
-                router.push('/publications')
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-colors"
-            >
-              <Plus size={16} />
-              New Publication
-            </button>
-
-            <button
-              onClick={() => {
-                setMenuOpen(false)
-                router.push('/publications')
-              }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors"
-            >
-              <BookOpen size={16} />
-              Manage All
-            </button>
-          </div>
-        </>
-      )}
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    router.push('/publications')
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                >
+                  <BookOpen size={16} />
+                  Manage All
+                </button>
+              </div>
+            </>,
+            menuPortalTarget
+          )
+        : null}
     </div>
   )
 }
