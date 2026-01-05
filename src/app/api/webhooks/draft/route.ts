@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
+import { marked } from 'marked'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,11 +39,17 @@ export async function POST(request: NextRequest) {
   const sourceUrl = typeof body?.source_url === 'string' ? body.source_url : null
   const meta = body?.meta && typeof body.meta === 'object' ? body.meta : {}
 
+  const contentHtml =
+    contentType === 'markdown'
+      ? String(marked.parse(content || ''))
+      : content
+
   // V1 behavior: store as an inbox artifact (consistent with supply chain).
   // Draft creation happens via Inbox → Draft conversion.
   const rawData = {
     title,
     content,
+    content_html: contentHtml,
     content_type: contentType,
     tags,
     source_tool: sourceTool,

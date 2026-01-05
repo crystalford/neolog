@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
+import { marked } from 'marked'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,19 @@ type InboxItemRow = {
   source_type: string
   status: 'new' | 'imported' | 'ignored'
   raw_data: any
+}
+
+function toHtmlFromInboxRawData(rawData: any): { original: string; html: string; contentType: 'html' | 'markdown' } {
+  const contentTypeRaw = rawData?.content_type
+  const contentType: 'html' | 'markdown' = contentTypeRaw === 'markdown' ? 'markdown' : 'html'
+
+  const original = String(rawData?.content_html || rawData?.content || rawData?.description || '')
+  const html =
+    contentType === 'markdown'
+      ? String(marked.parse(original || ''))
+      : original
+
+  return { original, html, contentType }
 }
 
 function slugifyTitle(input: string): string {
@@ -123,8 +137,7 @@ export async function POST(request: NextRequest) {
     }
 
     const title = item.title || item.raw_data?.title || 'Imported draft'
-    const contentHtml =
-      item.raw_data?.content_html || item.raw_data?.content || item.raw_data?.description || ''
+    const content = toHtmlFromInboxRawData(item.raw_data)
 
     const baseSlug = slugifyTitle(String(title))
     const canonical = String(item.canonical_url || '')
@@ -148,9 +161,9 @@ export async function POST(request: NextRequest) {
           publication_id: publicationId,
           title,
           slug,
-          content: contentHtml,
-          content_html: contentHtml,
-          content_type: 'html',
+          content: content.original,
+          content_html: content.html,
+          content_type: content.contentType,
           status: 'draft',
           canonical_url: item.canonical_url,
           original_source: item.source_type,
