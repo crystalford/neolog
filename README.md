@@ -247,6 +247,10 @@ Delete a test account (and cascade-delete its content) using a service role key:
 
 - `npm run delete:user -- <username> --yes`
 
+Backfill embeddings for semantic search (requires an Automation API key + `OPENAI_API_KEY` and the pgvector migration):
+
+- `NEOLOG_API_KEY=neo_... NEOLOG_BASE_URL=http://localhost:3000 npm run embeddings:backfill -- --limit=200 --maxUpserts=25`
+
 ## License
 
 MIT

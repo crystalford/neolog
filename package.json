@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "mcp": "node scripts/mcp/server.mjs",
+    "embeddings:backfill": "node scripts/backfill-embeddings.mjs",
     "delete:user": "node scripts/delete-user-by-username.mjs",
     "delete:user:id": "node scripts/delete-user-by-id.mjs"
   },
