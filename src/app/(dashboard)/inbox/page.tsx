@@ -23,6 +23,8 @@ export default function InboxPage() {
   const [publications, setPublications] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [bulkConverting, setBulkConverting] = useState(false)
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [statusFilter, setStatusFilter] = useState<'all' | InboxItem['status']>('new')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<'all' | '7' | '30'>('30')
@@ -80,13 +82,11 @@ export default function InboxPage() {
     )
   }
 
-  const convertToDraft = async (item: InboxItem) => {
+  const createDraftFromInboxItem = async (item: InboxItem): Promise<{ postId: string } | null> => {
     if (!publicationId) {
       setError('Choose a publication first.')
-      return
+      return null
     }
-    setError(null)
-    setConvertingId(item.id)
 
     const title = item.title || item.raw_data?.title || 'Imported draft'
     const contentHtml =
@@ -96,41 +96,164 @@ export default function InboxPage() {
       ''
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) return null
 
-    const slug = title
+    const baseSlug = title
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
       .slice(0, 80)
 
-    const { data: post, error: postError } = await supabase
-      .from('posts')
-      .insert({
-        author_id: session.user.id,
-        publication_id: publicationId,
-        title,
-        slug,
-        content: contentHtml,
-        content_html: contentHtml,
-        content_type: 'html',
-        status: 'draft',
-        canonical_url: item.canonical_url,
-        original_source: item.source_type,
-      })
-      .select('id')
-      .single()
+    const canonical = String(item.canonical_url || '')
+    const hash = canonical
+      ? canonical
+          .split('')
+          .reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7)
+          .toString(16)
+          .slice(0, 6)
+      : item.id.slice(0, 6)
 
-    if (postError || !post) {
-      setError('Failed to convert to draft.')
+    const fallbackBase = baseSlug || `import-${item.id.slice(0, 8)}`
+    const slugCandidates = [
+      fallbackBase,
+      `${fallbackBase.slice(0, 72)}-${hash}`,
+      `${fallbackBase.slice(0, 68)}-${hash}-${Date.now().toString(36).slice(-4)}`,
+    ]
+
+    for (const slug of slugCandidates) {
+      const attempt = await supabase
+        .from('posts')
+        .insert({
+          author_id: session.user.id,
+          publication_id: publicationId,
+          title,
+          slug,
+          content: contentHtml,
+          content_html: contentHtml,
+          content_type: 'html',
+          status: 'draft',
+          canonical_url: item.canonical_url,
+          original_source: item.source_type,
+        })
+        .select('id')
+        .maybeSingle()
+
+      if (attempt.data?.id && !attempt.error) {
+        return { postId: attempt.data.id as string }
+      }
+
+      const code = String((attempt.error as any)?.code || '')
+      if (code !== '23505') {
+        break
+      }
+    }
+
+    setError('Failed to convert to draft.')
+    return null
+  }
+
+  const convertToDraft = async (item: InboxItem) => {
+    setError(null)
+    setConvertingId(item.id)
+
+    const created = await createDraftFromInboxItem(item)
+    if (!created) {
       setConvertingId(null)
       return
     }
 
     await updateStatus(item.id, 'imported')
+    setSelected((prev) => {
+      const next = { ...prev }
+      delete next[item.id]
+      return next
+    })
     setConvertingId(null)
-    router.push(`/write?edit=${post.id}`)
+    router.push(`/write?edit=${created.postId}`)
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const selectAllFiltered = () => {
+    setSelected((prev) => {
+      const next = { ...prev }
+      filteredItems.forEach((item) => {
+        if (item.status === 'new') next[item.id] = true
+      })
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelected({})
+
+  const selectedCount = Object.values(selected).filter(Boolean).length
+
+  const bulkConvertSelected = async () => {
+    if (bulkConverting) return
+    setError(null)
+
+    if (!publicationId) {
+      setError('Choose a publication first.')
+      return
+    }
+
+    const selectedItems = filteredItems.filter((item) => selected[item.id])
+    const toConvert = selectedItems.filter((item) => item.status === 'new')
+    if (toConvert.length === 0) return
+
+    setBulkConverting(true)
+
+    try {
+      const resp = await fetch('/api/inbox/bulk-convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicationId,
+          inboxItemIds: toConvert.map((i) => i.id),
+        }),
+      })
+
+      const json = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        setError(json?.error || 'Failed to convert selected items.')
+        setBulkConverting(false)
+        return
+      }
+
+      const results: Array<{ inboxItemId: string; status: 'converted' | 'skipped' | 'failed' }> =
+        Array.isArray(json?.results) ? json.results : []
+
+      const convertedIds = results
+        .filter((r) => r.status === 'converted')
+        .map((r) => r.inboxItemId)
+
+      if (convertedIds.length > 0) {
+        setItems((prev) =>
+          prev.map((item) =>
+            convertedIds.includes(item.id) ? { ...item, status: 'imported' } : item,
+          ),
+        )
+      }
+
+      setSelected((prev) => {
+        const next = { ...prev }
+        for (const id of convertedIds) delete next[id]
+        return next
+      })
+
+      const failedCount = results.filter((r) => r.status === 'failed').length
+      if (failedCount > 0) {
+        setError('Some items failed to convert.')
+      }
+    } catch {
+      setError('Failed to convert selected items.')
+    }
+
+    setBulkConverting(false)
   }
 
   const sourceOptions = Array.from(new Set(items.map((item) => item.source_type))).sort()
@@ -202,6 +325,26 @@ export default function InboxPage() {
               Inbox ({filteredItems.length})
             </p>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={selectAllFiltered}
+                className="btn btn-secondary btn-sm"
+                disabled={filteredItems.filter((i) => i.status === 'new').length === 0}
+              >
+                Select all
+              </button>
+              <button
+                onClick={bulkConvertSelected}
+                className="btn btn-primary btn-sm"
+                disabled={selectedCount === 0 || bulkConverting}
+              >
+                <FilePlus2 size={14} />
+                {bulkConverting ? 'Converting...' : `Convert selected (${selectedCount})`}
+              </button>
+              {selectedCount > 0 && (
+                <button onClick={clearSelection} className="btn btn-secondary btn-sm" disabled={bulkConverting}>
+                  Clear
+                </button>
+              )}
               <select
                 id="inbox-status"
                 name="inbox-status"
@@ -253,9 +396,18 @@ export default function InboxPage() {
             {filteredItems.map((item) => (
               <div key={item.id} className="px-4 py-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={Boolean(selected[item.id])}
+                      onChange={() => toggleSelected(item.id)}
+                      disabled={bulkConverting || item.status !== 'new'}
+                    />
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                     {item.title || item.raw_data?.title || 'Untitled'}
                   </p>
+                  </div>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
                     {item.source_type.toUpperCase()} - {item.canonical_url || item.source_url || 'Unknown source'}
                   </p>
@@ -274,7 +426,7 @@ export default function InboxPage() {
                   <button
                     onClick={() => convertToDraft(item)}
                     className="btn btn-primary btn-sm"
-                    disabled={convertingId === item.id || item.status !== 'new'}
+                    disabled={bulkConverting || convertingId === item.id || item.status !== 'new'}
                   >
                     <FilePlus2 size={14} />
                     {convertingId === item.id ? 'Converting...' : 'Convert'}

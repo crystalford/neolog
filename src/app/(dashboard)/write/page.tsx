@@ -21,6 +21,25 @@ import {
   Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy
 } from 'lucide-react'
 
+type VaultAsset = {
+  id: string
+  type: 'prompt' | 'image' | 'code' | 'text' | 'link' | 'quote' | 'fragment'
+  title?: string | null
+  content: string
+  tags: string[]
+  source_platform?: string | null
+  source_url?: string | null
+  meta: any
+  created_at: string
+}
+
+type PostAssetLink = {
+  id: string
+  asset_id: string
+  created_at: string
+  assets?: VaultAsset[]
+}
+
 export default function WritePage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -44,6 +63,7 @@ export default function WritePage() {
   const [videoBriefError, setVideoBriefError] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [showSettings, setShowSettings] = useState(false)
+  const [showVaultDrawer, setShowVaultDrawer] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [scheduledAt, setScheduledAt] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
@@ -92,6 +112,144 @@ export default function WritePage() {
   const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'x' | 'manual'>('all')
   const [commentSort, setCommentSort] = useState<'score' | 'recent'>('score')
 
+  const [vaultDrawerAssets, setVaultDrawerAssets] = useState<VaultAsset[]>([])
+  const [vaultDrawerLoading, setVaultDrawerLoading] = useState(false)
+  const [vaultDrawerQuery, setVaultDrawerQuery] = useState('')
+  const [vaultDrawerType, setVaultDrawerType] = useState<string>('')
+  const [vaultInsertAssetId, setVaultInsertAssetId] = useState<string | null>(null)
+
+  const escapeHtml = (input: string) =>
+    input
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const formatAssetAsHtml = (asset: VaultAsset) => {
+    const title = (asset.title || '').trim()
+    const contentText = (asset.content || '').trim()
+    const sourceUrl = (asset.source_url || '').trim()
+
+    if (asset.type === 'image') {
+      const src = contentText
+      const alt = escapeHtml(title || 'Image')
+      const caption = title ? `<figcaption>${escapeHtml(title)}</figcaption>` : ''
+      return `<figure><img src="${escapeHtml(src)}" alt="${alt}" />${caption}</figure>`
+    }
+
+    if (asset.type === 'link') {
+      const href = contentText
+      const label = escapeHtml(title || contentText)
+      return `<p><a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a></p>`
+    }
+
+    if (asset.type === 'quote') {
+      const body = escapeHtml(contentText)
+      const cite = sourceUrl
+        ? `<cite><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">source</a></cite>`
+        : ''
+      return `<blockquote><p>${body}</p>${cite}</blockquote>`
+    }
+
+    if (asset.type === 'prompt' || asset.type === 'code') {
+      return `<pre><code>${escapeHtml(contentText)}</code></pre>`
+    }
+
+    // text / fragment
+    return `<p>${escapeHtml(contentText)}</p>`
+  }
+
+  const loadVaultDrawerAssets = async (opts?: { q?: string; type?: string }) => {
+    if (vaultDrawerLoading) return
+    setVaultDrawerLoading(true)
+    try {
+      const q = (opts?.q ?? vaultDrawerQuery).trim()
+      const t = (opts?.type ?? vaultDrawerType).trim()
+
+      const params = new URLSearchParams()
+      params.set('limit', '100')
+      if (q) params.set('q', q)
+      if (t) params.set('type', t)
+
+      const resp = await fetch(`/api/assets?${params.toString()}`)
+      const json = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        setError(json?.error || 'Failed to load vault assets.')
+        setVaultDrawerAssets([])
+        return
+      }
+      setVaultDrawerAssets((json?.assets || []) as VaultAsset[])
+    } finally {
+      setVaultDrawerLoading(false)
+    }
+  }
+
+  const attachAssetToPost = async (assetId: string) => {
+    if (!postId) {
+      setError('Save the draft first before inserting assets.')
+      return false
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login?redirect=/write')
+      return false
+    }
+
+    const { error } = await supabase
+      .from('post_assets')
+      .insert({
+        post_id: postId,
+        asset_id: assetId,
+        added_by: session.user.id,
+      })
+
+    if (error) {
+      const code = String((error as any)?.code || '')
+      if (code !== '23505') {
+        setError('Failed to attach asset.')
+        return false
+      }
+    }
+
+    await loadPostAssets(postId)
+    return true
+  }
+
+  const insertAssetIntoDraft = async (asset: VaultAsset) => {
+    if (vaultInsertAssetId) return
+    if (postType === 'pulse') {
+      setError('Vault insert is not available for Pulse posts yet.')
+      return
+    }
+
+    setVaultInsertAssetId(asset.id)
+    setError(null)
+    setSuccess(null)
+    try {
+      const ok = await attachAssetToPost(asset.id)
+      if (!ok) return
+
+      const snippet = formatAssetAsHtml(asset)
+      const next = content
+        ? `${content}\n\n${snippet}\n`
+        : `${snippet}\n`
+      setContent(next)
+      setSuccess('Inserted asset.')
+    } finally {
+      setVaultInsertAssetId(null)
+    }
+  }
+
+  // Vault attachments
+  const [vaultAssets, setVaultAssets] = useState<VaultAsset[]>([])
+  const [vaultAssetsLoading, setVaultAssetsLoading] = useState(false)
+  const [postAssets, setPostAssets] = useState<PostAssetLink[]>([])
+  const [postAssetsLoading, setPostAssetsLoading] = useState(false)
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('')
+  const [assetLinkSaving, setAssetLinkSaving] = useState(false)
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -127,6 +285,126 @@ export default function WritePage() {
   }, [showPack, postId])
 
   useEffect(() => {
+    if (!showSettings) return
+    void loadVaultAssets()
+    if (postId) {
+      void loadPostAssets(postId)
+    }
+  }, [showSettings, postId])
+
+  const loadVaultAssets = async () => {
+    if (vaultAssetsLoading) return
+    setVaultAssetsLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data, error } = await supabase
+        .from('assets')
+        .select('id, type, content, tags, meta, created_at')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (!error) {
+        setVaultAssets((data || []) as VaultAsset[])
+      }
+    } finally {
+      setVaultAssetsLoading(false)
+    }
+  }
+
+  const loadPostAssets = async (id: string) => {
+    if (postAssetsLoading) return
+    setPostAssetsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('post_assets')
+        .select('id, asset_id, created_at, assets(id, type, content, tags, meta, created_at)')
+        .eq('post_id', id)
+        .order('created_at', { ascending: false })
+
+      if (!error) {
+        setPostAssets((data || []) as unknown as PostAssetLink[])
+      }
+    } finally {
+      setPostAssetsLoading(false)
+    }
+  }
+
+  const attachSelectedAsset = async () => {
+    if (!postId) {
+      setError('Save the draft first before attaching assets.')
+      return
+    }
+    if (!selectedAssetId) return
+    if (assetLinkSaving) return
+
+    setAssetLinkSaving(true)
+    setError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { error } = await supabase
+        .from('post_assets')
+        .insert({
+          post_id: postId,
+          asset_id: selectedAssetId,
+          added_by: session.user.id,
+        })
+
+      if (error) {
+        const code = String((error as any)?.code || '')
+        if (code !== '23505') {
+          setError('Failed to attach asset.')
+        }
+      }
+
+      setSelectedAssetId('')
+      await loadPostAssets(postId)
+    } finally {
+      setAssetLinkSaving(false)
+    }
+  }
+
+  const detachAsset = async (linkId: string) => {
+    if (!postId) return
+    if (assetLinkSaving) return
+
+    setAssetLinkSaving(true)
+    setError(null)
+    try {
+      const { error } = await supabase
+        .from('post_assets')
+        .delete()
+        .eq('id', linkId)
+
+      if (error) {
+        setError('Failed to remove asset.')
+      }
+
+      await loadPostAssets(postId)
+    } finally {
+      setAssetLinkSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!postId) return
+    if (typeof window === 'undefined') return
+
+    try {
+      localStorage.setItem(
+        'neolog:lastEditingPost',
+        JSON.stringify({ id: postId, title: title || null })
+      )
+    } catch {
+      // ignore
+    }
+  }, [postId, title])
+
+  useEffect(() => {
     if (postId) {
       loadCuratedComments(postId)
     }
@@ -136,6 +414,12 @@ export default function WritePage() {
     if (!user || !publicationId) return
     loadScheduledQueue(user.id, publicationId)
   }, [user, publicationId])
+
+  useEffect(() => {
+    if (!showVaultDrawer) return
+    void loadVaultDrawerAssets({ q: vaultDrawerQuery, type: vaultDrawerType })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showVaultDrawer])
 
   const loadSelectedPublication = async () => {
     try {
@@ -712,6 +996,14 @@ export default function WritePage() {
     }
 
     const isAlreadyPublished = liveStatus === 'published'
+
+    // High-value safeguard: do not auto-save (write) to published posts.
+    // Published edits should only persist via explicit "Update", which runs
+    // versioning + embedding refresh on the server.
+    if (isAlreadyPublished) {
+      setSaving(false)
+      return
+    }
     const intent = isAlreadyPublished ? 'publish' : publishIntent
     const isScheduling = intent === 'schedule' && Boolean(scheduledAt)
     const statusValue = isScheduling ? 'scheduled' : isAlreadyPublished ? 'published' : 'draft'
@@ -763,10 +1055,11 @@ export default function WritePage() {
   // Debounced auto-save
   useEffect(() => {
     if (!title) return
+    if (existingStatus === 'published') return
     
     const timer = setTimeout(autoSave, 2000)
     return () => clearTimeout(timer)
-  }, [title, subtitle, content, coverImage, postType, pulse])
+  }, [title, subtitle, content, coverImage, postType, pulse, existingStatus])
 
   // Publish
   const handlePublish = async () => {
@@ -975,12 +1268,25 @@ export default function WritePage() {
           const response = await fetch('/api/posts/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId: finalPostId, notify: true }),
+            body: JSON.stringify({ postId: finalPostId, notify: true, fast: true }),
           })
 
+          const json = await response.json().catch(() => null)
+
           if (!response.ok) {
-            console.error('Notification API error:', await response.text())
+            console.error('Publish API error:', json || (await response.text()))
             // Don't fail publishing if notifications fail
+          } else {
+            // Kick off heavy publish side-effects in the background.
+            // keepalive helps the request complete even if we redirect.
+            void fetch('/api/posts/publish-side-effects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ postId: finalPostId, notify: true, firstPublish: true }),
+              keepalive: true,
+            }).catch(() => {
+              // ignore
+            })
           }
         } catch (notifyError) {
           console.error('Notification error:', notifyError)
@@ -1142,6 +1448,15 @@ export default function WritePage() {
                 className="btn btn-ghost btn-sm"
               >
                 Import HTML
+              </button>
+              <button
+                onClick={() => {
+                  setShowVaultDrawer(true)
+                  setShowSettings(false)
+                }}
+                className="btn btn-ghost btn-sm"
+              >
+                Vault
               </button>
               <button
                 onClick={() => setShowSettings(true)}
@@ -1402,6 +1717,96 @@ export default function WritePage() {
                           setVideoBrief((prev: any) => ({ ...prev, script: event.target.value }))
                         }
                       />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                      Assets
+                    </label>
+                    <p className="text-xs text-[var(--text-tertiary)] mb-3">
+                      Attach Vault items to this draft (provenance and reuse).
+                    </p>
+
+                    {!postId ? (
+                      <div className="text-sm text-[var(--text-secondary)]">
+                        Save the draft first to attach assets.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedAssetId}
+                            onChange={(e) => setSelectedAssetId(e.target.value)}
+                            className="input"
+                            aria-label="Select vault asset"
+                            disabled={assetLinkSaving || vaultAssetsLoading}
+                          >
+                            <option value="">Select an asset…</option>
+                            {vaultAssets.map((a) => {
+                              const preview = (a.content || '').replace(/\s+/g, ' ').slice(0, 60)
+                              return (
+                                <option key={a.id} value={a.id}>
+                                  {a.type}: {preview}{preview.length === 60 ? '…' : ''}
+                                </option>
+                              )
+                            })}
+                          </select>
+                          <button
+                            onClick={attachSelectedAsset}
+                            disabled={!selectedAssetId || assetLinkSaving}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Attach
+                          </button>
+                        </div>
+
+                        <div className="mt-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                          {postAssetsLoading ? (
+                            <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
+                          ) : postAssets.length === 0 ? (
+                            <div className="p-3 text-sm text-[var(--text-secondary)]">No attached assets.</div>
+                          ) : (
+                            <div className="divide-y divide-[var(--border-light)]">
+                              {postAssets.map((link) => {
+                                const asset = Array.isArray(link.assets) ? link.assets[0] : null
+                                const preview = String(asset?.content || '').replace(/\s+/g, ' ').slice(0, 80)
+                                return (
+                                  <div key={link.id} className="p-3 flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                                        {asset?.type || 'asset'}
+                                      </div>
+                                      <div className="text-sm text-[var(--text-primary)] break-words">
+                                        {preview}{preview.length === 80 ? '…' : ''}
+                                      </div>
+                                      {Array.isArray(asset?.tags) && asset.tags.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {asset.tags.slice(0, 8).map((t: string) => (
+                                            <span
+                                              key={t}
+                                              className="text-xs px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                                            >
+                                              {t}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    <button
+                                      onClick={() => detachAsset(link.id)}
+                                      disabled={assetLinkSaving}
+                                      className="btn btn-ghost btn-sm"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -1674,6 +2079,136 @@ export default function WritePage() {
             </div>
           )}
 
+          {showVaultDrawer && (
+            <div className="fixed inset-0 z-40">
+              <div
+                className="absolute inset-0 bg-black/30"
+                onClick={() => setShowVaultDrawer(false)}
+              />
+              <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-light)]">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                      Compose
+                    </p>
+                    <h2 className="font-display text-xl">Vault</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowVaultDrawer(false)}
+                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+                    aria-label="Close vault drawer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="px-5 py-5 space-y-4">
+                  {!postId ? (
+                    <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-sm text-[var(--text-secondary)]">
+                      Save the draft first to insert and track asset usage.
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-2">
+                    <input
+                      value={vaultDrawerQuery}
+                      onChange={(e) => setVaultDrawerQuery(e.target.value)}
+                      placeholder="Search vault"
+                      className="input"
+                    />
+                    <select
+                      value={vaultDrawerType}
+                      onChange={(e) => setVaultDrawerType(e.target.value)}
+                      className="input"
+                      aria-label="Filter asset type"
+                    >
+                      <option value="">All types</option>
+                      <option value="text">text</option>
+                      <option value="fragment">fragment</option>
+                      <option value="quote">quote</option>
+                      <option value="prompt">prompt</option>
+                      <option value="code">code</option>
+                      <option value="link">link</option>
+                      <option value="image">image</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => void loadVaultDrawerAssets({ q: vaultDrawerQuery, type: vaultDrawerType })}
+                        disabled={vaultDrawerLoading}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        {vaultDrawerLoading ? 'Searching…' : 'Search'}
+                      </button>
+                      <a href="/vault" className="btn btn-ghost btn-sm">
+                        Open Vault
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                    {vaultDrawerLoading ? (
+                      <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
+                    ) : vaultDrawerAssets.length === 0 ? (
+                      <div className="p-3 text-sm text-[var(--text-secondary)]">No matching assets.</div>
+                    ) : (
+                      <div className="divide-y divide-[var(--border-light)]">
+                        {vaultDrawerAssets.map((a) => {
+                          const preview = String(a.content || '').replace(/\s+/g, ' ').slice(0, 120)
+                          return (
+                            <div key={a.id} className="p-3 space-y-2">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+                                    {a.type}
+                                  </div>
+                                  {a.title ? (
+                                    <div className="text-sm font-medium text-[var(--text-primary)] break-words">
+                                      {a.title}
+                                    </div>
+                                  ) : null}
+                                  <div className="text-sm text-[var(--text-primary)] break-words">
+                                    {preview}{preview.length === 120 ? '…' : ''}
+                                  </div>
+                                  {a.source_platform || a.source_url ? (
+                                    <div className="text-xs text-[var(--text-tertiary)] pt-1 flex flex-wrap gap-2">
+                                      {a.source_platform ? <span>{a.source_platform}</span> : null}
+                                      {a.source_url ? (
+                                        <a
+                                          href={a.source_url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="underline"
+                                        >
+                                          source
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                  <button
+                                    onClick={() => void insertAssetIntoDraft(a)}
+                                    disabled={vaultInsertAssetId === a.id || !postId}
+                                    className="btn btn-secondary btn-sm"
+                                  >
+                                    {vaultInsertAssetId === a.id ? 'Inserting…' : 'Insert'}
+                                  </button>
+                                  <a href={`/vault/${a.id}`} className="btn btn-ghost btn-sm">
+                                    Details
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )}
+
           <div className="mb-6">
             <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
               Post type
@@ -1902,7 +2437,7 @@ export default function WritePage() {
                     disabled={!postId || packLoading}
                     className="ml-auto px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
                   >
-                    {packLoading ? 'Generating...' : 'Regenerate'}
+                    {packLoading ? 'Refreshing…' : 'Refresh pack'}
                   </button>
                 </div>
 
@@ -1983,7 +2518,7 @@ export default function WritePage() {
                 )}
                 {packLoading && (
                   <div className="py-10 text-center text-sm text-[var(--text-tertiary)]">
-                    Generating pack...
+                    Generating pack in the background…
                   </div>
                 )}
                 {packError && (

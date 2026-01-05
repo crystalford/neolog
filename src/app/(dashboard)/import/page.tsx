@@ -8,9 +8,13 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [rssUrl, setRssUrl] = useState('')
+  const [rssLimit, setRssLimit] = useState('50')
+  const [rssStatus, setRssStatus] = useState<'draft' | 'published'>('draft')
+  const [rssImporting, setRssImporting] = useState(false)
   const router = useRouter()
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, source: string) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -44,12 +48,41 @@ export default function ImportPage() {
     }
   }
 
-  const handleFileUploadWithSource = (source: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSource(source)
-    handleFileUpload(e)
-  }
+  const importFromRss = async () => {
+    const feedUrl = rssUrl.trim()
+    if (!feedUrl) {
+      setError('Paste an RSS/Atom feed URL to import.')
+      return
+    }
 
-  const [source, setSource] = useState('')
+    setRssImporting(true)
+    setError(null)
+    setResults(null)
+
+    const limit = Math.max(1, Math.min(200, Number(rssLimit) || 50))
+
+    try {
+      const res = await fetch('/api/import/rss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedUrl, limit, status: rssStatus }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'RSS import failed')
+      }
+
+      setResults({ success: data.imported || 0, failed: data.failed || 0 })
+      if ((data.imported || 0) > 0) {
+        setTimeout(() => router.push('/dashboard'), 2000)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to import RSS feed. Please try again.')
+    } finally {
+      setRssImporting(false)
+    }
+  }
 
   return (
     <>
@@ -100,7 +133,7 @@ export default function ImportPage() {
                       <input
                         type="file"
                         accept=".zip"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, 'substack')}
                         className="hidden"
                         disabled={importing}
                       />
@@ -133,7 +166,7 @@ export default function ImportPage() {
                       <input
                         type="file"
                         accept=".zip"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, 'medium')}
                         className="hidden"
                         disabled={importing}
                       />
@@ -166,7 +199,7 @@ export default function ImportPage() {
                       <input
                         type="file"
                         accept=".xml"
-                        onChange={handleFileUpload}
+                        onChange={(e) => handleFileUpload(e, 'wordpress')}
                         className="hidden"
                         disabled={importing}
                       />
@@ -203,6 +236,75 @@ export default function ImportPage() {
                 <FileText size={16} />
                 Write a Post
               </a>
+            </div>
+
+            {/* RSS import */}
+            <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center">
+                  <span className="text-xl font-bold text-[var(--text-primary)]">RSS</span>
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-medium text-base mb-1">Import from RSS / Atom</h2>
+                  <p className="text-sm text-[var(--text-secondary)] mb-4">
+                    Paste your publication feed URL to import posts in bulk.
+                  </p>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="md:col-span-2">
+                      <input
+                        className="input w-full"
+                        placeholder="https://example.com/feed.xml"
+                        value={rssUrl}
+                        onChange={(e) => setRssUrl(e.target.value)}
+                        disabled={rssImporting}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        className="input w-full"
+                        placeholder="Limit"
+                        value={rssLimit}
+                        onChange={(e) => setRssLimit(e.target.value)}
+                        disabled={rssImporting}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-3">
+                    <select
+                      className="input"
+                      value={rssStatus}
+                      onChange={(e) => setRssStatus(e.target.value as any)}
+                      disabled={rssImporting}
+                    >
+                      <option value="draft">Import as drafts</option>
+                      <option value="published">Import as published</option>
+                    </select>
+                    <button
+                      onClick={importFromRss}
+                      className="btn btn-secondary"
+                      disabled={rssImporting}
+                    >
+                      {rssImporting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={16} />
+                          Import RSS
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-[var(--text-tertiary)] mt-3">
+                    Tip: Draft imports are safest; published imports won’t run publish side-effects (embeddings/syndication) until you explicitly Update.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

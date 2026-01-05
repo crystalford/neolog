@@ -42,12 +42,14 @@ export async function POST(request: NextRequest) {
           postId?: string
           notify?: boolean
           authorId?: string
+          fast?: boolean
         }
       | null
 
     const postId = body?.postId
     const notify = typeof body?.notify === 'boolean' ? body.notify : true
     const cronAuthorId = typeof body?.authorId === 'string' ? body.authorId : null
+    const fast = body?.fast === true
 
     if (!session && !isCron) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -80,6 +82,21 @@ export async function POST(request: NextRequest) {
     }
 
     const alreadyPublished = post.status === 'published'
+    const firstPublish = !alreadyPublished
+
+    // Fast mode: if already published, do nothing and return quickly.
+    if (fast && alreadyPublished) {
+      return NextResponse.json({
+        success: true,
+        fast: true,
+        firstPublish: false,
+        post: {
+          id: postId,
+          slug: post.slug,
+          published_at: post.published_at || new Date().toISOString(),
+        },
+      })
+    }
 
     if (!alreadyPublished) {
       const { error: publishError } = await db
@@ -115,6 +132,21 @@ export async function POST(request: NextRequest) {
           change_summary: 'Published',
           changed_by: actorUserId,
         }, { onConflict: 'post_id,version_number' })
+
+      // Fast mode: return right after the publish transition.
+      // Run heavy side-effects via /api/posts/publish-side-effects.
+      if (fast) {
+        return NextResponse.json({
+          success: true,
+          fast: true,
+          firstPublish: true,
+          post: {
+            id: postId,
+            slug: post.slug,
+            published_at: new Date().toISOString(),
+          },
+        })
+      }
 
       // Best-effort: create/refresh pgvector embedding for semantic search.
       // Never block publishing on embedding failures.
@@ -358,6 +390,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      firstPublish,
       post: {
         id: postId,
         slug: post.slug,

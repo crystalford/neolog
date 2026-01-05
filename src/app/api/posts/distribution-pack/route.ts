@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { resolveProviderKey } from '@/lib/ai-provider'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
 
@@ -130,36 +131,58 @@ function splitTitleLines(title: string, maxLineLength = 34) {
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  if (!session) {
+  const authHeader = request.headers.get('authorization')
+  const isCron =
+    Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`
+
+  const body = (await request.json().catch(() => null)) as
+    | { postId?: string; authorId?: string }
+    | null
+
+  if (!session && !isCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { postId } = await request.json()
+  const postId = typeof body?.postId === 'string' ? body.postId : ''
+  const cronAuthorId = typeof body?.authorId === 'string' ? body.authorId : ''
+
   if (!postId) {
     return NextResponse.json({ error: 'postId is required' }, { status: 400 })
   }
 
-  const { data: post, error: postError } = await supabase
+  if (!session && isCron && !cronAuthorId) {
+    return NextResponse.json({ error: 'authorId is required for cron' }, { status: 400 })
+  }
+
+  const actorUserId = session?.user.id || cronAuthorId
+  const db = session ? supabase : createAdminClient()
+  if (!db) {
+    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
+  }
+
+  const { data: post, error: postError } = await db
     .from('posts')
     .select('id, title, subtitle, slug, excerpt, content, content_html, author_id, author:profiles(username, display_name)')
     .eq('id', postId)
-    .eq('author_id', session.user.id)
+    .eq('author_id', actorUserId)
     .single()
 
   if (postError || !post) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
-  const { data: profile } = await supabase
+  const { data: profile } = await db
     .from('profiles')
     .select('context_md')
     .eq('id', post.author_id)
     .single()
 
-  const groqKey = await resolveProviderKey(session.user.id, 'groq')
-  const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+  const groqKey = await resolveProviderKeyWithClient(db as any, actorUserId, 'groq')
+  const openaiKey = await resolveProviderKeyWithClient(db as any, actorUserId, 'openai')
   const apiKey = groqKey?.key || openaiKey?.key || ''
   const apiUrl = groqKey
     ? 'https://api.groq.com/openai/v1/chat/completions'
@@ -254,8 +277,8 @@ export async function POST(request: NextRequest) {
 
     try {
       await enforceUsageCaps({
-        supabase,
-        userId: session.user.id,
+        supabase: db as any,
+        userId: actorUserId,
         provider: groqKey ? 'groq' : 'openai',
       })
     } catch {
@@ -315,7 +338,7 @@ export async function POST(request: NextRequest) {
     if (usage) {
       const provider = groqKey ? 'groq' : 'openai'
       await logProviderUsage({
-        userId: session.user.id,
+        userId: actorUserId,
         provider,
         model,
         route: '/api/posts/distribution-pack',

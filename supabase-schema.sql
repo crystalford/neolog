@@ -3950,6 +3950,8 @@ alter table public.integration_keys add column if not exists quota_limit_usd num
   source_type text not null check (source_type in ('rss', 'x', 'youtube', 'grok', 'linkedin', 'hn', 'trends')),
   name text,
   url text not null,
+  publication_id uuid references public.publications(id) on delete set null,
+  auto_convert_to_drafts boolean default false,
   is_active boolean default true,
   last_fetched_at timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -4023,6 +4025,45 @@ create index inbox_items_status_idx on public.inbox_items(status);
 create index inbox_items_source_type_idx on public.inbox_items(source_type);
 
 -- =============================================
+-- ASSETS (Provenance-first vault)
+-- =============================================
+create table public.assets (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  type text not null check (type in ('prompt', 'image', 'code', 'text', 'link', 'quote', 'fragment')),
+  title text,
+  content text not null,
+  source_platform text,
+  source_url text,
+  meta jsonb not null default '{}'::jsonb,
+  tags text[] not null default '{}',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index assets_user_idx on public.assets(user_id);
+create index assets_type_idx on public.assets(type);
+create index assets_tags_gin on public.assets using gin(tags);
+create index assets_source_platform_idx on public.assets(source_platform);
+create index assets_source_url_idx on public.assets(source_url);
+
+-- =============================================
+-- POST_ASSETS (Join table: posts ↔ assets)
+-- =============================================
+create table public.post_assets (
+  id uuid default uuid_generate_v4() primary key,
+  post_id uuid references public.posts(id) on delete cascade not null,
+  asset_id uuid references public.assets(id) on delete cascade not null,
+  added_by uuid references public.profiles(id) on delete set null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint unique_post_asset unique (post_id, asset_id)
+);
+
+create index post_assets_post_idx on public.post_assets(post_id);
+create index post_assets_asset_idx on public.post_assets(asset_id);
+
+-- =============================================
 -- RLS: integration keys
 -- =============================================
   alter table public.integration_keys enable row level security;
@@ -4086,3 +4127,41 @@ create policy "Users manage their inbox items"
   on public.inbox_items for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- =============================================
+-- RLS: assets
+-- =============================================
+alter table public.assets enable row level security;
+
+create policy "Users manage own assets"
+  on public.assets for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- =============================================
+-- RLS: post assets
+-- =============================================
+alter table public.post_assets enable row level security;
+
+create policy "Authors manage post assets"
+  on public.post_assets for all
+  using (
+    exists (
+      select 1 from public.posts p
+      where p.id = post_id and p.author_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.assets a
+      where a.id = asset_id and a.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.posts p
+      where p.id = post_id and p.author_id = auth.uid()
+    )
+    and exists (
+      select 1 from public.assets a
+      where a.id = asset_id and a.user_id = auth.uid()
+    )
+  );

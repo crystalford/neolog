@@ -2,20 +2,20 @@
 
 Last updated: 2026-01-05
 
-## Supply Chain Versions (MVP slices)
-### Version 1 - Writer MVP
-- Ingest: Firecrawl URL import -> draft
-- Core: Editor + OpenAI summaries (BYOK)
-- Broadcast: X threader + Resend newsletter
+## Supply Chain Phases (realistic)
 
-### Version 2 - Media MVP
-- Ingest: Deepgram audio notes
-- Core: Anthropic critique
-- Broadcast: LinkedIn + Spotify audio articles
+### Phase V1 — Interoperable Publishing Node (ship + harden)
+- Ingest: manual capture + RSS/Atom sources + API-key webhook (Inbox artifacts)
+- Core: Inbox triage + bulk convert → drafts
+- Publish: fast publish + background side-effects
+- Broadcast: distribution pack generation (reviewable)
+- Interop read: /llms.txt
 
-### Version 3 - Video MVP
-- Ingest: Gemini video summary
-- Broadcast: TikTok/Instagram video outputs
+### Phase VNext — Vault + Automations (make “agents” real)
+- Vault: assets table + API + (later) UI
+- Attach assets to drafts/posts (join table)
+- Automations substrate: jobs + job runs + retries + logs + idempotency
+- Optional distribution: sending/posting integrations only after reliability/consent UX
 
 ## Phase 1 - Distribution Pack (shipping)
 - [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
@@ -67,6 +67,11 @@ Last updated: 2026-01-05
 7.1 Auto-embed on publish (done)
 8. MCP server integration (done)
 
+## Next Build Targets (near-term)
+- Drop Box: `POST /api/webhooks/draft` (API-key) to create inbox artifacts (drafts via conversion)
+- Vault: `POST /api/vault/add` + `assets` table (BYOK provenance-first)
+- Automations: introduce `jobs`/`job_runs` (minimal), then migrate cron routes onto it
+
 ## Cost-Gated Features
 - AI summaries (OpenAI)
 - AI distribution pack
@@ -78,3 +83,46 @@ Last updated: 2026-01-05
 - [x] Groq (speed, BYOK for expand)
 - [x] R2/S3 (sovereign storage, BYOK settings)
 - [x] HeyGen/Synthesia (video avatar, BYOK)
+
+## Integrations Catalog (source of truth)
+
+This section is the canonical list of real integrations in the codebase.
+
+Legend:
+- **Shipped**: implemented end-to-end (routes + data + UI where applicable)
+- **Key slot only**: you can store keys in Settings → AI Vault, but no product feature uses it yet
+- **Planned / demo-only**: mentioned in roadmap or screenshots, but not implemented
+
+### Shipped (implemented)
+- Supabase (Auth + Postgres + RLS; service-role admin operations)
+- OpenAI (summaries, expand, distribution packs, embeddings + vector search)
+- Groq (LLM provider option via vault)
+- Resend (subscribe confirmations + publish notifications + weekly digest cron)
+- PostHog (analytics via BYOK)
+- X API v2 (comment import for posts; requires paid X API)
+- Reddit (comment import via public JSON)
+- Medium (auto-syndication on first publish; stored in `post_syndications`)
+- Dev.to (auto-syndication on first publish; stored in `post_syndications`)
+- HeyGen (video avatar jobs: create/status/webhook)
+- Synthesia (video avatar jobs: create/status/webhook)
+- Cloudflare R2 + Amazon S3 (presigned uploads; storage connection + vault secret)
+- RSS (sources + cron pull into inbox; global RSS feed)
+- MCP server (local integration in `scripts/mcp/server.mjs`)
+
+### Key slot only (vault supports storing keys, feature not wired yet)
+- Anthropic (Claude)
+- Perplexity
+- Grok
+- Replicate
+- ElevenLabs
+- Stability (legacy)
+
+### Planned / demo-only (not implemented)
+- Deepgram audio notes ingest
+- Gemini video summary ingest
+- Auto-post to X/LinkedIn/Reddit/Threads (currently Neolog generates copy; only Medium/Dev.to auto-post today)
+- TikTok/Instagram video outputs
+- Firecrawl URL scraping (docs mention it, but current ingest uses built-in fetch + HTML strip)
+
+### Non-API “integrations” (embed/support only)
+- Rich embeds: YouTube, Vimeo, Spotify, Loom, Figma, Gist (iframe/embed rendering; no keys)

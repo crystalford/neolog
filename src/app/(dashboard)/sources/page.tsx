@@ -10,18 +10,27 @@ type FeedSource = {
   name: string | null
   url: string
   source_type: string
+  publication_id?: string | null
+  auto_convert_to_drafts?: boolean | null
   last_fetched_at: string | null
   created_at: string
+}
+
+type Publication = {
+  id: string
+  name: string
 }
 
 export default function SourcesPage() {
   const [loading, setLoading] = useState(true)
   const [sources, setSources] = useState<FeedSource[]>([])
+  const [publications, setPublications] = useState<Publication[]>([])
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [fetchingId, setFetchingId] = useState<string | null>(null)
   const [fetchingAll, setFetchingAll] = useState(false)
+  const [savingSettingsId, setSavingSettingsId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const router = useRouter()
@@ -39,6 +48,15 @@ export default function SourcesPage() {
       return
     }
 
+    const { data: pubs } = await supabase
+      .from('publications')
+      .select('id, name')
+      .eq('owner_id', session.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
+    setPublications((pubs || []) as Publication[])
+
     const { data } = await supabase
       .from('feed_sources')
       .select('*')
@@ -47,6 +65,32 @@ export default function SourcesPage() {
 
     setSources((data || []) as FeedSource[])
     setLoading(false)
+  }
+
+  const updateSourceSettings = async (
+    id: string,
+    update: { publicationId?: string | null; autoConvertToDrafts?: boolean }
+  ) => {
+    setError(null)
+    setSuccess(null)
+    setSavingSettingsId(id)
+    try {
+      const response = await fetch('/api/sources/rss', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...update }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update source.')
+      }
+      setSources((prev) => prev.map((s) => (s.id === id ? (data.source as FeedSource) : s)))
+      setSuccess('Source updated.')
+    } catch (err: any) {
+      setError(err.message || 'Failed to update source.')
+    } finally {
+      setSavingSettingsId(null)
+    }
   }
 
   const addSource = async () => {
@@ -204,7 +248,7 @@ export default function SourcesPage() {
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {sources.map((source) => (
-              <div key={source.id} className="px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+              <div key={source.id} className="px-4 py-3 space-y-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                     {source.name || source.url}
@@ -216,19 +260,67 @@ export default function SourcesPage() {
                     Last fetched: {source.last_fetched_at ? new Date(source.last_fetched_at).toLocaleString() : 'Never'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => fetchNow(source.id)}
-                    className="btn btn-secondary btn-sm"
-                    disabled={fetchingId === source.id}
-                  >
-                    <Rss size={14} />
-                    {fetchingId === source.id ? 'Fetching...' : 'Fetch'}
-                  </button>
-                  <button onClick={() => removeSource(source.id)} className="btn btn-secondary btn-sm text-[var(--error)]">
-                    <Trash2 size={14} />
-                    Remove
-                  </button>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                      Destination publication
+                    </label>
+                    <select
+                      className="input h-9"
+                      value={source.publication_id || ''}
+                      onChange={(event) => {
+                        const next = event.target.value || null
+                        void updateSourceSettings(source.id, { publicationId: next })
+                      }}
+                      disabled={savingSettingsId === source.id}
+                    >
+                      <option value="">(Use default)</option>
+                      {publications.map((pub) => (
+                        <option key={pub.id} value={pub.id}>
+                          {pub.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                      Used when auto-converting RSS items into drafts.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                      Auto-convert to drafts
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        disabled={savingSettingsId === source.id}
+                        onClick={() => {
+                          void updateSourceSettings(source.id, {
+                            autoConvertToDrafts: !Boolean(source.auto_convert_to_drafts),
+                          })
+                        }}
+                      >
+                        {Boolean(source.auto_convert_to_drafts) ? 'On' : 'Off'}
+                      </button>
+
+                      <button
+                        onClick={() => fetchNow(source.id)}
+                        className="btn btn-secondary btn-sm"
+                        disabled={fetchingId === source.id}
+                      >
+                        <Rss size={14} />
+                        {fetchingId === source.id ? 'Fetching...' : 'Fetch'}
+                      </button>
+
+                      <button onClick={() => removeSource(source.id)} className="btn btn-secondary btn-sm text-[var(--error)]">
+                        <Trash2 size={14} />
+                        Remove
+                      </button>
+                    </div>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                      Requires the scheduled RSS pull to be running.
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}

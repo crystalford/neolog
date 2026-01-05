@@ -11,6 +11,10 @@
   - [ ] Usage tracking + caps: `add_provider_usage.sql`, `add_usage_caps.sql`
   - [ ] Video avatar jobs: `add_video_brief_jobs.sql`
   - [ ] Syndication + visuals: `add_syndication.sql`, `add_og_variants.sql`
+  - [ ] Feed source settings: `add_feed_source_auto_convert.sql` (optional per-feed auto-convert + destination publication)
+  - [ ] Asset Vault: `add_assets_vault.sql` (assets table + RLS)
+  - [ ] Post ↔ Asset links: `add_post_assets.sql` (attach vault assets to drafts)
+  - [ ] Capture-first asset fields: `expand_assets_capture_fields.sql` (title/source/url + quote/fragment types)
 - [ ] Enable Email auth in Authentication > Providers
 - [ ] (Optional) Enable OAuth providers (Google, GitHub)
 - [ ] Create storage bucket named `images` with public access
@@ -75,6 +79,9 @@ Notes:
 - `SUPABASE_SERVICE_ROLE_KEY` is required for server-side automation endpoints (headless inbox webhook, automation triggers, and cron RSS pull).
 - `CRON_SECRET` is required to secure `/api/cron/*` routes.
 
+Optional:
+- `RSS_AUTO_CONVERT_TO_DRAFTS` when set to `true` (or `1`) makes `/api/cron/rss-pull` automatically convert newly pulled RSS inbox items into draft posts.
+
 ## Vercel Deployment
 
 ### 1. Deploy
@@ -126,6 +133,61 @@ Neolog supports API-key authenticated ingestion into a user's Inbox. Create an "
       "canonicalUrl": "https://example.com/article",
       "sourceUrl": "https://example.com/article",
       "rawData": { "tags": ["ai", "writing"] }
+    }
+    ```
+
+## Drop Box: Draft Webhook (Interoperability)
+
+Neolog also exposes a higher-level draft “drop box” endpoint for external AI workbenches.
+
+- `POST /api/webhooks/draft`
+  - Auth header: `Authorization: Bearer neo_...`
+  - Stores a provenance-first inbox artifact (convert to a draft from the Inbox UI)
+  - Body (example):
+    ```json
+    {
+      "title": "Outline: Supply Chain for Intellectuals",
+      "content": "# Idea\n\n...",
+      "content_type": "markdown",
+      "tags": ["writing", "systems"],
+      "source_tool": "Google AI Studio",
+      "canonical_url": "https://example.com/notes",
+      "source_url": "https://example.com/notes",
+      "meta": { "provenance": { "tool": "Google AI Studio" } }
+    }
+    ```
+
+## Asset API: Vault Add (Interoperability)
+
+After applying the `add_assets_vault.sql` migration, scripts can capture provenance-first assets.
+
+- `POST /api/vault/add`
+  - Auth: either `Authorization: Bearer neo_...` (automation key) OR a logged-in user session cookie
+  - Body (example):
+    ```json
+    {
+      "type": "prompt",
+      "content": "Write a 7-tweet thread explaining X.",
+      "tags": ["threads", "prompt"],
+      "meta": { "source": "manual", "created_in": "Cursor" }
+    }
+    ```
+
+## Capture Webhook: /api/capture (Capture-First)
+
+After applying `expand_assets_capture_fields.sql`, Neolog supports a dedicated capture endpoint aligned with the “Dump Box” model.
+
+- `POST /api/capture`
+  - Auth: either `Authorization: Bearer neo_...` (automation key) OR a logged-in user session cookie
+  - Body (example):
+    ```json
+    {
+      "type": "quote",
+      "title": "McLuhan on the medium",
+      "content": "The medium is the message.",
+      "tags": ["mcluhan", "media"],
+      "source": "Claude Chat",
+      "source_url": "https://..."
     }
     ```
 
