@@ -159,12 +159,16 @@ export default function SourcesPage() {
         <h2 className="font-display text-lg text-[var(--text-primary)]">Add RSS feed</h2>
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
           <input
+            id="rss-name"
+            name="rss-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Feed name (optional)"
             className="input"
           />
           <input
+            id="rss-url"
+            name="rss-url"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://example.com/rss.xml"

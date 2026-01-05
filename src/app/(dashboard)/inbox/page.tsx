@@ -145,6 +145,12 @@ export default function InboxPage() {
     return true
   })
 
+  const getStatusPill = (status: InboxItem['status']) => {
+    if (status === 'imported') return 'bg-[var(--success)]/10 text-[var(--success)]'
+    if (status === 'ignored') return 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+    return 'bg-[var(--accent-soft)] text-[var(--accent)]'
+  }
+
   return (
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
       <div>
@@ -166,6 +172,8 @@ export default function InboxPage() {
           Default publication
         </label>
         <select
+          id="inbox-publication"
+          name="inbox-publication"
           value={publicationId || ''}
           onChange={(event) => {
             const next = event.target.value
@@ -195,6 +203,8 @@ export default function InboxPage() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <select
+                id="inbox-status"
+                name="inbox-status"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
                 className="input h-8 text-xs"
@@ -205,6 +215,8 @@ export default function InboxPage() {
                 <option value="ignored">Ignored</option>
               </select>
               <select
+                id="inbox-source"
+                name="inbox-source"
                 value={sourceFilter}
                 onChange={(event) => setSourceFilter(event.target.value)}
                 className="input h-8 text-xs"
@@ -217,6 +229,8 @@ export default function InboxPage() {
                 ))}
               </select>
               <select
+                id="inbox-date"
+                name="inbox-date"
                 value={dateFilter}
                 onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}
                 className="input h-8 text-xs"
@@ -243,16 +257,18 @@ export default function InboxPage() {
                     {item.title || item.raw_data?.title || 'Untitled'}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {item.source_type.toUpperCase()} • {item.canonical_url || item.source_url || 'Unknown source'}
+                    {item.source_type.toUpperCase()} - {item.canonical_url || item.source_url || 'Unknown source'}
                   </p>
                   {item.raw_data?.published_at && (
                     <p className="text-xs text-[var(--text-tertiary)] mt-1">
                       Published {new Date(item.raw_data.published_at).toLocaleDateString()}
                     </p>
                   )}
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    Status: {item.status}
-                  </p>
+                  <div className="mt-2">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] ${getStatusPill(item.status)}`}>
+                      {item.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -273,14 +289,23 @@ export default function InboxPage() {
                       View source
                     </a>
                   )}
-                  <button onClick={() => updateStatus(item.id, 'ignored')} className="btn btn-secondary btn-sm">
-                    <X size={14} />
-                    Ignore
-                  </button>
-                  <button onClick={() => updateStatus(item.id, 'imported')} className="btn btn-secondary btn-sm">
-                    <Check size={14} />
-                    Done
-                  </button>
+                  {item.status !== 'ignored' ? (
+                    <button onClick={() => updateStatus(item.id, 'ignored')} className="btn btn-secondary btn-sm">
+                      <X size={14} />
+                      Ignore
+                    </button>
+                  ) : (
+                    <button onClick={() => updateStatus(item.id, 'new')} className="btn btn-secondary btn-sm">
+                      <Check size={14} />
+                      Restore
+                    </button>
+                  )}
+                  {item.status === 'new' && (
+                    <button onClick={() => updateStatus(item.id, 'imported')} className="btn btn-secondary btn-sm">
+                      <Check size={14} />
+                      Mark done
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
