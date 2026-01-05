@@ -16,6 +16,18 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [syndicationLoading, setSyndicationLoading] = useState(true)
+  const [syndicationError, setSyndicationError] = useState<string | null>(null)
+  const [syndications, setSyndications] = useState<
+    Array<{
+      post_id: string
+      provider: string
+      status: string
+      external_url: string | null
+      error_message: string | null
+      updated_at: string | null
+    }>
+  >([])
   const [usageLoading, setUsageLoading] = useState(true)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [usageSummary, setUsageSummary] = useState<
@@ -72,6 +84,31 @@ export default function DashboardPage() {
       .order('updated_at', { ascending: false })
     
     setPosts(postsData || [])
+
+    // Load recent syndication events
+    setSyndicationLoading(true)
+    setSyndicationError(null)
+    try {
+      const { data: syndicationRows, error: syndicationErr } = await supabase
+        .from('post_syndications')
+        .select('post_id, provider, status, external_url, error_message, updated_at')
+        .eq('author_id', session.user.id)
+        .order('updated_at', { ascending: false })
+        .limit(10)
+
+      if (syndicationErr) {
+        setSyndicationError('Syndication unavailable.')
+        setSyndications([])
+      } else {
+        setSyndications((syndicationRows as any[]) || [])
+      }
+    } catch {
+      setSyndicationError('Syndication unavailable.')
+      setSyndications([])
+    } finally {
+      setSyndicationLoading(false)
+    }
+
     const postIds = (postsData || []).map((post) => post.id)
 
     if (postIds.length > 0) {
@@ -123,6 +160,14 @@ export default function DashboardPage() {
     }
 
     setLoading(false)
+  }
+
+  const getPostTitle = (postId: string) => posts.find((p) => p.id === postId)?.title || 'Untitled'
+
+  const formatProviderLabel = (provider: string) => {
+    if (provider === 'devto') return 'Dev.to'
+    if (provider === 'medium') return 'Medium'
+    return provider
   }
 
   const loadUsage = async () => {
@@ -510,6 +555,85 @@ export default function DashboardPage() {
             )
           })}
         </div>
+      </div>
+
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Syndication</p>
+            <h2 className="font-display text-xl text-[var(--text-primary)]">Recent sends</h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Latest Medium/Dev.to results.
+            </p>
+          </div>
+          <Link
+            href="/syndication"
+            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            Manage
+          </Link>
+        </div>
+
+        {syndicationLoading ? (
+          <div className="py-8 text-center text-sm text-[var(--text-tertiary)]">Loading syndication…</div>
+        ) : syndicationError ? (
+          <div className="py-6 text-sm text-[var(--text-tertiary)]">{syndicationError}</div>
+        ) : syndications.length === 0 ? (
+          <div className="py-6 text-sm text-[var(--text-tertiary)]">
+            No syndication events yet.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {syndications.map((row) => {
+              const status = String(row.status || '')
+              const statusTone =
+                status === 'sent'
+                  ? 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20'
+                  : status === 'error'
+                    ? 'bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20'
+                    : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] border-[var(--border-light)]'
+
+              return (
+                <div
+                  key={`${row.post_id}-${row.provider}-${row.updated_at || ''}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                        {getPostTitle(row.post_id)}
+                      </p>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] border ${statusTone}`}>
+                        {formatProviderLabel(row.provider)} · {status}
+                      </span>
+                    </div>
+                    {row.external_url ? (
+                      <a
+                        href={row.external_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] underline break-all mt-1"
+                      >
+                        {row.external_url}
+                      </a>
+                    ) : row.error_message ? (
+                      <p className="text-xs text-[var(--error)] mt-1">{row.error_message}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/write?edit=${encodeURIComponent(row.post_id)}&pack=1`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Open pack
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {healthQueue.length > 0 && (
