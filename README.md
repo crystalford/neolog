@@ -169,6 +169,8 @@ See `supabase-schema.sql` for the complete schema including:
 | `/api/agent/user?username=...` | GET | Agent-friendly user profile + recent posts (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 | `/api/agent/post?username=...&slug=...` | GET | Agent-friendly post payload (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 | `/api/agent/search?q=...` | GET | Agent-friendly post search (optional `&username=...`; JSON by default; supports `Accept: text/markdown` or `?format=md`) |
+| `/api/agent/vector-search?q=...` | GET | Agent-friendly semantic search (optional `&username=...`; uses pgvector + embeddings; JSON by default; supports `Accept: text/markdown` or `?format=md`) |
+| `/api/agent/ingest` | POST | Ingest URL or raw text and create a draft post (API key) |
 
 ## Environment Variables
 
@@ -198,6 +200,12 @@ Or use the trigger endpoint:
     - `{"event":"rss.pull"}`
 
 Note: scheduled `/api/cron/*` routes can be triggered via Vercel Cron Jobs on paid plans, or via an external scheduler on Hobby.
+
+## MCP Server
+
+Run an MCP server over stdio that exposes Neolog tools (`neolog_search`, `neolog_vector_search`, `neolog_ingest_draft`):
+
+- `NEOLOG_API_KEY=neo_... NEOLOG_BASE_URL=http://localhost:3000 npm run mcp`
 
 ## Roadmap
 

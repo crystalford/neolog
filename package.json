@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "mcp": "node scripts/mcp/server.mjs",
     "delete:user": "node scripts/delete-user-by-username.mjs",
     "delete:user:id": "node scripts/delete-user-by-id.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@supabase/ssr": "^0.4.0",
     "@supabase/supabase-js": "^2.45.0",
     "@tiptap/extension-code-block-lowlight": "^2.6.0",

@@ -63,8 +63,8 @@ Last updated: 2026-01-05
 5.2 Account deletion cascades via auth user delete (done)
 6. Accept: text/markdown responses (done)
 6.1 Agent search endpoint (done)
-7. Vector search endpoint (later)
-8. MCP server integration (later)
+7. Vector search endpoint (done; requires pgvector migration + OPENAI_API_KEY)
+8. MCP server integration (done)
 
 ## Cost-Gated Features
 - AI summaries (OpenAI)

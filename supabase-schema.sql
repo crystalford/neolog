@@ -100,6 +100,17 @@ create table public.post_versions (
 );
 
 -- =============================================
+-- POST_EMBEDDINGS TABLE
+-- Semantic search support (pgvector)
+-- =============================================
+create table public.post_embeddings (
+  post_id uuid primary key references public.posts(id) on delete cascade,
+  embedding vector(1536) not null,
+  content_hash text not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- =============================================
 -- POST DISTRIBUTION PACKS
 -- Generated share-ready assets (threads, hooks, OG)
 -- =============================================
