@@ -79,11 +79,15 @@ export default function DashboardLayout({
       if (targetAttr && targetAttr !== '_self') return
 
       event.preventDefault()
-      router.push(href)
+      if (typeof window !== 'undefined') {
+        window.location.assign(href)
+      } else {
+        router.push(href)
+      }
     }
 
-    document.addEventListener('click', handleClick)
-    return () => document.removeEventListener('click', handleClick)
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
   }, [router])
 
   const loadUserAndProfile = async () => {
