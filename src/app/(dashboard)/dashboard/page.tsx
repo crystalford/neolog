@@ -65,37 +65,46 @@ export default function DashboardPage() {
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-      const { data: viewRows } = await supabase
-        .from('post_views')
-        .select('post_id, started_at')
-        .in('post_id', postIds)
-
-      const { data: recentRows } = await supabase
-        .from('post_views')
-        .select('post_id')
-        .in('post_id', postIds)
-        .gte('started_at', sevenDaysAgo.toISOString())
-
-      const { data: commentRows } = await supabase
-        .from('comments')
-        .select('post_id')
-        .in('post_id', postIds)
-        .eq('status', 'visible')
-
       const nextMetrics: Record<string, { views: number; recentViews: number; comments: number }> = {}
       postIds.forEach((id) => {
         nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
       })
 
-      viewRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views += 1
-      })
-      recentRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].recentViews += 1
-      })
-      commentRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].comments += 1
-      })
+      try {
+        const { data: viewRows } = await supabase
+          .from('post_views')
+          .select('post_id, started_at')
+          .in('post_id', postIds)
+
+        const { data: recentRows } = await supabase
+          .from('post_views')
+          .select('post_id')
+          .in('post_id', postIds)
+          .gte('started_at', sevenDaysAgo.toISOString())
+
+        viewRows?.forEach((row: any) => {
+          if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views += 1
+        })
+        recentRows?.forEach((row: any) => {
+          if (nextMetrics[row.post_id]) nextMetrics[row.post_id].recentViews += 1
+        })
+      } catch (error) {
+        console.error('Post views error:', error)
+      }
+
+      try {
+        const { data: commentRows } = await supabase
+          .from('comments')
+          .select('post_id')
+          .in('post_id', postIds)
+          .eq('status', 'visible')
+
+        commentRows?.forEach((row: any) => {
+          if (nextMetrics[row.post_id]) nextMetrics[row.post_id].comments += 1
+        })
+      } catch (error) {
+        console.error('Comments error:', error)
+      }
 
       setMetrics(nextMetrics)
     }
@@ -202,22 +211,6 @@ export default function DashboardPage() {
     setScheduleDraft('')
   }
 
-  if (loading) {
-    return (
-      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 skeleton rounded" />
-          <div className="h-4 w-32 skeleton rounded" />
-          <div className="mt-8 space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 skeleton rounded-md" />
-            ))}
-          </div>
-        </div>
-      </main>
-    )
-  }
-
   const publishedCount = posts.filter((post) => post.status === 'published').length
   const draftCount = posts.filter((post) => post.status === 'draft').length
   const archivedCount = posts.filter((post) => post.status === 'archived').length
@@ -310,6 +303,22 @@ export default function DashboardPage() {
       return { label: 'Active', className: 'text-[var(--warning)] bg-[var(--warning)]/10' }
     }
     return { label: 'Stale', className: 'text-[var(--error)] bg-[var(--error)]/10' }
+  }
+
+  if (loading) {
+    return (
+      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 skeleton rounded" />
+          <div className="h-4 w-32 skeleton rounded" />
+          <div className="mt-8 space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-24 skeleton rounded-md" />
+            ))}
+          </div>
+        </div>
+      </main>
+    )
   }
 
   return (
