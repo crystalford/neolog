@@ -59,6 +59,8 @@ Last updated: 2026-01-05
 3. Headless Inbox webhook (done)
 4. llms.txt + ?format=json (done)
 5. Agent-scoped API keys + automation triggers (done)
+5.1 OAuth signup onboarding w/ username selection (done)
+5.2 Account deletion cascades via auth user delete (done)
 6. Accept: text/markdown responses (next)
 7. Vector search endpoint (later)
 8. MCP server integration (later)

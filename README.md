@@ -71,6 +71,7 @@ npm install
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run the schema in `supabase-schema.sql` via the SQL Editor
+3. Run migrations in `supabase/migrations/` (e.g. `add_onboarded_at.sql`, `add_publications.sql`)
 3. Enable Row Level Security (the schema includes RLS policies)
 
 ### 3. Configure environment
@@ -172,7 +173,7 @@ See `supabase-schema.sql` for the complete schema including:
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | No | For admin operations (required for automation/webhooks/cron) |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | For admin operations (required for automation/webhooks/cron and account deletion) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Your domain |
 | `RESEND_API_KEY` | Yes | For email sending |
 | `EMAIL_FROM` | No | Sender address |
@@ -204,6 +205,12 @@ Note: scheduled `/api/cron/*` routes can be triggered via Vercel Cron Jobs on pa
 - [ ] AT Protocol identity (DIDs)
 - [ ] Weekly digest emails
 - [ ] Mobile app
+
+## Admin Utilities
+
+Delete a test account (and cascade-delete its content) using a service role key:
+
+- `npm run delete:user -- <username> --yes`
 
 ## License
 
