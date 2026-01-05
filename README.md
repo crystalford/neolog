@@ -1,6 +1,8 @@
 # Neolog
 
-A protocol-native publishing platform built for writers who care about ownership, distribution, and creative control.
+A creative infrastructure system for capture-first creators who care about ownership, distribution, and creative control.
+
+Pipeline: **Capture → Organize → Compose → Distribute → Analyze**
 
 ## Why Neolog?
 
@@ -11,6 +13,11 @@ A protocol-native publishing platform built for writers who care about ownership
 **vs Ghost**: Built-in discovery. Curator network. Boost marketplace. No cold-start problem.
 
 ## Features
+
+### Capture + Vault
+- **Capture-first Vault** — Save prompts, snippets, links, and notes with provenance
+- **Automation/webhook ingest** — Push captures from scripts and AI systems (API key)
+- **Publication-scoped organization** — Optional project containers for Vault + posts
 
 ### Publishing
 - **HTML-native editor** — Full creative control, not just markdown

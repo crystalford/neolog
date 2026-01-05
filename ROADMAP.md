@@ -17,6 +17,35 @@ Last updated: 2026-01-05
 - Automations substrate: jobs + job runs + retries + logs + idempotency
 - Optional distribution: sending/posting integrations only after reliability/consent UX
 
+---
+
+## v3.1 Alignment (vision reference; incremental)
+
+The v3.1 vision describes a 6-layer pipeline:
+`CAPTURE → ORGANIZE → MONITOR → COMPOSE → DISTRIBUTE → ANALYZE`
+
+This repo already covers a meaningful subset of that pipeline. The goal is to **preserve shipped supply-chain features** and convert the remaining “vision gaps” into concrete roadmap items.
+
+### What’s Already Built (v3.1 mapping)
+- **Capture**: `POST /api/capture` and `POST /api/vault/add` (API-key or session auth); RSS ingest into Inbox
+- **Organize**: Publications + publication-scoped Vault assets + filters + assignment UI
+- **Compose**: Rich editor + drafts/posts + asset attachment workflows
+- **Distribute**: Distribution pack generation; best-effort auto-syndication to Medium + Dev.to
+- **Analyze**: Platform/site analytics surfaces (PostHog + internal dashboards)
+
+### Major Gaps vs v3.1 (prioritized)
+- **Monitor system**: first-class monitors + monitored-items review queue + “promote to Vault” workflow
+- **Platform Connections**: OAuth/keyed connections per platform (as product surface), not just “generate pack”
+- **Distributions ledger**: persisted per-platform distribution records + status + retries + errors
+- **Engagement sync**: pull likes/views/comments per distribution and roll up by publication
+- **Lineage analytics**: asset → post → distribution attribution and per-asset impact reporting
+- **Quick capture UI**: global quick-add modal / command entry (e.g., ⌘K) and bulk import UX
+
+### Near-Term Work (safe + compatibility)
+- Add `/api/v1/capture` alias to align docs/spec clients with existing capture behavior
+- Harden capture/vault contracts (response shapes + examples) without breaking existing clients
+- Start Monitors v0 with the already-shipped RSS substrate (review queue + promote-to-vault)
+
 ## Phase 1 - Distribution Pack (shipping)
 - [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
 - [x] OG image data URL (SVG)

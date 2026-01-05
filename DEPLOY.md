@@ -179,6 +179,12 @@ After applying `expand_assets_capture_fields.sql`, Neolog supports a dedicated c
 
 - `POST /api/capture`
   - Auth: either `Authorization: Bearer neo_...` (automation key) OR a logged-in user session cookie
+  - Response: `{ "ok": true, "id": "<asset_id>" }`
+
+- `POST /api/v1/capture` (alias)
+  - Same auth + request body as `/api/capture`
+  - Response (v3.1-friendly): `{ "asset_id": "<asset_id>", "vault_url": "https://<host>/vault/<asset_id>" }`
+  - Auth: either `Authorization: Bearer neo_...` (automation key) OR a logged-in user session cookie
   - Body (example):
     ```json
     {

@@ -3,10 +3,12 @@
 Date: 2026-01-05  
 Codename: Sovereign Node (Reframed: **Interoperable Publishing Node**)
 
+Note: the target end-state architecture is captured in `NEOLOG_PRODUCT_DEFINITION_v3.1.md`.
+
 ## 0) Summary
 Neolog is a **content supply chain** for intellectual output.
 
-- **V1** ships a reliable pipeline: **Ingest → Triage → Draft → Publish → Generate distribution assets**.
+- **V1** ships a reliable pipeline: **Capture → Organize → Compose → Distribute → Analyze** (with Monitors as VNext).
 - **VNext** adds the “agentic” layer as **jobs/automations** (observable, retryable, idempotent), not as hand-wavy autonomous agents.
 
 This document keeps the original metaphor (3 stations) but tightens requirements into buildable, supportable features.
