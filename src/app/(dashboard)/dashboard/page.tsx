@@ -694,23 +694,25 @@ export default function DashboardPage() {
                     <option value="archived">Archived</option>
                   </select>
                 </div>
-                <div className="text-xs text-[var(--text-tertiary)] flex items-center gap-2">
+                <div className="text-xs text-[var(--text-tertiary)]">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
                     Updated
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Clock size={12} />
-                    {new Date(post.updated_at).toLocaleDateString()}
-                  </span>
-                  {(() => {
-                    const health = getHealthBadge(post)
-                    if (!health) return null
-                    return (
-                      <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] ${health.className}`}>
-                        {health.label}
-                      </span>
-                    )
-                  })()}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      <Clock size={12} />
+                      {new Date(post.updated_at).toLocaleDateString()}
+                    </span>
+                    {(() => {
+                      const health = getHealthBadge(post)
+                      if (!health) return null
+                      return (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] whitespace-nowrap ${health.className}`}>
+                          {health.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
                 <div className="text-sm text-[var(--text-primary)]">
                   {(metrics[post.id]?.views || 0).toLocaleString()}
