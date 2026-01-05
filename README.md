@@ -182,6 +182,8 @@ See `supabase-schema.sql` for the complete schema including:
 | `NEXT_PUBLIC_APP_URL` | Yes | Your domain |
 | `RESEND_API_KEY` | Yes | For email sending |
 | `EMAIL_FROM` | No | Sender address |
+| `OPENAI_API_KEY` | No | Required for AI features like `/api/agent/vector-search` embeddings |
+| `OPENAI_EMBEDDING_MODEL` | No | Optional (default `text-embedding-3-small`); must be 1536-dim for current pgvector schema |
 | `WEBSUB_HUB_URL` | No | WebSub hub for RSS push |
 | `CRON_SECRET` | No | Secures `/api/cron/*` endpoints |
 
@@ -200,6 +202,21 @@ Or use the trigger endpoint:
     - `{"event":"rss.pull"}`
 
 Note: scheduled `/api/cron/*` routes can be triggered via Vercel Cron Jobs on paid plans, or via an external scheduler on Hobby.
+
+## New Agent Endpoints (Quick Test)
+
+All `/api/agent/*` endpoints require an Automation API key.
+
+- Vector search:
+    - `curl -H "x-api-key: neo_..." "http://localhost:3000/api/agent/vector-search?q=what+is+neolog&limit=5"`
+    - Optional: `&username=yourname` (filters to that author)
+- Ingest to draft:
+    - `curl -X POST -H "x-api-key: neo_..." -H "content-type: application/json" -d "{\"url\":\"https://example.com\",\"title\":\"Example\"}" "http://localhost:3000/api/agent/ingest"`
+
+## Vector Search Setup
+
+- Apply the migration in Supabase: [supabase/migrations/add_vector_search.sql](supabase/migrations/add_vector_search.sql)
+- Ensure `OPENAI_API_KEY` is set in your environment.
 
 ## MCP Server
 
