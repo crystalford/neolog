@@ -85,9 +85,9 @@ export default function InboxPage() {
 
     const title = item.title || item.raw_data?.title || 'Imported draft'
     const contentHtml =
-      item.raw_data-.content_html ||
-      item.raw_data-.content ||
-      item.raw_data-.description ||
+      item.raw_data?.content_html ||
+      item.raw_data?.content ||
+      item.raw_data?.description ||
       ''
 
     const { data: { session } } = await supabase.auth.getSession()
