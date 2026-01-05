@@ -156,6 +156,15 @@ export async function POST(request: NextRequest) {
       '',
       `Read more: ${link}`,
     ].join('\n')
+    const newsletterSubject = post.title
+    const newsletterPreview = summary.slice(0, 140)
+    const newsletterBody = [
+      `<h1>${post.title}</h1>`,
+      post.subtitle ? `<p><em>${post.subtitle}</em></p>` : '',
+      `<p>${summary}</p>`,
+      `<ul>${sentenceList.map((s) => `<li>${s}</li>`).join('')}</ul>`,
+      `<p><a href="${link}">Read the full post</a></p>`,
+    ].filter(Boolean).join('\n')
 
     const hooks = [
       `Most people miss this in "${post.title}":`,
@@ -192,6 +201,9 @@ export async function POST(request: NextRequest) {
       hooks,
       medium_html: mediumHtml,
       devto_markdown: devtoMarkdown,
+      newsletter_subject: newsletterSubject,
+      newsletter_preview: newsletterPreview,
+      newsletter_body: newsletterBody,
       model: 'fallback',
       link,
     }
@@ -223,13 +235,14 @@ export async function POST(request: NextRequest) {
         {
           role: 'user',
           content: [
-            'Return JSON with keys: x_thread (array of 4-6 tweets), threads_post (string), bluesky_post (string), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5), medium_html (string), devto_markdown (string).',
+            'Return JSON with keys: x_thread (array of 4-6 tweets), threads_post (string), bluesky_post (string), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5), medium_html (string), devto_markdown (string), newsletter_subject (string), newsletter_preview (string), newsletter_body (string).',
             'X thread: start with a strong hook, keep each tweet under 260 chars, end with the link.',
             'LinkedIn: 1-sentence hook, 2-3 bullet takeaways, short CTA with link.',
             'Reddit: neutral tone, include TL;DR + bullets + link.',
             'Threads/Bluesky: a short 1-2 paragraph post with the link on a new line.',
             'Medium HTML: include an opening line that links back to the canonical URL.',
             'Dev.to Markdown: include a short summary, bullet takeaways, and the link.',
+            'Newsletter: subject <= 70 chars, preview <= 140 chars, body in HTML with title, short intro, bullets, and link.',
             profile?.context_md ? `Writer context:\n${profile.context_md}` : '',
             `Post title: ${post.title}`,
             `Subtitle: ${post.subtitle || ''}`,
@@ -259,6 +272,9 @@ export async function POST(request: NextRequest) {
         hooks: Array.isArray(parsed.hooks) ? parsed.hooks : [],
         medium_html: String(parsed.medium_html || ''),
         devto_markdown: String(parsed.devto_markdown || ''),
+        newsletter_subject: String(parsed.newsletter_subject || ''),
+        newsletter_preview: String(parsed.newsletter_preview || ''),
+        newsletter_body: String(parsed.newsletter_body || ''),
         model,
         link,
       }
@@ -287,6 +303,9 @@ export async function POST(request: NextRequest) {
       og_image_url,
       medium_html: pack.medium_html || '',
       devto_markdown: pack.devto_markdown || '',
+      newsletter_subject: pack.newsletter_subject || '',
+      newsletter_preview: pack.newsletter_preview || '',
+      newsletter_body: pack.newsletter_body || '',
       model: pack.model,
       error_message: null,
     }

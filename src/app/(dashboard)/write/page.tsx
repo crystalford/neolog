@@ -70,7 +70,7 @@ export default function WritePage() {
   const [packLoading, setPackLoading] = useState(false)
   const [packError, setPackError] = useState<string | null>(null)
   const [pack, setPack] = useState<any>(null)
-  const [packTab, setPackTab] = useState<'x' | 'threads' | 'bluesky' | 'linkedin' | 'reddit' | 'medium' | 'devto' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
+  const [packTab, setPackTab] = useState<'x' | 'threads' | 'bluesky' | 'linkedin' | 'reddit' | 'medium' | 'devto' | 'newsletter' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
   const [commentUrl, setCommentUrl] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
@@ -380,6 +380,11 @@ export default function WritePage() {
     } catch (error) {
       console.error('Clipboard error:', error)
     }
+  }
+
+  const formatCount = (value: string, limit?: number) => {
+    const count = value.length
+    return limit ? `${count} / ${limit} chars` : `${count} chars`
   }
 
   const uploadToStorage = async (file: File) => {
@@ -1818,6 +1823,7 @@ export default function WritePage() {
                     { id: 'reddit', label: 'Reddit' },
                     { id: 'medium', label: 'Medium' },
                     { id: 'devto', label: 'Dev.to' },
+                    { id: 'newsletter', label: 'Newsletter' },
                     { id: 'hooks', label: 'Hooks' },
                     { id: 'markdown', label: 'Markdown' },
                     { id: 'html', label: 'HTML' },
@@ -1863,6 +1869,9 @@ export default function WritePage() {
                   <div className="space-y-4">
                     {packTab === 'x' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount((pack.x_thread || []).join('\n\n'))}
+                        </p>
                         <textarea
                           className="input min-h-[180px]"
                           value={(pack.x_thread || []).map((tweet: string, index: number) => `${index + 1}. ${tweet}`).join('\n\n')}
@@ -1878,6 +1887,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'threads' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(pack.threads_post || '', 500)}
+                        </p>
                         <textarea
                           className="input min-h-[180px]"
                           value={pack.threads_post || ''}
@@ -1893,6 +1905,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'bluesky' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(pack.bluesky_post || '', 300)}
+                        </p>
                         <textarea
                           className="input min-h-[180px]"
                           value={pack.bluesky_post || ''}
@@ -1908,6 +1923,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'linkedin' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(pack.linkedin_post || '')}
+                        </p>
                         <textarea
                           className="input min-h-[180px]"
                           value={pack.linkedin_post || ''}
@@ -1923,7 +1941,13 @@ export default function WritePage() {
                     )}
                     {packTab === 'reddit' && (
                       <div className="space-y-3">
+                        <p className="text-xs text-[var(--text-tertiary)]">
+                          {formatCount(pack.reddit_title || '', 300)}
+                        </p>
                         <input className="input" value={pack.reddit_title || ''} readOnly />
+                        <p className="text-xs text-[var(--text-tertiary)]">
+                          {formatCount(pack.reddit_body || '')}
+                        </p>
                         <textarea className="input min-h-[180px]" value={pack.reddit_body || ''} readOnly />
                         <button
                           onClick={() => copyPack(`${pack.reddit_title}\n\n${pack.reddit_body}`)}
@@ -1935,6 +1959,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'medium' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(pack.medium_html || '')}
+                        </p>
                         <textarea
                           className="input min-h-[200px]"
                           value={pack.medium_html || ''}
@@ -1950,6 +1977,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'devto' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(pack.devto_markdown || '')}
+                        </p>
                         <textarea
                           className="input min-h-[200px]"
                           value={pack.devto_markdown || ''}
@@ -1963,8 +1993,39 @@ export default function WritePage() {
                         </button>
                       </div>
                     )}
+                    {packTab === 'newsletter' && (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                            Subject ({formatCount(pack.newsletter_subject || '', 70)})
+                          </p>
+                          <input className="input" value={pack.newsletter_subject || ''} readOnly />
+                        </div>
+                        <div>
+                          <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                            Preview ({formatCount(pack.newsletter_preview || '', 140)})
+                          </p>
+                          <input className="input" value={pack.newsletter_preview || ''} readOnly />
+                        </div>
+                        <div>
+                          <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                            Body ({formatCount(pack.newsletter_body || '')})
+                          </p>
+                          <textarea className="input min-h-[200px]" value={pack.newsletter_body || ''} readOnly />
+                        </div>
+                        <button
+                          onClick={() => copyPack([pack.newsletter_subject, pack.newsletter_preview, pack.newsletter_body].filter(Boolean).join('\n\n'))}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Copy newsletter
+                        </button>
+                      </div>
+                    )}
                     {packTab === 'hooks' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount((pack.hooks || []).join('\n'))}
+                        </p>
                         <textarea
                           className="input min-h-[160px]"
                           value={(pack.hooks || []).join('\n')}
@@ -1980,6 +2041,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'markdown' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(markdownExport)}
+                        </p>
                         <textarea
                           className="input min-h-[200px]"
                           value={markdownExport}
@@ -1995,6 +2059,9 @@ export default function WritePage() {
                     )}
                     {packTab === 'html' && (
                       <div>
+                        <p className="text-xs text-[var(--text-tertiary)] mb-2">
+                          {formatCount(htmlExport)}
+                        </p>
                         <textarea
                           className="input min-h-[200px]"
                           value={htmlExport}
