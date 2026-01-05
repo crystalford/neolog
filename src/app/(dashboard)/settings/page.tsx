@@ -535,17 +535,28 @@ export default function SettingsPage() {
   }
 
   const handleDeleteAccount = async () => {
+    if (!profile) return
     if (deleteConfirmText !== profile.username) return
-    
-    setDeleting(true)
 
-    // Delete all user data (cascade will handle most)
-    // Sign out and delete auth user
-    await supabase.auth.signOut()
-    
-    // Note: Full account deletion requires a server function with service role
-    // For now, sign out and show message
-    router.push('/?deleted=true')
+    setDeleting(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/account/delete', { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete account.')
+      }
+
+      await supabase.auth.signOut()
+      router.push('/?deleted=true')
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete account.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const baseUrl = typeof window !== 'undefined' 
