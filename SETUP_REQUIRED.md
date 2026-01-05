@@ -68,6 +68,13 @@ To enable provider job tracking (job id + video URL + processing status) for vid
 
 - `supabase/migrations/add_video_brief_jobs.sql`
 
+## Syndication + Visuals (Required for roadmap completion)
+
+These power auto-post syndication tracking and additional OG image variants (square + story):
+
+- `supabase/migrations/add_syndication.sql`
+- `supabase/migrations/add_og_variants.sql`
+
 ## ⚠️ IMPORTANT: Existing Data Migration
 
 ### 2. Migrate Existing Posts

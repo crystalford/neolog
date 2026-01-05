@@ -5,7 +5,24 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
 import { logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { postToDevto, postToMedium } from '@/lib/syndication'
 import { NextRequest, NextResponse } from 'next/server'
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
+
+function stripHtml(input: string): string {
+  return String(input || '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getSentences(text: string, max = 3): string[] {
+  const sentences = String(text || '').split(/(?<=[.!?])\s+/).filter(Boolean)
+  return sentences.slice(0, max)
+}
 
 // Publish a post and notify subscribers
 export async function POST(request: NextRequest) {
@@ -171,6 +188,148 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Best-effort: auto-post syndication (platform APIs).
+    // Only runs on first publish; never blocks publishing.
+    let syndicationResult: Record<string, any> = {}
+    if (!alreadyPublished) {
+      try {
+        const canonicalUrl = `${BASE_URL}/${post.author.username}/${post.slug}`
+        const plain = stripHtml(post.content_html || post.content || '')
+        const summary = post.excerpt || getSentences(plain, 2).join(' ')
+        const sentenceList = getSentences(plain, 4)
+
+        const mediumKey = await resolveProviderKey(session.user.id, 'medium')
+        if (mediumKey?.key) {
+          const { data: existing } = await supabase
+            .from('post_syndications')
+            .select('id, status')
+            .eq('post_id', postId)
+            .eq('provider', 'medium')
+            .maybeSingle()
+
+          if (!existing || existing.status !== 'sent') {
+            await supabase
+              .from('post_syndications')
+              .upsert(
+                {
+                  post_id: postId,
+                  author_id: session.user.id,
+                  provider: 'medium',
+                  status: 'pending',
+                  request_payload: {
+                    title: post.title,
+                    canonical_url: canonicalUrl,
+                  },
+                },
+                { onConflict: 'post_id,provider' }
+              )
+
+            const mediumHtml = [
+              `<p><em>Originally published at <a href="${canonicalUrl}">${canonicalUrl}</a></em></p>`,
+              post.content_html || post.content || '',
+            ].join('\n')
+
+            const res = await postToMedium({
+              token: mediumKey.key,
+              title: post.title,
+              html: mediumHtml,
+              canonicalUrl,
+              publishStatus: 'public',
+            })
+
+            await supabase
+              .from('post_syndications')
+              .upsert(
+                {
+                  post_id: postId,
+                  author_id: session.user.id,
+                  provider: 'medium',
+                  status: 'sent',
+                  external_id: res.externalId,
+                  external_url: res.externalUrl,
+                  response_payload: res.raw,
+                  error_message: null,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'post_id,provider' }
+              )
+
+            syndicationResult.medium = { ok: true, url: res.externalUrl }
+          }
+        }
+
+        const devtoKey = await resolveProviderKey(session.user.id, 'devto')
+        if (devtoKey?.key) {
+          const { data: existing } = await supabase
+            .from('post_syndications')
+            .select('id, status')
+            .eq('post_id', postId)
+            .eq('provider', 'devto')
+            .maybeSingle()
+
+          if (!existing || existing.status !== 'sent') {
+            await supabase
+              .from('post_syndications')
+              .upsert(
+                {
+                  post_id: postId,
+                  author_id: session.user.id,
+                  provider: 'devto',
+                  status: 'pending',
+                  request_payload: {
+                    title: post.title,
+                    canonical_url: canonicalUrl,
+                  },
+                },
+                { onConflict: 'post_id,provider' }
+              )
+
+            const devtoMarkdown = [
+              `> Originally published at ${canonicalUrl}`,
+              '',
+              `# ${post.title}`,
+              '',
+              summary,
+              '',
+              '## Key takeaways',
+              sentenceList.map((s) => `- ${s}`).join('\n'),
+              '',
+              `Read more: ${canonicalUrl}`,
+            ].join('\n')
+
+            const res = await postToDevto({
+              apiKey: devtoKey.key,
+              title: post.title,
+              bodyMarkdown: devtoMarkdown,
+              canonicalUrl,
+              published: true,
+            })
+
+            await supabase
+              .from('post_syndications')
+              .upsert(
+                {
+                  post_id: postId,
+                  author_id: session.user.id,
+                  provider: 'devto',
+                  status: 'sent',
+                  external_id: res.externalId,
+                  external_url: res.externalUrl,
+                  response_payload: res.raw,
+                  error_message: null,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'post_id,provider' }
+              )
+
+            syndicationResult.devto = { ok: true, url: res.externalUrl }
+          }
+        }
+      } catch (e: any) {
+        syndicationResult.error = e?.message || 'Syndication failed.'
+      }
+    }
+
     return NextResponse.json({
       success: true,
       post: {
@@ -179,6 +338,7 @@ export async function POST(request: NextRequest) {
         published_at: new Date().toISOString(),
       },
       notifications: notificationResult,
+      syndication: syndicationResult,
     })
 
   } catch (error) {

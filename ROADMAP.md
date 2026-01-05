@@ -50,8 +50,8 @@ Last updated: 2026-01-05
 
 ## Optional / Future
 - [x] Post health system (freshness score + revive queue)
-- [ ] Auto-post syndication (requires platform APIs)
-- [ ] Programmatic visuals engine
+- [x] Auto-post syndication (requires platform APIs)
+- [x] Programmatic visuals engine
 
 ## Neolog for Robots (prioritized)
 1. AI Vault (BYOK) + context.md injection (now)

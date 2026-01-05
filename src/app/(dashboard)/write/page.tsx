@@ -2072,16 +2072,53 @@ export default function WritePage() {
                     {packTab === 'og' && (
                       <div className="space-y-3">
                         {pack.og_image_url ? (
-                          <img src={pack.og_image_url} alt="OG preview" className="rounded-xl border border-[var(--border-light)]" />
+                          <div className="space-y-2">
+                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">OG (1200×630)</p>
+                            <img src={pack.og_image_url} alt="OG preview" className="rounded-xl border border-[var(--border-light)]" />
+                            <button
+                              onClick={() => copyPack(pack.og_image_url || '')}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Copy OG image URL
+                            </button>
+                          </div>
                         ) : (
                           <p className="text-sm text-[var(--text-tertiary)]">No OG image generated.</p>
                         )}
-                        <button
-                          onClick={() => copyPack(pack.og_image_url || '')}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          Copy OG image URL
-                        </button>
+
+                        {(pack as any).og_square_url && (
+                          <div className="space-y-2">
+                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Square (1080×1080)</p>
+                            <img
+                              src={(pack as any).og_square_url}
+                              alt="OG square preview"
+                              className="rounded-xl border border-[var(--border-light)] max-w-[420px]"
+                            />
+                            <button
+                              onClick={() => copyPack((pack as any).og_square_url || '')}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Copy square URL
+                            </button>
+                          </div>
+                        )}
+
+                        {(pack as any).og_story_url && (
+                          <div className="space-y-2">
+                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Story (1080×1920)</p>
+                            <img
+                              src={(pack as any).og_story_url}
+                              alt="OG story preview"
+                              className="rounded-xl border border-[var(--border-light)] max-w-[320px]"
+                            />
+                            <button
+                              onClick={() => copyPack((pack as any).og_story_url || '')}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Copy story URL
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

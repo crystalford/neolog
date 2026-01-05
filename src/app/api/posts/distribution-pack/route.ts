@@ -38,19 +38,48 @@ function chunkText(text: string, maxLength: number): string[] {
   return chunks
 }
 
-function createOgDataUrl(title: string, subtitle?: string | null) {
+function createOgDataUrlVariant(
+  title: string,
+  subtitle: string | null | undefined,
+  options: { width: number; height: number }
+) {
+  const { width, height } = options
   const safeTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const safeSubtitle = (subtitle || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
-  const titleLines = splitTitleLines(safeTitle)
-  const titleY = titleLines.length > 1 ? 270 : 300
-  const subtitleY = titleLines.length > 1 ? 380 : 360
+  const isStory = height > width
+  const scale = width / 1200
+  const maxTitleLine = isStory ? 22 : width <= 1100 ? 30 : 34
+  const titleLines = splitTitleLines(safeTitle, maxTitleLine)
+
+  const brandY = isStory ? Math.round(240 * (height / 630)) : Math.round(200 * scale)
+  const titleStartY = isStory ? Math.round(480 * (height / 630)) : Math.round((titleLines.length > 1 ? 270 : 300) * scale)
+  const subtitleY = isStory
+    ? Math.round(980 * (height / 630))
+    : Math.round((titleLines.length > 1 ? 380 : 360) * scale)
+  const footerY = isStory ? Math.round(1500 * (height / 630)) : Math.round(520 * scale)
+
+  const outerPad = isStory ? Math.round(90 * scale) : Math.round(70 * scale)
+  const outerW = width - outerPad * 2
+  const outerH = isStory ? Math.round(height * 0.62) : Math.round(490 * scale)
+  const outerY = isStory ? Math.round(height * 0.18) : Math.round(70 * scale)
+
+  const innerPad = isStory ? Math.round(50 * scale) : Math.round(40 * scale)
+  const innerX = outerPad + innerPad
+  const innerY = outerY + Math.round(50 * scale)
+  const innerW = width - innerX * 2
+  const innerH = outerH - Math.round(90 * scale)
+
+  const titleSize = isStory ? Math.round(64 * scale) : Math.round(58 * scale)
+  const subtitleSize = Math.round(26 * scale)
+  const brandSize = Math.round(28 * scale)
+  const footerSize = Math.round(20 * scale)
 
   const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0f172a"/>
@@ -61,28 +90,34 @@ function createOgDataUrl(title: string, subtitle?: string | null) {
       <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect width="1200" height="630" fill="url(#glow)"/>
-  <rect x="70" y="70" width="1060" height="490" rx="32" fill="#0b1220" opacity="0.78"/>
-  <rect x="110" y="120" width="980" height="400" rx="26" fill="#111827" stroke="#243042" stroke-width="1" opacity="0.9"/>
-  <text x="140" y="200" fill="#22d3ee" font-family="Inter, Arial, sans-serif" font-size="28" letter-spacing="4">NEOLOG</text>
-  <text x="140" y="${titleY}" fill="#f8fafc" font-family="Georgia, serif" font-size="58" font-weight="700">
-    ${titleLines.map((line, index) => `<tspan x="140" dy="${index === 0 ? 0 : 62}">${line}</tspan>`).join('')}
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect width="${width}" height="${height}" fill="url(#glow)"/>
+  <rect x="${outerPad}" y="${outerY}" width="${outerW}" height="${outerH}" rx="${Math.round(32 * scale)}" fill="#0b1220" opacity="0.78"/>
+  <rect x="${innerX}" y="${innerY}" width="${innerW}" height="${innerH}" rx="${Math.round(26 * scale)}" fill="#111827" stroke="#243042" stroke-width="${Math.max(1, Math.round(1 * scale))}" opacity="0.9"/>
+  <text x="${Math.round(140 * scale)}" y="${brandY}" fill="#22d3ee" font-family="Inter, Arial, sans-serif" font-size="${brandSize}" letter-spacing="${Math.max(2, Math.round(4 * scale))}">NEOLOG</text>
+  <text x="${Math.round(140 * scale)}" y="${titleStartY}" fill="#f8fafc" font-family="Georgia, serif" font-size="${titleSize}" font-weight="700">
+    ${titleLines
+      .map((line, index) => `<tspan x="${Math.round(140 * scale)}" dy="${index === 0 ? 0 : Math.round(62 * scale)}">${line}</tspan>`)
+      .join('')}
   </text>
-  ${safeSubtitle ? `<text x="140" y="${subtitleY}" fill="#cbd5f5" font-family="Inter, Arial, sans-serif" font-size="26">${safeSubtitle}</text>` : ''}
-  <text x="140" y="520" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="20">neolog.ai</text>
+  ${safeSubtitle ? `<text x="${Math.round(140 * scale)}" y="${subtitleY}" fill="#cbd5f5" font-family="Inter, Arial, sans-serif" font-size="${subtitleSize}">${safeSubtitle}</text>` : ''}
+  <text x="${Math.round(140 * scale)}" y="${footerY}" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="${footerSize}">neolog.ai</text>
 </svg>`
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-function splitTitleLines(title: string) {
+function createOgDataUrl(title: string, subtitle?: string | null) {
+  return createOgDataUrlVariant(title, subtitle, { width: 1200, height: 630 })
+}
+
+function splitTitleLines(title: string, maxLineLength = 34) {
   const words = title.split(' ').filter(Boolean)
   const lines: string[] = []
   let current = ''
   words.forEach((word) => {
     const next = current ? `${current} ${word}` : word
-    if (next.length > 34 && current) {
+    if (next.length > maxLineLength && current) {
       lines.push(current)
       current = word
     } else {
@@ -320,6 +355,8 @@ export async function POST(request: NextRequest) {
     const fallback = buildFallback()
     const pack = aiPack && aiPack.x_thread.length > 0 ? aiPack : fallback
     const og_image_url = createOgDataUrl(post.title, post.subtitle)
+    const og_square_url = createOgDataUrlVariant(post.title, post.subtitle, { width: 1080, height: 1080 })
+    const og_story_url = createOgDataUrlVariant(post.title, post.subtitle, { width: 1080, height: 1920 })
 
     const payload = {
       post_id: post.id,
@@ -333,6 +370,8 @@ export async function POST(request: NextRequest) {
       reddit_body: pack.reddit_body,
       hooks: pack.hooks,
       og_image_url,
+      og_square_url,
+      og_story_url,
       medium_html: pack.medium_html || '',
       devto_markdown: pack.devto_markdown || '',
       newsletter_subject: pack.newsletter_subject || '',

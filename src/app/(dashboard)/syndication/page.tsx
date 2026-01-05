@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function SyndicationPage() {
   const [loading, setLoading] = useState(true)
+  const [integrationKeys, setIntegrationKeys] = useState<Array<{ provider: string; is_active: boolean }>>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -16,10 +17,23 @@ export default function SyndicationPage() {
         router.push('/login')
         return
       }
+
+      try {
+        const response = await fetch('/api/integrations/list')
+        if (response.ok) {
+          const data = await response.json()
+          setIntegrationKeys(Array.isArray(data?.keys) ? data.keys : [])
+        }
+      } catch {
+        // ignore
+      }
       setLoading(false)
     }
     loadSession()
   }, [])
+
+  const isConnected = (provider: string) =>
+    integrationKeys.some((k) => k.provider === provider && k.is_active)
 
   if (loading) {
     return (
@@ -44,29 +58,34 @@ export default function SyndicationPage() {
 
       <div className="grid gap-3 md:grid-cols-2">
         {[
-          { name: 'X (Threads)', desc: 'Post a 5-6 tweet thread on publish.' },
-          { name: 'LinkedIn', desc: 'Publish a short case study post.' },
-          { name: 'Reddit', desc: 'Submit to a chosen subreddit.' },
-          { name: 'Threads (Meta)', desc: 'Publish a threaded summary post.' },
-          { name: 'Medium', desc: 'Syndicate with canonical URL for SEO.' },
-          { name: 'Dev.to', desc: 'Cross-post to the developer community.' },
-          { name: 'Newsletter (Resend)', desc: 'Email your subscribers on publish.' },
-        ].map((item) => (
+          { id: 'x', name: 'X (Threads)', desc: 'Post a 5-6 tweet thread on publish.' },
+          { id: 'linkedin', name: 'LinkedIn', desc: 'Publish a short case study post.' },
+          { id: 'reddit', name: 'Reddit', desc: 'Submit to a chosen subreddit.' },
+          { id: 'threads', name: 'Threads (Meta)', desc: 'Publish a threaded summary post.' },
+          { id: 'medium', name: 'Medium', desc: 'Syndicate with canonical URL for SEO.' },
+          { id: 'devto', name: 'Dev.to', desc: 'Cross-post to the developer community.' },
+          { id: 'resend', name: 'Newsletter (Resend)', desc: 'Email your subscribers on publish.' },
+        ].map((item) => {
+          const connected = isConnected(item.id)
+          return (
           <div key={item.name} className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-[var(--text-primary)]">{item.name}</p>
                 <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.desc}</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                  {connected ? 'Connected' : 'Not connected'}
+                </p>
               </div>
               <button
-                disabled
-                className="btn btn-secondary btn-sm cursor-not-allowed text-[var(--text-tertiary)]"
+                onClick={() => router.push('/settings')}
+                className="btn btn-secondary btn-sm"
               >
-                Connect
+                {connected ? 'Manage' : 'Connect'}
               </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </main>
   )

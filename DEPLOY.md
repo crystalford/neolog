@@ -10,6 +10,7 @@
 - [ ] Run migrations in `supabase/migrations/` (including `add_onboarded_at.sql` for onboarding gating)
   - [ ] Usage tracking + caps: `add_provider_usage.sql`, `add_usage_caps.sql`
   - [ ] Video avatar jobs: `add_video_brief_jobs.sql`
+  - [ ] Syndication + visuals: `add_syndication.sql`, `add_og_variants.sql`
 - [ ] Enable Email auth in Authentication > Providers
 - [ ] (Optional) Enable OAuth providers (Google, GitHub)
 - [ ] Create storage bucket named `images` with public access

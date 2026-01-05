@@ -71,7 +71,7 @@ npm install
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run the schema in `supabase-schema.sql` via the SQL Editor
-3. Run migrations in `supabase/migrations/` (e.g. `add_onboarded_at.sql`, `add_publications.sql`, `add_provider_usage.sql`, `add_usage_caps.sql`, `add_video_brief_jobs.sql`)
+3. Run migrations in `supabase/migrations/` (e.g. `add_onboarded_at.sql`, `add_publications.sql`, `add_provider_usage.sql`, `add_usage_caps.sql`, `add_video_brief_jobs.sql`, `add_syndication.sql`, `add_og_variants.sql`)
 3. Enable Row Level Security (the schema includes RLS policies)
 
 ### 3. Configure environment
