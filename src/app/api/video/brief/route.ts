@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     : OPENAI_MODEL
 
   let script = buildFallback(post.title, post.excerpt || '')
+  let capBlocked = false
 
   if (apiKey) {
     try {
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // fallback stays
+      capBlocked = true
     }
   }
 
@@ -135,5 +137,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create video brief.' }, { status: 500 })
   }
 
-  return NextResponse.json({ brief })
+  return NextResponse.json({ brief, meta: { cap_blocked: capBlocked } })
 }

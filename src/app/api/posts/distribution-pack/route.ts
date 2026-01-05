@@ -214,6 +214,9 @@ export async function POST(request: NextRequest) {
   const buildAiPack = async () => {
     if (!apiKey) return null
 
+    // If caps block AI, return null and let fallback handle it.
+    let capBlocked = false
+
     try {
       await enforceUsageCaps({
         supabase,
@@ -221,6 +224,7 @@ export async function POST(request: NextRequest) {
         provider: groqKey ? 'groq' : 'openai',
       })
     } catch {
+      capBlocked = true
       return null
     }
 
@@ -304,6 +308,7 @@ export async function POST(request: NextRequest) {
         newsletter_body: String(parsed.newsletter_body || ''),
         model,
         link,
+        cap_blocked: capBlocked,
       }
     } catch {
       return null
@@ -341,7 +346,8 @@ export async function POST(request: NextRequest) {
       .from('post_distribution_packs')
       .upsert(payload, { onConflict: 'post_id' })
 
-    return NextResponse.json({ pack: payload })
+    const capBlocked = Boolean((aiPack as any)?.cap_blocked) && (!aiPack || aiPack.x_thread.length === 0)
+    return NextResponse.json({ pack: payload, meta: { cap_blocked: capBlocked } })
   } catch (error: any) {
     const message = error?.message || 'Failed to generate distribution pack'
     await supabase

@@ -80,11 +80,13 @@ export async function POST(request: NextRequest) {
 
   const keyResult = await resolveProviderKey(session.user.id, 'openai')
   let apiKey = keyResult?.key || ''
+  let capBlocked = false
 
   if (apiKey) {
     try {
       await enforceUsageCaps({ supabase, userId: session.user.id, provider: 'openai' })
     } catch {
+      capBlocked = true
       apiKey = ''
     }
   }
@@ -109,5 +111,6 @@ export async function POST(request: NextRequest) {
     summary: result.summary,
     takeaway: result.takeaway,
     model: result.model,
+    meta: { cap_blocked: capBlocked },
   })
 }

@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
   const groqKey = await resolveProviderKey(session.user.id, 'groq')
   const openaiKey = await resolveProviderKey(session.user.id, 'openai')
   let apiKey = groqKey?.key || openaiKey?.key || ''
+  let capBlocked = false
   const apiUrl = groqKey
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://api.openai.com/v1/chat/completions'
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
         provider: groqKey ? 'groq' : 'openai',
       })
     } catch {
+      capBlocked = true
       apiKey = ''
     }
   }
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       expansion: `Add more detail on "${heading}". This is a placeholder until AI is enabled.`,
       model: 'fallback',
+      meta: { cap_blocked: capBlocked },
     })
   }
 
