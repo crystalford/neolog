@@ -67,6 +67,16 @@ export default function DashboardPage() {
         nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
       })
 
+      const { data: commentRows } = await supabase
+        .from('comments')
+        .select('post_id')
+        .in('post_id', postIds)
+        .eq('status', 'visible')
+
+      commentRows?.forEach((row: any) => {
+        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].comments += 1
+      })
+
       setMetrics(nextMetrics)
     }
 
