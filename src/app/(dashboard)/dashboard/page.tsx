@@ -172,6 +172,22 @@ export default function DashboardPage() {
     setScheduleDraft('')
   }
 
+  if (loading) {
+    return (
+      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 skeleton rounded" />
+          <div className="h-4 w-32 skeleton rounded" />
+          <div className="mt-8 space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-24 skeleton rounded-md" />
+            ))}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   const publishedCount = posts.filter((post) => post.status === 'published').length
   const draftCount = posts.filter((post) => post.status === 'draft').length
   const archivedCount = posts.filter((post) => post.status === 'archived').length
@@ -264,22 +280,6 @@ export default function DashboardPage() {
       return { label: 'Active', className: 'text-[var(--warning)] bg-[var(--warning)]/10' }
     }
     return { label: 'Stale', className: 'text-[var(--error)] bg-[var(--error)]/10' }
-  }
-
-  if (loading) {
-    return (
-      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 skeleton rounded" />
-          <div className="h-4 w-32 skeleton rounded" />
-          <div className="mt-8 space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 skeleton rounded-md" />
-            ))}
-          </div>
-        </div>
-      </main>
-    )
   }
 
   return (
