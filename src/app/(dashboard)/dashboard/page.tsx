@@ -16,6 +16,18 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [usageLoading, setUsageLoading] = useState(true)
+  const [usageError, setUsageError] = useState<string | null>(null)
+  const [usageSummary, setUsageSummary] = useState<
+    Array<{
+      provider: string
+      model: string | null
+      calls: number
+      prompt_tokens: number
+      completion_tokens: number
+      total_tokens: number
+    }>
+  >([])
   const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'archived' | 'scheduled'>('all')
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -32,6 +44,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadData()
+    loadUsage()
   }, [])
 
   const loadData = async () => {
@@ -110,6 +123,29 @@ export default function DashboardPage() {
     }
 
     setLoading(false)
+  }
+
+  const loadUsage = async () => {
+    setUsageLoading(true)
+    setUsageError(null)
+    try {
+      const res = await fetch('/api/usage?days=30')
+      if (!res.ok) {
+        setUsageSummary([])
+        setUsageError('Usage unavailable.')
+        setUsageLoading(false)
+        return
+      }
+
+      const json = await res.json()
+      const summary = Array.isArray(json?.summary) ? json.summary : []
+      setUsageSummary(summary)
+    } catch {
+      setUsageSummary([])
+      setUsageError('Usage unavailable.')
+    } finally {
+      setUsageLoading(false)
+    }
   }
 
   const handleDelete = async (postId: string) => {
@@ -355,6 +391,56 @@ export default function DashboardPage() {
             <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{stat.value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Usage</p>
+            <h2 className="font-display text-xl text-[var(--text-primary)]">AI tokens (30 days)</h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Best-effort totals based on provider responses.
+            </p>
+          </div>
+        </div>
+
+        {usageLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+              >
+                <div className="h-4 w-28 skeleton rounded" />
+                <div className="mt-2 h-6 w-40 skeleton rounded" />
+                <div className="mt-2 h-3 w-24 skeleton rounded" />
+              </div>
+            ))}
+          </div>
+        ) : usageError ? (
+          <p className="text-sm text-[var(--text-secondary)]">{usageError}</p>
+        ) : usageSummary.length === 0 ? (
+          <p className="text-sm text-[var(--text-secondary)]">No usage recorded yet.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {usageSummary.slice(0, 6).map((row) => (
+              <div
+                key={`${row.provider}::${row.model || ''}`}
+                className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+              >
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                  {row.provider}{row.model ? ` · ${row.model}` : ''}
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--text-primary)] font-mono">
+                  {Number(row.total_tokens || 0).toLocaleString()} tokens
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                  {Number(row.calls || 0).toLocaleString()} call(s)
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
