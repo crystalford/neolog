@@ -388,6 +388,10 @@ body {
   white-space: nowrap;
 }
 
+.btn svg {
+  color: currentColor;
+}
+
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -413,6 +417,11 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Ensure icons in primary buttons inherit text color */
+.btn-primary svg {
+  color: currentColor;
+}
+
 /* Secondary Button - Crisp and defined */
 .btn-secondary {
   background: transparent;
@@ -433,6 +442,11 @@ body {
   box-shadow: none;
 }
 
+/* Ensure icons in secondary buttons inherit text color */
+.btn-secondary svg {
+  color: currentColor;
+}
+
 /* Ghost Button - Minimal with subtle hover */
 .btn-ghost {
   background: transparent;
@@ -451,6 +465,11 @@ body {
   background: var(--bg-tertiary);
 }
 
+/* Ensure icons in ghost buttons inherit text color */
+.btn-ghost svg {
+  color: currentColor;
+}
+
 /* Outline Button - Accent focused */
 .btn-outline {
   background: transparent;
@@ -466,6 +485,11 @@ body {
 
 .btn-outline:active:not(:disabled) {
   background: var(--accent-softer);
+}
+
+/* Ensure icons in outline buttons inherit text color */
+.btn-outline svg {
+  color: currentColor;
 }
 
 /* Size Variants */
@@ -504,6 +528,11 @@ body {
 
 .btn-icon:active:not(:disabled) {
   transform: translateY(0.5px);
+}
+
+/* Ensure icons in icon-only buttons inherit text color */
+.btn-icon svg {
+  color: currentColor;
 }
 
 /* Focus State - Clean and accessible */
