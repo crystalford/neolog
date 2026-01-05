@@ -47,10 +47,10 @@ export default function InboxPage() {
     setPublications(pubs || [])
 
     const selectedId = typeof window !== 'undefined'
-      - localStorage.getItem('selectedPublicationId')
+      ? localStorage.getItem('selectedPublicationId')
       : null
 
-    const defaultId = selectedId || pubs-.[0]-.id || null
+    const defaultId = selectedId || pubs?.[0]?.id || null
     setPublicationId(defaultId)
     if (defaultId && typeof window !== 'undefined') {
       localStorage.setItem('selectedPublicationId', defaultId)
