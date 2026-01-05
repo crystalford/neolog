@@ -601,6 +601,11 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   color: currentColor;
 }
 
+/* SubscribeButton uses custom button styles (not .btn) */
+.subscribe-btn svg.lucide {
+  color: currentColor;
+}
+
 /* ================================
    INPUTS
    ================================ */

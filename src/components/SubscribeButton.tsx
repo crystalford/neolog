@@ -30,6 +30,7 @@ export function SubscribeButton({
   const [count, setCount] = useState(initialCount)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [hidden, setHidden] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
@@ -48,6 +49,7 @@ export function SubscribeButton({
 
     // Don't show subscribe button for own profile
     if (session.user.id === creatorId) {
+      setHidden(true)
       setChecking(false)
       return
     }
@@ -119,8 +121,7 @@ export function SubscribeButton({
     setLoading(false)
   }
 
-  // Don't show for own profile
-  if (!checking && subscribed === null) {
+  if (hidden) {
     return null
   }
 
@@ -154,7 +155,7 @@ export function SubscribeButton({
     <button
       onClick={handleSubscribe}
       disabled={loading || checking}
-      className={`${baseClasses} ${variantClasses} ${className}`}
+      className={`${baseClasses} ${variantClasses} subscribe-btn ${className}`}
     >
       {loading || checking ? (
         <Loader2 size={iconSizes[size]} className="animate-spin" />

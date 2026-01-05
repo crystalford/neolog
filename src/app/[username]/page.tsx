@@ -99,7 +99,8 @@ export default async function ProfilePage({ params }: Props) {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Profile Header */}
           <div className="pt-6 pb-6 border-b border-[var(--border-light)]">
-            <div className="flex items-start gap-6">
+            <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               {profile.avatar_url ? (
                 <img 
                   src={profile.avatar_url} 
@@ -128,9 +129,24 @@ export default async function ProfilePage({ params }: Props) {
                   />
                 </div>
                  
-                {profile.bio && (
-                  <p className="mt-4 text-[var(--text-secondary)]">{profile.bio}</p>
-                )}
+                <p className="mt-4 text-[var(--text-secondary)]">
+                  {profile.bio || 'No bio yet.'}
+                </p>
+
+                <div className="grid grid-cols-3 gap-2 mt-5 max-w-md">
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{postsWithAuthor.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-xs text-[var(--text-tertiary)]">Followers</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{followerCount || 0}</p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{subscriberCount || 0}</p>
+                  </div>
+                </div>
                  
                 <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-[var(--text-tertiary)]">
                   <span className="flex items-center gap-1">
@@ -159,7 +175,7 @@ export default async function ProfilePage({ params }: Props) {
                    
                   <span className="flex items-center gap-1">
                     <Users size={14} />
-                    {followerCount || 0} followers / {subscriberCount || 0} subscribers
+                    {followerCount || 0} followers
                   </span>
                 </div>
 
@@ -167,6 +183,7 @@ export default async function ProfilePage({ params }: Props) {
                 <div className="mt-4">
                   <SocialLinks profile={profile} />
                 </div>
+              </div>
               </div>
             </div>
           </div>

@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
+  const [usernameDraft, setUsernameDraft] = useState('')
+  const [usernameSaving, setUsernameSaving] = useState(false)
   
   const [formData, setFormData] = useState({
     display_name: '',
@@ -311,6 +313,7 @@ export default function SettingsPage() {
 
       if (data) {
         setProfile(data)
+        setUsernameDraft(data.username || '')
         setFormData({
           display_name: data.display_name || '',
           bio: data.bio || '',
@@ -440,6 +443,97 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
+  const RESERVED_USERNAMES = new Set([
+    'api',
+    '_next',
+    'dashboard',
+    'auth',
+    'explore',
+    'visuals',
+    'privacy',
+    'tos',
+    'search',
+    'tags',
+    'tag',
+    'unsubscribe',
+    'admin',
+    'earnings',
+    'curators',
+    'onboarding',
+    'login',
+    'signup',
+    'forgot-password',
+    'reset-password',
+    'preview',
+    'readme',
+    'roadmap',
+    'architecture',
+  ])
+
+  const normalizeUsername = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 30)
+
+  const handleUsernameSave = async () => {
+    if (!profile) return
+
+    setError(null)
+    setSuccess(null)
+    setUsernameSaving(true)
+
+    try {
+      const normalized = normalizeUsername(usernameDraft)
+      if (normalized !== usernameDraft) {
+        setUsernameDraft(normalized)
+      }
+
+      if (!normalized || normalized.length < 3) {
+        setError('Username must be at least 3 characters.')
+        return
+      }
+
+      if (RESERVED_USERNAMES.has(normalized)) {
+        setError('That username is reserved.')
+        return
+      }
+
+      if (normalized === profile.username) {
+        setError('That is already your username.')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ username: normalized })
+        .eq('id', profile.id)
+        .select('username')
+        .single()
+
+      if (error) {
+        if ((error as any).code === '23505') {
+          setError('That username is already taken.')
+          return
+        }
+        if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
+          setError('Username must be 3–30 characters and only use a-z, 0-9, and _.')
+          return
+        }
+        console.error('Username update error:', error)
+        setError('Failed to update username. Please try again.')
+        return
+      }
+
+      setProfile((prev: any) => ({ ...prev, username: data.username }))
+      setSuccess('Username updated.')
+      setTimeout(() => setSuccess(null), 3000)
+      router.refresh()
+    } finally {
+      setUsernameSaving(false)
+    }
+  }
+
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== profile.username) return
     
@@ -498,8 +592,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
-          <div className="space-y-8">
+        <div className="space-y-8">
             <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -556,15 +649,37 @@ export default function SettingsPage() {
                   </label>
                   <input
                     type="text"
-                    value={profile?.username || ''}
-                    disabled
-                    className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)] cursor-not-allowed"
+                    value={usernameDraft}
+                    onChange={(e) => setUsernameDraft(e.target.value)}
+                    className="input"
                   />
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <button
+                      onClick={handleUsernameSave}
+                      disabled={usernameSaving || !usernameDraft}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      {usernameSaving ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Check size={16} />
+                          Update username
+                        </>
+                      )}
+                    </button>
+                    <p className="text-xs text-[var(--text-tertiary)]">
+                      3–30 chars. a-z, 0-9, underscore.
+                    </p>
+                  </div>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
                     Your profile URL: {baseUrl}/{profile?.username}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    Username cannot be changed after account creation
+                    Changing your username can break old links.
                   </p>
                 </div>
 
@@ -776,9 +891,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             </section>
-          </div>
-
-          <div className="space-y-8">
             <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -1178,7 +1290,6 @@ export default function SettingsPage() {
               )}
             </section>
           </div>
-        </div>
       </div>
     </main>
   )
