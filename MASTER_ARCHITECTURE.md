@@ -1,41 +1,36 @@
 # Neolog Master Architecture
 
-Version: 3.1 (Technical Definition Release)  
+Version: 3.2 (Supply Chain Definition)  
 Last updated: January 2026  
-Core philosophy: "Not a blogging tool. An Operating System for Intellectuals."
+Core philosophy: "Not a place to write. An intellectual supply chain."
 
 ## 1) Product Vision
-Neolog is a protocol-native publishing platform for the sovereign creator. It combines:
-- Federated headless CMS
-- Personal data store (PDS) patterns
-- Distribution-first workflows
+Neolog is a headless intelligence log: a system that turns raw inputs into structured IP and ships it to distribution channels.
 
-### Signal Flow (Content ETL)
-**Ingest (Senses)**  
-Data aggregation + normalization: webhooks, API scrapers, audio processors.
+What it is:
+- A supply chain for intellectual output.
+- The database of record for a creator's public IP.
 
-**Core (Brain)**  
-Structured content repository + knowledge graph: relational storage, version history, semantic links.
+What it is not:
+- A social network.
+- A generic website builder.
+- A private note app.
 
-**Broadcast (Voice)**  
-Syndication engine: transforms internal JSON into platform formats (email, threads, RSS, etc).
+### Signal Flow (Supply Chain)
+**Ingest (Loading Dock)**  
+Turn chaos into normalized JSON: scrapers, feeds, audio, webhooks.
 
-## 2) Design System (Crystal Ford)
-**Vibe:** high-end, cinematic, glassmorphism, data-dense.  
-**Palette:**
-- Ingest: Blue
-- Core: Purple
-- Broadcast: Emerald
-- Error: Red
+**Core (Factory Floor)**  
+Refine raw input into structured content: editor, version log, knowledge graph.
 
-**Typography:**
-- UI: Inter / Geist
-- Metrics: JetBrains Mono
+**Broadcast (Shipping Dept)**  
+Package and distribute to the marketplace: email, threads, RSS, media outputs.
 
-**UX principles:**
-- Optimistic UI (local state updates, async sync)
-- Telemetry over navigation (status + sync times)
-- Visual pipes (signal flow connectors)
+## 2) System Principles
+- Standardize inputs into a single JSON schema.
+- Separate authoring from distribution.
+- Preserve ownership (canonical URLs, backups).
+- Prefer BYOK for cost-heavy features.
 
 ## 3) Stack
 - Frontend: Next.js 14, Tailwind, Lucide
@@ -52,7 +47,35 @@ Cost router:
 2) Else use managed key if Pro
 3) Else block with upgrade prompt
 
-## 5) Feature Scope (Condensed)
+## 5) Functional Specification (By Station)
+
+### Station 1: Ingest (Loading Dock)
+- Firecrawl: Reaction Draft. URL -> Firecrawl -> Markdown -> Draft.
+- Deepgram: Commute Capture. Audio -> Deepgram -> Transcript -> LLM cleanup -> Draft.
+- Reddit: Context Import. Thread URL -> top comments -> Draft sidebar.
+- GitHub: DevLog. Webhook -> markdown fetch -> update post.
+- RSS/Atom: News Desk. Feed -> parser -> triage queue -> user selects -> draft.
+- Gemini 1.5: Video Reader. YouTube URL -> summary -> draft.
+
+### Station 2: Core (Factory Floor)
+- Supabase: Sovereign Storage. Content, users, relationship graph.
+- ProseMirror: Variable Density Editor. Blocks tagged as summary/detail/private.
+- OpenAI: Expansion/Compression on selected text (BYOK).
+- Anthropic: Critique partner. Draft -> feedback notes (BYOK).
+- Groq: Real-time autocomplete (low latency).
+- Perplexity: Fact checking + citations (BYOK).
+
+### Station 3: Broadcast (Shipping Dept)
+- Resend: Newsletter dispatch. Post HTML -> email template -> send.
+- X: Threader. Post -> splitter -> thread.
+- LinkedIn: Business format. Post -> formatter -> LinkedIn API.
+- Medium: Canonical syndication. Post HTML -> Medium -> rel=canonical.
+- Instagram: Quote card. Title -> image -> post.
+- TikTok: Avatar read. Summary -> HeyGen -> MP4 -> post.
+- Spotify: Audio article. Post -> TTS -> RSS update.
+- GitHub: Hard backup. Post -> markdown commit.
+
+## 6) Feature Scope (Condensed)
 ### Core
 - HTML-native editor
 - Version history
@@ -83,7 +106,7 @@ Cost router:
 - Event stream (PostHog BYOK)
 - Internal page views
 
-## 6) Database Strategy (Core)
+## 7) Database Strategy (Core)
 **Core identity + content**
 - profiles
 - posts
@@ -97,7 +120,7 @@ Cost router:
 - storage_connections
 - video_briefs
 
-## 7) Integration Library (Heavy Hitters)
+## 8) Integration Library (Heavy Hitters)
 - Resend (email)
 - Deepgram (STT)
 - Firecrawl (scraper)
@@ -105,4 +128,3 @@ Cost router:
 - PostHog (analytics)
 - HeyGen (video avatar)
 - Cloudflare R2 (storage)
-

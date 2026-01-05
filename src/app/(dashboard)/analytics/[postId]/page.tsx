@@ -171,10 +171,10 @@ export default function PostAnalyticsPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
+      <main className="pt-14 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="pt-8 mb-8">
+          <div className="pt-6 mb-6">
             <Link 
               href="/analytics"
               className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-4 transition-colors"
@@ -201,8 +201,8 @@ export default function PostAnalyticsPage() {
           ) : (
             <>
               {/* Stats cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-7">
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <div className="flex items-center gap-2 mb-2">
                     <Eye size={16} className="text-[var(--text-tertiary)]" />
                     <span className="text-sm text-[var(--text-secondary)]">Views</span>
@@ -210,7 +210,7 @@ export default function PostAnalyticsPage() {
                   <p className="font-display text-2xl">{stats.totalViews.toLocaleString()}</p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock size={16} className="text-[var(--text-tertiary)]" />
                     <span className="text-sm text-[var(--text-secondary)]">Avg. Time</span>
@@ -218,7 +218,7 @@ export default function PostAnalyticsPage() {
                   <p className="font-display text-2xl">{formatTime(stats.avgTime)}</p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp size={16} className="text-[var(--text-tertiary)]" />
                     <span className="text-sm text-[var(--text-secondary)]">Avg. Scroll</span>
@@ -226,7 +226,7 @@ export default function PostAnalyticsPage() {
                   <p className="font-display text-2xl">{stats.avgScroll}%</p>
                 </div>
 
-                <div className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <div className="flex items-center gap-2 mb-2">
                     <Target size={16} className="text-[var(--text-tertiary)]" />
                     <span className="text-sm text-[var(--text-secondary)]">Completion</span>
@@ -395,19 +395,19 @@ export default function PostAnalyticsPage() {
 
               {/* Recent views table */}
               <div className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden">
-                <div className="p-4 border-b border-[var(--border-light)]">
+                <div className="p-3 border-b border-[var(--border-light)]">
                   <h2 className="font-display text-lg">Recent Readers</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full data-table">
                     <thead>
-                      <tr className="border-b border-[var(--border-light)] text-sm text-[var(--text-tertiary)]">
-                        <th className="text-left p-4 font-medium">Time</th>
-                        <th className="text-left p-4 font-medium">Source</th>
-                        <th className="text-left p-4 font-medium">Device</th>
-                        <th className="text-right p-4 font-medium">Read Time</th>
-                        <th className="text-right p-4 font-medium">Scroll</th>
-                        <th className="text-right p-4 font-medium">Finished</th>
+                      <tr>
+                        <th className="text-left">Time</th>
+                        <th className="text-left">Source</th>
+                        <th className="text-left">Device</th>
+                        <th className="text-right">Read Time</th>
+                        <th className="text-right">Scroll</th>
+                        <th className="text-right">Finished</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -416,7 +416,7 @@ export default function PostAnalyticsPage() {
                           key={i}
                           className="border-b border-[var(--border-light)] last:border-0"
                         >
-                          <td className="p-4 text-sm">
+                          <td className="text-sm">
                             {new Date(view.started_at).toLocaleString('en-US', {
                               month: 'short',
                               day: 'numeric',
@@ -424,19 +424,19 @@ export default function PostAnalyticsPage() {
                               minute: '2-digit',
                             })}
                           </td>
-                          <td className="p-4 text-sm text-[var(--text-secondary)]">
+                          <td className="text-sm text-[var(--text-secondary)]">
                             {view.referrer_domain || 'Direct'}
                           </td>
-                          <td className="p-4 text-sm text-[var(--text-secondary)] capitalize">
+                          <td className="text-sm text-[var(--text-secondary)] capitalize">
                             {view.device_type || ' - '}
                           </td>
-                          <td className="p-4 text-right font-mono text-sm">
+                          <td className="text-right font-mono text-sm">
                             {formatTime(view.time_on_page || 0)}
                           </td>
-                          <td className="p-4 text-right font-mono text-sm">
+                          <td className="text-right font-mono text-sm">
                             {view.scroll_depth || 0}%
                           </td>
-                          <td className="p-4 text-right">
+                          <td className="text-right">
                             {view.read_complete ? (
                               <span className="text-[var(--success)]">OK</span>
                             ) : (

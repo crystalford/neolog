@@ -42,7 +42,7 @@ export default function SyndicationPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
         {[
           { name: 'X (Threads)', desc: 'Post a 5-6 tweet thread on publish.' },
           { name: 'LinkedIn', desc: 'Publish a short case study post.' },
@@ -52,7 +52,7 @@ export default function SyndicationPage() {
           { name: 'Dev.to', desc: 'Cross-post to the developer community.' },
           { name: 'Newsletter (Resend)', desc: 'Email your subscribers on publish.' },
         ].map((item) => (
-          <div key={item.name} className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-sm">
+          <div key={item.name} className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-[var(--text-primary)]">{item.name}</p>

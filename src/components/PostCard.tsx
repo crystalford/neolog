@@ -27,7 +27,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
       <article className="group">
         <Link 
           href={`/${post.author.username}/${post.slug}`}
-          className="block h-full p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-sm transition-all"
+          className="block h-full p-3 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md transition-all"
         >
           {post.cover_image_url && (
             <div className="aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-tertiary)]">
@@ -67,7 +67,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               <span>{post.author.display_name || post.author.username}</span>
               {publishedDate && (
                 <>
-                  <span>•</span>
+                  <span>-</span>
                   <time>{publishedDate}</time>
                 </>
               )}
@@ -86,11 +86,12 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
     <article className="group relative">
       <Link 
         href={`/${post.author.username}/${post.slug}`}
-        className="block p-5 rounded-2xl border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:bg-[var(--bg-secondary)]/50 transition-all duration-300"
+        className="block p-5 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md hover:bg-[var(--bg-secondary)]/40 transition-all duration-300"
       >
         {post.cover_image_url && (
           <div className="relative aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-secondary)]">
             <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
 
@@ -107,9 +108,9 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         <div className="flex items-center gap-3 mb-2">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
-              <img src={post.author.avatar_url} alt="" className="w-6 h-6 rounded-full" />
+              <img src={post.author.avatar_url} alt="" className="w-7 h-7 rounded-full" />
             ) : (
-              <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center text-xs font-medium text-white">
+              <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center text-xs font-medium text-white">
                 {(post.author.display_name || post.author.username)[0].toUpperCase()}
               </div>
             )}
@@ -120,7 +121,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           
           {publishedDate && (
             <>
-              <span className="text-[var(--text-tertiary)]"> - </span>
+              <span className="text-[var(--text-tertiary)]">-</span>
               <time className="text-sm text-[var(--text-tertiary)]">{publishedDate}</time>
             </>
           )}

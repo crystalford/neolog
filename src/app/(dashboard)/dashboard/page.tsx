@@ -9,7 +9,7 @@ import { BulkPostActions } from '@/components/BulkPostActions'
 import type { Post, Profile } from '@/types/database'
 import {
   PenLine, Eye, Edit2, Trash2,
-  Globe, FileText, Clock, Search, BarChart3, Calendar, Share2
+  Globe, FileText, Clock, Search, BarChart3, Calendar, Share2, Inbox
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -316,6 +316,75 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
+            <h2 className="font-display text-xl text-[var(--text-primary)]">Common actions</h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Quick entry points for the content supply chain.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              label: 'Create post',
+              description: 'Start a new draft in the editor.',
+              href: '/write',
+              icon: PenLine,
+            },
+            {
+              label: 'Import HTML',
+              description: 'Paste or upload HTML into a draft.',
+              href: '/write',
+              icon: FileText,
+            },
+            {
+              label: 'Review inbox',
+              description: 'Convert incoming items into drafts.',
+              href: '/inbox',
+              icon: Inbox,
+            },
+            {
+              label: 'Connect sources',
+              description: 'Add RSS feeds and fetch updates.',
+              href: '/sources',
+              icon: Globe,
+            },
+            {
+              label: 'Syndication targets',
+              description: 'Set up outbound publishing.',
+              href: '/syndication',
+              icon: Share2,
+            },
+            {
+              label: 'Analytics snapshot',
+              description: 'See what is trending with readers.',
+              href: '/analytics',
+              icon: BarChart3,
+            },
+          ].map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                  <Icon size={16} className="text-[var(--text-secondary)]" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+
       {healthQueue.length > 0 && (
         <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -442,7 +511,7 @@ export default function DashboardPage() {
         </div>
       ) : (
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[36px_minmax(0,1fr)_110px_120px_100px_100px_150px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+          <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
             <div className="flex items-center justify-center">
               <input
                 type="checkbox"
@@ -489,7 +558,7 @@ export default function DashboardPage() {
             {visiblePosts.map((post) => (
               <div
                 key={post.id}
-                className="grid grid-cols-1 md:grid-cols-[36px_minmax(0,1fr)_110px_120px_100px_100px_150px] gap-2 md:gap-3 px-4 py-3 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 md:gap-2 px-4 py-2 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
               >
                 <div className="hidden md:flex items-center justify-center">
                   <input

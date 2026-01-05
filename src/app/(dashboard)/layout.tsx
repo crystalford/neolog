@@ -262,27 +262,22 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="dashboard-surface flex-1 flex flex-col">
-        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/90 backdrop-blur border-b border-[var(--border-light)]">
-          <div className="h-12 px-6 lg:px-12 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                Publisher workspace
-              </p>
-              <p className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</p>
-              <div className="mt-1 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Ingest</span>
-                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Core</span>
-                <span className="px-2 py-0.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)]">Broadcast</span>
-              </div>
+        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/95 backdrop-blur border-b border-[var(--border-light)]">
+          <div className="px-6 lg:px-12 py-2 flex items-center justify-between">
+            <div className="flex items-baseline gap-3">
+              <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
+                Workspace
+              </span>
+              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCommandOpen(true)}
                 className="hidden md:inline-flex btn btn-secondary btn-sm"
               >
                 <Command size={14} />
                 Quick switch
-                <span className="text-[10px] uppercase tracking-[0.2em]">Ctrl K</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl K</span>
               </button>
               <button
                 onClick={() => setCommandOpen(true)}
@@ -309,7 +304,7 @@ export default function DashboardLayout({
               {profile && (
                 <Link
                   href={`/${profile.username}`}
-                  className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                  className="w-7 h-7 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
                 >
                   {profile.avatar_url ? (
                     <img

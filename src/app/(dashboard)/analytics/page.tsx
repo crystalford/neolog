@@ -236,7 +236,7 @@ export default function AnalyticsPage() {
     <main className="pb-16">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-8 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 mb-6">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Analytics</p>
             <h1 className="font-display text-3xl text-[var(--text-primary)]">Reader intelligence</h1>
@@ -246,12 +246,12 @@ export default function AnalyticsPage() {
           </div>
             
           {/* Date range selector */}
-          <div className="flex gap-1 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)]">
+          <div className="flex gap-1 p-1 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-light)]">
             {(['7d', '30d', '90d'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   dateRange === range
                     ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -283,11 +283,11 @@ export default function AnalyticsPage() {
         ) : (
           <>
             {/* Overview cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
-                    <Eye size={20} className="text-[var(--accent)]" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
+                    <Eye size={18} className="text-[var(--accent)]" />
                   </div>
                   <span className="text-sm font-medium text-[var(--text-secondary)]">Total Views</span>
                 </div>
@@ -295,10 +295,10 @@ export default function AnalyticsPage() {
                 <Sparkline data={dailyData.map(d => d.views)} />
               </div>
 
-              <div className="p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
-                    <Users size={20} className="text-[var(--accent)]" />
+              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
+                    <Users size={18} className="text-[var(--accent)]" />
                   </div>
                   <span className="text-sm font-medium text-[var(--text-secondary)]">Unique Readers</span>
                 </div>
@@ -306,10 +306,10 @@ export default function AnalyticsPage() {
                 <Sparkline data={dailyData.map(d => d.uniques)} />
               </div>
 
-              <div className="p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
-                    <Clock size={20} className="text-[var(--accent)]" />
+              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
+                    <Clock size={18} className="text-[var(--accent)]" />
                   </div>
                   <span className="text-sm font-medium text-[var(--text-secondary)]">Avg. Read Time</span>
                 </div>
@@ -319,10 +319,10 @@ export default function AnalyticsPage() {
                 </p>
               </div>
 
-              <div className="p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
-                    <Target size={20} className="text-[var(--accent)]" />
+              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center border border-[var(--border-light)]">
+                    <Target size={18} className="text-[var(--accent)]" />
                   </div>
                   <span className="text-sm font-medium text-[var(--text-secondary)]">Completion Rate</span>
                 </div>
@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
                     )
                   })()}
                   <p>
-                    Average completion sits at <span className="text-[var(--text-primary)] font-medium">{totals.avgCompletion}%</span>. If it’s under 50%, tighten intros or add subheads every 2–3 paragraphs.
+                    Average completion sits at <span className="text-[var(--text-primary)] font-medium">{totals.avgCompletion}%</span>. If it's under 50%, tighten intros or add subheads every 2-3 paragraphs.
                   </p>
                   <p>
                     Your strongest referrer is <span className="text-[var(--text-primary)] font-medium">{referrers[0]?.domain || 'Direct'}</span>. Double down there with a tailored share.
@@ -376,7 +376,7 @@ export default function AnalyticsPage() {
                   <div className="space-y-2">
                     <p className="font-medium text-[var(--text-primary)]">{posts[0].title}</p>
                     <p className="text-xs text-[var(--text-tertiary)]">
-                      {posts[0].total_views.toLocaleString()} views · {posts[0].completion_rate}% completion
+                      {posts[0].total_views.toLocaleString()} views - {posts[0].completion_rate}% completion
                     </p>
                     <Link
                       href={`/analytics/${posts[0].id}`}
@@ -409,12 +409,12 @@ export default function AnalyticsPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full data-table">
                       <thead>
-                        <tr className="border-b border-[var(--border-light)] text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                          <th className="text-left p-4 font-medium">Post</th>
-                          <th className="text-right p-4 font-medium">Views</th>
-                          <th className="text-right p-4 font-medium">Uniques</th>
-                          <th className="text-right p-4 font-medium">Avg. Time</th>
-                          <th className="text-right p-4 font-medium">Completion</th>
+                        <tr>
+                          <th className="text-left">Post</th>
+                          <th className="text-right">Views</th>
+                          <th className="text-right">Uniques</th>
+                          <th className="text-right">Avg. Time</th>
+                          <th className="text-right">Completion</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -423,22 +423,22 @@ export default function AnalyticsPage() {
                             key={post.id}
                             className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-secondary)] transition-colors"
                           >
-                            <td className="p-4">
+                            <td>
                               <p className="font-medium text-[var(--text-primary)] truncate max-w-xs">{post.title}</p>
                               <p className="text-sm text-[var(--text-tertiary)]">
                                 {formatDate(post.published_at)}
                               </p>
                             </td>
-                            <td className="p-4 text-right font-mono text-sm text-[var(--text-primary)]">
+                            <td className="text-right font-mono text-sm text-[var(--text-primary)]">
                               {post.total_views.toLocaleString()}
                             </td>
-                            <td className="p-4 text-right font-mono text-sm text-[var(--text-primary)]">
+                            <td className="text-right font-mono text-sm text-[var(--text-primary)]">
                               {post.unique_viewers.toLocaleString()}
                             </td>
-                            <td className="p-4 text-right font-mono text-sm text-[var(--text-primary)]">
+                            <td className="text-right font-mono text-sm text-[var(--text-primary)]">
                               {formatTime(post.avg_time_on_page)}
                             </td>
-                            <td className="p-4 text-right">
+                            <td className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <div className="w-16 h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                                   <div

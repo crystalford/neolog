@@ -166,15 +166,15 @@
 }
 
 .dashboard-shell .btn {
-  padding: 0.38rem 0.75rem;
-  font-size: 0.75rem;
-  border-radius: 8px;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.72rem;
+  border-radius: 7px;
 }
 
 .dashboard-shell .btn-sm {
-  padding: 0.28rem 0.6rem;
-  font-size: 0.6875rem;
-  border-radius: 7px;
+  padding: 0.24rem 0.5rem;
+  font-size: 0.66rem;
+  border-radius: 6px;
 }
 
 .dashboard-shell .btn-lg {
@@ -184,20 +184,20 @@
 }
 
 .dashboard-shell .input {
-  padding: 0.55rem 0.8rem;
-  font-size: 0.875rem;
-  border-radius: 7px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  border-radius: 6px;
 }
 
 .dashboard-shell .btn-icon {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 8px;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 7px;
 }
 
 .dashboard-shell .card {
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1rem;
 }
 
 .dashboard-shell .card h2,
@@ -841,14 +841,14 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.6rem;
   text-align: left;
   border-bottom: 1px solid var(--border-light);
 }
 
 .data-table tbody td {
-  padding: 0.6rem 0.75rem;
-  font-size: 0.875rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
   border-top: 1px solid var(--border-light);
 }

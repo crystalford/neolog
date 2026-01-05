@@ -620,7 +620,7 @@ export default function SubscribersPage() {
                 <div className="p-4 border-b border-[var(--border-light)]">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">User subscribers</p>
                 </div>
-                <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_140px_140px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                  <div className="hidden md:grid grid-cols-[24px_minmax(0,1fr)_120px_120px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
                   <div className="flex items-center justify-center">
                     <input
                       type="checkbox"
@@ -671,7 +671,7 @@ export default function SubscribersPage() {
                   {filteredUserSubs.map((sub) => (
                     <div 
                       key={sub.id}
-                      className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_140px_140px] gap-3 px-4 py-3 items-center"
+                      className="grid grid-cols-1 md:grid-cols-[24px_minmax(0,1fr)_120px_120px] gap-2 px-4 py-2 items-center"
                     >
                       <div className="hidden md:flex items-center justify-center">
                         <input
@@ -692,10 +692,10 @@ export default function SubscribersPage() {
                           <img 
                             src={sub.subscriber.avatar_url}
                             alt={sub.subscriber.display_name || sub.subscriber.username}
-                            className="w-10 h-10 rounded-full"
+                            className="w-9 h-9 rounded-full"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
+                          <div className="w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
                             {(sub.subscriber.display_name || sub.subscriber.username)[0].toUpperCase()}
                           </div>
                         )}
@@ -772,7 +772,7 @@ export default function SubscribersPage() {
                   <div className="p-4 border-b border-[var(--border-light)]">
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Email subscribers</p>
                   </div>
-                  <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_120px_160px] gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                  <div className="hidden md:grid grid-cols-[24px_minmax(0,1fr)_110px_140px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
                     <div className="flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -840,7 +840,7 @@ export default function SubscribersPage() {
                     {filteredEmailSubs.map((sub) => (
                     <div 
                       key={sub.id}
-                      className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_120px_160px] gap-3 px-4 py-3 items-center"
+                      className="grid grid-cols-1 md:grid-cols-[24px_minmax(0,1fr)_110px_140px] gap-2 px-4 py-2 items-center"
                     >
                         <div className="hidden md:flex items-center justify-center">
                           <input
@@ -857,7 +857,7 @@ export default function SubscribersPage() {
                           />
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
                             <Mail size={18} className="text-[var(--text-tertiary)]" />
                           </div>
                           <div>

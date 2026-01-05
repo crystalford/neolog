@@ -84,10 +84,10 @@ export default function ExplorePage() {
   return (
     <>
       <Header />
-      <main className="pt-16 pb-14">
+      <main className="pt-14 pb-14">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="flex items-center justify-between pt-6 mb-6">
+          <div className="flex items-center justify-between pt-4 mb-5">
             <div>
               <h1 className="font-display text-3xl mb-2">Explore</h1>
               <p className="text-[var(--text-secondary)]">
@@ -109,7 +109,7 @@ export default function ExplorePage() {
             {/* Main content */}
             <div className="lg:col-span-3">
               {/* Filters */}
-              <div className="flex gap-2 mb-5">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {[
                   { id: 'latest', label: 'Latest', icon: Clock },
                   { id: 'popular', label: 'Most Forked', icon: Sparkles },
@@ -119,7 +119,7 @@ export default function ExplorePage() {
                     key={id}
                     onClick={() => setFilter(id as typeof filter)}
                     className={`
-                      flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                      flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all
                       ${filter === id
                         ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
                         : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -169,7 +169,7 @@ export default function ExplorePage() {
             <div className="space-y-6">
               {/* Rising posts */}
               <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden">
-                <div className="p-4 border-b border-[var(--border-light)] flex items-center gap-2">
+                <div className="p-3 border-b border-[var(--border-light)] flex items-center gap-2">
                   <TrendingUp size={18} className="text-[var(--accent)]" />
                   <h2 className="font-display text-lg">Rising Now</h2>
                 </div>
@@ -184,7 +184,7 @@ export default function ExplorePage() {
                       <Link
                         key={post.post_id}
                         href={`/${post.author_username}/${post.slug}`}
-                        className="block p-4 hover:bg-[var(--bg-tertiary)] transition-colors"
+                        className="block p-3 hover:bg-[var(--bg-tertiary)] transition-colors"
                       >
                         <div className="flex items-start gap-3">
                           <span className="w-6 h-6 rounded-full bg-[var(--accent-soft)] flex items-center justify-center text-xs font-medium text-[var(--accent)]">
@@ -206,7 +206,7 @@ export default function ExplorePage() {
               </div>
 
               {/* Call to action */}
-              <div className="p-5 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)]/20">
+              <div className="p-4 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)]/20">
                 <h3 className="font-display text-lg mb-2">Got something to share?</h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
                   Publish your HTML, markdown, or rich text. We render it exactly as you wrote it.

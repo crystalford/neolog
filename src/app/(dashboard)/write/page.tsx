@@ -997,7 +997,7 @@ export default function WritePage() {
   const titleChanged = lastVersion ? lastVersion.title !== title : false
 
   return (
-    <main className="pb-16 pt-6">
+    <main className="pb-16 pt-4">
       <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Error/Success Messages */}
           {hasNoPublications && (
@@ -1029,7 +1029,7 @@ export default function WritePage() {
 
           {/* Publication selector */}
           {publications.length > 0 && (
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
                 Publishing to
               </label>
@@ -1054,7 +1054,7 @@ export default function WritePage() {
           )}
 
           {/* Header actions */}
-          <div className="flex flex-wrap items-center justify-between gap-3 py-2 px-3 mb-6 sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-light)] rounded-xl shadow-sm z-10">
+          <div className="flex flex-wrap items-center justify-between gap-2 py-1.5 px-2.5 mb-5 sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-light)] rounded-lg shadow-sm z-10">
             <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
               {saving && (
                 <span className="flex items-center gap-1.5">
@@ -1069,7 +1069,7 @@ export default function WritePage() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setShowImport((prev) => !prev)}
                 className="btn btn-ghost btn-sm"
@@ -1125,7 +1125,7 @@ export default function WritePage() {
           </div>
 
           {showImport && (
-            <div className="mb-8 p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
+            <div className="mb-7 p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="font-display text-lg">Import HTML</h3>
@@ -1196,7 +1196,7 @@ export default function WritePage() {
                 onClick={() => setShowSettings(false)}
               />
               <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)]">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-light)]">
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                       Publish
@@ -1212,17 +1212,17 @@ export default function WritePage() {
                   </button>
                 </div>
 
-                <div className="px-6 py-6 space-y-6">
+                <div className="px-5 py-5 space-y-5">
                   <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)]">
+                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
                       <span>Words</span>
                       <span>{getWordCount(content).toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)] mt-2">
+                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
                       <span>Reading time</span>
                       <span>{calculateReadingTime(content)} min</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm text-[var(--text-tertiary)] mt-2">
+                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
                       <span>Editor</span>
                       <span>{htmlMode ? 'HTML' : 'Visual'}</span>
                     </div>
@@ -1390,7 +1390,7 @@ export default function WritePage() {
                               setScheduledAt('')
                             }
                           }}
-                          className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+                          className={`px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
                             resolvedIntent === item.value
                               ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
                               : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
@@ -1690,7 +1690,7 @@ export default function WritePage() {
                 className="absolute inset-0 bg-black/30"
                 onClick={() => setShowPublishConfirm(false)}
               />
-              <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-5">
+              <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-4">
                 <h3 className="font-display text-xl text-[var(--text-primary)] mb-2">
                   {publishLabel} post
                 </h3>
@@ -1961,7 +1961,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            className="w-full text-3xl md:text-4xl font-display tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-2 px-0 pt-2"
+            className="w-full text-3xl md:text-4xl font-display tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-1 px-0 pt-1"
             autoFocus
           />
 
@@ -1971,10 +1971,10 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Subtitle (optional)"
-            className="w-full text-lg md:text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-5 px-0"
+            className="w-full text-lg md:text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-4 px-0"
           />
 
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Editor mode: {postType === 'pulse' ? 'Pulse' : htmlMode ? 'HTML' : 'Visual'}
             </span>

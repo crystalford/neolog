@@ -2,6 +2,21 @@
 
 Last updated: 2026-01-05
 
+## Supply Chain Versions (MVP slices)
+### Version 1 - Writer MVP
+- Ingest: Firecrawl URL import -> draft
+- Core: Editor + OpenAI summaries (BYOK)
+- Broadcast: X threader + Resend newsletter
+
+### Version 2 - Media MVP
+- Ingest: Deepgram audio notes
+- Core: Anthropic critique
+- Broadcast: LinkedIn + Spotify audio articles
+
+### Version 3 - Video MVP
+- Ingest: Gemini video summary
+- Broadcast: TikTok/Instagram video outputs
+
 ## Phase 1 - Distribution Pack (shipping)
 - [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
 - [x] OG image data URL (SVG)

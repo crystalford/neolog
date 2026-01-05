@@ -110,7 +110,7 @@ export default function SourcesPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-6">
+    <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Sources</p>
         <h1 className="font-display text-3xl text-[var(--text-primary)]">Pull content in</h1>
@@ -130,9 +130,9 @@ export default function SourcesPage() {
         </div>
       )}
 
-      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 space-y-4">
+      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-4 space-y-3">
         <h2 className="font-display text-lg text-[var(--text-primary)]">Add RSS feed</h2>
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto]">
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -153,7 +153,7 @@ export default function SourcesPage() {
       </div>
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border-light)]">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Connected feeds</p>
           <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm">
             <RefreshCw size={14} />
@@ -167,7 +167,7 @@ export default function SourcesPage() {
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {sources.map((source) => (
-              <div key={source.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div key={source.id} className="px-4 py-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                     {source.name || source.url}

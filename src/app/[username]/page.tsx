@@ -95,19 +95,19 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <>
       <Header />
-      <main className="pt-16 pb-16">
+      <main className="pt-14 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Profile Header */}
-          <div className="pt-8 pb-8 border-b border-[var(--border-light)]">
+          <div className="pt-6 pb-6 border-b border-[var(--border-light)]">
             <div className="flex items-start gap-6">
               {profile.avatar_url ? (
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.display_name || profile.username}
-                  className="w-24 h-24 rounded-full"
+                  className="w-20 h-20 rounded-full"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-[var(--accent)] flex items-center justify-center text-3xl font-medium text-white">
+                <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl font-medium text-white">
                   {(profile.display_name || profile.username)[0].toUpperCase()}
                 </div>
               )}
@@ -159,7 +159,7 @@ export default async function ProfilePage({ params }: Props) {
                    
                   <span className="flex items-center gap-1">
                     <Users size={14} />
-                    {followerCount || 0} followers - {subscriberCount || 0} subscribers
+                    {followerCount || 0} followers / {subscriberCount || 0} subscribers
                   </span>
                 </div>
 
@@ -172,8 +172,8 @@ export default async function ProfilePage({ params }: Props) {
           </div>
 
           {/* Posts */}
-          <section className="mt-8">
-            <h2 className="font-display text-xl mb-6">Posts</h2>
+          <section className="mt-6">
+            <h2 className="font-display text-xl mb-4">Posts</h2>
              
             {postsWithAuthor.length === 0 ? (
               <p className="text-[var(--text-secondary)] text-center py-12">
@@ -189,7 +189,7 @@ export default async function ProfilePage({ params }: Props) {
           </section>
 
           {topicTags.length > 0 && (
-            <section className="mt-10 border-t border-[var(--border-light)] pt-8">
+            <section className="mt-8 border-t border-[var(--border-light)] pt-6">
               <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/60 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
