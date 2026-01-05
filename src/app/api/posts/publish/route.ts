@@ -28,25 +28,51 @@ function getSentences(text: string, max = 3): string[] {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
-    
-    // Get current user
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+
+    // Normal mode: session-auth
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const authHeader = request.headers.get('authorization')
+    const isCron = Boolean(process.env.CRON_SECRET) && authHeader === `Bearer ${process.env.CRON_SECRET}`
+
+    const body = (await request.json().catch(() => null)) as
+      | {
+          postId?: string
+          notify?: boolean
+          authorId?: string
+        }
+      | null
+
+    const postId = body?.postId
+    const notify = typeof body?.notify === 'boolean' ? body.notify : true
+    const cronAuthorId = typeof body?.authorId === 'string' ? body.authorId : null
+
+    if (!session && !isCron) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { postId, notify = true } = await request.json()
 
     if (!postId) {
       return NextResponse.json({ error: 'postId is required' }, { status: 400 })
     }
 
+    if (!session && isCron && !cronAuthorId) {
+      return NextResponse.json({ error: 'authorId is required for cron publish' }, { status: 400 })
+    }
+
+    const actorUserId = session?.user.id || cronAuthorId!
+    const db = session ? supabase : createAdminClient()
+    if (!db) {
+      return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
+    }
+
     // Get the post
-    const { data: post, error: postError } = await supabase
+    const { data: post, error: postError } = await db
       .from('posts')
       .select('*, author:profiles(username, display_name)')
       .eq('id', postId)
-      .eq('author_id', session.user.id)
+      .eq('author_id', actorUserId)
       .single()
 
     if (postError || !post) {
@@ -56,7 +82,7 @@ export async function POST(request: NextRequest) {
     const alreadyPublished = post.status === 'published'
 
     if (!alreadyPublished) {
-      const { error: publishError } = await supabase
+      const { error: publishError } = await db
         .from('posts')
         .update({
           status: 'published',
@@ -68,7 +94,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to publish' }, { status: 500 })
       }
 
-      const { data: latestVersion } = await supabase
+      const { data: latestVersion } = await db
         .from('post_versions')
         .select('version_number')
         .eq('post_id', postId)
@@ -78,7 +104,7 @@ export async function POST(request: NextRequest) {
 
       const nextVersionNumber = (latestVersion?.version_number || 0) + 1
 
-      await supabase
+      await db
         .from('post_versions')
         .upsert({
           post_id: postId,
@@ -87,19 +113,19 @@ export async function POST(request: NextRequest) {
           content: post.content,
           content_html: post.content_html,
           change_summary: 'Published',
-          changed_by: session.user.id,
+          changed_by: actorUserId,
         }, { onConflict: 'post_id,version_number' })
 
       // Best-effort: create/refresh pgvector embedding for semantic search.
       // Never block publishing on embedding failures.
       try {
-        const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+        const openaiKey = await resolveProviderKey(actorUserId, 'openai')
         const admin = createAdminClient()
 
         if (openaiKey?.key && admin) {
           let canEmbed = true
           try {
-            await enforceUsageCaps({ supabase, userId: session.user.id, provider: 'openai' })
+            await enforceUsageCaps({ supabase: db as any, userId: actorUserId, provider: 'openai' })
           } catch {
             canEmbed = false
           }
@@ -118,7 +144,7 @@ export async function POST(request: NextRequest) {
                 text,
                 onUsage: (u) => {
                   void logProviderUsage({
-                    userId: session.user.id,
+                    userId: actorUserId,
                     provider: 'openai',
                     model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
                     route: '/api/posts/publish',
@@ -152,23 +178,23 @@ export async function POST(request: NextRequest) {
     
     if (notify) {
       // Get all subscribers who want new post emails
-      const { data: userSubscribers } = await supabase
+      const { data: userSubscribers } = await db
         .from('subscriptions')
         .select('subscriber:profiles(id)')
-        .eq('creator_id', session.user.id)
+        .eq('creator_id', actorUserId)
         .eq('email_new_posts', true)
 
-      const { data: emailSubscribers } = await supabase
+      const { data: emailSubscribers } = await db
         .from('email_subscribers')
         .select('email, unsubscribe_token')
-        .eq('creator_id', session.user.id)
+        .eq('creator_id', actorUserId)
         .eq('status', 'active')
         .eq('email_new_posts', true)
 
       // For now, we only send to email subscribers
       // User subscribers would need their email from auth.users (requires service role)
       if (emailSubscribers && emailSubscribers.length > 0) {
-        const resendKey = await resolveProviderKey(session.user.id, 'resend')
+        const resendKey = await resolveProviderKey(actorUserId, 'resend')
         if (resendKey) {
           notificationResult = await sendNewPostNotifications(
             emailSubscribers.map(s => ({
@@ -198,9 +224,9 @@ export async function POST(request: NextRequest) {
         const summary = post.excerpt || getSentences(plain, 2).join(' ')
         const sentenceList = getSentences(plain, 4)
 
-        const mediumKey = await resolveProviderKey(session.user.id, 'medium')
+        const mediumKey = await resolveProviderKey(actorUserId, 'medium')
         if (mediumKey?.key) {
-          const { data: existing } = await supabase
+          const { data: existing } = await db
             .from('post_syndications')
             .select('id, status')
             .eq('post_id', postId)
@@ -208,12 +234,12 @@ export async function POST(request: NextRequest) {
             .maybeSingle()
 
           if (!existing || existing.status !== 'sent') {
-            await supabase
+            await db
               .from('post_syndications')
               .upsert(
                 {
                   post_id: postId,
-                  author_id: session.user.id,
+                  author_id: actorUserId,
                   provider: 'medium',
                   status: 'pending',
                   request_payload: {
@@ -237,12 +263,12 @@ export async function POST(request: NextRequest) {
               publishStatus: 'public',
             })
 
-            await supabase
+            await db
               .from('post_syndications')
               .upsert(
                 {
                   post_id: postId,
-                  author_id: session.user.id,
+                  author_id: actorUserId,
                   provider: 'medium',
                   status: 'sent',
                   external_id: res.externalId,
@@ -258,9 +284,9 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const devtoKey = await resolveProviderKey(session.user.id, 'devto')
+        const devtoKey = await resolveProviderKey(actorUserId, 'devto')
         if (devtoKey?.key) {
-          const { data: existing } = await supabase
+          const { data: existing } = await db
             .from('post_syndications')
             .select('id, status')
             .eq('post_id', postId)
@@ -268,12 +294,12 @@ export async function POST(request: NextRequest) {
             .maybeSingle()
 
           if (!existing || existing.status !== 'sent') {
-            await supabase
+            await db
               .from('post_syndications')
               .upsert(
                 {
                   post_id: postId,
-                  author_id: session.user.id,
+                  author_id: actorUserId,
                   provider: 'devto',
                   status: 'pending',
                   request_payload: {
@@ -305,12 +331,12 @@ export async function POST(request: NextRequest) {
               published: true,
             })
 
-            await supabase
+            await db
               .from('post_syndications')
               .upsert(
                 {
                   post_id: postId,
-                  author_id: session.user.id,
+                  author_id: actorUserId,
                   provider: 'devto',
                   status: 'sent',
                   external_id: res.externalId,

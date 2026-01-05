@@ -45,26 +45,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ published: 0 })
     }
 
-    // Publish each post
-    const postIds = scheduledPosts.map(p => p.id)
-    
-    const { error: updateError } = await supabase
-      .from('posts')
-      .update({
-        status: 'published',
-        published_at: new Date().toISOString(),
-      })
-      .in('id', postIds)
-
-    if (updateError) throw updateError
-
-    // Send notifications for each published post
+    // Publish each post through the normal publish pipeline.
+    // This ensures versioning, embeddings, and syndication run.
     for (const post of scheduledPosts) {
-      // Trigger the publish notification flow
       await fetch(`${appUrl}/api/posts/publish`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: post.id, notify: true }),
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+        body: JSON.stringify({ postId: post.id, notify: true, authorId: post.author_id }),
       })
     }
 
