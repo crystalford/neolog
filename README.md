@@ -171,6 +171,9 @@ See `supabase-schema.sql` for the complete schema including:
 | `/api/agent/search?q=...` | GET | Agent-friendly post search (optional `&username=...`; JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 | `/api/agent/vector-search?q=...` | GET | Agent-friendly semantic search (optional `&username=...`; uses pgvector + embeddings; JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 | `/api/agent/ingest` | POST | Ingest URL or raw text and create a draft post (API key) |
+| `/api/agent/draft/update` | POST | Update a draft post by id (API key) |
+| `/api/agent/draft/publish` | POST | Publish a draft post by id (API key) |
+| `/api/agent/embeddings/backfill` | POST | Backfill/refresh embeddings for recent published posts (API key) |
 
 ## Environment Variables
 
@@ -208,10 +211,14 @@ Note: scheduled `/api/cron/*` routes can be triggered via Vercel Cron Jobs on pa
 All `/api/agent/*` endpoints require an Automation API key.
 
 - Vector search:
-    - `curl -H "x-api-key: neo_..." "http://localhost:3000/api/agent/vector-search?q=what+is+neolog&limit=5"`
+    - Logged-in browser use: enable Semantic toggle on `/search`
+    - API key use: `curl -H "x-api-key: neo_..." "http://localhost:3000/api/agent/vector-search?q=what+is+neolog&limit=5"`
     - Optional: `&username=yourname` (filters to that author)
 - Ingest to draft:
     - `curl -X POST -H "x-api-key: neo_..." -H "content-type: application/json" -d "{\"url\":\"https://example.com\",\"title\":\"Example\"}" "http://localhost:3000/api/agent/ingest"`
+
+- Backfill embeddings (recommended before heavy semantic search):
+    - `curl -X POST -H "x-api-key: neo_..." "http://localhost:3000/api/agent/embeddings/backfill?limit=200&maxUpserts=25"`
 
 ## Vector Search Setup
 

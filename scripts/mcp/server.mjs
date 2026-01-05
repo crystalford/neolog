@@ -29,6 +29,44 @@ async function callAgent(path, { method = "GET", query, body } = {}) {
   const url = new URL(path, BASE_URL);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
+        inputSchema: {
+          type: "object",
+          properties: {
+            postId: { type: "string" },
+            title: { type: "string" },
+            excerpt: { type: "string" },
+            content: { type: "string" },
+            content_html: { type: "string" },
+            content_type: {
+              type: "string",
+              enum: ["markdown", "html", "rich", "pulse"],
+            },
+          },
+          required: ["postId"],
+        },
+      },
+      {
+        name: "neolog_publish_draft",
+        description: "Publish a draft post by id.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            postId: { type: "string" },
+          },
+          required: ["postId"],
+        },
+      },
+      {
+        name: "neolog_embeddings_backfill",
+        description: "Backfill or refresh embeddings for recent published posts.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            username: { type: "string" },
+            limit: { type: "number" },
+            maxUpserts: { type: "number" },
+          },
+        },
       if (v === undefined || v === null || v === "") continue;
       url.searchParams.set(k, String(v));
     }
@@ -64,6 +102,29 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
+      {
+        name: "neolog_get_user",
+        description: "Get a user profile and recent posts by username.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            username: { type: "string" },
+          },
+          required: ["username"],
+        },
+      },
+      {
+        name: "neolog_get_post",
+        description: "Get a published post by username + slug.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            username: { type: "string" },
+            slug: { type: "string" },
+          },
+          required: ["username", "slug"],
+        },
+      },
       {
         name: "neolog_search",
         description: "Keyword search published posts.",
@@ -106,6 +167,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: "neolog_update_draft",
+        description: "Update a draft post (title/excerpt/content).",
     ],
   };
 });
@@ -113,6 +177,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const name = request.params.name;
   const args = request.params.arguments || {};
+
+  if (name === "neolog_get_user") {
+    const result = await callAgent("/api/agent/user", {
+      method: "GET",
+      query: { username: args.username },
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+
+  if (name === "neolog_get_post") {
+    const result = await callAgent("/api/agent/post", {
+      method: "GET",
+      query: { username: args.username, slug: args.slug },
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
 
   if (name === "neolog_search") {
     const result = await callAgent("/api/agent/search", {
@@ -145,6 +225,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         text: args.text,
         excerpt: args.excerpt,
         status: args.status || "draft",
+      },
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+
+  if (name === "neolog_update_draft") {
+    const result = await callAgent("/api/agent/draft/update", {
+      method: "POST",
+      body: {
+        postId: args.postId,
+        title: args.title,
+        excerpt: args.excerpt,
+        content: args.content,
+        content_html: args.content_html,
+        content_type: args.content_type,
+      },
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+
+  if (name === "neolog_publish_draft") {
+    const result = await callAgent("/api/agent/draft/publish", {
+      method: "POST",
+      body: { postId: args.postId },
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+
+  if (name === "neolog_embeddings_backfill") {
+    const result = await callAgent("/api/agent/embeddings/backfill", {
+      method: "POST",
+      query: {
+        username: args.username,
+        limit: args.limit,
+        maxUpserts: args.maxUpserts,
       },
     });
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

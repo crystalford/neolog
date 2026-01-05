@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 
 import { requireAutomationKey } from "@/lib/apiKeyAuth";
+import { resolveProviderKeyWithClient } from "@/lib/ai-provider";
+import {
+  embedTextWithOpenAI,
+  pickTextForEmbedding,
+  sha256,
+  vectorLiteral,
+} from "@/lib/embeddings";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const EMBEDDING_DIM = 1536;
-
-type EmbeddingResponse = {
-  data: Array<{
-    embedding: number[];
-  }>;
+type Actor = {
+  userId: string;
+  openaiKey: string;
 };
 
 function wantsMarkdown(req: Request) {
@@ -23,77 +27,28 @@ function wantsMarkdown(req: Request) {
   return accept.includes("text/markdown") || accept.includes("text/plain");
 }
 
-function sha256(input: string) {
-  return crypto.createHash("sha256").update(input).digest("hex");
-}
-
-function vectorLiteral(vec: number[]) {
-  // pgvector accepts `[1,2,3]` format
-  return `[${vec.join(",")}]`;
-}
-
-function pickTextForEmbedding(post: {
-  title: string | null;
-  excerpt: string | null;
-  content: string | null;
-  content_html: string | null;
-}) {
-  const parts: string[] = [];
-  if (post.title) parts.push(post.title);
-  if (post.excerpt) parts.push(post.excerpt);
-
-  // Prefer plain text content when available; fallback to html.
-  if (post.content) parts.push(post.content);
-  else if (post.content_html) parts.push(post.content_html);
-
-  return parts.join("\n\n").trim();
-}
-
-async function embedText(text: string) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing OPENAI_API_KEY");
+async function resolveActor(req: NextRequest, admin: any): Promise<Actor | null> {
+  const auth = await requireAutomationKey(req);
+  if (auth.ok) {
+    const provider = await resolveProviderKeyWithClient(admin, auth.userId, "openai");
+    if (!provider) return null;
+    return { userId: auth.userId, openaiKey: provider.key };
   }
 
-  const res = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
-      input: text,
-    }),
-  });
+  const supabase = createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Embedding request failed (${res.status}): ${errText}`);
-  }
+  if (!user) return null;
 
-  const json = (await res.json()) as EmbeddingResponse;
-  const embedding = json.data?.[0]?.embedding;
-  if (!embedding || !Array.isArray(embedding)) {
-    throw new Error("Embedding response missing embedding array");
-  }
-
-  if (embedding.length !== EMBEDDING_DIM) {
-    throw new Error(
-      `Unexpected embedding dim ${embedding.length} (expected ${EMBEDDING_DIM}). Check OPENAI_EMBEDDING_MODEL.`,
-    );
-  }
-
-  return embedding;
+  const provider = await resolveProviderKeyWithClient(admin, user.id, "openai");
+  if (!provider) return null;
+  return { userId: user.id, openaiKey: provider.key };
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAutomationKey(req);
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: 401 });
-    }
-
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") || "").trim();
     const username = (url.searchParams.get("username") || "").trim();
@@ -112,6 +67,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { error: "Server missing Supabase admin configuration." },
         { status: 500 },
+      );
+    }
+
+    const actor = await resolveActor(req, supabase);
+    if (!actor) {
+      return NextResponse.json(
+        { error: "Semantic search requires login + OpenAI key (or Pro managed key)." },
+        { status: 401 },
       );
     }
 
@@ -183,7 +146,10 @@ export async function GET(req: NextRequest) {
           : 10;
 
         for (const item of stale.slice(0, maxUpserts)) {
-          const embedding = await embedText(item.text);
+          const embedding = await embedTextWithOpenAI({
+            apiKey: actor.openaiKey,
+            text: item.text,
+          });
           const embeddingValue = vectorLiteral(embedding);
 
           const { error: upsertError } = await supabase
@@ -204,7 +170,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Embed the query.
-    const queryEmbedding = await embedText(q);
+    const queryEmbedding = await embedTextWithOpenAI({ apiKey: actor.openaiKey, text: q });
 
     const { data: matches, error: matchError } = await supabase.rpc("match_posts", {
       query_embedding: vectorLiteral(queryEmbedding),

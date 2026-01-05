@@ -41,13 +41,16 @@ export default function SearchPage() {
   const supabase = createClient()
   
   const initialQuery = searchParams.get('q') || ''
+  const initialSemantic = searchParams.get('semantic') === '1'
   
   const [query, setQuery] = useState(initialQuery)
   const [tab, setTab] = useState<'posts' | 'people'>('posts')
+  const [semantic, setSemantic] = useState(initialSemantic)
   const [posts, setPosts] = useState<SearchResult[]>([])
   const [users, setUsers] = useState<UserResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialQuery) {
@@ -55,21 +58,63 @@ export default function SearchPage() {
     }
   }, [initialQuery])
 
-  const performSearch = useCallback(async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string, opts?: { semantic?: boolean }) => {
     if (!searchQuery.trim()) return
     
     setLoading(true)
     setSearched(true)
+    setError(null)
+
+    const useSemantic = Boolean(opts?.semantic)
 
     // Update URL
-    router.push(`/search?q=${encodeURIComponent(searchQuery)}`, { scroll: false })
+    const next = new URLSearchParams()
+    next.set('q', searchQuery)
+    if (useSemantic) next.set('semantic', '1')
+    router.push(`/search?${next.toString()}`, { scroll: false })
 
     // Search posts
-    const { data: postResults } = await supabase
-      .rpc('search_posts', { p_query: searchQuery, p_limit: 30 })
-    
-    if (postResults) {
-      setPosts(postResults)
+    if (useSemantic) {
+      try {
+        const res = await fetch(
+          `/api/agent/vector-search?q=${encodeURIComponent(searchQuery)}&limit=25&seed=50&maxUpserts=10`,
+          { headers: { accept: 'application/json' } },
+        )
+        const json = await res.json().catch(() => null)
+
+        if (!res.ok) {
+          setPosts([])
+          setError(json?.error || 'Semantic search failed.')
+        } else {
+          const results = (json?.results || []) as any[]
+          const mapped: SearchResult[] = results.map((r, i) => ({
+            id: r.id,
+            title: r.title,
+            slug: r.slug,
+            excerpt: r.excerpt ?? null,
+            cover_image_url: r.cover_image_url ?? null,
+            published_at: r.published_at,
+            reading_time_minutes: r.reading_time_minutes ?? null,
+            author_id: r.author_id,
+            author_username: r.author?.username || 'unknown',
+            author_display_name: null,
+            author_avatar_url: null,
+            rank: i + 1,
+          }))
+
+          setPosts(mapped)
+        }
+      } catch (e: any) {
+        setPosts([])
+        setError(e?.message || 'Semantic search failed.')
+      }
+    } else {
+      const { data: postResults } = await supabase
+        .rpc('search_posts', { p_query: searchQuery, p_limit: 30 })
+      
+      if (postResults) {
+        setPosts(postResults)
+      }
     }
 
     // Search users
@@ -85,7 +130,7 @@ export default function SearchPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    performSearch(query)
+    performSearch(query, { semantic })
   }
 
   const clearSearch = () => {
@@ -93,6 +138,8 @@ export default function SearchPage() {
     setPosts([])
     setUsers([])
     setSearched(false)
+    setSemantic(false)
+    setError(null)
     router.push('/search')
   }
 
@@ -146,6 +193,25 @@ export default function SearchPage() {
                 </button>
               )}
             </form>
+
+            <div className="mt-3 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input
+                id="semantic"
+                type="checkbox"
+                checked={semantic}
+                onChange={(e) => setSemantic(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <label htmlFor="semantic" className="select-none">
+                Semantic (requires login + OpenAI key or Pro)
+              </label>
+            </div>
+
+            {error && (
+              <div className="mt-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+                {error}
+              </div>
+            )}
           </div>
 
           {/* Results */}
