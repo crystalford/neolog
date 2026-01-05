@@ -85,25 +85,14 @@ Notes:
 - [ ] Test sign up flow
 - [ ] Test posting
 - [ ] Test payments (use Stripe test mode first)
-- [ ] Set up cron jobs in vercel.json:
-  ```json
-  {
-    "crons": [
-      {
-        "path": "/api/cron/publish-scheduled",
-        "schedule": "*/5 * * * *"
-      },
-      {
-        "path": "/api/cron/rss-pull",
-        "schedule": "*/30 * * * *"
-      },
-      {
-        "path": "/api/cron/weekly-digest",
-        "schedule": "0 9 * * 0"
-      }
-    ]
-  }
-  ```
+### Cron jobs
+
+Vercel Cron Jobs are plan-gated. If you're on the Hobby plan, keep the cron routes but trigger them from an external scheduler (GitHub Actions, cron-job.org, UptimeRobot, etc.) using `CRON_SECRET`.
+
+Cron routes:
+- `/api/cron/publish-scheduled`
+- `/api/cron/rss-pull`
+- `/api/cron/weekly-digest`
 
 ## Headless Inbox Webhook (Automation)
 

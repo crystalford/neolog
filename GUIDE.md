@@ -171,6 +171,8 @@ Notes:
 - `SUPABASE_SERVICE_ROLE_KEY` is required for server-side automation endpoints (headless inbox webhook, automation triggers, and cron RSS pull).
 - `CRON_SECRET` protects scheduled `/api/cron/*` routes.
 
+If you're on Vercel's Hobby plan, Vercel Cron Jobs may not be available. You can still use the cron routes by calling them from an external scheduler (GitHub Actions, cron-job.org, UptimeRobot, etc.) with the `Authorization: Bearer <CRON_SECRET>` header.
+
 3. Now click **Deploy**
 4. Wait 2-3 minutes for it to build
 

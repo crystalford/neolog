@@ -193,6 +193,8 @@ Or use the trigger endpoint:
     - `{"event":"inbox.create", ...}`
     - `{"event":"rss.pull"}`
 
+Note: scheduled `/api/cron/*` routes can be triggered via Vercel Cron Jobs on paid plans, or via an external scheduler on Hobby.
+
 ## Roadmap
 
 - [ ] Rich text editor (TipTap)

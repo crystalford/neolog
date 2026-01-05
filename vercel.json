@@ -1,7 +1,1 @@
-{
-	"crons": [
-		{ "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" },
-		{ "path": "/api/cron/rss-pull", "schedule": "*/30 * * * *" },
-		{ "path": "/api/cron/weekly-digest", "schedule": "0 9 * * 0" }
-	]
-}
+{}
