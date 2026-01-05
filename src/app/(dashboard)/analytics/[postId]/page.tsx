@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { readSelectedPublicationId } from '@/lib/publicationContext'
 import { 
   ArrowLeft, Eye, Clock, Users, Target,
   TrendingUp, TrendingDown, Minus
@@ -57,12 +58,25 @@ export default function PostAnalyticsPage() {
   }, [postId])
 
   const loadPostAnalytics = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setLoading(false)
+      return
+    }
+
     // Get post
-    const { data: postData } = await supabase
+    const selectedPublicationId = readSelectedPublicationId()
+    let postQuery = supabase
       .from('posts')
       .select('id, title, slug, published_at, content, content_type')
       .eq('id', postId)
-      .single()
+      .eq('author_id', session.user.id)
+
+    if (selectedPublicationId) {
+      postQuery = postQuery.eq('publication_id', selectedPublicationId)
+    }
+
+    const { data: postData } = await postQuery.single()
 
     if (!postData) {
       setLoading(false)

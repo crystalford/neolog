@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 import {
   Eye, Clock, Users,
   Monitor, Smartphone, Tablet, ExternalLink,
@@ -65,6 +66,12 @@ export default function AnalyticsPage() {
   useEffect(() => {
     loadAnalytics()
     loadUsage()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      loadAnalytics()
+    })
+
+    return unsubscribe
   }, [dateRange])
 
   const loadUsage = async () => {
@@ -100,12 +107,19 @@ export default function AnalyticsPage() {
     if (!session) return
 
     // Get user's posts
-    const { data: userPosts } = await supabase
+    const selectedPublicationId = readSelectedPublicationId()
+    let postsQuery = supabase
       .from('posts')
       .select('id, title, slug, published_at')
       .eq('author_id', session.user.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
+
+    if (selectedPublicationId) {
+      postsQuery = postsQuery.eq('publication_id', selectedPublicationId)
+    }
+
+    const { data: userPosts } = await postsQuery
 
     if (!userPosts || userPosts.length === 0) {
       setLoading(false)
