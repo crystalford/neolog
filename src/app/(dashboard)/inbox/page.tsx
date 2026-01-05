@@ -72,7 +72,7 @@ export default function InboxPage() {
       .eq('id', id)
 
     setItems((prev) =>
-      prev.map((item) => (item.id === id - { ...item, status } : item))
+      prev.map((item) => (item.id === id ? { ...item, status } : item))
     )
   }
 
