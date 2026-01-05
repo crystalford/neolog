@@ -13,6 +13,7 @@ import {
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
+import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 
 export default function DashboardLayout({
   children,
@@ -30,9 +31,13 @@ export default function DashboardLayout({
   const supabase = createClient()
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const stored = window.localStorage.getItem('selectedPublicationId')
-    if (stored) setSelectedPublicationId(stored)
+    setSelectedPublicationId(readSelectedPublicationId())
+
+    const unsubscribe = onSelectedPublicationIdChange((publicationId) => {
+      if (publicationId) setSelectedPublicationId(publicationId)
+    })
+
+    return unsubscribe
   }, [])
 
   useEffect(() => {

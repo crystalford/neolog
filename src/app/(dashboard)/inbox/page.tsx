@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Check, X, FilePlus2 } from 'lucide-react'
+import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 
 type InboxItem = {
   id: string
@@ -35,6 +36,13 @@ export default function InboxPage() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    const unsubscribe = onSelectedPublicationIdChange((publicationId) => {
+      if (publicationId) setPublicationId(publicationId)
+    })
+    return unsubscribe
+  }, [])
+
   const loadData = async () => {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -52,15 +60,11 @@ export default function InboxPage() {
 
     setPublications(pubs || [])
 
-    const selectedId = typeof window !== 'undefined'
-      ? localStorage.getItem('selectedPublicationId')
-      : null
+    const selectedId = readSelectedPublicationId()
 
     const defaultId = selectedId || pubs?.[0]?.id || null
     setPublicationId(defaultId)
-    if (defaultId && typeof window !== 'undefined') {
-      localStorage.setItem('selectedPublicationId', defaultId)
-    }
+    if (defaultId) writeSelectedPublicationId(defaultId)
 
     const { data: inboxItems } = await supabase
       .from('inbox_items')
@@ -301,9 +305,7 @@ export default function InboxPage() {
           onChange={(event) => {
             const next = event.target.value
             setPublicationId(next)
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('selectedPublicationId', next)
-            }
+            writeSelectedPublicationId(next)
           }}
           className="input max-w-md"
         >

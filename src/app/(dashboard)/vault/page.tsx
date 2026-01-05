@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, RefreshCw } from 'lucide-react'
+import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 
 type LastEditingPost = {
   id: string
@@ -98,6 +99,12 @@ export default function VaultPage() {
     void loadAssets()
     void loadPublications()
 
+    const initialPublicationId = readSelectedPublicationId()
+    if (initialPublicationId) {
+      setFilterPublicationId(initialPublicationId)
+      setNewAssetPublicationId(initialPublicationId)
+    }
+
     setCurrentDraft(readLastEditingPost())
 
     const onStorage = (e: StorageEvent) => {
@@ -106,7 +113,16 @@ export default function VaultPage() {
       }
     }
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+
+    const unsubscribePublication = onSelectedPublicationIdChange((publicationId) => {
+      if (!publicationId) return
+      setFilterPublicationId(publicationId)
+      setNewAssetPublicationId((prev) => (prev ? prev : publicationId))
+    })
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      unsubscribePublication()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
