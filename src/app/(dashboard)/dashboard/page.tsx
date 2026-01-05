@@ -694,14 +694,16 @@ export default function DashboardPage() {
                     <option value="archived">Archived</option>
                   </select>
                 </div>
-                <div className="text-xs text-[var(--text-tertiary)]">
+                <div className="text-xs text-[var(--text-tertiary)] min-w-0 overflow-hidden">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
                     Updated
                   </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-1 whitespace-nowrap">
-                      <Clock size={12} />
-                      {new Date(post.updated_at).toLocaleDateString()}
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className="flex items-center gap-1 min-w-0">
+                      <Clock size={12} className="shrink-0" />
+                      <span className="truncate" title={new Date(post.updated_at).toLocaleDateString()}>
+                        {new Date(post.updated_at).toLocaleDateString()}
+                      </span>
                     </span>
                     {(() => {
                       const health = getHealthBadge(post)

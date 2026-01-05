@@ -189,6 +189,10 @@
   border-radius: 6px;
 }
 
+.dashboard-shell .input-with-icon {
+  padding-left: 2.25rem;
+}
+
 .dashboard-shell .btn-icon {
   width: 1.75rem;
   height: 1.75rem;
