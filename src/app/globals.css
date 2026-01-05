@@ -588,6 +588,15 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   color: var(--icon-accent);
 }
 
+/* Buttons should control icon color (override global lucide color) */
+.btn svg.lucide {
+  color: currentColor;
+}
+
+.btn-icon svg.lucide {
+  color: currentColor;
+}
+
 /* ================================
    INPUTS
    ================================ */
