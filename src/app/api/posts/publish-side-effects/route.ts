@@ -146,12 +146,20 @@ export async function POST(request: NextRequest) {
     // 2) Notifications (best-effort)
     if (notify) {
       try {
-        const { data: emailSubscribers } = await db
+        let emailSubscribersQuery = db
           .from('email_subscribers')
           .select('email, unsubscribe_token')
           .eq('creator_id', actorUserId)
           .eq('status', 'active')
           .eq('email_new_posts', true)
+
+        if (post.publication_id) {
+          emailSubscribersQuery = emailSubscribersQuery.or(
+            `publication_id.eq.${post.publication_id},publication_id.is.null`,
+          )
+        }
+
+        const { data: emailSubscribers } = await emailSubscribersQuery
 
         if (emailSubscribers && emailSubscribers.length > 0) {
           const resendKey = await resolveProviderKey(actorUserId, 'resend')

@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import {
+  onSelectedPublicationIdChange,
+  readSelectedPublicationId,
+} from '@/lib/publicationContext'
 import { 
   Rocket, Plus, Wallet, TrendingUp, Eye, 
   MousePointer, Users, DollarSign, ArrowRight,
@@ -43,23 +47,39 @@ export default function BoostPage() {
 
   useEffect(() => {
     loadData()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      loadData()
+    })
+
+    return unsubscribe
   }, [])
 
   const loadData = async () => {
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
       return
     }
 
-    const { data: campaignsData } = await supabase
+    const selectedPublicationId = readSelectedPublicationId()
+
+    const campaignsQuery = supabase
       .from('boost_campaigns')
-      .select(`
-        *,
-        post:posts(title, slug)
-      `)
+      .select(
+        selectedPublicationId
+          ? `*, post:posts!inner(title, slug, publication_id)`
+          : `*, post:posts(title, slug)`
+      )
       .eq('advertiser_id', session.user.id)
       .order('created_at', { ascending: false })
+
+    if (selectedPublicationId) {
+      campaignsQuery.eq('post.publication_id', selectedPublicationId)
+    }
+
+    const { data: campaignsData } = await campaignsQuery
 
     if (campaignsData) {
       setCampaigns(campaignsData)

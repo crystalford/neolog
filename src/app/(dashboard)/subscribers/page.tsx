@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  onSelectedPublicationIdChange,
+  readSelectedPublicationId,
+} from '@/lib/publicationContext'
 import { 
   Users, Mail, Download, Search, UserPlus,
   Check, Clock, AlertCircle, UserMinus, Loader2,
@@ -69,6 +73,14 @@ export default function SubscribersPage() {
 
   useEffect(() => {
     loadSubscribers()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      setSelectedEmailIds([])
+      setSelectedUserIds([])
+      loadSubscribers()
+    })
+
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -94,19 +106,29 @@ export default function SubscribersPage() {
 
     setCreatorId(session.user.id)
 
+    const selectedPublicationId = readSelectedPublicationId()
+
     // Load email subscribers
-    const { data: emailSubs } = await supabase
+    let emailSubsQuery = supabase
       .from('email_subscribers')
       .select('*')
       .eq('creator_id', session.user.id)
       .order('created_at', { ascending: false })
+
+    if (selectedPublicationId) {
+      emailSubsQuery = emailSubsQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: emailSubs } = await emailSubsQuery
 
     if (emailSubs) {
       setEmailSubscribers(emailSubs)
     }
 
     // Load user subscribers
-    const { data: userSubs } = await supabase
+    let userSubsQuery = supabase
       .from('subscriptions')
       .select(`
         *,
@@ -115,14 +137,30 @@ export default function SubscribersPage() {
       .eq('creator_id', session.user.id)
       .order('created_at', { ascending: false })
 
+    if (selectedPublicationId) {
+      userSubsQuery = userSubsQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: userSubs } = await userSubsQuery
+
     if (userSubs) {
       setUserSubscribers(userSubs as any)
     }
 
-    const { data: notesRows } = await supabase
+    let notesQuery = supabase
       .from('subscriber_notes')
       .select('subscriber_id, email_subscriber_id, note, updated_at')
       .eq('creator_id', session.user.id)
+
+    if (selectedPublicationId) {
+      notesQuery = notesQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: notesRows } = await notesQuery
 
     if (notesRows) {
       const nextNotes: Record<string, { text: string; updatedAt: string }> = {}
@@ -136,10 +174,18 @@ export default function SubscribersPage() {
       setNotes(nextNotes)
     }
 
-    const { data: tagsRows } = await supabase
+    let tagsQuery = supabase
       .from('subscriber_tags')
       .select('subscriber_id, email_subscriber_id, tag')
       .eq('creator_id', session.user.id)
+
+    if (selectedPublicationId) {
+      tagsQuery = tagsQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: tagsRows } = await tagsQuery
 
     if (tagsRows) {
       const nextTags: Record<string, string[]> = {}
@@ -373,16 +419,19 @@ export default function SubscribersPage() {
     const tag = tagDraft.trim()
     if (!tag) return
 
+    const selectedPublicationId = readSelectedPublicationId()
+
     for (const id of tagTarget.ids) {
       const payload = {
         creator_id: creatorId,
+        publication_id: selectedPublicationId,
         tag,
         subscriber_id: tagTarget.type === 'user' ? id : null,
         email_subscriber_id: tagTarget.type === 'email' ? id : null,
       }
       const onConflict = tagTarget.type === 'user'
-        ? 'creator_id,subscriber_id,tag'
-        : 'creator_id,email_subscriber_id,tag'
+        ? 'creator_id,subscriber_id,publication_id,tag'
+        : 'creator_id,email_subscriber_id,publication_id,tag'
       await supabase
         .from('subscriber_tags')
         .upsert(payload, { onConflict })
@@ -415,16 +464,19 @@ export default function SubscribersPage() {
       return
     }
 
+    const selectedPublicationId = readSelectedPublicationId()
+
     const payload = {
       creator_id: creatorId,
+      publication_id: selectedPublicationId,
       note: trimmed,
       subscriber_id: noteTarget.type === 'user' ? noteTarget.id : null,
       email_subscriber_id: noteTarget.type === 'email' ? noteTarget.id : null,
     }
 
     const onConflict = noteTarget.type === 'user'
-      ? 'creator_id,subscriber_id'
-      : 'creator_id,email_subscriber_id'
+      ? 'creator_id,subscriber_id,publication_id'
+      : 'creator_id,email_subscriber_id,publication_id'
 
     const { data, error } = await supabase
       .from('subscriber_notes')
@@ -450,12 +502,19 @@ export default function SubscribersPage() {
 
   const clearNote = async () => {
     if (!noteTarget || !creatorId) return
+    const selectedPublicationId = readSelectedPublicationId()
     const matchColumn = noteTarget.type === 'user' ? 'subscriber_id' : 'email_subscriber_id'
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('subscriber_notes')
       .delete()
       .eq('creator_id', creatorId)
       .eq(matchColumn, noteTarget.id)
+
+    if (selectedPublicationId) {
+      deleteQuery = deleteQuery.eq('publication_id', selectedPublicationId)
+    }
+
+    const { error } = await deleteQuery
 
     if (error) {
       console.error('Note delete failed:', error)

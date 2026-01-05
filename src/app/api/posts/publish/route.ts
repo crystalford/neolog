@@ -216,20 +216,30 @@ export async function POST(request: NextRequest) {
         .eq('creator_id', actorUserId)
         .eq('email_new_posts', true)
 
-      const { data: emailSubscribers } = await db
+      let emailSubscribersQuery = db
         .from('email_subscribers')
         .select('email, unsubscribe_token')
         .eq('creator_id', actorUserId)
         .eq('status', 'active')
         .eq('email_new_posts', true)
 
+      if (post.publication_id) {
+        emailSubscribersQuery = emailSubscribersQuery.or(
+          `publication_id.eq.${post.publication_id},publication_id.is.null`
+        )
+      }
+
+      const { data: emailSubscribersScoped } = await emailSubscribersQuery
+
       // For now, we only send to email subscribers
       // User subscribers would need their email from auth.users (requires service role)
-      if (emailSubscribers && emailSubscribers.length > 0) {
+      const finalEmailSubscribers = emailSubscribersScoped || []
+
+      if (finalEmailSubscribers.length > 0) {
         const resendKey = await resolveProviderKey(actorUserId, 'resend')
         if (resendKey) {
           notificationResult = await sendNewPostNotifications(
-            emailSubscribers.map(s => ({
+            finalEmailSubscribers.map(s => ({
               email: s.email,
               unsubscribeToken: s.unsubscribe_token,
             })),

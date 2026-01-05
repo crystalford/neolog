@@ -413,6 +413,7 @@ export type BoostTransaction = {
 export type ReferralProgram = {
   id: string
   creator_id: string
+  publication_id?: string | null
   bounty_cents: number
   monthly_budget_cents: number | null
   spent_this_month_cents: number
@@ -449,6 +450,7 @@ export type Subscription = {
   id: string
   subscriber_id: string
   creator_id: string
+  publication_id?: string | null
   tier: 'free' | 'paid' | 'founding'
   stripe_subscription_id: string | null
   price_cents: number | null
@@ -462,6 +464,7 @@ export type Subscription = {
 export type EmailSubscriber = {
   id: string
   creator_id: string
+  publication_id?: string | null
   email: string
   name: string | null
   status: 'pending' | 'active' | 'unsubscribed' | 'bounced' | 'complained'
@@ -479,6 +482,7 @@ export type EmailSubscriber = {
 export type SubscriberNote = {
   id: string
   creator_id: string
+  publication_id?: string | null
   subscriber_id: string | null
   email_subscriber_id: string | null
   note: string
@@ -489,6 +493,7 @@ export type SubscriberNote = {
 export type SubscriberTag = {
   id: string
   creator_id: string
+  publication_id?: string | null
   subscriber_id: string | null
   email_subscriber_id: string | null
   tag: string

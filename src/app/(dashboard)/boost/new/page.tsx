@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  onSelectedPublicationIdChange,
+  readSelectedPublicationId,
+} from '@/lib/publicationContext'
 import { 
   ArrowLeft, ArrowRight, Rocket, Target, DollarSign,
   Users, MousePointer, BookOpen, Check, Loader2,
@@ -72,6 +76,15 @@ export default function NewCampaignPage() {
 
   useEffect(() => {
     loadPosts()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      setSelectedPost(null)
+      setCampaignName('')
+      setStep('post')
+      loadPosts()
+    })
+
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -90,18 +103,27 @@ export default function NewCampaignPage() {
   }, [selectedPost])
 
   const loadPosts = async () => {
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
       return
     }
 
-    const { data } = await supabase
+    const selectedPublicationId = readSelectedPublicationId()
+
+    const postsQuery = supabase
       .from('posts')
       .select('id, title, slug, published_at')
       .eq('author_id', session.user.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
+
+    if (selectedPublicationId) {
+      postsQuery.eq('publication_id', selectedPublicationId)
+    }
+
+    const { data } = await postsQuery
 
     if (data) {
       setPosts(data)

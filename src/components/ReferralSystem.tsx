@@ -1,7 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import {
+  onSelectedPublicationIdChange,
+  readSelectedPublicationId,
+} from '@/lib/publicationContext'
 import {
   Gift, Copy, Check, TrendingUp, Users, DollarSign,
   Link as LinkIcon, Loader2, Award
@@ -35,10 +40,17 @@ export function ReferralSystem() {
   const [copied, setCopied] = useState<string | null>(null)
   const [creatingLink, setCreatingLink] = useState(false)
 
+  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     loadReferralData()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      loadReferralData()
+    })
+
+    return unsubscribe
   }, [])
 
   const loadReferralData = async () => {
@@ -47,46 +59,68 @@ export function ReferralSystem() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Load referral links
-      const { data: linksData } = await supabase
+      const selectedPublicationId = readSelectedPublicationId()
+
+      // Load referral links (programs I'm promoting)
+      let linksQuery = supabase
         .from('referral_links')
-        .select('*')
-        .eq('user_id', session.user.id)
+        .select(
+          selectedPublicationId
+            ? 'id, code, clicks, signups, created_at, program:referral_programs!inner(publication_id)'
+            : 'id, code, clicks, signups, created_at'
+        )
+        .eq('referrer_id', session.user.id)
         .order('created_at', { ascending: false })
 
-      if (linksData) {
-        setLinks(linksData.map(link => ({
-          ...link,
-          url: `${window.location.origin}?ref=${link.code}`,
-        })))
+      if (selectedPublicationId) {
+        linksQuery = linksQuery.or(
+          `publication_id.eq.${selectedPublicationId},publication_id.is.null`,
+          { foreignTable: 'program' }
+        )
       }
 
-      // Load conversion stats
+      const { data: linksData } = await linksQuery
+
+      if (linksData) {
+        setLinks(
+          (linksData as any[]).map((link: any) => ({
+            id: link.id,
+            code: link.code,
+            clicks: link.clicks ?? 0,
+            conversions: link.signups ?? 0,
+            created_at: link.created_at,
+            url: `${window.location.origin}?ref=${link.code}`,
+          }))
+        )
+      }
+
+      const linkIds = (linksData || []).map((l: any) => l.id)
+      if (linkIds.length === 0) {
+        setStats({ totalReferrals: 0, activeReferrals: 0, totalEarnings: 0, pendingEarnings: 0 })
+        return
+      }
+
       const { data: conversions } = await supabase
         .from('referral_conversions')
-        .select('*, referral_link:referral_links!inner(user_id)')
-        .eq('referral_links.user_id', session.user.id)
+        .select('bounty_cents, paid')
+        .in('link_id', linkIds)
 
-      if (conversions) {
-        const totalReferrals = conversions.length
-        const activeReferrals = conversions.filter(c => c.status === 'active').length
+      const conversionsRows = conversions || []
+      const totalReferrals = conversionsRows.length
+      const activeReferrals = conversionsRows.filter((c: any) => !c.paid).length
+      const totalEarnings = conversionsRows
+        .filter((c: any) => c.paid)
+        .reduce((sum: number, c: any) => sum + (c.bounty_cents || 0), 0)
+      const pendingEarnings = conversionsRows
+        .filter((c: any) => !c.paid)
+        .reduce((sum: number, c: any) => sum + (c.bounty_cents || 0), 0)
 
-        // Calculate earnings (mock data - would come from actual payment system)
-        const totalEarnings = conversions
-          .filter(c => c.status === 'paid')
-          .reduce((sum, c) => sum + (c.commission_amount || 0), 0)
-
-        const pendingEarnings = conversions
-          .filter(c => c.status === 'pending')
-          .reduce((sum, c) => sum + (c.commission_amount || 0), 0)
-
-        setStats({
-          totalReferrals,
-          activeReferrals,
-          totalEarnings,
-          pendingEarnings,
-        })
-      }
+      setStats({
+        totalReferrals,
+        activeReferrals,
+        totalEarnings: totalEarnings / 100,
+        pendingEarnings: pendingEarnings / 100,
+      })
     } catch (error) {
       console.error('Error loading referral data:', error)
     } finally {
@@ -96,39 +130,8 @@ export function ReferralSystem() {
 
   const createReferralLink = async () => {
     setCreatingLink(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-
-      // Generate unique code
-      const code = Math.random().toString(36).substring(2, 10)
-
-      const { data, error } = await supabase
-        .from('referral_links')
-        .insert({
-          user_id: session.user.id,
-          code,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      if (data) {
-        setLinks([
-          {
-            ...data,
-            url: `${window.location.origin}?ref=${data.code}`,
-          },
-          ...links,
-        ])
-      }
-    } catch (error) {
-      console.error('Error creating referral link:', error)
-      alert('Failed to create referral link')
-    } finally {
-      setCreatingLink(false)
-    }
+    router.push('/boost/referrals')
+    setCreatingLink(false)
   }
 
   const copyToClipboard = async (link: ReferralLink) => {

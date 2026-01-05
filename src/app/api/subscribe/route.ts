@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // Subscribe via email (for non-logged-in users)
 export async function POST(request: NextRequest) {
   try {
-    const { email, creatorId, source = 'website' } = await request.json()
+    const { email, creatorId, publicationId, source = 'website' } = await request.json()
 
     if (!email || !creatorId) {
       return NextResponse.json(
@@ -26,6 +26,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient()
 
+    const admin = createAdminClient()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Server misconfigured' },
+        { status: 500 }
+      )
+    }
+
     // Get creator info
     const { data: creator } = await supabase
       .from('profiles')
@@ -40,12 +48,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (publicationId) {
+      const { data: pub } = await admin
+        .from('publications')
+        .select('id')
+        .eq('id', publicationId)
+        .eq('owner_id', creatorId)
+        .single()
+
+      if (!pub) {
+        return NextResponse.json(
+          { error: 'Invalid publicationId for creator' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Check if already subscribed
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('email_subscribers')
       .select('id, status, confirmed')
       .eq('creator_id', creatorId)
       .eq('email', email.toLowerCase().trim())
+      .eq('publication_id', publicationId ?? null)
       .single()
 
     if (existing) {
@@ -63,17 +88,22 @@ export async function POST(request: NextRequest) {
     const confirmationToken = crypto.randomUUID().replace(/-/g, '')
 
     // Insert or update subscriber
-    const { data: subscriber, error: insertError } = await supabase
+    const onConflict = publicationId
+      ? 'creator_id,email,publication_id'
+      : 'creator_id,email'
+
+    const { data: subscriber, error: insertError } = await admin
       .from('email_subscribers')
       .upsert({
         creator_id: creatorId,
+        publication_id: publicationId ?? null,
         email: email.toLowerCase().trim(),
         source,
         status: 'pending',
         confirmed: false,
         confirmation_token: confirmationToken,
       }, {
-        onConflict: 'creator_id,email',
+        onConflict,
       })
       .select()
       .single()
@@ -90,10 +120,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const confirmUrl = `${baseUrl}/api/subscribe/confirm?token=${confirmationToken}`
 
-    const admin = createAdminClient()
-    const resendKey = admin
-      ? await resolveProviderKeyWithClient(admin as any, creatorId, 'resend')
-      : null
+    const resendKey = await resolveProviderKeyWithClient(admin as any, creatorId, 'resend')
 
     const emailResult = await sendEmail(
       email,

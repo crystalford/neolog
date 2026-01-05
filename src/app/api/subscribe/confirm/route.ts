@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Confirm email subscription
@@ -10,11 +11,15 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createClient()
+  const admin = createAdminClient()
+  if (!admin) {
+    return NextResponse.redirect(new URL('/?error=server_misconfigured', request.url))
+  }
 
   // Find subscriber with this token
-  const { data: subscriber, error: findError } = await supabase
+  const { data: subscriber, error: findError } = await admin
     .from('email_subscribers')
-    .select('*, creator:profiles(username, display_name)')
+    .select('id, creator_id, confirmed, confirmation_token')
     .eq('confirmation_token', token)
     .single()
 
@@ -22,14 +27,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/?error=invalid_token', request.url))
   }
 
+  const { data: creator } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', subscriber.creator_id)
+    .single()
+
   // Already confirmed?
   if (subscriber.confirmed) {
-    const creatorUsername = subscriber.creator?.username || ''
+    const creatorUsername = creator?.username || ''
     return NextResponse.redirect(new URL(`/${creatorUsername}?confirmed=already`, request.url))
   }
 
   // Confirm the subscription
-  const { error: updateError } = await supabase
+  const { error: updateError } = await admin
     .from('email_subscribers')
     .update({
       status: 'active',
@@ -43,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to creator's profile with success message
-  const creatorUsername = subscriber.creator?.username || ''
+  const creatorUsername = creator?.username || ''
   return NextResponse.redirect(new URL(`/${creatorUsername}?confirmed=success`, request.url))
 }
 
@@ -55,10 +66,13 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Missing token' }, { status: 400 })
   }
 
-  const supabase = createClient()
+  const admin = createAdminClient()
+  if (!admin) {
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
 
   // Find and unsubscribe
-  const { error } = await supabase
+  const { error } = await admin
     .from('email_subscribers')
     .update({
       status: 'unsubscribed',

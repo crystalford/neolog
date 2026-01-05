@@ -54,11 +54,8 @@ export default async function ProfilePage({ params }: Props) {
     .select('*', { count: 'exact', head: true })
     .eq('following_id', profile.id)
 
-  const { count: subscriberCount } = await supabase
-    .from('email_subscribers')
-    .select('*', { count: 'exact', head: true })
-    .eq('author_id', profile.id)
-    .eq('status', 'active')
+  const { data: subscriberCount } = await supabase
+    .rpc('get_subscriber_count', { target_creator_id: profile.id })
 
   let topicTags: Array<{ id: string; name: string; slug: string; color: string; count: number }> = []
   if (posts && posts.length > 0) {

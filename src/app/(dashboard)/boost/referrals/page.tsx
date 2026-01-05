@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import {
+  onSelectedPublicationIdChange,
+  readSelectedPublicationId,
+} from '@/lib/publicationContext'
 import { 
   ArrowLeft, Plus, Users, DollarSign, Link as LinkIcon,
   Copy, Check, Loader2, ExternalLink, Trash2
@@ -57,6 +61,12 @@ export default function ReferralsPage() {
 
   useEffect(() => {
     loadData()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      loadData()
+    })
+
+    return unsubscribe
   }, [])
 
   const loadData = async () => {
@@ -66,32 +76,54 @@ export default function ReferralsPage() {
       return
     }
 
+    const selectedPublicationId = readSelectedPublicationId()
+
     // Load my program
-    const { data: program } = await supabase
+    let programQuery = supabase
       .from('referral_programs')
       .select('*')
       .eq('creator_id', session.user.id)
-      .single()
+
+    if (selectedPublicationId) {
+      programQuery = programQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: program } = await programQuery
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (program) {
       setMyProgram(program)
     }
 
     // Load my referral links (programs I'm promoting)
-    const { data: links } = await supabase
+    let linksQuery = supabase
       .from('referral_links')
-      .select(`
-        *,
-        program:referral_programs(*)
-      `)
+      .select(
+        selectedPublicationId
+          ? `*, program:referral_programs!inner(*)`
+          : `*, program:referral_programs(*)`
+      )
       .eq('referrer_id', session.user.id)
+
+    if (selectedPublicationId) {
+      linksQuery = linksQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`,
+        { foreignTable: 'program' }
+      )
+    }
+
+    const { data: links } = await linksQuery
 
     if (links) {
       setMyLinks(links)
     }
 
     // Load available programs to join
-    const { data: programs } = await supabase
+    let availableQuery = supabase
       .from('referral_programs')
       .select(`
         id,
@@ -101,6 +133,14 @@ export default function ReferralsPage() {
       .eq('is_active', true)
       .neq('creator_id', session.user.id)
       .limit(20)
+
+    if (selectedPublicationId) {
+      availableQuery = availableQuery.or(
+        `publication_id.eq.${selectedPublicationId},publication_id.is.null`
+      )
+    }
+
+    const { data: programs } = await availableQuery
 
     if (programs) {
       setAvailablePrograms(programs as any)
@@ -118,10 +158,13 @@ export default function ReferralsPage() {
       return
     }
 
+    const selectedPublicationId = readSelectedPublicationId()
+
     const { data, error } = await supabase
       .from('referral_programs')
       .insert({
         creator_id: session.user.id,
+        publication_id: selectedPublicationId,
         bounty_cents: Math.round(bounty * 100),
         monthly_budget_cents: monthlyBudget ? Math.round(monthlyBudget * 100) : null,
         target_minimum_curator_score: minCuratorScore,

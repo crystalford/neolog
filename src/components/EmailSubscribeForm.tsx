@@ -6,6 +6,7 @@ import { Mail, Loader2, Check, AlertCircle } from 'lucide-react'
 interface EmailSubscribeFormProps {
   creatorId: string
   creatorName: string
+  publicationId?: string | null
   className?: string
   variant?: 'inline' | 'card'
 }
@@ -13,6 +14,7 @@ interface EmailSubscribeFormProps {
 export function EmailSubscribeForm({
   creatorId,
   creatorName,
+  publicationId,
   className = '',
   variant = 'inline',
 }: EmailSubscribeFormProps) {
@@ -39,6 +41,7 @@ export function EmailSubscribeForm({
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
           creatorId,
+          publicationId: publicationId || undefined,
           source: 'website',
         }),
       })
