@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { BookOpen, ChevronDown, Plus, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { writeSelectedPublicationId } from '@/lib/publicationContext'
+import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 
 interface Publication {
   id: string
@@ -47,11 +47,10 @@ export function PublicationSwitcher({
   useEffect(() => {
     if (!selectedPub) return
     if (currentPublicationId) return
-    if (typeof window === 'undefined') return
 
-    const stored = window.localStorage.getItem('selectedPublicationId')
+    const stored = readSelectedPublicationId()
     if (!stored) {
-      window.localStorage.setItem('selectedPublicationId', selectedPub.id)
+      writeSelectedPublicationId(selectedPub.id)
       onPublicationChange?.(selectedPub.id)
     }
   }, [currentPublicationId, onPublicationChange, selectedPub])
