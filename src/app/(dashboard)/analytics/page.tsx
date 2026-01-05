@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
+import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import {
   Eye, Clock, Users,
   Monitor, Smartphone, Tablet, ExternalLink,
@@ -14,7 +14,7 @@ type PostWithViews = {
   id: string
   title: string
   slug: string
-  published_at: string
+  published_at: string | null
   total_views: number
   unique_viewers: number
   avg_time_on_page: number
@@ -45,6 +45,8 @@ type UsageSummaryRow = {
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [posts, setPosts] = useState<PostWithViews[]>([])
+  const [hasPublishedOutsideSelection, setHasPublishedOutsideSelection] = useState(false)
+  const [selectedPublicationName, setSelectedPublicationName] = useState<string | null>(null)
   const [totals, setTotals] = useState({
     views: 0,
     uniques: 0,
@@ -102,17 +104,38 @@ export default function AnalyticsPage() {
 
   const loadAnalytics = async () => {
     setLoading(true)
+    setHasPublishedOutsideSelection(false)
+    setPosts([])
+    setTotals({ views: 0, uniques: 0, avgTime: 0, avgScroll: 0, avgCompletion: 0 })
+    setDailyData([])
+    setReferrers([])
+    setDevices({ desktop: 0, mobile: 0, tablet: 0 })
     
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) {
+      setLoading(false)
+      return
+    }
+
+    const selectedPublicationId = readSelectedPublicationId()
+    setSelectedPublicationName(null)
+    if (selectedPublicationId) {
+      const { data: pubData } = await supabase
+        .from('publications')
+        .select('name')
+        .eq('id', selectedPublicationId)
+        .maybeSingle()
+
+      if (pubData?.name) setSelectedPublicationName(pubData.name)
+    }
 
     // Get user's posts
-    const selectedPublicationId = readSelectedPublicationId()
     let postsQuery = supabase
       .from('posts')
       .select('id, title, slug, published_at')
       .eq('author_id', session.user.id)
-      .eq('status', 'published')
+      // Treat any post with a published_at as eligible for analytics, even if later archived.
+      .or('status.eq.published,published_at.not.is.null')
       .order('published_at', { ascending: false })
 
     if (selectedPublicationId) {
@@ -122,6 +145,18 @@ export default function AnalyticsPage() {
     const { data: userPosts } = await postsQuery
 
     if (!userPosts || userPosts.length === 0) {
+      if (selectedPublicationId) {
+        const { data: anyPublished } = await supabase
+          .from('posts')
+          .select('id')
+          .eq('author_id', session.user.id)
+          .or('status.eq.published,published_at.not.is.null')
+          .limit(1)
+
+        if (anyPublished && anyPublished.length > 0) {
+          setHasPublishedOutsideSelection(true)
+        }
+      }
       setLoading(false)
       return
     }
@@ -243,7 +278,8 @@ export default function AnalyticsPage() {
     return `${mins}m ${secs}s`
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '—'
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -325,13 +361,32 @@ export default function AnalyticsPage() {
         ) : posts.length === 0 ? (
           <div className="text-center py-20">
             <BarChart3 size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-            <h2 className="font-display text-2xl tracking-tight text-[var(--text-primary)] mb-2">No published posts yet</h2>
+            <h2 className="font-display text-2xl tracking-tight text-[var(--text-primary)] mb-2">
+              {hasPublishedOutsideSelection && selectedPublicationName
+                ? `No published posts for “${selectedPublicationName}”`
+                : hasPublishedOutsideSelection
+                  ? 'No published posts for the selected publication'
+                  : 'No published posts yet'}
+            </h2>
             <p className="text-sm text-[var(--text-secondary)] mb-6">
-              Publish your first post to start seeing analytics
+              {hasPublishedOutsideSelection
+                ? 'You have published posts, but they are outside the current publication filter.'
+                : 'Publish your first post to start seeing analytics.'}
             </p>
-            <Link href="/write" className="inline-flex items-center gap-2 px-6 py-2.5 bg-[var(--accent)] text-[var(--text-inverse)] text-sm font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors">
-              Write your first post
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              {hasPublishedOutsideSelection && (
+                <button
+                  type="button"
+                  onClick={() => writeSelectedPublicationId(null)}
+                  className="btn btn-secondary"
+                >
+                  Show all publications
+                </button>
+              )}
+              <Link href="/write" className="btn btn-primary">
+                Write a post
+              </Link>
+            </div>
           </div>
         ) : (
           <>
