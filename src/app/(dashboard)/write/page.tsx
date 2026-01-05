@@ -71,6 +71,19 @@ export default function WritePage() {
   const [packError, setPackError] = useState<string | null>(null)
   const [pack, setPack] = useState<any>(null)
   const [packTab, setPackTab] = useState<'x' | 'threads' | 'bluesky' | 'linkedin' | 'reddit' | 'medium' | 'devto' | 'newsletter' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
+  const [syndicationLoading, setSyndicationLoading] = useState(false)
+  const [syndicationError, setSyndicationError] = useState<string | null>(null)
+  const [syndications, setSyndications] = useState<
+    Array<{
+      provider: string
+      status: string
+      external_url: string | null
+      external_id: string | null
+      error_message: string | null
+      created_at: string | null
+      updated_at: string | null
+    }>
+  >([])
   const [commentUrl, setCommentUrl] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
@@ -106,6 +119,12 @@ export default function WritePage() {
       loadDistributionPack()
     }
   }, [showPack, postId, pack, packLoading])
+
+  useEffect(() => {
+    if (showPack && postId) {
+      loadSyndications(postId)
+    }
+  }, [showPack, postId])
 
   useEffect(() => {
     if (postId) {
@@ -366,11 +385,33 @@ export default function WritePage() {
         return
       }
       setPack(data.pack)
+      void loadSyndications(postId)
     } catch (error) {
       console.error('Distribution pack error:', error)
       setPackError('Failed to generate pack')
     } finally {
       setPackLoading(false)
+    }
+  }
+
+  const loadSyndications = async (targetPostId: string) => {
+    setSyndicationLoading(true)
+    setSyndicationError(null)
+    try {
+      const url = `/api/posts/syndications?postId=${encodeURIComponent(targetPostId)}`
+      const response = await fetch(url)
+      const data = await response.json()
+      if (!response.ok) {
+        setSyndicationError(data.error || 'Failed to load syndication status.')
+        setSyndications([])
+        return
+      }
+      setSyndications(Array.isArray(data?.syndications) ? data.syndications : [])
+    } catch (e) {
+      setSyndicationError('Failed to load syndication status.')
+      setSyndications([])
+    } finally {
+      setSyndicationLoading(false)
     }
   }
 
@@ -1843,6 +1884,76 @@ export default function WritePage() {
                     {packLoading ? 'Generating...' : 'Regenerate'}
                   </button>
                 </div>
+
+                {postId && (
+                  <div className="mb-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Syndication</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                          Medium + Dev.to results for this post.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => loadSyndications(postId)}
+                        className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
+                        disabled={syndicationLoading}
+                      >
+                        {syndicationLoading ? 'Loading…' : 'Refresh'}
+                      </button>
+                    </div>
+
+                    {syndicationError && (
+                      <div className="mt-2 text-xs text-[var(--error)]">
+                        {syndicationError}
+                      </div>
+                    )}
+
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      {(
+                        syndications.length > 0
+                          ? syndications
+                          : [
+                              { provider: 'medium', status: 'not_configured' },
+                              { provider: 'devto', status: 'not_configured' },
+                            ]
+                      ).map((row: any) => {
+                        const providerLabel = row.provider === 'devto' ? 'Dev.to' : row.provider === 'medium' ? 'Medium' : row.provider
+                        const status = String(row.status || '')
+                        const statusTone =
+                          status === 'sent'
+                            ? 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20'
+                            : status === 'error'
+                              ? 'bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20'
+                              : 'bg-[var(--bg-primary)] text-[var(--text-tertiary)] border-[var(--border-light)]'
+
+                        return (
+                          <div key={`${row.provider}`} className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium text-[var(--text-primary)]">{providerLabel}</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] border ${statusTone}`}>
+                                {status === 'not_configured' ? 'Not configured' : status}
+                              </span>
+                            </div>
+                            {row.external_url && (
+                              <a
+                                href={row.external_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block mt-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline break-all"
+                              >
+                                {row.external_url}
+                              </a>
+                            )}
+                            {row.error_message && (
+                              <p className="mt-2 text-xs text-[var(--error)]">{row.error_message}</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {!postId && (
                   <div className="py-6 text-sm text-[var(--text-tertiary)]">
