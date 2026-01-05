@@ -2,6 +2,11 @@
 
 import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
+
+// Load env vars for local scripts (Next.js loads these automatically, Node scripts do not).
+dotenv.config({ path: '.env.local' })
+dotenv.config({ path: '.env' })
 
 function usage(exitCode = 1) {
   console.log(
