@@ -19,6 +19,15 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [usernameDraft, setUsernameDraft] = useState('')
   const [usernameSaving, setUsernameSaving] = useState(false)
+
+  const [usageCaps, setUsageCaps] = useState<{
+    openai: { day: string; month: string }
+    groq: { day: string; month: string }
+  }>({
+    openai: { day: '', month: '' },
+    groq: { day: '', month: '' },
+  })
+  const [usageCapsSaving, setUsageCapsSaving] = useState(false)
   
   const [formData, setFormData] = useState({
     display_name: '',
@@ -77,6 +86,7 @@ export default function SettingsPage() {
     loadIntegrations()
     loadApiKeys()
     loadStorage()
+    loadUsageCaps()
   }, [])
 
   const aiProviders = [
@@ -117,6 +127,74 @@ export default function SettingsPage() {
       return { tone: 'warning', text: validation.hint }
     }
     return null
+  }
+
+  const loadUsageCaps = async () => {
+    try {
+      const response = await fetch('/api/usage/limits')
+      if (!response.ok) return
+      const data = await response.json()
+      const next = {
+        openai: { day: '', month: '' },
+        groq: { day: '', month: '' },
+      }
+
+      for (const row of (data?.limits || []) as Array<any>) {
+        const provider = row?.provider
+        const period = row?.period
+        const tokenLimit = row?.token_limit
+
+        if ((provider === 'openai' || provider === 'groq') && (period === 'day' || period === 'month')) {
+          ;(next as any)[provider][period] = tokenLimit == null ? '' : String(tokenLimit)
+        }
+      }
+
+      setUsageCaps(next)
+    } catch {
+      // ignore
+    }
+  }
+
+  const saveUsageCaps = async () => {
+    setUsageCapsSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    const parseLimit = (value: string) => {
+      const trimmed = (value || '').trim()
+      if (!trimmed) return null
+      const n = Number(trimmed)
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+        throw new Error('Token caps must be a positive whole number (or blank for unlimited).')
+      }
+      return n
+    }
+
+    try {
+      const limits = [
+        { provider: 'openai', period: 'day', token_limit: parseLimit(usageCaps.openai.day) },
+        { provider: 'openai', period: 'month', token_limit: parseLimit(usageCaps.openai.month) },
+        { provider: 'groq', period: 'day', token_limit: parseLimit(usageCaps.groq.day) },
+        { provider: 'groq', period: 'month', token_limit: parseLimit(usageCaps.groq.month) },
+      ]
+
+      const response = await fetch('/api/usage/limits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limits }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save usage caps.')
+      }
+
+      setSuccess('Usage caps saved.')
+      await loadUsageCaps()
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save usage caps.')
+    } finally {
+      setUsageCapsSaving(false)
+    }
   }
 
   const loadIntegrations = async () => {
@@ -1050,6 +1128,81 @@ export default function SettingsPage() {
                     </div>
                   )
                 })}
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+                  <Shield size={20} className="text-[var(--accent)]" />
+                </div>
+                <h2 className="font-display text-lg">AI usage caps</h2>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mb-6">
+                Optional daily/monthly token caps per provider. Leave blank for unlimited.
+              </p>
+
+              <div className="grid gap-4">
+                {([
+                  { id: 'openai', label: 'OpenAI' },
+                  { id: 'groq', label: 'Groq' },
+                ] as const).map((provider) => (
+                  <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <label className="text-sm text-[var(--text-secondary)]">
+                        Daily cap (tokens)
+                        <input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={(usageCaps as any)[provider.id].day}
+                          onChange={(event) =>
+                            setUsageCaps((prev) => ({
+                              ...prev,
+                              [provider.id]: {
+                                ...(prev as any)[provider.id],
+                                day: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Unlimited"
+                          className="input mt-2"
+                        />
+                      </label>
+                      <label className="text-sm text-[var(--text-secondary)]">
+                        Monthly cap (tokens)
+                        <input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={(usageCaps as any)[provider.id].month}
+                          onChange={(event) =>
+                            setUsageCaps((prev) => ({
+                              ...prev,
+                              [provider.id]: {
+                                ...(prev as any)[provider.id],
+                                month: event.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Unlimited"
+                          className="input mt-2"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-end">
+                  <button
+                    onClick={saveUsageCaps}
+                    disabled={usageCapsSaving}
+                    className="btn btn-secondary"
+                  >
+                    {usageCapsSaving ? 'Saving...' : 'Save caps'}
+                  </button>
+                </div>
               </div>
             </section>
 

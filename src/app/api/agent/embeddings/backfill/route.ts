@@ -5,6 +5,7 @@ import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
 import { logProviderUsage } from '@/lib/usage'
+import { enforceUsageCaps } from '@/lib/usageCaps'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest) {
       { error: 'Missing OpenAI integration (or Pro managed key) for this user.' },
       { status: 402 },
     )
+  }
+
+  try {
+    await enforceUsageCaps({ supabase: admin, userId: auth.userId, provider: 'openai' })
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Usage cap reached.' }, { status: 429 })
   }
 
   const url = new URL(request.url)

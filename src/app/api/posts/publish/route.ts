@@ -4,6 +4,7 @@ import { resolveProviderKey } from '@/lib/ai-provider'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
 import { logProviderUsage } from '@/lib/usage'
+import { enforceUsageCaps } from '@/lib/usageCaps'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Publish a post and notify subscribers
@@ -79,43 +80,52 @@ export async function POST(request: NextRequest) {
         const admin = createAdminClient()
 
         if (openaiKey?.key && admin) {
-          const text = pickTextForEmbedding({
-            title: post.title,
-            excerpt: post.excerpt,
-            content: post.content,
-            content_html: post.content_html,
-          })
+          let canEmbed = true
+          try {
+            await enforceUsageCaps({ supabase, userId: session.user.id, provider: 'openai' })
+          } catch {
+            canEmbed = false
+          }
 
-          if (text) {
-            const embedding = await embedTextWithOpenAI({
-              apiKey: openaiKey.key,
-              text,
-              onUsage: (u) => {
-                void logProviderUsage({
-                  userId: session.user.id,
-                  provider: 'openai',
-                  model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
-                  route: '/api/posts/publish',
-                  operation: 'embeddings',
-                  usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
-                  metadata: { post_id: postId },
-                })
-              },
+          if (canEmbed) {
+            const text = pickTextForEmbedding({
+              title: post.title,
+              excerpt: post.excerpt,
+              content: post.content,
+              content_html: post.content_html,
             })
-            await admin
-              .from('post_embeddings')
-              .upsert(
-                {
-                  post_id: postId,
-                  embedding: vectorLiteral(embedding),
-                  content_hash: sha256(text),
-                  updated_at: new Date().toISOString(),
+
+            if (text) {
+              const embedding = await embedTextWithOpenAI({
+                apiKey: openaiKey.key,
+                text,
+                onUsage: (u) => {
+                  void logProviderUsage({
+                    userId: session.user.id,
+                    provider: 'openai',
+                    model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+                    route: '/api/posts/publish',
+                    operation: 'embeddings',
+                    usage: { prompt_tokens: u.prompt_tokens, total_tokens: u.total_tokens },
+                    metadata: { post_id: postId },
+                  })
                 },
-                { onConflict: 'post_id' },
-              )
+              })
+              await admin
+                .from('post_embeddings')
+                .upsert(
+                  {
+                    post_id: postId,
+                    embedding: vectorLiteral(embedding),
+                    content_hash: sha256(text),
+                    updated_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'post_id' },
+                )
+            }
           }
         }
-      } catch {
+      } catch (e: any) {
         // ignore
       }
     }

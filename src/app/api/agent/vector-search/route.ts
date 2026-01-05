@@ -11,6 +11,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { logProviderUsage } from "@/lib/usage";
+import { enforceUsageCaps } from "@/lib/usageCaps";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { error: "Semantic search requires login + OpenAI key (or Pro managed key)." },
         { status: 401 },
+      );
+    }
+
+    try {
+      await enforceUsageCaps({ supabase, userId: actor.userId, provider: "openai" });
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message || "Usage cap reached." },
+        { status: 429 },
       );
     }
 

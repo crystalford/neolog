@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
+import { enforceUsageCaps } from '@/lib/usageCaps'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -212,6 +213,17 @@ export async function POST(request: NextRequest) {
 
   const buildAiPack = async () => {
     if (!apiKey) return null
+
+    try {
+      await enforceUsageCaps({
+        supabase,
+        userId: session.user.id,
+        provider: groqKey ? 'groq' : 'openai',
+      })
+    } catch {
+      return null
+    }
+
     const plain = stripHtml(post.content_html || post.content || '')
     const authorProfile = Array.isArray((post as any).author)
       ? (post as any).author[0]

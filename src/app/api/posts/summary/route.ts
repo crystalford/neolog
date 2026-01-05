@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
+import { enforceUsageCaps } from '@/lib/usageCaps'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -114,13 +115,25 @@ export async function POST(request: NextRequest) {
 
   const groqKey = await resolveProviderKey(session.user.id, 'groq')
   const openaiKey = await resolveProviderKey(session.user.id, 'openai')
-  const apiKey = groqKey?.key || openaiKey?.key || ''
+  let apiKey = groqKey?.key || openaiKey?.key || ''
   const apiUrl = groqKey
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://api.openai.com/v1/chat/completions'
   const model = groqKey
     ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
     : MODEL
+
+  if (apiKey) {
+    try {
+      await enforceUsageCaps({
+        supabase,
+        userId: session.user.id,
+        provider: groqKey ? 'groq' : 'openai',
+      })
+    } catch {
+      apiKey = ''
+    }
+  }
 
   if (!apiKey) {
     const fallback = getFallbackSummary(base)

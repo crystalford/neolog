@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
+import { enforceUsageCaps } from '@/lib/usageCaps'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -31,7 +32,15 @@ export async function POST(request: NextRequest) {
     .single()
 
   const keyResult = await resolveProviderKey(session.user.id, 'openai')
-  const apiKey = keyResult?.key || ''
+  let apiKey = keyResult?.key || ''
+
+  if (apiKey) {
+    try {
+      await enforceUsageCaps({ supabase, userId: session.user.id, provider: 'openai' })
+    } catch {
+      apiKey = ''
+    }
+  }
 
   if (!apiKey) {
     return NextResponse.json({
