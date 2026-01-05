@@ -7,6 +7,7 @@
 - [ ] Get project URL and anon key
 - [ ] Get service role key (for server-side operations)
 - [ ] Run the SQL schema (`supabase-schema.sql`) in SQL Editor
+- [ ] Run migrations in `supabase/migrations/` (including `add_onboarded_at.sql` for onboarding gating)
 - [ ] Enable Email auth in Authentication > Providers
 - [ ] (Optional) Enable OAuth providers (Google, GitHub)
 - [ ] Create storage bucket named `images` with public access
@@ -82,7 +83,10 @@ Notes:
 ### 2. Post-Deploy
 - [ ] Update Stripe webhook URL to production domain
 - [ ] Update Supabase auth redirect URLs
-- [ ] Test sign up flow
+- [ ] Test sign up flow (OAuth)
+  - Sign up with Google → should land on `/onboarding`
+  - Choose a username → should reach `/dashboard`
+  - Refresh `/dashboard` → should not redirect back to onboarding
 - [ ] Test posting
 - [ ] Test payments (use Stripe test mode first)
 ### Cron jobs
@@ -155,6 +159,13 @@ UPDATE profiles SET is_admin = true WHERE username = 'your-username';
 - [ ] Create series
 - [ ] Import from Substack/Medium
 - [ ] Export data
+
+## Admin Utilities (Local)
+
+Delete a test account (and cascade-delete its posts/content) using the service role key:
+
+- Command: `npm run delete:user -- <username> --yes`
+- Requires env vars: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
 ## Optional Enhancements
 

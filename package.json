@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "delete:user": "node scripts/delete-user-by-username.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.4.0",
