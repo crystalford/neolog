@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [selectedPublicationName, setSelectedPublicationName] = useState<string | null>(null)
   const [syndicationLoading, setSyndicationLoading] = useState(true)
   const [syndicationError, setSyndicationError] = useState<string | null>(null)
   const [syndications, setSyndications] = useState<
@@ -85,6 +86,19 @@ export default function DashboardPage() {
 
     // Load posts
     const selectedPublicationId = readSelectedPublicationId()
+    setSelectedPublicationName(null)
+    if (selectedPublicationId) {
+      const { data: pubData, error: pubErr } = await supabase
+        .from('publications')
+        .select('name')
+        .eq('id', selectedPublicationId)
+        .single()
+
+      if (!pubErr && pubData?.name) {
+        setSelectedPublicationName(pubData.name)
+      }
+    }
+
     let postsQuery = supabase
       .from('posts')
       .select('*')
@@ -422,6 +436,14 @@ export default function DashboardPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Posts</p>
           <h1 className="font-display text-3xl text-[var(--text-primary)]">Your content pipeline</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+              Publication: <span className="ml-1 text-[var(--text-primary)]">{selectedPublicationName || 'All'}</span>
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-tertiary)]">
+              Capture (Ctrl/⌘K) → Vault → Draft → Publish
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -433,6 +455,76 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {posts.length === 0 && (
+        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Getting started</p>
+              <h2 className="font-display text-xl text-[var(--text-primary)] mt-1">Start by capturing inputs</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-2xl">
+                {selectedPublicationName
+                  ? `No posts yet for “${selectedPublicationName}”. Capture ideas into your Vault, then turn them into a draft.`
+                  : 'No posts yet. Capture ideas into your Vault, then turn them into a draft.'}
+              </p>
+              <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                Tip: press <span className="font-mono">Ctrl/⌘K</span> to Quick Capture from anywhere in the dashboard.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-5">
+            <Link
+              href="/vault"
+              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <Search size={16} className="text-[var(--text-secondary)]" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Open Vault</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">Find and organize captured inputs.</p>
+              </div>
+            </Link>
+
+            <Link
+              href="/inbox"
+              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <Inbox size={16} className="text-[var(--text-secondary)]" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Review Inbox</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">Convert incoming items into drafts.</p>
+              </div>
+            </Link>
+
+            <Link
+              href="/sources"
+              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <Globe size={16} className="text-[var(--text-secondary)]" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Connect Sources</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">Pull signals from RSS and feeds.</p>
+              </div>
+            </Link>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/write" className="btn btn-primary btn-sm">
+              <PenLine size={16} />
+              Write your first post
+            </Link>
+            <Link href="/publications" className="btn btn-secondary btn-sm">
+              Manage publications
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3 mb-8">
         {[

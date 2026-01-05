@@ -72,13 +72,18 @@ export default async function Home() {
               <div className="animate-fade-up">
                 {/* Main headline */}
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
-                  Build a sovereign node{' '}
-                  <span className="text-[var(--text-tertiary)]">for ideas.</span>
+                  Capture → Vault → Publish{' '}
+                  <span className="text-[var(--text-tertiary)]">with full ownership.</span>
                 </h1>
 
                 {/* Subheadline */}
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
-                  Ingest signals. Shape knowledge. Broadcast everywhere. HTML-native, BYOK, and versioned by default.
+                  Neolog is creative infrastructure for capture-first creators: collect inputs from anywhere, organize them into publications,
+                  turn them into posts, then distribute and measure.
+                </p>
+
+                <p className="text-sm text-[var(--text-tertiary)] mb-7">
+                  Pipeline: <span className="text-[var(--text-secondary)]">Capture → Organize → Monitor → Compose → Distribute → Analyze</span>
                 </p>
 
                 {/* CTA */}
@@ -111,13 +116,13 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Signal flow */}
+        {/* Pipeline */}
         <section className="px-6 lg:px-12 py-8">
           <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
             {[
-              { title: 'Ingest', copy: 'Pull from feeds, URLs, or voice notes.' },
-              { title: 'Core', copy: 'Versioned posts + knowledge graph.' },
-              { title: 'Broadcast', copy: 'Distribute to channels + email.' },
+              { title: 'Capture', copy: 'Save prompts, links, snippets, and notes from anywhere.' },
+              { title: 'Vault + Publications', copy: 'Organize your knowledge by project, with search and provenance.' },
+              { title: 'Publish + Distribute', copy: 'Write once, ship outward as posts, feeds, and newsletters.' },
             ].map((item) => (
               <div
                 key={item.title}
@@ -447,7 +452,7 @@ export default async function Home() {
                   <span className="font-display text-base font-semibold text-[var(--text-primary)]">Neolog</span>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] max-w-md">
-                  The sovereign node for ideas. Ingest, shape, broadcast.
+                  Capture-first creative infrastructure. Own the core. Broadcast everywhere.
                 </p>
               </div>
 
