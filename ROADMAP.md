@@ -46,7 +46,7 @@ Last updated: 2026-01-05
 - [x] Integration key encryption at rest
 - [x] Provider vault UI (labels, active key, rotation)
 - [x] Cost router (user key -> managed key if Pro)
-- [ ] Usage tracking per provider (optional caps)
+- [x] Usage tracking per provider (optional caps)
 
 ## Optional / Future
 - [x] Post health system (freshness score + revive queue)
