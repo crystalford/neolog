@@ -351,21 +351,21 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <div className="dashboard-surface flex-1 flex flex-col">
-        <header className="sticky top-0 z-30 bg-[var(--bg-secondary)]/95 backdrop-blur border-b border-[var(--border-light)]">
+        <header className="sticky top-0 z-[80] bg-[var(--bg-secondary)]/95 backdrop-blur border-b border-[var(--border-light)]">
           <div className="px-6 lg:px-12 py-2 flex items-center justify-between">
             <div className="flex items-baseline gap-3">
               <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
                 Workspace
               </span>
-              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
               <div className="hidden sm:block">
                 <PublicationSwitcher
                   currentPublicationId={selectedPublicationId}
                   onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
                 />
               </div>
+              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCaptureOpen(true)}
                 className="hidden md:inline-flex btn btn-secondary btn-sm"

@@ -120,11 +120,11 @@ export function PublicationSwitcher({
       {menuOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-[70]"
             onClick={() => setMenuOpen(false)}
           />
 
-          <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-20 py-2 animate-scale-in origin-top-right">
+          <div className="absolute right-0 top-full mt-2 w-64 bg-[var(--bg-primary)] border border-[var(--border-medium)] rounded-xl shadow-2xl z-[80] py-2 animate-scale-in origin-top-right">
             <div className="px-3 py-2 text-xs font-medium text-[var(--text-tertiary)] uppercase">
               Your Publications
             </div>
