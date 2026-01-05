@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
@@ -448,9 +449,7 @@ export default function WritePage() {
       setPublications(pubs)
 
       // Try to get selected publication from localStorage
-      const selectedId = typeof window !== 'undefined'
-        ? localStorage.getItem('selectedPublicationId')
-        : null
+      const selectedId = readSelectedPublicationId()
 
       if (selectedId) {
         // Verify this publication exists in the list
@@ -464,14 +463,22 @@ export default function WritePage() {
       // If no valid selection, use first publication
       if (pubs[0]) {
         setPublicationId(pubs[0].id)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selectedPublicationId', pubs[0].id)
-        }
+        writeSelectedPublicationId(pubs[0].id)
       }
     } catch (error) {
       console.error('Error loading publication:', error)
     }
   }
+
+  useEffect(() => {
+    const unsubscribe = onSelectedPublicationIdChange((nextPublicationId) => {
+      if (!nextPublicationId) return
+      // Only auto-follow context when composing a new post.
+      if (postId) return
+      setPublicationId(nextPublicationId)
+    })
+    return unsubscribe
+  }, [postId])
 
   const loadUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -1412,9 +1419,7 @@ export default function WritePage() {
                 onChange={(e) => {
                   const newId = e.target.value
                   setPublicationId(newId)
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('selectedPublicationId', newId)
-                  }
+                  writeSelectedPublicationId(newId)
                 }}
                 className="input max-w-md"
               >

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, RefreshCw, Trash2, Rss } from 'lucide-react'
+import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 
 type FeedSource = {
   id: string
@@ -25,6 +26,7 @@ export default function SourcesPage() {
   const [loading, setLoading] = useState(true)
   const [sources, setSources] = useState<FeedSource[]>([])
   const [publications, setPublications] = useState<Publication[]>([])
+  const [defaultPublicationId, setDefaultPublicationId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [saving, setSaving] = useState(false)
@@ -39,6 +41,19 @@ export default function SourcesPage() {
   useEffect(() => {
     loadSources()
   }, [])
+
+  useEffect(() => {
+    setDefaultPublicationId(readSelectedPublicationId())
+    const unsubscribe = onSelectedPublicationIdChange((publicationId) => {
+      setDefaultPublicationId(publicationId)
+    })
+    return unsubscribe
+  }, [])
+
+  const defaultPublicationName =
+    defaultPublicationId
+      ? publications.find((p) => p.id === defaultPublicationId)?.name || null
+      : null
 
   const loadSources = async () => {
     setLoading(true)
@@ -274,7 +289,11 @@ export default function SourcesPage() {
                       }}
                       disabled={savingSettingsId === source.id}
                     >
-                      <option value="">(Use default)</option>
+                      <option value="">
+                        {defaultPublicationName
+                          ? `(Use default: ${defaultPublicationName})`
+                          : '(Use default)'}
+                      </option>
                       {publications.map((pub) => (
                         <option key={pub.id} value={pub.id}>
                           {pub.name}
