@@ -20,6 +20,8 @@ export default function SourcesPage() {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [fetchingId, setFetchingId] = useState<string | null>(null)
+  const [fetchingAll, setFetchingAll] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const router = useRouter()
@@ -50,7 +52,18 @@ export default function SourcesPage() {
   const addSource = async () => {
     setError(null)
     setSuccess(null)
-    if (!url.trim()) {
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) {
+      setError('Enter a valid RSS URL.')
+      return
+    }
+    try {
+      const parsed = new URL(trimmedUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        setError('RSS URL must start with http or https.')
+        return
+      }
+    } catch {
       setError('Enter a valid RSS URL.')
       return
     }
@@ -59,7 +72,7 @@ export default function SourcesPage() {
       const response = await fetch('/api/sources/rss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || null, url: url.trim() }),
+        body: JSON.stringify({ name: name.trim() || null, url: trimmedUrl }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -95,6 +108,11 @@ export default function SourcesPage() {
   const fetchNow = async (id?: string) => {
     setError(null)
     setSuccess(null)
+    if (id) {
+      setFetchingId(id)
+    } else {
+      setFetchingAll(true)
+    }
     const response = await fetch('/api/sources/rss/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,10 +121,14 @@ export default function SourcesPage() {
     const data = await response.json()
     if (!response.ok) {
       setError(data.error || 'Fetch failed.')
+      setFetchingId(null)
+      setFetchingAll(false)
       return
     }
     setSuccess(`Fetched ${data.inserted || 0} new item(s).`)
     await loadSources()
+    setFetchingId(null)
+    setFetchingAll(false)
   }
 
   return (
@@ -115,7 +137,7 @@ export default function SourcesPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Sources</p>
         <h1 className="font-display text-3xl text-[var(--text-primary)]">Pull content in</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Connect RSS feeds to populate your inbox automatically.
+          Connect RSS feeds to populate your inbox automatically. Fetching runs in the background, or trigger it manually.
         </p>
       </div>
 
@@ -150,15 +172,23 @@ export default function SourcesPage() {
             {saving ? 'Adding...' : 'Add'}
           </button>
         </div>
+        <p className="text-xs text-[var(--text-tertiary)]">
+          Tip: add the full feed URL (often <span className="font-mono">/rss</span> or <span className="font-mono">/feed</span>).
+        </p>
       </div>
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border-light)]">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Connected feeds</p>
-          <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm">
+          <div className="flex items-center gap-2">
+            <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm" disabled={fetchingAll}>
             <RefreshCw size={14} />
-            Fetch all
-          </button>
+              {fetchingAll ? 'Fetching...' : 'Fetch all'}
+            </button>
+            <button onClick={() => router.push('/inbox')} className="btn btn-secondary btn-sm">
+              View inbox
+            </button>
+          </div>
         </div>
         {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading sources...</div>
@@ -180,9 +210,13 @@ export default function SourcesPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => fetchNow(source.id)} className="btn btn-secondary btn-sm">
+                  <button
+                    onClick={() => fetchNow(source.id)}
+                    className="btn btn-secondary btn-sm"
+                    disabled={fetchingId === source.id}
+                  >
                     <Rss size={14} />
-                    Fetch
+                    {fetchingId === source.id ? 'Fetching...' : 'Fetch'}
                   </button>
                   <button onClick={() => removeSource(source.id)} className="btn btn-secondary btn-sm text-[var(--error)]">
                     <Trash2 size={14} />

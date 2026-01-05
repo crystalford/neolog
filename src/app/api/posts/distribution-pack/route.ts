@@ -43,6 +43,10 @@ function createOgDataUrl(title: string, subtitle?: string | null) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+  const titleLines = splitTitleLines(safeTitle)
+  const titleY = titleLines.length > 1 ? 270 : 300
+  const subtitleY = titleLines.length > 1 ? 380 : 360
+
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
   <defs>
@@ -57,15 +61,34 @@ function createOgDataUrl(title: string, subtitle?: string | null) {
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#glow)"/>
-  <rect x="80" y="80" width="1040" height="470" rx="28" fill="#111827" opacity="0.75"/>
-  <rect x="110" y="120" width="980" height="390" rx="24" fill="#111827" stroke="#1f2937" stroke-width="1" opacity="0.9"/>
+  <rect x="70" y="70" width="1060" height="490" rx="32" fill="#0b1220" opacity="0.78"/>
+  <rect x="110" y="120" width="980" height="400" rx="26" fill="#111827" stroke="#243042" stroke-width="1" opacity="0.9"/>
   <text x="140" y="200" fill="#22d3ee" font-family="Inter, Arial, sans-serif" font-size="28" letter-spacing="4">NEOLOG</text>
-  <text x="140" y="280" fill="#f8fafc" font-family="Georgia, serif" font-size="58" font-weight="700">${safeTitle}</text>
-  <text x="140" y="360" fill="#cbd5f5" font-family="Inter, Arial, sans-serif" font-size="28">${safeSubtitle}</text>
+  <text x="140" y="${titleY}" fill="#f8fafc" font-family="Georgia, serif" font-size="58" font-weight="700">
+    ${titleLines.map((line, index) => `<tspan x="140" dy="${index === 0 ? 0 : 62}">${line}</tspan>`).join('')}
+  </text>
+  ${safeSubtitle ? `<text x="140" y="${subtitleY}" fill="#cbd5f5" font-family="Inter, Arial, sans-serif" font-size="26">${safeSubtitle}</text>` : ''}
   <text x="140" y="520" fill="#94a3b8" font-family="Inter, Arial, sans-serif" font-size="20">neolog.ai</text>
 </svg>`
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+function splitTitleLines(title: string) {
+  const words = title.split(' ').filter(Boolean)
+  const lines: string[] = []
+  let current = ''
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word
+    if (next.length > 34 && current) {
+      lines.push(current)
+      current = word
+    } else {
+      current = next
+    }
+  })
+  if (current) lines.push(current)
+  return lines.slice(0, 2)
 }
 
 export async function POST(request: NextRequest) {
@@ -119,14 +142,14 @@ export async function POST(request: NextRequest) {
     const link = `${BASE_URL}/${authorUsername}/${post.slug}`
 
     const hooks = [
-      `The hidden point in "${post.title}" most people miss:`,
-      `If you only read one thing today, make it this.`,
-      `A quick breakdown of ${post.title}.`,
-      `Here's the 60-second version of ${post.title}.`,
-      `What changed my mind about ${post.title}:`,
+      `Most people miss this in "${post.title}":`,
+      `The 60-second version of ${post.title}.`,
+      `The part of ${post.title} worth saving.`,
+      `What shifted my view on ${post.title}:`,
+      `A quick, clean breakdown of ${post.title}.`,
     ]
 
-    const threadBody = chunkText(summary, 260)
+    const threadBody = chunkText(`${hooks[0]} ${summary}`, 260)
     return {
       x_thread: [...threadBody, `Full post: ${link}`],
       linkedin_post: [
@@ -134,7 +157,8 @@ export async function POST(request: NextRequest) {
         '',
         summary,
         '',
-        sentenceList.slice(0, 3).map((s) => `- ${s}`).join('\n'),
+        'Key takeaways:',
+        sentenceList.slice(0, 3).map((s) => `• ${s}`).join('\n'),
         '',
         `Read more: ${link}`,
       ].filter(Boolean).join('\n'),
@@ -179,6 +203,9 @@ export async function POST(request: NextRequest) {
           role: 'user',
           content: [
             'Return JSON with keys: x_thread (array of 4-6 tweets), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5).',
+            'X thread: start with a strong hook, keep each tweet under 260 chars, end with the link.',
+            'LinkedIn: 1-sentence hook, 2-3 bullet takeaways, short CTA with link.',
+            'Reddit: neutral tone, include TL;DR + bullets + link.',
             profile?.context_md ? `Writer context:\n${profile.context_md}` : '',
             `Post title: ${post.title}`,
             `Subtitle: ${post.subtitle || ''}`,

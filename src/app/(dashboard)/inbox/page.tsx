@@ -22,6 +22,7 @@ export default function InboxPage() {
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [publications, setPublications] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -82,6 +83,7 @@ export default function InboxPage() {
       return
     }
     setError(null)
+    setConvertingId(item.id)
 
     const title = item.title || item.raw_data?.title || 'Imported draft'
     const contentHtml =
@@ -119,10 +121,12 @@ export default function InboxPage() {
 
     if (postError || !post) {
       setError('Failed to convert to draft.')
+      setConvertingId(null)
       return
     }
 
     await updateStatus(item.id, 'imported')
+    setConvertingId(null)
     router.push(`/write?edit=${post.id}`)
   }
 
@@ -134,7 +138,7 @@ export default function InboxPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Inbox</p>
         <h1 className="font-display text-3xl text-[var(--text-primary)]">Incoming drafts</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Review new items before converting to drafts.
+          Review new items before converting them into drafts.
         </p>
       </div>
 
@@ -165,6 +169,9 @@ export default function InboxPage() {
             </option>
           ))}
         </select>
+        <p className="text-xs text-[var(--text-tertiary)] mt-2">
+          Pull new items by adding RSS feeds in <span className="font-medium text-[var(--text-secondary)]">Sources</span>.
+        </p>
       </div>
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
@@ -176,7 +183,9 @@ export default function InboxPage() {
         {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading inbox...</div>
         ) : visibleItems.length === 0 ? (
-          <div className="p-6 text-sm text-[var(--text-tertiary)]">No new items yet.</div>
+          <div className="p-6 text-sm text-[var(--text-tertiary)]">
+            No new items yet. Add RSS feeds to pull in fresh content.
+          </div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {visibleItems.map((item) => (
@@ -186,14 +195,33 @@ export default function InboxPage() {
                     {item.title || item.raw_data?.title || 'Untitled'}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {item.source_type.toUpperCase()} - {item.canonical_url || item.source_url || 'Unknown source'}
+                    {item.source_type.toUpperCase()} • {item.canonical_url || item.source_url || 'Unknown source'}
                   </p>
+                  {item.raw_data?.published_at && (
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                      Published {new Date(item.raw_data.published_at).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => convertToDraft(item)} className="btn btn-primary btn-sm">
+                  <button
+                    onClick={() => convertToDraft(item)}
+                    className="btn btn-primary btn-sm"
+                    disabled={convertingId === item.id}
+                  >
                     <FilePlus2 size={14} />
-                    Convert
+                    {convertingId === item.id ? 'Converting...' : 'Convert'}
                   </button>
+                  {(item.canonical_url || item.source_url) && (
+                    <a
+                      href={item.canonical_url || item.source_url || ''}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-secondary btn-sm"
+                    >
+                      View source
+                    </a>
+                  )}
                   <button onClick={() => updateStatus(item.id, 'ignored')} className="btn btn-secondary btn-sm">
                     <X size={14} />
                     Ignore

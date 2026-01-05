@@ -280,6 +280,20 @@ export default function DashboardPage() {
     return 'text-[var(--text-secondary)] bg-[var(--bg-tertiary)]'
   }
 
+  const getHealthBadge = (post: Post) => {
+    if (post.status !== 'published') return null
+    const updatedAt = new Date(post.updated_at || post.published_at || post.created_at)
+    const daysSinceUpdate = Math.floor((Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24))
+    const recentViews = metrics[post.id]?.recentViews || 0
+    if (daysSinceUpdate < 30) {
+      return { label: 'Fresh', className: 'text-[var(--success)] bg-[var(--success)]/10' }
+    }
+    if (daysSinceUpdate < 90 || recentViews >= 10) {
+      return { label: 'Active', className: 'text-[var(--warning)] bg-[var(--warning)]/10' }
+    }
+    return { label: 'Stale', className: 'text-[var(--error)] bg-[var(--error)]/10' }
+  }
+
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -623,6 +637,15 @@ export default function DashboardPage() {
                     <Clock size={12} />
                     {new Date(post.updated_at).toLocaleDateString()}
                   </span>
+                  {(() => {
+                    const health = getHealthBadge(post)
+                    if (!health) return null
+                    return (
+                      <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] ${health.className}`}>
+                        {health.label}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div className="text-sm text-[var(--text-primary)]">
                   {(metrics[post.id]?.views || 0).toLocaleString()}

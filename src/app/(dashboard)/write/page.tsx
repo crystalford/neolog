@@ -1794,6 +1794,11 @@ export default function WritePage() {
                     <h3 className="font-display text-xl text-[var(--text-primary)]">
                       {title || 'Untitled'}
                     </h3>
+                    {pack?.model && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                        Generated with {pack.model === 'fallback' ? 'fallback copy' : pack.model}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => setShowPack(false)}
@@ -1831,7 +1836,7 @@ export default function WritePage() {
                     disabled={!postId || packLoading}
                     className="ml-auto px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]"
                   >
-                    Regenerate
+                    {packLoading ? 'Generating...' : 'Regenerate'}
                   </button>
                 </div>
 

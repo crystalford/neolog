@@ -93,6 +93,30 @@ export default function SettingsPage() {
     { id: 'stability', label: 'Stability (Legacy)' },
   ]
 
+  const providerValidation: Record<string, { pattern?: RegExp; hint: string }> = {
+    openai: { pattern: /^sk-(proj-)?[A-Za-z0-9]{10,}/, hint: 'OpenAI keys start with sk-' },
+    anthropic: { pattern: /^sk-ant-[A-Za-z0-9-]{10,}/, hint: 'Anthropic keys start with sk-ant-' },
+    groq: { pattern: /^gsk_[A-Za-z0-9]{10,}/, hint: 'Groq keys start with gsk_' },
+    perplexity: { pattern: /^pplx-[A-Za-z0-9]{10,}/, hint: 'Perplexity keys start with pplx-' },
+    elevenlabs: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'ElevenLabs keys are long alphanumeric strings' },
+    replicate: { pattern: /^r8_[A-Za-z0-9]{10,}/, hint: 'Replicate keys start with r8_' },
+    resend: { pattern: /^re_[A-Za-z0-9]{10,}/, hint: 'Resend keys start with re_' },
+    posthog: { pattern: /^phc_[A-Za-z0-9]{10,}/, hint: 'PostHog keys start with phc_' },
+    heygen: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'HeyGen keys are long alphanumeric strings' },
+  }
+
+  const getIntegrationHint = (provider: string, value: string) => {
+    if (!value) return null
+    if (value.length < 12) {
+      return { tone: 'error', text: 'Key is too short.' }
+    }
+    const validation = providerValidation[provider]
+    if (validation?.pattern && !validation.pattern.test(value)) {
+      return { tone: 'warning', text: validation.hint }
+    }
+    return null
+  }
+
   const loadIntegrations = async () => {
     try {
       const response = await fetch('/api/integrations/list')
@@ -179,6 +203,11 @@ export default function SettingsPage() {
     const apiKey = integrationDrafts[provider]?.trim()
     if (!apiKey) {
       setError('Enter an API key before saving.')
+      return
+    }
+    const hint = getIntegrationHint(provider, apiKey)
+    if (hint?.tone === 'error') {
+      setError(hint.text)
       return
     }
     setIntegrationSaving(provider)
@@ -800,6 +829,8 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 {aiProviders.map((provider) => {
                   const providerKeys = getProviderKeys(provider.id)
+                  const draftValue = integrationDrafts[provider.id] || ''
+                  const hint = getIntegrationHint(provider.id, draftValue)
                   return (
                     <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
                       <div className="flex items-center justify-between gap-3 mb-3">
@@ -870,7 +901,7 @@ export default function SettingsPage() {
                         />
                         <input
                           type="password"
-                          value={integrationDrafts[provider.id] || ''}
+                          value={draftValue}
                           onChange={(event) =>
                             setIntegrationDrafts((prev) => ({
                               ...prev,
@@ -888,6 +919,11 @@ export default function SettingsPage() {
                           {integrationSaving === provider.id ? 'Saving...' : 'Save'}
                         </button>
                       </div>
+                      {hint && (
+                        <p className={`text-xs mt-2 ${hint.tone === 'error' ? 'text-[var(--error)]' : 'text-[var(--warning)]'}`}>
+                          {hint.text}
+                        </p>
+                      )}
                     </div>
                   )
                 })}
