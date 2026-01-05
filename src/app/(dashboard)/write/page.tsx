@@ -883,12 +883,31 @@ export default function WritePage() {
       let finalPostId = postId
 
       if (postId) {
-        const { data, error: updateError } = await supabase
-          .from('posts')
-          .update(postData)
-          .eq('id', postId)
-          .select('id, slug')
-          .single()
+        let data: any = null
+        let updateError: any = null
+
+        if (isAlreadyPublished && !isScheduling) {
+          const response = await fetch('/api/posts/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId, patch: postData }),
+          })
+          const json = await response.json().catch(() => null)
+          if (!response.ok) {
+            updateError = { message: json?.error || 'Failed to update post.' }
+          } else {
+            data = json?.post
+          }
+        } else {
+          const res = await supabase
+            .from('posts')
+            .update(postData)
+            .eq('id', postId)
+            .select('id, slug')
+            .single()
+          data = res.data
+          updateError = res.error
+        }
 
         if (updateError) {
           console.error('Update error:', updateError)
