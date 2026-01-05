@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { sendNewPostNotifications } from '@/lib/email'
 import { resolveProviderKey } from '@/lib/ai-provider'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Publish a post and notify subscribers
@@ -68,6 +70,39 @@ export async function POST(request: NextRequest) {
           change_summary: 'Published',
           changed_by: session.user.id,
         }, { onConflict: 'post_id,version_number' })
+
+      // Best-effort: create/refresh pgvector embedding for semantic search.
+      // Never block publishing on embedding failures.
+      try {
+        const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+        const admin = createAdminClient()
+
+        if (openaiKey?.key && admin) {
+          const text = pickTextForEmbedding({
+            title: post.title,
+            excerpt: post.excerpt,
+            content: post.content,
+            content_html: post.content_html,
+          })
+
+          if (text) {
+            const embedding = await embedTextWithOpenAI({ apiKey: openaiKey.key, text })
+            await admin
+              .from('post_embeddings')
+              .upsert(
+                {
+                  post_id: postId,
+                  embedding: vectorLiteral(embedding),
+                  content_hash: sha256(text),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'post_id' },
+              )
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     // Send notifications if requested

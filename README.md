@@ -225,6 +225,8 @@ All `/api/agent/*` endpoints require an Automation API key.
 - Apply the migration in Supabase: [supabase/migrations/add_vector_search.sql](supabase/migrations/add_vector_search.sql)
 - Ensure `OPENAI_API_KEY` is set in your environment.
 
+Embeddings are refreshed automatically when you publish a post (via the normal publish flow or `/api/agent/draft/publish`). Use the backfill endpoint/script to populate older posts.
+
 ## MCP Server
 
 Run an MCP server over stdio that exposes Neolog tools (`neolog_search`, `neolog_vector_search`, `neolog_ingest_draft`):

@@ -64,6 +64,7 @@ Last updated: 2026-01-05
 6. Accept: text/markdown responses (done)
 6.1 Agent search endpoint (done)
 7. Vector search endpoint (done; requires pgvector migration + OPENAI_API_KEY)
+7.1 Auto-embed on publish (done)
 8. MCP server integration (done)
 
 ## Cost-Gated Features

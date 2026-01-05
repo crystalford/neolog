@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAutomationKey } from "@/lib/apiKeyAuth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveProviderKeyWithClient } from "@/lib/ai-provider";
+import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from "@/lib/embeddings";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +114,9 @@ export async function POST(req: NextRequest) {
     const slug = `${slugBase}-${Date.now().toString(36)}`;
 
     const supabase = createAdminClient();
+      const status = body.status || "draft";
+      const publishedAt = status === "published" ? new Date().toISOString() : null;
+
     if (!supabase) {
       return NextResponse.json(
         { error: "Server missing Supabase admin configuration." },
@@ -132,13 +137,46 @@ export async function POST(req: NextRequest) {
         excerpt,
         content: contentForPost,
         content_type: "markdown",
-        status: body.status || "draft",
+        status,
+        published_at: publishedAt,
         slug,
       })
       .select("id,slug,status")
       .single();
 
     if (insertError) throw insertError;
+
+    // Best-effort: if the ingest published immediately, create an embedding.
+    if (status === "published") {
+      try {
+        const provider = await resolveProviderKeyWithClient(supabase as any, auth.userId, "openai");
+        if (provider?.key) {
+          const text = pickTextForEmbedding({
+            title,
+            excerpt,
+            content: contentForPost,
+            content_html: null,
+          });
+
+          if (text) {
+            const embedding = await embedTextWithOpenAI({ apiKey: provider.key, text });
+            await supabase
+              .from("post_embeddings")
+              .upsert(
+                {
+                  post_id: created.id,
+                  embedding: vectorLiteral(embedding),
+                  content_hash: sha256(text),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "post_id" },
+              );
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     if (wantsMarkdown(req)) {
       const lines: string[] = [];
