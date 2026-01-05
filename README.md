@@ -166,6 +166,8 @@ See `supabase-schema.sql` for the complete schema including:
 | `/api/inbox/webhook` | POST | Headless inbox ingestion (API key) |
 | `/api/automation/trigger` | POST | Automation triggers (API key) |
 | `/api/cron/rss-pull` | GET | Server-side RSS pull into inbox (cron) |
+| `/api/agent/user?username=...` | GET | Agent-friendly user profile + recent posts (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
+| `/api/agent/post?username=...&slug=...` | GET | Agent-friendly post payload (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 
 ## Environment Variables
 
