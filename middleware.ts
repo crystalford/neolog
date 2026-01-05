@@ -20,6 +20,13 @@ const RESERVED = new Set([
 ])
 
 export function middleware(request: NextRequest) {
+  const host = request.headers.get('host') || ''
+  if (host.startsWith('www.')) {
+    const url = request.nextUrl.clone()
+    url.hostname = host.replace(/^www\./, '')
+    return NextResponse.redirect(url)
+  }
+
   const { pathname, searchParams } = request.nextUrl
   if (searchParams.get('format') !== 'json') {
     return NextResponse.next()
