@@ -67,15 +67,6 @@ export default function DashboardPage() {
         nextMetrics[id] = { views: 0, recentViews: 0, comments: 0 }
       })
 
-      const { data: statsRows } = await supabase
-        .from('post_stats')
-        .select('post_id, total_views')
-        .in('post_id', postIds)
-
-      statsRows?.forEach((row: any) => {
-        if (nextMetrics[row.post_id]) nextMetrics[row.post_id].views = row.total_views || 0
-      })
-
       const { data: commentRows } = await supabase
         .from('comments')
         .select('post_id')
