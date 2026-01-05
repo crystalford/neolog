@@ -524,9 +524,12 @@ export default function DashboardPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search posts..."
-              className="input w-56 pl-10"
+              className="input input-with-icon w-56"
             />
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
+            />
           </div>
           <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
             {[
