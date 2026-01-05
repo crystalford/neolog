@@ -870,8 +870,10 @@ export default function WritePage() {
         postData.status = 'scheduled'
         postData.scheduled_at = new Date(scheduledAt).toISOString()
       } else if (!isAlreadyPublished) {
-        postData.status = 'published'
-        postData.published_at = new Date().toISOString()
+        // Keep as draft here; the server-side publish endpoint is responsible for
+        // transitioning to published and running first-publish side-effects.
+        postData.status = 'draft'
+        postData.published_at = null
       }
       if (!isScheduling) {
         postData.scheduled_at = null
