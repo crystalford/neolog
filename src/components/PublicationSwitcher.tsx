@@ -43,6 +43,18 @@ export function PublicationSwitcher({
     }
   }, [currentPublicationId, publications])
 
+  useEffect(() => {
+    if (!selectedPub) return
+    if (currentPublicationId) return
+    if (typeof window === 'undefined') return
+
+    const stored = window.localStorage.getItem('selectedPublicationId')
+    if (!stored) {
+      window.localStorage.setItem('selectedPublicationId', selectedPub.id)
+      onPublicationChange?.(selectedPub.id)
+    }
+  }, [currentPublicationId, onPublicationChange, selectedPub])
+
   const loadPublications = async () => {
     setLoading(true)
     try {
@@ -97,7 +109,7 @@ export function PublicationSwitcher({
         ) : (
           <div
             className="w-5 h-5 rounded flex items-center justify-center text-white text-xs font-bold"
-            style={{ backgroundColor: selectedPub?.primary_color || '#6366f1' }}
+            style={{ backgroundColor: selectedPub?.primary_color || 'var(--accent)' }}
           >
             {selectedPub?.name.charAt(0).toUpperCase()}
           </div>

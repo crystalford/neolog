@@ -8,10 +8,11 @@ import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
   Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe
+  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe, Monitor
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
+import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 
 export default function DashboardLayout({
   children,
@@ -23,9 +24,16 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
   const [captureOpen, setCaptureOpen] = useState(false)
+  const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem('selectedPublicationId')
+    if (stored) setSelectedPublicationId(stored)
+  }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hostname.startsWith('www.')) {
@@ -183,6 +191,7 @@ export default function DashboardLayout({
     {
       title: 'Distribution',
       items: [
+        { href: '/monitors', icon: Monitor, label: 'Monitors' },
         { href: '/analytics', icon: BarChart3, label: 'Analytics' },
         { href: '/syndication', icon: Radio, label: 'Syndication' },
         { href: '/sources', icon: Globe, label: 'Sources' },
@@ -343,6 +352,12 @@ export default function DashboardLayout({
               <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
                 Workspace
               </span>
+              <div className="hidden sm:block">
+                <PublicationSwitcher
+                  currentPublicationId={selectedPublicationId}
+                  onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
+                />
+              </div>
               <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -423,7 +438,11 @@ export default function DashboardLayout({
         onOpen={() => setCommandOpen(true)}
       />
 
-      <QuickCaptureModal isOpen={captureOpen} onClose={() => setCaptureOpen(false)} />
+      <QuickCaptureModal
+        isOpen={captureOpen}
+        onClose={() => setCaptureOpen(false)}
+        initialPublicationId={selectedPublicationId}
+      />
     </div>
   )
 }
