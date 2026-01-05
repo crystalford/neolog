@@ -50,6 +50,18 @@ psql postgresql://[your-connection-string] < supabase/migrations/add_publication
 
 ---
 
+## 🤖 AI Usage Tracking + Optional Caps
+
+If you want the dashboard AI usage tiles + optional usage caps to work, run these migrations:
+
+- `supabase/migrations/add_provider_usage.sql`
+- `supabase/migrations/add_usage_caps.sql`
+
+These add:
+- `provider_usage` (token usage logging)
+- `provider_usage_limits` (per-user daily/monthly caps)
+- `sum_provider_usage(...)` RPC used for enforcement
+
 ## ⚠️ IMPORTANT: Existing Data Migration
 
 ### 2. Migrate Existing Posts

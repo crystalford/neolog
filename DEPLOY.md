@@ -8,6 +8,7 @@
 - [ ] Get service role key (for server-side operations)
 - [ ] Run the SQL schema (`supabase-schema.sql`) in SQL Editor
 - [ ] Run migrations in `supabase/migrations/` (including `add_onboarded_at.sql` for onboarding gating)
+  - [ ] Usage tracking + caps: `add_provider_usage.sql`, `add_usage_caps.sql`
 - [ ] Enable Email auth in Authentication > Providers
 - [ ] (Optional) Enable OAuth providers (Google, GitHub)
 - [ ] Create storage bucket named `images` with public access
