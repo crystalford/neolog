@@ -94,6 +94,7 @@ export default function SettingsPage() {
     { id: 'anthropic', label: 'Anthropic (Claude)' },
     { id: 'perplexity', label: 'Perplexity' },
     { id: 'grok', label: 'Grok' },
+    { id: 'x', label: 'X (Twitter) API' },
     { id: 'groq', label: 'Groq (Speed)' },
     { id: 'replicate', label: 'Replicate (Flux)' },
     { id: 'elevenlabs', label: 'ElevenLabs (Voice)' },
@@ -102,6 +103,7 @@ export default function SettingsPage() {
     { id: 'r2', label: 'Cloudflare R2 (Storage)' },
     { id: 's3', label: 'Amazon S3 (Storage)' },
     { id: 'heygen', label: 'HeyGen (Video Avatar)' },
+    { id: 'synthesia', label: 'Synthesia (Video Avatar)' },
     { id: 'stability', label: 'Stability (Legacy)' },
   ]
 
@@ -110,11 +112,13 @@ export default function SettingsPage() {
     anthropic: { pattern: /^sk-ant-[A-Za-z0-9-]{10,}/, hint: 'Anthropic keys start with sk-ant-' },
     groq: { pattern: /^gsk_[A-Za-z0-9]{10,}/, hint: 'Groq keys start with gsk_' },
     perplexity: { pattern: /^pplx-[A-Za-z0-9]{10,}/, hint: 'Perplexity keys start with pplx-' },
+    x: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'X uses a Bearer token (long string) from the Developer Portal' },
     elevenlabs: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'ElevenLabs keys are long alphanumeric strings' },
     replicate: { pattern: /^r8_[A-Za-z0-9]{10,}/, hint: 'Replicate keys start with r8_' },
     resend: { pattern: /^re_[A-Za-z0-9]{10,}/, hint: 'Resend keys start with re_' },
     posthog: { pattern: /^phc_[A-Za-z0-9]{10,}/, hint: 'PostHog keys start with phc_' },
     heygen: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'HeyGen keys are long alphanumeric strings' },
+    synthesia: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Synthesia keys are long strings; paste the API key from Synthesia → Integrations' },
   }
 
   const getIntegrationHint = (provider: string, value: string) => {

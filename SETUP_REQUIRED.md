@@ -62,6 +62,12 @@ These add:
 - `provider_usage_limits` (per-user daily/monthly caps)
 - `sum_provider_usage(...)` RPC used for enforcement
 
+## 🎬 Video Avatar (HeyGen/Synthesia)
+
+To enable provider job tracking (job id + video URL + processing status) for video briefs, run:
+
+- `supabase/migrations/add_video_brief_jobs.sql`
+
 ## ⚠️ IMPORTANT: Existing Data Migration
 
 ### 2. Migrate Existing Posts

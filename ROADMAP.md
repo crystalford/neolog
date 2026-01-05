@@ -27,7 +27,7 @@ Last updated: 2026-01-05
 - [x] Reddit import (top comments)
 - [x] Manual highlights
 - [x] Filters + sorting + pinning
-- [ ] X import (requires paid X API)
+- [x] X import (requires paid X API)
 
 ## Phase 3 - Digital Garden (shipping)
 - [x] "Where this fits" on post pages (tags + related posts)
@@ -77,4 +77,4 @@ Last updated: 2026-01-05
 - [x] PostHog (analytics, BYOK)
 - [x] Groq (speed, BYOK for expand)
 - [x] R2/S3 (sovereign storage, BYOK settings)
-- [ ] HeyGen/Synthesia (video avatar, BYOK)
+- [x] HeyGen/Synthesia (video avatar, BYOK)

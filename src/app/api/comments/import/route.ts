@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 
 type RedditComment = {
   body: string
@@ -9,7 +10,19 @@ type RedditComment = {
   permalink: string
 }
 
+type XReply = {
+  id: string
+  text: string
+  author_id: string
+  author_username: string
+  author_name?: string
+  created_at: string | null
+  like_count: number
+}
+
 const REDDIT_HOSTS = new Set(['reddit.com', 'www.reddit.com', 'old.reddit.com'])
+
+const X_HOSTS = new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com', 'mobile.twitter.com'])
 
 function isRedditUrl(url: string) {
   try {
@@ -17,6 +30,26 @@ function isRedditUrl(url: string) {
     return REDDIT_HOSTS.has(parsed.hostname)
   } catch {
     return false
+  }
+}
+
+function isXUrl(url: string) {
+  try {
+    const parsed = new URL(url)
+    return X_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+function extractXTweetId(url: string) {
+  try {
+    const parsed = new URL(url)
+    const path = parsed.pathname
+    const match = path.match(/\/status\/(\d+)/)
+    return match?.[1] || null
+  } catch {
+    return null
   }
 }
 
@@ -43,6 +76,67 @@ function extractRedditComments(payload: any): RedditComment[] {
   return comments
 }
 
+async function fetchXReplies(bearerToken: string, tweetId: string): Promise<XReply[]> {
+  const baseHeaders = {
+    accept: 'application/json',
+    Authorization: `Bearer ${bearerToken}`,
+  }
+
+  // Confirm the tweet exists and get author
+  const tweetResp = await fetch(`https://api.twitter.com/2/tweets/${tweetId}?tweet.fields=author_id,created_at,public_metrics`, {
+    headers: baseHeaders,
+  })
+
+  if (!tweetResp.ok) {
+    throw new Error('Failed to fetch X tweet.')
+  }
+
+  const tweetJson = await tweetResp.json()
+  const authorId = tweetJson?.data?.author_id
+
+  const queryParts = [`conversation_id:${tweetId}`, 'is:reply', '-is:retweet']
+  if (authorId) {
+    queryParts.push(`-from:${authorId}`)
+  }
+  const query = queryParts.join(' ')
+
+  const searchUrl = new URL('https://api.twitter.com/2/tweets/search/recent')
+  searchUrl.searchParams.set('query', query)
+  searchUrl.searchParams.set('max_results', '50')
+  searchUrl.searchParams.set('tweet.fields', 'author_id,created_at,public_metrics,conversation_id')
+  searchUrl.searchParams.set('expansions', 'author_id')
+  searchUrl.searchParams.set('user.fields', 'username,name')
+
+  const repliesResp = await fetch(searchUrl.toString(), { headers: baseHeaders })
+  if (!repliesResp.ok) {
+    throw new Error('Failed to search X replies.')
+  }
+
+  const repliesJson = await repliesResp.json()
+  const users = new Map<string, any>()
+  for (const user of repliesJson?.includes?.users || []) {
+    if (user?.id) users.set(String(user.id), user)
+  }
+
+  const replies: XReply[] = []
+  for (const item of repliesJson?.data || []) {
+    if (!item?.id || !item?.text || !item?.author_id) continue
+    const metrics = item.public_metrics || {}
+    const user = users.get(String(item.author_id))
+    replies.push({
+      id: String(item.id),
+      text: String(item.text),
+      author_id: String(item.author_id),
+      author_username: String(user?.username || 'unknown'),
+      author_name: typeof user?.name === 'string' ? user.name : undefined,
+      created_at: typeof item.created_at === 'string' ? item.created_at : null,
+      like_count: Number(metrics.like_count || 0),
+    })
+  }
+
+  return replies
+}
+
 export async function POST(request: NextRequest) {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
@@ -67,48 +161,92 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
-  if (!isRedditUrl(url)) {
-    return NextResponse.json({ error: 'Only Reddit URLs are supported right now.' }, { status: 400 })
-  }
-
   try {
-    const response = await fetch(normalizeRedditJsonUrl(url), {
-      headers: { 'User-Agent': 'neolog/1.0' },
-    })
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch Reddit thread.' }, { status: 400 })
+    if (isRedditUrl(url)) {
+      const response = await fetch(normalizeRedditJsonUrl(url), {
+        headers: { 'User-Agent': 'neolog/1.0' },
+      })
+      if (!response.ok) {
+        return NextResponse.json({ error: 'Failed to fetch Reddit thread.' }, { status: 400 })
+      }
+
+      const payload = await response.json()
+      const comments = extractRedditComments(payload)
+        .filter((comment) => comment.score >= 1)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+
+      await supabase
+        .from('curated_comments')
+        .delete()
+        .eq('post_id', postId)
+        .eq('author_id', session.user.id)
+        .eq('source', 'reddit')
+
+      const rows = comments.map((comment) => ({
+        post_id: postId,
+        author_id: session.user.id,
+        source: 'reddit',
+        source_url: `https://www.reddit.com${comment.permalink}`,
+        author_name: comment.author,
+        author_url: `https://www.reddit.com/user/${comment.author}`,
+        body: comment.body,
+        score: comment.score,
+        created_at: comment.created_utc ? new Date(comment.created_utc * 1000).toISOString() : null,
+      }))
+
+      if (rows.length > 0) {
+        await supabase.from('curated_comments').insert(rows)
+      }
+
+      return NextResponse.json({ imported: rows.length })
     }
 
-    const payload = await response.json()
-    const comments = extractRedditComments(payload)
-      .filter((comment) => comment.score >= 1)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
+    if (isXUrl(url)) {
+      const tweetId = extractXTweetId(url)
+      if (!tweetId) {
+        return NextResponse.json({ error: 'Could not extract tweet ID from URL.' }, { status: 400 })
+      }
 
-    await supabase
-      .from('curated_comments')
-      .delete()
-      .eq('post_id', postId)
-      .eq('author_id', session.user.id)
-      .eq('source', 'reddit')
+      const xKey = await resolveProviderKeyWithClient(supabase, session.user.id, 'x')
+      if (!xKey?.key) {
+        return NextResponse.json({
+          error: 'X API key not configured. Add it in Settings → AI Vault (BYOK) under “X (Twitter) API”.',
+        }, { status: 400 })
+      }
 
-    const rows = comments.map((comment) => ({
-      post_id: postId,
-      author_id: session.user.id,
-      source: 'reddit',
-      source_url: `https://www.reddit.com${comment.permalink}`,
-      author_name: comment.author,
-      author_url: `https://www.reddit.com/user/${comment.author}`,
-      body: comment.body,
-      score: comment.score,
-      created_at: comment.created_utc ? new Date(comment.created_utc * 1000).toISOString() : null,
-    }))
+      const replies = (await fetchXReplies(xKey.key, tweetId))
+        .filter((reply) => reply.like_count >= 1)
+        .sort((a, b) => b.like_count - a.like_count)
+        .slice(0, 5)
 
-    if (rows.length > 0) {
-      await supabase.from('curated_comments').insert(rows)
+      await supabase
+        .from('curated_comments')
+        .delete()
+        .eq('post_id', postId)
+        .eq('author_id', session.user.id)
+        .eq('source', 'x')
+
+      const rows = replies.map((reply) => ({
+        post_id: postId,
+        author_id: session.user.id,
+        source: 'x',
+        source_url: `https://x.com/${reply.author_username}/status/${reply.id}`,
+        author_name: reply.author_username,
+        author_url: `https://x.com/${reply.author_username}`,
+        body: reply.text,
+        score: reply.like_count,
+        created_at: reply.created_at,
+      }))
+
+      if (rows.length > 0) {
+        await supabase.from('curated_comments').insert(rows)
+      }
+
+      return NextResponse.json({ imported: rows.length })
     }
 
-    return NextResponse.json({ imported: rows.length })
+    return NextResponse.json({ error: 'Unsupported URL. Use a Reddit or X post URL.' }, { status: 400 })
   } catch (error) {
     console.error('Comment import error:', error)
     return NextResponse.json({ error: 'Failed to import comments.' }, { status: 500 })

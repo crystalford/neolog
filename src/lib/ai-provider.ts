@@ -18,6 +18,8 @@ const getManagedKey = (provider: string) => {
       return process.env.PERPLEXITY_API_KEY || ''
     case 'grok':
       return process.env.GROK_API_KEY || ''
+    case 'x':
+      return process.env.X_BEARER_TOKEN || ''
     case 'groq':
       return process.env.GROQ_API_KEY || ''
     case 'elevenlabs':
@@ -30,6 +32,10 @@ const getManagedKey = (provider: string) => {
       return process.env.POSTHOG_PROJECT_API_KEY || ''
     case 'r2':
       return process.env.R2_ACCESS_KEY_ID || ''
+    case 'heygen':
+      return process.env.HEYGEN_API_KEY || ''
+    case 'synthesia':
+      return process.env.SYNTHESIA_API_KEY || ''
     default:
       return ''
   }

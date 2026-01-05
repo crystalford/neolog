@@ -527,7 +527,9 @@ export type VideoBrief = {
   author_id: string
   provider: 'heygen' | 'synthesia'
   script: string
-  status: 'queued' | 'ready' | 'error'
+  status: 'queued' | 'processing' | 'ready' | 'error'
+  provider_job_id?: string | null
+  video_url?: string | null
   provider_payload: Record<string, any> | null
   provider_response: Record<string, any> | null
   error_message: string | null

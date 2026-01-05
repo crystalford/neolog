@@ -76,7 +76,7 @@ export default function WritePage() {
   const [commentError, setCommentError] = useState<string | null>(null)
   const [curatedComments, setCuratedComments] = useState<any[]>([])
   const [manualHighlight, setManualHighlight] = useState('')
-  const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'manual'>('all')
+  const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'x' | 'manual'>('all')
   const [commentSort, setCommentSort] = useState<'score' | 'recent'>('score')
 
   const router = useRouter()
@@ -1477,14 +1477,14 @@ export default function WritePage() {
                     <div>
                       <h3 className="text-sm font-medium text-[var(--text-primary)]">Community highlights</h3>
                       <p className="text-xs text-[var(--text-tertiary)]">
-                        Import top Reddit comments for this post.
+                          Import top Reddit comments or X replies for this post.
                       </p>
                     </div>
                     <input
                       type="url"
                       value={commentUrl}
                       onChange={(e) => setCommentUrl(e.target.value)}
-                      placeholder="https://www.reddit.com/r/.../comments/..."
+                        placeholder="https://www.reddit.com/... or https://x.com/.../status/..."
                       className="input"
                     />
                     {commentError && (
@@ -1500,6 +1500,7 @@ export default function WritePage() {
                         >
                           <option value="all">All</option>
                           <option value="reddit">Reddit</option>
+                          <option value="x">X</option>
                           <option value="manual">Manual</option>
                         </select>
                         <span>Sort</span>
@@ -1517,14 +1518,7 @@ export default function WritePage() {
                         disabled={!postId || commentLoading || !commentUrl.trim()}
                         className="btn btn-secondary btn-sm disabled:opacity-60"
                       >
-                        {commentLoading ? 'Importing...' : 'Import Reddit'}
-                      </button>
-                      <button
-                        disabled
-                        className="btn btn-ghost btn-sm opacity-50 cursor-not-allowed"
-                        title="X import requires API access"
-                      >
-                        Import X (soon)
+                        {commentLoading ? 'Importing...' : 'Import'}
                       </button>
                       <button
                         onClick={clearCuratedComments}
@@ -1567,7 +1561,7 @@ export default function WritePage() {
                           .map((comment) => (
                           <div key={comment.id} className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                             <p className="text-xs text-[var(--text-tertiary)] mb-2">
-                              {comment.author_name || (comment.source === 'manual' ? 'Manual highlight' : 'reddit user')}
+                              {comment.author_name || (comment.source === 'manual' ? 'Manual highlight' : comment.source === 'x' ? 'x user' : 'reddit user')}
                               {comment.score ? ` - ${comment.score} upvotes` : ''}
                             </p>
                             <p className="text-sm text-[var(--text-secondary)]">{comment.body}</p>
