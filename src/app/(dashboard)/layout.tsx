@@ -62,6 +62,30 @@ export default function DashboardLayout({
     return () => window.removeEventListener('keydown', handler)
   }, [router])
 
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return
+      if (event.button !== 0) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest('a')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#')) return
+      if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:')) return
+      const targetAttr = anchor.getAttribute('target')
+      if (targetAttr && targetAttr !== '_self') return
+
+      event.preventDefault()
+      router.push(href)
+    }
+
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [router])
+
   const loadUserAndProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     setUser(session?.user ?? null)
