@@ -32,6 +32,15 @@ type ReferrerData = {
   count: number
 }
 
+type UsageSummaryRow = {
+  provider: string
+  model: string | null
+  calls: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [posts, setPosts] = useState<PostWithViews[]>([])
@@ -45,6 +54,9 @@ export default function AnalyticsPage() {
   const [dailyData, setDailyData] = useState<DailyData[]>([])
   const [referrers, setReferrers] = useState<ReferrerData[]>([])
   const [devices, setDevices] = useState({ desktop: 0, mobile: 0, tablet: 0 })
+  const [usageLoading, setUsageLoading] = useState(true)
+  const [usageError, setUsageError] = useState<string | null>(null)
+  const [usageSummary, setUsageSummary] = useState<UsageSummaryRow[]>([])
   const [selectedPost, setSelectedPost] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d')
   
@@ -52,7 +64,34 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     loadAnalytics()
+    loadUsage()
   }, [dateRange])
+
+  const loadUsage = async () => {
+    setUsageLoading(true)
+    setUsageError(null)
+
+    const daysAgo = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90
+
+    try {
+      const res = await fetch(`/api/usage?days=${daysAgo}`)
+      if (!res.ok) {
+        setUsageSummary([])
+        setUsageError('Usage unavailable.')
+        setUsageLoading(false)
+        return
+      }
+
+      const json = await res.json()
+      const summary = Array.isArray(json?.summary) ? (json.summary as UsageSummaryRow[]) : []
+      setUsageSummary(summary)
+    } catch {
+      setUsageSummary([])
+      setUsageError('Usage unavailable.')
+    } finally {
+      setUsageLoading(false)
+    }
+  }
 
   const loadAnalytics = async () => {
     setLoading(true)
@@ -461,6 +500,52 @@ export default function AnalyticsPage() {
 
               {/* Sidebar */}
               <div className="space-y-6">
+                {/* AI usage */}
+                <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-4 shadow-sm">
+                  <h3 className="font-display text-lg text-[var(--text-primary)] mb-2">AI usage</h3>
+                  <p className="text-xs text-[var(--text-tertiary)] mb-4">Token totals for the selected range.</p>
+
+                  {usageLoading ? (
+                    <div className="space-y-3">
+                      <div className="h-6 rounded bg-[var(--bg-tertiary)] animate-pulse" />
+                      <div className="h-4 rounded bg-[var(--bg-tertiary)] animate-pulse" />
+                      <div className="h-4 rounded bg-[var(--bg-tertiary)] animate-pulse" />
+                    </div>
+                  ) : usageError ? (
+                    <p className="text-sm text-[var(--text-tertiary)]">{usageError}</p>
+                  ) : usageSummary.length === 0 ? (
+                    <p className="text-sm text-[var(--text-tertiary)]">No usage recorded yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm text-[var(--text-secondary)]">Total</span>
+                        <span className="font-mono text-sm text-[var(--text-primary)]">
+                          {usageSummary.reduce((sum, r) => sum + (r.total_tokens || 0), 0).toLocaleString()} tokens
+                        </span>
+                      </div>
+
+                      <div className="h-px bg-[var(--border-light)]" />
+
+                      {usageSummary.slice(0, 5).map((row) => (
+                        <div key={`${row.provider}::${row.model || ''}`} className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm text-[var(--text-primary)] truncate">
+                              {row.provider}{row.model ? ` · ${row.model}` : ''}
+                            </p>
+                            <p className="text-xs text-[var(--text-tertiary)]">{Number(row.calls || 0).toLocaleString()} call(s)</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-sm text-[var(--text-primary)]">
+                              {Number(row.total_tokens || 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-[var(--text-tertiary)]">tokens</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Top referrers */}
                 <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-4 shadow-sm">
                   <h3 className="font-display text-lg text-[var(--text-primary)] mb-4">Top sources</h3>
