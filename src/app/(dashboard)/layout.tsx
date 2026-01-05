@@ -26,6 +26,13 @@ export default function DashboardLayout({
   const supabase = createClient()
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hostname.startsWith('www.')) {
+      const nextHost = window.location.hostname.replace(/^www\./, '')
+      const nextUrl = `${window.location.protocol}//${nextHost}${window.location.pathname}${window.location.search}${window.location.hash}`
+      window.location.replace(nextUrl)
+      return
+    }
+
     loadUserAndProfile()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
