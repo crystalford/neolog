@@ -19,6 +19,9 @@ export type Profile = {
 export type Post = {
   id: string
   author_id: string
+
+  // Publication
+  publication_id?: string | null
   
   // Forking
   forked_from_id: string | null

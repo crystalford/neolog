@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 import { ShareDraftButton } from '@/components/ShareDraftButton'
 import { BulkPostActions } from '@/components/BulkPostActions'
 import type { Post, Profile } from '@/types/database'
@@ -57,6 +58,12 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData()
     loadUsage()
+
+    const unsubscribe = onSelectedPublicationIdChange(() => {
+      loadData()
+    })
+
+    return unsubscribe
   }, [])
 
   const loadData = async () => {
@@ -77,11 +84,18 @@ export default function DashboardPage() {
     setProfile(profileData)
 
     // Load posts
-    const { data: postsData } = await supabase
+    const selectedPublicationId = readSelectedPublicationId()
+    let postsQuery = supabase
       .from('posts')
       .select('*')
       .eq('author_id', session.user.id)
       .order('updated_at', { ascending: false })
+
+    if (selectedPublicationId) {
+      postsQuery = postsQuery.eq('publication_id', selectedPublicationId)
+    }
+
+    const { data: postsData } = await postsQuery
     
     setPosts(postsData || [])
 
