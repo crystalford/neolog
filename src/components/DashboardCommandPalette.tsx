@@ -29,7 +29,7 @@ export function DashboardCommandPalette({
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const isModifier = event.metaKey || event.ctrlKey
-      if (isModifier && event.key.toLowerCase() === 'k') {
+      if (isModifier && event.key === '/') {
         event.preventDefault()
         onOpen()
       }
@@ -104,7 +104,7 @@ export function DashboardCommandPalette({
         </div>
         <div className="px-4 py-3 border-t border-[var(--border-light)] text-xs text-[var(--text-tertiary)] flex flex-wrap items-center gap-4">
           <span>Shortcuts</span>
-          <span>Ctrl+K · Open switcher</span>
+          <span>Ctrl+/ · Open switcher</span>
           <span>Ctrl+N · New post</span>
           <span>Esc · Close</span>
         </div>

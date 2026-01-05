@@ -11,6 +11,7 @@ import {
   PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
+import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 
 export default function DashboardLayout({
   children,
@@ -21,6 +22,7 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
+  const [captureOpen, setCaptureOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -53,6 +55,22 @@ export default function DashboardLayout({
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const isModifier = event.metaKey || event.ctrlKey
+
+      // Quick capture
+      if (isModifier && event.key.toLowerCase() === 'k') {
+        const target = event.target as HTMLElement | null
+        const tag = target?.tagName?.toLowerCase()
+        const isEditable =
+          tag === 'input' ||
+          tag === 'textarea' ||
+          (target?.getAttribute('contenteditable') ?? '') === 'true'
+        if (isEditable) return
+
+        event.preventDefault()
+        setCaptureOpen(true)
+        return
+      }
+
       if (isModifier && event.key.toLowerCase() === 'n') {
         event.preventDefault()
         router.push('/write')
@@ -329,11 +347,11 @@ export default function DashboardLayout({
             </div>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setCommandOpen(true)}
+                onClick={() => setCaptureOpen(true)}
                 className="hidden md:inline-flex btn btn-secondary btn-sm"
               >
-                <Command size={14} />
-                Quick switch
+                <Zap size={14} />
+                Quick capture
                 <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl K</span>
               </button>
               <button
@@ -342,6 +360,21 @@ export default function DashboardLayout({
                 aria-label="Quick switch"
               >
                 <Command size={16} />
+              </button>
+              <button
+                onClick={() => setCaptureOpen(true)}
+                className="inline-flex md:hidden items-center justify-center w-8 h-8 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                aria-label="Quick capture"
+              >
+                <Zap size={16} />
+              </button>
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="hidden md:inline-flex btn btn-secondary btn-sm"
+              >
+                <Command size={14} />
+                Quick switch
+                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl /</span>
               </button>
               <Link
                 href="/write"
@@ -389,6 +422,8 @@ export default function DashboardLayout({
         onClose={() => setCommandOpen(false)}
         onOpen={() => setCommandOpen(true)}
       />
+
+      <QuickCaptureModal isOpen={captureOpen} onClose={() => setCaptureOpen(false)} />
     </div>
   )
 }
