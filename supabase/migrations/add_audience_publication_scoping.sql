@@ -322,11 +322,11 @@ begin
       and tablename = 'subscriptions'
       and policyname = 'subscriptions_select_own'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriptions_select_own
         on public.subscriptions for select
         using (auth.uid() = subscriber_id or auth.uid() = creator_id)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -336,7 +336,7 @@ begin
       and tablename = 'subscriptions'
       and policyname = 'subscriptions_insert_own'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriptions_insert_own
         on public.subscriptions for insert
         with check (
@@ -351,7 +351,7 @@ begin
             )
           )
         )
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -361,12 +361,12 @@ begin
       and tablename = 'subscriptions'
       and policyname = 'subscriptions_update_own'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriptions_update_own
         on public.subscriptions for update
         using (auth.uid() = subscriber_id or auth.uid() = creator_id)
         with check (auth.uid() = subscriber_id or auth.uid() = creator_id)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -376,11 +376,11 @@ begin
       and tablename = 'subscriptions'
       and policyname = 'subscriptions_delete_own'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriptions_delete_own
         on public.subscriptions for delete
         using (auth.uid() = subscriber_id)
-    $$;
+    $policy$;
   end if;
 end;
 $$;
@@ -396,7 +396,7 @@ begin
       and tablename = 'email_subscribers'
       and policyname = 'email_subscribers_manage_creator'
   ) then
-    execute $$
+    execute $policy$
       create policy email_subscribers_manage_creator
         on public.email_subscribers for all
         using (
@@ -423,7 +423,7 @@ begin
             )
           )
         )
-    $$;
+    $policy$;
   end if;
 end;
 $$;
@@ -440,7 +440,7 @@ begin
       and tablename = 'subscriber_notes'
       and policyname = 'subscriber_notes_manage_creator'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriber_notes_manage_creator
         on public.subscriber_notes for all
         using (
@@ -467,7 +467,7 @@ begin
             )
           )
         )
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -477,7 +477,7 @@ begin
       and tablename = 'subscriber_tags'
       and policyname = 'subscriber_tags_manage_creator'
   ) then
-    execute $$
+    execute $policy$
       create policy subscriber_tags_manage_creator
         on public.subscriber_tags for all
         using (
@@ -504,7 +504,7 @@ begin
             )
           )
         )
-    $$;
+    $policy$;
   end if;
 end;
 $$;
@@ -520,11 +520,11 @@ begin
       and tablename = 'referral_programs'
       and policyname = 'referral_programs_select_active'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_programs_select_active
         on public.referral_programs for select
         using (auth.uid() is not null and is_active = true)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -534,7 +534,7 @@ begin
       and tablename = 'referral_programs'
       and policyname = 'referral_programs_manage_creator'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_programs_manage_creator
         on public.referral_programs for all
         using (
@@ -561,7 +561,7 @@ begin
             )
           )
         )
-    $$;
+    $policy$;
   end if;
 end;
 $$;
@@ -578,11 +578,11 @@ begin
       and tablename = 'referral_links'
       and policyname = 'referral_links_select_own'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_links_select_own
         on public.referral_links for select
         using (auth.uid() = referrer_id)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -592,11 +592,11 @@ begin
       and tablename = 'referral_links'
       and policyname = 'referral_links_insert_own'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_links_insert_own
         on public.referral_links for insert
         with check (auth.uid() = referrer_id)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -606,11 +606,11 @@ begin
       and tablename = 'referral_links'
       and policyname = 'referral_links_delete_own'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_links_delete_own
         on public.referral_links for delete
         using (auth.uid() = referrer_id)
-    $$;
+    $policy$;
   end if;
 
   if not exists (
@@ -620,7 +620,7 @@ begin
       and tablename = 'referral_conversions'
       and policyname = 'referral_conversions_select_referrer'
   ) then
-    execute $$
+    execute $policy$
       create policy referral_conversions_select_referrer
         on public.referral_conversions for select
         using (
@@ -631,7 +631,7 @@ begin
               and rl.referrer_id = auth.uid()
           )
         )
-    $$;
+    $policy$;
   end if;
 end;
 $$;
