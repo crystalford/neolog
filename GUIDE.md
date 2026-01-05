@@ -167,6 +167,10 @@ Before deploying, you need to add your secret keys.
 | `NEXT_PUBLIC_APP_URL` | `https://your-project-name.vercel.app` (you'll update this later) |
 | `CRON_SECRET` | Make up a random string (like `my-secret-cron-key-12345`) |
 
+Notes:
+- `SUPABASE_SERVICE_ROLE_KEY` is required for server-side automation endpoints (headless inbox webhook, automation triggers, and cron RSS pull).
+- `CRON_SECRET` protects scheduled `/api/cron/*` routes.
+
 3. Now click **Deploy**
 4. Wait 2-3 minutes for it to build
 
@@ -197,6 +201,22 @@ Before deploying, you need to add your secret keys.
 4. Check your email for a confirmation link
 5. Click the link
 6. You should be logged in!
+
+---
+
+## (Optional) PHASE 6: Headless Inbox Webhook (Automations)
+
+If you want to send links/articles into your Neolog Inbox from external tools (Zapier/n8n/custom scripts):
+
+1. In Neolog dashboard: Settings → create an "Automation API key"
+2. Send a request:
+
+```bash
+curl -X POST https://YOUR_DOMAIN.com/api/inbox/webhook \
+   -H "Authorization: Bearer neo_..." \
+   -H "Content-Type: application/json" \
+   -d '{"title":"Interesting link","canonicalUrl":"https://example.com"}'
+```
 
 ### 5.3 Test Creating a Post
 1. Click "Write" or the pen icon

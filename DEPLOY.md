@@ -67,6 +67,10 @@ NEXT_PUBLIC_APP_URL=https://yourdomain.com
 CRON_SECRET=xxxxx
 ```
 
+Notes:
+- `SUPABASE_SERVICE_ROLE_KEY` is required for server-side automation endpoints (headless inbox webhook, automation triggers, and cron RSS pull).
+- `CRON_SECRET` is required to secure `/api/cron/*` routes.
+
 ## Vercel Deployment
 
 ### 1. Deploy
@@ -90,16 +94,41 @@ CRON_SECRET=xxxxx
         "schedule": "*/5 * * * *"
       },
       {
-        "path": "/api/cron/weekly-digest",
-        "schedule": "0 10 * * 0"
+        "path": "/api/cron/rss-pull",
+        "schedule": "*/30 * * * *"
       },
       {
-        "path": "/api/webmention/verify",
-        "schedule": "0 * * * *"
+        "path": "/api/cron/weekly-digest",
+        "schedule": "0 9 * * 0"
       }
     ]
   }
   ```
+
+## Headless Inbox Webhook (Automation)
+
+Neolog supports API-key authenticated ingestion into a user's Inbox. Create an "Automation API key" in the dashboard settings, then call:
+
+- `POST /api/inbox/webhook`
+  - Auth header: `Authorization: Bearer neo_...`
+  - Body (example):
+    ```json
+    {
+      "sourceType": "webhook",
+      "title": "Interesting link",
+      "canonicalUrl": "https://example.com/article",
+      "sourceUrl": "https://example.com/article",
+      "rawData": { "tags": ["ai", "writing"] }
+    }
+    ```
+
+## Automation Trigger Endpoint
+
+API-key authenticated trigger endpoint (same Automation API key as above):
+
+- `POST /api/automation/trigger`
+  - `{"event":"inbox.create", ...}` (creates an inbox item)
+  - `{"event":"rss.pull"}` (pulls RSS sources for that key's user)
 
 ### 3. Make Yourself Admin
 ```sql

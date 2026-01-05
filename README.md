@@ -162,6 +162,9 @@ See `supabase-schema.sql` for the complete schema including:
 | `/api/export` | GET | Export data |
 | `/api/feeds/global` | GET | Global RSS/Atom/JSON |
 | `/[username]/feed` | GET | Per-author RSS/Atom/JSON |
+| `/api/inbox/webhook` | POST | Headless inbox ingestion (API key) |
+| `/api/automation/trigger` | POST | Automation triggers (API key) |
+| `/api/cron/rss-pull` | GET | Server-side RSS pull into inbox (cron) |
 
 ## Environment Variables
 
@@ -169,11 +172,26 @@ See `supabase-schema.sql` for the complete schema including:
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | No | For admin operations |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | For admin operations (required for automation/webhooks/cron) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Your domain |
 | `RESEND_API_KEY` | Yes | For email sending |
 | `EMAIL_FROM` | No | Sender address |
 | `WEBSUB_HUB_URL` | No | WebSub hub for RSS push |
+| `CRON_SECRET` | No | Secures `/api/cron/*` endpoints |
+
+## Automation (Headless Ingestion)
+
+Create an "Automation API key" in the dashboard settings, then call the webhook:
+
+- `POST /api/inbox/webhook`
+    - Header: `Authorization: Bearer neo_...`
+    - JSON body accepts: `sourceType`, `title`, `canonicalUrl`, `sourceUrl`, `rawData`
+
+Or use the trigger endpoint:
+
+- `POST /api/automation/trigger`
+    - `{"event":"inbox.create", ...}`
+    - `{"event":"rss.pull"}`
 
 ## Roadmap
 
