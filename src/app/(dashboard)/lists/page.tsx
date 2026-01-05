@@ -69,13 +69,13 @@ export default function ListsPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
+      <main className="pt-14 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="flex items-center justify-between pt-8 mb-8">
+          <div className="flex items-center justify-between pt-6 mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
-                <List size={24} className="text-[var(--accent)]" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
+                <List size={20} className="text-[var(--accent)]" />
               </div>
               <div>
                 <h1 className="font-display text-3xl">Reading Lists</h1>
@@ -110,11 +110,11 @@ export default function ListsPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {lists.map((list) => (
                 <div 
                   key={list.id}
-                  className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                  className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <Link href={`/lists/${list.id}`} className="flex-1">

@@ -106,12 +106,12 @@ export default function DashboardLayout({
       ],
     },
     {
-      title: 'Growth',
+      title: 'Distribution',
       items: [
         { href: '/analytics', icon: BarChart3, label: 'Analytics' },
-        { href: '/syndication', icon: Radio, label: 'Syndication' },
-        { href: '/sources', icon: Globe, label: 'Sources' },
-        { href: '/inbox', icon: Mail, label: 'Inbox' },
+        { href: '/syndication', icon: Radio, label: 'Outputs' },
+        { href: '/sources', icon: Globe, label: 'Inputs' },
+        { href: '/inbox', icon: Mail, label: 'Queue' },
         { href: '/referrals', icon: Gift, label: 'Referrals' },
         { href: '/boost', icon: Zap, label: 'Boost' },
       ],

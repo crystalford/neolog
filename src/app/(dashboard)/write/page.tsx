@@ -725,7 +725,7 @@ export default function WritePage() {
   // Publish
   const handlePublish = async () => {
     if (!user || !title || (postType === 'post' && !content)) {
-      setError('Please add a title and content before publishing')
+      setError('Add a title and content before publishing.')
       return
     }
 
@@ -747,7 +747,7 @@ export default function WritePage() {
 
     const missingRequired = preflight.filter((item) => item.required && !item.ok)
     if (missingRequired.length > 0) {
-      setError('Add a longer title and some content before publishing.')
+      setError('Add a longer title and more content before publishing.')
       return
     }
 
@@ -1081,7 +1081,7 @@ export default function WritePage() {
                 className="btn btn-ghost btn-sm"
               >
                 <Settings size={14} />
-                Publish settings
+                Publish options
               </button>
               {postId && (
                 <button
@@ -1130,7 +1130,7 @@ export default function WritePage() {
                 <div>
                   <h3 className="font-display text-lg">Import HTML</h3>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    Upload an HTML file or paste raw HTML to convert it into a post.
+                    Paste HTML or upload a file to create a draft.
                   </p>
                 </div>
                 <button
@@ -1167,7 +1167,7 @@ export default function WritePage() {
                     />
                   </label>
                   <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                    Tip: HTML with inline CSS works best. External assets may need absolute URLs.
+                    Tip: Inline CSS works best. Use absolute URLs for assets.
                   </p>
                 </div>
                 <div>
@@ -1201,7 +1201,7 @@ export default function WritePage() {
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                       Publish
                     </p>
-                    <h2 className="font-display text-xl">Post settings</h2>
+                    <h2 className="font-display text-xl">Publish options</h2>
                   </div>
                   <button
                     onClick={() => setShowSettings(false)}
@@ -1219,24 +1219,24 @@ export default function WritePage() {
                       <span>{getWordCount(content).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
-                      <span>Reading time</span>
+                      <span>Read time</span>
                       <span>{calculateReadingTime(content)} min</span>
                     </div>
                     <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
-                      <span>Editor</span>
+                      <span>Mode</span>
                       <span>{htmlMode ? 'HTML' : 'Visual'}</span>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Cover image URL
+                      Cover image
                     </label>
                     <input
                       type="url"
                       value={coverImage}
                       onChange={(e) => setCoverImage(e.target.value)}
-                      placeholder="https://..."
+                      placeholder="Paste image URL"
                       className="input"
                     />
                     <div className="flex items-center gap-3 mt-3">
@@ -1301,7 +1301,7 @@ export default function WritePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Daily brief video
+                      Video brief
                     </label>
                     <p className="text-xs text-[var(--text-tertiary)] mb-3">
                       Generate a 60-90 second script for HeyGen or Synthesia.
@@ -1373,7 +1373,7 @@ export default function WritePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Status
+                      Publish status
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {([
@@ -1401,11 +1401,11 @@ export default function WritePage() {
                         </button>
                       ))}
                     </div>
-                    {existingStatus === 'published' && (
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                        Published posts stay live. Use Update to publish revisions.
-                      </p>
-                    )}
+                  {existingStatus === 'published' && (
+                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                      Published posts stay live. Use Update to push revisions.
+                    </p>
+                  )}
                   </div>
 
                   <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
@@ -1425,7 +1425,7 @@ export default function WritePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Schedule publish
+                      Schedule time
                     </label>
                     <input
                       type="datetime-local"
@@ -1434,6 +1434,11 @@ export default function WritePage() {
                       disabled={existingStatus === 'published' || resolvedIntent !== 'schedule'}
                       className="input"
                     />
+                    {resolvedIntent !== 'schedule' && (
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                        Choose Schedule to set a publish time.
+                      </p>
+                    )}
                     {existingStatus === 'published' && (
                       <p className="text-xs text-[var(--text-tertiary)] mt-2">
                         Scheduling is only available for drafts.
@@ -1695,7 +1700,7 @@ export default function WritePage() {
                   {publishLabel} post
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
-                  Confirm the details before you {publishLabel.toLowerCase()}.
+                  Review the details before you {publishLabel.toLowerCase()}.
                 </p>
                 <div className="space-y-3 text-sm text-[var(--text-secondary)]">
                   <div className="flex items-center justify-between">
@@ -1718,7 +1723,7 @@ export default function WritePage() {
                   </div>
                   {resolvedIntent === 'schedule' && scheduledAt && (
                     <div className="flex items-center justify-between">
-                      <span>Schedule time</span>
+                      <span>Scheduled for</span>
                       <span className="text-[var(--text-primary)] font-medium">
                         {new Date(scheduledAt).toLocaleString()}
                       </span>

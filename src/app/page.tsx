@@ -3,9 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import {
-  Code, Eye, Terminal, FileDown, Zap, Layout,
-  ArrowRight, Upload, Sparkles, GitFork, Radio,
-  TrendingUp, Users, BookOpen, PenLine
+  Code, Eye, Terminal, FileDown,
+  ArrowRight, Sparkles, GitFork, Radio,
+  PenLine, Inbox, Share2, BarChart3, Globe
 } from 'lucide-react'
 
 async function getFeaturedPosts() {
@@ -129,6 +129,81 @@ export default async function Home() {
                 <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Workflows */}
+        <section className="px-6 lg:px-12 pb-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
+                <h2 className="font-display text-2xl text-[var(--text-primary)]">Start with the task</h2>
+              </div>
+              <Link
+                href="/dashboard"
+                className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                Open dashboard
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                {
+                  label: 'Create post',
+                  description: 'Open the editor and start writing.',
+                  href: '/write',
+                  icon: PenLine,
+                },
+                {
+                  label: 'Review inbox',
+                  description: 'Convert incoming drafts into posts.',
+                  href: '/inbox',
+                  icon: Inbox,
+                },
+                {
+                  label: 'Connect sources',
+                  description: 'Add RSS feeds and sync items.',
+                  href: '/sources',
+                  icon: Globe,
+                },
+                {
+                  label: 'Distribution pack',
+                  description: 'Generate threads + copies.',
+                  href: '/dashboard',
+                  icon: Share2,
+                },
+                {
+                  label: 'Analytics snapshot',
+                  description: 'Track reader engagement.',
+                  href: '/analytics',
+                  icon: BarChart3,
+                },
+                {
+                  label: 'Explore posts',
+                  description: 'See what the community is publishing.',
+                  href: '/explore',
+                  icon: Sparkles,
+                },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-secondary)]/60 transition-colors"
+                  >
+                    <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                      <Icon size={16} className="text-[var(--text-secondary)]" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         </section>
 

@@ -103,13 +103,13 @@ export default function HistoryPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
+      <main className="pt-14 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="flex items-center justify-between pt-8 mb-8">
+          <div className="flex items-center justify-between pt-6 mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
-                <History size={24} className="text-[var(--accent)]" />
+              <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
+                <History size={20} className="text-[var(--accent)]" />
               </div>
               <div>
                 <h1 className="font-display text-3xl">Reading History</h1>
@@ -149,7 +149,7 @@ export default function HistoryPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {Object.entries(groupedPosts).map(([date, items]) => (
                 <div key={date}>
                   <h2 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">
@@ -161,17 +161,17 @@ export default function HistoryPage() {
                       <Link
                         key={post.post_id}
                         href={`/${post.author_username}/${post.slug}`}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors group"
+                        className="flex items-center gap-4 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors group"
                       >
                         {/* Cover or progress */}
                         {post.cover_image_url ? (
                           <img 
                             src={post.cover_image_url}
                             alt=""
-                            className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                          <div className="w-14 h-14 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
                             {post.completed ? (
                               <Check size={24} className="text-[var(--success)]" />
                             ) : (

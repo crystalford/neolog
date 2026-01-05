@@ -137,7 +137,7 @@ export function PublicationsManager() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-6 space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -173,29 +173,29 @@ export function PublicationsManager() {
           </button>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {publications.map(pub => (
-            <div
-              key={pub.id}
-              className="group relative p-6 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-lg transition-all"
-            >
-              {/* Cover/Logo */}
-              <div className="mb-4">
-                {pub.logo_url ? (
-                  <img
-                    src={pub.logo_url}
-                    alt={pub.name}
-                    className="w-16 h-16 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div
-                    className="w-16 h-16 rounded-lg flex items-center justify-center font-display font-bold text-2xl text-white"
-                    style={{ backgroundColor: pub.primary_color }}
-                  >
-                    {pub.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {publications.map(pub => (
+          <div
+            key={pub.id}
+            className="group relative p-5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-lg transition-all"
+          >
+            {/* Cover/Logo */}
+            <div className="mb-4">
+              {pub.logo_url ? (
+                <img
+                  src={pub.logo_url}
+                  alt={pub.name}
+                  className="w-14 h-14 rounded-lg object-cover"
+                />
+              ) : (
+                <div
+                  className="w-14 h-14 rounded-lg flex items-center justify-center font-display font-bold text-xl text-white"
+                  style={{ backgroundColor: pub.primary_color }}
+                >
+                  {pub.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
 
               {/* Info */}
               <div className="mb-4">
@@ -211,17 +211,17 @@ export function PublicationsManager() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-[var(--border-light)]">
+              <div className="grid grid-cols-3 gap-3 mb-3 pb-3 border-b border-[var(--border-light)]">
                 <div>
-                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_posts}</p>
+                  <p className="text-lg font-semibold text-[var(--text-primary)] leading-tight">{pub.total_posts}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
                 </div>
                 <div>
-                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_subscribers}</p>
+                  <p className="text-lg font-semibold text-[var(--text-primary)] leading-tight">{pub.total_subscribers}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
                 </div>
                 <div>
-                  <p className="text-xl font-semibold text-[var(--text-primary)] leading-tight">{pub.total_views}</p>
+                  <p className="text-lg font-semibold text-[var(--text-primary)] leading-tight">{pub.total_views}</p>
                   <p className="text-xs text-[var(--text-tertiary)]">Views</p>
                 </div>
               </div>
