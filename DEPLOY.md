@@ -167,6 +167,11 @@ Delete a test account (and cascade-delete its posts/content) using the service r
 - Command: `npm run delete:user -- <username> --yes`
 - Requires env vars: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 
+If your database permissions block username lookup, delete by user id instead:
+
+- Find the user's UID in Supabase → Authentication → Users
+- Command: `npm run delete:user:id -- <userId> --yes`
+
 ## Optional Enhancements
 
 - [ ] Set up Sentry for error tracking
