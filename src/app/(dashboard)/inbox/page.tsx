@@ -123,7 +123,7 @@ export default function InboxPage() {
     }
 
     await updateStatus(item.id, 'imported')
-    router.push(`/write-edit=${post.id}`)
+    router.push(`/write?edit=${post.id}`)
   }
 
   const visibleItems = items.filter((item) => item.status === 'new')
@@ -173,9 +173,9 @@ export default function InboxPage() {
             New items ({visibleItems.length})
           </p>
         </div>
-        {loading - (
+        {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading inbox...</div>
-        ) : visibleItems.length === 0 - (
+        ) : visibleItems.length === 0 ? (
           <div className="p-6 text-sm text-[var(--text-tertiary)]">No new items yet.</div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
