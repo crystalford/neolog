@@ -140,6 +140,22 @@ export async function POST(request: NextRequest) {
       : (post as any).author
     const authorUsername = authorProfile?.username || 'unknown'
     const link = `${BASE_URL}/${authorUsername}/${post.slug}`
+    const mediumHtml = [
+      `<p><em>Originally published at <a href="${link}">${link}</a></em></p>`,
+      post.content_html || post.content || '',
+    ].join('\n')
+    const devtoMarkdown = [
+      `> Originally published at ${link}`,
+      '',
+      `# ${post.title}`,
+      '',
+      summary,
+      '',
+      '## Key takeaways',
+      sentenceList.map((s) => `- ${s}`).join('\n'),
+      '',
+      `Read more: ${link}`,
+    ].join('\n')
 
     const hooks = [
       `Most people miss this in "${post.title}":`,
@@ -150,8 +166,11 @@ export async function POST(request: NextRequest) {
     ]
 
     const threadBody = chunkText(`${hooks[0]} ${summary}`, 260)
+    const shortThread = chunkText(`${hooks[0]} ${summary}`, 280).join('\n\n')
     return {
       x_thread: [...threadBody, `Full post: ${link}`],
+      threads_post: shortThread,
+      bluesky_post: shortThread.slice(0, 280),
       linkedin_post: [
         post.title,
         '',
@@ -171,6 +190,8 @@ export async function POST(request: NextRequest) {
         `Source: ${link}`,
       ].join('\n'),
       hooks,
+      medium_html: mediumHtml,
+      devto_markdown: devtoMarkdown,
       model: 'fallback',
       link,
     }
@@ -202,10 +223,13 @@ export async function POST(request: NextRequest) {
         {
           role: 'user',
           content: [
-            'Return JSON with keys: x_thread (array of 4-6 tweets), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5).',
+            'Return JSON with keys: x_thread (array of 4-6 tweets), threads_post (string), bluesky_post (string), linkedin_post (string), reddit_title, reddit_body, hooks (array of 5), medium_html (string), devto_markdown (string).',
             'X thread: start with a strong hook, keep each tweet under 260 chars, end with the link.',
             'LinkedIn: 1-sentence hook, 2-3 bullet takeaways, short CTA with link.',
             'Reddit: neutral tone, include TL;DR + bullets + link.',
+            'Threads/Bluesky: a short 1-2 paragraph post with the link on a new line.',
+            'Medium HTML: include an opening line that links back to the canonical URL.',
+            'Dev.to Markdown: include a short summary, bullet takeaways, and the link.',
             profile?.context_md ? `Writer context:\n${profile.context_md}` : '',
             `Post title: ${post.title}`,
             `Subtitle: ${post.subtitle || ''}`,
@@ -227,10 +251,14 @@ export async function POST(request: NextRequest) {
       const parsed = JSON.parse(content)
       return {
         x_thread: Array.isArray(parsed.x_thread) ? parsed.x_thread : [],
+        threads_post: String(parsed.threads_post || ''),
+        bluesky_post: String(parsed.bluesky_post || ''),
         linkedin_post: String(parsed.linkedin_post || ''),
         reddit_title: String(parsed.reddit_title || post.title),
         reddit_body: String(parsed.reddit_body || ''),
         hooks: Array.isArray(parsed.hooks) ? parsed.hooks : [],
+        medium_html: String(parsed.medium_html || ''),
+        devto_markdown: String(parsed.devto_markdown || ''),
         model,
         link,
       }
@@ -250,11 +278,15 @@ export async function POST(request: NextRequest) {
       author_id: post.author_id,
       status: 'ready',
       x_thread: pack.x_thread,
+      threads_post: pack.threads_post || '',
+      bluesky_post: pack.bluesky_post || '',
       linkedin_post: pack.linkedin_post,
       reddit_title: pack.reddit_title,
       reddit_body: pack.reddit_body,
       hooks: pack.hooks,
       og_image_url,
+      medium_html: pack.medium_html || '',
+      devto_markdown: pack.devto_markdown || '',
       model: pack.model,
       error_message: null,
     }

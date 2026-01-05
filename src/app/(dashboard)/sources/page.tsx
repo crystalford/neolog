@@ -139,6 +139,9 @@ export default function SourcesPage() {
         <p className="text-sm text-[var(--text-secondary)] mt-1">
           Connect RSS feeds to populate your inbox automatically. Fetching runs in the background, or trigger it manually.
         </p>
+        <p className="text-xs text-[var(--text-tertiary)] mt-2">
+          Auto-pull uses the RSS fetch endpoint (<span className="font-mono">/api/sources/rss/fetch</span>) when you wire a scheduled job.
+        </p>
       </div>
 
       {error && (

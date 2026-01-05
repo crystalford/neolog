@@ -70,7 +70,7 @@ export default function WritePage() {
   const [packLoading, setPackLoading] = useState(false)
   const [packError, setPackError] = useState<string | null>(null)
   const [pack, setPack] = useState<any>(null)
-  const [packTab, setPackTab] = useState<'x' | 'linkedin' | 'reddit' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
+  const [packTab, setPackTab] = useState<'x' | 'threads' | 'bluesky' | 'linkedin' | 'reddit' | 'medium' | 'devto' | 'hooks' | 'og' | 'markdown' | 'html'>('x')
   const [commentUrl, setCommentUrl] = useState('')
   const [commentLoading, setCommentLoading] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
@@ -1812,8 +1812,12 @@ export default function WritePage() {
                 <div className="flex flex-wrap gap-2 mb-4">
                   {([
                     { id: 'x', label: 'X Thread' },
+                    { id: 'threads', label: 'Threads' },
+                    { id: 'bluesky', label: 'Bluesky' },
                     { id: 'linkedin', label: 'LinkedIn' },
                     { id: 'reddit', label: 'Reddit' },
+                    { id: 'medium', label: 'Medium' },
+                    { id: 'devto', label: 'Dev.to' },
                     { id: 'hooks', label: 'Hooks' },
                     { id: 'markdown', label: 'Markdown' },
                     { id: 'html', label: 'HTML' },
@@ -1872,6 +1876,36 @@ export default function WritePage() {
                         </button>
                       </div>
                     )}
+                    {packTab === 'threads' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[180px]"
+                          value={pack.threads_post || ''}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(pack.threads_post || '')}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy Threads
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'bluesky' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[180px]"
+                          value={pack.bluesky_post || ''}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(pack.bluesky_post || '')}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy Bluesky
+                        </button>
+                      </div>
+                    )}
                     {packTab === 'linkedin' && (
                       <div>
                         <textarea
@@ -1896,6 +1930,36 @@ export default function WritePage() {
                           className="btn btn-secondary btn-sm"
                         >
                           Copy Reddit
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'medium' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[200px]"
+                          value={pack.medium_html || ''}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(pack.medium_html || '')}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy Medium HTML
+                        </button>
+                      </div>
+                    )}
+                    {packTab === 'devto' && (
+                      <div>
+                        <textarea
+                          className="input min-h-[200px]"
+                          value={pack.devto_markdown || ''}
+                          readOnly
+                        />
+                        <button
+                          onClick={() => copyPack(pack.devto_markdown || '')}
+                          className="mt-3 btn btn-secondary btn-sm"
+                        >
+                          Copy Dev.to Markdown
                         </button>
                       </div>
                     )}

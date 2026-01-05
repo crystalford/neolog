@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [scheduleTarget, setScheduleTarget] = useState<Post | null>(null)
   const [scheduleDraft, setScheduleDraft] = useState('')
   const [analyticsPost, setAnalyticsPost] = useState<Post | null>(null)
+  const [healthSelectedIds, setHealthSelectedIds] = useState<string[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -273,6 +274,23 @@ export default function DashboardPage() {
     .sort((a, b) => a.score - b.score)
     .slice(0, 5)
 
+  const allHealthSelected =
+    healthQueue.length > 0 &&
+    healthQueue.every((item) => healthSelectedIds.includes(item.post.id))
+
+  const handleBulkRevive = () => {
+    if (healthSelectedIds.length === 0) return
+    if (typeof window === 'undefined') return
+    healthSelectedIds.forEach((id) => {
+      window.open(`/write?edit=${id}&revive=1`, '_blank', 'noopener,noreferrer')
+    })
+  }
+
+  useEffect(() => {
+    const queueIds = new Set(healthQueue.map((item) => item.post.id))
+    setHealthSelectedIds((prev) => prev.filter((id) => queueIds.has(id)))
+  }, [healthQueue])
+
   const getStatusClasses = (status: Post['status']) => {
     if (status === 'published') return 'text-[var(--success)] bg-[var(--success)]/10'
     if (status === 'scheduled') return 'text-[var(--warning)] bg-[var(--warning)]/10'
@@ -409,6 +427,27 @@ export default function DashboardPage() {
                 Posts older than 90 days with low recent views.
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (allHealthSelected) {
+                    setHealthSelectedIds([])
+                  } else {
+                    setHealthSelectedIds(healthQueue.map((item) => item.post.id))
+                  }
+                }}
+                className="btn btn-secondary btn-sm"
+              >
+                {allHealthSelected ? 'Clear' : 'Select all'}
+              </button>
+              <button
+                onClick={handleBulkRevive}
+                className="btn btn-primary btn-sm"
+                disabled={healthSelectedIds.length === 0}
+              >
+                Revive selected
+              </button>
+            </div>
           </div>
           <div className="space-y-3">
             {healthQueue.map(({ post, daysSinceUpdate, recentViews }) => (
@@ -416,11 +455,25 @@ export default function DashboardPage() {
                 key={post.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4"
               >
-                <div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={healthSelectedIds.includes(post.id)}
+                    onChange={(event) => {
+                      setHealthSelectedIds((prev) =>
+                        event.target.checked
+                          ? [...prev, post.id]
+                          : prev.filter((id) => id !== post.id)
+                      )
+                    }}
+                    className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                  <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">{post.title || 'Untitled'}</p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
                     {daysSinceUpdate} days since update - {recentViews} views in last 7d
                   </p>
+                  </div>
                 </div>
                 <Link
                   href={`/write?edit=${post.id}&revive=1`}

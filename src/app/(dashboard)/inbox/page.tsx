@@ -23,6 +23,9 @@ export default function InboxPage() {
   const [publications, setPublications] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | InboxItem['status']>('new')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [dateFilter, setDateFilter] = useState<'all' | '7' | '30'>('30')
   const router = useRouter()
   const supabase = createClient()
 
@@ -130,7 +133,17 @@ export default function InboxPage() {
     router.push(`/write?edit=${post.id}`)
   }
 
-  const visibleItems = items.filter((item) => item.status === 'new')
+  const sourceOptions = Array.from(new Set(items.map((item) => item.source_type))).sort()
+  const filteredItems = items.filter((item) => {
+    if (statusFilter !== 'all' && item.status !== statusFilter) return false
+    if (sourceFilter !== 'all' && item.source_type !== sourceFilter) return false
+    if (dateFilter !== 'all') {
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - Number(dateFilter))
+      if (new Date(item.created_at) < cutoff) return false
+    }
+    return true
+  })
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
@@ -176,19 +189,54 @@ export default function InboxPage() {
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
         <div className="px-4 py-2 border-b border-[var(--border-light)]">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-            New items ({visibleItems.length})
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+              Inbox ({filteredItems.length})
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                className="input h-8 text-xs"
+              >
+                <option value="all">All statuses</option>
+                <option value="new">New</option>
+                <option value="imported">Imported</option>
+                <option value="ignored">Ignored</option>
+              </select>
+              <select
+                value={sourceFilter}
+                onChange={(event) => setSourceFilter(event.target.value)}
+                className="input h-8 text-xs"
+              >
+                <option value="all">All sources</option>
+                {sourceOptions.map((source) => (
+                  <option key={source} value={source}>
+                    {source.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}
+                className="input h-8 text-xs"
+              >
+                <option value="all">All time</option>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+              </select>
+            </div>
+          </div>
         </div>
         {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading inbox...</div>
-        ) : visibleItems.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="p-6 text-sm text-[var(--text-tertiary)]">
-            No new items yet. Add RSS feeds to pull in fresh content.
+            No items match those filters.
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
-            {visibleItems.map((item) => (
+            {filteredItems.map((item) => (
               <div key={item.id} className="px-4 py-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">
@@ -202,12 +250,15 @@ export default function InboxPage() {
                       Published {new Date(item.raw_data.published_at).toLocaleDateString()}
                     </p>
                   )}
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Status: {item.status}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => convertToDraft(item)}
                     className="btn btn-primary btn-sm"
-                    disabled={convertingId === item.id}
+                    disabled={convertingId === item.id || item.status !== 'new'}
                   >
                     <FilePlus2 size={14} />
                     {convertingId === item.id ? 'Converting...' : 'Convert'}
