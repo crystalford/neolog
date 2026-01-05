@@ -14,19 +14,6 @@ const getFallbackUsername = (userId: string) =>
   `user_${userId.replace(/-/g, '').slice(0, 8)}`
 
 const buildUsername = (user: User) => {
-  const candidates = [
-    user.user_metadata?.username,
-    user.user_metadata?.preferred_username,
-    user.email?.split('@')[0],
-  ].filter(Boolean) as string[]
-
-  for (const candidate of candidates) {
-    const normalized = normalizeUsername(candidate)
-    if (normalized.length >= 3) {
-      return normalized
-    }
-  }
-
   return getFallbackUsername(user.id)
 }
 

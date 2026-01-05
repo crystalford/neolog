@@ -18,6 +18,9 @@ export default function OnboardingPage() {
   
   // Form data
   const [displayName, setDisplayName] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle')
+  const [usernameMessage, setUsernameMessage] = useState<string | null>(null)
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -46,19 +49,110 @@ export default function OnboardingPage() {
     if (profileData) {
       setProfile(profileData)
       
-      // If profile is already complete, redirect to dashboard
-      if (profileData.display_name && profileData.bio) {
+      // If onboarding already completed, go to dashboard
+      if (profileData.onboarded_at) {
         router.push('/dashboard')
         return
       }
       
       // Pre-fill existing data
       setDisplayName(profileData.display_name || '')
+      setUsername(profileData.username || '')
       setBio(profileData.bio || '')
       setAvatarUrl(profileData.avatar_url || '')
     }
 
     setLoading(false)
+  }
+
+  const RESERVED_USERNAMES = new Set([
+    'api',
+    '_next',
+    'dashboard',
+    'auth',
+    'explore',
+    'visuals',
+    'privacy',
+    'tos',
+    'search',
+    'tags',
+    'tag',
+    'unsubscribe',
+    'admin',
+    'earnings',
+    'curators',
+    'onboarding',
+    'login',
+    'signup',
+    'forgot-password',
+    'reset-password',
+    'preview',
+    'readme',
+    'roadmap',
+    'architecture',
+  ])
+
+  const normalizeUsername = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 30)
+
+  const validateUsernameLocal = (value: string) => {
+    const normalized = normalizeUsername(value)
+    if (!normalized || normalized.length < 3) {
+      return { ok: false as const, normalized, message: 'Username must be at least 3 characters.' }
+    }
+    if (RESERVED_USERNAMES.has(normalized)) {
+      return { ok: false as const, normalized, message: 'That username is reserved.' }
+    }
+    return { ok: true as const, normalized, message: null }
+  }
+
+  const checkUsernameAvailability = async (value: string) => {
+    const { ok, normalized, message } = validateUsernameLocal(value)
+    if (normalized !== value) {
+      setUsername(normalized)
+    }
+
+    if (!ok) {
+      setUsernameStatus('invalid')
+      setUsernameMessage(message)
+      return false
+    }
+
+    // If unchanged, treat as available.
+    if (profile?.username && normalized === profile.username) {
+      setUsernameStatus('available')
+      setUsernameMessage(null)
+      return true
+    }
+
+    setUsernameStatus('checking')
+    setUsernameMessage(null)
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', normalized)
+      .limit(1)
+
+    if (error) {
+      setUsernameStatus('idle')
+      setUsernameMessage('Could not check username availability.')
+      return false
+    }
+
+    const taken = Array.isArray(data) && data.length > 0
+    if (taken) {
+      setUsernameStatus('taken')
+      setUsernameMessage('That username is already taken.')
+      return false
+    }
+
+    setUsernameStatus('available')
+    setUsernameMessage(null)
+    return true
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +217,8 @@ export default function OnboardingPage() {
     if (step === 1) {
       // Validate step 1
       if (!displayName.trim()) return
+      const ok = await checkUsernameAvailability(username)
+      if (!ok) return
       setStep(2)
     } else if (step === 2) {
       setStep(3)
@@ -144,14 +240,22 @@ export default function OnboardingPage() {
       const { error } = await supabase
         .from('profiles')
         .update({
+          username: normalizeUsername(username),
           display_name: displayName,
           bio: bio || null,
           avatar_url: avatarUrl || null,
+          onboarded_at: new Date().toISOString(),
         })
         .eq('id', currentProfile.id)
 
       if (error) {
+        if ((error as any).code === '23505') {
+          setSaveError('That username is already taken.')
+        } else if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
+          setSaveError('Username must be 3–30 characters and only use a-z, 0-9, and _.')
+        } else {
         setSaveError('Unable to finish setup. Please try again.')
+        }
         setSaving(false)
         return
       }
@@ -259,6 +363,49 @@ export default function OnboardingPage() {
                   className="input text-lg py-3"
                   autoFocus
                 />
+              </div>
+
+              {/* Username */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Choose your username
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--text-tertiary)]">@</span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value)
+                      setUsernameStatus('idle')
+                      setUsernameMessage(null)
+                    }}
+                    onBlur={() => {
+                      void checkUsernameAvailability(username)
+                    }}
+                    placeholder="your_handle"
+                    className="input text-lg py-3 flex-1"
+                    inputMode="text"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                </div>
+                {(profile?.username?.startsWith('user_') || username.startsWith('user_')) && (
+                  <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+                    We created a temporary username for you — pick the one you want now.
+                  </p>
+                )}
+                <div className="mt-2 text-sm">
+                  {usernameStatus === 'checking' ? (
+                    <span className="text-[var(--text-tertiary)]">Checking availability…</span>
+                  ) : usernameMessage ? (
+                    <span className="text-red-500">{usernameMessage}</span>
+                  ) : usernameStatus === 'available' ? (
+                    <span className="text-[var(--text-secondary)]">Looks good.</span>
+                  ) : (
+                    <span className="text-[var(--text-tertiary)]">3–30 chars, a-z, 0-9, underscore.</span>
+                  )}
+                </div>
               </div>
 
               {/* Bio */}
@@ -381,7 +528,7 @@ export default function OnboardingPage() {
 
           <button
             onClick={handleNext}
-            disabled={step === 1 && !displayName.trim()}
+            disabled={step === 1 && (!displayName.trim() || usernameStatus === 'checking' || !username.trim())}
             className="btn btn-primary btn-lg"
           >
             {saving ? (
@@ -404,18 +551,6 @@ export default function OnboardingPage() {
         </div>
         {saveError && (
           <p className="mt-4 text-center text-sm text-red-500">{saveError}</p>
-        )}
-
-        {/* Skip */}
-        {step < 3 && (
-          <p className="text-center mt-6">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-            >
-              Skip for now
-            </button>
-          </p>
         )}
       </div>
     </div>

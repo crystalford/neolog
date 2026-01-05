@@ -104,13 +104,34 @@ export default function DashboardLayout({
   }
 
   const loadProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
-      .select('username, display_name, avatar_url')
+      .select('username, display_name, avatar_url, onboarded_at')
       .eq('id', userId)
       .single()
 
+    if (error) {
+      // Backward-compatible: if the column doesn't exist yet, don't block access.
+      if ((error as any).message?.includes('onboarded_at')) {
+        const { data: fallback } = await supabase
+          .from('profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', userId)
+          .single()
+
+        if (fallback) {
+          setProfile(fallback)
+        }
+        return
+      }
+      return
+    }
+
     if (data) {
+      if (!data.onboarded_at) {
+        router.push('/onboarding')
+        return
+      }
       setProfile(data)
     }
   }

@@ -22,6 +22,7 @@ create table public.profiles (
   linkedin_url text,
   context_md text,
   is_pro boolean default false,
+  onboarded_at timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 

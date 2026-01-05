@@ -11,16 +11,28 @@ export async function GET(request: Request) {
     const { data: { session } } = await supabase.auth.exchangeCodeForSession(code)
 
     if (session) {
-      // Check if this is a new user (no display_name set)
-      const { data: profile } = await supabase
+      // Users must finish onboarding (username selection etc.)
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select('display_name')
+        .select('onboarded_at')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
-      // New users go to onboarding
-      if (!profile?.display_name) {
-        return NextResponse.redirect(new URL('/onboarding', requestUrl.origin))
+      if (error && (error as any).message?.includes('onboarded_at')) {
+        // Backward-compatible fallback if the column isn't present yet.
+        const { data: legacyProfile } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (!legacyProfile?.display_name) {
+          return NextResponse.redirect(new URL('/onboarding', requestUrl.origin))
+        }
+      } else {
+        if (!profile?.onboarded_at) {
+          return NextResponse.redirect(new URL('/onboarding', requestUrl.origin))
+        }
       }
     }
   }

@@ -6,6 +6,15 @@ I've implemented a major update with **multi-publication support** (Substack-sty
 
 ## 📋 CRITICAL: Database Migration Required
 
+### 0. Run the Onboarding Marker Migration
+
+**File:** `supabase/migrations/add_onboarded_at.sql`
+
+This migration adds:
+- `profiles.onboarded_at` (used to force new OAuth users through onboarding until they pick a username)
+
+Run it the same way as the publications migration (Supabase SQL Editor or CLI).
+
 ### 1. Run the Publications Migration
 
 **File:** `supabase/migrations/add_publications.sql`
