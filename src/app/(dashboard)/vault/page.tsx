@@ -29,6 +29,7 @@ const readLastEditingPost = (): LastEditingPost | null => {
 type Asset = {
   id: string
   user_id: string
+  publication_id?: string | null
   type: 'prompt' | 'image' | 'code' | 'text' | 'link' | 'quote' | 'fragment'
   title?: string | null
   content: string
@@ -37,6 +38,12 @@ type Asset = {
   meta: any
   tags: string[]
   created_at: string
+}
+
+type Publication = {
+  id: string
+  name: string
+  slug: string
 }
 
 const ASSET_TYPES: Asset['type'][] = ['text', 'fragment', 'quote', 'prompt', 'code', 'link', 'image']
@@ -49,6 +56,16 @@ export default function VaultPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const [publications, setPublications] = useState<Publication[]>([])
+
+  const publicationNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of publications) {
+      map.set(p.id, p.name)
+    }
+    return map
+  }, [publications])
+
   const [currentDraft, setCurrentDraft] = useState<LastEditingPost | null>(null)
   const [attachingAssetId, setAttachingAssetId] = useState<string | null>(null)
 
@@ -56,11 +73,13 @@ export default function VaultPage() {
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
   const [meta, setMeta] = useState('')
+  const [newAssetPublicationId, setNewAssetPublicationId] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
   const [query, setQuery] = useState('')
 
   const [filterType, setFilterType] = useState<string>('')
+  const [filterPublicationId, setFilterPublicationId] = useState<string>('')
   const [filterTags, setFilterTags] = useState('')
   const [filterSource, setFilterSource] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
@@ -77,6 +96,7 @@ export default function VaultPage() {
 
   useEffect(() => {
     void loadAssets()
+    void loadPublications()
 
     setCurrentDraft(readLastEditingPost())
 
@@ -89,6 +109,28 @@ export default function VaultPage() {
     return () => window.removeEventListener('storage', onStorage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    void loadAssets()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterPublicationId])
+
+  const loadPublications = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session) return
+
+    const { data, error } = await supabase
+      .from('publications')
+      .select('id,name,slug')
+      .eq('owner_id', session.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
+    if (error) return
+    setPublications((data || []) as Publication[])
+  }
 
   useEffect(() => {
     if (!isSemanticQuery) {
@@ -122,6 +164,7 @@ export default function VaultPage() {
             limit: '50',
           })
           if (filterType.trim()) params.set('type', filterType.trim())
+          if (filterPublicationId) params.set('publication_id', filterPublicationId)
 
           const resp = await fetch(`/api/assets/search?${params.toString()}`)
           const json = await resp.json().catch(() => null)
@@ -143,7 +186,7 @@ export default function VaultPage() {
 
     return () => window.clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSemanticQuery, semanticQuery, filterType])
+  }, [isSemanticQuery, semanticQuery, filterType, filterPublicationId])
 
   const attachToCurrentDraft = async (assetId: string) => {
     if (!currentDraft?.id) {
@@ -196,7 +239,10 @@ export default function VaultPage() {
     }
 
     // Use API route so filters/pagination can evolve without rewriting the UI.
-    const resp = await fetch('/api/assets?limit=200')
+    const params = new URLSearchParams({ limit: '200' })
+    if (filterPublicationId) params.set('publication_id', filterPublicationId)
+
+    const resp = await fetch(`/api/assets?${params.toString()}`)
     const json = await resp.json().catch(() => null)
     if (!resp.ok) {
       setError(json?.error || 'Failed to load assets.')
@@ -212,6 +258,7 @@ export default function VaultPage() {
   const filtered = useMemo(() => {
     const q = (isSemanticQuery ? '' : query).trim().toLowerCase()
     const selectedType = filterType.trim()
+    const publicationFilter = filterPublicationId.trim()
     const source = filterSource.trim().toLowerCase()
     const requiredTags = filterTags
       .split(',')
@@ -224,6 +271,14 @@ export default function VaultPage() {
     const base = isSemanticQuery ? semanticAssets || [] : assets
 
     return base.filter((a) => {
+      if (publicationFilter) {
+        if (publicationFilter === 'none' || publicationFilter === 'null') {
+          if (a.publication_id) return false
+        } else {
+          if (a.publication_id !== publicationFilter) return false
+        }
+      }
+
       if (selectedType && a.type !== selectedType) return false
 
       if (source) {
@@ -250,7 +305,18 @@ export default function VaultPage() {
         .toLowerCase()
       return haystack.includes(q)
     })
-  }, [assets, semanticAssets, isSemanticQuery, query, filterType, filterTags, filterSource, filterFrom, filterTo])
+  }, [
+    assets,
+    semanticAssets,
+    isSemanticQuery,
+    query,
+    filterType,
+    filterPublicationId,
+    filterTags,
+    filterSource,
+    filterFrom,
+    filterTo,
+  ])
 
   const addAsset = async () => {
     setError(null)
@@ -284,12 +350,18 @@ export default function VaultPage() {
       const resp = await fetch('/api/vault/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, content: trimmedContent, tags: tagsList, meta: parsedMeta }),
+        body: JSON.stringify({
+          type,
+          content: trimmedContent,
+          tags: tagsList,
+          meta: parsedMeta,
+          publication_id: newAssetPublicationId || null,
+        }),
       })
 
       const json = await resp.json().catch(() => null)
       if (!resp.ok) {
-        setError(json?.error || 'Failed to create asset.')
+        setError(json?.error || 'Failed to add to Vault.')
         setSaving(false)
         return
       }
@@ -297,10 +369,11 @@ export default function VaultPage() {
       setContent('')
       setTags('')
       setMeta('')
-      setSuccess('Asset added.')
+      setNewAssetPublicationId('')
+      setSuccess('Added to Vault.')
       await loadAssets()
     } catch {
-      setError('Failed to create asset.')
+      setError('Failed to add to Vault.')
     } finally {
       setSaving(false)
     }
@@ -310,7 +383,7 @@ export default function VaultPage() {
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Vault</p>
-        <h1 className="font-display text-3xl text-[var(--text-primary)]">Assets</h1>
+        <h1 className="font-display text-3xl text-[var(--text-primary)]">Vault</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
           Store prompts, snippets, links, and notes with provenance.
         </p>
@@ -345,7 +418,7 @@ export default function VaultPage() {
       )}
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-4 space-y-3">
-        <h2 className="font-display text-lg text-[var(--text-primary)]">Add asset</h2>
+        <h2 className="font-display text-lg text-[var(--text-primary)]">Add to Vault</h2>
 
         <div className="grid gap-2 md:grid-cols-[160px_1fr]">
           <select
@@ -361,13 +434,27 @@ export default function VaultPage() {
             ))}
           </select>
 
-          <input
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="tags (comma-separated)"
+          <select
+            value={newAssetPublicationId}
+            onChange={(e) => setNewAssetPublicationId(e.target.value)}
             className="input"
-          />
+            aria-label="Assign to publication"
+          >
+            <option value="">No publication (global)</option>
+            {publications.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="tags (comma-separated)"
+          className="input"
+        />
 
         <textarea
           value={content}
@@ -421,7 +508,22 @@ export default function VaultPage() {
           </div>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-5">
+        <div className="grid gap-2 md:grid-cols-6">
+          <select
+            value={filterPublicationId}
+            onChange={(e) => setFilterPublicationId(e.target.value)}
+            className="input"
+            aria-label="Filter by publication"
+          >
+            <option value="">All publications</option>
+            <option value="none">Global (unassigned)</option>
+            {publications.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -470,7 +572,7 @@ export default function VaultPage() {
         {loading || semanticLoading ? (
           <div className="text-sm text-[var(--text-secondary)]">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="text-sm text-[var(--text-secondary)]">{isSemanticQuery ? 'No results.' : 'No assets yet.'}</div>
+          <div className="text-sm text-[var(--text-secondary)]">{isSemanticQuery ? 'No results.' : 'Nothing in your Vault yet.'}</div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {filtered.map((a) => (
@@ -479,7 +581,14 @@ export default function VaultPage() {
                 className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-4 space-y-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{a.type}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">{a.type}</div>
+                    {a.publication_id ? (
+                      <span className="text-xs px-2 py-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-tertiary)] truncate">
+                        {publicationNameById.get(a.publication_id) || 'Publication'}
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="text-xs text-[var(--text-tertiary)]">{new Date(a.created_at).toLocaleDateString()}</div>
                 </div>
 

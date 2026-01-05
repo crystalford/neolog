@@ -171,6 +171,7 @@ export default function WritePage() {
       params.set('limit', '100')
       if (q) params.set('q', q)
       if (t) params.set('type', t)
+      if (publicationId) params.set('publication_id', publicationId)
 
       const resp = await fetch(`/api/assets?${params.toString()}`)
       const json = await resp.json().catch(() => null)
@@ -1722,7 +1723,7 @@ export default function WritePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Assets
+                      Vault
                     </label>
                     <p className="text-xs text-[var(--text-tertiary)] mb-3">
                       Attach Vault items to this draft (provenance and reuse).
@@ -1730,7 +1731,7 @@ export default function WritePage() {
 
                     {!postId ? (
                       <div className="text-sm text-[var(--text-secondary)]">
-                        Save the draft first to attach assets.
+                        Save the draft first to attach Vault items.
                       </div>
                     ) : (
                       <>
@@ -1742,7 +1743,7 @@ export default function WritePage() {
                             aria-label="Select vault asset"
                             disabled={assetLinkSaving || vaultAssetsLoading}
                           >
-                            <option value="">Select an asset…</option>
+                            <option value="">Select a Vault item…</option>
                             {vaultAssets.map((a) => {
                               const preview = (a.content || '').replace(/\s+/g, ' ').slice(0, 60)
                               return (
@@ -1765,7 +1766,7 @@ export default function WritePage() {
                           {postAssetsLoading ? (
                             <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
                           ) : postAssets.length === 0 ? (
-                            <div className="p-3 text-sm text-[var(--text-secondary)]">No attached assets.</div>
+                            <div className="p-3 text-sm text-[var(--text-secondary)]">No attached Vault items.</div>
                           ) : (
                             <div className="divide-y divide-[var(--border-light)]">
                               {postAssets.map((link) => {

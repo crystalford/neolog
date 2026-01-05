@@ -4030,6 +4030,7 @@ create index inbox_items_source_type_idx on public.inbox_items(source_type);
 create table public.assets (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
+  publication_id uuid references public.publications(id) on delete set null,
   type text not null check (type in ('prompt', 'image', 'code', 'text', 'link', 'quote', 'fragment')),
   title text,
   content text not null,
@@ -4042,6 +4043,7 @@ create table public.assets (
 );
 
 create index assets_user_idx on public.assets(user_id);
+create index assets_publication_idx on public.assets(publication_id);
 create index assets_type_idx on public.assets(type);
 create index assets_tags_gin on public.assets using gin(tags);
 create index assets_source_platform_idx on public.assets(source_platform);
@@ -4135,8 +4137,30 @@ alter table public.assets enable row level security;
 
 create policy "Users manage own assets"
   on public.assets for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (
+    auth.uid() = user_id
+    and (
+      publication_id is null
+      or exists (
+        select 1
+        from public.publications p
+        where p.id = publication_id
+          and p.owner_id = auth.uid()
+      )
+    )
+  )
+  with check (
+    auth.uid() = user_id
+    and (
+      publication_id is null
+      or exists (
+        select 1
+        from public.publications p
+        where p.id = publication_id
+          and p.owner_id = auth.uid()
+      )
+    )
+  );
 
 -- =============================================
 -- RLS: post assets

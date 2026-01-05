@@ -11,6 +11,8 @@ type Body = {
   content?: unknown
   title?: unknown
   tags?: unknown
+  publication_id?: unknown
+  publicationId?: unknown
   source?: unknown
   source_platform?: unknown
   source_url?: unknown
@@ -27,12 +29,23 @@ function normalizeTags(input: unknown): string[] {
     .slice(0, 50)
 }
 
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
+}
+
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as Body | null
   const assetType = typeof body?.type === 'string' ? body.type : ''
   const content = typeof body?.content === 'string' ? body.content : ''
   const title = typeof body?.title === 'string' ? body.title : null
   const tags = normalizeTags(body?.tags)
+  const publicationIdRaw =
+    (typeof body?.publication_id === 'string' ? body.publication_id : null) ||
+    (typeof body?.publicationId === 'string' ? body.publicationId : null)
+  const publicationId = publicationIdRaw?.trim() || ''
+  const normalizedPublicationId = !publicationId || publicationId === 'none' || publicationId === 'null'
+    ? null
+    : publicationId
   const sourcePlatform =
     (typeof body?.source_platform === 'string' ? body.source_platform : null) ||
     (typeof body?.source === 'string' ? body.source : null)
@@ -40,6 +53,10 @@ export async function POST(request: NextRequest) {
     (typeof body?.source_url === 'string' ? body.source_url : null) ||
     (typeof body?.sourceUrl === 'string' ? body.sourceUrl : null)
   const meta = body?.meta && typeof body.meta === 'object' ? body.meta : {}
+
+  if (normalizedPublicationId && !isUuid(normalizedPublicationId)) {
+    return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+  }
 
   if (!assetType) {
     return NextResponse.json({ error: 'type is required' }, { status: 400 })
@@ -74,10 +91,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
     }
 
+    if (normalizedPublicationId) {
+      const { data: pub, error: pubError } = await admin
+        .from('publications')
+        .select('id')
+        .eq('id', normalizedPublicationId)
+        .eq('owner_id', auth.userId)
+        .maybeSingle()
+      if (pubError) {
+        return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
+      }
+      if (!pub) {
+        return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+      }
+    }
+
     const { data, error } = await admin
       .from('assets')
       .insert({
         user_id: auth.userId,
+        publication_id: normalizedPublicationId,
         type: assetType,
         content,
         title,
@@ -103,10 +136,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  if (normalizedPublicationId) {
+    const { data: pub, error: pubError } = await supabase
+      .from('publications')
+      .select('id')
+      .eq('id', normalizedPublicationId)
+      .eq('owner_id', session.user.id)
+      .maybeSingle()
+    if (pubError) {
+      return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
+    }
+    if (!pub) {
+      return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+    }
+  }
+
   const { data, error } = await supabase
     .from('assets')
     .insert({
       user_id: session.user.id,
+      publication_id: normalizedPublicationId,
       type: assetType,
       content,
       title,

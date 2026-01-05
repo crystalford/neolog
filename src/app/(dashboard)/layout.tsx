@@ -146,6 +146,7 @@ export default function DashboardLayout({
       title: 'Create',
       items: [
         { href: '/write', icon: PenLine, label: 'Write' },
+        { href: '/vault', icon: Command, label: 'Vault' },
         { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
         { href: '/topics', icon: Hash, label: 'Topics' },
         { href: '/series', icon: Layers, label: 'Series' },
@@ -165,9 +166,9 @@ export default function DashboardLayout({
       title: 'Distribution',
       items: [
         { href: '/analytics', icon: BarChart3, label: 'Analytics' },
-        { href: '/syndication', icon: Radio, label: 'Outputs' },
-        { href: '/sources', icon: Globe, label: 'Inputs' },
-        { href: '/inbox', icon: Mail, label: 'Queue' },
+        { href: '/syndication', icon: Radio, label: 'Syndication' },
+        { href: '/sources', icon: Globe, label: 'Sources' },
+        { href: '/inbox', icon: Mail, label: 'Inbox' },
         { href: '/referrals', icon: Gift, label: 'Referrals' },
         { href: '/boost', icon: Zap, label: 'Boost' },
       ],

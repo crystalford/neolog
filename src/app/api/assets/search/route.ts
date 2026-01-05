@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const q = (url.searchParams.get('q') || '').trim()
     const type = (url.searchParams.get('type') || '').trim()
+    const publicationParam = (url.searchParams.get('publication_id') || '').trim()
 
     const limitParam = Number(url.searchParams.get('limit') || '20')
     const limit = Number.isFinite(limitParam) ? Math.max(1, Math.min(100, limitParam)) : 20
@@ -71,6 +72,15 @@ export async function GET(req: NextRequest) {
 
     if (type && !ALLOWED_TYPES.includes(type as AssetType)) {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+    }
+
+    const publicationId =
+      !publicationParam || publicationParam === 'none' || publicationParam === 'null'
+        ? null
+        : publicationParam
+
+    if (publicationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(publicationId)) {
+      return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
     }
 
     const admin = createAdminClient()
@@ -89,6 +99,21 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    if (publicationId) {
+      const { data: pub, error: pubError } = await admin
+        .from('publications')
+        .select('id')
+        .eq('id', publicationId)
+        .eq('owner_id', actor.userId)
+        .maybeSingle()
+      if (pubError) {
+        return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
+      }
+      if (!pub) {
+        return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+      }
+    }
+
     try {
       await enforceUsageCaps({ supabase: admin, userId: actor.userId, provider: 'openai' })
     } catch (e: any) {
@@ -103,12 +128,18 @@ export async function GET(req: NextRequest) {
     const seed = Number.isFinite(seedLimitParam) ? Math.max(0, Math.min(300, seedLimitParam)) : 100
 
     if (seed > 0) {
-      const { data: seedAssets, error: seedError } = await admin
+      let seedQuery = admin
         .from('assets')
-        .select('id,type,title,content,tags,source_platform,source_url,updated_at')
+        .select('id,type,title,content,tags,source_platform,source_url,publication_id,updated_at')
         .eq('user_id', actor.userId)
         .order('created_at', { ascending: false })
         .limit(seed)
+
+      if (publicationId) {
+        seedQuery = seedQuery.eq('publication_id', publicationId)
+      }
+
+      const { data: seedAssets, error: seedError } = await seedQuery
 
       if (seedError) throw seedError
 
@@ -210,6 +241,7 @@ export async function GET(req: NextRequest) {
       match_count: limit,
       user_filter: actor.userId,
       type_filter: type || null,
+      publication_filter: publicationId,
     })
 
     if (matchError) throw matchError
@@ -221,9 +253,15 @@ export async function GET(req: NextRequest) {
 
     const { data: assets, error: assetsError } = await admin
       .from('assets')
-      .select('id,user_id,type,title,content,source_platform,source_url,meta,tags,created_at,updated_at')
+      .select('id,user_id,publication_id,type,title,content,source_platform,source_url,meta,tags,created_at,updated_at')
       .in('id', assetIds)
       .eq('user_id', actor.userId)
+
+    // NOTE: If publicationParam was 'none', we filter down to unassigned assets client-side.
+    const filteredByPublication =
+      publicationParam === 'none' || publicationParam === 'null'
+        ? (assets || []).filter((a: any) => !a.publication_id)
+        : assets || []
 
     if (assetsError) throw assetsError
 
@@ -232,7 +270,7 @@ export async function GET(req: NextRequest) {
       scoreById.set(m.asset_id, m.score)
     }
 
-    const ordered = (assets || [])
+    const ordered = filteredByPublication
       .map((a: any) => ({ ...a, score: scoreById.get(a.id) ?? null }))
       .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
 

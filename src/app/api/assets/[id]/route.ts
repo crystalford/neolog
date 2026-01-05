@@ -18,6 +18,8 @@ type PatchBody = {
   meta?: unknown
   source_platform?: unknown
   source_url?: unknown
+  publication_id?: unknown
+  publicationId?: unknown
 }
 
 function normalizeTags(input: unknown): string[] {
@@ -36,6 +38,10 @@ function getAuthKey(request: NextRequest): string {
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
     ''
   ).trim()
+}
+
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
 }
 
 async function resolveUser(request: NextRequest): Promise<
@@ -76,7 +82,9 @@ export async function GET(
 
   const { data: asset, error } = await db
     .from('assets')
-    .select('id, user_id, type, title, content, source_platform, source_url, meta, tags, created_at, updated_at')
+    .select(
+      'id, user_id, publication_id, type, title, content, source_platform, source_url, meta, tags, created_at, updated_at',
+    )
     .eq('id', params.id)
     .eq('user_id', auth.userId)
     .single()
@@ -135,6 +143,41 @@ export async function PATCH(
   const body = (await request.json().catch(() => null)) as PatchBody | null
 
   const patch: Record<string, any> = {}
+
+  if (body?.publication_id !== undefined || body?.publicationId !== undefined) {
+    const raw =
+      (typeof body.publication_id === 'string' ? body.publication_id : null) ||
+      (typeof body.publicationId === 'string' ? body.publicationId : null)
+
+    const normalized = raw?.trim() || ''
+    if (!normalized || normalized === 'none' || normalized === 'null') {
+      patch.publication_id = null
+    } else {
+      if (!isUuid(normalized)) {
+        return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+      }
+
+      const dbForPubCheck = auth.mode === 'admin' ? createAdminClient() : createClient()
+      if (!dbForPubCheck) {
+        return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
+      }
+
+      const { data: pub, error: pubError } = await dbForPubCheck
+        .from('publications')
+        .select('id')
+        .eq('id', normalized)
+        .eq('owner_id', auth.userId)
+        .maybeSingle()
+
+      if (pubError) {
+        return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
+      }
+      if (!pub) {
+        return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
+      }
+      patch.publication_id = normalized
+    }
+  }
 
   if (typeof body?.type === 'string') {
     if (!ALLOWED_TYPES.includes(body.type as AssetType)) {

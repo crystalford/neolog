@@ -12,11 +12,18 @@ type Asset = {
   title: string | null
   content: string
   tags: string[]
+  publication_id?: string | null
   source_platform: string | null
   source_url: string | null
   meta: any
   created_at: string
   updated_at: string
+}
+
+type Publication = {
+  id: string
+  name: string
+  slug: string
 }
 
 type UsedInRow = {
@@ -44,6 +51,8 @@ export default function VaultAssetDetailPage() {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [usedIn, setUsedIn] = useState<UsedInRow[]>([])
 
+  const [publications, setPublications] = useState<Publication[]>([])
+
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -51,6 +60,7 @@ export default function VaultAssetDetailPage() {
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
+  const [publicationId, setPublicationId] = useState<string>('')
   const [sourcePlatform, setSourcePlatform] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
   const [metaText, setMetaText] = useState('')
@@ -59,9 +69,24 @@ export default function VaultAssetDetailPage() {
 
   useEffect(() => {
     if (!id) return
+    void loadPublications()
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const loadPublications = async () => {
+    const resp = await fetch('/api/publications')
+    const json = await resp.json().catch(() => null)
+
+    if (!resp.ok) {
+      // Publications are optional; keep the page usable even if unavailable.
+      setPublications([])
+      return
+    }
+
+    const pubs = (json?.publications || []) as Publication[]
+    setPublications(pubs)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -95,6 +120,7 @@ export default function VaultAssetDetailPage() {
     setTitle(loaded.title || '')
     setContent(loaded.content || '')
     setTags((loaded.tags || []).join(', '))
+    setPublicationId(loaded.publication_id ? String(loaded.publication_id) : '')
     setSourcePlatform(loaded.source_platform || '')
     setSourceUrl(loaded.source_url || '')
     setMetaText(JSON.stringify(loaded.meta || {}, null, 2))
@@ -150,6 +176,7 @@ export default function VaultAssetDetailPage() {
           title: title.trim() || null,
           content: trimmedContent,
           tags: tagsList,
+          publication_id: publicationId || null,
           source_platform: sourcePlatform.trim() || null,
           source_url: sourceUrl.trim() || null,
           meta: parsedMeta,
@@ -208,7 +235,7 @@ export default function VaultAssetDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>
-        <div className="text-sm text-[var(--text-secondary)]">Asset not found.</div>
+        <div className="text-sm text-[var(--text-secondary)]">Vault item not found.</div>
       </main>
     )
   }
@@ -218,7 +245,7 @@ export default function VaultAssetDetailPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Vault</p>
-          <h1 className="font-display text-3xl text-[var(--text-primary)]">Asset</h1>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Vault item</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Edit metadata and track usage.</p>
         </div>
         <button onClick={() => router.push('/vault')} className="btn btn-ghost inline-flex items-center gap-2">
@@ -256,6 +283,20 @@ export default function VaultAssetDetailPage() {
           </select>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input" />
         </div>
+
+        <select
+          value={publicationId}
+          onChange={(e) => setPublicationId(e.target.value)}
+          className="input"
+          aria-label="Assign to publication"
+        >
+          <option value="">No publication (global)</option>
+          {publications.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
 
         <div className="grid gap-2 md:grid-cols-2">
           <input
