@@ -168,6 +168,7 @@ See `supabase-schema.sql` for the complete schema including:
 | `/api/cron/rss-pull` | GET | Server-side RSS pull into inbox (cron) |
 | `/api/agent/user?username=...` | GET | Agent-friendly user profile + recent posts (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 | `/api/agent/post?username=...&slug=...` | GET | Agent-friendly post payload (JSON by default; supports `Accept: text/markdown` or `?format=md`) |
+| `/api/agent/search?q=...` | GET | Agent-friendly post search (optional `&username=...`; JSON by default; supports `Accept: text/markdown` or `?format=md`) |
 
 ## Environment Variables
 
