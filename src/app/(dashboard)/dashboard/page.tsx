@@ -430,12 +430,19 @@ export default function DashboardPage() {
     )
   }
 
+  const hasPosts = posts.length > 0
+  const totalTokens = usageSummary.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0)
+  const totalCalls = usageSummary.reduce((sum, row) => sum + Number(row.calls || 0), 0)
+
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Posts</p>
-          <h1 className="font-display text-3xl text-[var(--text-primary)]">Your content pipeline</h1>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Manage posts</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-2">
+            Draft, schedule, publish, and keep an eye on what’s working.
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-1 text-xs text-[var(--text-secondary)]">
               Publication: <span className="ml-1 text-[var(--text-primary)]">{selectedPublicationName || 'All'}</span>
@@ -456,645 +463,637 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {posts.length === 0 && (
-        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Getting started</p>
-              <h2 className="font-display text-xl text-[var(--text-primary)] mt-1">Start by capturing inputs</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-2xl">
-                {selectedPublicationName
-                  ? `No posts yet for “${selectedPublicationName}”. Capture ideas into your Vault, then turn them into a draft.`
-                  : 'No posts yet. Capture ideas into your Vault, then turn them into a draft.'}
-              </p>
-              <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                Tip: press <span className="font-mono">Ctrl/⌘K</span> to Quick Capture from anywhere in the dashboard.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-5">
-            <Link
-              href="/vault"
-              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
-            >
-              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                <Search size={16} className="text-[var(--text-secondary)]" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Open Vault</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Find and organize captured inputs.</p>
-              </div>
-            </Link>
-
-            <Link
-              href="/inbox"
-              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
-            >
-              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                <Inbox size={16} className="text-[var(--text-secondary)]" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Review Inbox</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Convert incoming items into drafts.</p>
-              </div>
-            </Link>
-
-            <Link
-              href="/sources"
-              className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
-            >
-              <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                <Globe size={16} className="text-[var(--text-secondary)]" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Connect Sources</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">Pull signals from RSS and feeds.</p>
-              </div>
-            </Link>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link href="/write" className="btn btn-primary btn-sm">
-              <PenLine size={16} />
-              Write your first post
-            </Link>
-            <Link href="/publications" className="btn btn-secondary btn-sm">
-              Manage publications
-            </Link>
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
-        {[
-          { label: 'Total posts', value: posts.length },
-          { label: 'Published', value: publishedCount },
-          { label: 'Drafts', value: draftCount },
-          { label: 'Scheduled', value: scheduledCount },
-          { label: 'Archived', value: archivedCount },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-4 shadow-sm"
-          >
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">{stat.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Usage</p>
-            <h2 className="font-display text-xl text-[var(--text-primary)]">AI tokens (30 days)</h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Best-effort totals based on provider responses.
-            </p>
-          </div>
-        </div>
-
-        {usageLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
-              >
-                <div className="h-4 w-28 skeleton rounded" />
-                <div className="mt-2 h-6 w-40 skeleton rounded" />
-                <div className="mt-2 h-3 w-24 skeleton rounded" />
-              </div>
-            ))}
-          </div>
-        ) : usageError ? (
-          <p className="text-sm text-[var(--text-secondary)]">{usageError}</p>
-        ) : usageSummary.length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">No usage recorded yet.</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {usageSummary.slice(0, 6).map((row) => (
-              <div
-                key={`${row.provider}::${row.model || ''}`}
-                className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
-              >
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                  {row.provider}{row.model ? ` · ${row.model}` : ''}
-                </p>
-                <p className="mt-2 text-lg font-semibold text-[var(--text-primary)] font-mono">
-                  {Number(row.total_tokens || 0).toLocaleString()} tokens
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                  {Number(row.calls || 0).toLocaleString()} call(s)
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
-            <h2 className="font-display text-xl text-[var(--text-primary)]">Common actions</h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Quick entry points for the content supply chain.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              label: 'Create post',
-              description: 'Start a new draft in the editor.',
-              href: '/write',
-              icon: PenLine,
-            },
-            {
-              label: 'Import HTML',
-              description: 'Paste or upload HTML into a draft.',
-              href: '/write',
-              icon: FileText,
-            },
-            {
-              label: 'Review inbox',
-              description: 'Convert incoming items into drafts.',
-              href: '/inbox',
-              icon: Inbox,
-            },
-            {
-              label: 'Connect sources',
-              description: 'Add RSS feeds and fetch updates.',
-              href: '/sources',
-              icon: Globe,
-            },
-            {
-              label: 'Syndication targets',
-              description: 'Set up outbound publishing.',
-              href: '/syndication',
-              icon: Share2,
-            },
-            {
-              label: 'Analytics snapshot',
-              description: 'See what is trending with readers.',
-              href: '/analytics',
-              icon: BarChart3,
-            },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
-              >
-                <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                  <Icon size={16} className="text-[var(--text-secondary)]" />
-                </span>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="min-w-0">
+          {!hasPosts && (
+            <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Syndication</p>
-            <h2 className="font-display text-xl text-[var(--text-primary)]">Recent sends</h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Latest Medium/Dev.to results.
-            </p>
-          </div>
-          <Link
-            href="/syndication"
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            Manage
-          </Link>
-        </div>
-
-        {syndicationLoading ? (
-          <div className="py-8 text-center text-sm text-[var(--text-tertiary)]">Loading syndication…</div>
-        ) : syndicationError ? (
-          <div className="py-6 text-sm text-[var(--text-tertiary)]">{syndicationError}</div>
-        ) : syndications.length === 0 ? (
-          <div className="py-6 text-sm text-[var(--text-tertiary)]">
-            No syndication events yet.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {syndications.map((row) => {
-              const status = String(row.status || '')
-              const statusTone =
-                status === 'sent'
-                  ? 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20'
-                  : status === 'error'
-                    ? 'bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20'
-                    : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] border-[var(--border-light)]'
-
-              return (
-                <div
-                  key={`${row.post_id}-${row.provider}-${row.updated_at || ''}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                        {getPostTitle(row.post_id)}
-                      </p>
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] border ${statusTone}`}>
-                        {formatProviderLabel(row.provider)} · {status}
-                      </span>
-                    </div>
-                    {row.external_url ? (
-                      <a
-                        href={row.external_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] underline break-all mt-1"
-                      >
-                        {row.external_url}
-                      </a>
-                    ) : row.error_message ? (
-                      <p className="text-xs text-[var(--error)] mt-1">{row.error_message}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/write?edit=${encodeURIComponent(row.post_id)}&pack=1`}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      Open pack
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {healthQueue.length > 0 && (
-        <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Post health</p>
-              <h2 className="font-display text-xl text-[var(--text-primary)]">Needs attention</h2>
-              <p className="text-sm text-[var(--text-secondary)]">
-                Posts older than 90 days with low recent views.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (allHealthSelected) {
-                    setHealthSelectedIds([])
-                  } else {
-                    setHealthSelectedIds(healthQueue.map((item) => item.post.id))
-                  }
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                {allHealthSelected ? 'Clear' : 'Select all'}
-              </button>
-              <button
-                onClick={handleBulkRevive}
-                className="btn btn-primary btn-sm"
-                disabled={healthSelectedIds.length === 0}
-              >
-                Revive selected
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {healthQueue.map(({ post, daysSinceUpdate, recentViews }) => (
-              <div
-                key={post.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={healthSelectedIds.includes(post.id)}
-                    onChange={(event) => {
-                      setHealthSelectedIds((prev) =>
-                        event.target.checked
-                          ? [...prev, post.id]
-                          : prev.filter((id) => id !== post.id)
-                      )
-                    }}
-                    className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-                  />
-                  <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{post.title || 'Untitled'}</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {daysSinceUpdate} days since update - {recentViews} views in last 7d
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Getting started</p>
+                  <h2 className="font-display text-xl text-[var(--text-primary)] mt-1">Capture ideas → ship posts</h2>
+                  <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-2xl">
+                    {selectedPublicationName
+                      ? `No posts yet for “${selectedPublicationName}”. Capture into your Vault, then turn an input into a draft.`
+                      : 'No posts yet. Capture into your Vault, then turn an input into a draft.'}
                   </p>
-                  </div>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                    Tip: press <span className="font-mono">Ctrl/⌘K</span> to Quick Capture from anywhere in the dashboard.
+                  </p>
                 </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-5">
                 <Link
-                  href={`/write?edit=${post.id}&revive=1`}
-                  className="btn btn-secondary btn-sm"
+                  href="/vault"
+                  className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
                 >
-                  Revive
+                  <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <Search size={16} className="text-[var(--text-secondary)]" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">Open Vault</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">Find and organize captured inputs.</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/inbox"
+                  className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <Inbox size={16} className="text-[var(--text-secondary)]" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">Review Inbox</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">Convert incoming items into drafts.</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/sources"
+                  className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <Globe size={16} className="text-[var(--text-secondary)]" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">Connect Sources</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">Pull signals from RSS and feeds.</p>
+                  </div>
                 </Link>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'published', label: 'Published' },
-            { id: 'draft', label: 'Drafts' },
-            { id: 'scheduled', label: 'Scheduled' },
-            { id: 'archived', label: 'Archived' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setFilter(item.id as typeof filter)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === item.id
-                  ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search posts..."
-              className="input input-with-icon w-56"
-            />
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
-            />
-          </div>
-          <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-            {[
-              { id: 'all', label: 'All types' },
-              { id: 'standard', label: 'Standard' },
-              { id: 'pulse', label: 'Pulse' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setTypeFilter(item.id as typeof typeFilter)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  typeFilter === item.id
-                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-            {[
-              { id: 'latest', label: 'Latest' },
-              { id: 'trending', label: 'Trending' },
-              { id: 'discussed', label: 'Discussed' },
-              { id: 'views', label: 'Views' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setSortBy(item.id as typeof sortBy)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  sortBy === item.id
-                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {visiblePosts.length} {visiblePosts.length === 1 ? 'post' : 'posts'}
-          </p>
-        </div>
-      </div>
-
-      {visiblePosts.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
-            <FileText size={28} className="text-[var(--text-tertiary)]" />
-          </div>
-          <h2 className="font-display text-xl tracking-tight text-[var(--text-primary)] mb-2">No posts yet</h2>
-          <p className="text-sm text-[var(--text-secondary)] mb-6">Create your first post to get started</p>
-          <Link href="/write" className="btn btn-primary btn-sm">
-            <PenLine size={16} />
-            Write your first post
-          </Link>
-        </div>
-      ) : (
-      <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
-            <div className="flex items-center justify-center">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={(event) => {
-                  if (event.target.checked) {
-                    setSelectedIds(visiblePosts.map((post) => post.id))
-                  } else {
-                    setSelectedIds([])
-                  }
-                }}
-                className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-              />
-            </div>
-            <span>Post</span>
-            <span>Status</span>
-            <span>Updated</span>
-            <span>Views</span>
-            <span>Comments</span>
-            <span className="text-right">Actions</span>
-          </div>
-          {selectedIds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
-              <span className="text-[var(--text-secondary)]">
-                {selectedIds.length} selected
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowBulkActions(true)}
-                  className="btn btn-primary btn-sm"
-                >
-                  Bulk actions
-                </button>
-                <button
-                  onClick={() => setSelectedIds([])}
-                  className="btn btn-secondary btn-sm"
-                >
-                  Clear
-                </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link href="/write" className="btn btn-primary btn-sm">
+                  <PenLine size={16} />
+                  Write your first post
+                </Link>
+                <Link href="/publications" className="btn btn-secondary btn-sm">
+                  Manage publications
+                </Link>
               </div>
             </div>
           )}
-          <div className="divide-y divide-[var(--border-light)]">
-            {visiblePosts.map((post) => (
-              <div
-                key={post.id}
-                className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 md:gap-2 px-4 py-2 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
-              >
-                <div className="hidden md:flex items-center justify-center">
+
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'published', label: 'Published' },
+                { id: 'draft', label: 'Drafts' },
+                { id: 'scheduled', label: 'Scheduled' },
+                { id: 'archived', label: 'Archived' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setFilter(item.id as typeof filter)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    filter === item.id
+                      ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search posts..."
+                  className="input input-with-icon w-56"
+                />
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
+                />
+              </div>
+              <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
+                {[
+                  { id: 'all', label: 'All types' },
+                  { id: 'standard', label: 'Standard' },
+                  { id: 'pulse', label: 'Pulse' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setTypeFilter(item.id as typeof typeFilter)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      typeFilter === item.id
+                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
+                {[
+                  { id: 'latest', label: 'Latest' },
+                  { id: 'trending', label: 'Trending' },
+                  { id: 'discussed', label: 'Discussed' },
+                  { id: 'views', label: 'Views' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSortBy(item.id as typeof sortBy)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      sortBy === item.id
+                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-[var(--text-secondary)]">
+                {visiblePosts.length} {visiblePosts.length === 1 ? 'post' : 'posts'}
+              </p>
+            </div>
+          </div>
+
+          {visiblePosts.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4 border border-[var(--border-light)]">
+                <FileText size={28} className="text-[var(--text-tertiary)]" />
+              </div>
+              <h2 className="font-display text-xl tracking-tight text-[var(--text-primary)] mb-2">No posts found</h2>
+              <p className="text-sm text-[var(--text-secondary)] mb-6">
+                Try a different filter, or create a new post.
+              </p>
+              <Link href="/write" className="btn btn-primary btn-sm">
+                <PenLine size={16} />
+                New post
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
+              <div className="hidden md:grid grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 px-4 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                <div className="flex items-center justify-center">
                   <input
                     type="checkbox"
-                    checked={selectedIds.includes(post.id)}
+                    checked={allVisibleSelected}
                     onChange={(event) => {
-                      setSelectedIds((prev) =>
-                        event.target.checked
-                          ? [...prev, post.id]
-                          : prev.filter((id) => id !== post.id)
-                      )
+                      if (event.target.checked) {
+                        setSelectedIds(visiblePosts.map((post) => post.id))
+                      } else {
+                        setSelectedIds([])
+                      }
                     }}
                     className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
                   />
                 </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-[var(--text-primary)] truncate text-sm">
-                      {post.title || 'Untitled'}
-                    </p>
-                    {post.content_type === 'pulse' && (
-                      <span className="doc-badge doc-badge-pulse">Pulse</span>
-                    )}
-                  </div>
-                  {post.excerpt && (
-                    <p className="text-xs text-[var(--text-secondary)] truncate mt-1">
-                      {post.excerpt}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 md:block">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
-                    Status
+                <span>Post</span>
+                <span>Status</span>
+                <span>Updated</span>
+                <span>Views</span>
+                <span>Comments</span>
+                <span className="text-right">Actions</span>
+              </div>
+              {selectedIds.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] text-sm">
+                  <span className="text-[var(--text-secondary)]">
+                    {selectedIds.length} selected
                   </span>
-                  <select
-                    value={post.status}
-                    onChange={(event) => {
-                      const nextStatus = event.target.value as Post['status']
-                      if (nextStatus === 'scheduled') {
-                        setScheduleTarget(post)
-                        const nextValue = post.scheduled_at
-                          ? new Date(post.scheduled_at).toISOString().slice(0, 16)
-                          : new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 16)
-                        setScheduleDraft(nextValue)
-                        return
-                      }
-                      updatePostStatus(post, nextStatus)
-                    }}
-                    className={`text-[11px] font-medium px-2.5 py-1 rounded-md border border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${getStatusClasses(post.status)}`}
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
-                <div className="text-xs text-[var(--text-tertiary)] min-w-0 overflow-hidden">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
-                    Updated
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    <span className="flex items-center gap-1 min-w-0">
-                      <Clock size={12} className="shrink-0" />
-                      <span className="truncate" title={new Date(post.updated_at).toLocaleDateString()}>
-                        {new Date(post.updated_at).toLocaleDateString()}
-                      </span>
-                    </span>
-                    {(() => {
-                      const health = getHealthBadge(post)
-                      if (!health) return null
-                      return (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] whitespace-nowrap ${health.className}`}>
-                          {health.label}
-                        </span>
-                      )
-                    })()}
-                  </div>
-                </div>
-                <div className="text-sm text-[var(--text-primary)]">
-                  {(metrics[post.id]?.views || 0).toLocaleString()}
-                  <p className="text-[10px] text-[var(--text-tertiary)]">
-                    {(metrics[post.id]?.recentViews || 0).toLocaleString()} last 7d
-                  </p>
-                </div>
-                <div className="text-sm text-[var(--text-primary)]">
-                  {(metrics[post.id]?.comments || 0).toLocaleString()}
-                  <p className="text-[10px] text-[var(--text-tertiary)]">
-                    visible comments
-                  </p>
-                </div>
-                <div className="flex items-center justify-end gap-1.5">
-                  {post.status === 'draft' && (
-                    <ShareDraftButton
-                      postId={post.id}
-                      existingToken={(post as any).preview_token}
-                      expiresAt={(post as any).preview_expires_at}
-                    />
-                  )}
-                  {post.status === 'published' && profile && (
-                    <Link
-                      href={`/${profile.username}/${post.slug}`}
-                      className="btn-icon"
-                      title="View post"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowBulkActions(true)}
+                      className="btn btn-primary btn-sm"
                     >
-                      <Eye size={14} />
-                    </Link>
+                      Bulk actions
+                    </button>
+                    <button
+                      onClick={() => setSelectedIds([])}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="divide-y divide-[var(--border-light)]">
+                {visiblePosts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 md:gap-2 px-4 py-2 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
+                  >
+                    <div className="hidden md:flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(post.id)}
+                        onChange={(event) => {
+                          setSelectedIds((prev) =>
+                            event.target.checked
+                              ? [...prev, post.id]
+                              : prev.filter((id) => id !== post.id)
+                          )
+                        }}
+                        className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-[var(--text-primary)] truncate text-sm">
+                          {post.title || 'Untitled'}
+                        </p>
+                        {post.content_type === 'pulse' && (
+                          <span className="doc-badge doc-badge-pulse">Pulse</span>
+                        )}
+                      </div>
+                      {post.excerpt && (
+                        <p className="text-xs text-[var(--text-secondary)] truncate mt-1">
+                          {post.excerpt}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 md:block">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
+                        Status
+                      </span>
+                      <select
+                        value={post.status}
+                        onChange={(event) => {
+                          const nextStatus = event.target.value as Post['status']
+                          if (nextStatus === 'scheduled') {
+                            setScheduleTarget(post)
+                            const nextValue = post.scheduled_at
+                              ? new Date(post.scheduled_at).toISOString().slice(0, 16)
+                              : new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 16)
+                            setScheduleDraft(nextValue)
+                            return
+                          }
+                          updatePostStatus(post, nextStatus)
+                        }}
+                        className={`text-[11px] font-medium px-2.5 py-1 rounded-md border border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${getStatusClasses(post.status)}`}
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="archived">Archived</option>
+                      </select>
+                    </div>
+                    <div className="text-xs text-[var(--text-tertiary)] min-w-0 overflow-hidden">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:hidden">
+                        Updated
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        <span className="flex items-center gap-1 min-w-0">
+                          <Clock size={12} className="shrink-0" />
+                          <span className="truncate" title={new Date(post.updated_at).toLocaleDateString()}>
+                            {new Date(post.updated_at).toLocaleDateString()}
+                          </span>
+                        </span>
+                        {(() => {
+                          const health = getHealthBadge(post)
+                          if (!health) return null
+                          return (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] whitespace-nowrap ${health.className}`}>
+                              {health.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                    <div className="text-sm text-[var(--text-primary)]">
+                      {(metrics[post.id]?.views || 0).toLocaleString()}
+                      <p className="text-[10px] text-[var(--text-tertiary)]">
+                        {(metrics[post.id]?.recentViews || 0).toLocaleString()} last 7d
+                      </p>
+                    </div>
+                    <div className="text-sm text-[var(--text-primary)]">
+                      {(metrics[post.id]?.comments || 0).toLocaleString()}
+                      <p className="text-[10px] text-[var(--text-tertiary)]">
+                        visible comments
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-end gap-1.5">
+                      {post.status === 'draft' && (
+                        <ShareDraftButton
+                          postId={post.id}
+                          existingToken={(post as any).preview_token}
+                          expiresAt={(post as any).preview_expires_at}
+                        />
+                      )}
+                      {post.status === 'published' && profile && (
+                        <Link
+                          href={`/${profile.username}/${post.slug}`}
+                          className="btn-icon"
+                          title="View post"
+                        >
+                          <Eye size={14} />
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => setAnalyticsPost(post)}
+                        className="btn-icon"
+                        title="View analytics"
+                      >
+                        <BarChart3 size={14} />
+                      </button>
+                      <Link
+                        href={`/write?edit=${post.id}`}
+                        className="btn-icon"
+                        title="Edit post"
+                      >
+                        <Edit2 size={14} />
+                      </Link>
+                      <Link
+                        href={`/write?edit=${post.id}&pack=1`}
+                        className="btn-icon"
+                        title="Distribution pack"
+                      >
+                        <Share2 size={14} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(post.id)}
+                        className="btn-icon text-[var(--error)] hover:bg-[var(--error)]/10"
+                        title="Delete post"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <aside className="space-y-4">
+          <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Overview</p>
+                <h2 className="font-display text-xl text-[var(--text-primary)] mt-1">At a glance</h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              {[
+                { label: 'Published', value: publishedCount },
+                { label: 'Drafts', value: draftCount },
+                { label: 'Scheduled', value: scheduledCount },
+                { label: 'Archived', value: archivedCount },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                >
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">{stat.label}</p>
+                  <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 text-xs text-[var(--text-tertiary)]">
+              Total posts: <span className="text-[var(--text-secondary)]">{posts.length}</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Quick actions</p>
+            <h2 className="font-display text-xl text-[var(--text-primary)] mt-1">Do the next thing</h2>
+            <div className="grid gap-3 mt-4">
+              {[
+                { label: 'Create post', description: 'Start a new draft in the editor.', href: '/write', icon: PenLine },
+                { label: 'Open Vault', description: 'Find and organize captured inputs.', href: '/vault', icon: Search },
+                { label: 'Review Inbox', description: 'Convert incoming items into drafts.', href: '/inbox', icon: Inbox },
+                { label: 'Analytics', description: 'See what is trending with readers.', href: '/analytics', icon: BarChart3 },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                  >
+                    <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                      <Icon size={16} className="text-[var(--text-secondary)]" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
+          <details className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden" open={false}>
+            <summary className="list-none cursor-pointer select-none px-5 py-4 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Usage</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="font-display text-lg text-[var(--text-primary)]">AI tokens (30 days)</h2>
+                  {!usageLoading && !usageError && usageSummary.length > 0 && (
+                    <span className="text-xs text-[var(--text-tertiary)]">
+                      {totalTokens.toLocaleString()} tokens · {totalCalls.toLocaleString()} calls
+                    </span>
                   )}
-                  <button
-                    onClick={() => setAnalyticsPost(post)}
-                    className="btn-icon"
-                    title="View analytics"
-                  >
-                    <BarChart3 size={14} />
-                  </button>
-                  <Link
-                    href={`/write?edit=${post.id}`}
-                    className="btn-icon"
-                    title="Edit post"
-                  >
-                    <Edit2 size={14} />
-                  </Link>
-                  <Link
-                    href={`/write?edit=${post.id}&pack=1`}
-                    className="btn-icon"
-                    title="Distribution pack"
-                  >
-                    <Share2 size={14} />
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    className="btn-icon text-[var(--error)] hover:bg-[var(--error)]/10"
-                    title="Delete post"
-                  >
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <span className="text-xs text-[var(--text-tertiary)]">Expand</span>
+            </summary>
+            <div className="px-5 pb-5">
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                Best-effort totals based on provider responses.
+              </p>
+              {usageLoading ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[0, 1].map((i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                    >
+                      <div className="h-4 w-28 skeleton rounded" />
+                      <div className="mt-2 h-6 w-40 skeleton rounded" />
+                      <div className="mt-2 h-3 w-24 skeleton rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : usageError ? (
+                <p className="text-sm text-[var(--text-secondary)]">{usageError}</p>
+              ) : usageSummary.length === 0 ? (
+                <p className="text-sm text-[var(--text-secondary)]">No usage recorded yet.</p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {usageSummary.slice(0, 6).map((row) => (
+                    <div
+                      key={`${row.provider}::${row.model || ''}`}
+                      className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                    >
+                      <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                        {row.provider}{row.model ? ` · ${row.model}` : ''}
+                      </p>
+                      <p className="mt-2 text-base font-semibold text-[var(--text-primary)] font-mono">
+                        {Number(row.total_tokens || 0).toLocaleString()} tokens
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                        {Number(row.calls || 0).toLocaleString()} call(s)
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+
+          <details className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden" open={false}>
+            <summary className="list-none cursor-pointer select-none px-5 py-4 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Syndication</p>
+                <h2 className="font-display text-lg text-[var(--text-primary)]">Recent sends</h2>
+              </div>
+              <span className="text-xs text-[var(--text-tertiary)]">Expand</span>
+            </summary>
+            <div className="px-5 pb-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-[var(--text-secondary)]">Latest Medium/Dev.to results.</p>
+                <Link
+                  href="/syndication"
+                  className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Manage
+                </Link>
+              </div>
+              {syndicationLoading ? (
+                <div className="py-6 text-center text-sm text-[var(--text-tertiary)]">Loading syndication…</div>
+              ) : syndicationError ? (
+                <div className="py-4 text-sm text-[var(--text-tertiary)]">{syndicationError}</div>
+              ) : syndications.length === 0 ? (
+                <div className="py-4 text-sm text-[var(--text-tertiary)]">
+                  No syndication events yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {syndications.map((row) => {
+                    const status = String(row.status || '')
+                    const statusTone =
+                      status === 'sent'
+                        ? 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20'
+                        : status === 'error'
+                          ? 'bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20'
+                          : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] border-[var(--border-light)]'
+
+                    return (
+                      <div
+                        key={`${row.post_id}-${row.provider}-${row.updated_at || ''}`}
+                        className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                            {getPostTitle(row.post_id)}
+                          </p>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] border ${statusTone}`}>
+                            {formatProviderLabel(row.provider)} · {status}
+                          </span>
+                        </div>
+                        {row.external_url ? (
+                          <a
+                            href={row.external_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] underline break-all mt-1"
+                          >
+                            {row.external_url}
+                          </a>
+                        ) : row.error_message ? (
+                          <p className="text-xs text-[var(--error)] mt-1">{row.error_message}</p>
+                        ) : null}
+                        <div className="mt-2">
+                          <Link
+                            href={`/write?edit=${encodeURIComponent(row.post_id)}&pack=1`}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Open pack
+                          </Link>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </details>
+
+          {healthQueue.length > 0 && (
+            <details className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden" open={false}>
+              <summary className="list-none cursor-pointer select-none px-5 py-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Post health</p>
+                  <h2 className="font-display text-lg text-[var(--text-primary)]">Needs attention</h2>
+                </div>
+                <span className="text-xs text-[var(--text-tertiary)]">Expand</span>
+              </summary>
+              <div className="px-5 pb-5">
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Posts older than 90 days with low recent views.
+                </p>
+                <div className="flex items-center gap-2 mb-4">
+                  <button
+                    onClick={() => {
+                      if (allHealthSelected) {
+                        setHealthSelectedIds([])
+                      } else {
+                        setHealthSelectedIds(healthQueue.map((item) => item.post.id))
+                      }
+                    }}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    {allHealthSelected ? 'Clear' : 'Select all'}
+                  </button>
+                  <button
+                    onClick={handleBulkRevive}
+                    className="btn btn-primary btn-sm"
+                    disabled={healthSelectedIds.length === 0}
+                  >
+                    Revive selected
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {healthQueue.map(({ post, daysSinceUpdate, recentViews }) => (
+                    <div
+                      key={post.id}
+                      className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={healthSelectedIds.includes(post.id)}
+                          onChange={(event) => {
+                            setHealthSelectedIds((prev) =>
+                              event.target.checked
+                                ? [...prev, post.id]
+                                : prev.filter((id) => id !== post.id)
+                            )
+                          }}
+                          className="w-4 h-4 mt-1 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{post.title || 'Untitled'}</p>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                            {daysSinceUpdate} days since update · {recentViews} views (7d)
+                          </p>
+                          <div className="mt-2">
+                            <Link
+                              href={`/write?edit=${post.id}&revive=1`}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Revive
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+          )}
+        </aside>
+      </div>
 
       {showBulkActions && (
         <BulkPostActions
