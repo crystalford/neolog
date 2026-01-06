@@ -46,7 +46,7 @@ export default async function Home() {
   }
 
   return (
-    <>
+    <div data-accent="ember">
       <Header />
 
       <main className="pt-14">
@@ -385,7 +385,7 @@ export default async function Home() {
           </div>
         </footer>
       </main>
-    </>
+    </div>
   )
 }
 
