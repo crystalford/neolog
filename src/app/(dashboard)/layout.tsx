@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
   Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe, Monitor
+  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe, Monitor, Inbox, FileUp
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
@@ -69,14 +69,15 @@ export default function DashboardLayout({
     const handler = (event: KeyboardEvent) => {
       const isModifier = event.metaKey || event.ctrlKey
 
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName?.toLowerCase()
+      const isEditable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        (target?.getAttribute('contenteditable') ?? '') === 'true'
+
       // Quick capture
       if (isModifier && event.key.toLowerCase() === 'k') {
-        const target = event.target as HTMLElement | null
-        const tag = target?.tagName?.toLowerCase()
-        const isEditable =
-          tag === 'input' ||
-          tag === 'textarea' ||
-          (target?.getAttribute('contenteditable') ?? '') === 'true'
         if (isEditable) return
 
         event.preventDefault()
@@ -84,7 +85,16 @@ export default function DashboardLayout({
         return
       }
 
+      // Quick switch (command palette)
+      if (isModifier && event.key === '/') {
+        if (isEditable) return
+        event.preventDefault()
+        setCommandOpen(true)
+        return
+      }
+
       if (isModifier && event.key.toLowerCase() === 'n') {
+        if (isEditable) return
         event.preventDefault()
         router.push('/write')
       }
@@ -179,6 +189,7 @@ export default function DashboardLayout({
         { href: '/write', icon: PenLine, label: 'Write' },
         { href: '/vault', icon: Command, label: 'Vault' },
         { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
+        { href: '/import', icon: FileUp, label: 'Import' },
         { href: '/topics', icon: Hash, label: 'Topics' },
         { href: '/series', icon: Layers, label: 'Series' },
         { href: '/publications', icon: BookOpen, label: 'Publications' },
@@ -200,7 +211,7 @@ export default function DashboardLayout({
         { href: '/analytics', icon: BarChart3, label: 'Analytics' },
         { href: '/syndication', icon: Radio, label: 'Syndication' },
         { href: '/sources', icon: Globe, label: 'Sources' },
-        { href: '/inbox', icon: Mail, label: 'Inbox' },
+        { href: '/inbox', icon: Inbox, label: 'Inbox' },
         { href: '/referrals', icon: Gift, label: 'Referrals' },
         { href: '/boost', icon: Zap, label: 'Boost' },
       ],
@@ -223,7 +234,6 @@ export default function DashboardLayout({
       }))
     )
     items.push({ label: 'Settings', href: '/settings', description: 'Workspace' })
-    items.push({ label: 'Import', href: '/import', description: 'Create' })
     return items
   }, [navSections])
 
@@ -372,7 +382,7 @@ export default function DashboardLayout({
               >
                 <Zap size={14} />
                 Quick capture
-                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl K</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl+K</span>
               </button>
               <button
                 onClick={() => setCommandOpen(true)}
@@ -394,7 +404,7 @@ export default function DashboardLayout({
               >
                 <Command size={14} />
                 Quick switch
-                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl /</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl+/</span>
               </button>
               <Link
                 href="/write"
