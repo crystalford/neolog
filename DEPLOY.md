@@ -124,12 +124,29 @@ Cron routes:
 
 #### Cron observability (recommended)
 
-If you apply `add_jobs_job_runs.sql` and `add_jobs_job_runs_read_policies.sql`, cron routes will record `job_runs` and the dashboard Monitors page will show a lightweight “Automation runs” panel (last 10 runs).
+If you apply `add_jobs_job_runs.sql` and `add_jobs_job_runs_read_policies.sql`, automation routes will record `job_runs` and the dashboard Monitors page will show a lightweight “Automation runs” panel (last 10 runs).
+
+Notes:
+- Monitors shows runs for your user (via `meta.user_id`) plus global cron runs.
+- Job run logging is best-effort: routes still work even if the tables are not deployed yet.
 
 To verify quickly:
 
 - Trigger `/api/cron/rss-pull` once (using `CRON_SECRET`)
 - Open `/monitors` and confirm the run appears
+
+Common job names you may see:
+- `cron.rss.pull` (trigger `/api/cron/rss-pull`)
+- `cron.publish.scheduled` (trigger `/api/cron/publish-scheduled`)
+- `cron.weekly.digest` (trigger `/api/cron/weekly-digest`)
+- `automation.trigger.inbox.create` / `automation.trigger.rss.pull` (trigger `/api/automation/trigger`)
+- `inbox.webhook` (trigger `/api/inbox/webhook`)
+- `webhooks.draft` (trigger `/api/webhooks/draft`)
+- `inbox.bulk_convert` (Inbox → Draft conversion via `/api/inbox/bulk-convert`)
+- `vault.add` (capture assets via `/api/vault/add`)
+- `agent.ingest`, `agent.draft.update`, `agent.draft.publish`, `agent.embeddings.backfill` (API-key agent endpoints)
+- `pulse.summarize`, `pulse.sentiment` (Pulse AI endpoints; session-authenticated)
+- `import.rss` and `import.file` (RSS import and file import endpoints; session-authenticated)
 
 ## Headless Inbox Webhook (Automation)
 
