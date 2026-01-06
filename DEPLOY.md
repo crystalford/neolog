@@ -158,6 +158,9 @@ Common job names you may see:
 - `integrations.save`, `integrations.toggle`, `integrations.delete`, `integrations.list` (integration key management)
 - `stripe.checkout.create`, `stripe.connect.onboarding`, `stripe.connect.status`, `stripe.price.create`, `stripe.tip.create_intent`, `stripe.webhook` (Stripe endpoints)
 - `subscribe.email.start`, `subscribe.email.confirm`, `subscribe.email.unsubscribe` (email subscription flow)
+- `sources.rss.add`, `sources.rss.update`, `sources.rss.delete`, `sources.rss.fetch` (RSS source management and fetch)
+- `storage.get`, `storage.save`, `storage.sign` (storage endpoints)
+- `usage.summary`, `usage.limits.get`, `usage.limits.save` (usage endpoints)
 - `assets.list`, `assets.create`, `assets.get`, `assets.update`, `assets.delete`, `assets.search` (asset endpoints)
 - `analytics.track` (author analytics forwarding)
 
