@@ -7,6 +7,7 @@ import { logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
 import { postToDevto, postToMedium } from '@/lib/syndication'
 import { NextRequest, NextResponse } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
@@ -26,6 +27,12 @@ function getSentences(text: string, max = 3): string[] {
 
 // Publish a post and notify subscribers
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
 
@@ -55,17 +62,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const actorUserId = session?.user.id || cronAuthorId
+
+    const tryStartRun = async (meta: Record<string, any>) => {
+      if (runId) return
+      try {
+        const run = await startJobRun('posts.publish', meta)
+        runId = run.id
+      } catch {
+        // best-effort
+      }
+    }
+
     if (!postId) {
+      if (actorUserId) {
+        finalMeta = {
+          user_id: actorUserId,
+          auth_mode: session ? 'session' : 'cron',
+          post_id: null,
+          notify,
+          fast,
+        }
+        await tryStartRun(finalMeta)
+      }
+      finalErrorMessage = 'postId is required'
       return NextResponse.json({ error: 'postId is required' }, { status: 400 })
     }
 
     if (!session && isCron && !cronAuthorId) {
+      finalErrorMessage = 'authorId is required for cron publish'
       return NextResponse.json({ error: 'authorId is required for cron publish' }, { status: 400 })
     }
 
-    const actorUserId = session?.user.id || cronAuthorId!
+    const actorUserIdStrict = actorUserId!
+
+    finalMeta = {
+      user_id: actorUserIdStrict,
+      auth_mode: session ? 'session' : 'cron',
+      post_id: postId,
+      notify,
+      fast,
+    }
+    await tryStartRun(finalMeta)
+
     const db = session ? supabase : createAdminClient()
     if (!db) {
+      finalErrorMessage = 'Server misconfigured.'
       return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
     }
 
@@ -74,10 +116,11 @@ export async function POST(request: NextRequest) {
       .from('posts')
       .select('*, author:profiles(username, display_name)')
       .eq('id', postId)
-      .eq('author_id', actorUserId)
+      .eq('author_id', actorUserIdStrict)
       .single()
 
     if (postError || !post) {
+      finalErrorMessage = 'Post not found'
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
@@ -86,6 +129,8 @@ export async function POST(request: NextRequest) {
 
     // Fast mode: if already published, do nothing and return quickly.
     if (fast && alreadyPublished) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, already_published: true, fast_return: true, first_publish: false }
       return NextResponse.json({
         success: true,
         fast: true,
@@ -108,6 +153,7 @@ export async function POST(request: NextRequest) {
         .eq('id', postId)
 
       if (publishError) {
+        finalErrorMessage = 'Failed to publish'
         return NextResponse.json({ error: 'Failed to publish' }, { status: 500 })
       }
 
@@ -136,6 +182,8 @@ export async function POST(request: NextRequest) {
       // Fast mode: return right after the publish transition.
       // Run heavy side-effects via /api/posts/publish-side-effects.
       if (fast) {
+        finalStatus = 'success'
+        finalMeta = { ...finalMeta, already_published: false, fast_return: true, first_publish: true }
         return NextResponse.json({
           success: true,
           fast: true,
@@ -151,13 +199,13 @@ export async function POST(request: NextRequest) {
       // Best-effort: create/refresh pgvector embedding for semantic search.
       // Never block publishing on embedding failures.
       try {
-        const openaiKey = await resolveProviderKey(actorUserId, 'openai')
+        const openaiKey = await resolveProviderKey(actorUserIdStrict, 'openai')
         const admin = createAdminClient()
 
         if (openaiKey?.key && admin) {
           let canEmbed = true
           try {
-            await enforceUsageCaps({ supabase: db as any, userId: actorUserId, provider: 'openai' })
+            await enforceUsageCaps({ supabase: db as any, userId: actorUserIdStrict, provider: 'openai' })
           } catch {
             canEmbed = false
           }
@@ -176,7 +224,7 @@ export async function POST(request: NextRequest) {
                 text,
                 onUsage: (u) => {
                   void logProviderUsage({
-                    userId: actorUserId,
+                    userId: actorUserIdStrict,
                     provider: 'openai',
                     model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
                     route: '/api/posts/publish',
@@ -213,13 +261,13 @@ export async function POST(request: NextRequest) {
       const { data: userSubscribers } = await db
         .from('subscriptions')
         .select('subscriber:profiles(id)')
-        .eq('creator_id', actorUserId)
+        .eq('creator_id', actorUserIdStrict)
         .eq('email_new_posts', true)
 
       let emailSubscribersQuery = db
         .from('email_subscribers')
         .select('email, unsubscribe_token')
-        .eq('creator_id', actorUserId)
+        .eq('creator_id', actorUserIdStrict)
         .eq('status', 'active')
         .eq('email_new_posts', true)
 
@@ -236,7 +284,7 @@ export async function POST(request: NextRequest) {
       const finalEmailSubscribers = emailSubscribersScoped || []
 
       if (finalEmailSubscribers.length > 0) {
-        const resendKey = await resolveProviderKey(actorUserId, 'resend')
+        const resendKey = await resolveProviderKey(actorUserIdStrict, 'resend')
         if (resendKey) {
           notificationResult = await sendNewPostNotifications(
             finalEmailSubscribers.map(s => ({
@@ -266,7 +314,7 @@ export async function POST(request: NextRequest) {
         const summary = post.excerpt || getSentences(plain, 2).join(' ')
         const sentenceList = getSentences(plain, 4)
 
-        const mediumKey = await resolveProviderKey(actorUserId, 'medium')
+        const mediumKey = await resolveProviderKey(actorUserIdStrict, 'medium')
         if (mediumKey?.key) {
           const { data: existing } = await db
             .from('post_syndications')
@@ -326,7 +374,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const devtoKey = await resolveProviderKey(actorUserId, 'devto')
+        const devtoKey = await resolveProviderKey(actorUserIdStrict, 'devto')
         if (devtoKey?.key) {
           const { data: existing } = await db
             .from('post_syndications')
@@ -398,6 +446,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      already_published: alreadyPublished,
+      first_publish: firstPublish,
+      notifications_sent: notificationResult.sent,
+      notifications_failed: notificationResult.failed,
+      syndication_ok: Boolean(Object.keys(syndicationResult || {}).length),
+    }
+
     return NextResponse.json({
       success: true,
       firstPublish,
@@ -410,8 +468,22 @@ export async function POST(request: NextRequest) {
       syndication: syndicationResult,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Publish error:', error)
+    finalErrorMessage = error?.message || 'Internal server error'
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

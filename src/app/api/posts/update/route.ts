@@ -6,6 +6,7 @@ import { resolveProviderKey } from '@/lib/ai-provider'
 import { enforceUsageCaps } from '@/lib/usageCaps'
 import { logProviderUsage } from '@/lib/usage'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,12 @@ type Body = {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const {
@@ -39,17 +46,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const tryStartRun = async (meta: Record<string, any>) => {
+      if (runId) return
+      try {
+        const run = await startJobRun('posts.update', meta)
+        runId = run.id
+      } catch {
+        // best-effort
+      }
+    }
+
     const body = (await request.json().catch(() => null)) as Body | null
     const postId = body?.postId
     const patch = body?.patch
 
     if (!postId) {
+      finalMeta = { user_id: session.user.id, post_id: null }
+      await tryStartRun(finalMeta)
+      finalErrorMessage = 'postId is required'
       return NextResponse.json({ error: 'postId is required' }, { status: 400 })
     }
 
     if (!patch || Object.keys(patch).length === 0) {
+      finalMeta = { user_id: session.user.id, post_id: postId, patch_keys: [] }
+      await tryStartRun(finalMeta)
+      finalErrorMessage = 'patch is required'
       return NextResponse.json({ error: 'patch is required' }, { status: 400 })
     }
+
+    finalMeta = {
+      user_id: session.user.id,
+      post_id: postId,
+      patch_keys: Object.keys(patch).slice(0, 50),
+    }
+    await tryStartRun(finalMeta)
 
     // Load current post (ownership + status check)
     const { data: post, error: postError } = await supabase
@@ -59,15 +89,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (postError || !post) {
+      finalErrorMessage = 'Post not found'
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
     if (post.author_id !== session.user.id) {
+      finalErrorMessage = 'Forbidden'
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Only intended for updating published posts.
     if (post.status !== 'published') {
+      finalErrorMessage = 'Only published posts can be updated here.'
       return NextResponse.json({ error: 'Only published posts can be updated here.' }, { status: 400 })
     }
 
@@ -101,6 +134,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (updateError || !updated) {
+      finalErrorMessage = updateError?.message || 'Failed to update post'
       return NextResponse.json({ error: updateError?.message || 'Failed to update post' }, { status: 500 })
     }
 
@@ -195,8 +229,24 @@ export async function POST(request: NextRequest) {
       // ignore
     }
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, post_id: updated.id, slug: updated.slug }
     return NextResponse.json({ ok: true, post: { id: updated.id, slug: updated.slug } })
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Internal server error' }, { status: 500 })
+    finalErrorMessage = e?.message || 'Internal server error'
+    return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
