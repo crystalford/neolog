@@ -13,6 +13,7 @@
   - [ ] Syndication + visuals: `add_syndication.sql`, `add_og_variants.sql`
   - [ ] Automation substrate (recommended): `add_jobs_job_runs.sql`
   - [ ] Automation UI read access (recommended): `add_jobs_job_runs_read_policies.sql`
+  - [ ] Automation indexes (recommended): `add_jobs_job_runs_indexes.sql`
   - [ ] Feed source settings: `add_feed_source_auto_convert.sql` (optional per-feed auto-convert + destination publication)
   - [ ] Asset Vault: `add_assets_vault.sql` (assets table + RLS)
   - [ ] Post ↔ Asset links: `add_post_assets.sql` (attach vault assets to drafts)
