@@ -57,12 +57,12 @@ export default async function Home() {
   }
 
   return (
-    <div data-accent="ember">
+    <div>
       <Header />
 
       <main className="pt-14">
         {/* Hero */}
-        <section className="relative px-6 lg:px-12 pt-14 pb-10 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
+        <section className="relative px-6 lg:px-12 pt-12 md:pt-14 pb-10 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
           <div
             className="absolute inset-0 opacity-[0.35] pointer-events-none"
             style={{
@@ -84,21 +84,21 @@ export default async function Home() {
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-10 items-start">
               <div className="lg:col-span-6">
-                <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1.5 mb-6">
+                <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--text-secondary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-3 py-1.5 mb-6">
                   Capture → Vault → Publish
                 </p>
 
-                <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
+                <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-5">
                   Capture-first publishing.
                   <span className="block text-[var(--text-tertiary)]">Capture, shape, and ship — without losing the truth.</span>
                 </h1>
 
-                <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
+                <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-6 max-w-xl">
                   Collect inputs from anywhere, turn them into durable publications, write posts with provenance, then distribute and measure —
                   all from one core.
                 </p>
 
-                <div className="flex flex-wrap gap-2 mb-7">
+                <div className="flex flex-wrap gap-2 mb-6">
                   {['Inbox-first capture', 'Publications as containers', 'Distribution + analytics'].map((label) => (
                     <span
                       key={label}
@@ -132,7 +132,7 @@ export default async function Home() {
                 </div>
 
                 {(stats.posts > 0 || stats.creators > 0) && (
-                  <div className="mt-7 flex flex-wrap gap-3">
+                  <div className="mt-6 flex flex-wrap gap-3">
                     {stats.posts > 0 && (
                       <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-2">
                         <span className="text-sm font-medium text-[var(--text-primary)]">
@@ -169,7 +169,7 @@ export default async function Home() {
                       </span>
                     </div>
 
-                    <span className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1">
+                    <span className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-3 py-1">
                       <Sparkles size={14} /> Preview
                     </span>
                   </div>
@@ -190,7 +190,7 @@ export default async function Home() {
                               className={
                                 'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ' +
                                 (t.active
-                                  ? 'bg-[var(--accent-soft)] border-[var(--border-light)] text-[var(--accent)]'
+                                  ? 'bg-[var(--bg-secondary)] border-[var(--border-light)] text-[var(--text-primary)]'
                                   : 'bg-[var(--bg-primary)] border-[var(--border-light)] text-[var(--text-tertiary)]')
                               }
                             >
@@ -219,7 +219,7 @@ export default async function Home() {
                         </div>
 
                         <div className="p-3 space-y-2">
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--accent-soft)] px-3 py-2">
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <p className="text-xs text-[var(--text-primary)] font-medium">Link: research memo</p>
@@ -286,7 +286,7 @@ export default async function Home() {
                               ].map((line) => (
                                 <div key={line} className="flex items-start gap-2">
                                   <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                                    <CheckCircle2 size={12} className="text-[var(--accent)]" />
+                                    <CheckCircle2 size={12} className="text-[var(--text-secondary)]" />
                                   </span>
                                   <p className="text-xs text-[var(--text-secondary)]">{line}</p>
                                 </div>
@@ -350,7 +350,7 @@ export default async function Home() {
 
                 <Link
                   href={session ? '/dashboard' : '/signup'}
-                  className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:border-[var(--border-medium)] transition-colors"
                 >
                   {session ? 'Open dashboard' : 'Get started'}
                   <ArrowRight size={14} />
@@ -399,8 +399,8 @@ export default async function Home() {
                         className="group flex items-start justify-between gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-4 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
                       >
                         <div className="flex items-start gap-3">
-                          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                            <Icon size={16} className="text-[var(--accent)]" />
+                          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Icon size={16} className="text-[var(--text-secondary)]" />
                           </span>
                           <div>
                             <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
@@ -408,7 +408,7 @@ export default async function Home() {
                           </div>
                         </div>
 
-                        <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                        <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:border-[var(--border-medium)] transition-colors">
                           <ArrowRight size={16} />
                         </span>
                       </Link>
@@ -429,7 +429,7 @@ export default async function Home() {
                       </div>
                     </div>
 
-                    <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                    <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:border-[var(--border-medium)] transition-colors">
                       <ArrowRight size={16} />
                     </span>
                   </Link>
@@ -472,8 +472,8 @@ export default async function Home() {
                       <div key={item.title} className="contents">
                         <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)]">
                           <div className="flex items-center gap-3 mb-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                              <Icon size={16} className="text-[var(--accent)]" />
+                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                              <Icon size={16} className="text-[var(--text-secondary)]" />
                             </span>
                             <div className="min-w-0">
                               <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Step {idx + 1}</p>
