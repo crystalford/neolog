@@ -503,7 +503,7 @@ export default async function Home() {
         {(stats.posts > 0 || stats.creators > 0) && (
           <section className="px-6 lg:px-12 py-10">
             <div className="max-w-6xl mx-auto">
-              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] p-8">
+              <div className="rounded-3xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] p-8">
                 <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
                   <div className="text-center">
                     <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.posts.toLocaleString()}</p>
@@ -521,66 +521,90 @@ export default async function Home() {
 
         {/* Featured Posts */}
         {featuredPosts.length > 0 && (
-          <section className="px-6 lg:px-12 py-14 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
+          <section className="px-6 lg:px-12 py-10">
             <div className="max-w-6xl mx-auto">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="font-display text-2xl text-[var(--text-primary)] mb-1">Latest posts</h2>
-                  <p className="text-sm text-[var(--text-secondary)]">From the community</p>
+              <div className="rounded-3xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
+                <div className="px-6 py-5 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Community</p>
+                    <h2 className="font-display text-2xl text-[var(--text-primary)] mt-1">Latest posts</h2>
+                  </div>
+
+                  <Link
+                    href="/explore"
+                    className="hidden sm:inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:opacity-90 transition-opacity"
+                  >
+                    View all
+                    <ArrowRight size={14} />
+                  </Link>
                 </div>
-                <Link href="/explore" className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors hidden sm:inline-flex items-center gap-1">
-                  View all
-                  <ArrowRight size={14} />
-                </Link>
-              </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {featuredPosts.map((post: any) => (
-                  <PostCard key={post.id} post={post} variant="compact" />
-                ))}
-              </div>
+                <div className="p-6">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {featuredPosts.map((post: any) => (
+                      <PostCard key={post.id} post={post} variant="compact" />
+                    ))}
+                  </div>
 
-              <div className="mt-8 text-center sm:hidden">
-                <Link href="/explore" className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1">
-                  View all posts
-                  <ArrowRight size={14} />
-                </Link>
+                  <div className="mt-6 text-center sm:hidden">
+                    <Link
+                      href="/explore"
+                      className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:opacity-90 transition-opacity"
+                    >
+                      View all
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         )}
 
         {/* Final CTA */}
-        <section className="relative px-6 lg:px-12 py-16 bg-[var(--bg-secondary)] border-t border-[var(--border-light)]">
-          <div className="relative max-w-4xl mx-auto text-center">
-            <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4 leading-tight">
-              Ready to start publishing?
-            </h2>
+        <section className="relative px-6 lg:px-12 py-10">
+          <div className="max-w-6xl mx-auto">
+            <div className="relative overflow-hidden rounded-3xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)]">
+              <div
+                className="absolute inset-0 opacity-[0.18] pointer-events-none"
+                style={{
+                  backgroundImage:
+                    'radial-gradient(circle at 20% 30%, var(--accent-soft) 0%, transparent 55%), radial-gradient(circle at 85% 15%, var(--accent-soft) 0%, transparent 55%)',
+                }}
+              />
 
-            <p className="text-lg text-[var(--text-secondary)] mb-8 max-w-2xl mx-auto">
-              Build a core you control — then broadcast outward.
-            </p>
+              <div className="relative px-8 py-12 text-center">
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Get started</p>
+                <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mt-2 mb-4 leading-tight">
+                  Ready to start publishing?
+                </h2>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              {session ? (
-                <>
-                  <Link href="/dashboard" className="btn btn-primary">
-                    Open dashboard
-                  </Link>
-                  <Link href="/explore" className="btn btn-secondary">
-                    Explore
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/signup" className="btn btn-primary">
-                    Start writing
-                  </Link>
-                  <Link href="/explore" className="btn btn-secondary">
-                    Explore
-                  </Link>
-                </>
-              )}
+                <p className="text-lg text-[var(--text-secondary)] mb-8 max-w-2xl mx-auto">
+                  Build a core you control — then broadcast outward.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  {session ? (
+                    <>
+                      <Link href="/dashboard" className="btn btn-primary btn-lg">
+                        Open dashboard
+                      </Link>
+                      <Link href="/explore" className="btn btn-secondary btn-lg">
+                        Explore
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link href="/signup" className="btn btn-primary btn-lg">
+                        Start writing
+                      </Link>
+                      <Link href="/explore" className="btn btn-secondary btn-lg">
+                        Explore
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </section>
