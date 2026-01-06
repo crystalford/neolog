@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,12 @@ function pickTextForAssetEmbedding(asset: {
 }
 
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const url = new URL(req.url)
     const q = (url.searchParams.get('q') || '').trim()
@@ -66,11 +73,39 @@ export async function GET(req: NextRequest) {
     const limitParam = Number(url.searchParams.get('limit') || '20')
     const limit = Number.isFinite(limitParam) ? Math.max(1, Math.min(100, limitParam)) : 20
 
+    const seedLimitParam = Number(url.searchParams.get('seed') || '100')
+    const seed = Number.isFinite(seedLimitParam) ? Math.max(0, Math.min(300, seedLimitParam)) : 100
+
+    const maxUpsertsParam = Number(url.searchParams.get('maxUpserts') || '25')
+    const maxUpserts = Number.isFinite(maxUpsertsParam)
+      ? Math.max(0, Math.min(50, maxUpsertsParam))
+      : 25
+
+    finalMeta = {
+      q_len: q.length,
+      type: type || null,
+      publication_filter: publicationParam || null,
+      limit,
+      seed,
+      max_upserts: maxUpserts,
+    }
+
+    try {
+      const run = await startJobRun('assets.search', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     if (!q) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
       return NextResponse.json({ error: 'Missing q' }, { status: 400 })
     }
 
     if (type && !ALLOWED_TYPES.includes(type as AssetType)) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'invalid_type' }
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
     }
 
@@ -80,11 +115,14 @@ export async function GET(req: NextRequest) {
         : publicationParam
 
     if (publicationId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(publicationId)) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'invalid_publication_id' }
       return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
     }
 
     const admin = createAdminClient()
     if (!admin) {
+      finalErrorMessage = 'Server missing Supabase admin configuration.'
       return NextResponse.json(
         { error: 'Server missing Supabase admin configuration.' },
         { status: 500 },
@@ -93,11 +131,15 @@ export async function GET(req: NextRequest) {
 
     const actor = await resolveActor(req, admin)
     if (!actor) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'unauthorized' }
       return NextResponse.json(
         { error: 'Semantic search requires login + OpenAI key (or Pro managed key).' },
         { status: 401 },
       )
     }
+
+    finalMeta = { ...finalMeta, user_id: actor.userId }
 
     if (publicationId) {
       const { data: pub, error: pubError } = await admin
@@ -124,9 +166,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Ensure we have embeddings for latest assets (small capped batch).
-    const seedLimitParam = Number(url.searchParams.get('seed') || '100')
-    const seed = Number.isFinite(seedLimitParam) ? Math.max(0, Math.min(300, seedLimitParam)) : 100
-
     if (seed > 0) {
       let seedQuery = admin
         .from('assets')
@@ -173,11 +212,6 @@ export async function GET(req: NextRequest) {
             stale.push({ asset_id: asset.id, text, hash })
           }
         }
-
-        const maxUpsertsParam = Number(url.searchParams.get('maxUpserts') || '25')
-        const maxUpserts = Number.isFinite(maxUpsertsParam)
-          ? Math.max(0, Math.min(50, maxUpsertsParam))
-          : 25
 
         for (const item of stale.slice(0, maxUpserts)) {
           const embedding = await embedTextWithOpenAI({
@@ -248,6 +282,8 @@ export async function GET(req: NextRequest) {
 
     const assetIds = (matches || []).map((m: any) => m.asset_id)
     if (!assetIds.length) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'success', results_count: 0 }
       return NextResponse.json({ query: q, results: [] })
     }
 
@@ -273,12 +309,27 @@ export async function GET(req: NextRequest) {
     const ordered = filteredByPublication
       .map((a: any) => ({ ...a, score: scoreById.get(a.id) ?? null }))
       .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
-
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', results_count: ordered.length }
     return NextResponse.json({ query: q, results: ordered })
   } catch (e: any) {
+    finalErrorMessage = e?.message || 'Failed to search.'
     return NextResponse.json(
-      { error: e?.message || 'Failed to search.' },
+      { error: finalErrorMessage },
       { status: 500 },
     )
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

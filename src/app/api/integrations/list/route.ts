@@ -1,22 +1,55 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export async function GET() {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data, error } = await supabase
-    .from('integration_keys')
-    .select('id, provider, label, is_active, created_at')
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: 'Failed to load integrations.' }, { status: 500 })
+  finalMeta = { user_id: session.user.id }
+  try {
+    const run = await startJobRun('integrations.list', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
   }
 
-  return NextResponse.json({ keys: data || [] })
+  try {
+    const { data, error } = await supabase
+      .from('integration_keys')
+      .select('id, provider, label, is_active, created_at')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      finalErrorMessage = 'Failed to load integrations.'
+      return NextResponse.json({ error: 'Failed to load integrations.' }, { status: 500 })
+    }
+
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, keys_count: (data || []).length }
+    return NextResponse.json({ keys: data || [] })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }

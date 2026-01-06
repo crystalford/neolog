@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,15 +69,33 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = { asset_id: params.id }
+  let finalErrorMessage: string | undefined = undefined
+
   const includeUsedIn = request.nextUrl.searchParams.get('includeUsedIn') === '1'
+  finalMeta = { ...finalMeta, include_used_in: includeUsedIn }
 
   const auth = await resolveUser(request)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
+  finalMeta = { ...finalMeta, user_id: auth.userId, mode: auth.mode }
+  try {
+    const run = await startJobRun('assets.get', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
+  try {
+
   const db = auth.mode === 'admin' ? createAdminClient() : createClient()
   if (!db) {
+    finalErrorMessage = 'Server misconfigured.'
     return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
   }
 
@@ -90,10 +109,14 @@ export async function GET(
     .single()
 
   if (error || !asset) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'not_found' }
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
   if (!includeUsedIn) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success' }
     return NextResponse.json({ ok: true, asset })
   }
 
@@ -105,11 +128,15 @@ export async function GET(
     .order('created_at', { ascending: false })
 
   if (linksError) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', used_in_count: 0 }
     return NextResponse.json({ ok: true, asset, usedIn: [] })
   }
 
   const postIds = (links || []).map((l: any) => l.post_id).filter(Boolean)
   if (!postIds.length) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', used_in_count: 0 }
     return NextResponse.json({ ok: true, asset, usedIn: [] })
   }
 
@@ -128,17 +155,52 @@ export async function GET(
     })
     .filter(Boolean)
 
+  finalStatus = 'success'
+  finalMeta = { ...finalMeta, result: 'success', used_in_count: usedIn.length }
   return NextResponse.json({ ok: true, asset, usedIn })
+  } catch (e: any) {
+    finalErrorMessage = e?.message || 'Failed to load asset.'
+    return NextResponse.json({ error: 'Failed to load asset.' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = { asset_id: params.id }
+  let finalErrorMessage: string | undefined = undefined
+
   const auth = await resolveUser(request)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
+
+  finalMeta = { ...finalMeta, user_id: auth.userId, mode: auth.mode }
+  try {
+    const run = await startJobRun('assets.update', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
+  try {
 
   const body = (await request.json().catch(() => null)) as PatchBody | null
 
@@ -194,10 +256,12 @@ export async function PATCH(
     const c = body.content.trim()
     if (!c) return NextResponse.json({ error: 'content is required' }, { status: 400 })
     patch.content = c
+    finalMeta = { ...finalMeta, content_len: c.length }
   }
 
   if (body?.tags !== undefined) {
     patch.tags = normalizeTags(body.tags)
+    finalMeta = { ...finalMeta, tags_count: Array.isArray(patch.tags) ? patch.tags.length : 0 }
   }
 
   if (body?.meta !== undefined) {
@@ -219,6 +283,8 @@ export async function PATCH(
   }
 
   if (Object.keys(patch).length === 0) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'no_changes' }
     return NextResponse.json({ error: 'No changes' }, { status: 400 })
   }
 
@@ -226,6 +292,7 @@ export async function PATCH(
 
   const db = auth.mode === 'admin' ? createAdminClient() : createClient()
   if (!db) {
+    finalErrorMessage = 'Server misconfigured.'
     return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
   }
 
@@ -238,23 +305,60 @@ export async function PATCH(
     .single()
 
   if (error || !data) {
+    finalErrorMessage = 'Failed to update asset.'
     return NextResponse.json({ error: 'Failed to update asset.' }, { status: 500 })
   }
 
+  finalStatus = 'success'
+  finalMeta = { ...finalMeta, result: 'success', changed_fields: Object.keys(patch).filter((k) => k !== 'updated_at').length }
   return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    finalErrorMessage = e?.message || 'Failed to update asset.'
+    return NextResponse.json({ error: 'Failed to update asset.' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = { asset_id: params.id }
+  let finalErrorMessage: string | undefined = undefined
+
   const auth = await resolveUser(request)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
 
+  finalMeta = { ...finalMeta, user_id: auth.userId, mode: auth.mode }
+  try {
+    const run = await startJobRun('assets.delete', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
+  try {
+
   const db = auth.mode === 'admin' ? createAdminClient() : createClient()
   if (!db) {
+    finalErrorMessage = 'Server misconfigured.'
     return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
   }
 
@@ -265,8 +369,25 @@ export async function DELETE(
     .eq('user_id', auth.userId)
 
   if (error) {
+    finalErrorMessage = 'Failed to delete asset.'
     return NextResponse.json({ error: 'Failed to delete asset.' }, { status: 500 })
   }
 
+  finalStatus = 'success'
+  finalMeta = { ...finalMeta, result: 'success' }
   return NextResponse.json({ ok: true })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }

@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { logProviderUsage } from "@/lib/usage";
 import { enforceUsageCaps } from "@/lib/usageCaps";
+import { finishJobRun, startJobRun } from "@/lib/jobRuns";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,12 @@ async function resolveActor(req: NextRequest, admin: any): Promise<Actor | null>
 }
 
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
+  let runId: string | null = null;
+  let finalStatus: "success" | "error" = "error";
+  let finalMeta: Record<string, any> = {};
+  let finalErrorMessage: string | undefined = undefined;
+
   try {
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") || "").trim();
@@ -60,12 +67,41 @@ export async function GET(req: NextRequest) {
       ? Math.max(1, Math.min(25, limitParam))
       : 10;
 
+    const seedLimitParam = Number(url.searchParams.get("seed") || "50");
+    const seed = Number.isFinite(seedLimitParam)
+      ? Math.max(0, Math.min(200, seedLimitParam))
+      : 50;
+
+    const maxUpsertsParam = Number(url.searchParams.get("maxUpserts") || "10");
+    const maxUpserts = Number.isFinite(maxUpsertsParam)
+      ? Math.max(0, Math.min(25, maxUpsertsParam))
+      : 10;
+
+    finalMeta = {
+      q_len: q.length,
+      username: username || null,
+      limit,
+      seed,
+      max_upserts: maxUpserts,
+      wants_markdown: wantsMarkdown(req),
+    };
+
+    try {
+      const run = await startJobRun("agent.vector_search", finalMeta);
+      runId = run.id;
+    } catch {
+      // best-effort
+    }
+
     if (!q) {
+      finalStatus = "success";
+      finalMeta = { ...finalMeta, result: "bad_request" };
       return NextResponse.json({ error: "Missing q" }, { status: 400 });
     }
 
     const supabase = createAdminClient();
     if (!supabase) {
+      finalErrorMessage = "Server missing Supabase admin configuration.";
       return NextResponse.json(
         { error: "Server missing Supabase admin configuration." },
         { status: 500 },
@@ -74,15 +110,21 @@ export async function GET(req: NextRequest) {
 
     const actor = await resolveActor(req, supabase);
     if (!actor) {
+      finalStatus = "success";
+      finalMeta = { ...finalMeta, result: "unauthorized" };
       return NextResponse.json(
         { error: "Semantic search requires login + OpenAI key (or Pro managed key)." },
         { status: 401 },
       );
     }
 
+    finalMeta = { ...finalMeta, user_id: actor.userId };
+
     try {
       await enforceUsageCaps({ supabase, userId: actor.userId, provider: "openai" });
     } catch (e: any) {
+      finalStatus = "success";
+      finalMeta = { ...finalMeta, result: "rate_limited" };
       return NextResponse.json(
         { error: e?.message || "Usage cap reached." },
         { status: 429 },
@@ -108,11 +150,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Ensure we have embeddings for the latest posts (small capped batch).
-    const seedLimitParam = Number(url.searchParams.get("seed") || "50");
-    const seed = Number.isFinite(seedLimitParam)
-      ? Math.max(0, Math.min(200, seedLimitParam))
-      : 50;
-
     if (seed > 0) {
       let postsQuery = supabase
         .from("posts")
@@ -150,11 +187,6 @@ export async function GET(req: NextRequest) {
             stale.push({ post_id: post.id, text, hash });
           }
         }
-
-        const maxUpsertsParam = Number(url.searchParams.get("maxUpserts") || "10");
-        const maxUpserts = Number.isFinite(maxUpsertsParam)
-          ? Math.max(0, Math.min(25, maxUpsertsParam))
-          : 10;
 
         for (const item of stale.slice(0, maxUpserts)) {
           const embedding = await embedTextWithOpenAI({
@@ -219,10 +251,14 @@ export async function GET(req: NextRequest) {
     const postIds = (matches || []).map((m: any) => m.post_id);
     if (!postIds.length) {
       if (wantsMarkdown(req)) {
+        finalStatus = "success";
+        finalMeta = { ...finalMeta, result: "success", results_count: 0 };
         return new NextResponse("No results.\n", {
           headers: { "content-type": "text/markdown; charset=utf-8" },
         });
       }
+      finalStatus = "success";
+      finalMeta = { ...finalMeta, result: "success", results_count: 0 };
       return NextResponse.json({ query: q, results: [] });
     }
 
@@ -262,18 +298,34 @@ export async function GET(req: NextRequest) {
       }
 
       lines.push("");
+      finalStatus = "success";
+      finalMeta = { ...finalMeta, result: "success", results_count: ordered.length };
       return new NextResponse(lines.join("\n"), {
         headers: { "content-type": "text/markdown; charset=utf-8" },
       });
     }
-
+    finalStatus = "success";
+    finalMeta = { ...finalMeta, result: "success", results_count: ordered.length };
     return NextResponse.json({
       query: q,
       username: username || null,
       results: ordered,
     });
   } catch (e: any) {
-    const message = e?.message || "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    finalErrorMessage = e?.message || "Unknown error";
+    return NextResponse.json({ error: finalErrorMessage }, { status: 500 });
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        );
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

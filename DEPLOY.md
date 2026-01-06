@@ -149,8 +149,17 @@ Common job names you may see:
 - `inbox.bulk_convert` (Inbox → Draft conversion via `/api/inbox/bulk-convert`)
 - `vault.add` (capture assets via `/api/vault/add`)
 - `agent.ingest`, `agent.draft.update`, `agent.draft.publish`, `agent.embeddings.backfill` (API-key agent endpoints)
+- `agent.post`, `agent.search`, `agent.user`, `agent.vector_search` (read-only agent endpoints)
 - `pulse.summarize`, `pulse.sentiment` (Pulse AI endpoints; session-authenticated)
 - `import.rss` and `import.file` (RSS import and file import endpoints; session-authenticated)
+- `posts.publish`, `posts.update`, `posts.publish.side_effects` (post publishing/update endpoints)
+- `comments.import`, `export.user`, `upload.image`, `account.delete` (ops endpoints)
+- `keys.create`, `keys.revoke`, `keys.list` (API key management)
+- `integrations.save`, `integrations.toggle`, `integrations.delete`, `integrations.list` (integration key management)
+- `stripe.checkout.create`, `stripe.connect.onboarding`, `stripe.connect.status`, `stripe.price.create`, `stripe.tip.create_intent`, `stripe.webhook` (Stripe endpoints)
+- `subscribe.email.start`, `subscribe.email.confirm`, `subscribe.email.unsubscribe` (email subscription flow)
+- `assets.list`, `assets.create`, `assets.get`, `assets.update`, `assets.delete`, `assets.search` (asset endpoints)
+- `analytics.track` (author analytics forwarding)
 
 ## Headless Inbox Webhook (Automation)
 
