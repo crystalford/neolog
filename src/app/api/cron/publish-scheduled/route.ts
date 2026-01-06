@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // This endpoint should be called by a cron job (e.g., Vercel Cron, Supabase Edge Functions)
 // Add to vercel.json: { "crons": [{ "path": "/api/cron/publish-scheduled", "schedule": "*/5 * * * *" }] }
@@ -11,12 +12,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+  let runId: string | null = null
+  try {
+    const started = await startJobRun('cron.publish_scheduled', {
+      path: '/api/cron/publish-scheduled',
+    })
+    runId = started.id
+  } catch {
+    // best-effort only
+  }
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
 
     if (!supabaseUrl || !serviceRoleKey) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing Supabase configuration')
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json(
         { error: 'Missing Supabase configuration' },
         { status: 500 }
@@ -24,6 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (!appUrl) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing NEXT_PUBLIC_APP_URL configuration')
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json(
         { error: 'Missing NEXT_PUBLIC_APP_URL configuration' },
         { status: 500 }
@@ -42,6 +68,13 @@ export async function GET(request: NextRequest) {
     if (fetchError) throw fetchError
 
     if (!scheduledPosts || scheduledPosts.length === 0) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'success', { duration_ms: Date.now() - startedAt, published: 0 })
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json({ published: 0 })
     }
 
@@ -58,12 +91,31 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    if (runId) {
+      try {
+        await finishJobRun(runId, 'success', {
+          duration_ms: Date.now() - startedAt,
+          published: scheduledPosts.length,
+          post_ids: scheduledPosts.map((p) => p.id),
+        })
+      } catch {
+        // ignore
+      }
+    }
+
     return NextResponse.json({ 
       published: scheduledPosts.length,
       posts: scheduledPosts.map(p => ({ id: p.id, title: p.title })),
     })
   } catch (error) {
     console.error('Cron error:', error)
+    if (runId) {
+      try {
+        await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Failed to publish scheduled posts')
+      } catch {
+        // ignore
+      }
+    }
     return NextResponse.json({ error: 'Failed to publish scheduled posts' }, { status: 500 })
   }
 }

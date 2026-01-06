@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // Run weekly: { "crons": [{ "path": "/api/cron/weekly-digest", "schedule": "0 9 * * 0" }] }
 
@@ -10,6 +11,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+  let runId: string | null = null
+  try {
+    const started = await startJobRun('cron.weekly_digest', {
+      path: '/api/cron/weekly-digest',
+    })
+    runId = started.id
+  } catch {
+    // best-effort only
+  }
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -17,6 +29,13 @@ export async function GET(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
 
     if (!supabaseUrl || !serviceRoleKey) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing Supabase configuration')
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json(
         { error: 'Missing Supabase configuration' },
         { status: 500 }
@@ -24,6 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (!resendApiKey) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing Resend API key configuration')
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json(
         { error: 'Missing Resend API key configuration' },
         { status: 500 }
@@ -31,6 +57,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (!appUrl) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing NEXT_PUBLIC_APP_URL configuration')
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json(
         { error: 'Missing NEXT_PUBLIC_APP_URL configuration' },
         { status: 500 }
@@ -50,10 +83,18 @@ export async function GET(request: NextRequest) {
       // .eq('email_weekly_digest', true) // Uncomment when column exists
 
     if (!users || users.length === 0) {
+      if (runId) {
+        try {
+          await finishJobRun(runId, 'success', { duration_ms: Date.now() - startedAt, sent: 0, users: 0 })
+        } catch {
+          // ignore
+        }
+      }
       return NextResponse.json({ sent: 0 })
     }
 
     let sentCount = 0
+    let emailFailures = 0
 
     for (const user of users) {
       // Get posts from creators they follow
@@ -140,12 +181,33 @@ export async function GET(request: NextRequest) {
         sentCount++
       } catch (emailError) {
         console.error(`Failed to send digest to ${user.id}:`, emailError)
+        emailFailures++
+      }
+    }
+
+    if (runId) {
+      try {
+        await finishJobRun(runId, 'success', {
+          duration_ms: Date.now() - startedAt,
+          sent: sentCount,
+          users: users.length,
+          email_failures: emailFailures,
+        })
+      } catch {
+        // ignore
       }
     }
 
     return NextResponse.json({ sent: sentCount })
   } catch (error) {
     console.error('Digest cron error:', error)
+    if (runId) {
+      try {
+        await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Failed to send digests')
+      } catch {
+        // ignore
+      }
+    }
     return NextResponse.json({ error: 'Failed to send digests' }, { status: 500 })
   }
 }
