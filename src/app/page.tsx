@@ -3,112 +3,133 @@ import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import {
-  Code, Eye, Terminal, FileDown,
-  ArrowRight, Sparkles, GitFork, Radio,
-  PenLine, Inbox, Share2, BarChart3, Globe
+  ArrowRight,
+  BarChart3,
+  Globe,
+  Inbox,
+  PenLine,
+  Share2,
 } from 'lucide-react'
 
-async function getFeaturedPosts() {
+export default async function Home() {
   const supabase = createClient()
-  
-  // Get recent popular posts
-  const { data: posts } = await supabase
-    .from('posts')
-    .select(`
-      id,
-      title,
-      slug,
-      subtitle,
-      excerpt,
-      cover_image_url,
-      published_at,
-      reading_time_minutes,
-      author:profiles(id, username, display_name, avatar_url)
-    `)
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
-    .limit(6)
-  
-  return posts || []
-}
 
-async function getStats() {
-  const supabase = createClient()
-  
-  const [postsCount, creatorsCount] = await Promise.all([
+  const [{ data: auth }, featuredPostsRes, postsCountRes, creatorsCountRes] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase
+      .from('posts')
+      .select(
+        [
+          'id',
+          'title',
+          'slug',
+          'subtitle',
+          'excerpt',
+          'cover_image_url',
+          'published_at',
+          'reading_time_minutes',
+          'author:profiles(id, username, display_name, avatar_url)',
+        ].join(','),
+      )
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(6),
     supabase.from('posts').select('*', { count: 'exact', head: true }).eq('status', 'published'),
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
   ])
-  
-  return {
-    posts: postsCount.count || 0,
-    creators: creatorsCount.count || 0,
-  }
-}
 
-export default async function Home() {
-  const [featuredPosts, stats] = await Promise.all([
-    getFeaturedPosts(),
-    getStats(),
-  ])
+  const session = auth?.session ?? null
+  const featuredPosts = featuredPostsRes.data || []
+  const stats = {
+    posts: postsCountRes.count || 0,
+    creators: creatorsCountRes.count || 0,
+  }
+
   return (
     <>
       <Header />
 
       <main className="pt-14">
-        {/* Hero - Compact and professional */}
-        <section className="relative px-6 lg:px-12 pt-16 pb-16 overflow-hidden">
-          {/* Subtle gradient background */}
+        {/* Hero */}
+        <section className="relative px-6 lg:px-12 pt-16 pb-10 overflow-hidden">
           <div
-            className="absolute top-0 right-0 w-[1000px] h-[1000px] opacity-[0.02] pointer-events-none blur-3xl"
+            className="absolute top-0 right-0 w-[900px] h-[900px] opacity-[0.02] pointer-events-none blur-3xl"
             style={{
               background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)',
-              transform: 'translate(40%, -40%)',
+              transform: 'translate(45%, -45%)',
             }}
           />
 
           <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-10 items-center">
-              <div className="animate-fade-up">
-                {/* Main headline */}
+            <div className="grid lg:grid-cols-2 gap-10 items-start">
+              <div>
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
-                  Capture → Vault → Publish{' '}
-                  <span className="text-[var(--text-tertiary)]">with full ownership.</span>
+                  Capture-first publishing.
+                  <span className="block text-[var(--text-tertiary)]">Own the core. Broadcast everywhere.</span>
                 </h1>
 
-                {/* Subheadline */}
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
-                  Neolog is creative infrastructure for capture-first creators: collect inputs from anywhere, organize them into publications,
-                  turn them into posts, then distribute and measure.
+                  Collect inputs from anywhere, organize them into publications, turn them into posts, then distribute and measure — without
+                  losing your source of truth.
                 </p>
 
-                <p className="text-sm text-[var(--text-tertiary)] mb-7">
-                  Pipeline: <span className="text-[var(--text-secondary)]">Capture → Organize → Monitor → Compose → Distribute → Analyze</span>
-                </p>
-
-                {/* CTA */}
                 <div className="flex flex-wrap gap-3 items-center">
-                  <Link href="/signup" className="btn btn-primary">
-                    Start writing
-                  </Link>
-                  <Link href="/explore" className="btn btn-secondary">
-                    Explore
-                  </Link>
+                  {session ? (
+                    <>
+                      <Link href="/dashboard" className="btn btn-primary">
+                        Open dashboard
+                      </Link>
+                      <Link href="/write" className="btn btn-secondary">
+                        New post
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link href="/signup" className="btn btn-primary">
+                        Start writing
+                      </Link>
+                      <Link href="/explore" className="btn btn-secondary">
+                        Explore
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Visual element - Code preview */}
+              {/* Compact value summary */}
               <div className="hidden lg:block">
-                <div className="relative bg-[var(--bg-inverse)] rounded-lg p-6 border border-[var(--border-heavy)]">
-                  <div className="font-mono text-sm leading-relaxed">
-                    <div className="text-purple-400">&lt;article&gt;</div>
-                    <div className="pl-4 text-blue-400">&lt;h1&gt;</div>
-                    <div className="pl-8 text-gray-300">Publish HTML</div>
-                    <div className="pl-4 text-blue-400">&lt;/h1&gt;</div>
-                    <div className="pl-4 text-blue-400 mt-2">&lt;p&gt;</div>
-                    <div className="pl-8 text-gray-300">No friction.</div>
-                    <div className="pl-4 text-blue-400">&lt;/p&gt;</div>
-                    <div className="text-purple-400 mt-2">&lt;/article&gt;</div>
+                <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Pipeline</p>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                        <Inbox size={16} className="text-[var(--text-secondary)]" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">Capture</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Links, snippets, notes, prompts.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                        <PenLine size={16} className="text-[var(--text-secondary)]" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">Compose</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Drafts, revisions, previews.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                        <Share2 size={16} className="text-[var(--text-secondary)]" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">Distribute</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Threads, newsletters, feeds.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -116,7 +137,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Pipeline */}
+        {/* Pipeline cards */}
         <section className="px-6 lg:px-12 py-8">
           <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
             {[
@@ -146,12 +167,13 @@ export default async function Home() {
                 <h2 className="font-display text-2xl text-[var(--text-primary)]">Start with the task</h2>
               </div>
               <Link
-                href="/dashboard"
+                href={session ? '/dashboard' : '/signup'}
                 className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               >
-                Open dashboard
+                {session ? 'Open dashboard' : 'Get started'}
               </Link>
             </div>
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 {
@@ -184,19 +206,13 @@ export default async function Home() {
                   href: '/analytics',
                   icon: BarChart3,
                 },
-                {
-                  label: 'Explore posts',
-                  description: 'See what the community is publishing.',
-                  href: '/explore',
-                  icon: Sparkles,
-                },
               ].map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-secondary)]/60 transition-colors"
+                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
                   >
                     <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                       <Icon size={16} className="text-[var(--text-secondary)]" />
@@ -208,6 +224,19 @@ export default async function Home() {
                   </Link>
                 )
               })}
+
+              <Link
+                href="/explore"
+                className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
+              >
+                <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Explore posts</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">See what the community is publishing.</p>
+                </div>
+              </Link>
             </div>
           </div>
         </section>
@@ -269,157 +298,6 @@ export default async function Home() {
           </section>
         )}
 
-        {/* The Problem / Solution */}
-        <section className="px-6 lg:px-12 py-24">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-14 items-center">
-              <div className="space-y-12">
-                <div>
-                  <span className="inline-flex items-center gap-2 text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-6 px-3 py-1.5 bg-[var(--bg-secondary)] rounded-full">
-                    The problem
-                  </span>
-                  <h3 className="font-display text-3xl md:text-4xl lg:text-5xl mb-6 leading-tight">
-                    Publishing tools turn your work into their format and their feed.
-                  </h3>
-                  <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                    Your writing becomes a destination link, throttled by algorithms and trapped in templates.
-                    The result is content without a true source of truth.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">X</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Custom CSS stripped</p>
-                  </div>
-                  <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">X</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Scripts blocked</p>
-                  </div>
-                  <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">X</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Format destroyed</p>
-                  </div>
-                  <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
-                    <p className="text-2xl mb-1">X</p>
-                    <p className="text-sm text-[var(--text-secondary)]">Lock-in forever</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-12">
-                <div>
-                  <span className="inline-flex items-center gap-2 text-[var(--accent)] text-xs font-medium uppercase tracking-wider mb-6 px-3 py-1.5 bg-[var(--accent-soft)] rounded-full">
-                    The solution
-                  </span>
-                  <h3 className="font-display text-3xl md:text-4xl lg:text-5xl mb-6 leading-tight">
-                    Neolog is the core node. Everything else is a broadcast.
-                  </h3>
-                  <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                    Your content lives in a structured, versioned core, then ships outward as feeds,
-                    threads, newsletters, and integrations.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">OK</p>
-                    <p className="text-sm text-[var(--text-primary)]">Full CSS support</p>
-                  </div>
-                  <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">OK</p>
-                    <p className="text-sm text-[var(--text-primary)]">Scripts allowed</p>
-                  </div>
-                  <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">OK</p>
-                    <p className="text-sm text-[var(--text-primary)]">Perfect rendering</p>
-                  </div>
-                  <div className="p-6 bg-[var(--accent-soft)] rounded-xl border border-[var(--accent)]/20">
-                    <p className="text-2xl mb-1">OK</p>
-                    <p className="text-sm text-[var(--text-primary)]">Export anytime</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features - Clean grid */}
-        <section className="px-6 lg:px-12 py-24 bg-[var(--bg-primary)]">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="font-display text-4xl md:text-5xl lg:text-6xl mb-6 leading-tight">
-                Everything you need.{' '}
-                <span className="italic text-[var(--text-secondary)]">Nothing you don't.</span>
-              </h2>
-              <p className="text-xl text-[var(--text-secondary)] max-w-2xl mx-auto">
-                Built for creators who want full control
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  icon: Code,
-                  title: 'Native HTML',
-                  description: 'Full document support. Your CSS, your scripts, your formatting - rendered exactly.',
-                  badge: null,
-                },
-                {
-                  icon: Eye,
-                  title: 'Live preview',
-                  description: 'Side-by-side editing. See exactly what readers will see, in real time.',
-                  badge: null,
-                },
-                {
-                  icon: Terminal,
-                  title: 'Code that runs',
-                  description: 'Interactive demos, syntax highlighting, copy buttons. Code should be alive.',
-                  badge: 'interactive',
-                },
-                {
-                  icon: GitFork,
-                  title: 'Forkable posts',
-                  description: 'Readers can fork your work. See the lineage. Build on ideas.',
-                  badge: 'coming soon',
-                },
-                {
-                  icon: Radio,
-                  title: 'Live documents',
-                  description: 'Posts that update themselves. Pull live data. Real-time embeds.',
-                  badge: 'coming soon',
-                },
-                {
-                  icon: FileDown,
-                  title: 'Export anywhere',
-                  description: 'HTML, Markdown, PDF, EPUB. Your content is yours. No lock-in.',
-                  badge: null,
-                },
-              ].map((feature, i) => (
-                <div
-                  key={i}
-                  className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-xl transition-all duration-300"
-                >
-                  <div className="flex items-start justify-between mb-8">
-                    <div className="w-14 h-14 rounded-2xl bg-[var(--accent-softer)] flex items-center justify-center group-hover:bg-[var(--accent-soft)] group-hover:scale-110 transition-all duration-300">
-                      <feature.icon size={24} className="text-[var(--accent)]" />
-                    </div>
-                    {feature.badge && (
-                      <span className={`doc-badge ${feature.badge === 'interactive' ? 'doc-badge-interactive' : ''}`}>
-                        {feature.badge}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-display text-xl mb-3">{feature.title}</h3>
-                  <p className="text-[var(--text-secondary)] text-base leading-relaxed">
-                    {feature.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* Final CTA */}
         <section className="relative px-6 lg:px-12 py-16 bg-[var(--bg-secondary)] border-t border-[var(--border-light)]">
           <div className="relative max-w-4xl mx-auto text-center">
@@ -432,12 +310,25 @@ export default async function Home() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link href="/signup" className="btn btn-primary">
-                Start writing
-              </Link>
-              <Link href="/explore" className="btn btn-secondary">
-                Explore
-              </Link>
+              {session ? (
+                <>
+                  <Link href="/dashboard" className="btn btn-primary">
+                    Open dashboard
+                  </Link>
+                  <Link href="/explore" className="btn btn-secondary">
+                    Explore
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/signup" className="btn btn-primary">
+                    Start writing
+                  </Link>
+                  <Link href="/explore" className="btn btn-secondary">
+                    Explore
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </section>
@@ -471,7 +362,7 @@ export default async function Home() {
 
             <div className="mt-8 pt-8 border-t border-[var(--border-light)]">
               <p className="text-xs text-[var(--text-tertiary)] text-center">
-                (c) 2025 Neolog
+                (c) 2026 Neolog
               </p>
             </div>
           </div>
