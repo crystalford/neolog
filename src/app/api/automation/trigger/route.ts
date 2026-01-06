@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
 import { parseRss } from '@/lib/rss/parse'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export async function POST(request: NextRequest) {
   const auth = await requireAutomationKey(request)
@@ -18,6 +19,18 @@ export async function POST(request: NextRequest) {
   const event = typeof body.event === 'string' ? body.event : ''
 
   if (event === 'inbox.create') {
+    const startedAt = Date.now()
+    let runId: string | null = null
+    try {
+      const run = await startJobRun('automation.trigger.inbox.create', {
+        event,
+        user_id: auth.userId,
+      })
+      runId = run.id
+    } catch {
+      // best-effort: don't break the automation endpoint if job tables aren't deployed
+    }
+
     const sourceType = typeof body.sourceType === 'string' ? body.sourceType : 'webhook'
     const title = typeof body.title === 'string' ? body.title : null
     const canonicalUrl = typeof body.canonicalUrl === 'string' ? body.canonicalUrl : null
@@ -39,13 +52,48 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !data) {
+      try {
+        if (runId) {
+          await finishJobRun(
+            runId,
+            'error',
+            { duration_ms: Date.now() - startedAt },
+            error?.message || 'Failed to create inbox item.',
+          )
+        }
+      } catch {
+        // best-effort
+      }
       return NextResponse.json({ error: 'Failed to create inbox item.' }, { status: 500 })
+    }
+
+    try {
+      if (runId) {
+        await finishJobRun(runId, 'success', {
+          duration_ms: Date.now() - startedAt,
+          inbox_item_id: data.id,
+        })
+      }
+    } catch {
+      // best-effort
     }
 
     return NextResponse.json({ id: data.id })
   }
 
   if (event === 'rss.pull') {
+    const startedAt = Date.now()
+    let runId: string | null = null
+    try {
+      const run = await startJobRun('automation.trigger.rss.pull', {
+        event,
+        user_id: auth.userId,
+      })
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     const { data: sources, error: sourcesError } = await admin
       .from('feed_sources')
       .select('id, url')
@@ -54,6 +102,18 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
 
     if (sourcesError) {
+      try {
+        if (runId) {
+          await finishJobRun(
+            runId,
+            'error',
+            { duration_ms: Date.now() - startedAt },
+            sourcesError.message || 'Failed to load sources.',
+          )
+        }
+      } catch {
+        // best-effort
+      }
       return NextResponse.json({ error: 'Failed to load sources.' }, { status: 500 })
     }
 
@@ -107,6 +167,18 @@ export async function POST(request: NextRequest) {
       } catch {
         // swallow per-source errors so one bad feed doesn't break the batch
       }
+    }
+
+    try {
+      if (runId) {
+        await finishJobRun(runId, 'success', {
+          duration_ms: Date.now() - startedAt,
+          inserted,
+          sources_count: (sources || []).length,
+        })
+      }
+    } catch {
+      // best-effort
     }
 
     return NextResponse.json({ inserted })
