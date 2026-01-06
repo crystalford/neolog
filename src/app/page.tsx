@@ -127,67 +127,110 @@ export default async function Home() {
 
               {/* Compact value summary */}
               <div className="hidden lg:block">
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
-                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Pipeline</p>
-                    <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                        <Inbox size={16} className="text-[var(--text-secondary)]" />
+                <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
+                  <div className="px-5 py-4 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                        <Boxes size={16} className="text-[var(--accent)]" />
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">Capture</p>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Links, snippets, notes, prompts.</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)] leading-none">Neolog</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Capture → Vault → Publish</p>
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                        <PenLine size={16} className="text-[var(--text-secondary)]" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">Compose</p>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Drafts, revisions, previews.</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                        <Share2 size={16} className="text-[var(--text-secondary)]" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)]">Distribute</p>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Threads, newsletters, feeds.</p>
-                      </div>
-                    </div>
-                    </div>
+                    <span className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1">
+                      Live preview
+                    </span>
                   </div>
 
-                  <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
-                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Integrations</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: 'RSS', icon: Rss },
-                        { label: 'Webhooks', icon: Webhook },
-                        { label: 'Email', icon: Mail },
-                        { label: 'Sources', icon: Globe },
-                        { label: 'Exports', icon: Boxes },
-                        { label: 'Distribution', icon: Share2 },
-                      ].map((item) => {
-                        const Icon = item.icon
-                        return (
-                          <div key={item.label} className="flex items-center gap-2">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <div className="p-5">
+                    <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-stretch gap-3">
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Inbox size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Inbox</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Link: research memo</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Tagged • Saved 2m ago</p>
+                          </div>
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Snippet: launch copy</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Draft • Needs review</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Boxes size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Vault</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Publication: Growth</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">12 sources • 48 items</p>
+                          </div>
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Search: “onboarding”</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Notes • Posts • Snippets</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <PenLine size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Publish</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Draft: Product update</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Preview • 7 min read</p>
+                          </div>
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center justify-between gap-2">
+                            <p className="text-xs text-[var(--text-primary)] font-medium">Distribute</p>
+                            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-tertiary)]">
+                              <Share2 size={12} /> Pack
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Integrates with</p>
+                        <div className="flex items-center gap-2">
+                          {[Rss, Webhook, Mail, Globe].map((Icon, idx) => (
+                            <span key={idx} className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                               <Icon size={14} className="text-[var(--text-secondary)]" />
                             </span>
-                            <p className="text-sm text-[var(--text-secondary)]">{item.label}</p>
-                          </div>
-                        )
-                      })}
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2">Connect inputs and push outputs without losing provenance.</p>
                     </div>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-4">
-                      Connect inputs and push outputs without losing provenance.
-                    </p>
                   </div>
                 </div>
               </div>
