@@ -5,6 +5,80 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, Rss, Radio, Inbox, BarChart3, Clock, AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { readSelectedPublicationId } from '@/lib/publicationContext'
+
+type QueueItem = {
+  id: string
+  title: string | null
+  canonical_url: string | null
+  source_url: string | null
+  source_type: string
+  status: 'new' | 'imported' | 'ignored'
+  raw_data: any
+  created_at: string
+}
+
+function normalizeTags(input: unknown): string[] {
+  const tags = Array.isArray(input) ? input : []
+  return tags
+    .filter((t): t is string => typeof t === 'string')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 50)
+}
+
+function toVaultPayload(item: QueueItem): {
+  type: 'link' | 'text' | 'fragment'
+  title: string | null
+  content: string
+  tags: string[]
+  source: string
+  sourceUrl: string | null
+  meta: Record<string, any>
+} {
+  const title = item.title || (typeof item.raw_data?.title === 'string' ? item.raw_data.title : null)
+  const tags = normalizeTags(item.raw_data?.tags)
+
+  const canonicalUrl = item.canonical_url || (typeof item.raw_data?.canonical_url === 'string' ? item.raw_data.canonical_url : null)
+  const sourceUrl = item.source_url || (typeof item.raw_data?.source_url === 'string' ? item.raw_data.source_url : null)
+
+  if (canonicalUrl) {
+    return {
+      type: 'link',
+      title,
+      content: canonicalUrl,
+      tags,
+      source: item.source_type,
+      sourceUrl: canonicalUrl,
+      meta: {
+        inbox_item_id: item.id,
+        canonical_url: canonicalUrl,
+        source_url: sourceUrl,
+        raw_data: item.raw_data || {},
+      },
+    }
+  }
+
+  const content =
+    (typeof item.raw_data?.content === 'string' ? item.raw_data.content : null) ||
+    (typeof item.raw_data?.content_html === 'string' ? item.raw_data.content_html : null) ||
+    ''
+
+  return {
+    type: content.length > 400 ? 'text' : 'fragment',
+    title,
+    content,
+    tags,
+    source: item.source_type,
+    sourceUrl,
+    meta: {
+      inbox_item_id: item.id,
+      canonical_url: canonicalUrl,
+      source_url: sourceUrl,
+      raw_data: item.raw_data || {},
+    },
+  }
+}
 
 export default function MonitorsPage() {
   const router = useRouter()
@@ -17,6 +91,10 @@ export default function MonitorsPage() {
   const [sourcesStaleCount, setSourcesStaleCount] = useState<number>(0)
   const [syndicationErrorCount, setSyndicationErrorCount] = useState<number>(0)
   const [scheduledDueSoonCount, setScheduledDueSoonCount] = useState<number>(0)
+
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([])
+  const [promotingId, setPromotingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const hasAnyIssues = useMemo(
     () => inboxNewCount + sourcesStaleCount + syndicationErrorCount + scheduledDueSoonCount > 0,
@@ -45,11 +123,18 @@ export default function MonitorsPage() {
       dueSoonCutoff.setHours(dueSoonCutoff.getHours() + 24)
 
       try {
-        const [{ count: inboxCount }, { count: staleSources }, { count: syndicationErrors }, { count: dueSoon }]
+        const [
+          { count: inboxCount },
+          { count: staleSources },
+          { count: syndicationErrors },
+          { count: dueSoon },
+          { data: queue },
+        ]
           = await Promise.all([
             supabase
               .from('inbox_items')
               .select('id', { count: 'exact', head: true })
+              .eq('user_id', authorId)
               .eq('status', 'new'),
 
             supabase
@@ -70,12 +155,21 @@ export default function MonitorsPage() {
               .eq('author_id', authorId)
               .eq('status', 'scheduled')
               .lte('scheduled_at', dueSoonCutoff.toISOString()),
+
+            supabase
+              .from('inbox_items')
+              .select('id, title, canonical_url, source_url, source_type, status, raw_data, created_at')
+              .eq('user_id', authorId)
+              .eq('status', 'new')
+              .order('created_at', { ascending: false })
+              .limit(20),
           ])
 
         setInboxNewCount(inboxCount || 0)
         setSourcesStaleCount(staleSources || 0)
         setSyndicationErrorCount(syndicationErrors || 0)
         setScheduledDueSoonCount(dueSoon || 0)
+        setQueueItems((queue || []) as QueueItem[])
       } catch {
         setError('Failed to load monitor data.')
       } finally {
@@ -97,6 +191,9 @@ export default function MonitorsPage() {
             </p>
             {error && (
               <p className="text-sm text-[var(--error)] mt-2">{error}</p>
+            )}
+            {actionError && (
+              <p className="text-sm text-[var(--error)] mt-2">{actionError}</p>
             )}
           </div>
         </div>
@@ -201,6 +298,143 @@ export default function MonitorsPage() {
               ? 'Open the cards above to resolve outstanding items.'
               : 'No urgent items detected. (Monitors will expand into alerts and rollups per v3.1.)'}
           </p>
+        </div>
+
+        <div className="mt-6">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-sm font-medium text-[var(--text-primary)]">Review queue</h2>
+            <Link
+              href="/inbox"
+              className="text-sm text-[var(--accent)] hover:underline"
+            >
+              Open Inbox
+            </Link>
+          </div>
+
+          <div className="mt-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden">
+            {loading ? (
+              <div className="p-4 text-sm text-[var(--text-secondary)]">Loading…</div>
+            ) : queueItems.length === 0 ? (
+              <div className="p-4 text-sm text-[var(--text-secondary)]">No new inbox items to review.</div>
+            ) : (
+              <div className="divide-y divide-[var(--border-light)]">
+                {queueItems.map((item) => {
+                  const title = item.title || item.raw_data?.title || 'Untitled'
+                  const url = item.canonical_url || item.source_url || null
+                  const createdAt = new Date(item.created_at).toLocaleString()
+
+                  return (
+                    <div key={item.id} className="p-4 flex items-start gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-[var(--text-primary)] truncate">{String(title)}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
+                            {item.source_type}
+                          </span>
+                        </div>
+                        {url && (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-xs text-[var(--text-tertiary)] hover:underline mt-1 truncate"
+                          >
+                            {url}
+                          </a>
+                        )}
+                        <div className="text-xs text-[var(--text-tertiary)] mt-1">{createdAt}</div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          disabled={promotingId === item.id}
+                          onClick={async () => {
+                            if (promotingId) return
+                            setActionError(null)
+                            setPromotingId(item.id)
+
+                            try {
+                              const payload = toVaultPayload(item)
+                              const publicationId = readSelectedPublicationId()
+
+                              const resp = await fetch('/api/vault/add', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  type: payload.type,
+                                  title: payload.title,
+                                  content: payload.content,
+                                  tags: payload.tags,
+                                  publicationId: publicationId || null,
+                                  source: payload.source,
+                                  sourceUrl: payload.sourceUrl,
+                                  meta: payload.meta,
+                                }),
+                              })
+
+                              const json = await resp.json().catch(() => null)
+                              if (!resp.ok || !json?.id) {
+                                setActionError(json?.error || 'Failed to promote to Vault.')
+                                setPromotingId(null)
+                                return
+                              }
+
+                              const promotedMeta = {
+                                ...(item.raw_data || {}),
+                                promoted_to_vault_asset_id: json.id,
+                                promoted_to_vault_at: new Date().toISOString(),
+                              }
+
+                              await supabase
+                                .from('inbox_items')
+                                .update({ status: 'ignored', raw_data: promotedMeta })
+                                .eq('id', item.id)
+
+                              setQueueItems((prev) => prev.filter((row) => row.id !== item.id))
+                              setInboxNewCount((prev) => Math.max(0, prev - 1))
+                            } catch {
+                              setActionError('Failed to promote to Vault.')
+                            } finally {
+                              setPromotingId(null)
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-60"
+                        >
+                          {promotingId === item.id ? 'Promoting…' : 'Promote to Vault'}
+                        </button>
+
+                        <button
+                          disabled={promotingId === item.id}
+                          onClick={async () => {
+                            if (promotingId) return
+                            setActionError(null)
+                            setPromotingId(item.id)
+
+                            try {
+                              await supabase
+                                .from('inbox_items')
+                                .update({ status: 'ignored' })
+                                .eq('id', item.id)
+
+                              setQueueItems((prev) => prev.filter((row) => row.id !== item.id))
+                              setInboxNewCount((prev) => Math.max(0, prev - 1))
+                            } catch {
+                              setActionError('Failed to update inbox item.')
+                            } finally {
+                              setPromotingId(null)
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--border-medium)] disabled:opacity-60"
+                        >
+                          Ignore
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
