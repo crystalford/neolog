@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,13 +8,33 @@ export const dynamic = 'force-dynamic'
 // GET /api/social-cards?postId=xxx
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const { searchParams } = new URL(request.url)
     const postId = searchParams.get('postId')
     const title = searchParams.get('title')
     const author = searchParams.get('author')
 
+    finalMeta = {
+      has_post_id: Boolean(postId),
+      title_len: typeof title === 'string' ? title.length : null,
+      author_len: typeof author === 'string' ? author.length : null,
+    }
+    try {
+      const run = await startJobRun('social_cards.render', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     if (!postId && !title) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
       return NextResponse.json({ error: 'postId or title required' }, { status: 400 })
     }
 
@@ -90,6 +111,9 @@ export async function GET(request: NextRequest) {
       </svg>
     `
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', used_post_lookup: Boolean(postId) }
+
     return new NextResponse(svg, {
       headers: {
         'Content-Type': 'image/svg+xml',
@@ -98,7 +122,21 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Social card error:', error)
+    finalErrorMessage = (error as any)?.message || 'Internal server error'
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 

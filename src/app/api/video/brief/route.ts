@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -10,19 +11,36 @@ const buildFallback = (title: string, excerpt: string) =>
   `Today’s brief: ${title}. ${excerpt || 'Summarize the key points and why they matter.'}`
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const postId = typeof body.postId === 'string' ? body.postId : ''
-  const provider = body.provider === 'synthesia' ? 'synthesia' : 'heygen'
+  try {
+    const body = await request.json().catch(() => ({} as any))
+    const postId = typeof (body as any).postId === 'string' ? (body as any).postId : ''
+    const provider = (body as any).provider === 'synthesia' ? 'synthesia' : 'heygen'
 
-  if (!postId) {
-    return NextResponse.json({ error: 'postId is required.' }, { status: 400 })
-  }
+    finalMeta = { user_id: session.user.id, post_id: postId || null, provider }
+    try {
+      const run = await startJobRun('video.brief.create', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
+    if (!postId) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
+      return NextResponse.json({ error: 'postId is required.' }, { status: 400 })
+    }
 
   const { data: post } = await supabase
     .from('posts')
@@ -31,9 +49,11 @@ export async function POST(request: NextRequest) {
     .eq('author_id', session.user.id)
     .maybeSingle()
 
-  if (!post) {
-    return NextResponse.json({ error: 'Post not found.' }, { status: 404 })
-  }
+    if (!post) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'not_found' }
+      return NextResponse.json({ error: 'Post not found.' }, { status: 404 })
+    }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -134,8 +154,34 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
+    finalErrorMessage = 'Failed to create video brief.'
     return NextResponse.json({ error: 'Failed to create video brief.' }, { status: 500 })
   }
 
-  return NextResponse.json({ brief, meta: { cap_blocked: capBlocked } })
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      result: 'success',
+      brief_id: brief?.id || null,
+      cap_blocked: capBlocked,
+      script_len: typeof script === 'string' ? script.length : null,
+    }
+    return NextResponse.json({ brief, meta: { cap_blocked: capBlocked } })
+  } catch (e: any) {
+    finalErrorMessage = e?.message || 'Failed to create video brief.'
+    return NextResponse.json({ error: 'Failed to create video brief.' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }

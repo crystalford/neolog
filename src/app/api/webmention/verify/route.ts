@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 /**
  * Webmention Verification
@@ -14,6 +15,12 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -30,7 +37,17 @@ export async function POST(request: NextRequest) {
     // Verify cron secret
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      finalStatus = 'success'
+      finalMeta = { result: 'unauthorized' }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    finalMeta = { batch_limit: 50 }
+    try {
+      const run = await startJobRun('webmention.verify', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
     }
 
     // Get unverified webmentions
@@ -41,6 +58,8 @@ export async function POST(request: NextRequest) {
       .limit(50)
 
     if (!pending || pending.length === 0) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'success', processed: 0, verified: 0, failed: 0 }
       return NextResponse.json({ message: 'No pending webmentions', processed: 0 })
     }
 
@@ -106,6 +125,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', processed: pending.length, verified, failed }
+
     return NextResponse.json({
       message: 'Verification complete',
       processed: pending.length,
@@ -114,7 +136,21 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Webmention verification error:', error)
+    finalErrorMessage = (error as any)?.message || 'Internal error'
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 

@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { MAX_PULSE_CARDS } from '@/lib/pulse'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const { topic } = await request.json()
 
+    finalMeta = { topic_len: typeof topic === 'string' ? topic.length : null }
+    try {
+      const run = await startJobRun('pulse.curate', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     if (!topic || typeof topic !== 'string') {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
       return NextResponse.json({ error: 'topic is required' }, { status: 400 })
     }
 
@@ -51,11 +68,34 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      result: 'success',
+      cards_returned: Math.min(cards.length, MAX_PULSE_CARDS),
+      reddit_ok: redditResponse.ok,
+      hn_ok: hnResponse.ok,
+    }
+
     return NextResponse.json({
       cards: cards.slice(0, MAX_PULSE_CARDS),
     })
   } catch (error) {
     console.error('Pulse curate error:', error)
+    finalErrorMessage = (error as any)?.message || 'Failed to curate sources.'
     return NextResponse.json({ error: 'Failed to curate sources.' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

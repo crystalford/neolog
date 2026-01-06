@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -81,6 +82,12 @@ async function getAiSummary(
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
@@ -88,24 +95,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { postId } = await request.json()
-  if (!postId) {
-    return NextResponse.json({ error: 'postId is required' }, { status: 400 })
-  }
+  try {
+    const body = await request.json().catch(() => ({} as any))
+    const postId = (body as any)?.postId
 
-  const { data: post, error: postError } = await supabase
-    .from('posts')
-    .select('id, author_id, title, excerpt, content, content_html')
-    .eq('id', postId)
-    .eq('author_id', session.user.id)
-    .single()
+    finalMeta = { user_id: session.user.id, post_id: typeof postId === 'string' ? postId : null }
+    try {
+      const run = await startJobRun('posts.summary', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
 
-  if (postError || !post) {
-    return NextResponse.json({ error: 'Post not found' }, { status: 404 })
-  }
+    if (!postId) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
+      return NextResponse.json({ error: 'postId is required' }, { status: 400 })
+    }
 
-  const plain = stripHtml(post.content_html || post.content || '')
-  const base = plain || post.excerpt || post.title
+    const { data: post, error: postError } = await supabase
+      .from('posts')
+      .select('id, author_id, title, excerpt, content, content_html')
+      .eq('id', postId)
+      .eq('author_id', session.user.id)
+      .single()
+
+    if (postError || !post) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'not_found' }
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
+
+    const plain = stripHtml(post.content_html || post.content || '')
+    const base = plain || post.excerpt || post.title
+    finalMeta = { ...finalMeta, base_len: typeof base === 'string' ? base.length : null }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -113,76 +136,106 @@ export async function POST(request: NextRequest) {
     .eq('id', post.author_id)
     .single()
 
-  const groqKey = await resolveProviderKey(session.user.id, 'groq')
-  const openaiKey = await resolveProviderKey(session.user.id, 'openai')
-  let apiKey = groqKey?.key || openaiKey?.key || ''
-  let capBlocked = false
-  const apiUrl = groqKey
-    ? 'https://api.groq.com/openai/v1/chat/completions'
-    : 'https://api.openai.com/v1/chat/completions'
-  const model = groqKey
-    ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
-    : MODEL
+    const groqKey = await resolveProviderKey(session.user.id, 'groq')
+    const openaiKey = await resolveProviderKey(session.user.id, 'openai')
+    let apiKey = groqKey?.key || openaiKey?.key || ''
+    let capBlocked = false
+    const apiUrl = groqKey
+      ? 'https://api.groq.com/openai/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions'
+    const model = groqKey
+      ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
+      : MODEL
 
-  if (apiKey) {
-    try {
-      await enforceUsageCaps({
-        supabase,
-        userId: session.user.id,
-        provider: groqKey ? 'groq' : 'openai',
-      })
-    } catch {
-      capBlocked = true
-      apiKey = ''
+    if (apiKey) {
+      try {
+        await enforceUsageCaps({
+          supabase,
+          userId: session.user.id,
+          provider: groqKey ? 'groq' : 'openai',
+        })
+      } catch {
+        capBlocked = true
+        apiKey = ''
+      }
     }
-  }
 
-  if (!apiKey) {
-    const fallback = getFallbackSummary(base)
+    if (!apiKey) {
+      const fallback = getFallbackSummary(base)
+      const payload = {
+        post_id: post.id,
+        author_id: post.author_id,
+        summary: fallback.summary,
+        bullets: fallback.bullets,
+        model: fallback.model,
+      }
+
+      await supabase
+        .from('post_summaries')
+        .upsert(payload, { onConflict: 'post_id' })
+
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'success', model: 'fallback', cap_blocked: capBlocked }
+      return NextResponse.json({ summary: payload, meta: { cap_blocked: capBlocked } })
+    }
+
+    let result = await getAiSummary(base, apiKey, profile?.context_md, apiUrl, model)
+    if (!result) {
+      result = getFallbackSummary(base)
+    }
+
+    if ((result as any)?.usage) {
+      const provider = groqKey ? 'groq' : 'openai'
+      await logProviderUsage({
+        userId: session.user.id,
+        provider,
+        model,
+        route: '/api/posts/summary',
+        operation: 'chat.completions',
+        usage: (result as any).usage,
+        metadata: { fallback: false },
+      })
+    }
+
     const payload = {
       post_id: post.id,
       author_id: post.author_id,
-      summary: fallback.summary,
-      bullets: fallback.bullets,
-      model: fallback.model,
+      summary: result.summary,
+      bullets: result.bullets,
+      model: result.model,
     }
 
     await supabase
       .from('post_summaries')
       .upsert(payload, { onConflict: 'post_id' })
 
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      result: 'success',
+      model: result.model,
+      provider: groqKey ? 'groq' : 'openai',
+      cap_blocked: capBlocked,
+      used_ai: Boolean((result as any)?.usage),
+      bullets_count: Array.isArray(result.bullets) ? result.bullets.length : null,
+      summary_len: typeof result.summary === 'string' ? result.summary.length : null,
+    }
     return NextResponse.json({ summary: payload, meta: { cap_blocked: capBlocked } })
+  } catch (e: any) {
+    finalErrorMessage = e?.message || 'Failed to summarize post'
+    return NextResponse.json({ error: 'Failed to summarize post' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
-
-  let result = await getAiSummary(base, apiKey, profile?.context_md, apiUrl, model)
-  if (!result) {
-    result = getFallbackSummary(base)
-  }
-
-  if ((result as any)?.usage) {
-    const provider = groqKey ? 'groq' : 'openai'
-    await logProviderUsage({
-      userId: session.user.id,
-      provider,
-      model,
-      route: '/api/posts/summary',
-      operation: 'chat.completions',
-      usage: (result as any).usage,
-      metadata: { fallback: false },
-    })
-  }
-
-  const payload = {
-    post_id: post.id,
-    author_id: post.author_id,
-    summary: result.summary,
-    bullets: result.bullets,
-    model: result.model,
-  }
-
-  await supabase
-    .from('post_summaries')
-    .upsert(payload, { onConflict: 'post_id' })
-
-  return NextResponse.json({ summary: payload, meta: { cap_blocked: capBlocked } })
 }

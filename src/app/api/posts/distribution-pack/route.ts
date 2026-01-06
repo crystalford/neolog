@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -130,6 +131,12 @@ function splitTitleLines(title: string, maxLineLength = 34) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const {
     data: { session },
@@ -149,20 +156,39 @@ export async function POST(request: NextRequest) {
 
   const postId = typeof body?.postId === 'string' ? body.postId : ''
   const cronAuthorId = typeof body?.authorId === 'string' ? body.authorId : ''
-
-  if (!postId) {
-    return NextResponse.json({ error: 'postId is required' }, { status: 400 })
-  }
-
-  if (!session && isCron && !cronAuthorId) {
-    return NextResponse.json({ error: 'authorId is required for cron' }, { status: 400 })
-  }
-
   const actorUserId = session?.user.id || cronAuthorId
-  const db = session ? supabase : createAdminClient()
-  if (!db) {
-    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
+
+  finalMeta = {
+    is_cron: isCron,
+    user_id: actorUserId || null,
+    has_session: Boolean(session),
+    post_id: postId || null,
   }
+  try {
+    const run = await startJobRun('posts.distribution_pack', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
+  try {
+    if (!postId) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'bad_request' }
+      return NextResponse.json({ error: 'postId is required' }, { status: 400 })
+    }
+
+    if (!session && isCron && !cronAuthorId) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, result: 'missing_author_id' }
+      return NextResponse.json({ error: 'authorId is required for cron' }, { status: 400 })
+    }
+
+    const db = session ? supabase : createAdminClient()
+    if (!db) {
+      finalErrorMessage = 'Server misconfigured.'
+      return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
+    }
 
   const { data: post, error: postError } = await db
     .from('posts')
@@ -172,7 +198,19 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (postError || !post) {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'not_found' }
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+  }
+
+  finalMeta = {
+    ...finalMeta,
+    author_id: post.author_id,
+    title_len: typeof post.title === 'string' ? post.title.length : 0,
+    subtitle_len: typeof post.subtitle === 'string' ? post.subtitle.length : 0,
+    excerpt_len: typeof post.excerpt === 'string' ? post.excerpt.length : 0,
+    content_len: typeof post.content === 'string' ? post.content.length : 0,
+    content_html_len: typeof post.content_html === 'string' ? post.content_html.length : 0,
   }
 
   const { data: profile } = await db
@@ -180,6 +218,12 @@ export async function POST(request: NextRequest) {
     .select('context_md')
     .eq('id', post.author_id)
     .single()
+
+  finalMeta = {
+    ...finalMeta,
+    has_writer_context: Boolean(profile?.context_md),
+    writer_context_len: typeof profile?.context_md === 'string' ? profile.context_md.length : 0,
+  }
 
   const groqKey = await resolveProviderKeyWithClient(db as any, actorUserId, 'groq')
   const openaiKey = await resolveProviderKeyWithClient(db as any, actorUserId, 'openai')
@@ -190,6 +234,13 @@ export async function POST(request: NextRequest) {
   const model = groqKey
     ? process.env.GROQ_MODEL || 'llama-3.1-8b-instant'
     : MODEL
+
+  finalMeta = {
+    ...finalMeta,
+    provider: groqKey ? 'groq' : openaiKey ? 'openai' : 'none',
+    model,
+    has_api_key: Boolean(apiKey),
+  }
 
   const buildFallback = () => {
     const plain = stripHtml(post.content_html || post.content || '')
@@ -409,9 +460,20 @@ export async function POST(request: NextRequest) {
       .upsert(payload, { onConflict: 'post_id' })
 
     const capBlocked = Boolean((aiPack as any)?.cap_blocked) && (!aiPack || aiPack.x_thread.length === 0)
+
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      result: 'success',
+      used_ai: Boolean(aiPack && aiPack.x_thread.length > 0),
+      cap_blocked: capBlocked,
+      x_thread_count: Array.isArray(pack.x_thread) ? pack.x_thread.length : 0,
+      hooks_count: Array.isArray(pack.hooks) ? pack.hooks.length : 0,
+    }
     return NextResponse.json({ pack: payload, meta: { cap_blocked: capBlocked } })
   } catch (error: any) {
     const message = error?.message || 'Failed to generate distribution pack'
+    finalErrorMessage = message
     await supabase
       .from('post_distribution_packs')
       .upsert({
@@ -422,5 +484,19 @@ export async function POST(request: NextRequest) {
       }, { onConflict: 'post_id' })
 
     return NextResponse.json({ error: message }, { status: 500 })
+  }
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

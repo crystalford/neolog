@@ -1,10 +1,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // Generate feeds for all Neolog posts (firehose)
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const format = request.nextUrl.searchParams.get('format') || 'rss'
+
+  finalMeta = { format }
+  try {
+    const run = await startJobRun('feeds.global', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
+  try {
 
   // Get recent published posts with author info
   const { data: posts } = await supabase
@@ -21,11 +38,34 @@ export async function GET(request: NextRequest) {
   const feedUrl = `${baseUrl}/api/feeds/global`
 
   if (format === 'json') {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', response: 'json' }
     return generateJSONFeed(posts || [], baseUrl, feedUrl)
   } else if (format === 'atom') {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', response: 'atom' }
     return generateAtomFeed(posts || [], baseUrl, feedUrl)
   } else {
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, result: 'success', response: 'rss' }
     return generateRSSFeed(posts || [], baseUrl, feedUrl)
+  }
+  } catch (error: any) {
+    finalErrorMessage = error?.message || 'Failed to generate feed'
+    return new Response('Failed to generate feed', { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 
