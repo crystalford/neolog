@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,21 @@ function isUuid(v: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  const finish = async (
+    status: 'success' | 'error',
+    meta: Record<string, any> = {},
+    errorMessage?: string,
+  ) => {
+    try {
+      if (!runId) return
+      await finishJobRun(runId, status, { duration_ms: Date.now() - startedAt, ...meta }, errorMessage)
+    } catch {
+      // best-effort
+    }
+  }
+
   const body = (await request.json().catch(() => null)) as Body | null
   const assetType = typeof body?.type === 'string' ? body.type : ''
   const content = typeof body?.content === 'string' ? body.content : ''
@@ -86,8 +102,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 401 })
     }
 
+    try {
+      const run = await startJobRun('vault.add', {
+        user_id: auth.userId,
+        auth: 'automation_key',
+        type: assetType,
+        publication_id: normalizedPublicationId,
+      })
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     const admin = createAdminClient()
     if (!admin) {
+      await finish('error', { user_id: auth.userId }, 'Server misconfigured.')
       return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
     }
 
@@ -99,9 +128,11 @@ export async function POST(request: NextRequest) {
         .eq('owner_id', auth.userId)
         .maybeSingle()
       if (pubError) {
+        await finish('error', { user_id: auth.userId, publication_id: normalizedPublicationId }, 'Failed to validate publication.')
         return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
       }
       if (!pub) {
+        await finish('error', { user_id: auth.userId, publication_id: normalizedPublicationId }, 'Invalid publication_id')
         return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
       }
     }
@@ -123,9 +154,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !data) {
+      await finish('error', { user_id: auth.userId, type: assetType, publication_id: normalizedPublicationId }, error?.message || 'Failed to create asset.')
       return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
     }
 
+    await finish('success', {
+      user_id: auth.userId,
+      auth: 'automation_key',
+      asset_id: data.id,
+      type: assetType,
+      publication_id: normalizedPublicationId,
+      tags_count: tags.length,
+    })
     return NextResponse.json({ ok: true, id: data.id })
   }
 
@@ -136,6 +176,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  try {
+    const run = await startJobRun('vault.add', {
+      user_id: session.user.id,
+      auth: 'session',
+      type: assetType,
+      publication_id: normalizedPublicationId,
+    })
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
   if (normalizedPublicationId) {
     const { data: pub, error: pubError } = await supabase
       .from('publications')
@@ -144,9 +196,11 @@ export async function POST(request: NextRequest) {
       .eq('owner_id', session.user.id)
       .maybeSingle()
     if (pubError) {
+      await finish('error', { user_id: session.user.id, publication_id: normalizedPublicationId }, 'Failed to validate publication.')
       return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
     }
     if (!pub) {
+      await finish('error', { user_id: session.user.id, publication_id: normalizedPublicationId }, 'Invalid publication_id')
       return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
     }
   }
@@ -168,8 +222,17 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error || !data) {
+    await finish('error', { user_id: session.user.id, type: assetType, publication_id: normalizedPublicationId }, error?.message || 'Failed to create asset.')
     return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
   }
 
+  await finish('success', {
+    user_id: session.user.id,
+    auth: 'session',
+    asset_id: data.id,
+    type: assetType,
+    publication_id: normalizedPublicationId,
+    tags_count: tags.length,
+  })
   return NextResponse.json({ ok: true, id: data.id })
 }
