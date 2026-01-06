@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseRss } from '@/lib/rss/parse'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 function generateSlug(title: string): string {
   return String(title || '')
@@ -30,8 +31,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+  let runId: string | null = null
+  try {
+    const started = await startJobRun('cron.rss.pull', {
+      path: '/api/cron/rss-pull',
+    })
+    runId = started.id
+  } catch {
+    // Best-effort only: cron should still run even if jobs/job_runs tables aren't deployed yet.
+  }
+
   const supabase = createAdminClient()
   if (!supabase) {
+    if (runId) {
+      try {
+        await finishJobRun(runId, 'error', { duration_ms: Date.now() - startedAt }, 'Missing Supabase configuration')
+      } catch {
+        // ignore
+      }
+    }
     return NextResponse.json({ error: 'Missing Supabase configuration' }, { status: 500 })
   }
 
@@ -65,6 +84,18 @@ export async function GET(request: NextRequest) {
   }
 
   if (error) {
+    if (runId) {
+      try {
+        await finishJobRun(
+          runId,
+          'error',
+          { duration_ms: Date.now() - startedAt },
+          'Failed to load sources.'
+        )
+      } catch {
+        // ignore
+      }
+    }
     return NextResponse.json({ error: 'Failed to load sources.' }, { status: 500 })
   }
 
@@ -291,6 +322,19 @@ export async function GET(request: NextRequest) {
           convert_failed += 1
         }
       }
+    }
+  }
+
+  if (runId) {
+    try {
+      await finishJobRun(runId, 'success', {
+        duration_ms: Date.now() - startedAt,
+        sources_count: (sources || []).length,
+        inserted,
+        ...(shouldConvertAny ? { converted, convert_failed } : {}),
+      })
+    } catch {
+      // ignore
     }
   }
 
