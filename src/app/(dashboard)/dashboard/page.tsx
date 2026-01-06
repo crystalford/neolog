@@ -696,17 +696,33 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-[var(--text-primary)] truncate text-sm">
+                        <Link
+                          href={
+                            post.status === 'published' && profile
+                              ? `/${profile.username}/${post.slug}`
+                              : `/write?edit=${encodeURIComponent(post.id)}`
+                          }
+                          className="font-medium text-[var(--text-primary)] truncate text-sm hover:underline"
+                          title={post.title || 'Untitled'}
+                        >
                           {post.title || 'Untitled'}
-                        </p>
+                        </Link>
                         {post.content_type === 'pulse' && (
                           <span className="doc-badge doc-badge-pulse">Pulse</span>
                         )}
                       </div>
                       {post.excerpt && (
-                        <p className="text-xs text-[var(--text-secondary)] truncate mt-1">
+                        <Link
+                          href={
+                            post.status === 'published' && profile
+                              ? `/${profile.username}/${post.slug}`
+                              : `/write?edit=${encodeURIComponent(post.id)}`
+                          }
+                          className="text-xs text-[var(--text-secondary)] truncate mt-1 block hover:underline"
+                          title={post.excerpt}
+                        >
                           {post.excerpt}
-                        </p>
+                        </Link>
                       )}
                     </div>
                     <div className="flex items-center gap-2 md:block">
