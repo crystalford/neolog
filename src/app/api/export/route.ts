@@ -1,9 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // Export all of a user's content as a portable package
 // Supports: json (full data), markdown, html
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const format = request.nextUrl.searchParams.get('format') || 'json'
 
@@ -13,6 +20,14 @@ export async function GET(request: NextRequest) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  try {
+    try {
+      const run = await startJobRun('export.user', { user_id: session.user.id, format })
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
   // Get user profile
   const { data: profile } = await supabase
     .from('profiles')
@@ -21,6 +36,7 @@ export async function GET(request: NextRequest) {
     .single()
 
   if (!profile) {
+    finalErrorMessage = 'Profile not found'
     return new Response('Profile not found', { status: 404 })
   }
 
@@ -46,12 +62,40 @@ export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://neolog.ai'
   const exportDate = new Date().toISOString()
 
+  finalMeta = {
+    user_id: session.user.id,
+    format,
+    posts_count: posts?.length || 0,
+    drafts_count: drafts?.length || 0,
+    upvotes_count: upvotes?.length || 0,
+  }
+
   if (format === 'markdown') {
+    finalStatus = 'success'
     return generateMarkdownExport(profile, posts || [], exportDate)
   } else if (format === 'html') {
+    finalStatus = 'success'
     return generateHTMLExport(profile, posts || [], baseUrl, exportDate)
   } else {
+    finalStatus = 'success'
     return generateJSONExport(profile, posts || [], drafts || [], upvotes || [], baseUrl, exportDate)
+  }
+  } catch (e: any) {
+    finalErrorMessage = e?.message || 'Export failed'
+    return new Response('Export failed', { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 

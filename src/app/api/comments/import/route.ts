@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 type RedditComment = {
   body: string
@@ -138,6 +139,12 @@ async function fetchXReplies(bearerToken: string, tweetId: string): Promise<XRep
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
@@ -145,10 +152,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tryStartRun = async (meta: Record<string, any>) => {
+    if (runId) return
+    try {
+      const run = await startJobRun('comments.import', meta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+  }
+
   const { postId, url } = await request.json()
   if (!postId || !url) {
+    finalMeta = { user_id: session.user.id, post_id: postId || null }
+    await tryStartRun(finalMeta)
+    finalErrorMessage = 'postId and url are required'
     return NextResponse.json({ error: 'postId and url are required' }, { status: 400 })
   }
+
+  finalMeta = {
+    user_id: session.user.id,
+    post_id: postId,
+    url_host: (() => {
+      try {
+        return new URL(String(url)).hostname
+      } catch {
+        return null
+      }
+    })(),
+    source: isRedditUrl(url) ? 'reddit' : isXUrl(url) ? 'x' : 'unknown',
+  }
+  await tryStartRun(finalMeta)
 
   const { data: post } = await supabase
     .from('posts')
@@ -158,6 +192,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!post) {
+    finalErrorMessage = 'Post not found'
     return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
@@ -167,6 +202,7 @@ export async function POST(request: NextRequest) {
         headers: { 'User-Agent': 'neolog/1.0' },
       })
       if (!response.ok) {
+        finalErrorMessage = 'Failed to fetch Reddit thread.'
         return NextResponse.json({ error: 'Failed to fetch Reddit thread.' }, { status: 400 })
       }
 
@@ -199,17 +235,21 @@ export async function POST(request: NextRequest) {
         await supabase.from('curated_comments').insert(rows)
       }
 
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, imported: rows.length }
       return NextResponse.json({ imported: rows.length })
     }
 
     if (isXUrl(url)) {
       const tweetId = extractXTweetId(url)
       if (!tweetId) {
+        finalErrorMessage = 'Could not extract tweet ID from URL.'
         return NextResponse.json({ error: 'Could not extract tweet ID from URL.' }, { status: 400 })
       }
 
       const xKey = await resolveProviderKeyWithClient(supabase, session.user.id, 'x')
       if (!xKey?.key) {
+        finalErrorMessage = 'X API key not configured.'
         return NextResponse.json({
           error: 'X API key not configured. Add it in Settings → AI Vault (BYOK) under “X (Twitter) API”.',
         }, { status: 400 })
@@ -243,12 +283,29 @@ export async function POST(request: NextRequest) {
         await supabase.from('curated_comments').insert(rows)
       }
 
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, imported: rows.length }
       return NextResponse.json({ imported: rows.length })
     }
 
+    finalErrorMessage = 'Unsupported URL. Use a Reddit or X post URL.'
     return NextResponse.json({ error: 'Unsupported URL. Use a Reddit or X post URL.' }, { status: 400 })
   } catch (error) {
     console.error('Comment import error:', error)
+    finalErrorMessage = 'Failed to import comments.'
     return NextResponse.json({ error: 'Failed to import comments.' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

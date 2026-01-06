@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // Simple image optimization using canvas resize
 // In production, you'd use Sharp or a service like Cloudinary/imgix
@@ -10,6 +11,12 @@ const THUMBNAIL_SIZE = 400
 const QUALITY = 0.85
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -18,22 +25,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    try {
+      const run = await startJobRun('upload.image', { user_id: session.user.id })
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     
     if (!file) {
+      finalErrorMessage = 'No file provided'
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    }
+
+    finalMeta = {
+      user_id: session.user.id,
+      file_type: file.type,
+      file_size: file.size,
     }
 
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
     if (!validTypes.includes(file.type)) {
+      finalErrorMessage = 'Invalid file type'
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 })
     }
 
     // Check file size (max 10MB)
     const MAX_SIZE = 10 * 1024 * 1024
     if (file.size > MAX_SIZE) {
+      finalErrorMessage = 'File too large (max 10MB)'
       return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 })
     }
 
@@ -56,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError)
+      finalErrorMessage = 'Upload failed'
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
     }
 
@@ -83,6 +107,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, image_id: imageRecord?.id || null }
     return NextResponse.json({
       url: publicUrl,
       optimizedUrl,
@@ -91,7 +117,21 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Image upload error:', error)
+    finalErrorMessage = 'Upload failed'
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 
