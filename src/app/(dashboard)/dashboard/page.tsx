@@ -192,6 +192,13 @@ export default function DashboardPage() {
 
   const getPostTitle = (postId: string) => posts.find((p) => p.id === postId)?.title || 'Untitled'
 
+  const getPostHref = (post: Post) => {
+    if (post.status === 'published' && profile?.username) {
+      return `/${profile.username}/${post.slug}`
+    }
+    return `/write?edit=${encodeURIComponent(post.id)}`
+  }
+
   const formatProviderLabel = (provider: string) => {
     if (provider === 'devto') return 'Dev.to'
     if (provider === 'medium') return 'Medium'
@@ -675,11 +682,30 @@ export default function DashboardPage() {
                 </div>
               )}
               <div className="divide-y divide-[var(--border-light)]">
-                {visiblePosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 md:gap-2 px-4 py-2 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors"
-                  >
+                {visiblePosts.map((post) => {
+                  const postHref = getPostHref(post)
+                  return (
+                    <div
+                      key={post.id}
+                      className="grid grid-cols-1 md:grid-cols-[28px_minmax(0,1fr)_100px_110px_90px_90px_130px] gap-2 md:gap-2 px-4 py-2 items-start md:items-center hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer"
+                      role="link"
+                      tabIndex={0}
+                      aria-label={`Open ${post.title || 'post'}`}
+                      onClick={(event) => {
+                        const target = event.target as HTMLElement | null
+                        if (!target) return
+                        if (target.closest('a,button,input,select,textarea,[role="button"],[role="menuitem"]')) {
+                          return
+                        }
+                        router.push(postHref)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          router.push(postHref)
+                        }
+                      }}
+                    >
                     <div className="hidden md:flex items-center justify-center">
                       <input
                         type="checkbox"
@@ -697,11 +723,7 @@ export default function DashboardPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
-                          href={
-                            post.status === 'published' && profile
-                              ? `/${profile.username}/${post.slug}`
-                              : `/write?edit=${encodeURIComponent(post.id)}`
-                          }
+                          href={postHref}
                           className="font-medium text-[var(--text-primary)] truncate text-sm hover:underline"
                           title={post.title || 'Untitled'}
                         >
@@ -713,11 +735,7 @@ export default function DashboardPage() {
                       </div>
                       {post.excerpt && (
                         <Link
-                          href={
-                            post.status === 'published' && profile
-                              ? `/${profile.username}/${post.slug}`
-                              : `/write?edit=${encodeURIComponent(post.id)}`
-                          }
+                          href={postHref}
                           className="text-xs text-[var(--text-secondary)] truncate mt-1 block hover:underline"
                           title={post.excerpt}
                         >
@@ -831,8 +849,9 @@ export default function DashboardPage() {
                         <Trash2 size={14} />
                       </button>
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
