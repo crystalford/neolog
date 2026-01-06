@@ -8,11 +8,150 @@ export default function ImportPage() {
   const [importing, setImporting] = useState(false)
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [htmlImporting, setHtmlImporting] = useState(false)
+  const [htmlProgress, setHtmlProgress] = useState<{ total: number; done: number } | null>(null)
+  const [htmlResults, setHtmlResults] = useState<{ imported: number; failed: number; created: Array<{ id: string; title: string }> } | null>(null)
   const [rssUrl, setRssUrl] = useState('')
   const [rssLimit, setRssLimit] = useState('50')
   const [rssStatus, setRssStatus] = useState<'draft' | 'published'>('draft')
   const [rssImporting, setRssImporting] = useState(false)
   const router = useRouter()
+
+  const extractHtmlContent = (html: string) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+
+    const cleanText = (value?: string | null) => {
+      if (!value) return ''
+      return value.replace(/\s+/g, ' ').trim()
+    }
+
+    const titleFromMeta = doc.querySelector('meta[property="og:title"]')?.getAttribute('content')
+    const titleFromDoc = doc.querySelector('title')?.textContent
+    const titleFromH1 = doc.querySelector('h1')?.textContent
+    const descriptionMeta =
+      doc.querySelector('meta[name="description"]')?.getAttribute('content') ||
+      doc.querySelector('meta[property="og:description"]')?.getAttribute('content')
+    const contentRoot = doc.querySelector('article') || doc.querySelector('main') || doc.body
+    const titleText = cleanText(titleFromMeta || titleFromDoc || titleFromH1)
+
+    const findSubtitle = () => {
+      if (!contentRoot) return ''
+      const headerText = contentRoot.querySelector('header h2, header p')?.textContent
+      if (headerText) return cleanText(headerText)
+      const paragraphs = Array.from(contentRoot.querySelectorAll('p'))
+      const candidate = paragraphs.find((p) => {
+        const text = cleanText(p.textContent)
+        return text.length >= 40 && text.length <= 180
+      })
+      return candidate ? cleanText(candidate.textContent) : ''
+    }
+    const subtitleText = cleanText(descriptionMeta) || findSubtitle()
+
+    const stripSelectors = ['nav', '[role="navigation"]', 'header', 'footer']
+    doc.querySelectorAll(stripSelectors.join(',')).forEach((node) => {
+      const inContent = node.closest('article, main')
+      if (!inContent) {
+        node.remove()
+      }
+    })
+
+    doc.body
+      ?.querySelectorAll('meta, title, base, link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
+      .forEach((node) => {
+        node.remove()
+      })
+
+    const forceWhite = doc.createElement('style')
+    forceWhite.setAttribute('data-neolog', 'force-white-bg')
+    forceWhite.textContent = 'html, body { background: #ffffff !important; }'
+    doc.head.appendChild(forceWhite)
+    if (doc.body) {
+      doc.body.style.backgroundColor = '#ffffff'
+    }
+    if (doc.documentElement) {
+      doc.documentElement.style.backgroundColor = '#ffffff'
+    }
+
+    const tailwindCdn = doc.querySelector('script[src*="cdn.tailwindcss.com"]')
+    const tailwindConfig = Array.from(doc.querySelectorAll('script')).find(
+      (script) => !script.src && script.textContent?.includes('tailwind.config'),
+    )
+    if (
+      tailwindCdn &&
+      tailwindConfig &&
+      (tailwindConfig.compareDocumentPosition(tailwindCdn) & Node.DOCUMENT_POSITION_FOLLOWING)
+    ) {
+      tailwindCdn.parentNode?.insertBefore(tailwindConfig, tailwindCdn)
+    }
+
+    const normalizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`
+
+    return {
+      title: titleText,
+      subtitle: subtitleText && subtitleText !== titleText ? subtitleText : '',
+      contentHtml: normalizedHtml,
+    }
+  }
+
+  const handleHtmlBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setHtmlImporting(true)
+    setHtmlProgress({ total: files.length, done: 0 })
+    setHtmlResults(null)
+    setError(null)
+
+    try {
+      const items: Array<{ filename: string; title: string; subtitle: string; contentHtml: string }> = []
+
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i]
+        const raw = await file.text()
+        const parsed = extractHtmlContent(raw)
+
+        const fallbackTitle = file.name.replace(/\.(html|htm)$/i, '').replace(/[_-]+/g, ' ').trim()
+        const title = (parsed.title || fallbackTitle || 'Untitled').trim()
+        items.push({
+          filename: file.name,
+          title,
+          subtitle: parsed.subtitle || '',
+          contentHtml: parsed.contentHtml || '',
+        })
+
+        setHtmlProgress({ total: files.length, done: i + 1 })
+      }
+
+      const res = await fetch('/api/import/html-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Bulk HTML import failed')
+      }
+
+      setHtmlResults({
+        imported: data?.imported || 0,
+        failed: data?.failed || 0,
+        created: Array.isArray(data?.created) ? data.created : [],
+      })
+
+      if ((data?.imported || 0) > 0) {
+        // Send them somewhere predictable; drafts will show up in dashboard.
+        setTimeout(() => router.push('/dashboard'), 2000)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to import HTML files. Please try again.')
+    } finally {
+      setHtmlImporting(false)
+      setHtmlProgress(null)
+      e.target.value = ''
+    }
+  }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, source: string) => {
     const file = e.target.files?.[0]
@@ -234,6 +373,76 @@ export default function ImportPage() {
                 <FileText size={16} />
                 Write a Post
               </a>
+            </div>
+
+            {/* Bulk HTML import */}
+            <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center">
+                  <span className="text-xl font-bold text-[var(--text-primary)]">HTML</span>
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-medium text-base mb-1">Bulk import HTML files</h2>
+                  <p className="text-sm text-[var(--text-secondary)] mb-4">
+                    Upload many HTML files at once. Neolog will auto-detect titles/subtitles and strip headers/footers.
+                  </p>
+
+                  <label className="btn btn-secondary cursor-pointer inline-flex">
+                    {htmlImporting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={16} />
+                        Upload HTML files
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept=".html,.htm"
+                      multiple
+                      onChange={handleHtmlBulkUpload}
+                      className="hidden"
+                      disabled={htmlImporting || importing || rssImporting}
+                    />
+                  </label>
+
+                  {htmlProgress && (
+                    <p className="text-xs text-[var(--text-tertiary)] mt-3">
+                      Reading files: {htmlProgress.done}/{htmlProgress.total}
+                    </p>
+                  )}
+
+                  {htmlResults && (
+                    <div className="mt-4">
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Imported {htmlResults.imported} drafts{htmlResults.failed ? `, ${htmlResults.failed} failed` : ''}.
+                      </p>
+                      {htmlResults.created.length > 0 && (
+                        <div className="mt-3 grid gap-2">
+                          {htmlResults.created.slice(0, 10).map((row) => (
+                            <a
+                              key={row.id}
+                              href={`/write?edit=${encodeURIComponent(row.id)}`}
+                              className="inline-flex items-center justify-between gap-3 p-3 rounded-lg border border-[var(--border-light)] hover:bg-[var(--bg-secondary)]"
+                            >
+                              <span className="text-sm text-[var(--text-primary)] truncate">{row.title}</span>
+                              <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
+                            </a>
+                          ))}
+                          {htmlResults.created.length > 10 && (
+                            <p className="text-xs text-[var(--text-tertiary)]">
+                              Showing first 10. Find the rest in your Dashboard.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* RSS import */}
