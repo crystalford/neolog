@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { marked } from 'marked'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,56 +60,89 @@ export async function POST(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
+  const startedAt = Date.now()
+  let runId: string | null = null
+  const finish = async (
+    status: 'success' | 'error',
+    meta: Record<string, any> = {},
+    errorMessage?: string,
+  ) => {
+    try {
+      if (!runId) return
+      await finishJobRun(runId, status, { duration_ms: Date.now() - startedAt, ...meta }, errorMessage)
+    } catch {
+      // best-effort
+    }
+  }
+
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json().catch(() => null)) as Body | null
-  const inboxItemIdsRaw = body?.inboxItemIds
-  const publicationIdRaw = body?.publicationId
-
-  const inboxItemIds = Array.isArray(inboxItemIdsRaw)
-    ? inboxItemIdsRaw.filter((v): v is string => typeof v === 'string' && v.length > 0)
-    : []
-
-  const publicationId = typeof publicationIdRaw === 'string' ? publicationIdRaw : ''
-
-  if (!publicationId) {
-    return NextResponse.json({ error: 'publicationId is required' }, { status: 400 })
+  try {
+    const run = await startJobRun('inbox.bulk_convert', { user_id: session.user.id })
+    runId = run.id
+  } catch {
+    // best-effort
   }
 
-  if (inboxItemIds.length === 0) {
-    return NextResponse.json({ error: 'inboxItemIds is required' }, { status: 400 })
-  }
+  try {
+    const body = (await request.json().catch(() => null)) as Body | null
+    const inboxItemIdsRaw = body?.inboxItemIds
+    const publicationIdRaw = body?.publicationId
 
-  // Validate publication ownership (avoid converting into someone else’s publication)
-  const { data: publication, error: publicationError } = await supabase
-    .from('publications')
-    .select('id, owner_id, is_active')
-    .eq('id', publicationId)
-    .maybeSingle()
+    const inboxItemIds = Array.isArray(inboxItemIdsRaw)
+      ? inboxItemIdsRaw.filter((v): v is string => typeof v === 'string' && v.length > 0)
+      : []
 
-  if (publicationError || !publication) {
-    return NextResponse.json({ error: 'Publication not found' }, { status: 404 })
-  }
+    const publicationId = typeof publicationIdRaw === 'string' ? publicationIdRaw : ''
 
-  if (publication.owner_id !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+    if (!publicationId) {
+      await finish('error', { user_id: session.user.id }, 'publicationId is required')
+      return NextResponse.json({ error: 'publicationId is required' }, { status: 400 })
+    }
 
-  if (!publication.is_active) {
-    return NextResponse.json({ error: 'Publication is inactive' }, { status: 400 })
-  }
+    if (inboxItemIds.length === 0) {
+      await finish('error', { user_id: session.user.id, publication_id: publicationId }, 'inboxItemIds is required')
+      return NextResponse.json({ error: 'inboxItemIds is required' }, { status: 400 })
+    }
 
-  const { data: inboxItems, error: inboxError } = await supabase
-    .from('inbox_items')
-    .select('id, title, canonical_url, source_type, status, raw_data')
-    .in('id', inboxItemIds)
-    .eq('user_id', session.user.id)
+    // Validate publication ownership (avoid converting into someone else’s publication)
+    const { data: publication, error: publicationError } = await supabase
+      .from('publications')
+      .select('id, owner_id, is_active')
+      .eq('id', publicationId)
+      .maybeSingle()
 
-  if (inboxError) {
-    return NextResponse.json({ error: 'Failed to load inbox items' }, { status: 500 })
-  }
+    if (publicationError || !publication) {
+      await finish('error', { user_id: session.user.id, publication_id: publicationId }, 'Publication not found')
+      return NextResponse.json({ error: 'Publication not found' }, { status: 404 })
+    }
+
+    if (publication.owner_id !== session.user.id) {
+      await finish('error', { user_id: session.user.id, publication_id: publicationId }, 'Forbidden')
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (!publication.is_active) {
+      await finish('error', { user_id: session.user.id, publication_id: publicationId }, 'Publication is inactive')
+      return NextResponse.json({ error: 'Publication is inactive' }, { status: 400 })
+    }
+
+    const { data: inboxItems, error: inboxError } = await supabase
+      .from('inbox_items')
+      .select('id, title, canonical_url, source_type, status, raw_data')
+      .in('id', inboxItemIds)
+      .eq('user_id', session.user.id)
+
+    if (inboxError) {
+      await finish(
+        'error',
+        { user_id: session.user.id, publication_id: publicationId, inbox_items_requested: inboxItemIds.length },
+        'Failed to load inbox items',
+      )
+      return NextResponse.json({ error: 'Failed to load inbox items' }, { status: 500 })
+    }
 
   const byId = new Map<string, InboxItemRow>()
   for (const item of (inboxItems || []) as InboxItemRow[]) {
@@ -210,5 +244,18 @@ export async function POST(request: NextRequest) {
     failed: results.filter((r) => r.status === 'failed').length,
   }
 
+  await finish('success', {
+    user_id: session.user.id,
+    publication_id: publicationId,
+    inbox_items_requested: inboxItemIds.length,
+    converted: summary.converted,
+    skipped: summary.skipped,
+    failed: summary.failed,
+  })
+
   return NextResponse.json({ ok: true, summary, results })
+  } catch (e: any) {
+    await finish('error', { user_id: session.user.id }, e?.message || 'Unknown error')
+    return NextResponse.json({ error: e?.message || 'Unknown error' }, { status: 500 })
+  }
 }

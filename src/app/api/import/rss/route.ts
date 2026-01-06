@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { parseRss } from '@/lib/rss/parse'
 import crypto from 'crypto'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 function stripHtml(html: string): string {
   return html
@@ -72,6 +73,21 @@ function makeUniqueSlug(options: {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  const finish = async (
+    status: 'success' | 'error',
+    meta: Record<string, any> = {},
+    errorMessage?: string,
+  ) => {
+    try {
+      if (!runId) return
+      await finishJobRun(runId, status, { duration_ms: Date.now() - startedAt, ...meta }, errorMessage)
+    } catch {
+      // best-effort
+    }
+  }
+
   try {
     const supabase = createClient()
     const {
@@ -80,6 +96,13 @@ export async function POST(request: NextRequest) {
 
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    try {
+      const run = await startJobRun('import.rss', { user_id: session.user.id })
+      runId = run.id
+    } catch {
+      // best-effort
     }
 
     const body = (await request.json().catch(() => null)) as
@@ -92,6 +115,7 @@ export async function POST(request: NextRequest) {
     const limit = Math.max(1, Math.min(200, Math.floor(limitRaw || 50)))
 
     if (!feedUrl) {
+      await finish('error', { user_id: session.user.id }, 'feedUrl is required')
       return NextResponse.json({ error: 'feedUrl is required' }, { status: 400 })
     }
 
@@ -99,10 +123,12 @@ export async function POST(request: NextRequest) {
     try {
       parsedUrl = new URL(feedUrl)
     } catch {
+      await finish('error', { user_id: session.user.id, feed_url: feedUrl }, 'feedUrl must be a valid URL')
       return NextResponse.json({ error: 'feedUrl must be a valid URL' }, { status: 400 })
     }
 
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      await finish('error', { user_id: session.user.id, feed_url: feedUrl }, 'feedUrl must be http(s)')
       return NextResponse.json({ error: 'feedUrl must be http(s)' }, { status: 400 })
     }
 
@@ -116,6 +142,7 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
+      await finish('error', { user_id: session.user.id, feed_url: feedUrl, status_code: res.status }, `Failed to fetch feed (${res.status}).`)
       return NextResponse.json(
         { error: `Failed to fetch feed (${res.status}). ${text.slice(0, 200)}` },
         { status: 400 },
@@ -128,6 +155,7 @@ export async function POST(request: NextRequest) {
       .slice(0, limit)
 
     if (items.length === 0) {
+      await finish('success', { user_id: session.user.id, feed_url: feedUrl, imported: 0, skipped: 0, failed: 0 })
       return NextResponse.json({ imported: 0, skipped: 0, failed: 0 })
     }
 
@@ -144,6 +172,7 @@ export async function POST(request: NextRequest) {
     const toImport = items.filter((item) => !existing.has(item.link))
 
     if (toImport.length === 0) {
+      await finish('success', { user_id: session.user.id, feed_url: feedUrl, imported: 0, skipped: items.length, failed: 0 })
       return NextResponse.json({ imported: 0, skipped: items.length, failed: 0 })
     }
 
@@ -195,6 +224,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (rows.length === 0) {
+      await finish('success', { user_id: session.user.id, feed_url: feedUrl, imported: 0, skipped: items.length, failed: 0 })
       return NextResponse.json({ imported: 0, skipped: items.length, failed: 0 })
     }
 
@@ -221,6 +251,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await finish('success', { user_id: session.user.id, feed_url: feedUrl, imported, skipped, failed })
     return NextResponse.json({
       imported,
       skipped,
@@ -229,6 +260,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('RSS import error:', error)
+    await finish('error', {}, (error as any)?.message || 'RSS import failed')
     return NextResponse.json({ error: 'RSS import failed' }, { status: 500 })
   }
 }

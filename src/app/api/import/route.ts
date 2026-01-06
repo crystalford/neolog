@@ -1,8 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import JSZip from 'jszip'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -11,16 +18,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    try {
+      const run = await startJobRun('import.file', { user_id: session.user.id })
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     const source = formData.get('source') as string
 
     if (!file) {
+      finalErrorMessage = 'No file provided'
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
     const arrayBuffer = await file.arrayBuffer()
     const results = { success: 0, failed: 0, errors: [] as string[] }
+
+    finalMeta = {
+      user_id: session.user.id,
+      source,
+      file_name: (file as any)?.name || null,
+    }
 
     if (source === 'substack') {
       const zip = await JSZip.loadAsync(arrayBuffer)
@@ -105,10 +126,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, success: results.success, failed: results.failed }
     return NextResponse.json(results)
   } catch (error) {
     console.error('Import error:', error)
+    finalErrorMessage = (error as any)?.message || 'Import failed'
     return NextResponse.json({ error: 'Import failed' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 
