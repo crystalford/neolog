@@ -6,12 +6,19 @@ import {
   ArrowRight,
   BarChart3,
   Boxes,
+  CheckCircle2,
+  Clock,
+  Link2,
   Globe,
   Inbox,
   Mail,
+  MoreHorizontal,
   PenLine,
   Rss,
+  Search,
   Share2,
+  Sparkles,
+  Tag,
   Webhook,
 } from 'lucide-react'
 
@@ -149,108 +156,172 @@ export default async function Home() {
               {/* Hero preview */}
               <div className="hidden lg:block lg:col-span-6">
                 <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
-                  <div className="px-5 py-4 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
+                  {/* Faux app chrome */}
+                  <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                        <Boxes size={16} className="text-[var(--accent)]" />
+                      <span className="flex gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border-medium)]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border-medium)]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[var(--border-medium)]" />
                       </span>
-                      <div>
-                        <p className="text-sm font-medium text-[var(--text-primary)] leading-none">Neolog</p>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1">Capture → Vault → Publish</p>
-                      </div>
+                      <span className="ml-2 inline-flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                        <Boxes size={14} /> neolog.app
+                      </span>
                     </div>
 
                     <span className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1">
-                      Live preview
+                      <Sparkles size={14} /> Preview
                     </span>
                   </div>
 
-                  <div className="p-5">
-                    <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-stretch gap-3">
-                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <Inbox size={15} className="text-[var(--text-secondary)]" />
-                          </span>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">Inbox</p>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Link: research memo</p>
-                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Tagged • Saved 2m ago</p>
-                          </div>
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Snippet: launch copy</p>
-                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Draft • Needs review</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
-                        </span>
-                      </div>
-
-                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <Boxes size={15} className="text-[var(--text-secondary)]" />
-                          </span>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">Vault</p>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Publication: Growth</p>
-                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">12 sources • 48 items</p>
-                          </div>
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Search: “onboarding”</p>
-                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Notes • Posts • Snippets</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
-                        </span>
-                      </div>
-
-                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <PenLine size={15} className="text-[var(--text-secondary)]" />
-                          </span>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">Publish</p>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Draft: Product update</p>
-                            <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Preview • 7 min read</p>
-                          </div>
-                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 flex items-center justify-between gap-2">
-                            <p className="text-xs text-[var(--text-primary)] font-medium">Distribute</p>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-tertiary)]">
-                              <Share2 size={12} /> Pack
+                  {/* Tabs + content */}
+                  <div className="px-5 pt-4 pb-5">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        {[
+                          { label: 'Inbox', icon: Inbox, active: true },
+                          { label: 'Vault', icon: Boxes, active: false },
+                          { label: 'Publish', icon: PenLine, active: false },
+                        ].map((t) => {
+                          const Icon = t.icon
+                          return (
+                            <span
+                              key={t.label}
+                              className={
+                                'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ' +
+                                (t.active
+                                  ? 'bg-[var(--accent-soft)] border-[var(--border-light)] text-[var(--accent)]'
+                                  : 'bg-[var(--bg-primary)] border-[var(--border-light)] text-[var(--text-tertiary)]')
+                              }
+                            >
+                              <Icon size={13} /> {t.label}
                             </span>
+                          )
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-2 text-xs text-[var(--text-tertiary)]">
+                          <Search size={14} /> Search
+                        </span>
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                          <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-4 items-stretch">
+                      {/* Left list */}
+                      <div className="col-span-5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] overflow-hidden">
+                        <div className="px-3 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
+                          <p className="text-xs font-medium text-[var(--text-primary)]">Inbox</p>
+                          <span className="text-[11px] text-[var(--text-tertiary)]">2 new</span>
+                        </div>
+
+                        <div className="p-3 space-y-2">
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--accent-soft)] px-3 py-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs text-[var(--text-primary)] font-medium">Link: research memo</p>
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1">
+                                  <Link2 size={12} /> Saved 2m ago
+                                </p>
+                              </div>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]">
+                                <Tag size={11} /> tagged
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs text-[var(--text-primary)] font-medium">Snippet: launch copy</p>
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1">
+                                  <PenLine size={12} /> Draft
+                                </p>
+                              </div>
+                              <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]">
+                                needs review
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs text-[var(--text-primary)] font-medium">Prompt: series outline</p>
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1">
+                                  <Sparkles size={12} /> Captured
+                                </p>
+                              </div>
+                              <span className="inline-flex items-center rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]">
+                                idea
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right detail */}
+                      <div className="col-span-7 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] overflow-hidden">
+                        <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Selected</p>
+                            <p className="text-sm font-medium text-[var(--text-primary)] mt-1">research memo</p>
+                          </div>
+                          <span className="inline-flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                            <Clock size={14} /> 7 min read
+                          </span>
+                        </div>
+
+                        <div className="p-4">
+                          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                            <p className="text-sm text-[var(--text-primary)] font-medium mb-2">Key points</p>
+                            <div className="space-y-2">
+                              {[
+                                'Capture sources as atoms, not docs',
+                                'Keep provenance attached to every draft',
+                                'Ship outward without forking the truth',
+                              ].map((line) => (
+                                <div key={line} className="flex items-start gap-2">
+                                  <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                                    <CheckCircle2 size={12} className="text-[var(--accent)]" />
+                                  </span>
+                                  <p className="text-xs text-[var(--text-secondary)]">{line}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-2 gap-3">
+                            <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                              <p className="text-xs text-[var(--text-tertiary)]">Convert to</p>
+                              <p className="text-sm font-medium text-[var(--text-primary)] mt-1">Draft post</p>
+                              <p className="text-[11px] text-[var(--text-tertiary)] mt-1">Keeps source + tags</p>
+                            </div>
+                            <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                              <p className="text-xs text-[var(--text-tertiary)]">Send to</p>
+                              <p className="text-sm font-medium text-[var(--text-primary)] mt-1">Distribution pack</p>
+                              <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1">
+                                <Share2 size={12} /> Threads + copies
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Integrates with</p>
-                        <div className="flex items-center gap-2">
-                          {[Rss, Webhook, Mail, Globe].map((Icon, idx) => (
-                            <span key={idx} className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                              <Icon size={14} className="text-[var(--text-secondary)]" />
-                            </span>
-                          ))}
-                        </div>
+                    <div className="mt-4 pt-4 border-t border-[var(--border-light)] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        {[Rss, Webhook, Mail, Globe].map((Icon, idx) => (
+                          <span key={idx} className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Icon size={14} className="text-[var(--text-secondary)]" />
+                          </span>
+                        ))}
+                        <span className="text-xs text-[var(--text-tertiary)]">Integrations</span>
                       </div>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">Connect inputs and push outputs without losing provenance.</p>
+                      <span className="text-xs text-[var(--text-tertiary)]">Synced 2m ago</span>
                     </div>
                   </div>
                 </div>
