@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -30,13 +30,9 @@ export default function InvitationsPage() {
   const [processing, setProcessing] = useState<string | null>(null)
   
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadInvitations()
-  }, [])
-
-  const loadInvitations = async () => {
+  const loadInvitations = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session) {
@@ -66,7 +62,11 @@ export default function InvitationsPage() {
     }
 
     setLoading(false)
-  }
+  }, [router, supabase])
+
+  useEffect(() => {
+    loadInvitations()
+  }, [loadInvitations])
 
   const handleAccept = async (invitationId: string) => {
     setProcessing(invitationId)
@@ -160,6 +160,7 @@ export default function InvitationsPage() {
                           {invitation.post.author.avatar_url ? (
                             <img 
                               src={invitation.post.author.avatar_url} 
+                              alt={`${invitation.post.author.display_name || invitation.post.author.username} avatar`}
                               className="w-5 h-5 rounded-full" 
                             />
                           ) : (

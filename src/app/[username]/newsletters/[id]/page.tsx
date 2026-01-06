@@ -81,7 +81,11 @@ export default async function NewsletterDetailPage({ params }: Props) {
             <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
               <Link href={`/${params.username}`} className="flex items-center gap-2 hover:text-[var(--accent)]">
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} className="w-6 h-6 rounded-full" />
+                  <img
+                    src={profile.avatar_url}
+                    alt={`${profile.display_name || profile.username} avatar`}
+                    className="w-6 h-6 rounded-full"
+                  />
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-xs">
                     {(profile.display_name || profile.username)[0].toUpperCase()}

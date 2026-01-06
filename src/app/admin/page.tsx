@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -49,37 +49,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'featured'>('overview')
   
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    checkAdmin()
-  }, [])
-
-  const checkAdmin = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      router.push('/login')
-      return
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', session.user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      router.push('/')
-      return
-    }
-
-    setIsAdmin(true)
-    loadData()
-  }
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     // Get stats
     const { data: statsData } = await supabase.rpc('get_admin_stats')
     if (statsData && statsData[0]) {
@@ -120,7 +92,35 @@ export default function AdminPage() {
     }
 
     setLoading(false)
-  }
+  }, [supabase])
+
+  const checkAdmin = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      router.push('/login')
+      return
+    }
+
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', session.user.id)
+      .single()
+
+    if (!profile?.is_admin) {
+      router.push('/')
+      return
+    }
+
+    setIsAdmin(true)
+    loadData()
+  }, [loadData, router, supabase])
+
+  useEffect(() => {
+    checkAdmin()
+  }, [checkAdmin])
 
   const handleReportAction = async (reportId: string, action: 'resolved' | 'dismissed') => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -287,7 +287,11 @@ export default function AdminPage() {
                       <div key={writer.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)]">
                         <Link href={`/${writer.username}`} className="flex items-center gap-3">
                           {writer.avatar_url ? (
-                            <img src={writer.avatar_url} className="w-10 h-10 rounded-full" />
+                            <img
+                              src={writer.avatar_url}
+                              alt={`${writer.display_name || writer.username} avatar`}
+                              className="w-10 h-10 rounded-full"
+                            />
                           ) : (
                             <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
                               {(writer.display_name || writer.username)[0].toUpperCase()}
@@ -318,7 +322,11 @@ export default function AdminPage() {
                     <div key={writer.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)]">
                       <Link href={`/${writer.username}`} className="flex items-center gap-3">
                         {writer.avatar_url ? (
-                          <img src={writer.avatar_url} className="w-10 h-10 rounded-full" />
+                          <img
+                            src={writer.avatar_url}
+                            alt={`${writer.display_name || writer.username} avatar`}
+                            className="w-10 h-10 rounded-full"
+                          />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
                             {(writer.display_name || writer.username)[0].toUpperCase()}

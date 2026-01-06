@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Users, Plus, X, Check, Loader2, Search } from 'lucide-react'
@@ -35,21 +35,21 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
   const [searching, setSearching] = useState(false)
   const [adding, setAdding] = useState(false)
   
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadCoauthors()
-  }, [postId])
-
-  const loadCoauthors = async () => {
+  const loadCoauthors = useCallback(async () => {
     const { data } = await supabase.rpc('get_post_coauthors', { p_post_id: postId })
     if (data) {
       setCoauthors(data)
     }
     setLoading(false)
-  }
+  }, [postId, supabase])
 
-  const searchUsers = async (query: string) => {
+  useEffect(() => {
+    loadCoauthors()
+  }, [loadCoauthors])
+
+  const searchUsers = useCallback(async (query: string) => {
     if (query.length < 2) {
       setSearchResults([])
       return
@@ -69,9 +69,9 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
 
     setSearchResults((data || []).filter(u => !existing.has(u.id)))
     setSearching(false)
-  }
+  }, [coauthors, supabase])
 
-  const addCoauthor = async (userId: string, role: string = 'coauthor') => {
+  const addCoauthor = useCallback(async (userId: string, role: string = 'coauthor') => {
     setAdding(true)
     const { data: { session } } = await supabase.auth.getSession()
 
@@ -97,17 +97,17 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
     setSearchQuery('')
     setSearchResults([])
     setAdding(false)
-  }
+  }, [loadCoauthors, postId, supabase])
 
-  const removeCoauthor = async (userId: string) => {
+  const removeCoauthor = useCallback(async (userId: string) => {
     await supabase
       .from('post_coauthors')
       .delete()
       .eq('post_id', postId)
       .eq('user_id', userId)
 
-    setCoauthors(coauthors.filter(c => c.user_id !== userId))
-  }
+    setCoauthors(prev => prev.filter(c => c.user_id !== userId))
+  }, [postId, supabase])
 
   // Only show accepted coauthors to non-authors
   const visibleCoauthors = isAuthor 
@@ -138,7 +138,11 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
           >
             <Link href={`/${coauthor.username}`} className="flex items-center gap-2">
               {coauthor.avatar_url ? (
-                <img src={coauthor.avatar_url} className="w-5 h-5 rounded-full" />
+                <img
+                  src={coauthor.avatar_url}
+                  alt={`${coauthor.display_name || coauthor.username} avatar`}
+                  className="w-5 h-5 rounded-full"
+                />
               ) : (
                 <div className="w-5 h-5 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-xs">
                   {(coauthor.display_name || coauthor.username)[0].toUpperCase()}
@@ -209,7 +213,11 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
                   >
                     <div className="flex items-center gap-3">
                       {user.avatar_url ? (
-                        <img src={user.avatar_url} className="w-8 h-8 rounded-full" />
+                        <img
+                          src={user.avatar_url}
+                          alt={`${user.display_name || user.username} avatar`}
+                          className="w-8 h-8 rounded-full"
+                        />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-sm">
                           {(user.display_name || user.username)[0].toUpperCase()}
@@ -254,18 +262,18 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
 // Display-only version for post pages
 export function CoAuthorsList({ postId }: { postId: string }) {
   const [coauthors, setCoauthors] = useState<CoAuthor[]>([])
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadCoauthors()
-  }, [postId])
-
-  const loadCoauthors = async () => {
+  const loadCoauthors = useCallback(async () => {
     const { data } = await supabase.rpc('get_post_coauthors', { p_post_id: postId })
     if (data) {
       setCoauthors(data.filter((c: CoAuthor) => c.accepted))
     }
-  }
+  }, [postId, supabase])
+
+  useEffect(() => {
+    loadCoauthors()
+  }, [loadCoauthors])
 
   if (coauthors.length === 0) return null
 
