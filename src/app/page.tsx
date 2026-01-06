@@ -122,13 +122,74 @@ export default async function Home() {
                   ) : (
                     <>
                       <Link href="/signup" className="btn btn-primary btn-lg">
-                        Start writing
+                        Create account
                       </Link>
                       <Link href="/explore" className="btn btn-secondary btn-lg">
                         Explore
                       </Link>
                     </>
                   )}
+                </div>
+
+                {!session && (
+                  <p className="text-xs text-[var(--text-tertiary)] mt-3 max-w-xl">
+                    Create an account to write and publish. You can always explore first.
+                  </p>
+                )}
+
+                {/* Mobile preview */}
+                <div className="lg:hidden mt-6 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
+                  <div className="px-4 py-3 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
+                    <span className="inline-flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                      <Boxes size={14} /> neolog.app
+                    </span>
+                    <span className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-3 py-1">
+                      <Sparkles size={14} /> Preview
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Inbox size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Inbox</p>
+                        </div>
+                        <p className="text-xs text-[var(--text-tertiary)]">Capture links, prompts, snippets.</p>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Boxes size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Vault</p>
+                        </div>
+                        <p className="text-xs text-[var(--text-tertiary)]">Organize by publication with provenance.</p>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <PenLine size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Publish</p>
+                        </div>
+                        <p className="text-xs text-[var(--text-tertiary)]">Draft, preview, publish.</p>
+                      </div>
+
+                      <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <Share2 size={15} className="text-[var(--text-secondary)]" />
+                          </span>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">Distribute</p>
+                        </div>
+                        <p className="text-xs text-[var(--text-tertiary)]">Ship outward, measure engagement.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {(stats.posts > 0 || stats.creators > 0) && (
@@ -352,7 +413,7 @@ export default async function Home() {
                   href={session ? '/dashboard' : '/signup'}
                   className="inline-flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:border-[var(--border-medium)] transition-colors"
                 >
-                  {session ? 'Open dashboard' : 'Get started'}
+                  {session ? 'Open dashboard' : 'Create account'}
                   <ArrowRight size={14} />
                 </Link>
               </div>
@@ -596,7 +657,7 @@ export default async function Home() {
                   ) : (
                     <>
                       <Link href="/signup" className="btn btn-primary btn-lg">
-                        Start writing
+                        Create account
                       </Link>
                       <Link href="/explore" className="btn btn-secondary btn-lg">
                         Explore
@@ -604,6 +665,12 @@ export default async function Home() {
                     </>
                   )}
                 </div>
+
+                {!session && (
+                  <p className="text-xs text-[var(--text-tertiary)] mt-4">
+                    Prefer to look around first? Explore posts, then come back to create an account.
+                  </p>
+                )}
               </div>
             </div>
           </div>
