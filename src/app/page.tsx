@@ -55,14 +55,14 @@ export default async function Home() {
 
       <main className="pt-14">
         {/* Hero */}
-        <section className="relative px-6 lg:px-12 pt-14 pb-8 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
+        <section className="relative px-6 lg:px-12 pt-14 pb-10 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
           <div
             className="absolute inset-0 opacity-[0.35] pointer-events-none"
             style={{
               backgroundImage:
                 'linear-gradient(var(--border-light) 1px, transparent 1px), linear-gradient(90deg, var(--border-light) 1px, transparent 1px)',
               backgroundSize: '48px 48px',
-              maskImage: 'radial-gradient(circle at 30% 0%, black 0%, transparent 70%)',
+              maskImage: 'radial-gradient(circle at 25% 0%, black 0%, transparent 72%)',
             }}
           />
 
@@ -75,15 +75,15 @@ export default async function Home() {
           />
 
           <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-10 items-start">
-              <div>
+            <div className="grid lg:grid-cols-12 gap-10 items-start">
+              <div className="lg:col-span-6">
                 <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1.5 mb-6">
                   Capture → Vault → Publish
                 </p>
 
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
                   Capture-first publishing.
-                  <span className="block text-[var(--text-tertiary)]">Own the core. Broadcast everywhere.</span>
+                  <span className="block text-[var(--text-tertiary)]">A real system for shipping ideas.</span>
                 </h1>
 
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
@@ -92,7 +92,7 @@ export default async function Home() {
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-7">
-                  {["Inbox-first capture", "Publications as containers", "Distribution + analytics"].map((label) => (
+                  {['Inbox-first capture', 'Publications as containers', 'Distribution + analytics'].map((label) => (
                     <span
                       key={label}
                       className="inline-flex items-center text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-3 py-1"
@@ -123,10 +123,31 @@ export default async function Home() {
                     </>
                   )}
                 </div>
+
+                {(stats.posts > 0 || stats.creators > 0) && (
+                  <div className="mt-7 flex flex-wrap gap-3">
+                    {stats.posts > 0 && (
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-2">
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {stats.posts.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-[var(--text-tertiary)]">posts published</span>
+                      </div>
+                    )}
+                    {stats.creators > 0 && (
+                      <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-2">
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {stats.creators.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-[var(--text-tertiary)]">writers</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Compact value summary */}
-              <div className="hidden lg:block">
+              {/* Hero preview */}
+              <div className="hidden lg:block lg:col-span-6">
                 <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
                   <div className="px-5 py-4 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -238,39 +259,21 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Pipeline cards */}
-        <section className="px-6 lg:px-12 pt-6 pb-8 -mt-4">
-          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
-            {[
-              { title: 'Capture', copy: 'Save prompts, links, snippets, and notes from anywhere.', icon: Inbox },
-              { title: 'Vault + Publications', copy: 'Organize your knowledge by project, with search and provenance.', icon: Boxes },
-              { title: 'Publish + Distribute', copy: 'Write once, ship outward as posts, feeds, and newsletters.', icon: Share2 },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-shadow"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                    <item.icon size={16} className="text-[var(--accent)]" />
-                  </span>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                    {item.title}
-                  </p>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Workflows */}
-        <section className="px-6 lg:px-12 pb-6">
+        <section className="relative px-6 lg:px-12 py-10">
+          <div
+            className="absolute inset-0 opacity-[0.25] pointer-events-none"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 10% 10%, var(--accent-soft) 0%, transparent 55%), radial-gradient(circle at 90% 30%, var(--accent-soft) 0%, transparent 50%)',
+            }}
+          />
+
           <div className="max-w-6xl mx-auto">
             <div className="flex items-end justify-between gap-4 mb-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
-                <h2 className="font-display text-2xl text-[var(--text-primary)]">Start with the task</h2>
+                <h2 className="font-display text-2xl text-[var(--text-primary)]">Start with a task, not a blank page</h2>
               </div>
               <Link
                 href={session ? '/dashboard' : '/signup'}
@@ -318,14 +321,18 @@ export default async function Home() {
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
+                    className="group flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
                   >
-                    <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                      <Icon size={16} className="text-[var(--text-secondary)]" />
+                    <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                      <Icon size={16} className="text-[var(--accent)]" />
                     </span>
                     <div>
                       <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
                       <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-2 inline-flex items-center gap-1 group-hover:text-[var(--text-secondary)] transition-colors">
+                        Open
+                        <ArrowRight size={12} />
+                      </p>
                     </div>
                   </Link>
                 )
@@ -333,7 +340,7 @@ export default async function Home() {
 
               <Link
                 href="/explore"
-                className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
+                className="group flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
               >
                 <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <ArrowRight size={16} className="text-[var(--text-secondary)]" />
@@ -341,24 +348,88 @@ export default async function Home() {
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">Explore posts</p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">See what the community is publishing.</p>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-2 inline-flex items-center gap-1 group-hover:text-[var(--text-secondary)] transition-colors">
+                    Browse
+                    <ArrowRight size={12} />
+                  </p>
                 </div>
               </Link>
             </div>
           </div>
         </section>
 
+        {/* How it works */}
+        <section className="px-6 lg:px-12 py-10 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-end justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">How it works</p>
+                <h2 className="font-display text-2xl text-[var(--text-primary)]">One system, three motions</h2>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
+              {[
+                {
+                  title: 'Capture',
+                  copy: 'Save prompts, links, snippets, and notes from anywhere.',
+                  icon: Inbox,
+                },
+                {
+                  title: 'Vault + Publications',
+                  copy: 'Organize by project, with provenance and fast search.',
+                  icon: Boxes,
+                },
+                {
+                  title: 'Publish + Distribute',
+                  copy: 'Write once, ship outward as posts, feeds, and newsletters.',
+                  icon: Share2,
+                },
+              ].map((item, idx) => {
+                const Icon = item.icon
+                return (
+                  <div key={item.title} className="contents">
+                    <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)]">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                          <Icon size={16} className="text-[var(--accent)]" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Step {idx + 1}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)] mt-1">{item.title}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
+                    </div>
+
+                    {idx < 2 && (
+                      <div className="hidden md:flex items-center justify-center">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
         {/* Stats */}
         {(stats.posts > 0 || stats.creators > 0) && (
-          <section className="px-6 lg:px-12 py-10 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
+          <section className="px-6 lg:px-12 py-10">
             <div className="max-w-6xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
-                <div className="text-center">
-                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.posts.toLocaleString()}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Posts published</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.creators.toLocaleString()}</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Writers</p>
+              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] p-8">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
+                  <div className="text-center">
+                    <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.posts.toLocaleString()}</p>
+                    <p className="text-sm text-[var(--text-secondary)]">Posts published</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.creators.toLocaleString()}</p>
+                    <p className="text-sm text-[var(--text-secondary)]">Writers</p>
+                  </div>
                 </div>
               </div>
             </div>
