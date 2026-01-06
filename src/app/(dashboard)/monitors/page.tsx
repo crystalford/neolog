@@ -190,7 +190,7 @@ export default function MonitorsPage() {
               .from('job_runs')
               .select('id, status, started_at, finished_at, error_message, meta, jobs(name)')
               .order('started_at', { ascending: false })
-              .limit(10),
+              .limit(50),
           ])
 
         setInboxNewCount(inboxCount || 0)
@@ -198,7 +198,11 @@ export default function MonitorsPage() {
         setSyndicationErrorCount(syndicationErrors || 0)
         setScheduledDueSoonCount(dueSoon || 0)
         setQueueItems((queue || []) as QueueItem[])
-        setJobRuns((runs || []) as unknown as JobRunRow[])
+        const filteredRuns = (runs || []).filter((run: any) => {
+          const runUserId = typeof run?.meta?.user_id === 'string' ? run.meta.user_id : null
+          return !runUserId || runUserId === authorId
+        })
+        setJobRuns(filteredRuns.slice(0, 10) as unknown as JobRunRow[])
       } catch {
         setError('Failed to load monitor data.')
       } finally {

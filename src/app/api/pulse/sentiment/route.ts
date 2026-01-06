@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { extractOpenAIStyleUsage, logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
@@ -16,12 +17,35 @@ export async function POST(request: NextRequest) {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
+  const startedAt = Date.now()
+  let runId: string | null = null
+  const finish = async (
+    status: 'success' | 'error',
+    meta: Record<string, any> = {},
+    errorMessage?: string,
+  ) => {
+    try {
+      if (!runId) return
+      await finishJobRun(runId, status, { duration_ms: Date.now() - startedAt, ...meta }, errorMessage)
+    } catch {
+      // best-effort
+    }
+  }
+
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  try {
+    const run = await startJobRun('pulse.sentiment', { user_id: session.user.id })
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
   const { cards } = await request.json()
   if (!Array.isArray(cards) || cards.length === 0) {
+    await finish('error', { cards_count: 0 }, 'cards are required')
     return NextResponse.json({ error: 'cards are required' }, { status: 400 })
   }
 
@@ -45,6 +69,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!apiKey) {
+    await finish('success', {
+      user_id: session.user.id,
+      cards_count: cards.length,
+      model: 'fallback',
+      cap_blocked: capBlocked,
+      fallback: true,
+    })
     return NextResponse.json({
       sentiments: cards.map((card: any) => fallbackSentiment(card?.label)),
       model: 'fallback',
@@ -81,6 +112,14 @@ export async function POST(request: NextRequest) {
   })
 
   if (!response.ok) {
+    await finish('success', {
+      user_id: session.user.id,
+      cards_count: cards.length,
+      model: 'fallback',
+      cap_blocked: capBlocked,
+      fallback: true,
+      fallback_reason: 'openai_response_not_ok',
+    })
     return NextResponse.json({
       sentiments: cards.map((card: any) => fallbackSentiment(card?.label)),
       model: 'fallback',
@@ -91,6 +130,14 @@ export async function POST(request: NextRequest) {
   const usage = extractOpenAIStyleUsage(data)
   const content = data?.choices?.[0]?.message?.content
   if (!content) {
+    await finish('success', {
+      user_id: session.user.id,
+      cards_count: cards.length,
+      model: 'fallback',
+      cap_blocked: capBlocked,
+      fallback: true,
+      fallback_reason: 'missing_content',
+    })
     return NextResponse.json({
       sentiments: cards.map((card: any) => fallbackSentiment(card?.label)),
       model: 'fallback',
@@ -117,8 +164,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    await finish('success', {
+      user_id: session.user.id,
+      cards_count: cards.length,
+      model: MODEL,
+      cap_blocked: capBlocked,
+      fallback: false,
+    })
+
     return NextResponse.json({ sentiments, model: MODEL })
   } catch {
+    await finish('success', {
+      user_id: session.user.id,
+      cards_count: cards.length,
+      model: 'fallback',
+      cap_blocked: capBlocked,
+      fallback: true,
+      fallback_reason: 'parse_error',
+    })
     return NextResponse.json({
       sentiments: cards.map((card: any) => fallbackSentiment(card?.label)),
       model: 'fallback',
