@@ -4,17 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-type ImportItem = {
-  filename?: unknown
-  title?: unknown
-  subtitle?: unknown
-  contentHtml?: unknown
-}
-
-type Body = {
-  items?: unknown
-}
-
 function stripHtml(html: string): string {
   return String(html || '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
@@ -31,6 +20,79 @@ function generateSlug(title: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .substring(0, 60)
+}
+
+function ensureFullHtmlDoc(html: string, title: string): string {
+  const raw = String(html || '').trim()
+  if (!raw) return ''
+  const isFull = /<!doctype/i.test(raw) || /<html[\s>]/i.test(raw)
+  if (isFull) return raw
+  const safeTitle = String(title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${safeTitle}</title></head><body>${raw}</body></html>`
+}
+
+function decodeEntities(text: string): string {
+  return String(text || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+}
+
+function extractMetaContent(html: string, selectors: Array<{ attr: 'name' | 'property'; value: string }>): string {
+  const input = String(html || '')
+  for (const sel of selectors) {
+    const re = new RegExp(`<meta[^>]+${sel.attr}=["']${sel.value}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i')
+    const m = input.match(re)
+    if (m?.[1]) return decodeEntities(m[1]).trim()
+  }
+  return ''
+}
+
+function extractTitle(html: string, filenameFallback: string): string {
+  const fromOg = extractMetaContent(html, [{ attr: 'property', value: 'og:title' }])
+  if (fromOg) return fromOg
+
+  const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+  if (titleTag) {
+    const cleaned = stripHtml(titleTag)
+    if (cleaned) return cleaned
+  }
+
+  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
+  if (h1) {
+    const cleaned = stripHtml(h1)
+    if (cleaned) return cleaned
+  }
+
+  return filenameFallback
+}
+
+function extractSubtitle(html: string, title: string): string {
+  const fromDesc = extractMetaContent(html, [
+    { attr: 'name', value: 'description' },
+    { attr: 'property', value: 'og:description' },
+  ])
+  if (fromDesc && fromDesc !== title) return fromDesc
+
+  const paragraphRe = /<p[^>]*>([\s\S]*?)<\/p>/gi
+  let match: RegExpExecArray | null
+  while ((match = paragraphRe.exec(html)) !== null) {
+    const text = stripHtml(match[1])
+    if (text.length >= 40 && text.length <= 180 && text !== title) return text
+  }
+
+  return ''
+}
+
+function stripHeaderFooter(html: string): string {
+  // Intentionally blunt: this is a bulk tool meant to remove exported site chrome.
+  return String(html || '')
+    .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header\b[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, '')
 }
 
 function stableHashHex6(input: string): string {
@@ -78,25 +140,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = (await request.json().catch(() => null)) as Body | null
-  const itemsRaw = Array.isArray(body?.items) ? body?.items : null
-  if (!itemsRaw) {
-    return NextResponse.json({ error: 'items must be an array' }, { status: 400 })
+  const form = await request.formData().catch(() => null)
+  if (!form) {
+    return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
 
-  if (itemsRaw.length === 0) {
-    return NextResponse.json({ imported: 0, failed: 0, created: [] })
+  const files = form.getAll('files').filter(Boolean) as File[]
+  if (files.length === 0) {
+    return NextResponse.json({ error: 'No files provided' }, { status: 400 })
   }
 
-  if (itemsRaw.length > 200) {
+  if (files.length > 200) {
     return NextResponse.json({ error: 'Too many files (max 200)' }, { status: 400 })
   }
 
-  const items = itemsRaw as ImportItem[]
   const baseSlugs = Array.from(
     new Set(
-      items
-        .map((item) => (typeof item?.title === 'string' ? generateSlug(item.title) : ''))
+      files
+        .map((f) => {
+          const base = String((f as any)?.name || '')
+            .replace(/\.(html|htm)$/i, '')
+            .replace(/[_-]+/g, ' ')
+            .trim()
+          return generateSlug(base)
+        })
         .filter(Boolean)
         .slice(0, 200),
     ),
@@ -117,12 +184,27 @@ export async function POST(request: NextRequest) {
   const created: Array<{ id: string; slug: string; title: string; filename?: string }> = []
   const failures: Array<{ filename?: string; error: string }> = []
 
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index]
-    const filename = typeof item?.filename === 'string' ? item.filename.trim() : ''
-    const title = typeof item?.title === 'string' ? item.title.trim() : ''
-    const subtitle = typeof item?.subtitle === 'string' ? item.subtitle.trim() : ''
-    const contentHtml = typeof item?.contentHtml === 'string' ? item.contentHtml.trim() : ''
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index]
+    const filename = String((file as any)?.name || '').trim()
+    const filenameFallback = filename
+      .replace(/\.(html|htm)$/i, '')
+      .replace(/[_-]+/g, ' ')
+      .trim()
+
+    let raw = ''
+    try {
+      raw = await file.text()
+    } catch {
+      failed += 1
+      if (failures.length < 50) failures.push({ filename: filename || undefined, error: 'Unable to read file' })
+      continue
+    }
+
+    const cleaned = stripHeaderFooter(raw)
+    const title = extractTitle(cleaned, filenameFallback || 'Untitled').trim()
+    const subtitle = extractSubtitle(cleaned, title).trim()
+    const contentHtml = ensureFullHtmlDoc(cleaned, title)
 
     if (!title || !contentHtml) {
       failed += 1

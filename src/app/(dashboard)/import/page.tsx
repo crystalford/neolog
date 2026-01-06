@@ -17,83 +17,6 @@ export default function ImportPage() {
   const [rssImporting, setRssImporting] = useState(false)
   const router = useRouter()
 
-  const extractHtmlContent = (html: string) => {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-
-    const cleanText = (value?: string | null) => {
-      if (!value) return ''
-      return value.replace(/\s+/g, ' ').trim()
-    }
-
-    const titleFromMeta = doc.querySelector('meta[property="og:title"]')?.getAttribute('content')
-    const titleFromDoc = doc.querySelector('title')?.textContent
-    const titleFromH1 = doc.querySelector('h1')?.textContent
-    const descriptionMeta =
-      doc.querySelector('meta[name="description"]')?.getAttribute('content') ||
-      doc.querySelector('meta[property="og:description"]')?.getAttribute('content')
-    const contentRoot = doc.querySelector('article') || doc.querySelector('main') || doc.body
-    const titleText = cleanText(titleFromMeta || titleFromDoc || titleFromH1)
-
-    const findSubtitle = () => {
-      if (!contentRoot) return ''
-      const headerText = contentRoot.querySelector('header h2, header p')?.textContent
-      if (headerText) return cleanText(headerText)
-      const paragraphs = Array.from(contentRoot.querySelectorAll('p'))
-      const candidate = paragraphs.find((p) => {
-        const text = cleanText(p.textContent)
-        return text.length >= 40 && text.length <= 180
-      })
-      return candidate ? cleanText(candidate.textContent) : ''
-    }
-    const subtitleText = cleanText(descriptionMeta) || findSubtitle()
-
-    const stripSelectors = ['nav', '[role="navigation"]', 'header', 'footer']
-    doc.querySelectorAll(stripSelectors.join(',')).forEach((node) => {
-      const inContent = node.closest('article, main')
-      if (!inContent) {
-        node.remove()
-      }
-    })
-
-    doc.body
-      ?.querySelectorAll('meta, title, base, link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
-      .forEach((node) => {
-        node.remove()
-      })
-
-    const forceWhite = doc.createElement('style')
-    forceWhite.setAttribute('data-neolog', 'force-white-bg')
-    forceWhite.textContent = 'html, body { background: #ffffff !important; }'
-    doc.head.appendChild(forceWhite)
-    if (doc.body) {
-      doc.body.style.backgroundColor = '#ffffff'
-    }
-    if (doc.documentElement) {
-      doc.documentElement.style.backgroundColor = '#ffffff'
-    }
-
-    const tailwindCdn = doc.querySelector('script[src*="cdn.tailwindcss.com"]')
-    const tailwindConfig = Array.from(doc.querySelectorAll('script')).find(
-      (script) => !script.src && script.textContent?.includes('tailwind.config'),
-    )
-    if (
-      tailwindCdn &&
-      tailwindConfig &&
-      (tailwindConfig.compareDocumentPosition(tailwindCdn) & Node.DOCUMENT_POSITION_FOLLOWING)
-    ) {
-      tailwindCdn.parentNode?.insertBefore(tailwindConfig, tailwindCdn)
-    }
-
-    const normalizedHtml = `<!doctype html>\n${doc.documentElement.outerHTML}`
-
-    return {
-      title: titleText,
-      subtitle: subtitleText && subtitleText !== titleText ? subtitleText : '',
-      contentHtml: normalizedHtml,
-    }
-  }
-
   const handleHtmlBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
@@ -104,29 +27,14 @@ export default function ImportPage() {
     setError(null)
 
     try {
-      const items: Array<{ filename: string; title: string; subtitle: string; contentHtml: string }> = []
-
-      for (let i = 0; i < files.length; i += 1) {
-        const file = files[i]
-        const raw = await file.text()
-        const parsed = extractHtmlContent(raw)
-
-        const fallbackTitle = file.name.replace(/\.(html|htm)$/i, '').replace(/[_-]+/g, ' ').trim()
-        const title = (parsed.title || fallbackTitle || 'Untitled').trim()
-        items.push({
-          filename: file.name,
-          title,
-          subtitle: parsed.subtitle || '',
-          contentHtml: parsed.contentHtml || '',
-        })
-
-        setHtmlProgress({ total: files.length, done: i + 1 })
+      const formData = new FormData()
+      for (const file of files) {
+        formData.append('files', file)
       }
 
       const res = await fetch('/api/import/html-bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        body: formData,
       })
 
       const data = await res.json().catch(() => null)
