@@ -157,6 +157,37 @@ Neolog also exposes a higher-level draft “drop box” endpoint for external AI
     }
     ```
 
+### Drop Box smoke test (curl)
+
+Creates an Inbox artifact via API key. Convert it into a draft from the Inbox UI (or via the session-authenticated bulk-convert endpoint).
+
+```bash
+curl -sS -X POST "https://<your-domain>/api/webhooks/draft" \
+  -H "Authorization: Bearer neo_<your_automation_key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Outline: Supply Chain for Intellectuals",
+    "content": "# Idea\n\n- Capture\n- Vault\n- Publish\n",
+    "content_type": "markdown",
+    "tags": ["writing", "systems"],
+    "source_tool": "curl",
+    "canonical_url": "https://example.com/notes",
+    "source_url": "https://example.com/notes",
+    "meta": { "provenance": { "tool": "curl" } }
+  }'
+```
+
+Expected response:
+
+```json
+{ "ok": true, "inboxItemId": "..." }
+```
+
+To convert in the UI:
+
+- Visit `https://<your-domain>/inbox`
+- Select the new item and use “Convert to draft” (or bulk convert)
+
 ## Asset API: Vault Add (Interoperability)
 
 After applying the `add_assets_vault.sql` migration, scripts can capture provenance-first assets.
