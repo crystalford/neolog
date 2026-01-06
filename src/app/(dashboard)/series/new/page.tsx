@@ -62,6 +62,11 @@ export default function NewSeriesPage() {
       }
 
       const seriesId = String(data?.seriesId || '')
+      if (!seriesId) {
+        setError('Failed to create series (missing series id)')
+        setSaving(false)
+        return
+      }
       const created = (data?.created || {}) as Record<string, { id?: string }>
 
       const url = new URL(`/series/${encodeURIComponent(seriesId)}`, window.location.origin)
@@ -207,7 +212,7 @@ export default function NewSeriesPage() {
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || !title.trim()}
                 className="btn btn-primary"
               >
                 {saving ? (
