@@ -6,17 +6,41 @@ import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from '@/lib/embeddings'
 import { logProviderUsage } from '@/lib/usage'
 import { enforceUsageCaps } from '@/lib/usageCaps'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  const finish = async (
+    status: 'success' | 'error',
+    meta: Record<string, any> = {},
+    errorMessage?: string,
+  ) => {
+    try {
+      if (!runId) return
+      await finishJobRun(runId, status, { duration_ms: Date.now() - startedAt, ...meta }, errorMessage)
+    } catch {
+      // best-effort
+    }
+  }
+
   const auth = await requireAutomationKey(request)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: 401 })
   }
 
+  try {
+    const run = await startJobRun('agent.draft.publish', { user_id: auth.userId })
+    runId = run.id
+  } catch {
+    // best-effort
+  }
+
   const admin = createAdminClient()
   if (!admin) {
+    await finish('error', {}, 'Server misconfigured.')
     return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
   }
 
@@ -27,6 +51,7 @@ export async function POST(request: NextRequest) {
     | null
 
   if (!body?.postId) {
+    await finish('error', {}, 'postId is required.')
     return NextResponse.json({ error: 'postId is required.' }, { status: 400 })
   }
 
@@ -37,10 +62,12 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!post) {
+    await finish('error', { post_id: body.postId }, 'Post not found.')
     return NextResponse.json({ error: 'Post not found.' }, { status: 404 })
   }
 
   if (post.author_id !== auth.userId) {
+    await finish('error', { post_id: post.id }, 'Forbidden.')
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
   }
 
@@ -54,6 +81,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error || !updated) {
+    await finish('error', { post_id: body.postId }, error?.message || 'Failed to publish post.')
     return NextResponse.json({ error: 'Failed to publish post.' }, { status: 500 })
   }
 
@@ -110,5 +138,6 @@ export async function POST(request: NextRequest) {
     // ignore
   }
 
+  await finish('success', { post_id: updated.id, published_at: updated.published_at })
   return NextResponse.json({ ok: true, post: updated })
 }

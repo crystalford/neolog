@@ -6,6 +6,7 @@ import { logProviderUsage } from "@/lib/usage";
 import { resolveProviderKeyWithClient } from "@/lib/ai-provider";
 import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from "@/lib/embeddings";
 import { enforceUsageCaps } from "@/lib/usageCaps";
+import { finishJobRun, startJobRun } from "@/lib/jobRuns";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,25 @@ function stripHtml(html: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
+  let runId: string | null = null;
+  let finalStatus: "success" | "error" = "error";
+  let finalMeta: Record<string, any> = {};
+  let finalErrorMessage: string | undefined = undefined;
+
+  const tryStartRun = async (meta: Record<string, any>) => {
+    try {
+      const run = await startJobRun("agent.ingest", meta);
+      runId = run.id;
+    } catch {
+      // best-effort
+    }
+  };
+
   try {
     const auth = await requireAutomationKey(req);
     if (!auth.ok) {
+      finalErrorMessage = auth.error;
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
 
@@ -79,6 +96,8 @@ export async function POST(req: NextRequest) {
       | null;
 
     if (!body) {
+      await tryStartRun({ user_id: auth.userId });
+      finalErrorMessage = "Invalid JSON";
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
@@ -86,11 +105,20 @@ export async function POST(req: NextRequest) {
     const rawText = body.text?.trim();
 
     if (!url && !rawText) {
+      await tryStartRun({ user_id: auth.userId });
+      finalErrorMessage = "Provide either url or text";
       return NextResponse.json(
         { error: "Provide either url or text" },
         { status: 400 },
       );
     }
+
+    await tryStartRun({
+      user_id: auth.userId,
+      has_url: Boolean(url),
+      has_text: Boolean(rawText),
+      requested_status: body.status || "draft",
+    });
 
     let contentText = rawText || "";
     if (!contentText && url) {
@@ -100,6 +128,7 @@ export async function POST(req: NextRequest) {
 
     contentText = contentText.trim();
     if (!contentText) {
+      finalErrorMessage = "No ingestable content found";
       return NextResponse.json(
         { error: "No ingestable content found" },
         { status: 400 },
@@ -120,6 +149,7 @@ export async function POST(req: NextRequest) {
       const publishedAt = status === "published" ? new Date().toISOString() : null;
 
     if (!supabase) {
+      finalErrorMessage = "Server missing Supabase admin configuration.";
       return NextResponse.json(
         { error: "Server missing Supabase admin configuration." },
         { status: 500 },
@@ -147,6 +177,8 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) throw insertError;
+
+    finalMeta = { post_id: created.id, status: created.status };
 
     // Best-effort: if the ingest published immediately, create an embedding.
     if (status === "published") {
@@ -203,6 +235,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    finalStatus = "success";
+
     if (wantsMarkdown(req)) {
       const lines: string[] = [];
       lines.push(`# Ingested draft`);
@@ -224,6 +258,20 @@ export async function POST(req: NextRequest) {
     });
   } catch (e: any) {
     const message = e?.message || "Unknown error";
+    finalErrorMessage = message;
     return NextResponse.json({ error: message }, { status: 500 });
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        );
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
