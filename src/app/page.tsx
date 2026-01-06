@@ -90,12 +90,12 @@ export default async function Home() {
 
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
                   Capture-first publishing.
-                  <span className="block text-[var(--text-tertiary)]">A real system for shipping ideas.</span>
+                  <span className="block text-[var(--text-tertiary)]">Capture, shape, and ship — without losing the truth.</span>
                 </h1>
 
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
-                  Collect inputs from anywhere, organize them into publications, turn them into posts, then distribute and measure — without
-                  losing the source of truth.
+                  Collect inputs from anywhere, turn them into durable publications, write posts with provenance, then distribute and measure —
+                  all from one core.
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-7">
@@ -333,98 +333,108 @@ export default async function Home() {
         {/* Workflows */}
         <section className="relative px-6 lg:px-12 py-10">
           <div
-            className="absolute inset-0 opacity-[0.25] pointer-events-none"
+            className="absolute inset-0 opacity-[0.18] pointer-events-none"
             style={{
               backgroundImage:
-                'radial-gradient(circle at 10% 10%, var(--accent-soft) 0%, transparent 55%), radial-gradient(circle at 90% 30%, var(--accent-soft) 0%, transparent 50%)',
+                'radial-gradient(circle at 12% 15%, var(--accent-soft) 0%, transparent 55%), radial-gradient(circle at 88% 25%, var(--accent-soft) 0%, transparent 50%)',
             }}
           />
 
           <div className="max-w-6xl mx-auto">
-            <div className="flex items-end justify-between gap-4 mb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
-                <h2 className="font-display text-2xl text-[var(--text-primary)]">Start with a task, not a blank page</h2>
-              </div>
-              <Link
-                href={session ? '/dashboard' : '/signup'}
-                className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                {session ? 'Open dashboard' : 'Get started'}
-              </Link>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                {
-                  label: 'Create post',
-                  description: 'Open the editor and start writing.',
-                  href: session ? '/write' : '/signup',
-                  icon: PenLine,
-                },
-                {
-                  label: 'Review inbox',
-                  description: 'Convert incoming drafts into posts.',
-                  href: session ? '/inbox' : '/signup',
-                  icon: Inbox,
-                },
-                {
-                  label: 'Connect sources',
-                  description: 'Add RSS feeds and sync items.',
-                  href: session ? '/sources' : '/signup',
-                  icon: Globe,
-                },
-                {
-                  label: 'Distribution pack',
-                  description: 'Generate threads + copies.',
-                  href: session ? '/dashboard' : '/signup',
-                  icon: Share2,
-                },
-                {
-                  label: 'Analytics snapshot',
-                  description: 'Track reader engagement.',
-                  href: session ? '/analytics' : '/signup',
-                  icon: BarChart3,
-                },
-              ].map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className="group flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
-                  >
-                    <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                      <Icon size={16} className="text-[var(--accent)]" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2 inline-flex items-center gap-1 group-hover:text-[var(--text-secondary)] transition-colors">
-                        Open
-                        <ArrowRight size={12} />
-                      </p>
-                    </div>
-                  </Link>
-                )
-              })}
-
-              <Link
-                href="/explore"
-                className="group flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
-              >
-                <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                  <ArrowRight size={16} className="text-[var(--text-secondary)]" />
-                </span>
+            <div className="rounded-3xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
+              <div className="px-6 py-5 bg-[var(--bg-secondary)] border-b border-[var(--border-light)] flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">Explore posts</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">See what the community is publishing.</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-2 inline-flex items-center gap-1 group-hover:text-[var(--text-secondary)] transition-colors">
-                    Browse
-                    <ArrowRight size={12} />
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workflows</p>
+                  <h2 className="font-display text-2xl text-[var(--text-primary)] mt-1">Start with a task</h2>
                 </div>
-              </Link>
+
+                <Link
+                  href={session ? '/dashboard' : '/signup'}
+                  className="inline-flex items-center gap-2 text-xs font-medium text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-4 py-2 hover:opacity-90 transition-opacity"
+                >
+                  {session ? 'Open dashboard' : 'Get started'}
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <div className="p-6">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    {
+                      label: 'Write a post',
+                      description: 'Draft, preview, and publish with provenance.',
+                      href: session ? '/write' : '/signup',
+                      icon: PenLine,
+                    },
+                    {
+                      label: 'Triage inbox',
+                      description: 'Turn captured items into drafts or notes.',
+                      href: session ? '/inbox' : '/signup',
+                      icon: Inbox,
+                    },
+                    {
+                      label: 'Sync sources',
+                      description: 'Pull from RSS feeds and keep your vault fresh.',
+                      href: session ? '/sources' : '/signup',
+                      icon: Globe,
+                    },
+                    {
+                      label: 'Distribution pack',
+                      description: 'Generate threads + variants from a post.',
+                      href: session ? '/dashboard' : '/signup',
+                      icon: Share2,
+                    },
+                    {
+                      label: 'Analytics snapshot',
+                      description: 'Understand what’s landing with readers.',
+                      href: session ? '/analytics' : '/signup',
+                      icon: BarChart3,
+                    },
+                  ].map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        className="group flex items-start justify-between gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-4 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                            <Icon size={16} className="text-[var(--accent)]" />
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                            <p className="text-xs text-[var(--text-tertiary)] mt-1">{item.description}</p>
+                          </div>
+                        </div>
+
+                        <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                          <ArrowRight size={16} />
+                        </span>
+                      </Link>
+                    )
+                  })}
+
+                  <Link
+                    href="/explore"
+                    className="group flex items-start justify-between gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-4 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                        <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">Explore posts</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">See what the community is publishing.</p>
+                      </div>
+                    </div>
+
+                    <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                      <ArrowRight size={16} />
+                    </span>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -432,57 +442,59 @@ export default async function Home() {
         {/* How it works */}
         <section className="px-6 lg:px-12 py-10 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
           <div className="max-w-6xl mx-auto">
-            <div className="flex items-end justify-between gap-4 mb-6">
-              <div>
+            <div className="rounded-3xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">
+              <div className="px-6 py-5 bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
                 <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">How it works</p>
-                <h2 className="font-display text-2xl text-[var(--text-primary)]">One system, three motions</h2>
+                <h2 className="font-display text-2xl text-[var(--text-primary)] mt-1">One system, three motions</h2>
               </div>
-            </div>
 
-            <div className="grid md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
-              {[
-                {
-                  title: 'Capture',
-                  copy: 'Save prompts, links, snippets, and notes from anywhere.',
-                  icon: Inbox,
-                },
-                {
-                  title: 'Vault + Publications',
-                  copy: 'Organize by project, with provenance and fast search.',
-                  icon: Boxes,
-                },
-                {
-                  title: 'Publish + Distribute',
-                  copy: 'Write once, ship outward as posts, feeds, and newsletters.',
-                  icon: Share2,
-                },
-              ].map((item, idx) => {
-                const Icon = item.icon
-                return (
-                  <div key={item.title} className="contents">
-                    <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)]">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
-                          <Icon size={16} className="text-[var(--accent)]" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Step {idx + 1}</p>
-                          <p className="text-sm font-medium text-[var(--text-primary)] mt-1">{item.title}</p>
+              <div className="p-6">
+                <div className="grid md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
+                  {[
+                    {
+                      title: 'Capture',
+                      copy: 'Save links, prompts, snippets, and notes from anywhere.',
+                      icon: Inbox,
+                    },
+                    {
+                      title: 'Vault + Publications',
+                      copy: 'Organize by project, with provenance + fast search.',
+                      icon: Boxes,
+                    },
+                    {
+                      title: 'Publish + Distribute',
+                      copy: 'Write once, ship outward as posts, feeds, and newsletters.',
+                      icon: Share2,
+                    },
+                  ].map((item, idx) => {
+                    const Icon = item.icon
+                    return (
+                      <div key={item.title} className="contents">
+                        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)]">
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                              <Icon size={16} className="text-[var(--accent)]" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Step {idx + 1}</p>
+                              <p className="text-sm font-medium text-[var(--text-primary)] mt-1">{item.title}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
                         </div>
-                      </div>
-                      <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
-                    </div>
 
-                    {idx < 2 && (
-                      <div className="hidden md:flex items-center justify-center">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                          <ArrowRight size={16} className="text-[var(--text-secondary)]" />
-                        </span>
+                        {idx < 2 && (
+                          <div className="hidden md:flex items-center justify-center">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                              <ArrowRight size={16} className="text-[var(--text-secondary)]" />
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -546,7 +558,7 @@ export default async function Home() {
             </h2>
 
             <p className="text-lg text-[var(--text-secondary)] mb-8 max-w-2xl mx-auto">
-              Join writers who want their work rendered exactly as intended.
+              Build a core you control — then broadcast outward.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
