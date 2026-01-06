@@ -130,6 +130,7 @@ If you apply `add_jobs_job_runs.sql` and `add_jobs_job_runs_read_policies.sql`, 
 Notes:
 - Monitors shows runs for your user (via `meta.user_id`) plus global cron runs.
 - Job run logging is best-effort: routes still work even if the tables are not deployed yet.
+- `/api/v1/capture` forwards to `/api/capture` and sets `x-neolog-skip-job-run: 1` internally to avoid duplicate job_runs entries.
 
 To verify quickly:
 
@@ -141,6 +142,8 @@ Common job names you may see:
 - `cron.publish.scheduled` (trigger `/api/cron/publish-scheduled`)
 - `cron.weekly.digest` (trigger `/api/cron/weekly-digest`)
 - `automation.trigger.inbox.create` / `automation.trigger.rss.pull` (trigger `/api/automation/trigger`)
+- `capture` (capture endpoint `/api/capture`)
+- `capture.v1` (compat alias `/api/v1/capture`)
 - `inbox.webhook` (trigger `/api/inbox/webhook`)
 - `webhooks.draft` (trigger `/api/webhooks/draft`)
 - `inbox.bulk_convert` (Inbox → Draft conversion via `/api/inbox/bulk-convert`)
