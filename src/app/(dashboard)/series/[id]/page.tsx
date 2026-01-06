@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { 
-  ArrowLeft, Loader2, GripVertical, Plus, X, Save,
+  ArrowLeft, Loader2, Plus, X, Save,
   ChevronUp, ChevronDown
 } from 'lucide-react'
 
@@ -49,15 +50,19 @@ export default function SeriesDetailPage({ params }: Props) {
   // Edit fields
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [coverImage, setCoverImage] = useState('')
   
   const router = useRouter()
-  const supabase = createClient()
+  const searchParams = useSearchParams()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    loadSeries()
-  }, [params.id])
+  const [createdDrafts, setCreatedDrafts] = useState<{
+    infographicId?: string
+    essayId?: string
+    researchId?: string
+  } | null>(null)
 
-  const loadSeries = async () => {
+  const loadSeries = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       router.push('/login')
@@ -80,6 +85,7 @@ export default function SeriesDetailPage({ params }: Props) {
     setSeries(seriesData)
     setTitle(seriesData.title)
     setDescription(seriesData.description || '')
+    setCoverImage(seriesData.cover_image_url || '')
 
     // Get posts in series
     const { data: seriesPosts } = await supabase
@@ -105,7 +111,34 @@ export default function SeriesDetailPage({ params }: Props) {
     }
 
     setLoading(false)
-  }
+  }, [params.id, router, supabase])
+
+  useEffect(() => {
+    loadSeries()
+  }, [loadSeries])
+
+  useEffect(() => {
+    const createdFlag = searchParams.get('created')
+    if (createdFlag !== '1') return
+
+    const infographicId = searchParams.get('infographic') || undefined
+    const essayId = searchParams.get('essay') || undefined
+    const researchId = searchParams.get('research') || undefined
+
+    if (infographicId || essayId || researchId) {
+      setCreatedDrafts({ infographicId, essayId, researchId })
+    }
+
+    // Clean the URL so refresh/share doesn't keep the query params.
+    router.replace(`/series/${encodeURIComponent(params.id)}`)
+  }, [params.id, router, searchParams])
+
+  useEffect(() => {
+    if (loading) return
+    if (!createdDrafts) return
+    const el = document.getElementById('series-posts')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [loading, createdDrafts])
 
   const saveChanges = async () => {
     if (!title.trim()) return
@@ -116,6 +149,7 @@ export default function SeriesDetailPage({ params }: Props) {
       .update({
         title: title.trim(),
         description: description.trim() || null,
+        cover_image_url: coverImage.trim() || null,
       })
       .eq('id', params.id)
 
@@ -221,6 +255,24 @@ export default function SeriesDetailPage({ params }: Props) {
             </div>
 
             <div>
+              <label className="block text-sm font-medium mb-2">Cover Image URL</label>
+              <input
+                type="url"
+                value={coverImage}
+                onChange={(e) => setCoverImage(e.target.value)}
+                className="input"
+                placeholder="https://..."
+              />
+              {coverImage && (
+                <img
+                  src={coverImage}
+                  alt="Cover preview"
+                  className="mt-3 w-full h-32 object-cover rounded-lg"
+                />
+              )}
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-2">Description</label>
               <textarea
                 value={description}
@@ -245,7 +297,7 @@ export default function SeriesDetailPage({ params }: Props) {
           </div>
 
           {/* Posts in series */}
-          <div>
+          <div id="series-posts">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-xl">Posts in Series</h2>
               <button
@@ -256,6 +308,35 @@ export default function SeriesDetailPage({ params }: Props) {
                 Add Posts
               </button>
             </div>
+
+            {createdDrafts && (createdDrafts.infographicId || createdDrafts.essayId || createdDrafts.researchId) && (
+              <div className="mb-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <p className="text-sm text-[var(--text-secondary)] mb-3">Drafts created</p>
+                <div className="flex flex-wrap gap-2">
+                  {createdDrafts.infographicId && (
+                    <Link
+                      href={`/write?edit=${encodeURIComponent(createdDrafts.infographicId)}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Open Infographic
+                    </Link>
+                  )}
+                  {createdDrafts.essayId && (
+                    <Link href={`/write?edit=${encodeURIComponent(createdDrafts.essayId)}`} className="btn btn-secondary btn-sm">
+                      Open Essay
+                    </Link>
+                  )}
+                  {createdDrafts.researchId && (
+                    <Link
+                      href={`/write?edit=${encodeURIComponent(createdDrafts.researchId)}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Open Research Dump
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Add posts panel */}
             {showAddPosts && availablePosts.length > 0 && (
@@ -281,6 +362,10 @@ export default function SeriesDetailPage({ params }: Props) {
             {posts.length === 0 ? (
               <div className="text-center py-12 rounded-lg bg-[var(--bg-secondary)]">
                 <p className="text-[var(--text-secondary)]">No posts in this series yet</p>
+                <Link href="/write" className="btn btn-secondary btn-sm mt-4">
+                  <Plus size={14} />
+                  Create a post
+                </Link>
               </div>
             ) : (
               <div className="space-y-2">
@@ -311,11 +396,23 @@ export default function SeriesDetailPage({ params }: Props) {
                     </span>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{post.title}</p>
+                      <Link
+                        href={`/write?edit=${encodeURIComponent(post.id)}`}
+                        className="font-medium truncate hover:text-[var(--accent)] transition-colors block"
+                      >
+                        {post.title}
+                      </Link>
                       <p className="text-xs text-[var(--text-tertiary)]">
                         {post.status === 'published' ? 'Published' : 'Draft'}
                       </p>
                     </div>
+
+                    <Link
+                      href={`/write?edit=${encodeURIComponent(post.id)}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Open
+                    </Link>
 
                     <button
                       onClick={() => removePostFromSeries(post.id)}

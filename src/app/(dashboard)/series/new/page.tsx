@@ -3,26 +3,26 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, Loader2, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function NewSeriesPage() {
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [coverImage, setCoverImage] = useState('')
+  const [researchDoc, setResearchDoc] = useState('')
+  const [infographicHtml, setInfographicHtml] = useState('')
+  const [essay, setEssay] = useState('')
   const [error, setError] = useState<string | null>(null)
   
   const router = useRouter()
-  const supabase = createClient()
 
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .substring(0, 60)
+  const willCreateDrafts = {
+    infographic: Boolean(infographicHtml.trim()),
+    essay: Boolean(essay.trim()),
+    research: Boolean(researchDoc.trim()),
   }
+  const willCreateAnyDrafts = willCreateDrafts.infographic || willCreateDrafts.essay || willCreateDrafts.research
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,37 +35,55 @@ export default function NewSeriesPage() {
 
     setSaving(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      router.push('/login')
-      return
-    }
+    const hasStackContent = willCreateAnyDrafts
 
-    const slug = generateSlug(title)
-
-    const { data, error: dbError } = await supabase
-      .from('series')
-      .insert({
-        author_id: session.user.id,
-        title: title.trim(),
-        slug,
-        description: description.trim() || null,
-        cover_image_url: coverImage || null,
+    try {
+      const response = await fetch('/api/series/create-stack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          coverImageUrl: coverImage.trim() || null,
+          researchDoc: researchDoc.trim() || null,
+          infographicHtml: infographicHtml.trim() || null,
+          essay: essay.trim() || null,
+          createDrafts: hasStackContent,
+        }),
       })
-      .select()
-      .single()
 
-    if (dbError) {
-      if (dbError.code === '23505') {
-        setError('You already have a series with this title')
-      } else {
-        setError('Failed to create series')
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        const rolledBack = Boolean(data?.rolledBack)
+        const base = typeof data?.error === 'string' && data.error.trim() ? data.error.trim() : 'Failed to create series'
+        setError(rolledBack ? `${base} (rolled back; nothing was created)` : base)
+        setSaving(false)
+        return
       }
-      setSaving(false)
-      return
-    }
 
-    router.push(`/series/${data.id}`)
+      const seriesId = String(data?.seriesId || '')
+      const created = (data?.created || {}) as Record<string, { id?: string }>
+
+      const url = new URL(`/series/${encodeURIComponent(seriesId)}`, window.location.origin)
+      const createdIds = {
+        infographic: created?.infographic?.id,
+        essay: created?.essay?.id,
+        research: created?.research?.id,
+      }
+
+      const anyCreated = Object.values(createdIds).some(Boolean)
+      if (anyCreated) {
+        url.searchParams.set('created', '1')
+        if (createdIds.infographic) url.searchParams.set('infographic', createdIds.infographic)
+        if (createdIds.essay) url.searchParams.set('essay', createdIds.essay)
+        if (createdIds.research) url.searchParams.set('research', createdIds.research)
+      }
+
+      router.push(url.pathname + url.search)
+    } catch {
+      setError('Failed to create series (network or server error)')
+      setSaving(false)
+    }
   }
 
   return (
@@ -131,6 +149,57 @@ export default function NewSeriesPage() {
               )}
             </div>
 
+            <div className="pt-4 border-t border-[var(--border-light)]">
+              <h2 className="font-display text-xl mb-2">Optional: Create a research stack</h2>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">
+                Paste your Deep Research dump, infographic HTML, and essay here.
+                If any are provided, Neolog will create draft posts in this series automatically.
+              </p>
+
+              {willCreateAnyDrafts && (
+                <div className="mb-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <p className="text-sm text-[var(--text-secondary)] mb-2">Drafts that will be created</p>
+                  <ul className="text-sm text-[var(--text-tertiary)] space-y-1">
+                    {willCreateDrafts.infographic && <li>• Infographic (HTML)</li>}
+                    {willCreateDrafts.essay && <li>• Essay</li>}
+                    {willCreateDrafts.research && <li>• Research Dump</li>}
+                  </ul>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Deep Research dump</label>
+                  <textarea
+                    value={researchDoc}
+                    onChange={(e) => setResearchDoc(e.target.value)}
+                    className="input min-h-[140px] resize-y"
+                    placeholder="Paste the full Deep Research text here..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Infographic HTML</label>
+                  <textarea
+                    value={infographicHtml}
+                    onChange={(e) => setInfographicHtml(e.target.value)}
+                    className="input min-h-[140px] resize-y font-mono text-xs"
+                    placeholder="Paste the infographic HTML page here..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Essay</label>
+                  <textarea
+                    value={essay}
+                    onChange={(e) => setEssay(e.target.value)}
+                    className="input min-h-[140px] resize-y"
+                    placeholder="Paste your aphoristic essay here..."
+                  />
+                </div>
+              </div>
+            </div>
+
             {error && (
               <p className="text-sm text-[var(--error)]">{error}</p>
             )}
@@ -147,7 +216,7 @@ export default function NewSeriesPage() {
                     Creating...
                   </>
                 ) : (
-                  'Create Series'
+                  willCreateAnyDrafts ? 'Create Stack' : 'Create Series'
                 )}
               </button>
               <Link href="/series" className="btn btn-secondary">
