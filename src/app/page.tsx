@@ -179,31 +179,31 @@ export default async function Home() {
                 {
                   label: 'Create post',
                   description: 'Open the editor and start writing.',
-                  href: '/write',
+                  href: session ? '/write' : '/signup',
                   icon: PenLine,
                 },
                 {
                   label: 'Review inbox',
                   description: 'Convert incoming drafts into posts.',
-                  href: '/inbox',
+                  href: session ? '/inbox' : '/signup',
                   icon: Inbox,
                 },
                 {
                   label: 'Connect sources',
                   description: 'Add RSS feeds and sync items.',
-                  href: '/sources',
+                  href: session ? '/sources' : '/signup',
                   icon: Globe,
                 },
                 {
                   label: 'Distribution pack',
                   description: 'Generate threads + copies.',
-                  href: '/dashboard',
+                  href: session ? '/dashboard' : '/signup',
                   icon: Share2,
                 },
                 {
                   label: 'Analytics snapshot',
                   description: 'Track reader engagement.',
-                  href: '/analytics',
+                  href: session ? '/analytics' : '/signup',
                   icon: BarChart3,
                 },
               ].map((item) => {
@@ -245,7 +245,7 @@ export default async function Home() {
         {(stats.posts > 0 || stats.creators > 0) && (
           <section className="px-6 lg:px-12 py-10 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
             <div className="max-w-6xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
                 <div className="text-center">
                   <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.posts.toLocaleString()}</p>
                   <p className="text-sm text-[var(--text-secondary)]">Posts published</p>
@@ -253,14 +253,6 @@ export default async function Home() {
                 <div className="text-center">
                   <p className="font-display text-3xl text-[var(--text-primary)] mb-1">{stats.creators.toLocaleString()}</p>
                   <p className="text-sm text-[var(--text-secondary)]">Writers</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">100%</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Your content</p>
-                </div>
-                <div className="text-center">
-                  <p className="font-display text-3xl text-[var(--text-primary)] mb-1">&lt;1s</p>
-                  <p className="text-sm text-[var(--text-secondary)]">To publish</p>
                 </div>
               </div>
             </div>
