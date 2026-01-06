@@ -4,7 +4,7 @@ import { PublicationsManager } from '@/components/PublicationsManager'
 
 export default function PublicationsPage() {
   return (
-    <main className="pb-16">
+    <main>
       <PublicationsManager />
     </main>
   )

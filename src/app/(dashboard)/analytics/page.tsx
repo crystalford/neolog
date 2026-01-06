@@ -322,10 +322,9 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <main className="pb-16">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 mb-6">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Analytics</p>
             <h1 className="font-display text-3xl text-[var(--text-primary)]">Reader intelligence</h1>
@@ -352,7 +351,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {loading ? (
+      {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="h-32 rounded-xl bg-[var(--bg-tertiary)] animate-pulse border border-[var(--border-light)]" />
@@ -674,7 +673,6 @@ export default function AnalyticsPage() {
             </div>
           </>
         )}
-      </div>
     </main>
   )
 }

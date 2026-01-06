@@ -1378,8 +1378,8 @@ export default function WritePage() {
   const titleChanged = lastVersion ? lastVersion.title !== title : false
 
   return (
-    <main className="pb-16 pt-4">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
+    <main className="px-6 lg:px-12 py-10">
+      <div className="max-w-7xl mx-auto">
           {/* Error/Success Messages */}
           {hasNoPublications && (
             <div className="mb-6 p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">

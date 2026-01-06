@@ -532,10 +532,9 @@ export default function SubscribersPage() {
   }
 
   return (
-    <main className="pb-16">
-      <div className="max-w-7xl mx-auto px-6 lg:px-12">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Audience</p>
             <h1 className="font-display text-3xl text-[var(--text-primary)]">Subscribers</h1>
@@ -552,7 +551,7 @@ export default function SubscribersPage() {
           <Download size={16} />
           Export CSV
         </button>
-        </div>
+      </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -1002,7 +1001,6 @@ export default function SubscribersPage() {
               )}
           </div>
         )}
-      </div>
 
       {noteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
