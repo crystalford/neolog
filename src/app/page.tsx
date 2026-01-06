@@ -5,10 +5,14 @@ import { PostCard } from '@/components/PostCard'
 import {
   ArrowRight,
   BarChart3,
+  Boxes,
   Globe,
   Inbox,
+  Mail,
   PenLine,
+  Rss,
   Share2,
+  Webhook,
 } from 'lucide-react'
 
 export default async function Home() {
@@ -51,7 +55,7 @@ export default async function Home() {
 
       <main className="pt-14">
         {/* Hero */}
-        <section className="relative px-6 lg:px-12 pt-16 pb-12 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
+        <section className="relative px-6 lg:px-12 pt-14 pb-8 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
           <div
             className="absolute inset-0 opacity-[0.35] pointer-events-none"
             style={{
@@ -123,9 +127,10 @@ export default async function Home() {
 
               {/* Compact value summary */}
               <div className="hidden lg:block">
-                <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Pipeline</p>
-                  <div className="space-y-3">
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Pipeline</p>
+                    <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                         <Inbox size={16} className="text-[var(--text-secondary)]" />
@@ -155,6 +160,34 @@ export default async function Home() {
                         <p className="text-xs text-[var(--text-tertiary)] mt-1">Threads, newsletters, feeds.</p>
                       </div>
                     </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Integrations</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'RSS', icon: Rss },
+                        { label: 'Webhooks', icon: Webhook },
+                        { label: 'Email', icon: Mail },
+                        { label: 'Sources', icon: Globe },
+                        { label: 'Exports', icon: Boxes },
+                        { label: 'Distribution', icon: Share2 },
+                      ].map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <div key={item.label} className="flex items-center gap-2">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                              <Icon size={14} className="text-[var(--text-secondary)]" />
+                            </span>
+                            <p className="text-sm text-[var(--text-secondary)]">{item.label}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-4">
+                      Connect inputs and push outputs without losing provenance.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -163,20 +196,25 @@ export default async function Home() {
         </section>
 
         {/* Pipeline cards */}
-        <section className="px-6 lg:px-12 py-8">
+        <section className="px-6 lg:px-12 pt-6 pb-8 -mt-4">
           <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-4">
             {[
-              { title: 'Capture', copy: 'Save prompts, links, snippets, and notes from anywhere.' },
-              { title: 'Vault + Publications', copy: 'Organize your knowledge by project, with search and provenance.' },
-              { title: 'Publish + Distribute', copy: 'Write once, ship outward as posts, feeds, and newsletters.' },
+              { title: 'Capture', copy: 'Save prompts, links, snippets, and notes from anywhere.', icon: Inbox },
+              { title: 'Vault + Publications', copy: 'Organize your knowledge by project, with search and provenance.', icon: Boxes },
+              { title: 'Publish + Distribute', copy: 'Write once, ship outward as posts, feeds, and newsletters.', icon: Share2 },
             ].map((item) => (
               <div
                 key={item.title}
                 className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-shadow"
               >
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-                  {item.title}
-                </p>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--accent-soft)] border border-[var(--border-light)]">
+                    <item.icon size={16} className="text-[var(--accent)]" />
+                  </span>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                    {item.title}
+                  </p>
+                </div>
                 <p className="text-sm text-[var(--text-secondary)]">{item.copy}</p>
               </div>
             ))}
