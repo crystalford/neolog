@@ -651,24 +651,19 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <>
-        <main className="pt-16 pb-16">
-          <div className="max-w-2xl mx-auto px-6 pt-8">
-            <div className="h-8 w-32 skeleton rounded mb-8" />
-            <div className="space-y-4">
-              <div className="h-20 skeleton rounded-xl" />
-              <div className="h-20 skeleton rounded-xl" />
-            </div>
-          </div>
-        </main>
-      </>
+      <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
+        <div className="h-8 w-32 skeleton rounded mb-8" />
+        <div className="space-y-4">
+          <div className="h-20 skeleton rounded-xl" />
+          <div className="h-20 skeleton rounded-xl" />
+        </div>
+      </main>
     )
   }
 
   return (
-    <main className="pt-16 pb-16">
-      <div className="max-w-6xl mx-auto px-6 lg:px-12">
-        <div className="pt-8 mb-10">
+    <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
+      <div className="mb-10">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
             Publisher settings
           </p>
@@ -689,7 +684,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="space-y-8">
+      <div className="space-y-8">
             <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -1461,8 +1456,7 @@ export default function SettingsPage() {
                 </div>
               )}
             </section>
-          </div>
-      </div>
+        </div>
     </main>
   )
 }

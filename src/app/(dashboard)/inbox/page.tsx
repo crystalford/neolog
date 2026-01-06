@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Check, X, FilePlus2 } from 'lucide-react'
+import { Check, X, FilePlus2, RefreshCw, Rss } from 'lucide-react'
 import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 
 type InboxItem = {
@@ -196,6 +196,12 @@ export default function InboxPage() {
 
   const selectedCount = Object.values(selected).filter(Boolean).length
 
+  const resetFilters = () => {
+    setStatusFilter('new')
+    setSourceFilter('all')
+    setDateFilter('30')
+  }
+
   const bulkConvertSelected = async () => {
     if (bulkConverting) return
     setError(null)
@@ -280,12 +286,31 @@ export default function InboxPage() {
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Inbox</p>
-        <h1 className="font-display text-3xl text-[var(--text-primary)]">Incoming drafts</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Review new items before converting them into drafts.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Inbox</p>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Incoming drafts</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Review new items before converting them into drafts.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={loadData}
+            className="btn btn-secondary btn-sm"
+            disabled={loading || bulkConverting}
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+          <button
+            onClick={() => router.push('/sources')}
+            className="btn btn-secondary btn-sm"
+          >
+            <Rss size={14} />
+            Add RSS source
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -390,8 +415,25 @@ export default function InboxPage() {
         {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading inbox...</div>
         ) : filteredItems.length === 0 ? (
-          <div className="p-6 text-sm text-[var(--text-tertiary)]">
-            No items match those filters.
+          <div className="p-6">
+            <p className="text-sm text-[var(--text-secondary)]">No items match those filters.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button onClick={resetFilters} className="btn btn-secondary btn-sm">
+                Reset filters
+              </button>
+              <button
+                onClick={loadData}
+                className="btn btn-secondary btn-sm"
+                disabled={loading || bulkConverting}
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+              <button onClick={() => router.push('/sources')} className="btn btn-secondary btn-sm">
+                <Rss size={14} />
+                Add RSS source
+              </button>
+            </div>
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">

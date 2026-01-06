@@ -229,10 +229,9 @@ export default function ReferralsPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center gap-4 pt-8 mb-8">
+          <div className="flex items-center gap-4 mb-8">
             <Link 
               href="/boost"
               className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
@@ -442,7 +441,6 @@ export default function ReferralsPage() {
               </div>
             </div>
           )}
-        </div>
       </main>
 
       {/* Create Modal */}

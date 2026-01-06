@@ -131,11 +131,9 @@ export default function NotificationsPage() {
   }, {} as Record<string, Notification[]>)
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-2xl mx-auto px-6">
-          {/* Header */}
-          <div className="flex items-center gap-4 pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
               <Bell size={24} className="text-[var(--accent)]" />
             </div>
@@ -150,28 +148,28 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <Bell size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">All caught up!</h2>
-              <p className="text-[var(--text-secondary)]">
-                You'll see notifications here when people interact with your content.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {Object.entries(groupedNotifications).map(([date, items]) => (
-                <div key={date}>
-                  <h2 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">
-                    {date}
-                  </h2>
-                  
-                  <div className="space-y-2">
-                    {items.map(notification => {
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <Bell size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">All caught up!</h2>
+          <p className="text-[var(--text-secondary)]">
+            You'll see notifications here when people interact with your content.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {Object.entries(groupedNotifications).map(([date, items]) => (
+            <div key={date}>
+              <h2 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">
+                {date}
+              </h2>
+              
+              <div className="space-y-2">
+                {items.map(notification => {
                       const Icon = typeIcons[notification.type] || Bell
                       const colorClasses = typeColors[notification.type] || 'text-[var(--text-tertiary)] bg-[var(--bg-tertiary)]'
                       
@@ -211,22 +209,20 @@ export default function NotificationsPage() {
                         </div>
                       )
                       
-                      return notification.url ? (
-                        <Link key={notification.id} href={notification.url}>
-                          {content}
-                        </Link>
-                      ) : (
-                        <div key={notification.id}>{content}</div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+                  return notification.url ? (
+                    <Link key={notification.id} href={notification.url}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <div key={notification.id}>{content}</div>
+                  )
+                })}
+              </div>
             </div>
-          )}
+          ))}
         </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

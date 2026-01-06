@@ -145,10 +145,9 @@ export default function PlacementsPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between pt-8 mb-8">
+          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Link 
                 href="/boost"
@@ -283,7 +282,6 @@ export default function PlacementsPage() {
               })}
             </div>
           )}
-        </div>
       </main>
 
       {/* Create Modal */}

@@ -192,15 +192,26 @@ export default function SourcesPage() {
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Sources</p>
-        <h1 className="font-display text-3xl text-[var(--text-primary)]">Pull content in</h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
-          Connect RSS feeds to populate your inbox automatically. Fetching runs in the background, or trigger it manually.
-        </p>
-        <p className="text-xs text-[var(--text-tertiary)] mt-2">
-          Auto-pull uses the RSS fetch endpoint (<span className="font-mono">/api/sources/rss/fetch</span>) when you wire a scheduled job.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Sources</p>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Pull content in</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Connect RSS feeds to populate your inbox automatically. Fetching runs in the background, or trigger it manually.
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+            Auto-pull uses the RSS fetch endpoint (<span className="font-mono">/api/sources/rss/fetch</span>) when you wire a scheduled job.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm" disabled={fetchingAll}>
+            <RefreshCw size={14} />
+            {fetchingAll ? 'Fetching...' : 'Fetch all'}
+          </button>
+          <button onClick={() => router.push('/inbox')} className="btn btn-secondary btn-sm">
+            View inbox
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -246,15 +257,6 @@ export default function SourcesPage() {
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border-light)]">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Connected feeds</p>
-          <div className="flex items-center gap-2">
-            <button onClick={() => fetchNow()} className="btn btn-secondary btn-sm" disabled={fetchingAll}>
-            <RefreshCw size={14} />
-              {fetchingAll ? 'Fetching...' : 'Fetch all'}
-            </button>
-            <button onClick={() => router.push('/inbox')} className="btn btn-secondary btn-sm">
-              View inbox
-            </button>
-          </div>
         </div>
         {loading ? (
           <div className="p-4 text-sm text-[var(--text-tertiary)]">Loading sources...</div>

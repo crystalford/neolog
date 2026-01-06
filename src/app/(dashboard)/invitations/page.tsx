@@ -107,10 +107,8 @@ export default function InvitationsPage() {
   }
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="flex items-center gap-4 pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
               <Users size={24} className="text-[var(--accent)]" />
             </div>
@@ -122,25 +120,25 @@ export default function InvitationsPage() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : invitations.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No pending invitations</h2>
-              <p className="text-[var(--text-secondary)]">
-                When someone invites you to co-author a post, it will appear here
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {invitations.map(invitation => (
-                <div
-                  key={invitation.id}
-                  className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]"
-                >
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+        </div>
+      ) : invitations.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No pending invitations</h2>
+          <p className="text-[var(--text-secondary)]">
+            When someone invites you to co-author a post, it will appear here
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {invitations.map(invitation => (
+            <div
+              key={invitation.id}
+              className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]"
+            >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
@@ -206,13 +204,11 @@ export default function InvitationsPage() {
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
             </div>
-          )}
+          ))}
         </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

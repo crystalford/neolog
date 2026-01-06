@@ -68,11 +68,9 @@ export default function ListsPage() {
   }
 
   return (
-    <>
-      <main className="pt-14 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          {/* Header */}
-          <div className="flex items-center justify-between pt-6 mb-6">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
                 <List size={20} className="text-[var(--accent)]" />
@@ -89,35 +87,35 @@ export default function ListsPage() {
               <Plus size={16} />
               New List
             </Link>
-          </div>
+      </div>
 
-          {loading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 skeleton rounded-xl" />
-              ))}
-            </div>
-          ) : lists.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <BookOpen size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No reading lists yet</h2>
-              <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                Create lists to organize posts by topic, save them for later, or share curated collections.
-              </p>
-              <Link href="/lists/new" className="btn btn-primary">
-                <Plus size={16} />
-                Create Your First List
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {lists.map((list) => (
-                <div 
-                  key={list.id}
-                  className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <Link href={`/lists/${list.id}`} className="flex-1">
+      {loading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 skeleton rounded-xl" />
+          ))}
+        </div>
+      ) : lists.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <BookOpen size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No reading lists yet</h2>
+          <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+            Create lists to organize posts by topic, save them for later, or share curated collections.
+          </p>
+          <Link href="/lists/new" className="btn btn-primary">
+            <Plus size={16} />
+            Create Your First List
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {lists.map((list) => (
+            <div 
+              key={list.id}
+              className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <Link href={`/lists/${list.id}`} className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium hover:text-[var(--accent)] transition-colors">
                           {list.name}
@@ -190,10 +188,8 @@ export default function ListsPage() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

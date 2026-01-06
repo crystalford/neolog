@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PostCard } from '@/components/PostCard'
 import { ContinueReading } from '@/components/ContinueReading'
@@ -30,27 +30,54 @@ export default function FeedPage() {
   const [subscriptionCount, setSubscriptionCount] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<'all' | 'standard' | 'pulse'>('all')
-  
-  const router = useRouter()
-  const supabase = createClient()
 
-  const fetchPosts = useCallback(async (offset: number, limit: number) => {
-    if (!userId) return { data: [], hasMore: false }
-    const contentType = typeFilter === 'pulse' ? 'pulse' : null
-    
-    const { data } = await supabase
-      .rpc('get_subscription_feed', {
+  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
+
+  const checkAuth = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      router.push('/login?redirect=/feed')
+      return
+    }
+
+    setUserId(session.user.id)
+
+    const { count } = await supabase
+      .from('subscriptions')
+      .select('*', { count: 'exact', head: true })
+      .eq('subscriber_id', session.user.id)
+
+    setSubscriptionCount(count || 0)
+  }, [router, supabase])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
+
+  const fetchPosts = useCallback(
+    async (offset: number, limit: number) => {
+      if (!userId) return { data: [], hasMore: false }
+
+      const contentType = typeFilter === 'pulse' ? 'pulse' : null
+
+      const { data } = await supabase.rpc('get_subscription_feed', {
         p_user_id: userId,
         p_limit: limit,
         p_offset: offset,
         p_content_type: contentType,
       })
 
-    return {
-      data: (data || []) as FeedPost[],
-      hasMore: (data?.length || 0) === limit,
-    }
-  }, [userId, supabase, typeFilter])
+      return {
+        data: (data || []) as FeedPost[],
+        hasMore: (data?.length || 0) === limit,
+      }
+    },
+    [supabase, typeFilter, userId]
+  )
 
   const {
     data: posts,
@@ -65,160 +92,135 @@ export default function FeedPage() {
   })
 
   useEffect(() => {
-    checkAuth()
-  }, [])
+    if (userId) loadInitial()
+  }, [loadInitial, typeFilter, userId])
 
-  useEffect(() => {
-    if (userId) {
-      loadInitial()
-    }
-  }, [userId, typeFilter])
+  const visiblePosts = useMemo(() => {
+    if (typeFilter === 'pulse') return posts.filter((p) => p.content_type === 'pulse')
+    if (typeFilter === 'standard') return posts.filter((p) => p.content_type !== 'pulse')
+    return posts
+  }, [posts, typeFilter])
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      router.push('/login?redirect=/feed')
-      return
-    }
-
-    setUserId(session.user.id)
-
-    // Get subscription count
-    const { count } = await supabase
-      .from('subscriptions')
-      .select('*', { count: 'exact', head: true })
-      .eq('subscriber_id', session.user.id)
-
-    setSubscriptionCount(count || 0)
-  }
-
-  // Transform feed posts to PostWithAuthor format for PostCard
-  const transformedPosts = posts.map(post => ({
-    id: post.post_id,
-    title: post.title,
-    slug: post.slug,
-    subtitle: post.subtitle,
-    excerpt: post.excerpt,
-    cover_image_url: post.cover_image_url,
-    published_at: post.published_at,
-    reading_time_minutes: post.reading_time_minutes,
-    status: 'published' as const,
-    content_type: post.content_type || 'html',
-    author: {
-      id: post.author_id,
-      username: post.author_username,
-      display_name: post.author_display_name,
-      avatar_url: post.author_avatar_url,
-    },
-  }))
+  const transformedPosts = useMemo(
+    () =>
+      visiblePosts.map((post) => ({
+        id: post.post_id,
+        title: post.title,
+        slug: post.slug,
+        subtitle: post.subtitle,
+        excerpt: post.excerpt,
+        cover_image_url: post.cover_image_url,
+        published_at: post.published_at,
+        reading_time_minutes: post.reading_time_minutes,
+        status: 'published' as const,
+        content_type: (post.content_type || 'html') as any,
+        author: {
+          id: post.author_id,
+          username: post.author_username,
+          display_name: post.author_display_name,
+          avatar_url: post.author_avatar_url,
+        },
+      })),
+    [visiblePosts]
+  )
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          {/* Header */}
-          <div className="flex items-center justify-between pt-8 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
-                <Rss size={24} className="text-[var(--accent)]" />
-              </div>
-              <div>
-                <h1 className="font-display text-3xl">Your Feed</h1>
-                <p className="text-[var(--text-secondary)]">
-                  {subscriptionCount > 0 
-                    ? `Posts from ${subscriptionCount} creator${subscriptionCount === 1 ? '' : 's'} you follow`
-                    : 'Subscribe to creators to see their posts here'
-                  }
-                </p>
-              </div>
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
+              <Rss size={24} className="text-[var(--accent)]" />
             </div>
-            
-            <Link href="/explore" className="btn btn-secondary">
-              <Compass size={16} />
-              Explore
-            </Link>
+            <div>
+              <h1 className="font-display text-3xl">Your Feed</h1>
+              <p className="text-[var(--text-secondary)]">
+                {subscriptionCount > 0
+                  ? `Posts from ${subscriptionCount} creator${subscriptionCount === 1 ? '' : 's'} you follow`
+                  : 'Subscribe to creators to see their posts here'}
+              </p>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mb-8">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'standard', label: 'Standard' },
-              { id: 'pulse', label: 'Pulse' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setTypeFilter(item.id as typeof typeFilter)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  typeFilter === item.id
-                    ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
-                    : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
-                }`}
-              >
-                {item.label}
-              </button>
+
+          <Link href="/explore" className="btn btn-secondary">
+            <Compass size={16} />
+            Explore
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-8">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'standard', label: 'Standard' },
+            { id: 'pulse', label: 'Pulse' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setTypeFilter(item.id as typeof typeFilter)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                typeFilter === item.id
+                  ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
+                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <ContinueReading />
+
+        {loading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <PostCardListSkeleton key={i} />
             ))}
           </div>
-
-          {/* Continue Reading section */}
-          <ContinueReading />
-
-          {loading ? (
+        ) : subscriptionCount === 0 ? (
+          <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+            <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+            <h2 className="font-display text-xl mb-2">No subscriptions yet</h2>
+            <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+              Follow creators to see their latest posts in your feed.
+            </p>
+            <Link href="/explore" className="btn btn-primary">
+              <Compass size={16} />
+              Find Creators
+            </Link>
+          </div>
+        ) : transformedPosts.length === 0 ? (
+          <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+            <Rss size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+            <h2 className="font-display text-xl mb-2">No posts yet</h2>
+            <p className="text-[var(--text-secondary)] mb-6">
+              New posts from creators you follow will appear here
+            </p>
+            <Link href="/explore" className="btn btn-secondary">
+              <Compass size={16} />
+              Explore More
+            </Link>
+          </div>
+        ) : (
+          <>
             <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <PostCardListSkeleton key={i} />
+              {transformedPosts.map((post) => (
+                <PostCard key={post.id} post={post as any} variant="list" />
               ))}
             </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              {subscriptionCount === 0 ? (
-                <>
-                  <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                  <h2 className="font-display text-xl mb-2">Your feed is empty</h2>
-                  <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                    Subscribe to creators to see their posts in your personalized feed
-                  </p>
-                  <Link href="/explore" className="btn btn-primary">
-                    <Compass size={16} />
-                    Discover Writers
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Rss size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                  <h2 className="font-display text-xl mb-2">No new posts yet</h2>
-                  <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                    The creators you follow haven't published anything recently
-                  </p>
-                  <Link href="/explore" className="btn btn-secondary">
-                    <Compass size={16} />
-                    Explore More
-                  </Link>
-                </>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="space-y-6">
-                {transformedPosts.map((post) => (
-                  <PostCard key={post.id} post={post as any} variant="list" />
-                ))}
+
+            {loadingMore && (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 size={28} className="animate-spin text-[var(--text-tertiary)]" />
               </div>
-              
-              {/* Load more trigger */}
-              <div ref={loadMoreRef} className="py-8 flex justify-center">
-                {loadingMore && (
-                  <Loader2 size={24} className="animate-spin text-[var(--text-tertiary)]" />
-                )}
-                {!hasMore && posts.length > 0 && (
-                  <p className="text-sm text-[var(--text-tertiary)]">You've reached the end</p>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+            )}
+
+            {hasMore && <div ref={loadMoreRef} className="h-10" />}
+          </>
+        )}
       </main>
-    </>
   )
-}
+    }
+
+
 
 

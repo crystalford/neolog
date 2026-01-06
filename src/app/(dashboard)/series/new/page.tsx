@@ -69,10 +69,8 @@ export default function NewSeriesPage() {
   }
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-2xl mx-auto px-6">
-          <div className="pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
+      <div className="mb-8">
             <Link 
               href="/series" 
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
@@ -156,10 +154,8 @@ export default function NewSeriesPage() {
                 Cancel
               </Link>
             </div>
-          </form>
-        </div>
-      </main>
-    </>
+      </form>
+    </main>
   )
 }
 

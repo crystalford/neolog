@@ -112,27 +112,21 @@ export default function ListDetailPage({ params }: Props) {
 
   if (loading) {
     return (
-      <>
-        <main className="pt-16 pb-16">
-          <div className="max-w-7xl mx-auto px-6 lg:px-12">
-            <div className="pt-8 space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <PostCardListSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-        </main>
-      </>
+      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <PostCardListSkeleton key={i} />
+          ))}
+        </div>
+      </main>
     )
   }
 
   if (!list) return null
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <div className="mb-8">
             <Link 
               href="/lists" 
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
@@ -168,7 +162,7 @@ export default function ListDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {posts.length === 0 ? (
+      {posts.length === 0 ? (
             <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
               <BookOpen size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">This list is empty</h2>
@@ -184,7 +178,7 @@ export default function ListDetailPage({ params }: Props) {
                 </Link>
               )}
             </div>
-          ) : (
+      ) : (
             <div className="space-y-4">
               {posts.map((item) => (
                 <div key={item.id} className="relative group">
@@ -213,10 +207,8 @@ export default function ListDetailPage({ params }: Props) {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

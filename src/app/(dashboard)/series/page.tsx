@@ -79,10 +79,8 @@ export default function SeriesPage() {
   }
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="flex items-center justify-between pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
                 <Layers size={24} className="text-[var(--accent)]" />
@@ -101,29 +99,29 @@ export default function SeriesPage() {
             </Link>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : series.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <Layers size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No series yet</h2>
-              <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                Create a series to group related posts with sequential navigation
-              </p>
-              <Link href="/series/new" className="btn btn-primary">
-                <Plus size={16} />
-                Create Your First Series
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {series.map(s => (
-                <div
-                  key={s.id}
-                  className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
-                >
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+        </div>
+      ) : series.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <Layers size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No series yet</h2>
+          <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+            Create a series to group related posts with sequential navigation
+          </p>
+          <Link href="/series/new" className="btn btn-primary">
+            <Plus size={16} />
+            Create Your First Series
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {series.map(s => (
+            <div
+              key={s.id}
+              className="p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+            >
                   <div className="flex items-start justify-between">
                     <Link href={`/series/${s.id}`} className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -190,13 +188,11 @@ export default function SeriesPage() {
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
             </div>
-          )}
+          ))}
         </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

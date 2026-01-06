@@ -75,11 +75,9 @@ export default function SavedPage() {
   }))
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          {/* Header */}
-          <div className="flex items-center gap-4 pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
               <Bookmark size={24} className="text-[var(--accent)]" />
             </div>
@@ -94,32 +92,30 @@ export default function SavedPage() {
             </div>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <Bookmark size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No saved posts yet</h2>
-              <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                Click the bookmark icon on any post to save it for later
-              </p>
-              <Link href="/explore" className="btn btn-primary">
-                <Compass size={16} />
-                Explore Posts
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {transformedPosts.map((post) => (
-                <PostCard key={post.id} post={post as any} variant="list" />
-              ))}
-            </div>
-          )}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
         </div>
-      </main>
-    </>
+      ) : posts.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <Bookmark size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No saved posts yet</h2>
+          <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+            Click the bookmark icon on any post to save it for later
+          </p>
+          <Link href="/explore" className="btn btn-primary">
+            <Compass size={16} />
+            Explore Posts
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {transformedPosts.map((post) => (
+            <PostCard key={post.id} post={post as any} variant="list" />
+          ))}
+        </div>
+      )}
+    </main>
   )
 }
 

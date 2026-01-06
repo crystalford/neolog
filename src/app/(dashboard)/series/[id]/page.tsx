@@ -186,21 +186,17 @@ export default function SeriesDetailPage({ params }: Props) {
 
   if (loading) {
     return (
-      <>
-        <main className="pt-16 pb-16 flex items-center justify-center min-h-screen">
-          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-        </main>
-      </>
+      <main className="px-6 lg:px-12 py-10 flex items-center justify-center min-h-[60vh]">
+        <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+      </main>
     )
   }
 
   if (!series) return null
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-2xl mx-auto px-6">
-          <div className="pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
+      <div className="mb-8">
             <Link 
               href="/series" 
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
@@ -332,9 +328,7 @@ export default function SeriesDetailPage({ params }: Props) {
               </div>
             )}
           </div>
-        </div>
-      </main>
-    </>
+    </main>
   )
 }
 

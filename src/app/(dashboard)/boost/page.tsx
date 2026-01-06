@@ -130,13 +130,11 @@ export default function BoostPage() {
   if (loading) {
     return (
       <>
-        <main className="pt-16 pb-16">
-          <div className="max-w-7xl mx-auto px-6 lg:px-12">
-            <div className="space-y-4 pt-8">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 skeleton rounded-xl" />
-              ))}
-            </div>
+        <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-24 skeleton rounded-xl" />
+            ))}
           </div>
         </main>
       </>
@@ -145,9 +143,8 @@ export default function BoostPage() {
 
   return (
     <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="flex items-center justify-between pt-8 mb-8">
+      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
                 <Rocket size={24} className="text-[var(--accent)]" />
@@ -343,7 +340,6 @@ export default function BoostPage() {
               </div>
             </div>
           </div>
-        </div>
       </main>
     </>
   )

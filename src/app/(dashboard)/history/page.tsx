@@ -102,11 +102,9 @@ export default function HistoryPage() {
   }, {} as Record<string, HistoryPost[]>)
 
   return (
-    <>
-      <main className="pt-14 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          {/* Header */}
-          <div className="flex items-center justify-between pt-6 mb-6">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center">
                 <History size={20} className="text-[var(--accent)]" />
@@ -131,25 +129,25 @@ export default function HistoryPage() {
                 Clear
               </button>
             )}
-          </div>
+      </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <History size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No reading history</h2>
-              <p className="text-[var(--text-secondary)] mb-6">
-                Posts you read will appear here
-              </p>
-              <Link href="/explore" className="btn btn-primary">
-                Explore Posts
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-6">
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <History size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No reading history</h2>
+          <p className="text-[var(--text-secondary)] mb-6">
+            Posts you read will appear here
+          </p>
+          <Link href="/explore" className="btn btn-primary">
+            Explore Posts
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-8">
               {Object.entries(groupedPosts).map(([date, items]) => (
                 <div key={date}>
                   <h2 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">
@@ -210,10 +208,8 @@ export default function HistoryPage() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

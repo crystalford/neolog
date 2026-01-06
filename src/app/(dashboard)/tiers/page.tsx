@@ -96,10 +96,8 @@ export default function TiersPage() {
   const formatPrice = (cents: number) => `$${(cents / 100).toFixed(0)}`
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          <div className="flex items-center justify-between pt-8 mb-8">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="font-display text-3xl mb-2">Subscription Tiers</h1>
               <p className="text-[var(--text-secondary)]">
@@ -112,41 +110,41 @@ export default function TiersPage() {
             </Link>
           </div>
 
-          {!stripeEnabled && (
-            <div className="mb-8 p-4 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20">
-              <p className="text-sm">
-                <strong>Connect Stripe first.</strong> You need to{' '}
-                <Link href="/earnings" className="text-[var(--accent)] underline">set up Stripe</Link>
-                {' '}before you can accept payments.
-              </p>
-            </div>
-          )}
+      {!stripeEnabled && (
+        <div className="mb-8 p-4 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20">
+          <p className="text-sm">
+            <strong>Connect Stripe first.</strong> You need to{' '}
+            <Link href="/earnings" className="text-[var(--accent)] underline">set up Stripe</Link>
+            {' '}before you can accept payments.
+          </p>
+        </div>
+      )}
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
-            </div>
-          ) : tiers.length === 0 ? (
-            <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-              <CreditCard size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-              <h2 className="font-display text-xl mb-2">No subscription tiers yet</h2>
-              <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                Create tiers to offer paid subscriptions to your readers
-              </p>
-              <Link href="/tiers/new" className="btn btn-primary">
-                <Plus size={16} />
-                Create Your First Tier
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {tiers.map(tier => (
-                <div
-                  key={tier.id}
-                  className={`p-6 rounded-xl bg-[var(--bg-secondary)] border transition-colors ${
-                    tier.is_active ? 'border-[var(--border-light)]' : 'border-dashed border-[var(--border-medium)] opacity-60'
-                  }`}
-                >
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-[var(--text-tertiary)]" />
+        </div>
+      ) : tiers.length === 0 ? (
+        <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+          <CreditCard size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <h2 className="font-display text-xl mb-2">No subscription tiers yet</h2>
+          <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+            Create tiers to offer paid subscriptions to your readers
+          </p>
+          <Link href="/tiers/new" className="btn btn-primary">
+            <Plus size={16} />
+            Create Your First Tier
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {tiers.map(tier => (
+            <div
+              key={tier.id}
+              className={`p-6 rounded-xl bg-[var(--bg-secondary)] border transition-colors ${
+                tier.is_active ? 'border-[var(--border-light)]' : 'border-dashed border-[var(--border-medium)] opacity-60'
+              }`}
+            >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -216,13 +214,11 @@ export default function TiersPage() {
                       </span>
                     )}
                   </div>
-                </div>
-              ))}
             </div>
-          )}
+          ))}
         </div>
-      </main>
-    </>
+      )}
+    </main>
   )
 }
 

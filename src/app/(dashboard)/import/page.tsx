@@ -85,10 +85,8 @@ export default function ImportPage() {
   }
 
   return (
-    <>
-      <main className="pt-16 pb-16">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12">
-          <div className="pt-8 mb-10">
+    <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
+      <div className="mb-10">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Import
             </p>
@@ -96,9 +94,9 @@ export default function ImportPage() {
             <p className="text-[var(--text-secondary)] max-w-2xl">
               Bring your existing posts from Substack, Medium, or WordPress.
             </p>
-          </div>
+      </div>
 
-          <div className="space-y-8">
+      <div className="space-y-8">
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Substack */}
               <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
@@ -306,10 +304,8 @@ export default function ImportPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </main>
-    </>
+      </div>
+    </main>
   )
 }
 
