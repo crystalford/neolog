@@ -11,10 +11,13 @@
   - [ ] Usage tracking + caps: `add_provider_usage.sql`, `add_usage_caps.sql`
   - [ ] Video avatar jobs: `add_video_brief_jobs.sql`
   - [ ] Syndication + visuals: `add_syndication.sql`, `add_og_variants.sql`
+  - [ ] Automation substrate (recommended): `add_jobs_job_runs.sql`
+  - [ ] Automation UI read access (recommended): `add_jobs_job_runs_read_policies.sql`
   - [ ] Feed source settings: `add_feed_source_auto_convert.sql` (optional per-feed auto-convert + destination publication)
   - [ ] Asset Vault: `add_assets_vault.sql` (assets table + RLS)
   - [ ] Post ↔ Asset links: `add_post_assets.sql` (attach vault assets to drafts)
   - [ ] Capture-first asset fields: `expand_assets_capture_fields.sql` (title/source/url + quote/fragment types)
+  - [ ] Audience/referrals publication scoping (if using referrals/audience features): `add_audience_publication_scoping.sql`
 - [ ] Enable Email auth in Authentication > Providers
 - [ ] (Optional) Enable OAuth providers (Google, GitHub)
 - [ ] Create storage bucket named `images` with public access
@@ -118,6 +121,15 @@ Cron routes:
 - `/api/cron/publish-scheduled`
 - `/api/cron/rss-pull`
 - `/api/cron/weekly-digest`
+
+#### Cron observability (recommended)
+
+If you apply `add_jobs_job_runs.sql` and `add_jobs_job_runs_read_policies.sql`, cron routes will record `job_runs` and the dashboard Monitors page will show a lightweight “Automation runs” panel (last 10 runs).
+
+To verify quickly:
+
+- Trigger `/api/cron/rss-pull` once (using `CRON_SECRET`)
+- Open `/monitors` and confirm the run appears
 
 ## Headless Inbox Webhook (Automation)
 
