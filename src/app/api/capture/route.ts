@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,24 @@ function isUuid(v: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
+  const skipJobRuns = request.headers.get('x-neolog-skip-job-run') === '1'
+  const tryStartRun = async (jobName: string, meta: Record<string, any>) => {
+    if (skipJobRuns || runId) return
+    try {
+      const run = await startJobRun(jobName, meta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+  }
+
+  try {
   const body = (await request.json().catch(() => null)) as Body | null
 
   const assetType = typeof body?.type === 'string' ? body.type : ''
@@ -93,8 +112,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 401 })
     }
 
+    finalMeta = {
+      user_id: auth.userId,
+      auth_mode: 'api_key',
+      asset_type: assetType,
+      publication_id: normalizedPublicationId,
+      tags_count: Array.isArray(tags) ? tags.length : 0,
+      has_title: Boolean(title),
+      source_platform: sourcePlatform,
+      has_source_url: Boolean(sourceUrl),
+    }
+    await tryStartRun('capture', finalMeta)
+
     const admin = createAdminClient()
     if (!admin) {
+      finalErrorMessage = 'Server misconfigured.'
       return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
     }
 
@@ -106,9 +138,11 @@ export async function POST(request: NextRequest) {
         .eq('owner_id', auth.userId)
         .maybeSingle()
       if (pubError) {
+        finalErrorMessage = 'Failed to validate publication.'
         return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
       }
       if (!pub) {
+        finalErrorMessage = 'Invalid publication_id'
         return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
       }
     }
@@ -130,9 +164,15 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !data) {
+      finalErrorMessage = 'Failed to create asset.'
       return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
     }
 
+    finalStatus = 'success'
+    finalMeta = {
+      ...finalMeta,
+      asset_id: data.id,
+    }
     return NextResponse.json({ ok: true, id: data.id })
   }
 
@@ -146,6 +186,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  finalMeta = {
+    user_id: session.user.id,
+    auth_mode: 'session',
+    asset_type: assetType,
+    publication_id: normalizedPublicationId,
+    tags_count: Array.isArray(tags) ? tags.length : 0,
+    has_title: Boolean(title),
+    source_platform: sourcePlatform,
+    has_source_url: Boolean(sourceUrl),
+  }
+  await tryStartRun('capture', finalMeta)
+
   if (normalizedPublicationId) {
     const { data: pub, error: pubError } = await supabase
       .from('publications')
@@ -154,9 +206,11 @@ export async function POST(request: NextRequest) {
       .eq('owner_id', session.user.id)
       .maybeSingle()
     if (pubError) {
+      finalErrorMessage = 'Failed to validate publication.'
       return NextResponse.json({ error: 'Failed to validate publication.' }, { status: 500 })
     }
     if (!pub) {
+      finalErrorMessage = 'Invalid publication_id'
       return NextResponse.json({ error: 'Invalid publication_id' }, { status: 400 })
     }
   }
@@ -178,8 +232,28 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error || !data) {
+    finalErrorMessage = 'Failed to create asset.'
     return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
   }
 
+  finalStatus = 'success'
+  finalMeta = {
+    ...finalMeta,
+    asset_id: data.id,
+  }
   return NextResponse.json({ ok: true, id: data.id })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
+  }
 }
