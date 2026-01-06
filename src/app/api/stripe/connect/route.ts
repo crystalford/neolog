@@ -1,18 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 })
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    finalMeta = { user_id: session.user.id, op: 'onboarding' }
+    try {
+      const run = await startJobRun('stripe.connect.onboarding', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
     }
 
     const { data: profile } = await supabase
@@ -49,21 +64,51 @@ export async function POST(request: NextRequest) {
       type: 'account_onboarding',
     })
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, stripe_account_id: accountId }
     return NextResponse.json({ url: accountLink.url })
   } catch (error) {
     console.error('Connect error:', error)
+    finalErrorMessage = 'Failed to create account link'
     return NextResponse.json({ error: 'Failed to create account link' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
 
 // Check account status
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    finalMeta = { user_id: session.user.id, op: 'status' }
+    try {
+      const run = await startJobRun('stripe.connect.status', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
     }
 
     const { data: profile } = await supabase
@@ -73,6 +118,8 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!profile?.stripe_account_id) {
+      finalStatus = 'success'
+      finalMeta = { ...finalMeta, connected: false }
       return NextResponse.json({ connected: false, enabled: false })
     }
 
@@ -85,6 +132,8 @@ export async function GET(request: NextRequest) {
       .update({ stripe_account_enabled: enabled })
       .eq('id', session.user.id)
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, connected: true, enabled }
     return NextResponse.json({ 
       connected: true, 
       enabled,
@@ -92,6 +141,20 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Connect status error:', error)
+    finalErrorMessage = 'Failed to check status'
     return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

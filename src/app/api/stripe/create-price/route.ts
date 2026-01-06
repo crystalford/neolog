@@ -1,12 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 })
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -15,7 +22,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { tierId, name, priceCents } = await request.json()
+    const { tierId, name, priceCents } = await request.json().catch(() => ({}))
+
+    finalMeta = {
+      user_id: session.user.id,
+      tier_id: typeof tierId === 'string' ? tierId : null,
+      price_cents: typeof priceCents === 'number' ? priceCents : null,
+    }
+    try {
+      const run = await startJobRun('stripe.price.create', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
 
     // Get user's Stripe account
     const { data: profile } = await supabase
@@ -60,9 +79,25 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, stripe_price_id: price.id }
     return NextResponse.json({ priceId: price.id })
   } catch (error) {
     console.error('Create price error:', error)
+    finalErrorMessage = 'Failed to create price'
     return NextResponse.json({ error: 'Failed to create price' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

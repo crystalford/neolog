@@ -3,13 +3,35 @@ import { sendEmail } from '@/lib/email'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 // Subscribe via email (for non-logged-in users)
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const { email, creatorId, publicationId, source = 'website' } = await request.json()
 
+    finalMeta = {
+      creator_id: typeof creatorId === 'string' ? creatorId : null,
+      publication_id: typeof publicationId === 'string' ? publicationId : null,
+      source: typeof source === 'string' ? source : null,
+      has_email: Boolean(email),
+      email_len: typeof email === 'string' ? email.length : null,
+    }
+    try {
+      const run = await startJobRun('subscribe.email.start', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
     if (!email || !creatorId) {
+      finalErrorMessage = 'Email and creatorId are required'
       return NextResponse.json(
         { error: 'Email and creatorId are required' },
         { status: 400 }
@@ -18,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Basic email validation
     if (!email.includes('@') || email.length < 5) {
+      finalErrorMessage = 'Invalid email address'
       return NextResponse.json(
         { error: 'Invalid email address' },
         { status: 400 }
@@ -28,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
     if (!admin) {
+      finalErrorMessage = 'Server misconfigured'
       return NextResponse.json(
         { error: 'Server misconfigured' },
         { status: 500 }
@@ -42,6 +66,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!creator) {
+      finalErrorMessage = 'Creator not found'
       return NextResponse.json(
         { error: 'Creator not found' },
         { status: 404 }
@@ -57,6 +82,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (!pub) {
+        finalErrorMessage = 'Invalid publicationId for creator'
         return NextResponse.json(
           { error: 'Invalid publicationId for creator' },
           { status: 400 }
@@ -75,6 +101,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       if (existing.status === 'active' && existing.confirmed) {
+        finalErrorMessage = 'Already subscribed'
         return NextResponse.json(
           { error: 'Already subscribed' },
           { status: 409 }
@@ -110,6 +137,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('Insert error:', insertError)
+      finalErrorMessage = 'Failed to create subscription'
       return NextResponse.json(
         { error: 'Failed to create subscription' },
         { status: 500 }
@@ -138,6 +166,7 @@ export async function POST(request: NextRequest) {
       // Don't fail the request - subscription was created, email can be resent
     }
 
+    finalStatus = 'success'
     return NextResponse.json({
       success: true,
       message: 'Confirmation email sent',
@@ -146,9 +175,23 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Subscribe error:', error)
+    finalErrorMessage = 'Internal server error'
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

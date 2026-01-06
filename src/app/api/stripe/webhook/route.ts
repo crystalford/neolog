@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const stripeSecret = process.env.STRIPE_SECRET_KEY
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -38,6 +45,14 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Webhook signature verification failed:', err)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  }
+
+  finalMeta = { event_type: event.type, event_id: event.id }
+  try {
+    const run = await startJobRun('stripe.webhook', finalMeta)
+    runId = run.id
+  } catch {
+    // best-effort
   }
 
   try {
@@ -165,9 +180,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    finalStatus = 'success'
     return NextResponse.json({ received: true })
   } catch (error) {
     console.error('Webhook handler error:', error)
+    finalErrorMessage = 'Webhook handler failed'
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const getKey = () => {
   const secret = process.env.INTEGRATION_KEY_SECRET || ''
@@ -24,22 +25,37 @@ const encrypt = (plain: string) => {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json()
-  const provider = typeof body.provider === 'string' ? body.provider : ''
-  const apiKey = typeof body.apiKey === 'string' ? body.apiKey : ''
-  const label = typeof body.label === 'string' ? body.label.trim() || null : null
-
-  if (!provider || !apiKey) {
-    return NextResponse.json({ error: 'Provider and API key are required.' }, { status: 400 })
-  }
-
   try {
+    const body = await request.json().catch(() => ({}))
+    const provider = typeof body.provider === 'string' ? body.provider : ''
+    const apiKey = typeof body.apiKey === 'string' ? body.apiKey : ''
+    const label = typeof body.label === 'string' ? body.label.trim() || null : null
+
+    finalMeta = { user_id: session.user.id, provider: provider || null, has_label: Boolean(label) }
+    try {
+      const run = await startJobRun('integrations.save', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
+
+    if (!provider || !apiKey) {
+      finalErrorMessage = 'Provider and API key are required.'
+      return NextResponse.json({ error: 'Provider and API key are required.' }, { status: 400 })
+    }
+
     const encrypted = encrypt(apiKey)
     const payload = {
       user_id: session.user.id,
@@ -57,6 +73,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
+      finalErrorMessage = 'Failed to save integration.'
       return NextResponse.json({ error: 'Failed to save integration.' }, { status: 500 })
     }
 
@@ -74,8 +91,23 @@ export async function POST(request: NextRequest) {
         .eq('id', saved.id)
     }
 
+    finalStatus = 'success'
     return NextResponse.json({ ok: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to encrypt key.' }, { status: 500 })
+    finalErrorMessage = error?.message || 'Failed to encrypt key.'
+    return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }

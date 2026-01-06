@@ -1,12 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 })
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+  let runId: string | null = null
+  let finalStatus: 'success' | 'error' = 'error'
+  let finalMeta: Record<string, any> = {}
+  let finalErrorMessage: string | undefined = undefined
+
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
@@ -15,7 +22,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { tierId, creatorId } = await request.json()
+    const { tierId, creatorId } = await request.json().catch(() => ({}))
+
+    finalMeta = {
+      user_id: session.user.id,
+      tier_id: typeof tierId === 'string' ? tierId : null,
+      creator_id: typeof creatorId === 'string' ? creatorId : null,
+    }
+    try {
+      const run = await startJobRun('stripe.checkout.create', finalMeta)
+      runId = run.id
+    } catch {
+      // best-effort
+    }
 
     // Get tier details
     const { data: tier } = await supabase
@@ -25,6 +44,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!tier || !tier.stripe_price_id) {
+      finalErrorMessage = 'Tier not found'
       return NextResponse.json({ error: 'Tier not found' }, { status: 404 })
     }
 
@@ -71,9 +91,25 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    finalStatus = 'success'
+    finalMeta = { ...finalMeta, stripe_checkout_session_id: checkoutSession.id }
     return NextResponse.json({ url: checkoutSession.url })
   } catch (error) {
     console.error('Checkout error:', error)
+    finalErrorMessage = 'Failed to create checkout'
     return NextResponse.json({ error: 'Failed to create checkout' }, { status: 500 })
+  } finally {
+    try {
+      if (runId) {
+        await finishJobRun(
+          runId,
+          finalStatus,
+          { duration_ms: Date.now() - startedAt, ...finalMeta },
+          finalErrorMessage,
+        )
+      }
+    } catch {
+      // best-effort
+    }
   }
 }
