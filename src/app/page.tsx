@@ -51,7 +51,17 @@ export default async function Home() {
 
       <main className="pt-14">
         {/* Hero */}
-        <section className="relative px-6 lg:px-12 pt-16 pb-10 overflow-hidden">
+        <section className="relative px-6 lg:px-12 pt-16 pb-12 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
+          <div
+            className="absolute inset-0 opacity-[0.35] pointer-events-none"
+            style={{
+              backgroundImage:
+                'linear-gradient(var(--border-light) 1px, transparent 1px), linear-gradient(90deg, var(--border-light) 1px, transparent 1px)',
+              backgroundSize: '48px 48px',
+              maskImage: 'radial-gradient(circle at 30% 0%, black 0%, transparent 70%)',
+            }}
+          />
+
           <div
             className="absolute top-0 right-0 w-[900px] h-[900px] opacity-[0.02] pointer-events-none blur-3xl"
             style={{
@@ -63,6 +73,10 @@ export default async function Home() {
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-10 items-start">
               <div>
+                <p className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent)] bg-[var(--accent-soft)] border border-[var(--border-light)] rounded-full px-3 py-1.5 mb-6">
+                  Capture → Vault → Publish
+                </p>
+
                 <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-6">
                   Capture-first publishing.
                   <span className="block text-[var(--text-tertiary)]">Own the core. Broadcast everywhere.</span>
@@ -70,25 +84,36 @@ export default async function Home() {
 
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-7 max-w-xl">
                   Collect inputs from anywhere, organize them into publications, turn them into posts, then distribute and measure — without
-                  losing your source of truth.
+                  losing the source of truth.
                 </p>
+
+                <div className="flex flex-wrap gap-2 mb-7">
+                  {["Inbox-first capture", "Publications as containers", "Distribution + analytics"].map((label) => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full px-3 py-1"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
 
                 <div className="flex flex-wrap gap-3 items-center">
                   {session ? (
                     <>
-                      <Link href="/dashboard" className="btn btn-primary">
+                      <Link href="/dashboard" className="btn btn-primary btn-lg">
                         Open dashboard
                       </Link>
-                      <Link href="/write" className="btn btn-secondary">
+                      <Link href="/write" className="btn btn-secondary btn-lg">
                         New post
                       </Link>
                     </>
                   ) : (
                     <>
-                      <Link href="/signup" className="btn btn-primary">
+                      <Link href="/signup" className="btn btn-primary btn-lg">
                         Start writing
                       </Link>
-                      <Link href="/explore" className="btn btn-secondary">
+                      <Link href="/explore" className="btn btn-secondary btn-lg">
                         Explore
                       </Link>
                     </>
@@ -98,7 +123,7 @@ export default async function Home() {
 
               {/* Compact value summary */}
               <div className="hidden lg:block">
-                <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6">
+                <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-[var(--surface-shadow)]">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4">Pipeline</p>
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
@@ -147,7 +172,7 @@ export default async function Home() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5"
+                className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-5 shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-shadow"
               >
                 <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
                   {item.title}
@@ -212,7 +237,7 @@ export default async function Home() {
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
+                    className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
                   >
                     <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                       <Icon size={16} className="text-[var(--text-secondary)]" />
@@ -227,7 +252,7 @@ export default async function Home() {
 
               <Link
                 href="/explore"
-                className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
+                className="flex items-start gap-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] px-4 py-3 hover:border-[var(--border-medium)] shadow-[var(--surface-shadow)] hover:shadow-[var(--surface-shadow-hover)] transition-all"
               >
                 <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <ArrowRight size={16} className="text-[var(--text-secondary)]" />
@@ -261,7 +286,7 @@ export default async function Home() {
 
         {/* Featured Posts */}
         {featuredPosts.length > 0 && (
-          <section className="px-6 lg:px-12 py-14 bg-[var(--bg-primary)]">
+          <section className="px-6 lg:px-12 py-14 bg-[var(--bg-secondary)] border-y border-[var(--border-light)]">
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-8">
                 <div>
