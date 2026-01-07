@@ -2,6 +2,8 @@
 
 <!-- Trivial change to force Vercel redeploy -->
 
+<!-- Another trivial change to force Vercel route refresh -->
+
 A creative infrastructure system for capture-first creators who care about ownership, distribution, and creative control.
 
 Pipeline: **Capture → Organize → Compose → Distribute → Analyze**
