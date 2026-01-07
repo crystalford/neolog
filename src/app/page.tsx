@@ -8,6 +8,7 @@ import {
   Boxes,
   CheckCircle2,
   Clock,
+  FileText,
   Link2,
   Globe,
   Inbox,
@@ -62,6 +63,31 @@ export default async function Home() {
       <Header />
 
       <main className="pt-14">
+        {/* Quick Actions (logged in) */}
+        {session && (
+          <section className="px-6 lg:px-12 py-4 border-b border-[var(--border-light)] bg-[var(--bg-primary)]">
+            <div className="max-w-6xl mx-auto flex flex-wrap gap-3">
+              {[
+                { href: '/write', label: 'Write', Icon: PenLine },
+                { href: '/inbox', label: 'Inbox', Icon: Inbox },
+                { href: '/sources', label: 'Sources', Icon: Globe },
+                { href: '/series', label: 'Stacks', Icon: Boxes },
+                { href: '/publications', label: 'Publications', Icon: FileText },
+              ].map(({ href, label, Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 text-sm hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <Icon size={14} className="text-[var(--text-secondary)]" />
+                  </span>
+                  <span className="text-[var(--text-primary)]">{label}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         {/* Hero */}
         <section className="relative px-6 lg:px-12 pt-12 md:pt-14 pb-10 overflow-hidden bg-[var(--bg-secondary)] border-b border-[var(--border-light)]">
           <div

@@ -470,6 +470,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 mb-6">
+        {[
+          { href: '/write', label: 'Write', Icon: PenLine },
+          { href: '/inbox', label: 'Inbox', Icon: Inbox },
+          { href: '/sources', label: 'Sources', Icon: Globe },
+          { href: '/series', label: 'Stacks', Icon: FileText },
+          { href: '/publications', label: 'Publications', Icon: FileText },
+        ].map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-start gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 hover:border-[var(--border-medium)] hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            <span className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)]">
+              <Icon size={16} className="text-[var(--text-secondary)]" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">Quick access</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="min-w-0">
           {!hasPosts && (
