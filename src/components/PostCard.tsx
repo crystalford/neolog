@@ -23,6 +23,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
   const postHref = `/${post.author.username}/${post.slug}`
   const stackHref = post.series?.slug ? `/${post.author.username}/stack/${post.series.slug}` : null
 
+  const isDraft = post.status === 'draft';
   const publishedDate = post.published_at 
     ? new Date(post.published_at).toLocaleDateString('en-US', {
         month: 'short',
@@ -47,11 +48,22 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               <img src={post.cover_image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
             </div>
           )}
+          <div className="flex items-center gap-2 mb-1">
+            {isDraft && (
+              <span className="doc-badge doc-badge-draft bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">Draft</span>
+            )}
+          </div>
           <h2 className="font-display text-base mb-2 group-hover:text-[var(--accent)] transition-colors line-clamp-2">
             {post.title}
           </h2>
           <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
             <span className="truncate">{post.author.display_name || post.author.username}</span>
+            {!isDraft && publishedDate && (
+              <>
+                <span>-</span>
+                <time>{publishedDate}</time>
+              </>
+            )}
           </div>
         </Link>
       </article>
@@ -84,6 +96,11 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             </div>
           )}
           <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              {isDraft && (
+                <span className="doc-badge doc-badge-draft bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">Draft</span>
+              )}
+            </div>
             <h2 className="font-display text-xl mb-2">{post.title}</h2>
             {stackHref && post.series?.title && (
               <div className="mb-2">
@@ -101,7 +118,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             )}
             <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
               <span>{post.author.display_name || post.author.username}</span>
-              {publishedDate && (
+              {!isDraft && publishedDate && (
                 <>
                   <span>-</span>
                   <time>{publishedDate}</time>
@@ -141,6 +158,9 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         )}
 
         <div className="flex items-center gap-2 mb-2">
+          {isDraft && (
+            <span className="doc-badge doc-badge-draft bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">Draft</span>
+          )}
           {hasInteractiveContent && (
             <span className="doc-badge doc-badge-interactive"><Code size={10} /> Interactive</span>
           )}
@@ -148,8 +168,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             <span className="doc-badge doc-badge-pulse">Pulse</span>
           )}
         </div>
-        
-        {/* FIXED: Replaced nested Link with a div/span since the parent Link covers the whole card */}
+        {/* Author and published date, demoted if not draft */}
         <div className="flex items-center gap-3 mb-2">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
@@ -163,8 +182,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               {post.author.display_name || post.author.username}
             </span>
           </div>
-          
-          {publishedDate && (
+          {!isDraft && publishedDate && (
             <>
               <span className="text-[var(--text-tertiary)]">-</span>
               <time className="text-sm text-[var(--text-tertiary)]">{publishedDate}</time>
@@ -187,7 +205,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         <h2 className="font-display text-lg md:text-xl mb-2 group-hover:text-[var(--accent)] transition-colors leading-snug">
           {post.title}
         </h2>
-        
+
         {post.excerpt && (
           <p className="text-[var(--text-secondary)] text-sm line-clamp-2 mb-4 leading-relaxed">
             {post.excerpt}

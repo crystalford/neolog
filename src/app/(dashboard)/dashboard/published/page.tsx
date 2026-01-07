@@ -179,67 +179,18 @@ export default function PublishedPage() {
 
   return (
     <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
         <div>
           <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Published</h1>
-          <p className="text-base text-[var(--text-secondary)] mt-2">Your work in the world.</p>
+          <p className="text-base text-[var(--text-secondary)] mt-2">Published posts are an optional exposure state. Your workspace is where continuity lives.</p>
         </div>
-        <Link href="/write" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
-          New Post
+        <Link href="/dashboard/workspace" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
+          View Drafts
         </Link>
       </div>
 
-      {/* Stats Overview - Dismissible */}
-      {showAnalytics && capabilities.showLightweightAnalytics && posts.length > 0 && (
-        <div className="relative mb-8 p-6 rounded-2xl border border-[var(--border-light)] bg-white/80 shadow">
-          <button
-            onClick={() => setShowAnalytics(false)}
-            className="absolute top-3 right-3 p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none"
-            title="Dismiss"
-          >
-            <X size={16} />
-          </button>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalViews.toLocaleString()}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Total views</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[var(--text-primary)]">{posts.length}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Published</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalReactions}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Reactions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.subscriberCount}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Subscribers</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-2 p-2 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-8 w-fit">
-        {[
-          { id: 'posts', label: 'Posts' },
-          ...(capabilities.showLightweightAnalytics ? [{ id: 'analytics', label: 'Analytics' }] : []),
-          ...(capabilities.showEngagementPanel ? [{ id: 'engagement', label: 'Engagement' }] : []),
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-5 py-2 rounded-xl text-base font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white/90 text-[var(--text-primary)] shadow'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Analytics and engagement panels demoted: hidden by default, can be re-enabled in settings */}
+      {/* ...existing code... */}
 
       {/* Posts Tab */}
       {activeTab === 'posts' && (
@@ -275,39 +226,39 @@ export default function PublishedPage() {
                           <Calendar size={14} />
                           {formatRelativeTime(post.published_at)}
                         </span>
-                        <span className="flex items-center gap-2">
+                        {/* Analytics and engagement stats demoted: visually subtle, not primary */}
+                        <span className="flex items-center gap-2 opacity-60">
                           <Eye size={14} />
                           {post.view_count.toLocaleString()}
                         </span>
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 opacity-60">
                           <Heart size={14} />
                           {post.reaction_count}
                         </span>
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 opacity-60">
                           <MessageSquare size={14} />
                           {post.comment_count}
                         </span>
                       </div>
                     </div>
-
-                    {/* Actions */}
+                    {/* Actions: Only edit, view is secondary */}
                     <div className="flex items-center gap-3">
-                      {username && (
-                        <Link
-                          href={`/${username}/${post.slug}`}
-                          className="btn btn-secondary text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                          target="_blank"
-                        >
-                          <ExternalLink size={16} />
-                          View
-                        </Link>
-                      )}
                       <Link
                         href={`/write?edit=${post.id}`}
                         className="btn btn-ghost text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
                         <Edit2 size={16} />
                       </Link>
+                      {username && (
+                        <Link
+                          href={`/${username}/${post.slug}`}
+                          className="btn btn-secondary text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)] opacity-60"
+                          target="_blank"
+                        >
+                          <ExternalLink size={16} />
+                          View
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
