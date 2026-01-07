@@ -250,6 +250,44 @@ To convert in the UI:
 - Visit `https://<your-domain>/inbox`
 - Select the new item and use “Convert to draft” (or bulk convert)
 
+## Sources (Feeds)
+
+Quickstart (UI):
+- Open `https://<your-domain>/sources` while logged in.
+- Paste a social profile or site URL (e.g., YouTube `@handle`, personal blog).
+- Click “Auto-detect” to discover feeds, then “Test” to preview the first items.
+- Choose the best feed, click “Add”, and optionally “Send newest to inbox” to verify.
+- JSON Feed, Atom, and RSS are supported.
+
+Cron pull (server):
+
+```bash
+curl -sS -X GET "https://<your-domain>/api/cron/rss-pull" \
+  -H "Authorization: Bearer <CRON_SECRET>"
+```
+
+Notes:
+- With `add_feed_source_health.sql` applied, failing feeds increment `consecutive_failures`; auto-disable after `RSS_MAX_CONSECUTIVE_FAILURES` (default 10).
+- Set `RSS_AUTO_CONVERT_TO_DRAFTS=true` to auto-convert new inbox items into drafts during cron.
+
+OPML import/export:
+- Export: visit `https://<your-domain>/api/sources/opml/export` in a logged-in browser.
+- Import: use the Sources page UI to upload an OPML file.
+
+Manual fetch now (session):
+
+```bash
+# Requires logged-in session cookie; run from a browser client or include your session cookie
+curl -sS -X POST "https://<your-domain>/api/sources/rss/fetch" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <your_session_cookie>" \
+  -d '{"sourceId":"<optional_feed_source_id>"}'
+```
+
+YouTube tip:
+- The Sources page can resolve `@handle` → `channel_id`, then uses `https://www.youtube.com/feeds/videos.xml?channel_id=...`.
+- Alternatively, paste a channel URL directly; feed autodiscovery will propose the videos.xml feed.
+
 ## Asset API: Vault Add (Interoperability)
 
 After applying the `add_assets_vault.sql` migration, scripts can capture provenance-first assets.
