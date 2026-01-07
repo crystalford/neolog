@@ -155,10 +155,9 @@ export default function NewSeriesPage() {
             </div>
 
             <div className="pt-4 border-t border-[var(--border-light)]">
-              <h2 className="font-display text-xl mb-2">Optional: Create a research stack</h2>
+              <h2 className="font-display text-xl mb-2">Optional: Create starter drafts (research stack)</h2>
               <p className="text-sm text-[var(--text-secondary)] mb-4">
-                Paste your Deep Research dump, infographic HTML, and essay here.
-                If any are provided, Neolog will create draft posts in this series automatically.
+                Add any of the following and Neolog will create draft posts inside this series automatically.
               </p>
 
               {willCreateAnyDrafts && (
@@ -221,7 +220,7 @@ export default function NewSeriesPage() {
                     Creating...
                   </>
                 ) : (
-                  willCreateAnyDrafts ? 'Create Stack' : 'Create Series'
+                  willCreateAnyDrafts ? 'Create Series + Drafts' : 'Create Series'
                 )}
               </button>
               <Link href="/series" className="btn btn-secondary">
