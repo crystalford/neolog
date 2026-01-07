@@ -115,14 +115,12 @@ export default async function Home() {
                   Capture → Vault → Publish
                 </p>
 
-                <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-5">
-                  Capture-first publishing.
-                  <span className="block text-[var(--text-tertiary)]">Capture, shape, and ship — without losing the truth.</span>
+                <h1 className="font-display text-5xl md:text-6xl leading-tight tracking-tight text-[var(--text-primary)] mb-4">
+                  One home for your writing.
                 </h1>
 
                 <p className="text-lg leading-relaxed text-[var(--text-secondary)] mb-6 max-w-xl">
-                  Collect inputs from anywhere, turn them into durable publications, write posts with provenance, then distribute and measure —
-                  all from one core.
+                  Capture anything, draft fast, publish confidently. Fewer clicks, one clear path: Inbox → Draft → Publish.
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-6">
@@ -138,31 +136,18 @@ export default async function Home() {
 
                 <div className="flex flex-wrap gap-3 items-center">
                   {session ? (
-                    <>
-                      <Link href="/dashboard" className="btn btn-primary btn-lg">
-                        Open dashboard
-                      </Link>
-                      <Link href="/write" className="btn btn-secondary btn-lg">
-                        New post
-                      </Link>
-                    </>
+                    <Link href="/write" className="btn btn-primary btn-lg">
+                      Start writing
+                    </Link>
                   ) : (
-                    <>
-                      <Link href="/signup" className="btn btn-primary btn-lg">
-                        Create account
-                      </Link>
-                      <Link href="/explore" className="btn btn-secondary btn-lg">
-                        Explore
-                      </Link>
-                    </>
+                    <Link href="/signup" className="btn btn-primary btn-lg">
+                      Start writing
+                    </Link>
                   )}
+                  <Link href="/sources" className="btn btn-secondary btn-lg">
+                    Pull in sources
+                  </Link>
                 </div>
-
-                {!session && (
-                  <p className="text-xs text-[var(--text-tertiary)] mt-3 max-w-xl">
-                    Create an account to write and publish. You can always explore first.
-                  </p>
-                )}
 
                 {/* Mobile preview */}
                 <div className="lg:hidden mt-6 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-[var(--surface-shadow)] overflow-hidden">

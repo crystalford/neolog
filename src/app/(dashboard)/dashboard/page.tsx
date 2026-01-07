@@ -505,7 +505,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Focus & Progress */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] mb-8">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] mb-6">
         <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
@@ -582,6 +582,56 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Today checklist */}
+      <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Today</p>
+            <h2 className="text-lg font-medium text-[var(--text-primary)]">Ship one thing</h2>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-medium text-[var(--text-primary)]">{progressScore}%</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Momentum</p>
+          </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[{
+            label: 'Capture a note',
+            done: draftCount + publishedCount + scheduledCount > 0,
+            href: '/inbox',
+          }, {
+            label: 'Draft or update',
+            done: draftCount > 0,
+            href: '/write',
+          }, {
+            label: 'Publish or schedule',
+            done: publishedCount + scheduledCount > 0,
+            href: '/write',
+          }].map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${
+                item.done
+                  ? 'border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                  : 'border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:border-[var(--border-medium)]'
+              }`}
+            >
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border text-sm font-medium ${
+                  item.done
+                    ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]'
+                    : 'bg-[var(--bg-secondary)] border-[var(--border-light)] text-[var(--text-tertiary)]'
+                }`}
+              >
+                {item.done ? '✓' : '•'}
+              </span>
+              <span className="text-sm">{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="min-w-0">
           {!hasPosts && (
@@ -654,84 +704,98 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'published', label: 'Published' },
-                { id: 'draft', label: 'Drafts' },
-                { id: 'scheduled', label: 'Scheduled' },
-                { id: 'archived', label: 'Archived' },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setFilter(item.id as typeof filter)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filter === item.id
-                      ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
+          <details className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] mb-4" open>
+            <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none">
+              <div className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+                Filters & sorting
+              </div>
+              <span className="text-xs text-[var(--text-tertiary)]">Toggle</span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl p-1">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'published', label: 'Published' },
+                    { id: 'draft', label: 'Drafts' },
+                    { id: 'scheduled', label: 'Scheduled' },
+                    { id: 'archived', label: 'Archived' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setFilter(item.id as typeof filter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        filter === item.id
+                          ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="inline-flex bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl p-1">
+                  {[
+                    { id: 'all', label: 'All types' },
+                    { id: 'standard', label: 'Standard' },
+                    { id: 'pulse', label: 'Pulse' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setTypeFilter(item.id as typeof typeFilter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        typeFilter === item.id
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="inline-flex bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl p-1">
+                  {[
+                    { id: 'latest', label: 'Latest' },
+                    { id: 'trending', label: 'Trending' },
+                    { id: 'discussed', label: 'Discussed' },
+                    { id: 'views', label: 'Most viewed' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setSortBy(item.id as typeof sortBy)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        sortBy === item.id
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative w-full sm:w-72">
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search posts..."
-                  className="input input-with-icon w-56"
+                  className="input input-with-icon w-full"
                 />
                 <Search
                   size={16}
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
                 />
               </div>
-              <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-                {[
-                  { id: 'all', label: 'All types' },
-                  { id: 'standard', label: 'Standard' },
-                  { id: 'pulse', label: 'Pulse' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setTypeFilter(item.id as typeof typeFilter)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      typeFilter === item.id
-                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <div className="inline-flex bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl p-1">
-                {[
-                  { id: 'latest', label: 'Latest' },
-                  { id: 'trending', label: 'Trending' },
-                  { id: 'discussed', label: 'Discussed' },
-                  { id: 'views', label: 'Views' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setSortBy(item.id as typeof sortBy)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      sortBy === item.id
-                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-sm text-[var(--text-secondary)]">
-                {visiblePosts.length} {visiblePosts.length === 1 ? 'post' : 'posts'}
-              </p>
             </div>
+          </details>
+
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-[var(--text-secondary)]">
+              {visiblePosts.length} {visiblePosts.length === 1 ? 'post' : 'posts'}
+            </p>
           </div>
 
           {visiblePosts.length === 0 ? (
