@@ -159,17 +159,17 @@ export default function PublishedPage() {
 
   if (loading) {
     return (
-      <main className="px-6 lg:px-8 py-8 max-w-5xl mx-auto">
-        <div className="animate-pulse space-y-6">
+      <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+        <div className="animate-pulse space-y-8">
           <div className="h-8 w-48 skeleton rounded" />
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-6">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-20 skeleton rounded-xl" />
+              <div key={i} className="h-20 skeleton rounded-2xl" />
             ))}
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 skeleton rounded-xl" />
+              <div key={i} className="h-20 skeleton rounded-2xl" />
             ))}
           </div>
         </div>
@@ -178,44 +178,42 @@ export default function PublishedPage() {
   }
 
   return (
-    <main className="px-6 lg:px-8 py-8 max-w-5xl mx-auto animate-fade-up">
-      <div className="flex items-center justify-between mb-6">
+    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+      <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="font-display text-2xl text-[var(--text-primary)]">Published</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Your work in the world.
-          </p>
+          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Published</h1>
+          <p className="text-base text-[var(--text-secondary)] mt-2">Your work in the world.</p>
         </div>
-        <Link href="/write" className="btn btn-primary btn-sm">
+        <Link href="/write" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
           New Post
         </Link>
       </div>
 
       {/* Stats Overview - Dismissible */}
       {showAnalytics && capabilities.showLightweightAnalytics && posts.length > 0 && (
-        <div className="relative mb-6 p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+        <div className="relative mb-8 p-6 rounded-2xl border border-[var(--border-light)] bg-white/80 shadow">
           <button
             onClick={() => setShowAnalytics(false)}
-            className="absolute top-2 right-2 p-1 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+            className="absolute top-3 right-3 p-2 rounded-xl text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] transition-colors focus:outline-none"
             title="Dismiss"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <p className="text-2xl font-semibold text-[var(--text-primary)]">{stats.totalViews.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalViews.toLocaleString()}</p>
               <p className="text-xs text-[var(--text-secondary)]">Total views</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-semibold text-[var(--text-primary)]">{posts.length}</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{posts.length}</p>
               <p className="text-xs text-[var(--text-secondary)]">Published</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-semibold text-[var(--text-primary)]">{stats.totalReactions}</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalReactions}</p>
               <p className="text-xs text-[var(--text-secondary)]">Reactions</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-semibold text-[var(--text-primary)]">{stats.subscriberCount}</p>
+              <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.subscriberCount}</p>
               <p className="text-xs text-[var(--text-secondary)]">Subscribers</p>
             </div>
           </div>
@@ -223,7 +221,7 @@ export default function PublishedPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-6 w-fit">
+      <div className="flex gap-2 p-2 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-8 w-fit">
         {[
           { id: 'posts', label: 'Posts' },
           ...(capabilities.showLightweightAnalytics ? [{ id: 'analytics', label: 'Analytics' }] : []),
@@ -232,9 +230,9 @@ export default function PublishedPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-5 py-2 rounded-xl text-base font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                ? 'bg-white/90 text-[var(--text-primary)] shadow'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -248,67 +246,67 @@ export default function PublishedPage() {
         <>
           {/* Search */}
           {posts.length > 0 && (
-            <div className="relative mb-6">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+            <div className="relative mb-8">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search published posts..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] text-sm focus:outline-none focus:border-[var(--border-medium)]"
+                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-white/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
               />
             </div>
           )}
 
           {filteredPosts.length > 0 ? (
-            <div className="space-y-3">
-              {filteredPosts.map((post) => (
+            <div className="space-y-4">
+              {filteredPosts.map((post, i) => (
                 <div
                   key={post.id}
-                  className="group p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-6">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-medium text-[var(--text-primary)] truncate">
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)] truncate">
                         {post.title || 'Untitled'}
                       </h3>
-                      <div className="flex items-center gap-3 mt-1.5 text-sm text-[var(--text-secondary)]">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} />
+                      <div className="flex items-center gap-4 mt-2 text-base text-[var(--text-secondary)]">
+                        <span className="flex items-center gap-2">
+                          <Calendar size={14} />
                           {formatRelativeTime(post.published_at)}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Eye size={12} />
+                        <span className="flex items-center gap-2">
+                          <Eye size={14} />
                           {post.view_count.toLocaleString()}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Heart size={12} />
+                        <span className="flex items-center gap-2">
+                          <Heart size={14} />
                           {post.reaction_count}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare size={12} />
+                        <span className="flex items-center gap-2">
+                          <MessageSquare size={14} />
                           {post.comment_count}
                         </span>
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {username && (
                         <Link
                           href={`/${username}/${post.slug}`}
-                          className="btn btn-secondary btn-sm"
+                          className="btn btn-secondary text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                           target="_blank"
                         >
-                          <ExternalLink size={14} />
+                          <ExternalLink size={16} />
                           View
                         </Link>
                       )}
                       <Link
                         href={`/write?edit=${post.id}`}
-                        className="btn btn-ghost btn-sm"
+                        className="btn btn-ghost text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={16} />
                       </Link>
                     </div>
                   </div>
@@ -316,31 +314,31 @@ export default function PublishedPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-12 text-center">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
               {search ? (
                 <>
-                  <Search size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-                  <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+                  <Search size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+                  <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                     No matches found
                   </h2>
-                  <p className="text-sm text-[var(--text-secondary)]">
+                  <p className="text-base text-[var(--text-secondary)] mb-6">
                     Try a different search term.
                   </p>
                 </>
               ) : (
                 <>
-                  <TrendingUp size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-                  <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+                  <TrendingUp size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+                  <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                     Nothing published yet
                   </h2>
-                  <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  <p className="text-base text-[var(--text-secondary)] mb-6">
                     Write, refine, publish. Your first piece awaits.
                   </p>
-                  <div className="flex gap-3 justify-center">
-                    <Link href="/dashboard/workspace" className="btn btn-secondary">
+                  <div className="flex gap-4 justify-center">
+                    <Link href="/dashboard/workspace" className="btn btn-secondary text-base px-5 py-3 font-medium">
                       View Drafts
                     </Link>
-                    <Link href="/write" className="btn btn-primary">
+                    <Link href="/write" className="btn btn-primary text-base px-5 py-3 font-semibold">
                       Start Writing
                     </Link>
                   </div>
@@ -353,31 +351,31 @@ export default function PublishedPage() {
 
       {/* Analytics Tab */}
       {activeTab === 'analytics' && capabilities.showLightweightAnalytics && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Top Posts */}
           <div>
-            <h2 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Top Performing</h2>
+            <h2 className="text-base font-semibold text-[var(--text-secondary)] mb-4">Top Performing</h2>
             {posts.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[...posts]
                   .sort((a, b) => b.view_count - a.view_count)
                   .slice(0, 5)
                   .map((post, idx) => (
                     <div
                       key={post.id}
-                      className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)]"
+                      className="flex items-center justify-between p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded bg-[var(--bg-secondary)] text-xs flex items-center justify-center text-[var(--text-tertiary)]">
+                      <div className="flex items-center gap-4">
+                        <span className="w-8 h-8 rounded bg-[var(--bg-secondary)] text-base flex items-center justify-center text-[var(--text-tertiary)] font-bold">
                           {idx + 1}
                         </span>
-                        <span className="text-sm text-[var(--text-primary)] truncate max-w-[200px]">
+                        <span className="text-base text-[var(--text-primary)] truncate max-w-[200px] font-semibold">
                           {post.title || 'Untitled'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
-                        <span className="flex items-center gap-1">
-                          <Eye size={12} />
+                      <div className="flex items-center gap-4 text-base text-[var(--text-secondary)]">
+                        <span className="flex items-center gap-2">
+                          <Eye size={14} />
                           {post.view_count.toLocaleString()}
                         </span>
                       </div>
@@ -385,14 +383,14 @@ export default function PublishedPage() {
                   ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-secondary)]">Publish your first post to see analytics.</p>
+              <p className="text-base text-[var(--text-secondary)]">Publish your first post to see analytics.</p>
             )}
           </div>
 
           {/* More Analytics Placeholder */}
-          <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-8 text-center">
-            <BarChart2 size={32} className="mx-auto text-[var(--text-tertiary)] mb-3" />
-            <p className="text-sm text-[var(--text-secondary)]">
+          <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-12 text-center shadow">
+            <BarChart2 size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+            <p className="text-base text-[var(--text-secondary)]">
               Deeper analytics coming soon.
             </p>
           </div>
@@ -401,17 +399,17 @@ export default function PublishedPage() {
 
       {/* Engagement Tab */}
       {activeTab === 'engagement' && capabilities.showEngagementPanel && (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* Subscribers */}
-          <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Users size={20} className="text-[var(--text-secondary)]" />
-              <h2 className="text-base font-medium text-[var(--text-primary)]">Subscribers</h2>
+          <div className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-8 shadow">
+            <div className="flex items-center gap-4 mb-6">
+              <Users size={24} className="text-[var(--text-secondary)]" />
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Subscribers</h2>
             </div>
-            <p className="text-3xl font-semibold text-[var(--text-primary)]">
+            <p className="text-4xl font-bold text-[var(--text-primary)]">
               {stats.subscriberCount}
             </p>
-            <p className="text-sm text-[var(--text-secondary)] mt-1">
+            <p className="text-base text-[var(--text-secondary)] mt-2">
               {stats.subscriberCount === 0 
                 ? 'Share your work to grow your audience.'
                 : stats.subscriberCount === 1
@@ -422,13 +420,13 @@ export default function PublishedPage() {
 
           {/* Recent Comments Preview */}
           <div>
-            <h2 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Recent Engagement</h2>
-            <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-8 text-center">
-              <MessageSquare size={32} className="mx-auto text-[var(--text-tertiary)] mb-3" />
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
+            <h2 className="text-base font-semibold text-[var(--text-secondary)] mb-4">Recent Engagement</h2>
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-12 text-center shadow">
+              <MessageSquare size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <p className="text-base text-[var(--text-secondary)] mb-6">
                 View all comments and reactions in one place.
               </p>
-              <Link href="/comments" className="btn btn-secondary btn-sm">
+              <Link href="/comments" className="btn btn-secondary text-lg px-6 py-3 font-medium">
                 View Comments
               </Link>
             </div>

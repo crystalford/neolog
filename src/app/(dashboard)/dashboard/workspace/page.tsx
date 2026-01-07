@@ -178,13 +178,13 @@ export default function WorkspacePage() {
 
   if (loading) {
     return (
-      <main className="px-6 lg:px-8 py-8 max-w-5xl mx-auto">
-        <div className="animate-pulse space-y-6">
+      <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+        <div className="animate-pulse space-y-8">
           <div className="h-8 w-48 skeleton rounded" />
-          <div className="h-12 skeleton rounded-xl" />
-          <div className="space-y-3">
+          <div className="h-12 skeleton rounded-2xl" />
+          <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 skeleton rounded-xl" />
+              <div key={i} className="h-24 skeleton rounded-2xl" />
             ))}
           </div>
         </div>
@@ -193,22 +193,20 @@ export default function WorkspacePage() {
   }
 
   return (
-    <main className="px-6 lg:px-8 py-8 max-w-5xl mx-auto animate-fade-up">
-      <div className="flex items-center justify-between mb-6">
+    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+      <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="font-display text-2xl text-[var(--text-primary)]">Workspace</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Active projects. Where creation happens.
-          </p>
+          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Workspace</h1>
+          <p className="text-base text-[var(--text-secondary)] mt-2">Active projects. Where creation happens.</p>
         </div>
-        <Link href="/write" className="btn btn-primary btn-sm">
-          <Plus size={16} />
+        <Link href="/write" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
+          <Plus size={18} />
           New Draft
         </Link>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-6 w-fit">
+      <div className="flex gap-2 p-2 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-8 w-fit">
         {[
           { id: 'drafts', label: 'Drafts', count: drafts.length },
           { id: 'scheduled', label: 'Scheduled', count: scheduled.length },
@@ -218,15 +216,15 @@ export default function WorkspacePage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-5 py-2 rounded-xl text-base font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm'
+                ? 'bg-white/90 text-[var(--text-primary)] shadow'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
             {tab.label}
             {tab.count !== null && (
-              <span className="ml-1.5 text-xs text-[var(--text-tertiary)]">
+              <span className="ml-2 text-xs text-[var(--text-tertiary)] font-normal">
                 {tab.count}
               </span>
             )}
@@ -238,44 +236,44 @@ export default function WorkspacePage() {
       {activeTab === 'drafts' && (
         <>
           {/* Search */}
-          <div className="relative mb-6">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          <div className="relative mb-8">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input
               type="text"
               placeholder="Search drafts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] text-sm focus:outline-none focus:border-[var(--border-medium)]"
+              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-white/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
             />
           </div>
 
           {filteredDrafts.length > 0 ? (
-            <div className="space-y-3">
-              {filteredDrafts.map((draft) => (
+            <div className="space-y-4">
+              {filteredDrafts.map((draft, i) => (
                 <div
                   key={draft.id}
-                  className="group p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-6">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-medium text-[var(--text-primary)] truncate">
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)] truncate">
                         {draft.title || 'Untitled Draft'}
                       </h3>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-[var(--text-secondary)]">
+                      <div className="flex items-center gap-4 mt-2 text-base text-[var(--text-secondary)]">
                         <span>{draft.word_count.toLocaleString()} words</span>
                         <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
+                        <span className="flex items-center gap-2">
+                          <Clock size={14} />
                           {formatRelativeTime(draft.updated_at)}
                         </span>
                       </div>
 
                       {/* Progress bar */}
-                      <div className="mt-3 max-w-xs">
+                      <div className="mt-4 max-w-xs">
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="text-[var(--text-tertiary)]">{draft.progress_label}</span>
                         </div>
-                        <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                        <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-[var(--accent)] rounded-full transition-all"
                             style={{ width: `${draft.progress_percent}%` }}
@@ -285,20 +283,20 @@ export default function WorkspacePage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <Link
                         href={`/write?edit=${draft.id}`}
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-primary text-base px-5 py-3 font-semibold shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
                         Continue
-                        <ArrowRight size={14} />
+                        <ArrowRight size={16} />
                       </Link>
                       <button
                         onClick={() => handleDeleteDraft(draft.id)}
-                        className="p-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-3 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] opacity-0 group-hover:opacity-100 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--error)]"
                         title="Delete draft"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </div>
@@ -306,23 +304,23 @@ export default function WorkspacePage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-12 text-center">
-              <PenLine size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-              <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+              <PenLine size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 {search ? 'No matches found' : 'No drafts yet'}
               </h2>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
+              <p className="text-base text-[var(--text-secondary)] mb-6">
                 {search 
                   ? 'Try a different search term.'
                   : 'Turn a capture into something or start fresh.'}
               </p>
               {!search && (
-                <div className="flex gap-3 justify-center">
-                  <Link href="/dashboard/captures" className="btn btn-secondary">
+                <div className="flex gap-4 justify-center">
+                  <Link href="/dashboard/captures" className="btn btn-secondary text-base px-5 py-3 font-medium">
                     Browse Captures
                   </Link>
-                  <Link href="/write" className="btn btn-primary">
-                    <PenLine size={16} />
+                  <Link href="/write" className="btn btn-primary text-base px-5 py-3 font-semibold">
+                    <PenLine size={18} />
                     New Draft
                   </Link>
                 </div>
@@ -336,32 +334,32 @@ export default function WorkspacePage() {
       {activeTab === 'scheduled' && (
         <>
           {scheduled.length > 0 ? (
-            <div className="space-y-3">
-              {scheduled.map((item) => (
+            <div className="space-y-4">
+              {scheduled.map((item, i) => (
                 <div
                   key={item.id}
-                  className="group p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--warning)]/10">
-                        <Calendar size={18} className="text-[var(--warning)]" />
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center justify-center w-12 h-12 rounded-lg bg-[var(--warning)]/10">
+                        <Calendar size={20} className="text-[var(--warning)]" />
                       </span>
                       <div>
-                        <h3 className="text-base font-medium text-[var(--text-primary)]">
+                        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                           {item.title || 'Untitled'}
                         </h3>
-                        <p className="text-sm text-[var(--text-secondary)]">
+                        <p className="text-base text-[var(--text-secondary)]">
                           Publishes {formatScheduledTime(item.scheduled_at!)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <Link
                         href={`/write?edit=${item.id}`}
-                        className="btn btn-secondary btn-sm"
+                        className="btn btn-secondary text-base px-5 py-3 font-medium shadow focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={16} />
                         Edit
                       </Link>
                     </div>
@@ -370,12 +368,12 @@ export default function WorkspacePage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-12 text-center">
-              <Calendar size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-              <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+              <Calendar size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 Nothing scheduled
               </h2>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <p className="text-base text-[var(--text-secondary)] mb-6">
                 Schedule a draft to publish it automatically.
               </p>
             </div>
@@ -387,51 +385,51 @@ export default function WorkspacePage() {
       {activeTab === 'stacks' && capabilities.showStacks && (
         <>
           {stacks.length > 0 ? (
-            <div className="space-y-3">
-              {stacks.map((stack) => (
+            <div className="space-y-4">
+              {stacks.map((stack, i) => (
                 <Link
                   key={stack.id}
                   href={`/series/${stack.slug}`}
-                  className="group block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`group block p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)]">
-                        <Layers size={18} className="text-[var(--text-secondary)]" />
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center justify-center w-12 h-12 rounded-lg bg-[var(--bg-secondary)]">
+                        <Layers size={20} className="text-[var(--text-secondary)]" />
                       </span>
                       <div>
-                        <h3 className="text-base font-medium text-[var(--text-primary)]">
+                        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                           {stack.title}
                         </h3>
-                        <p className="text-sm text-[var(--text-secondary)]">
+                        <p className="text-base text-[var(--text-secondary)]">
                           {stack.post_count} post{stack.post_count !== 1 ? 's' : ''}
                           {stack.description && ` · ${stack.description.slice(0, 50)}...`}
                         </p>
                       </div>
                     </div>
-                    <ArrowRight size={16} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight size={18} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                 </Link>
               ))}
               <Link
                 href="/series/new"
-                className="block p-4 rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--border-medium)] transition-colors text-center"
+                className="block p-5 rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 hover:border-[var(--accent)] transition-colors text-center shadow"
               >
-                <Plus size={20} className="mx-auto text-[var(--text-tertiary)] mb-2" />
-                <p className="text-sm text-[var(--text-secondary)]">Create new stack</p>
+                <Plus size={22} className="mx-auto text-[var(--text-tertiary)] mb-2" />
+                <p className="text-base text-[var(--text-secondary)]">Create new stack</p>
               </Link>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] p-12 text-center">
-              <Layers size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-              <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+              <Layers size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 No stacks yet
               </h2>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
+              <p className="text-base text-[var(--text-secondary)] mb-6">
                 Group related posts into a stack to create a series.
               </p>
-              <Link href="/series/new" className="btn btn-primary">
-                <Layers size={16} />
+              <Link href="/series/new" className="btn btn-primary text-lg px-6 py-3 font-semibold">
+                <Layers size={18} />
                 Create Stack
               </Link>
             </div>
@@ -441,16 +439,16 @@ export default function WorkspacePage() {
 
       {/* Topics Tab */}
       {activeTab === 'topics' && (
-        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-8 text-center">
-          <Hash size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-          <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
+        <div className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-12 text-center shadow">
+          <Hash size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+          <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
             Manage Topics
           </h2>
-          <p className="text-sm text-[var(--text-secondary)] mb-4">
+          <p className="text-base text-[var(--text-secondary)] mb-6">
             Organize your work with tags and topics.
           </p>
-          <Link href="/topics" className="btn btn-secondary">
-            <Hash size={16} />
+          <Link href="/topics" className="btn btn-secondary text-lg px-6 py-3 font-medium">
+            <Hash size={18} />
             Go to Topics
           </Link>
         </div>

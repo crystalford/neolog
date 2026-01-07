@@ -249,13 +249,13 @@ export default function DashboardHomePage() {
   const hasPublished = publishedCount > 0
 
   return (
-    <main className="px-6 lg:px-8 py-8 max-w-5xl mx-auto animate-fade-up">
+    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
       {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="font-display text-2xl text-[var(--text-primary)]">
+      <div className="mb-10">
+        <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">
           Welcome back{profile?.display_name ? `, ${profile.display_name.split(' ')[0]}` : ''}
         </h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <p className="text-base text-[var(--text-secondary)] mt-2">
           {!hasCaptures && "Start by capturing your first idea."}
           {hasCaptures && !hasDrafts && "You have ideas saved. Turn one into a draft."}
           {hasDrafts && !hasPublished && "You're working on something. Let's finish it."}
@@ -263,158 +263,152 @@ export default function DashboardHomePage() {
         </p>
       </div>
 
-      {/* Today's Focus */}
-      {focusDraft ? (
-        <section className="mb-8">
-          <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-6 shadow-sm">
+      {/* Today's Focus or lifecycle CTA */}
+      <section className="mb-10">
+        {focusDraft ? (
+          <div className="rounded-3xl border border-[var(--border-light)] bg-white/80 backdrop-blur p-8 shadow-lg">
             <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-3">
               Today's Focus
             </p>
-            <h2 className="font-display text-xl text-[var(--text-primary)] mb-2">
+            <h2 className="font-display text-2xl font-semibold text-[var(--text-primary)] mb-2">
               {focusDraft.title || 'Untitled Draft'}
             </h2>
-            <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)] mb-4">
+            <div className="flex items-center gap-4 text-base text-[var(--text-secondary)] mb-4">
               <span>{focusDraft.word_count.toLocaleString()} words</span>
               <span>·</span>
               <span>Updated {formatRelativeTime(focusDraft.updated_at)}</span>
             </div>
-            
             {/* Progress bar */}
-            <div className="mb-4">
+            <div className="mb-6">
               <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="text-[var(--text-tertiary)]">{focusDraft.progress_label}</span>
                 <span className="text-[var(--text-tertiary)]">{focusDraft.progress_percent}%</span>
               </div>
-              <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+              <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-[var(--accent)] rounded-full transition-all"
                   style={{ width: `${focusDraft.progress_percent}%` }}
                 />
               </div>
             </div>
-
             <Link
               href={`/write?edit=${focusDraft.id}`}
-              className="btn btn-primary"
+              className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
               Continue Writing
-              <ArrowRight size={16} />
+              <ArrowRight size={18} />
             </Link>
           </div>
-        </section>
-      ) : hasCaptures ? (
-        <section className="mb-8">
-          <div className="rounded-2xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)] p-6">
+        ) : hasCaptures ? (
+          <div className="rounded-3xl border border-dashed border-[var(--border-light)] bg-white/70 backdrop-blur p-8 shadow">
             <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-3">
               Ready to create?
             </p>
-            <h2 className="font-display text-xl text-[var(--text-primary)] mb-2">
+            <h2 className="font-display text-2xl font-semibold text-[var(--text-primary)] mb-2">
               Turn a capture into something
             </h2>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">
+            <p className="text-base text-[var(--text-secondary)] mb-6">
               You have {captureCount} idea{captureCount !== 1 ? 's' : ''} saved. Pick one and start writing.
             </p>
-            <div className="flex gap-3">
-              <Link href="/dashboard/captures" className="btn btn-secondary">
+            <div className="flex gap-4">
+              <Link href="/dashboard/captures" className="btn btn-secondary text-base px-5 py-3 font-medium">
                 Browse Captures
               </Link>
-              <Link href="/write" className="btn btn-primary">
-                <PenLine size={16} />
+              <Link href="/write" className="btn btn-primary text-base px-5 py-3 font-semibold">
+                <PenLine size={18} />
                 New Draft
               </Link>
             </div>
           </div>
-        </section>
-      ) : (
-        <section className="mb-8">
-          <div className="rounded-2xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)] p-6">
+        ) : (
+          <div className="rounded-3xl border border-dashed border-[var(--border-light)] bg-white/70 backdrop-blur p-8 shadow">
             <p className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] mb-3">
               Get started
             </p>
-            <h2 className="font-display text-xl text-[var(--text-primary)] mb-2">
+            <h2 className="font-display text-2xl font-semibold text-[var(--text-primary)] mb-2">
               Capture your first idea
             </h2>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">
+            <p className="text-base text-[var(--text-secondary)] mb-6">
               Save a link, quote, screenshot, or thought. Everything starts somewhere.
             </p>
-            <Link href="/dashboard/captures" className="btn btn-primary">
-              <Zap size={16} />
+            <Link href="/dashboard/captures" className="btn btn-primary text-base px-5 py-3 font-semibold">
+              <Zap size={18} />
               Add Capture
             </Link>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-3 gap-8">
         {/* Quick Actions */}
-        <div className="space-y-3">
-          <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)]">
+        <div className="space-y-4">
+          <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] font-semibold">
             Quick Actions
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Link
               href="/write"
-              className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+              className="flex items-center gap-4 p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
-              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-secondary)]">
-                <PenLine size={16} className="text-[var(--text-secondary)]" />
+              <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)]">
+                <PenLine size={20} className="text-[var(--text-secondary)]" />
               </span>
-              <span className="text-sm font-medium text-[var(--text-primary)]">New Draft</span>
+              <span className="text-base font-semibold text-[var(--text-primary)]">New Draft</span>
             </Link>
             <Link
               href="/dashboard/captures"
-              className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+              className="flex items-center gap-4 p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
-              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-secondary)]">
-                <Zap size={16} className="text-[var(--text-secondary)]" />
+              <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)]">
+                <Zap size={20} className="text-[var(--text-secondary)]" />
               </span>
-              <span className="text-sm font-medium text-[var(--text-primary)]">Capture</span>
+              <span className="text-base font-semibold text-[var(--text-primary)]">Capture</span>
             </Link>
             {hasDrafts && (
               <Link
                 href="/dashboard/workspace"
-                className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                className="flex items-center gap-4 p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               >
-                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--bg-secondary)]">
-                  <Send size={16} className="text-[var(--text-secondary)]" />
+                <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)]">
+                  <Send size={20} className="text-[var(--text-secondary)]" />
                 </span>
-                <span className="text-sm font-medium text-[var(--text-primary)]">Publish</span>
+                <span className="text-base font-semibold text-[var(--text-primary)]">Publish</span>
               </Link>
             )}
           </div>
 
           {/* This Week Stats (dismissible, only after first publish) */}
           {hasPublished && statsVisible && (
-            <div className="mt-4 p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
+            <div className="mt-6 p-5 rounded-2xl border border-[var(--border-light)] bg-white/80 shadow">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)]">
+                <h4 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] font-semibold">
                   This Week
                 </h4>
                 <button
                   onClick={() => setStatsVisible(false)}
-                  className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                  className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] focus:outline-none"
                   aria-label="Dismiss"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-base">
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Published</span>
-                  <span className="text-[var(--text-primary)]">{thisWeekStats.published}</span>
+                  <span className="text-[var(--text-primary)] font-semibold">{thisWeekStats.published}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Drafts</span>
-                  <span className="text-[var(--text-primary)]">{thisWeekStats.drafts}</span>
+                  <span className="text-[var(--text-primary)] font-semibold">{thisWeekStats.drafts}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--text-secondary)]">Captures</span>
-                  <span className="text-[var(--text-primary)]">{thisWeekStats.captures}</span>
+                  <span className="text-[var(--text-primary)] font-semibold">{thisWeekStats.captures}</span>
                 </div>
                 {thisWeekStats.views > 0 && (
                   <div className="flex items-center justify-between pt-2 border-t border-[var(--border-light)]">
                     <span className="text-[var(--text-secondary)]">Views</span>
-                    <span className="text-[var(--text-primary)]">{thisWeekStats.views}</span>
+                    <span className="text-[var(--text-primary)] font-semibold">{thisWeekStats.views}</span>
                   </div>
                 )}
               </div>
@@ -423,30 +417,29 @@ export default function DashboardHomePage() {
         </div>
 
         {/* Recent Captures */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)]">
+            <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] font-semibold">
               Recent Captures
             </h3>
             {recentCaptures.length > 0 && (
               <Link 
                 href="/dashboard/captures"
-                className="text-xs text-[var(--accent)] hover:underline"
+                className="text-xs text-[var(--accent)] hover:underline font-medium"
               >
                 See all →
               </Link>
             )}
           </div>
-          
           {recentCaptures.length > 0 ? (
-            <div className="space-y-2">
-              {recentCaptures.map((capture) => (
+            <div className="space-y-3">
+              {recentCaptures.map((capture, i) => (
                 <Link
                   key={capture.id}
                   href={`/dashboard/captures?id=${capture.id}`}
-                  className="block p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`block p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : ''}`}
                 >
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                  <p className="text-base font-medium text-[var(--text-primary)] truncate">
                     {capture.title || `${capture.type} capture`}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
@@ -456,9 +449,9 @@ export default function DashboardHomePage() {
               ))}
             </div>
           ) : (
-            <div className="p-4 rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] text-center">
-              <Archive size={20} className="mx-auto text-[var(--text-tertiary)] mb-2" />
-              <p className="text-sm text-[var(--text-secondary)]">No captures yet</p>
+            <div className="p-5 rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 text-center">
+              <Archive size={24} className="mx-auto text-[var(--text-tertiary)] mb-2" />
+              <p className="text-base text-[var(--text-secondary)]">No captures yet</p>
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
                 Ideas are everywhere
               </p>
@@ -467,39 +460,38 @@ export default function DashboardHomePage() {
         </div>
 
         {/* Recent Published */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)]">
+            <h3 className="text-xs uppercase tracking-[0.15em] text-[var(--text-tertiary)] font-semibold">
               Recent Published
             </h3>
             {recentPublished.length > 0 && (
               <Link 
                 href="/dashboard/published"
-                className="text-xs text-[var(--accent)] hover:underline"
+                className="text-xs text-[var(--accent)] hover:underline font-medium"
               >
                 See all →
               </Link>
             )}
           </div>
-          
           {recentPublished.length > 0 ? (
-            <div className="space-y-2">
-              {recentPublished.map((post) => (
+            <div className="space-y-3">
+              {recentPublished.map((post, i) => (
                 <Link
                   key={post.id}
                   href={`/dashboard/published?id=${post.id}`}
-                  className="block p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                  className={`block p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : ''}`}
                 >
-                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                  <p className="text-base font-medium text-[var(--text-primary)] truncate">
                     {post.title}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)] mt-1">
                     <span className="flex items-center gap-1">
-                      <Eye size={12} />
+                      <Eye size={14} />
                       {post.views}
                     </span>
                     <span className="flex items-center gap-1">
-                      <MessageCircle size={12} />
+                      <MessageCircle size={14} />
                       {post.reactions}
                     </span>
                     <span>{formatRelativeTime(post.published_at)}</span>
@@ -508,9 +500,9 @@ export default function DashboardHomePage() {
               ))}
             </div>
           ) : (
-            <div className="p-4 rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)] text-center">
-              <Send size={20} className="mx-auto text-[var(--text-tertiary)] mb-2" />
-              <p className="text-sm text-[var(--text-secondary)]">Nothing published yet</p>
+            <div className="p-5 rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 text-center">
+              <Send size={24} className="mx-auto text-[var(--text-tertiary)] mb-2" />
+              <p className="text-base text-[var(--text-secondary)]">Nothing published yet</p>
               <p className="text-xs text-[var(--text-tertiary)] mt-1">
                 Your first post awaits
               </p>
