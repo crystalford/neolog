@@ -42,13 +42,17 @@ type PostAssetLink = {
 }
 
 export default function WritePage() {
+  // Defaults
+  const fallbackCover = '/default-cover.jpg'
+  const defaultTags = ['writing', 'neolog', 'product']
+
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  
+
   // Post data
   const [postId, setPostId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -62,7 +66,7 @@ export default function WritePage() {
   const [videoBrief, setVideoBrief] = useState<any>(null)
   const [videoBriefLoading, setVideoBriefLoading] = useState(false)
   const [videoBriefError, setVideoBriefError] = useState<string | null>(null)
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<string[]>(defaultTags)
   const [showSettings, setShowSettings] = useState(false)
   const [showVaultDrawer, setShowVaultDrawer] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
@@ -460,7 +464,7 @@ export default function WritePage() {
         }
       }
 
-      // If no valid selection, use first publication
+      // If no valid selection, use first publication as default
       if (pubs[0]) {
         setPublicationId(pubs[0].id)
         writeSelectedPublicationId(pubs[0].id)
@@ -507,17 +511,18 @@ export default function WritePage() {
       .single()
     
     if (post) {
+      // Backwards compatibility for legacy posts
       const scheduledValue = post.scheduled_at
         ? new Date(post.scheduled_at).toISOString().slice(0, 16)
         : ''
       setPostId(post.id)
       setTitle(post.title)
-      setSubtitle(post.subtitle || '')
-      setContent(post.content || '')
-      setCoverImage(post.cover_image_url || '')
-      setCanonicalUrl(post.canonical_url || '')
-      setOriginalSource(post.original_source || '')
-      setIsPremium(post.is_premium || false)
+      setSubtitle(typeof post.subtitle === 'string' ? post.subtitle : '')
+      setContent(typeof post.content === 'string' ? post.content : '')
+      setCoverImage(typeof post.cover_image_url === 'string' && post.cover_image_url ? post.cover_image_url : fallbackCover)
+      setCanonicalUrl(typeof post.canonical_url === 'string' ? post.canonical_url : '')
+      setOriginalSource(typeof post.original_source === 'string' ? post.original_source : '')
+      setIsPremium(!!post.is_premium)
       setScheduledAt(scheduledValue)
       const loadedType = post.content_type === 'pulse' ? 'pulse' : 'post'
       setPostType(loadedType)
@@ -1432,83 +1437,66 @@ export default function WritePage() {
             </div>
           )}
 
-          {/* Header actions */}
-          <div className="flex flex-wrap items-center justify-between gap-2 py-1.5 px-2.5 mb-5 sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur border border-[var(--border-light)] rounded-lg shadow-sm z-10">
-            <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
-              {saving && (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 size={12} className="animate-spin" />
-                  Saving...
-                </span>
-              )}
-              {!saving && lastSaved && (
-                <span className="flex items-center gap-1.5">
-                  Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-            </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setShowImport((prev) => !prev)}
-                className="btn btn-ghost btn-sm"
-              >
-                Import HTML
-              </button>
-              <button
-                onClick={() => {
-                  setShowVaultDrawer(true)
-                  setShowSettings(false)
-                }}
-                className="btn btn-ghost btn-sm"
-              >
-                Vault
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="btn btn-ghost btn-sm"
-              >
-                <Settings size={14} />
-                Publish options
-              </button>
-              {postId && (
-                <button
-                  onClick={() => setShowHistory(true)}
-                  className="btn btn-ghost btn-sm"
-                >
-                  History
-                </button>
+          {/* Inline Title, Subtitle, Cover Image */}
+          <div className="mb-8">
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Title"
+              className="font-display text-3xl md:text-4xl w-full bg-transparent border-none outline-none mb-2"
+              maxLength={120}
+              autoFocus
+            />
+            <input
+              type="text"
+              value={subtitle}
+              onChange={e => setSubtitle(e.target.value)}
+              placeholder="Subtitle (optional)"
+              className="text-lg w-full bg-transparent border-none outline-none mb-4 text-[var(--text-secondary)]"
+              maxLength={180}
+            />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Cover image
+              </label>
+              <input
+                type="url"
+                value={coverImage}
+                onChange={e => setCoverImage(e.target.value)}
+                placeholder="Paste image URL"
+                className="input"
+              />
+              {!coverImage && (
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">Default cover will be used if left blank.</p>
               )}
-              {postId && (
-                <button
-                  onClick={() => {
-                    setShowPack(true)
-                    if (!pack && !packLoading) {
-                      loadDistributionPack()
-                    }
-                  }}
-                  className="btn btn-ghost btn-sm"
-                >
-                  Distribution pack
-                </button>
+              <div className="flex items-center gap-3 mt-3">
+                <label className="btn btn-secondary btn-sm cursor-pointer">
+                  <Upload size={16} />
+                  {uploadingCover ? 'Uploading...' : 'Upload cover'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={event => handleCoverUpload(event.target.files?.[0] || null)}
+                    disabled={uploadingCover}
+                  />
+                </label>
+                <span className="text-xs text-[var(--text-tertiary)]">
+                  Uses your R2/S3 settings.
+                </span>
+              </div>
+              {uploadNotice && (
+                <p className="text-xs text-[var(--error)] mt-2">{uploadNotice}</p>
               )}
-              {profile && postId && (
-                <a
-                  href={`/${profile.username}/${generateSlug(title)}?preview=true`}
-                  target="_blank"
-                  className="btn btn-ghost btn-sm"
-                >
-                  Preview
-                </a>
+              {coverImage && (
+                <img
+                  src={coverImage}
+                  alt="Cover preview"
+                  className="mt-3 rounded-lg border border-[var(--border-light)] max-h-64"
+                />
               )}
-
-              <button
-                onClick={() => setShowPublishConfirm(true)}
-                disabled={publishing || !title || !content || !publicationId}
-                className="btn btn-primary btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {publishing ? 'Publishing...' : publishLabel}
-              </button>
             </div>
           </div>
 
@@ -1577,513 +1565,7 @@ export default function WritePage() {
             </div>
           )}
 
-          {showSettings && (
-            <div className="fixed inset-0 z-40">
-              <div
-                className="absolute inset-0 bg-black/30"
-                onClick={() => setShowSettings(false)}
-              />
-              <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-light)]">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                      Publish
-                    </p>
-                    <h2 className="font-display text-xl">Publish options</h2>
-                  </div>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
-                    aria-label="Close settings"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
 
-                <div className="px-5 py-5 space-y-5">
-                  <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
-                      <span>Words</span>
-                      <span>{getWordCount(content).toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
-                      <span>Read time</span>
-                      <span>{calculateReadingTime(content)} min</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-2">
-                      <span>Mode</span>
-                      <span>{htmlMode ? 'HTML' : 'Visual'}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Cover image
-                    </label>
-                    <input
-                      type="url"
-                      value={coverImage}
-                      onChange={(e) => setCoverImage(e.target.value)}
-                      placeholder="Paste image URL"
-                      className="input"
-                    />
-                    <div className="flex items-center gap-3 mt-3">
-                      <label className="btn btn-secondary btn-sm cursor-pointer">
-                        <Upload size={16} />
-                        {uploadingCover ? 'Uploading...' : 'Upload cover'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => handleCoverUpload(event.target.files?.[0] || null)}
-                          disabled={uploadingCover}
-                        />
-                      </label>
-                      <span className="text-xs text-[var(--text-tertiary)]">
-                        Uses your R2/S3 settings.
-                      </span>
-                    </div>
-                    {uploadNotice && (
-                      <p className="text-xs text-[var(--error)] mt-2">{uploadNotice}</p>
-                    )}
-                    {coverImage && (
-                      <img
-                        src={coverImage}
-                        alt="Cover preview"
-                        className="mt-3 rounded-lg border border-[var(--border-light)]"
-                      />
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Upload asset
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <label className="btn btn-secondary btn-sm cursor-pointer">
-                        <Upload size={16} />
-                        {uploadingAsset ? 'Uploading...' : 'Upload file'}
-                        <input
-                          type="file"
-                          className="hidden"
-                          onChange={(event) => handleAssetUpload(event.target.files?.[0] || null)}
-                          disabled={uploadingAsset}
-                        />
-                      </label>
-                      {assetUrl && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => assetUrl && navigator.clipboard.writeText(assetUrl)}
-                        >
-                          <Copy size={16} />
-                          Copy URL
-                        </button>
-                      )}
-                    </div>
-                    {assetUrl && (
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2 break-all">
-                        {assetUrl}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Video brief
-                    </label>
-                    <p className="text-xs text-[var(--text-tertiary)] mb-3">
-                      Generate a 60-90 second script for HeyGen or Synthesia.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={generateVideoBrief}
-                        disabled={!postId || videoBriefLoading}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        {videoBriefLoading ? 'Generating...' : 'Generate brief'}
-                      </button>
-                      {videoBrief?.script && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => navigator.clipboard.writeText(videoBrief.script)}
-                        >
-                          <Copy size={16} />
-                          Copy script
-                        </button>
-                      )}
-                    </div>
-                    {videoBriefError && (
-                      <p className="text-xs text-[var(--error)] mt-2">{videoBriefError}</p>
-                    )}
-                    {videoBrief?.script && (
-                      <textarea
-                        className="input mt-3 min-h-[140px]"
-                        value={videoBrief.script}
-                        onChange={(event) =>
-                          setVideoBrief((prev: any) => ({ ...prev, script: event.target.value }))
-                        }
-                      />
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Vault
-                    </label>
-                    <p className="text-xs text-[var(--text-tertiary)] mb-3">
-                      Attach Vault items to this draft (provenance and reuse).
-                    </p>
-
-                    {!postId ? (
-                      <div className="text-sm text-[var(--text-secondary)]">
-                        Save the draft first to attach Vault items.
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={selectedAssetId}
-                            onChange={(e) => setSelectedAssetId(e.target.value)}
-                            className="input"
-                            aria-label="Select vault asset"
-                            disabled={assetLinkSaving || vaultAssetsLoading}
-                          >
-                            <option value="">Select a Vault item…</option>
-                            {vaultAssets.map((a) => {
-                              const preview = (a.content || '').replace(/\s+/g, ' ').slice(0, 60)
-                              return (
-                                <option key={a.id} value={a.id}>
-                                  {a.type}: {preview}{preview.length === 60 ? '…' : ''}
-                                </option>
-                              )
-                            })}
-                          </select>
-                          <button
-                            onClick={attachSelectedAsset}
-                            disabled={!selectedAssetId || assetLinkSaving}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Attach
-                          </button>
-                        </div>
-
-                        <div className="mt-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
-                          {postAssetsLoading ? (
-                            <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
-                          ) : postAssets.length === 0 ? (
-                            <div className="p-3 text-sm text-[var(--text-secondary)]">No attached Vault items.</div>
-                          ) : (
-                            <div className="divide-y divide-[var(--border-light)]">
-                              {postAssets.map((link) => {
-                                const asset = Array.isArray(link.assets) ? link.assets[0] : null
-                                const preview = String(asset?.content || '').replace(/\s+/g, ' ').slice(0, 80)
-                                return (
-                                  <div key={link.id} className="p-3 flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                                        {asset?.type || 'asset'}
-                                      </div>
-                                      <div className="text-sm text-[var(--text-primary)] break-words">
-                                        {preview}{preview.length === 80 ? '…' : ''}
-                                      </div>
-                                      {Array.isArray(asset?.tags) && asset.tags.length > 0 ? (
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                          {asset.tags.slice(0, 8).map((t: string) => (
-                                            <span
-                                              key={t}
-                                              className="text-xs px-2 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                                            >
-                                              {t}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <button
-                                      onClick={() => detachAsset(link.id)}
-                                      disabled={assetLinkSaving}
-                                      className="btn btn-ghost btn-sm"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Tags
-                    </label>
-                    <TagSelect selectedTags={tags} onChange={setTags} />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Canonical URL
-                    </label>
-                    <input
-                      type="url"
-                      value={canonicalUrl}
-                      onChange={(e) => setCanonicalUrl(e.target.value)}
-                      placeholder="https://original.com/post"
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Original source
-                    </label>
-                    <input
-                      type="text"
-                      value={originalSource}
-                      onChange={(e) => setOriginalSource(e.target.value)}
-                      placeholder="Publication name"
-                      className="input"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Publish status
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([
-                        { value: 'draft', label: 'Draft' },
-                        { value: 'publish', label: 'Publish' },
-                        { value: 'schedule', label: 'Schedule' },
-                      ] as const).map((item) => (
-                        <button
-                          key={item.value}
-                          onClick={() => {
-                            if (existingStatus === 'published' && item.value !== 'publish') return
-                            setPublishIntent(item.value)
-                            if (item.value !== 'schedule') {
-                              setScheduledAt('')
-                            }
-                          }}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
-                            resolvedIntent === item.value
-                              ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
-                              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
-                          } ${existingStatus === 'published' && item.value !== 'publish' ? 'opacity-40 cursor-not-allowed' : ''}`}
-                          type="button"
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  {existingStatus === 'published' && (
-                    <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                      Published posts stay live. Use Update to push revisions.
-                    </p>
-                  )}
-                  </div>
-
-                  <label className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">Premium only</p>
-                      <p className="text-xs text-[var(--text-tertiary)]">
-                        Restrict this post to paid subscribers
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isPremium}
-                      onChange={(e) => setIsPremium(e.target.checked)}
-                      className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-                    />
-                  </label>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Schedule time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      disabled={existingStatus === 'published' || resolvedIntent !== 'schedule'}
-                      className="input"
-                    />
-                    {resolvedIntent !== 'schedule' && (
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                        Choose Schedule to set a publish time.
-                      </p>
-                    )}
-                    {existingStatus === 'published' && (
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                        Scheduling is only available for drafts.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
-                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">Scheduled queue</h3>
-                    {scheduledPosts.length === 0 ? (
-                      <p className="text-xs text-[var(--text-tertiary)]">
-                        No scheduled posts for this publication.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {scheduledPosts.map((post) => (
-                          <div key={post.id} className="flex items-center justify-between text-sm">
-                            <span className="text-[var(--text-secondary)] truncate max-w-[180px]">
-                              {post.title || 'Untitled'}
-                            </span>
-                            <span className="text-xs text-[var(--text-tertiary)]">
-                              {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : 'TBD'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] space-y-3">
-                    <div>
-                      <h3 className="text-sm font-medium text-[var(--text-primary)]">Community highlights</h3>
-                      <p className="text-xs text-[var(--text-tertiary)]">
-                          Import top Reddit comments or X replies for this post.
-                      </p>
-                    </div>
-                    <input
-                      type="url"
-                      value={commentUrl}
-                      onChange={(e) => setCommentUrl(e.target.value)}
-                        placeholder="https://www.reddit.com/... or https://x.com/.../status/..."
-                      className="input"
-                    />
-                    {commentError && (
-                      <p className="text-xs text-[var(--error)]">{commentError}</p>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <div className="ml-auto flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                        <span>Filter</span>
-                        <select
-                          value={commentFilter}
-                          onChange={(e) => setCommentFilter(e.target.value as typeof commentFilter)}
-                          className="input py-1 px-2 text-xs"
-                        >
-                          <option value="all">All</option>
-                          <option value="reddit">Reddit</option>
-                          <option value="x">X</option>
-                          <option value="manual">Manual</option>
-                        </select>
-                        <span>Sort</span>
-                        <select
-                          value={commentSort}
-                          onChange={(e) => setCommentSort(e.target.value as typeof commentSort)}
-                          className="input py-1 px-2 text-xs"
-                        >
-                          <option value="score">Top</option>
-                          <option value="recent">Recent</option>
-                        </select>
-                      </div>
-                      <button
-                        onClick={importComments}
-                        disabled={!postId || commentLoading || !commentUrl.trim()}
-                        className="btn btn-secondary btn-sm disabled:opacity-60"
-                      >
-                        {commentLoading ? 'Importing...' : 'Import'}
-                      </button>
-                      <button
-                        onClick={clearCuratedComments}
-                        disabled={!postId || commentLoading || curatedComments.length === 0}
-                        className="btn btn-ghost btn-sm disabled:opacity-50"
-                      >
-                        Clear highlights
-                      </button>
-                    </div>
-                    <div className="grid gap-2">
-                      <label className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                        Add manual highlight
-                      </label>
-                      <textarea
-                        value={manualHighlight}
-                        onChange={(e) => setManualHighlight(e.target.value)}
-                        placeholder="Paste a highlight you want to feature..."
-                        className="input min-h-[120px]"
-                      />
-                      <button
-                        onClick={addManualHighlight}
-                        disabled={!postId || commentLoading || !manualHighlight.trim()}
-                        className="btn btn-secondary btn-sm disabled:opacity-60"
-                      >
-                        Add highlight
-                      </button>
-                    </div>
-                    {curatedComments.length > 0 && (
-                      <div className="space-y-2">
-                        {curatedComments
-                          .filter((comment) => commentFilter === 'all' || comment.source === commentFilter)
-                          .sort((a, b) => {
-                            if (a.is_pinned && !b.is_pinned) return -1
-                            if (!a.is_pinned && b.is_pinned) return 1
-                            if (commentSort === 'recent') {
-                              return new Date(b.created_at || b.imported_at).getTime() - new Date(a.created_at || a.imported_at).getTime()
-                            }
-                            return (b.score || 0) - (a.score || 0)
-                          })
-                          .map((comment) => (
-                          <div key={comment.id} className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <p className="text-xs text-[var(--text-tertiary)] mb-2">
-                              {comment.author_name || (comment.source === 'manual' ? 'Manual highlight' : comment.source === 'x' ? 'x user' : 'reddit user')}
-                              {comment.score ? ` - ${comment.score} upvotes` : ''}
-                            </p>
-                            <p className="text-sm text-[var(--text-secondary)]">{comment.body}</p>
-                            <div className="flex items-center justify-end mt-2">
-                              <button
-                                onClick={() => togglePin(comment.id, Boolean(comment.is_pinned))}
-                                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
-                              >
-                                {comment.is_pinned ? 'Unpin' : 'Pin'}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
-                    <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">Preflight checks</h3>
-                    {(postType === 'pulse'
-                      ? [
-                          { label: 'Summary added', ok: pulse.summary.trim().length >= 40, required: true },
-                          { label: 'At least 2 cards', ok: pulse.cards.length >= 2, required: true },
-                          { label: 'Takeaway added', ok: pulse.takeaway.trim().length >= 20, required: false },
-                        ]
-                      : [
-                          { label: 'Title added', ok: title.trim().length >= 5, required: true },
-                          { label: 'Subtitle added', ok: subtitle.trim().length >= 5, required: false },
-                          { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
-                          { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
-                        ]
-                    ).map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-sm text-[var(--text-secondary)] mb-2 last:mb-0">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 size={14} className={item.ok ? 'text-[var(--success)]' : 'text-[var(--text-tertiary)]'} />
-                          <span className={item.ok ? 'text-[var(--text-primary)]' : ''}>{item.label}</span>
-                        </div>
-                        {item.required && (
-                          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </aside>
-            </div>
-          )}
 
           {showVaultDrawer && (
             <div className="fixed inset-0 z-40">
@@ -2337,7 +1819,83 @@ export default function WritePage() {
                       {tags.length} selected
                     </span>
                   </div>
+                  {/* Advanced toggle */}
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={() => setShowAdvanced((v: boolean) => !v)}
+                    >
+                      {showAdvanced ? 'Hide advanced options' : 'Show advanced options'}
+                    </button>
+                  </div>
+                  {showAdvanced && (
+                    <div className="space-y-3 mt-3 border-t border-[var(--border-light)] pt-3">
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                          Canonical URL
+                        </label>
+                        <input
+                          type="url"
+                          value={canonicalUrl}
+                          onChange={e => setCanonicalUrl(e.target.value)}
+                          placeholder="https://original.com/post"
+                          className="input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                          Original source
+                        </label>
+                        <input
+                          type="text"
+                          value={originalSource}
+                          onChange={e => setOriginalSource(e.target.value)}
+                          placeholder="Publication name"
+                          className="input"
+                        />
+                      </div>
+                      <label className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                        <div>
+                          <p className="font-medium text-[var(--text-primary)]">Premium only</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">
+                            Restrict this post to paid subscribers
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isPremium}
+                          onChange={e => setIsPremium(e.target.checked)}
+                          className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                        />
+                      </label>
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                          Schedule time
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={scheduledAt}
+                          onChange={e => setScheduledAt(e.target.value)}
+                          disabled={existingStatus === 'published' || resolvedIntent !== 'schedule'}
+                          className="input"
+                        />
+                        {resolvedIntent !== 'schedule' && (
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                            Choose Schedule to set a publish time.
+                          </p>
+                        )}
+                        {existingStatus === 'published' && (
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                            Scheduling is only available for drafts.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
+                  // Advanced toggle state
+                  const [showAdvanced, setShowAdvanced] = useState(false)
                 {lastVersion && (
                   <div className="mt-4 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-sm text-[var(--text-secondary)]">
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
