@@ -10,7 +10,12 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null)
   const [htmlImporting, setHtmlImporting] = useState(false)
   const [htmlProgress, setHtmlProgress] = useState<{ total: number } | null>(null)
-  const [htmlResults, setHtmlResults] = useState<{ imported: number; failed: number; created: Array<{ id: string; title: string }> } | null>(null)
+  const [htmlResults, setHtmlResults] = useState<{
+    imported: number
+    failed: number
+    created: Array<{ id: string; title: string }>
+    failures: Array<{ filename?: string; error: string }>
+  } | null>(null)
   const [rssUrl, setRssUrl] = useState('')
   const [rssLimit, setRssLimit] = useState('50')
   const [rssStatus, setRssStatus] = useState<'draft' | 'published'>('draft')
@@ -46,6 +51,7 @@ export default function ImportPage() {
         imported: data?.imported || 0,
         failed: data?.failed || 0,
         created: Array.isArray(data?.created) ? data.created : [],
+        failures: Array.isArray(data?.failures) ? data.failures : [],
       })
 
       if ((data?.imported || 0) > 0) {
@@ -343,6 +349,26 @@ export default function ImportPage() {
                           {htmlResults.created.length > 10 && (
                             <p className="text-xs text-[var(--text-tertiary)]">
                               Showing first 10. Find the rest in your Dashboard.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {htmlResults.failures.length > 0 && (
+                        <div className="mt-4 p-3 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20">
+                          <p className="text-sm text-[var(--text-secondary)] mb-2">
+                            Some files failed to import
+                          </p>
+                          <ul className="text-xs text-[var(--text-tertiary)] space-y-1">
+                            {htmlResults.failures.slice(0, 10).map((failure, index) => (
+                              <li key={`${failure.filename || 'file'}-${index}`}>
+                                • {failure.filename ? `${failure.filename}: ` : ''}{failure.error}
+                              </li>
+                            ))}
+                          </ul>
+                          {htmlResults.failures.length > 10 && (
+                            <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                              Showing first 10 failures.
                             </p>
                           )}
                         </div>
