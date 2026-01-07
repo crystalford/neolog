@@ -263,5 +263,5 @@ export async function POST(request: NextRequest) {
     created.push({ id: String(row.id), slug: String(row.slug), title, ...(filename ? { filename } : {}) })
   }
 
-  return NextResponse.json({ imported, failed, created, ...(failures.length ? { failures } : {}) })
+  return NextResponse.json({ imported, failed, created, failures })
 }
