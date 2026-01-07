@@ -288,6 +288,22 @@ YouTube tip:
 - The Sources page can resolve `@handle` → `channel_id`, then uses `https://www.youtube.com/feeds/videos.xml?channel_id=...`.
 - Alternatively, paste a channel URL directly; feed autodiscovery will propose the videos.xml feed.
 
+## Stacks (SEO hubs)
+
+Overview:
+- Stacks are powered by `series` and render public hub pages at `/{username}/stack/{slug}`.
+- Hub pages list posts in order and emit JSON‑LD `ItemList`; post pages emit `Article` and link back with in‑stack navigation.
+- Stacks are discoverable on public profiles and included in the sitemap.
+
+Quickstart:
+- Create a series: open `/series/new` in the dashboard.
+- Assign posts to the stack and set `series_order`.
+- Verify hub: visit `/{username}/stack/{slug}`; check post pages show “Part of stack” and Series navigation.
+
+Notes:
+- Sitemap includes stack hub URLs; search engines will see the structured ItemList.
+- Listing cards show “Part of stack” when available; clicking navigates to the hub.
+
 ## Asset API: Vault Add (Interoperability)
 
 After applying the `add_assets_vault.sql` migration, scripts can capture provenance-first assets.
