@@ -42,6 +42,10 @@ export type Post = {
   cover_image_url: string | null
   excerpt: string | null
   reading_time_minutes: number | null
+
+  // Stacks (series)
+  series_id?: string | null
+  series_order?: number | null
   
   // Status
   status: 'draft' | 'published' | 'archived' | 'scheduled'

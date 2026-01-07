@@ -47,6 +47,19 @@ export default async function TagPage({ params }: Props) {
       p_limit: 50,
       p_offset: 0,
     })
+
+  const postIds = (posts || []).map((p: any) => p.id)
+  const { data: seriesByPost } = postIds.length
+    ? await supabase
+        .from('posts')
+        .select('id, series:series(title, slug)')
+        .in('id', postIds)
+    : { data: [] }
+
+  const seriesMap = new Map<string, any>()
+  ;(seriesByPost || []).forEach((row: any) => {
+    seriesMap.set(row.id, row.series)
+  })
   
   // Transform for PostCard
   const transformedPosts = (posts || []).map((post: any) => ({
@@ -64,6 +77,7 @@ export default async function TagPage({ params }: Props) {
       display_name: post.author_display_name,
       avatar_url: post.author_avatar_url,
     },
+    series: seriesMap.get(post.id) || null,
   }))
 
   return (

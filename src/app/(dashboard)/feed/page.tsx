@@ -124,6 +124,42 @@ export default function FeedPage() {
     [visiblePosts]
   )
 
+  const [seriesMap, setSeriesMap] = useState<Map<string, any>>(new Map())
+
+  useEffect(() => {
+    const ids = visiblePosts.map((p) => p.post_id).filter(Boolean)
+    if (ids.length === 0) {
+      setSeriesMap(new Map())
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('posts')
+        .select('id, series:series(title, slug)')
+        .in('id', ids)
+
+      if (cancelled) return
+      const map = new Map<string, any>()
+      ;(data || []).forEach((row: any) => map.set(row.id, row.series))
+      setSeriesMap(map)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, visiblePosts])
+
+  const transformedPostsWithSeries = useMemo(
+    () =>
+      transformedPosts.map((p: any) => ({
+        ...p,
+        series: seriesMap.get(p.id) || null,
+      })),
+    [seriesMap, transformedPosts]
+  )
+
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
         {/* Header */}
@@ -203,7 +239,7 @@ export default function FeedPage() {
         ) : (
           <>
             <div className="space-y-4">
-              {transformedPosts.map((post) => (
+              {transformedPostsWithSeries.map((post) => (
                 <PostCard key={post.id} post={post as any} variant="list" />
               ))}
             </div>

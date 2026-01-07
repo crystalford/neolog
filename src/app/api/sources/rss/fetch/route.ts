@@ -67,6 +67,19 @@ export async function POST(request: NextRequest) {
           },
         })
         if (!response.ok) {
+          try {
+            const nextFailures = (Number((source as any).consecutive_failures || 0) || 0) + 1
+            await supabase
+              .from('feed_sources')
+              .update({
+                consecutive_failures: nextFailures,
+                last_fetch_status_code: response.status,
+                last_error: `Fetch failed (${response.status}).`,
+              } as any)
+              .eq('id', source.id)
+          } catch {
+            // best-effort
+          }
           sourcesFetchFail += 1
           continue
         }
@@ -104,13 +117,39 @@ export async function POST(request: NextRequest) {
           })
         })
 
-        await supabase
-          .from('feed_sources')
-          .update({ last_fetched_at: new Date().toISOString() })
-          .eq('id', source.id)
+        try {
+          await supabase
+            .from('feed_sources')
+            .update({
+              last_fetched_at: new Date().toISOString(),
+              last_success_at: new Date().toISOString(),
+              last_fetch_status_code: 200,
+              last_error: null,
+              consecutive_failures: 0,
+            } as any)
+            .eq('id', source.id)
+        } catch {
+          await supabase
+            .from('feed_sources')
+            .update({ last_fetched_at: new Date().toISOString() })
+            .eq('id', source.id)
+        }
       } catch (error) {
         sourcesFetchFail += 1
         console.error('RSS fetch error:', error)
+        try {
+          const nextFailures = (Number((source as any).consecutive_failures || 0) || 0) + 1
+          await supabase
+            .from('feed_sources')
+            .update({
+              consecutive_failures: nextFailures,
+              last_fetch_status_code: null,
+              last_error: 'Fetch error.',
+            } as any)
+            .eq('id', source.id)
+        } catch {
+          // best-effort
+        }
       }
     }
 

@@ -5,6 +5,25 @@ export type RssItem = {
   content?: string | null
 }
 
+type JsonFeedItem = {
+  id?: string
+  url?: string
+  external_url?: string
+  title?: string
+  content_html?: string
+  content_text?: string
+  date_published?: string
+  date_modified?: string
+}
+
+type JsonFeed = {
+  version?: string
+  title?: string
+  home_page_url?: string
+  feed_url?: string
+  items?: JsonFeedItem[]
+}
+
 const stripCdata = (value: string) => value.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '').trim()
 
 const decodeEntities = (value: string) =>
@@ -23,6 +42,27 @@ const getTag = (block: string, tag: string) => {
 }
 
 export const parseRss = (xml: string): RssItem[] => {
+  const trimmed = String(xml || '').trim()
+
+  // JSON Feed support (https://www.jsonfeed.org/version/1)
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed) as JsonFeed | JsonFeedItem[]
+      const items: JsonFeedItem[] = Array.isArray(parsed) ? parsed : parsed.items || []
+      return items
+        .map((item) => {
+          const link = String(item.url || item.external_url || '').trim()
+          const title = String(item.title || '').trim() || (link ? 'Untitled' : '')
+          const published_at = item.date_published || item.date_modified || null
+          const content = item.content_html || item.content_text || null
+          return link ? ({ title, link, published_at, content } satisfies RssItem) : null
+        })
+        .filter(Boolean) as RssItem[]
+    } catch {
+      // Fall through to XML parsing
+    }
+  }
+
   const itemBlocks = xml.match(/<item[\s\S]*?<\/item>/gi) || []
   const entries = itemBlocks.map((block) => {
     const title = getTag(block, 'title')

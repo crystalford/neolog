@@ -62,5 +62,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }))
 
-  return [...staticPages, ...postPages, ...profilePages, ...tagPages]
+  // Get all stacks (series)
+  const { data: stacks } = await supabase
+    .from('series')
+    .select('slug, created_at, author:profiles(username)')
+    .limit(5000)
+
+  const stackPages = (stacks || [])
+    .filter((stack: any) => stack?.author?.username && stack?.slug)
+    .map((stack: any) => ({
+      url: `${BASE_URL}/${stack.author.username}/stack/${stack.slug}`,
+      lastModified: stack.created_at ? new Date(stack.created_at) : new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.5,
+    }))
+
+  return [...staticPages, ...postPages, ...profilePages, ...tagPages, ...stackPages]
 }

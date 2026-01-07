@@ -29,7 +29,7 @@ export default function ExplorePage() {
   const fetchPosts = useCallback(async (offset: number, limit: number) => {
     let query = supabase
       .from('posts')
-      .select(`*, author:profiles(*)`)
+      .select(`*, author:profiles(*), series:series(title, slug)`)
       .eq('status', 'published')
       .range(offset, offset + limit - 1)
 

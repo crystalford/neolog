@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   {
     const attempt = await supabase
       .from('feed_sources')
-      .select('id, user_id, url, publication_id, auto_convert_to_drafts')
+      .select('id, user_id, url, publication_id, auto_convert_to_drafts, consecutive_failures')
       .eq('source_type', 'rss')
       .eq('is_active', true)
 
@@ -69,7 +69,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       const msg = String(error.message || '')
-      const looksLikeMissingColumn = msg.includes('publication_id') || msg.includes('auto_convert_to_drafts')
+      const looksLikeMissingColumn =
+        msg.includes('publication_id') ||
+        msg.includes('auto_convert_to_drafts') ||
+        msg.includes('consecutive_failures')
       if (looksLikeMissingColumn) {
         const fallback = await supabase
           .from('feed_sources')
@@ -101,6 +104,9 @@ export async function GET(request: NextRequest) {
 
   const envAutoConvert =
     process.env.RSS_AUTO_CONVERT_TO_DRAFTS === 'true' || process.env.RSS_AUTO_CONVERT_TO_DRAFTS === '1'
+
+  const maxFailuresRaw = process.env.RSS_MAX_CONSECUTIVE_FAILURES
+  const maxFailures = maxFailuresRaw ? Math.max(1, Math.min(50, Number(maxFailuresRaw))) : 10
 
   let inserted = 0
   let converted = 0
@@ -136,7 +142,25 @@ export async function GET(request: NextRequest) {
           accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
         },
       })
-      if (!response.ok) continue
+      if (!response.ok) {
+        try {
+          const currentFailures = Number((source as any).consecutive_failures || 0) || 0
+          const nextFailures = currentFailures + 1
+          const shouldDisable = nextFailures >= maxFailures
+          await supabase
+            .from('feed_sources')
+            .update({
+              consecutive_failures: nextFailures,
+              last_fetch_status_code: response.status,
+              last_error: `Fetch failed (${response.status}).`,
+              ...(shouldDisable ? { is_active: false } : {}),
+            } as any)
+            .eq('id', source.id)
+        } catch {
+          // best-effort
+        }
+        continue
+      }
 
       const xml = await response.text()
       const items = parseRss(xml)
@@ -196,12 +220,41 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      await supabase
-        .from('feed_sources')
-        .update({ last_fetched_at: new Date().toISOString() })
-        .eq('id', source.id)
+      try {
+        await supabase
+          .from('feed_sources')
+          .update({
+            last_fetched_at: new Date().toISOString(),
+            last_success_at: new Date().toISOString(),
+            last_fetch_status_code: 200,
+            last_error: null,
+            consecutive_failures: 0,
+          } as any)
+          .eq('id', source.id)
+      } catch {
+        await supabase
+          .from('feed_sources')
+          .update({ last_fetched_at: new Date().toISOString() })
+          .eq('id', source.id)
+      }
     } catch (e) {
       console.error('RSS cron error:', e)
+      try {
+        const currentFailures = Number((source as any).consecutive_failures || 0) || 0
+        const nextFailures = currentFailures + 1
+        const shouldDisable = nextFailures >= maxFailures
+        await supabase
+          .from('feed_sources')
+          .update({
+            consecutive_failures: nextFailures,
+            last_fetch_status_code: null,
+            last_error: 'Fetch error.',
+            ...(shouldDisable ? { is_active: false } : {}),
+          } as any)
+          .eq('id', source.id)
+      } catch {
+        // best-effort
+      }
     }
   }
 

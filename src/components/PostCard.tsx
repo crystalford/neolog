@@ -1,15 +1,28 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Clock, ArrowUpRight, Code } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
 
+type PostWithOptionalSeries = PostWithAuthor & {
+  series?: {
+    title: string
+    slug: string
+  } | null
+}
+
 interface PostCardProps {
-  post: PostWithAuthor
+  post: PostWithOptionalSeries
   variant?: 'default' | 'featured' | 'compact' | 'list'
 }
 
 export function PostCard({ post, variant = 'default' }: PostCardProps) {
+  const router = useRouter()
+
+  const postHref = `/${post.author.username}/${post.slug}`
+  const stackHref = post.series?.slug ? `/${post.author.username}/stack/${post.series.slug}` : null
+
   const publishedDate = post.published_at 
     ? new Date(post.published_at).toLocaleDateString('en-US', {
         month: 'short',
@@ -47,8 +60,20 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
 
   if (variant === 'list') {
     return (
-      <article className="group py-6 border-b border-[var(--border-light)] last:border-0">
-        <Link href={`/${post.author.username}/${post.slug}`} className="flex flex-col gap-3 md:flex-row md:items-center">
+      <article
+        className="group py-6 border-b border-[var(--border-light)] last:border-0"
+        role="link"
+        tabIndex={0}
+        aria-label={post.title}
+        onClick={() => router.push(postHref)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            router.push(postHref)
+          }
+        }}
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
           {post.cover_image_url && (
             <div className="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex-shrink-0">
               <img
@@ -60,6 +85,17 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
           <div className="flex-1">
             <h2 className="font-display text-xl mb-2">{post.title}</h2>
+            {stackHref && post.series?.title && (
+              <div className="mb-2">
+                <Link
+                  href={stackHref}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                >
+                  Part of stack: <span className="text-[var(--accent)]">{post.series.title}</span>
+                </Link>
+              </div>
+            )}
             {post.excerpt && (
               <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{post.excerpt}</p>
             )}
@@ -76,18 +112,27 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               )}
             </div>
           </div>
-        </Link>
+        </div>
       </article>
     )
   }
 
   // Default variant - CLEAN VERSION (No nested Links)
   return (
-    <article className="group relative">
-      <Link 
-        href={`/${post.author.username}/${post.slug}`}
-        className="block p-5 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md hover:bg-[var(--bg-secondary)]/40 transition-all duration-300"
-      >
+    <article
+      className="group relative"
+      role="link"
+      tabIndex={0}
+      aria-label={post.title}
+      onClick={() => router.push(postHref)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          router.push(postHref)
+        }
+      }}
+    >
+      <div className="block p-5 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md hover:bg-[var(--bg-secondary)]/40 transition-all duration-300">
         {post.cover_image_url && (
           <div className="relative aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-secondary)]">
             <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -127,6 +172,18 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
         </div>
 
+        {stackHref && post.series?.title && (
+          <div className="mb-2">
+            <Link
+              href={stackHref}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              Part of stack: <span className="text-[var(--accent)]">{post.series.title}</span>
+            </Link>
+          </div>
+        )}
+
         <h2 className="font-display text-lg md:text-xl mb-2 group-hover:text-[var(--accent)] transition-colors leading-snug">
           {post.title}
         </h2>
@@ -142,7 +199,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             Read <ArrowUpRight size={14} />
           </span>
         </div>
-      </Link>
+      </div>
     </article>
   )
 }

@@ -5,7 +5,8 @@ import { Header } from '@/components/Header'
 import { HtmlIframe } from '@/components/HtmlIframe'
 import { PostDensityToggle } from '@/components/PostDensityToggle'
 import { PulseArticle } from '@/components/PulseArticle'
-import { generateSEO } from '@/lib/seo'
+import { SeriesNav } from '@/components/SeriesNav'
+import { generateArticleSchema, generateSEO } from '@/lib/seo'
 import { parsePulseContent } from '@/lib/pulse'
 import { Clock, ArrowLeft } from 'lucide-react'
 
@@ -80,6 +81,15 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   if (!post) notFound()
 
+  const stackId: string | null = post.series_id || null
+  const { data: stack } = stackId
+    ? await supabase
+        .from('series')
+        .select('title, slug')
+        .eq('id', stackId)
+        .maybeSingle()
+    : { data: null }
+
   const { data: tagRows } = await supabase
     .from('post_tags')
     .select('tag:tags(id, name, slug, color)')
@@ -137,9 +147,26 @@ export default async function PostPage({ params, searchParams }: Props) {
   const summaryText = summaryRow?.summary || post.excerpt || summarySentences.join(' ')
   const pulseContent = isPulse ? parsePulseContent(post.content || '') : null
 
+  const articleSchema = generateArticleSchema({
+    title: post.title,
+    description: post.excerpt || undefined,
+    image: post.cover_image_url || undefined,
+    url: `/${params.username}/${params.slug}`,
+    author: profile.display_name || profile.username,
+    authorUrl: `/${params.username}`,
+    publishedTime: post.published_at || undefined,
+    modifiedTime: post.updated_at || undefined,
+  })
+
   return (
     <>
       <Header />
+      {!isPreview && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+        />
+      )}
       <main className="pt-20">
         {isPreview && (
           <div className="bg-black text-white py-2 px-4 text-center text-sm font-medium">
@@ -210,6 +237,21 @@ export default async function PostPage({ params, searchParams }: Props) {
                 </span>
               </div>
             </header>
+
+            {stackId && stack?.slug && (
+              <div className="mb-8">
+                <Link
+                  href={`/${params.username}/stack/${stack.slug}`}
+                  className="block rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] p-4 hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <p className="text-xs text-[var(--text-tertiary)]">Part of stack</p>
+                  <p className="font-medium text-[var(--text-primary)]">{stack.title}</p>
+                  <p className="text-sm text-[var(--text-tertiary)] mt-1">View stack hub</p>
+                </Link>
+              </div>
+            )}
+
+            {stackId && <SeriesNav seriesId={stackId} currentPostId={post.id} />}
 
             {!isFullHtml && post.cover_image_url && (
               <img

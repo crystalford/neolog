@@ -26,6 +26,15 @@ type SearchResult = {
   rank: number
 }
 
+type SeriesInfo = {
+  title: string
+  slug: string
+}
+
+type SearchResultWithSeries = SearchResult & {
+  series?: SeriesInfo | null
+}
+
 type UserResult = {
   id: string
   username: string
@@ -46,11 +55,32 @@ export default function SearchPage() {
   const [query, setQuery] = useState(initialQuery)
   const [tab, setTab] = useState<'posts' | 'people'>('posts')
   const [semantic, setSemantic] = useState(initialSemantic)
-  const [posts, setPosts] = useState<SearchResult[]>([])
+  const [posts, setPosts] = useState<SearchResultWithSeries[]>([])
   const [users, setUsers] = useState<UserResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const attachSeries = useCallback(
+    async (results: SearchResultWithSeries[]) => {
+      const ids = results.map((r) => r.id).filter(Boolean)
+      if (ids.length === 0) return results
+
+      const { data } = await supabase
+        .from('posts')
+        .select('id, series:series(title, slug)')
+        .in('id', ids)
+
+      const map = new Map<string, any>()
+      ;(data || []).forEach((row: any) => map.set(row.id, row.series))
+
+      return results.map((r) => ({
+        ...r,
+        series: map.get(r.id) || null,
+      }))
+    },
+    [supabase],
+  )
 
   useEffect(() => {
     if (initialQuery) {
@@ -87,7 +117,7 @@ export default function SearchPage() {
           setError(json?.error || 'Semantic search failed.')
         } else {
           const results = (json?.results || []) as any[]
-          const mapped: SearchResult[] = results.map((r, i) => ({
+          const mapped: SearchResultWithSeries[] = results.map((r, i) => ({
             id: r.id,
             title: r.title,
             slug: r.slug,
@@ -102,7 +132,8 @@ export default function SearchPage() {
             rank: i + 1,
           }))
 
-          setPosts(mapped)
+          const enriched = await attachSeries(mapped)
+          setPosts(enriched)
         }
       } catch (e: any) {
         setPosts([])
@@ -113,7 +144,8 @@ export default function SearchPage() {
         .rpc('search_posts', { p_query: searchQuery, p_limit: 30 })
       
       if (postResults) {
-        setPosts(postResults)
+        const enriched = await attachSeries(postResults as SearchResultWithSeries[])
+        setPosts(enriched)
       }
     }
 
@@ -159,6 +191,7 @@ export default function SearchPage() {
       display_name: post.author_display_name,
       avatar_url: post.author_avatar_url,
     },
+    series: post.series || null,
   }))
 
   return (

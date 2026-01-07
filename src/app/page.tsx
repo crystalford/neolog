@@ -40,6 +40,7 @@ export default async function Home() {
           'published_at',
           'reading_time_minutes',
           'author:profiles(id, username, display_name, avatar_url)',
+          'series:series(title, slug)',
         ].join(','),
       )
       .eq('status', 'published')

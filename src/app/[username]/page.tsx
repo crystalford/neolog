@@ -44,10 +44,16 @@ export default async function ProfilePage({ params }: Props) {
 
   const { data: posts } = await supabase
     .from('posts')
-    .select('*')
+    .select('*, series:series(title, slug)')
     .eq('author_id', profile.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
+
+  const { data: stacks } = await supabase
+    .from('series')
+    .select('id, title, slug, description, cover_image_url, post_count, created_at')
+    .eq('author_id', profile.id)
+    .order('created_at', { ascending: false })
 
   const { count: followerCount } = await supabase
     .from('follows')
@@ -186,6 +192,45 @@ export default async function ProfilePage({ params }: Props) {
           </div>
 
           {/* Posts */}
+          {stacks && stacks.length > 0 && (
+            <section className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-xl">Stacks</h2>
+                <span className="text-sm text-[var(--text-tertiary)]">{stacks.length}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {stacks.map((stack) => (
+                  <Link
+                    key={stack.id}
+                    href={`/${profile.username}/stack/${stack.slug}`}
+                    className="block rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/40 hover:bg-[var(--bg-secondary)]/60 transition-colors overflow-hidden"
+                  >
+                    {stack.cover_image_url && (
+                      <img
+                        src={stack.cover_image_url}
+                        alt={stack.title}
+                        className="w-full h-36 object-cover"
+                      />
+                    )}
+                    <div className="p-5">
+                      <p className="text-xs text-[var(--text-tertiary)]">Stack</p>
+                      <p className="font-medium text-[var(--text-primary)] mt-1">{stack.title}</p>
+                      {stack.description && (
+                        <p className="text-sm text-[var(--text-secondary)] mt-2 line-clamp-2">
+                          {stack.description}
+                        </p>
+                      )}
+                      <div className="mt-3 text-xs text-[var(--text-tertiary)]">
+                        {(stack.post_count ?? 0).toString()} posts
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mt-6">
             <h2 className="font-display text-xl mb-4">Posts</h2>
              
