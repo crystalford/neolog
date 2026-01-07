@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from 'react'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
@@ -298,7 +298,6 @@ export default function CapturesPage() {
     </>
   )
 }
-'use client'
 
 import { useEffect, useState } from 'react'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
