@@ -68,6 +68,7 @@ export default function WritePage() {
   const [videoBriefError, setVideoBriefError] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>(defaultTags)
   const [showSettings, setShowSettings] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [showVaultDrawer, setShowVaultDrawer] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [scheduledAt, setScheduledAt] = useState('')
