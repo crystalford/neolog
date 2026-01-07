@@ -82,7 +82,7 @@ export function welcomeEmail(username: string): { subject: string; html: string 
         <li style="margin-bottom: 8px;">Write in HTML, Markdown, or use our rich editor</li>
         <li style="margin-bottom: 8px;">Subscribe to writers you admire</li>
         <li style="margin-bottom: 8px;">Fork posts to build on others' ideas</li>
-        <li style="margin-bottom: 8px;">Create series to group related content</li>
+        <li style="margin-bottom: 8px;">Create stacks to group related content</li>
       </ul>
       
       <div style="${footerStyle}">

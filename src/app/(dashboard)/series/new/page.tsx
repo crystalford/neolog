@@ -55,7 +55,7 @@ export default function NewSeriesPage() {
       const data = await response.json().catch(() => null)
       if (!response.ok) {
         const rolledBack = Boolean(data?.rolledBack)
-        const base = typeof data?.error === 'string' && data.error.trim() ? data.error.trim() : 'Failed to create series'
+        const base = typeof data?.error === 'string' && data.error.trim() ? data.error.trim() : 'Failed to create stack'
         setError(rolledBack ? `${base} (rolled back; nothing was created)` : base)
         setSaving(false)
         return
@@ -63,7 +63,7 @@ export default function NewSeriesPage() {
 
       const seriesId = String(data?.seriesId || '')
       if (!seriesId) {
-        setError('Failed to create series (missing series id)')
+        setError('Failed to create stack (missing stack id)')
         setSaving(false)
         return
       }
@@ -86,7 +86,7 @@ export default function NewSeriesPage() {
 
       router.push(url.pathname + url.search)
     } catch {
-      setError('Failed to create series (network or server error)')
+      setError('Failed to create stack (network or server error)')
       setSaving(false)
     }
   }
@@ -127,7 +127,7 @@ export default function NewSeriesPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="input min-h-[100px] resize-none"
-                placeholder="What's this series about?"
+                placeholder="What's this stack about?"
                 maxLength={500}
               />
             </div>

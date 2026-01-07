@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     if (code === '42501') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    return NextResponse.json({ error: 'Failed to create series' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create stack' }, { status: 500 })
   }
 
   const seriesId = seriesRow.id as string

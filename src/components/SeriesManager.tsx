@@ -223,7 +223,7 @@ export function SeriesManager() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-display font-bold flex items-center gap-3">
           <BookOpen size={32} />
-          Series & Collections
+          Stacks & Collections
         </h1>
         <button
           onClick={() => {
@@ -235,7 +235,7 @@ export function SeriesManager() {
           className="btn btn-primary"
         >
           <Plus size={16} />
-          New Series
+          New Stack
         </button>
       </div>
 
@@ -244,7 +244,7 @@ export function SeriesManager() {
         <div className="mb-8 p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-lg">
-              {editingSeries ? 'Edit Series' : 'Create New Series'}
+              {editingSeries ? 'Edit Stack' : 'Create New Stack'}
             </h3>
             <button
               onClick={() => {
@@ -277,7 +277,7 @@ export function SeriesManager() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="A brief description of this series..."
+                placeholder="A brief description of this stack..."
                 className="input w-full min-h-[100px] resize-y"
               />
             </div>
@@ -304,7 +304,7 @@ export function SeriesManager() {
                     Saving...
                   </>
                 ) : (
-                  editingSeries ? 'Update Series' : 'Create Series'
+                  editingSeries ? 'Update Stack' : 'Create Stack'
                 )}
               </button>
             </div>
@@ -320,9 +320,9 @@ export function SeriesManager() {
       ) : series.length === 0 ? (
         <div className="text-center py-16 text-[var(--text-tertiary)]">
           <BookOpen size={48} className="mx-auto mb-4 opacity-50" />
-          <p className="text-lg mb-2">No series yet</p>
+          <p className="text-lg mb-2">No stacks yet</p>
           <p className="text-sm">
-            Organize your posts into series to help readers follow along
+            Organize your posts into stacks to help readers follow along
           </p>
         </div>
       ) : (
@@ -382,10 +382,10 @@ export function SeriesManager() {
               {/* Manage posts */}
               {managingPosts === s.id && (
                 <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
-                  <h4 className="text-sm font-medium mb-3">Posts in this series</h4>
+                  <h4 className="text-sm font-medium mb-3">Posts in this stack</h4>
                   {seriesPosts.length === 0 ? (
                     <p className="text-sm text-[var(--text-tertiary)]">
-                      No posts in this series yet
+                      No posts in this stack yet
                     </p>
                   ) : (
                     <div className="space-y-2">

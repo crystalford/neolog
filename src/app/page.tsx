@@ -311,7 +311,7 @@ export default async function Home() {
                           <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <p className="text-xs text-[var(--text-primary)] font-medium">Prompt: series outline</p>
+                                <p className="text-xs text-[var(--text-primary)] font-medium">Prompt: stack outline</p>
                                 <p className="text-[11px] text-[var(--text-tertiary)] mt-1 inline-flex items-center gap-1">
                                   <Sparkles size={12} /> Captured
                                 </p>
