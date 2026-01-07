@@ -441,6 +441,15 @@ export default function DashboardPage() {
   const totalTokens = usageSummary.reduce((sum, row) => sum + Number(row.total_tokens || 0), 0)
   const totalCalls = usageSummary.reduce((sum, row) => sum + Number(row.calls || 0), 0)
 
+  const progressSteps = [
+    { label: 'Capture → Draft', done: draftCount > 0 },
+    { label: 'Publish', done: publishedCount > 0 },
+    { label: 'Schedule/Refresh', done: scheduledCount > 0 },
+  ]
+  const progressScore = Math.round((progressSteps.filter((s) => s.done).length / progressSteps.length) * 100)
+
+  const focusQueue = sortedPosts.slice(0, 5)
+
   return (
     <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -493,6 +502,84 @@ export default function DashboardPage() {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* Focus & Progress */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] mb-8">
+        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Today</p>
+              <h2 className="text-lg font-medium text-[var(--text-primary)]">Stay on track</h2>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium text-[var(--text-primary)]">{progressScore}%</p>
+              <p className="text-xs text-[var(--text-tertiary)]">Done</p>
+            </div>
+          </div>
+          <div className="w-full h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden mb-3">
+            <div
+              className="h-full bg-[var(--accent)]"
+              style={{ width: `${progressScore}%`, transition: 'width 200ms ease' }}
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {progressSteps.map((step) => (
+              <div
+                key={step.label}
+                className={`rounded-xl border px-3 py-2 text-sm flex items-center gap-2 ${
+                  step.done
+                    ? 'border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)]'
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-lg border ${
+                    step.done
+                      ? 'bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]'
+                      : 'bg-[var(--bg-secondary)] border-[var(--border-light)] text-[var(--text-tertiary)]'
+                  }`}
+                >
+                  {step.done ? '✓' : '•'}
+                </span>
+                {step.label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Focus queue</p>
+              <h2 className="text-lg font-medium text-[var(--text-primary)]">Next up</h2>
+            </div>
+            <Link href="/write" className="text-xs text-[var(--accent)] hover:underline">
+              Open editor
+            </Link>
+          </div>
+          {focusQueue.length === 0 ? (
+            <p className="text-sm text-[var(--text-tertiary)]">No posts yet. Start a draft.</p>
+          ) : (
+            <div className="space-y-2">
+              {focusQueue.map((post) => (
+                <Link
+                  key={post.id}
+                  href={getPostHref(post)}
+                  className="block rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 hover:border-[var(--border-medium)] transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-1">{post.title || 'Untitled'}</p>
+                    <span className="text-[11px] text-[var(--text-tertiary)] capitalize">{post.status}</span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)] line-clamp-1 mt-0.5">
+                    Updated {new Date(post.updated_at || post.created_at).toLocaleDateString()}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
