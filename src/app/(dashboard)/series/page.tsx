@@ -54,7 +54,7 @@ export default function SeriesPage() {
   }
 
   const deleteSeries = async (seriesId: string) => {
-    if (!confirm('Delete this series? Posts will be kept but removed from the series.')) return
+    if (!confirm('Delete this stack? Posts will be kept but removed from the stack.')) return
 
     // Remove posts from series first
     await supabase
@@ -86,16 +86,16 @@ export default function SeriesPage() {
                 <Layers size={24} className="text-[var(--accent)]" />
               </div>
               <div>
-                <h1 className="font-display text-3xl">Series</h1>
+                <h1 className="font-display text-3xl">Stacks</h1>
                 <p className="text-[var(--text-secondary)]">
-                  Group related posts together
+                  A hub page that groups posts and adds navigation
                 </p>
               </div>
             </div>
             
             <Link href="/series/new" className="btn btn-primary">
               <Plus size={16} />
-              New Series
+              New Stack
             </Link>
           </div>
 
@@ -106,13 +106,13 @@ export default function SeriesPage() {
       ) : series.length === 0 ? (
         <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
           <Layers size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-          <h2 className="font-display text-xl mb-2">No series yet</h2>
+          <h2 className="font-display text-xl mb-2">No stacks yet</h2>
           <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-            Create a series to group related posts with sequential navigation
+            Create a stack to group related posts under a single hub page
           </p>
           <Link href="/series/new" className="btn btn-primary">
             <Plus size={16} />
-            Create Your First Series
+            Create Your First Stack
           </Link>
         </div>
       ) : (

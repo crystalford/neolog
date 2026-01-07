@@ -99,15 +99,15 @@ export default function NewSeriesPage() {
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft size={14} />
-              Back to Series
+              Back to Stacks
             </Link>
-            <h1 className="font-display text-3xl">Create Series</h1>
+            <h1 className="font-display text-3xl">Create Stack</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium mb-2">
-                Series Title *
+                Stack Title *
               </label>
               <input
                 type="text"
@@ -155,9 +155,9 @@ export default function NewSeriesPage() {
             </div>
 
             <div className="pt-4 border-t border-[var(--border-light)]">
-              <h2 className="font-display text-xl mb-2">Optional: Create starter drafts (research stack)</h2>
+              <h2 className="font-display text-xl mb-2">Optional: Create starter drafts</h2>
               <p className="text-sm text-[var(--text-secondary)] mb-4">
-                Add any of the following and Neolog will create draft posts inside this series automatically.
+                Add any of the following and Neolog will create draft posts inside this stack automatically.
               </p>
 
               {willCreateAnyDrafts && (
@@ -220,7 +220,7 @@ export default function NewSeriesPage() {
                     Creating...
                   </>
                 ) : (
-                  willCreateAnyDrafts ? 'Create Series + Drafts' : 'Create Series'
+                  willCreateAnyDrafts ? 'Create Stack + Drafts' : 'Create Stack'
                 )}
               </button>
               <Link href="/series" className="btn btn-secondary">

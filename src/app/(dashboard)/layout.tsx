@@ -191,7 +191,7 @@ export default function DashboardLayout({
         { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
         { href: '/import', icon: FileUp, label: 'Import' },
         { href: '/topics', icon: Hash, label: 'Topics' },
-        { href: '/series', icon: Layers, label: 'Series' },
+        { href: '/series', icon: Layers, label: 'Stacks' },
         { href: '/publications', icon: BookOpen, label: 'Publications' },
       ],
     },

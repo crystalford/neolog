@@ -236,9 +236,9 @@ export default function SeriesDetailPage({ params }: Props) {
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft size={14} />
-              Back to Series
+              Back to Stacks
             </Link>
-            <h1 className="font-display text-3xl">Edit Series</h1>
+            <h1 className="font-display text-3xl">Edit Stack</h1>
           </div>
 
           {/* Series details */}
@@ -296,10 +296,10 @@ export default function SeriesDetailPage({ params }: Props) {
             </button>
           </div>
 
-          {/* Posts in series */}
+          {/* Posts in stack */}
           <div id="series-posts">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-xl">Posts in Series</h2>
+              <h2 className="font-display text-xl">Posts in Stack</h2>
               <button
                 onClick={() => setShowAddPosts(!showAddPosts)}
                 className="btn btn-secondary btn-sm"
@@ -342,7 +342,7 @@ export default function SeriesDetailPage({ params }: Props) {
             {showAddPosts && availablePosts.length > 0 && (
               <div className="mb-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                 <p className="text-sm text-[var(--text-secondary)] mb-3">
-                  Select posts to add to this series:
+                  Select posts to add to this stack:
                 </p>
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
                   {availablePosts.map(post => (
@@ -361,7 +361,7 @@ export default function SeriesDetailPage({ params }: Props) {
 
             {posts.length === 0 ? (
               <div className="text-center py-12 rounded-lg bg-[var(--bg-secondary)]">
-                <p className="text-[var(--text-secondary)]">No posts in this series yet</p>
+                <p className="text-[var(--text-secondary)]">No posts in this stack yet</p>
                 <Link href="/write" className="btn btn-secondary btn-sm mt-4">
                   <Plus size={14} />
                   Create a post

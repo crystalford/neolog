@@ -67,7 +67,7 @@ export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
         <div className="flex items-center gap-3">
           <BookOpen size={18} className="text-[var(--accent)]" />
           <div className="text-left">
-            <p className="text-xs text-[var(--text-tertiary)]">Part of series</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Part of stack</p>
             <p className="font-medium">{series.title}</p>
           </div>
         </div>
