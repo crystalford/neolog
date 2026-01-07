@@ -1894,8 +1894,6 @@ export default function WritePage() {
                     </div>
                   )}
                 </div>
-                  // Advanced toggle state
-                  const [showAdvanced, setShowAdvanced] = useState(false)
                 {lastVersion && (
                   <div className="mt-4 p-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] text-sm text-[var(--text-secondary)]">
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
