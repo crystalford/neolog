@@ -6,14 +6,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
-  LayoutDashboard, BookOpen, BarChart3, Mail, Layers, Gift,
-  Zap, Settings, LogOut, User as UserIcon,
-  PenLine, Bell, Radio, List, Bookmark, Clock, Command, Hash, Globe, Monitor, Inbox, FileUp
+  Home, Archive, PenSquare, Send, Settings, LogOut, User as UserIcon,
+  PenLine, Zap, Command, Search
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
+import { useUserMaturity } from '@/hooks/useUserMaturity'
 
 export default function DashboardLayout({
   children,
@@ -182,60 +182,47 @@ export default function DashboardLayout({
     router.push('/')
   }
 
-  const navSections = [
-    {
-      title: 'Create',
-      items: [
-        { href: '/write', icon: PenLine, label: 'Write' },
-        { href: '/vault', icon: Command, label: 'Vault' },
-        { href: '/dashboard', icon: LayoutDashboard, label: 'Posts' },
-        { href: '/import', icon: FileUp, label: 'Import' },
-        { href: '/topics', icon: Hash, label: 'Topics' },
-        { href: '/series', icon: Layers, label: 'Stacks' },
-        { href: '/publications', icon: BookOpen, label: 'Publications' },
-      ],
-    },
-    {
-      title: 'Audience',
-      items: [
-        { href: '/subscribers', icon: Mail, label: 'Subscribers' },
-        { href: '/lists', icon: List, label: 'Lists' },
-        { href: '/notifications', icon: Bell, label: 'Notifications' },
-        { href: '/saved', icon: Bookmark, label: 'Saved' },
-      ],
-    },
-    {
-      title: 'Distribution',
-      items: [
-        { href: '/monitors', icon: Monitor, label: 'Monitors' },
-        { href: '/analytics', icon: BarChart3, label: 'Analytics' },
-        { href: '/syndication', icon: Radio, label: 'Syndication' },
-        { href: '/sources', icon: Globe, label: 'Sources' },
-        { href: '/inbox', icon: Inbox, label: 'Inbox' },
-        { href: '/referrals', icon: Gift, label: 'Referrals' },
-        { href: '/boost', icon: Zap, label: 'Boost' },
-      ],
-    },
-    {
-      title: 'Workspace',
-      items: [
-        { href: '/feed', icon: Radio, label: 'Feed' },
-        { href: '/history', icon: Clock, label: 'History' },
-      ],
-    },
-  ]
+  // User maturity for progressive disclosure
+  const { capabilities, loading: maturityLoading } = useUserMaturity(user?.id ?? null)
+
+  // NEW: 5 Primary Destinations (progressive disclosure)
+  const primaryNav = useMemo(() => {
+    const items = [
+      { href: '/dashboard', icon: Home, label: 'Home' },
+      { href: '/dashboard/captures', icon: Archive, label: 'Captures' },
+    ]
+
+    // Show Workspace tab after first draft or publish
+    if (capabilities.showWorkspaceTab) {
+      items.push({ href: '/dashboard/workspace', icon: PenSquare, label: 'Workspace' })
+    } else {
+      // New users see simple "Write" instead
+      items.push({ href: '/write', icon: PenLine, label: 'Write' })
+    }
+
+    // Show Published tab after first publish
+    if (capabilities.showPublishedTab) {
+      items.push({ href: '/dashboard/published', icon: Send, label: 'Published' })
+    }
+
+    items.push({ href: '/dashboard/settings', icon: Settings, label: 'Settings' })
+
+    return items
+  }, [capabilities])
 
   const commandItems = useMemo(() => {
-    const items = navSections.flatMap((section) =>
-      section.items.map((item) => ({
-        label: item.label,
-        href: item.href,
-        description: section.title,
-      }))
+    const items = primaryNav.map((item) => ({
+      label: item.label,
+      href: item.href,
+      description: 'Navigation',
+    }))
+    // Add common actions
+    items.push(
+      { label: 'New Draft', href: '/write', description: 'Action' },
+      { label: 'Quick Capture', href: '#capture', description: 'Action' },
     )
-    items.push({ label: 'Settings', href: '/settings', description: 'Workspace' })
     return items
-  }, [navSections])
+  }, [primaryNav])
 
   if (loading) {
     return (
@@ -244,7 +231,7 @@ export default function DashboardLayout({
           <div className="h-6 w-28 skeleton rounded mb-6" />
           <div className="space-y-1">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="h-7 skeleton rounded" />
+              <div key={i} className="h-10 skeleton rounded" />
             ))}
           </div>
         </div>
@@ -257,82 +244,88 @@ export default function DashboardLayout({
     )
   }
 
+  // Determine active label from new primary nav
   const activeLabel =
-    navSections
-      .flatMap((section) => section.items)
-      .find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))
-      ?.label || (pathname.startsWith('/settings') ? 'Settings' : 'Dashboard')
+    primaryNav.find(
+      (item) => pathname === item.href || pathname.startsWith(item.href + '/')
+    )?.label ||
+    (pathname === '/write' || pathname.startsWith('/write/') ? 'Write' : 'Home')
 
   return (
     <div className="dashboard-shell flex min-h-screen bg-[var(--bg-secondary)]">
-      {/* Sidebar */}
+      {/* Sidebar - 5 Primary Destinations */}
       <aside className="w-[248px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-4 pt-5">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="logo-mark logo-mark-lg">N</span>
             <span className="font-display text-xl">Neolog</span>
           </Link>
-
-          <Link
-            href="/write"
-            className="mt-5 btn btn-primary btn-sm w-full justify-between"
-          >
-            <span className="flex items-center gap-2">
-              <PenLine size={16} />
-              New post
-            </span>
-            <span className="text-xs opacity-80">Ctrl+N</span>
-          </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-4">
-          {navSections.map((section) => (
-            <div key={section.title}>
-              <p className="px-2 text-[11px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-                {section.title}
-              </p>
-              <div className="space-y-1">
-                {section.items.map((link) => {
-                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-                  const Icon = link.icon
+        {/* Primary Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-5">
+          <div className="space-y-1">
+            {primaryNav.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+              const Icon = link.icon
 
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                      }`}
-                    >
-                      <Icon size={16} className="flex-shrink-0" />
-                      <span>{link.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                  }`}
+                >
+                  <Icon size={18} className="flex-shrink-0" />
+                  <span>{link.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
+            <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-3">
+              Quick Actions
+            </p>
+            <div className="space-y-1">
+              <Link
+                href="/write"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                <PenLine size={16} />
+                <span>New Draft</span>
+                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘N</span>
+              </Link>
+              <button
+                onClick={() => setCaptureOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                <Zap size={16} />
+                <span>Quick Capture</span>
+                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘K</span>
+              </button>
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                <Search size={16} />
+                <span>Search</span>
+                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘/</span>
+              </button>
             </div>
-          ))}
+          </div>
         </nav>
 
+        {/* User Section */}
         <div className="border-t border-[var(--border-light)] px-3 py-4 space-y-1">
-          <Link
-            href="/settings"
-            className={`flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              pathname === '/settings'
-                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-            }`}
-          >
-            <Settings size={16} />
-            <span>Settings</span>
-          </Link>
-
           {profile && (
             <Link
               href={`/${profile.username}`}
-              className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
               {profile.avatar_url ? (
                 <img
@@ -351,7 +344,7 @@ export default function DashboardLayout({
 
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] transition-colors"
           >
             <LogOut size={16} />
             <span>Sign out</span>
@@ -362,69 +355,68 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="dashboard-surface flex-1 flex flex-col">
         <header className="sticky top-0 z-[80] bg-[var(--bg-secondary)]/95 backdrop-blur border-b border-[var(--border-light)]">
-          <div className="px-6 lg:px-12 py-2 flex items-center justify-between">
-            <div className="flex items-baseline gap-3">
-              <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
-                Workspace
-              </span>
-              <div className="hidden sm:block">
-                <PublicationSwitcher
-                  currentPublicationId={selectedPublicationId}
-                  onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
-                />
-              </div>
-              <span className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</span>
+          <div className="px-6 lg:px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Mobile: Logo */}
+              <Link href="/" className="lg:hidden flex items-center gap-2">
+                <span className="logo-mark">N</span>
+              </Link>
+              
+              {/* Page Title */}
+              <h1 className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</h1>
+              
+              {/* Publication Switcher (if applicable) */}
+              {capabilities.showPublicationsManagement && (
+                <div className="hidden sm:block">
+                  <PublicationSwitcher
+                    currentPublicationId={selectedPublicationId}
+                    onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
+                  />
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setCaptureOpen(true)}
-                className="hidden md:inline-flex btn btn-secondary btn-sm"
-              >
-                <Zap size={14} />
-                Quick capture
-                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl+K</span>
-              </button>
+            
+            <div className="flex items-center gap-2">
+              {/* Search */}
               <button
                 onClick={() => setCommandOpen(true)}
-                className="inline-flex md:hidden items-center justify-center w-8 h-8 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
-                aria-label="Quick switch"
+                className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:border-[var(--border-medium)] transition-colors"
               >
-                <Command size={16} />
+                <Search size={14} />
+                <span>Search...</span>
+                <span className="text-[10px] ml-4 opacity-60">⌘/</span>
+              </button>
+              
+              {/* Mobile buttons */}
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                aria-label="Search"
+              >
+                <Search size={16} />
               </button>
               <button
                 onClick={() => setCaptureOpen(true)}
-                className="inline-flex md:hidden items-center justify-center w-8 h-8 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                className="inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                 aria-label="Quick capture"
               >
                 <Zap size={16} />
               </button>
-              <button
-                onClick={() => setCommandOpen(true)}
-                className="hidden md:inline-flex btn btn-secondary btn-sm"
-              >
-                <Command size={14} />
-                Quick switch
-                <span className="text-[10px] text-[var(--text-tertiary)]">Ctrl+/</span>
-              </button>
+              
+              {/* New Draft button */}
               <Link
                 href="/write"
                 className="hidden sm:inline-flex btn btn-primary btn-sm"
               >
                 <PenLine size={16} />
-                New post
+                New Draft
               </Link>
+              
+              {/* User avatar */}
               {profile && (
                 <Link
                   href={`/${profile.username}`}
-                  className="hidden sm:inline-flex btn btn-secondary btn-sm"
-                >
-                  View site
-                </Link>
-              )}
-              {profile && (
-                <Link
-                  href={`/${profile.username}`}
-                  className="w-7 h-7 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                  className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
                 >
                   {profile.avatar_url ? (
                     <img
@@ -438,6 +430,29 @@ export default function DashboardLayout({
                 </Link>
               )}
             </div>
+          </div>
+          
+          {/* Mobile Navigation Tabs */}
+          <div className="lg:hidden flex border-t border-[var(--border-light)] overflow-x-auto">
+            {primaryNav.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+              const Icon = link.icon
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2 px-3 text-xs transition-colors ${
+                    isActive
+                      ? 'text-[var(--text-primary)] border-b-2 border-[var(--accent)]'
+                      : 'text-[var(--text-tertiary)]'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span className="truncate">{link.label}</span>
+                </Link>
+              )
+            })}
           </div>
         </header>
 
