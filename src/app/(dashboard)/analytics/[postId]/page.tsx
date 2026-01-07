@@ -189,7 +189,7 @@ export default function PostAnalyticsPage() {
         {/* Header */}
         <div className="mb-8">
             <Link 
-              href="/analytics"
+              href="/dashboard/analytics"
               className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-4 transition-colors"
             >
               <ArrowLeft size={16} />

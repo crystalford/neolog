@@ -120,10 +120,10 @@ export function MobileNav() {
                 </p>
                 <nav className="space-y-1">
                   <NavLink href="/dashboard" icon={BarChart3}>Dashboard</NavLink>
-                  <NavLink href="/analytics" icon={BarChart3}>Analytics</NavLink>
-                  <NavLink href="/tiers" icon={CreditCard}>Tiers</NavLink>
-                  <NavLink href="/earnings" icon={DollarSign}>Earnings</NavLink>
-                  <NavLink href="/boost" icon={Rocket}>Boost</NavLink>
+                  <NavLink href="/dashboard/tiers" icon={CreditCard}>Tiers</NavLink>
+                  <NavLink href="/dashboard/earnings" icon={DollarSign}>Earnings</NavLink>
+                  <NavLink href="/dashboard/boost" icon={Rocket}>Boost</NavLink>
+                  <NavLink href="/dashboard/settings" icon={Settings}>Settings</NavLink>
                 </nav>
               </div>
 

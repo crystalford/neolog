@@ -100,14 +100,14 @@ export default function NewTierPage() {
       console.error('Stripe price creation failed:', err)
     }
 
-    router.push('/tiers')
+    router.push('/dashboard/tiers')
   }
 
   return (
     <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
       <div className="mb-8">
             <Link 
-              href="/tiers" 
+              href="/dashboard/tiers" 
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft size={14} />
@@ -221,7 +221,7 @@ export default function NewTierPage() {
                   'Create Tier'
                 )}
               </button>
-              <Link href="/tiers" className="btn btn-secondary">
+              <Link href="/dashboard/tiers" className="btn btn-secondary">
                 Cancel
               </Link>
             </div>

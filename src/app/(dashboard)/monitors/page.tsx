@@ -308,7 +308,7 @@ export default function MonitorsPage() {
           </Link>
 
           <Link
-            href="/analytics"
+            href="/dashboard/analytics"
             className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
           >
             <div className="flex items-center gap-2 text-[var(--text-primary)]">

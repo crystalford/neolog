@@ -104,7 +104,7 @@ export default function EditTierPage({ params }: Props) {
       return
     }
 
-    router.push('/tiers')
+    router.push('/dashboard/tiers')
   }
 
   const handleDelete = async () => {
@@ -122,7 +122,7 @@ export default function EditTierPage({ params }: Props) {
       .delete()
       .eq('id', params.id)
 
-    router.push('/tiers')
+    router.push('/dashboard/tiers')
   }
 
   if (loading) {
@@ -137,7 +137,7 @@ export default function EditTierPage({ params }: Props) {
     <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
       <div className="mb-8">
             <Link 
-              href="/tiers" 
+              href="/dashboard/tiers" 
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft size={14} />
@@ -266,7 +266,7 @@ export default function EditTierPage({ params }: Props) {
               </button>
 
               <div className="flex gap-3">
-                <Link href="/tiers" className="btn btn-secondary">
+                <Link href="/dashboard/tiers" className="btn btn-secondary">
                   Cancel
                 </Link>
                 <button

@@ -105,8 +105,8 @@ export default function TiersPage() {
               </p>
             </div>
             <Link href="/tiers/new" className="btn btn-primary">
-              <Plus size={16} />
-              New Tier
+                <Plus size={16} />
+                New Tier
             </Link>
           </div>
 
@@ -114,7 +114,7 @@ export default function TiersPage() {
         <div className="mb-8 p-4 rounded-lg bg-[var(--warning)]/10 border border-[var(--warning)]/20">
           <p className="text-sm">
             <strong>Connect Stripe first.</strong> You need to{' '}
-            <Link href="/earnings" className="text-[var(--accent)] underline">set up Stripe</Link>
+            <Link href="/dashboard/earnings" className="text-[var(--accent)] underline">set up Stripe</Link>
             {' '}before you can accept payments.
           </p>
         </div>

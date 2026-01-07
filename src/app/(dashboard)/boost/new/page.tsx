@@ -232,7 +232,7 @@ export default function NewCampaignPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Link 
-              href="/boost"
+              href="/dashboard/boost"
               className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
             >
               <ArrowLeft size={20} />
