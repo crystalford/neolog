@@ -15,6 +15,7 @@
   - [ ] Automation UI read access (recommended): `add_jobs_job_runs_read_policies.sql`
   - [ ] Automation indexes (recommended): `add_jobs_job_runs_indexes.sql`
   - [ ] Feed source settings: `add_feed_source_auto_convert.sql` (optional per-feed auto-convert + destination publication)
+  - [ ] Feed health/backoff: `add_feed_source_health.sql` (optional failure tracking + auto-disable threshold for RSS cron)
   - [ ] Asset Vault: `add_assets_vault.sql` (assets table + RLS)
   - [ ] Post ↔ Asset links: `add_post_assets.sql` (attach vault assets to drafts)
   - [ ] Capture-first asset fields: `expand_assets_capture_fields.sql` (title/source/url + quote/fragment types)
@@ -77,11 +78,17 @@ NEXT_PUBLIC_APP_URL=https://yourdomain.com
 
 # Cron Secret (generate random string)
 CRON_SECRET=xxxxx
+# Optional RSS cron auto-disable threshold (default 10)
+RSS_MAX_CONSECUTIVE_FAILURES=10
 ```
 
 Notes:
 - `SUPABASE_SERVICE_ROLE_KEY` is required for server-side automation endpoints (headless inbox webhook, automation triggers, and cron RSS pull).
 - `CRON_SECRET` is required to secure `/api/cron/*` routes.
+
+RSS Sources Health:
+- If you apply `add_feed_source_health.sql`, the RSS fetchers track `consecutive_failures`, `last_fetch_status_code`, `last_error`, and `last_success_at` on `feed_sources`.
+- The cron route `/api/cron/rss-pull` will automatically disable a source after `RSS_MAX_CONSECUTIVE_FAILURES` (default 10). Set `RSS_MAX_CONSECUTIVE_FAILURES` to tune this.
 
 Optional:
 - `RSS_AUTO_CONVERT_TO_DRAFTS` when set to `true` (or `1`) makes `/api/cron/rss-pull` automatically convert newly pulled RSS inbox items into draft posts.
