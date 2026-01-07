@@ -87,6 +87,16 @@ function extractSubtitle(html: string, title: string): string {
   return ''
 }
 
+function extractCoverImage(html: string): string {
+  const fromOg = extractMetaContent(html, [{ attr: 'property', value: 'og:image' }])
+  if (fromOg) return fromOg
+
+  const imgMatch = String(html || '').match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i)
+  if (imgMatch?.[1]) return decodeEntities(imgMatch[1]).trim()
+
+  return ''
+}
+
 function stripHeaderFooter(html: string): string {
   // Intentionally blunt: this is a bulk tool meant to remove exported site chrome.
   return String(html || '')
@@ -204,6 +214,7 @@ export async function POST(request: NextRequest) {
     const cleaned = stripHeaderFooter(raw)
     const title = extractTitle(cleaned, filenameFallback || 'Untitled').trim()
     const subtitle = extractSubtitle(cleaned, title).trim()
+    const coverImageUrl = extractCoverImage(cleaned).trim()
     const contentHtml = ensureFullHtmlDoc(cleaned, title)
 
     if (!title || !contentHtml) {
@@ -236,6 +247,7 @@ export async function POST(request: NextRequest) {
         content_html: contentHtml,
         content_type: 'html',
         excerpt: excerpt || null,
+        cover_image_url: coverImageUrl || null,
         status: 'draft',
       })
       .select('id, slug')

@@ -9,7 +9,7 @@ export default function ImportPage() {
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [htmlImporting, setHtmlImporting] = useState(false)
-  const [htmlProgress, setHtmlProgress] = useState<{ total: number; done: number } | null>(null)
+  const [htmlProgress, setHtmlProgress] = useState<{ total: number } | null>(null)
   const [htmlResults, setHtmlResults] = useState<{ imported: number; failed: number; created: Array<{ id: string; title: string }> } | null>(null)
   const [rssUrl, setRssUrl] = useState('')
   const [rssLimit, setRssLimit] = useState('50')
@@ -22,7 +22,7 @@ export default function ImportPage() {
     if (files.length === 0) return
 
     setHtmlImporting(true)
-    setHtmlProgress({ total: files.length, done: 0 })
+    setHtmlProgress({ total: files.length })
     setHtmlResults(null)
     setError(null)
 
@@ -319,7 +319,7 @@ export default function ImportPage() {
 
                   {htmlProgress && (
                     <p className="text-xs text-[var(--text-tertiary)] mt-3">
-                      Reading files: {htmlProgress.done}/{htmlProgress.total}
+                      Uploading {htmlProgress.total} file{htmlProgress.total === 1 ? '' : 's'}...
                     </p>
                   )}
 
