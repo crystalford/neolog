@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -32,12 +33,12 @@ const typeIcons: Record<string, typeof LinkIcon> = {
   prompt: Zap,
 }
 
-export default function CapturesPage() {
   const [captures, setCaptures] = useState<Capture[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
+  const [captureModalOpen, setCaptureModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'inbox' | 'vault' | 'sources'>('all')
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
@@ -164,13 +165,13 @@ export default function CapturesPage() {
           >
             <Plus size={16} />
             Add Capture
+          <button
+            onClick={() => setCaptureModalOpen(true)}
+            className="btn btn-primary btn-sm"
+          >
+            <Plus size={16} />
+            Add Capture
           </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] mb-6 w-fit">
-          {[
-            { id: 'all', label: 'All', count: captures.length },
             { id: 'inbox', label: 'Inbox', count: inboxCount },
             { id: 'vault', label: 'Vault', count: vaultCount },
             ...(capabilities.showSourcesMonitors ? [{ id: 'sources', label: 'Sources', count: null }] : []),
@@ -190,13 +191,13 @@ export default function CapturesPage() {
                   {tab.count}
                 </span>
               )}
+            <button
+              onClick={() => setCaptureModalOpen(true)}
+              className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            >
+              <Plus size={18} />
+              Add Capture
             </button>
-          ))}
-        </div>
-
-        {/* Sources Content */}
-        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-8 text-center">
-          <Globe size={32} className="mx-auto text-[var(--text-tertiary)] mb-4" />
           <h2 className="font-display text-lg text-[var(--text-primary)] mb-2">
             Configure Sources
           </h2>
@@ -213,7 +214,9 @@ export default function CapturesPage() {
   }
 
   return (
-    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+    <>
+      <QuickCaptureModal isOpen={captureModalOpen} onClose={() => setCaptureModalOpen(false)} />
+      <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
       <div className="flex items-center justify-between mb-10">
         <div>
           <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Captures</h1>
@@ -445,5 +448,7 @@ export default function CapturesPage() {
         </div>
       )}
     </main>
+      </main>
+    </>
   )
 }
