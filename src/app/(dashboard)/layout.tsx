@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
   Home, Archive, PenSquare, Send, Settings, LogOut, User as UserIcon,
-  PenLine, Zap, Command, Search, Upload
+  PenLine, Zap, Command, Search, Upload, BarChart3, Layers, Tag,
+  BookOpen, DollarSign
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
@@ -185,21 +186,14 @@ export default function DashboardLayout({
   // User maturity for progressive disclosure
   const { capabilities, loading: maturityLoading } = useUserMaturity(user?.id ?? null)
 
-  // NEW: 5 Primary Destinations (progressive disclosure)
+  // Enhanced Navigation with essential features
   const primaryNav = useMemo(() => {
     const items = [
       { href: '/dashboard', icon: Home, label: 'Home' },
+      { href: '/write', icon: PenLine, label: 'Write' },
       { href: '/dashboard/captures', icon: Archive, label: 'Captures' },
       { href: '/import', icon: Upload, label: 'Import' },
     ]
-
-    // Show Workspace tab after first draft or publish
-    if (capabilities.showWorkspaceTab) {
-      items.push({ href: '/dashboard/workspace', icon: PenSquare, label: 'Workspace' })
-    } else {
-      // New users see simple "Write" instead
-      items.push({ href: '/write', icon: PenLine, label: 'Write' })
-    }
 
     // Show Published tab after first publish
     if (capabilities.showPublishedTab) {
@@ -209,6 +203,26 @@ export default function DashboardLayout({
     items.push({ href: '/dashboard/settings', icon: Settings, label: 'Settings' })
 
     return items
+  }, [capabilities])
+
+  // Secondary navigation for manage/organize features
+  const secondaryNav = useMemo(() => {
+    if (!capabilities.showPublishedTab) return [] // Only show after first publish
+
+    return [
+      { href: '/analytics', icon: BarChart3, label: 'Analytics' },
+      { href: '/series', icon: Layers, label: 'Series' },
+      { href: '/topics', icon: Tag, label: 'Topics' },
+    ]
+  }, [capabilities])
+
+  // Grow section for monetization features
+  const growNav = useMemo(() => {
+    if (!capabilities.showPublishedTab) return []
+
+    return [
+      { href: '/tiers', icon: DollarSign, label: 'Tiers' },
+    ]
   }, [capabilities])
 
   const commandItems = useMemo(() => {
@@ -286,6 +300,66 @@ export default function DashboardLayout({
               )
             })}
           </div>
+
+          {/* Manage Section */}
+          {secondaryNav.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
+              <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-3">
+                Manage
+              </p>
+              <div className="space-y-1">
+                {secondaryNav.map((link) => {
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                  const Icon = link.icon
+
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                    >
+                      <Icon size={18} className="flex-shrink-0" />
+                      <span>{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Grow Section */}
+          {growNav.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
+              <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-3">
+                Grow
+              </p>
+              <div className="space-y-1">
+                {growNav.map((link) => {
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                  const Icon = link.icon
+
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                    >
+                      <Icon size={18} className="flex-shrink-0" />
+                      <span>{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
