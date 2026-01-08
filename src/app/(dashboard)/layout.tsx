@@ -373,7 +373,6 @@ export default function DashboardLayout({
               >
                 <PenLine size={16} />
                 <span>New Draft</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘N</span>
               </Link>
               <button
                 onClick={() => setCaptureOpen(true)}
@@ -381,7 +380,9 @@ export default function DashboardLayout({
               >
                 <Zap size={16} />
                 <span>Quick Capture</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘K</span>
+                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+K or Ctrl+K">
+                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘K' : 'Ctrl+K'}
+                </span>
               </button>
               <button
                 onClick={() => setCommandOpen(true)}
@@ -389,7 +390,9 @@ export default function DashboardLayout({
               >
                 <Search size={16} />
                 <span>Search</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">⌘/</span>
+                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+/ or Ctrl+/">
+                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘/' : 'Ctrl+/'}
+                </span>
               </button>
             </div>
           </div>

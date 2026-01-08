@@ -171,8 +171,8 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
       <div className="w-full max-w-2xl rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-[var(--border-light)]">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-[var(--text-primary)]">Quick capture</p>
-            <p className="text-xs text-[var(--text-tertiary)]">Save to Captures · Ctrl+Enter to save</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">Quick Capture</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Save snippets, quotes, ideas, or links to use in your posts later · Ctrl+Enter to save</p>
           </div>
           <button
             onClick={close}
@@ -188,7 +188,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste or type content…"
+              placeholder="Paste a quote, snippet, link, or idea you want to save for later..."
               className="w-full input min-h-[140px]"
               autoFocus
             />

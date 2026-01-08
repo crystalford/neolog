@@ -94,15 +94,24 @@ export default function ExplorePage() {
                 Discover great writing from the community
               </p>
             </div>
-            
-            {/* Curators link */}
-            <Link 
-              href="/curators"
-              className="btn btn-secondary btn-sm"
-            >
-              <Award size={16} />
-              Top Curators
-            </Link>
+
+            {/* Links */}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/visuals"
+                className="btn btn-ghost btn-sm"
+              >
+                <Sparkles size={16} />
+                Visuals
+              </Link>
+              <Link
+                href="/curators"
+                className="btn btn-secondary btn-sm"
+              >
+                <Award size={16} />
+                Top Curators
+              </Link>
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-4 gap-6">

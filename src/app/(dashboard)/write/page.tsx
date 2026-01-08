@@ -1487,6 +1487,186 @@ export default function WritePage() {
             </div>
           </div>
 
+          {/* Publishing Controls */}
+          <div className="mb-8 p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+            <h3 className="font-display text-lg mb-4">Publishing Settings</h3>
+
+            {/* Tags */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Tags
+              </label>
+              <TagSelect
+                selectedTags={tags}
+                onChange={setTags}
+              />
+            </div>
+
+            {/* Publish Intent */}
+            {existingStatus !== 'published' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Status
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setPublishIntent('draft')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'draft'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Save as Draft
+                  </button>
+                  <button
+                    onClick={() => setPublishIntent('publish')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'publish'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Publish Now
+                  </button>
+                  <button
+                    onClick={() => setPublishIntent('schedule')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'schedule'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Schedule time - only show when schedule is selected */}
+            {publishIntent === 'schedule' && existingStatus !== 'published' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Schedule for
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="input max-w-md"
+                />
+              </div>
+            )}
+
+            {/* Advanced Settings Toggle */}
+            <div className="mb-4">
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                {showAdvanced ? '− Hide' : '+ Show'} advanced options
+              </button>
+            </div>
+
+            {/* Advanced Options */}
+            {showAdvanced && (
+              <div className="space-y-4 mb-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Canonical URL
+                  </label>
+                  <input
+                    type="url"
+                    value={canonicalUrl}
+                    onChange={(e) => setCanonicalUrl(e.target.value)}
+                    placeholder="https://original.com/post"
+                    className="input"
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    If this was originally published elsewhere
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                    Original source
+                  </label>
+                  <input
+                    type="text"
+                    value={originalSource}
+                    onChange={(e) => setOriginalSource(e.target.value)}
+                    placeholder="Publication name"
+                    className="input"
+                  />
+                </div>
+                <label className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer">
+                  <div>
+                    <p className="font-medium text-[var(--text-primary)]">Premium only</p>
+                    <p className="text-xs text-[var(--text-tertiary)]">
+                      Restrict this post to paid subscribers
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isPremium}
+                    onChange={(e) => setIsPremium(e.target.checked)}
+                    className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setShowPublishConfirm(true)}
+                disabled={publishing || !title || !content}
+                className="btn btn-primary"
+              >
+                {publishing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    {publishLabel}
+                  </>
+                )}
+              </button>
+
+              {postId && (
+                <>
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="btn btn-secondary"
+                  >
+                    Version History
+                  </button>
+                  <button
+                    onClick={() => setShowCaptureDrawer(true)}
+                    className="btn btn-secondary"
+                  >
+                    Insert Captures
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => setShowImport(!showImport)}
+                className="btn btn-ghost"
+              >
+                <Upload size={16} />
+                Import HTML
+              </button>
+
+              {lastSaved && (
+                <span className="text-xs text-[var(--text-tertiary)] ml-auto">
+                  Last saved {lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+
           {showImport && (
             <div className="mb-7 p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -2306,52 +2486,6 @@ export default function WritePage() {
             </div>
           )}
 
-          {/* Editor mode and word count controls - now below editor */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-              Editor mode: {htmlMode ? 'HTML' : 'Visual'}
-            </span>
-            <span className="text-xs text-[var(--text-tertiary)]">
-              {getCurrentWordCount().toLocaleString()} words
-            </span>
-            <button
-              onClick={() => {
-                if (htmlMode) {
-                  const confirmSwitch = window.confirm(
-                    'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
-                  )
-                  if (!confirmSwitch) return
-                }
-                setHtmlMode(!htmlMode)
-              }}
-              className="btn btn-ghost btn-sm"
-            >
-              Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
-            </button>
-          </div>
-
-          {htmlMode ? (
-            <div className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)]">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Paste or write raw HTML..."
-                className="editor-textarea min-h-[360px]"
-              />
-              <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-                Raw HTML mode preserves scripts and styles. Preview to verify the final layout.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
-              <RichEditor
-                content={content}
-                onChange={setContent}
-                placeholder="Tell your story..."
-                onImageUpload={handleImageUpload}
-              />
-            </div>
-          )}
       </div>
     </main>
   )
