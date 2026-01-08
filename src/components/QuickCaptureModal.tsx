@@ -147,10 +147,10 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
         return
       }
 
-      setSuccess('Saved to Vault.')
-      // Keep the workflow moving: go to the captured vault item.
+      setSuccess('Saved to Captures.')
+      // Keep the workflow moving: go to the captured capture item.
       close()
-      router.push(`/vault/${encodeURIComponent(id)}`)
+      router.push(`/dashboard/captures/${encodeURIComponent(id)}`)
     } finally {
       setSaving(false)
     }
@@ -172,7 +172,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
         <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-[var(--border-light)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)]">Quick capture</p>
-            <p className="text-xs text-[var(--text-tertiary)]">Save to Vault · Ctrl+Enter to save</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Save to Captures · Ctrl+Enter to save</p>
           </div>
           <button
             onClick={close}
@@ -217,7 +217,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
                 className="w-full input"
                 disabled={loadingPubs}
               >
-                <option value="">Global Vault</option>
+                <option value="">Global Captures</option>
                 {publications.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -259,7 +259,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
             Cancel
           </button>
           <button onClick={submit} className="btn btn-primary btn-sm" disabled={!canSave}>
-            {saving ? 'Saving…' : 'Save to Vault'}
+            {saving ? 'Saving…' : 'Save to Captures'}
           </button>
         </div>
       </div>

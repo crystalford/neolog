@@ -31,7 +31,7 @@ export async function GET() {
       finalStatus = 'success'
       finalMeta = { ...finalMeta, result: 'missing_key' }
       return NextResponse.json({
-        error: 'HeyGen API key not configured. Add it in Settings → AI Vault (BYOK).',
+        error: 'HeyGen API key not configured. Add it in Settings → AI Capture (BYOK).',
       }, { status: 400 })
     }
 

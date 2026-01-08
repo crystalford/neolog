@@ -15,7 +15,7 @@ export interface UserMaturity {
 }
 
 export interface CapabilityFlags {
-  showVaultOrganization: boolean      // 3+ manual captures
+  showCaptureOrganization: boolean    // 3+ manual captures
   showThemeDetection: boolean         // 2 drafts referencing captures
   showLightweightAnalytics: boolean   // 1 publish
   showStacks: boolean                 // 3 publishes
@@ -109,7 +109,7 @@ export function useUserMaturity(userId: string | null): UserMaturity & { capabil
 
   // Derive capability flags from maturity
   const capabilities: CapabilityFlags = {
-    showVaultOrganization: maturity.captureCount >= 3,
+    showCaptureOrganization: maturity.captureCount >= 3,
     showThemeDetection: maturity.draftCount >= 2 && maturity.captureCount >= 2,
     showLightweightAnalytics: maturity.publishedCount >= 1,
     showStacks: maturity.publishedCount >= 3,

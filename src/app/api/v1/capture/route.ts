@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(
     {
       asset_id: assetId,
-      vault_url: `${origin}/vault/${assetId}`,
+      capture_url: `${origin}/dashboard/captures/${assetId}`,
     },
     { status: 201 },
   )
