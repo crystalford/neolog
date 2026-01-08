@@ -190,7 +190,7 @@ export default function DashboardLayout({
     const items = [
       { href: '/dashboard', icon: Home, label: 'Home' },
       { href: '/dashboard/captures', icon: Archive, label: 'Captures' },
-      { href: '/dashboard/import', icon: Upload, label: 'Import' },
+      { href: '/import', icon: Upload, label: 'Import' },
     ]
 
     // Show Workspace tab after first draft or publish
