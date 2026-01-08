@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
   Home, Archive, PenSquare, Send, Settings, LogOut, User as UserIcon,
-  PenLine, Zap, Command, Search
+  PenLine, Zap, Command, Search, Upload
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
