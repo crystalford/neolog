@@ -43,9 +43,6 @@ export function Header() {
           <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">
             Explore
           </Link>
-          <Link href="/visuals" className="hover:text-[var(--text-primary)] transition-colors">
-            Visuals
-          </Link>
         </nav>
 
         {/* Auth buttons */}

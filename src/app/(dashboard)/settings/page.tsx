@@ -1021,11 +1021,28 @@ export default function SettingsPage() {
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <KeyRound size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-lg">AI Capture (BYOK)</h2>
+                <h2 className="font-display text-lg">Integrations (BYOK)</h2>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-4">
-                Add your own keys to unlock AI summaries, expansions, and research tools.
+                Connect your own API keys to unlock AI features, cross-posting, storage, and more. You only pay for what you use.
               </p>
+
+              <div className="mb-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <p className="text-xs font-medium text-[var(--text-primary)] mb-2">What each provider unlocks:</p>
+                <ul className="text-xs text-[var(--text-secondary)] space-y-1">
+                  <li><strong>OpenAI / Anthropic / Groq:</strong> AI summaries, content expansion, research tools</li>
+                  <li><strong>Perplexity / Grok:</strong> Real-time research and web search</li>
+                  <li><strong>Replicate:</strong> AI image generation (Flux models)</li>
+                  <li><strong>ElevenLabs:</strong> Text-to-speech for audio posts</li>
+                  <li><strong>Resend:</strong> Email newsletter delivery</li>
+                  <li><strong>Medium / Dev.to:</strong> Cross-post to other platforms</li>
+                  <li><strong>R2 / S3:</strong> Custom image storage (instead of Supabase)</li>
+                  <li><strong>HeyGen / Synthesia:</strong> AI video avatar generation</li>
+                  <li><strong>PostHog:</strong> Advanced analytics tracking</li>
+                  <li><strong>X (Twitter):</strong> Cross-post to Twitter</li>
+                </ul>
+              </div>
+
               <p className="text-xs text-[var(--text-tertiary)] mb-6">
                 Active keys are used first. Pro users can fall back to managed keys when no active key is set.
               </p>
