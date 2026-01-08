@@ -18,7 +18,7 @@ type Body = {
     slug?: string
     content?: string | null
     content_html?: string | null
-    content_type?: 'markdown' | 'html' | 'rich' | 'pulse'
+    content_type?: 'markdown' | 'html' | 'rich'
     cover_image_url?: string | null
     reading_time_minutes?: number
     excerpt?: string | null

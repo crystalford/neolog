@@ -34,7 +34,6 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
 
   const hasInteractiveContent = post.content?.includes('<script') ||
                                  (post.content_type === 'html' && post.content?.includes('<!doctype'))
-  const isPulse = post.content_type === 'pulse'
 
   if (variant === 'compact') {
     return (
@@ -124,9 +123,6 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
                   <time>{publishedDate}</time>
                 </>
               )}
-              {post.content_type === 'pulse' && (
-                <span className="doc-badge doc-badge-pulse">Pulse</span>
-              )}
             </div>
           </div>
         </div>
@@ -163,9 +159,6 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
           )}
           {hasInteractiveContent && (
             <span className="doc-badge doc-badge-interactive"><Code size={10} /> Interactive</span>
-          )}
-          {isPulse && (
-            <span className="doc-badge doc-badge-pulse">Pulse</span>
           )}
         </div>
         {/* Author and published date, demoted if not draft */}

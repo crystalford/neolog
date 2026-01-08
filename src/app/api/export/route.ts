@@ -163,7 +163,7 @@ function generateJSONExport(
       posts_count: posts.length,
       published_count: posts.filter(p => p.status === 'published').length,
       drafts_count: drafts.length,
-      import_instructions: 'This export can be imported into any platform that supports the neolog-export-v1 format. Posts with content_type="html" contain raw HTML. Posts with content_type="markdown" contain markdown source. Posts with content_type="pulse" contain JSON.',
+      import_instructions: 'This export can be imported into any platform that supports the neolog-export-v1 format. Posts with content_type="html" contain raw HTML. Posts with content_type="markdown" contain markdown source.',
     },
   }
 
@@ -200,11 +200,6 @@ function generateMarkdownExport(
     if (post.content_type === 'html') {
       markdown += `> Note: This post was authored in HTML.\n\n`
       markdown += '```html\n'
-      markdown += post.content || ''
-      markdown += '\n```\n\n'
-    } else if (post.content_type === 'pulse') {
-      markdown += `> Note: This post was authored as a Pulse (JSON).\n\n`
-      markdown += '```json\n'
       markdown += post.content || ''
       markdown += '\n```\n\n'
     } else {
@@ -274,9 +269,7 @@ function generateHTMLExport(
 `
 
   for (const post of publishedPosts) {
-    const contentBlock = post.content_type === 'pulse'
-      ? `<pre>${escapeHtml(post.content || '')}</pre>`
-      : post.content_html || post.content || ''
+    const contentBlock = post.content_html || post.content || ''
 
     html += `
     <article>
