@@ -1405,7 +1405,7 @@ export default function WritePage() {
           )}
 
 
-          {/* Inline Title, Subtitle, Cover Image */}
+          {/* Title, Subtitle, Cover Image, then Editor */}
           <div className="mb-8">
             <input
               type="text"
@@ -1463,6 +1463,26 @@ export default function WritePage() {
                   alt="Cover preview"
                   className="mt-3 rounded-lg border border-[var(--border-light)] max-h-64"
                 />
+              )}
+            </div>
+            {/* Main Editor - moved above the fold */}
+            <div className="mb-8">
+              {htmlMode ? (
+                <textarea
+                  value={content}
+                  onChange={e => setContent(e.target.value)}
+                  placeholder="Paste or write raw HTML..."
+                  className="editor-textarea min-h-[360px]"
+                />
+              ) : (
+                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                  <RichEditor
+                    content={content}
+                    onChange={setContent}
+                    placeholder="Tell your story..."
+                    onImageUpload={handleImageUpload}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -2286,25 +2306,7 @@ export default function WritePage() {
             </div>
           )}
 
-          {/* Title */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title"
-            className="w-full text-3xl md:text-4xl font-display tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] text-[var(--text-primary)] mb-1 px-0 pt-1"
-            autoFocus
-          />
-
-          {/* Subtitle */}
-          <input
-            type="text"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Subtitle (optional)"
-            className="w-full text-lg md:text-xl text-[var(--text-secondary)] bg-transparent border-none outline-none focus:outline-none focus:ring-0 placeholder:text-[var(--text-tertiary)] mb-4 px-0"
-          />
-
+          {/* Editor mode and word count controls - now below editor */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Editor mode: {htmlMode ? 'HTML' : 'Visual'}
