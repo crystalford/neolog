@@ -1020,7 +1020,7 @@ export default function SettingsPage() {
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
                   <KeyRound size={20} className="text-[var(--accent)]" />
                 </div>
-                <h2 className="font-display text-lg">AI Vault (BYOK)</h2>
+                <h2 className="font-display text-lg">AI Capture (BYOK)</h2>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mb-4">
                 Add your own keys to unlock AI summaries, expansions, and research tools.

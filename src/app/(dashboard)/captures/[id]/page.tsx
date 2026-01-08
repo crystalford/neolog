@@ -40,7 +40,7 @@ type UsedInRow = {
 
 const ASSET_TYPES: AssetType[] = ['text', 'fragment', 'quote', 'prompt', 'code', 'link', 'image']
 
-export default function VaultAssetDetailPage() {
+export default function CaptureAssetDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
 
@@ -214,7 +214,7 @@ export default function VaultAssetDetailPage() {
         return
       }
 
-      router.push('/vault')
+      router.push('/dashboard/captures')
     } finally {
       setDeleting(false)
     }
@@ -231,11 +231,11 @@ export default function VaultAssetDetailPage() {
   if (!asset) {
     return (
       <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-4">
-        <button onClick={() => router.push('/vault')} className="btn btn-ghost inline-flex items-center gap-2">
+        <button onClick={() => router.push('/dashboard/captures')} className="btn btn-ghost inline-flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>
-        <div className="text-sm text-[var(--text-secondary)]">Vault item not found.</div>
+        <div className="text-sm text-[var(--text-secondary)]">Capture not found.</div>
       </main>
     )
   }
@@ -244,11 +244,11 @@ export default function VaultAssetDetailPage() {
     <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Vault</p>
-          <h1 className="font-display text-3xl text-[var(--text-primary)]">Vault item</h1>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Captures</p>
+          <h1 className="font-display text-3xl text-[var(--text-primary)]">Capture</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">Edit metadata and track usage.</p>
         </div>
-        <button onClick={() => router.push('/vault')} className="btn btn-ghost inline-flex items-center gap-2">
+        <button onClick={() => router.push('/dashboard/captures')} className="btn btn-ghost inline-flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>

@@ -46,7 +46,6 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'latest' | 'trending' | 'discussed' | 'views'>('latest')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'standard' | 'pulse'>('all')
   const [metrics, setMetrics] = useState<Record<string, { views: number; recentViews: number; comments: number }>>({})
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [scheduleTarget, setScheduleTarget] = useState<Post | null>(null)
@@ -336,10 +335,6 @@ export default function DashboardPage() {
     if (filter === 'draft') return post.status === 'draft'
     if (filter === 'archived') return post.status === 'archived'
     if (filter === 'scheduled') return post.status === 'scheduled'
-    return true
-  }).filter((post) => {
-    if (typeFilter === 'pulse') return post.content_type === 'pulse'
-    if (typeFilter === 'standard') return post.content_type !== 'pulse'
     return true
   }).filter((post) => {
     if (!search.trim()) return true
@@ -735,25 +730,6 @@ export default function DashboardPage() {
                   ))}
                 </div>
 
-                <div className="inline-flex bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl p-1">
-                  {[
-                    { id: 'all', label: 'All types' },
-                    { id: 'standard', label: 'Standard' },
-                    { id: 'pulse', label: 'Pulse' },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setTypeFilter(item.id as typeof typeFilter)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        typeFilter === item.id
-                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
 
                 <div className="inline-flex bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl p-1">
                   {[
@@ -905,9 +881,6 @@ export default function DashboardPage() {
                         >
                           {post.title || 'Untitled'}
                         </Link>
-                        {post.content_type === 'pulse' && (
-                          <span className="doc-badge doc-badge-pulse">Pulse</span>
-                        )}
                       </div>
                       {post.excerpt && (
                         <Link
@@ -1412,9 +1385,6 @@ export default function DashboardPage() {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(analyticsPost.status)}`}>
                     {analyticsPost.status}
                   </span>
-                  {analyticsPost.content_type === 'pulse' && (
-                    <span className="doc-badge doc-badge-pulse">Pulse</span>
-                  )}
                   {analyticsPost.status === 'scheduled' && analyticsPost.scheduled_at && (
                     <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
                       <Calendar size={12} />

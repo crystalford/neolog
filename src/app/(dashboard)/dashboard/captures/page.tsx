@@ -29,7 +29,7 @@ export default function CapturesPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      const { data } = await supabase.from('vault_assets').select('id,title,content,created_at,processed').eq('user_id', session.user.id).order('created_at', { ascending: false })
+      const { data } = await supabase.from('assets').select('id,title,content,created_at').eq('user_id', session.user.id).order('created_at', { ascending: false })
       setCaptures((data || []) as Capture[])
     } finally {
       setLoading(false)
@@ -51,9 +51,11 @@ export default function CapturesPage() {
       ) : (
         <ul className="space-y-4">
           {captures.map(c => (
-            <li key={c.id} className="p-4 border rounded">
-              <div className="text-sm font-medium">{c.title || c.content.slice(0,80)}</div>
-              <div className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</div>
+            <li key={c.id} className="p-4 border rounded hover:bg-gray-50 cursor-pointer">
+              <Link href={`/dashboard/captures/${c.id}`}>
+                <div className="text-sm font-medium">{c.title || c.content.slice(0,80)}</div>
+                <div className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</div>
+              </Link>
             </li>
           ))}
         </ul>

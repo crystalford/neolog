@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         excerpt?: string
         content?: string
         content_html?: string
-        content_type?: 'markdown' | 'html' | 'rich' | 'pulse'
+        content_type?: 'markdown' | 'html' | 'rich'
       }
     | null
 

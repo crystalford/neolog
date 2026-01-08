@@ -9,7 +9,6 @@ import {
   ArrowLeft, Eye, Clock, Users, Target,
   TrendingUp, TrendingDown, Minus
 } from 'lucide-react'
-import { parsePulseContent } from '@/lib/pulse'
 
 type DropoffData = {
   scroll_bucket: number
@@ -150,38 +149,24 @@ export default function PostAnalyticsPage() {
   }
 
   // Get content sections for drop-off context
-  const getContentSections = (content: string | null, contentType?: string | null) => {
-    if (!content || contentType === 'pulse') return []
-    
+  const getContentSections = (content: string | null) => {
+    if (!content) return []
+
     // Extract headings from HTML
     const headingRegex = /<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi
     const headings: { text: string; position: number }[] = []
     let match
-    
+
     while ((match = headingRegex.exec(content)) !== null) {
       const position = Math.round((match.index / content.length) * 100)
       const text = match[1].replace(/<[^>]*>/g, '') // Strip any nested tags
       headings.push({ text, position })
     }
-    
+
     return headings
   }
 
-  const contentSections = post ? getContentSections(post.content, post.content_type) : []
-  const isPulse = post?.content_type === 'pulse'
-  const pulseContent = isPulse ? parsePulseContent(post?.content || '') : null
-  const pulseStats = pulseContent
-    ? {
-        totalCards: pulseContent.cards.length,
-        hype: pulseContent.cards.filter((card) => card.label === 'Hype').length,
-        critic: pulseContent.cards.filter((card) => card.label === 'Critic').length,
-        neutral: pulseContent.cards.filter((card) => card.label === 'Neutral').length,
-        sources: pulseContent.cards.reduce<Record<string, number>>((acc, card) => {
-          acc[card.source] = (acc[card.source] || 0) + 1
-          return acc
-        }, {}),
-      }
-    : null
+  const contentSections = post ? getContentSections(post.content) : []
 
   return (
     <>
@@ -248,42 +233,6 @@ export default function PostAnalyticsPage() {
                 </div>
               </div>
 
-              {isPulse && pulseStats && (
-                <div className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] p-6 mb-8">
-                  <h2 className="font-display text-xl mb-2">Pulse signals</h2>
-                  <p className="text-sm text-[var(--text-secondary)] mb-6">
-                    Snapshot of the discourse mix for this Pulse.
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-[0.2em]">Cards</p>
-                      <p className="font-display text-2xl">{pulseStats.totalCards}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-[0.2em]">Hype</p>
-                      <p className="font-display text-2xl">{pulseStats.hype}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-[0.2em]">Critic</p>
-                      <p className="font-display text-2xl">{pulseStats.critic}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-[0.2em]">Neutral</p>
-                      <p className="font-display text-2xl">{pulseStats.neutral}</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {Object.entries(pulseStats.sources).map(([source, count]) => (
-                      <div
-                        key={source}
-                        className="px-3 py-1 rounded-full border border-[var(--border-light)] text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]"
-                      >
-                        {source} {count}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Drop-off visualization */}
               <div className="rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] p-6 mb-8">

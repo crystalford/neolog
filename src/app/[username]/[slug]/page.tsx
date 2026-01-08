@@ -4,10 +4,8 @@ import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { HtmlIframe } from '@/components/HtmlIframe'
 import { PostDensityToggle } from '@/components/PostDensityToggle'
-import { PulseArticle } from '@/components/PulseArticle'
 import { SeriesNav } from '@/components/SeriesNav'
 import { generateArticleSchema, generateSEO } from '@/lib/seo'
-import { parsePulseContent } from '@/lib/pulse'
 import { Clock, ArrowLeft } from 'lucide-react'
 
 interface Props {
@@ -133,19 +131,15 @@ export default async function PostPage({ params, searchParams }: Props) {
       })
     : null
   const htmlContent = post.content_html || post.content || ''
-  const isPulse = post.content_type === 'pulse'
-  const isFullHtml = !isPulse && (/<!doctype/i.test(htmlContent) || /<html[\s>]/i.test(htmlContent))
-  const plainText = isPulse
-    ? ''
-    : htmlContent
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+  const isFullHtml = /<!doctype/i.test(htmlContent) || /<html[\s>]/i.test(htmlContent)
+  const plainText = htmlContent
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   const summarySentences = plainText ? plainText.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 4) : []
   const summaryText = summaryRow?.summary || post.excerpt || summarySentences.join(' ')
-  const pulseContent = isPulse ? parsePulseContent(post.content || '') : null
 
   const articleSchema = generateArticleSchema({
     title: post.title,
@@ -262,11 +256,7 @@ export default async function PostPage({ params, searchParams }: Props) {
             )}
           </div>
 
-          {isPulse && pulseContent ? (
-            <div className="max-w-4xl mx-auto">
-              <PulseArticle pulse={pulseContent} />
-            </div>
-          ) : isFullHtml ? (
+          {isFullHtml ? (
             <div className="max-w-4xl mx-auto">
               <HtmlIframe html={htmlContent} className="mt-6" />
             </div>

@@ -36,7 +36,7 @@ export type Post = {
   subtitle: string | null
   content: string | null
   content_html: string | null
-  content_type: 'html' | 'markdown' | 'rich' | 'pulse'
+  content_type: 'html' | 'markdown' | 'rich'
   
   // Metadata
   cover_image_url: string | null
@@ -164,7 +164,7 @@ export type Draft = {
   author_id: string
   title: string | null
   content: string | null
-  content_type: 'html' | 'markdown' | 'rich' | 'pulse'
+  content_type: 'html' | 'markdown' | 'rich'
   saved_at: string
 }
 
@@ -187,7 +187,7 @@ export type CreatePostInput = {
   subtitle?: string
   content?: string
   content_html?: string
-  content_type?: 'html' | 'markdown' | 'rich' | 'pulse'
+  content_type?: 'html' | 'markdown' | 'rich'
   cover_image_url?: string
   excerpt?: string
   status?: 'draft' | 'published'

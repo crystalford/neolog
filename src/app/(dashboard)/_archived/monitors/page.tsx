@@ -46,7 +46,7 @@ function normalizeTags(input: unknown): string[] {
     .slice(0, 50)
 }
 
-function toVaultPayload(item: QueueItem): {
+function toCapturePayload(item: QueueItem): {
   type: 'link' | 'text' | 'fragment'
   title: string | null
   content: string
@@ -387,10 +387,10 @@ export default function MonitorsPage() {
                             setPromotingId(item.id)
 
                             try {
-                              const payload = toVaultPayload(item)
+                              const payload = toCapturePayload(item)
                               const publicationId = readSelectedPublicationId()
 
-                              const resp = await fetch('/api/vault/add', {
+                              const resp = await fetch('/api/capture', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -398,7 +398,7 @@ export default function MonitorsPage() {
                                   title: payload.title,
                                   content: payload.content,
                                   tags: payload.tags,
-                                  publicationId: publicationId || null,
+                                  publication_id: publicationId || null,
                                   source: payload.source,
                                   sourceUrl: payload.sourceUrl,
                                   meta: payload.meta,
@@ -407,15 +407,15 @@ export default function MonitorsPage() {
 
                               const json = await resp.json().catch(() => null)
                               if (!resp.ok || !json?.id) {
-                                setActionError(json?.error || 'Failed to promote to Vault.')
+                                setActionError(json?.error || 'Failed to promote to Capture.')
                                 setPromotingId(null)
                                 return
                               }
 
                               const promotedMeta = {
                                 ...(item.raw_data || {}),
-                                promoted_to_vault_asset_id: json.id,
-                                promoted_to_vault_at: new Date().toISOString(),
+                                promoted_to_capture_asset_id: json.id,
+                                promoted_to_capture_at: new Date().toISOString(),
                               }
 
                               await supabase
@@ -426,14 +426,14 @@ export default function MonitorsPage() {
                               setQueueItems((prev) => prev.filter((row) => row.id !== item.id))
                               setInboxNewCount((prev) => Math.max(0, prev - 1))
                             } catch {
-                              setActionError('Failed to promote to Vault.')
+                              setActionError('Failed to promote to Capture.')
                             } finally {
                               setPromotingId(null)
                             }
                           }}
                           className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-60"
                         >
-                          {promotingId === item.id ? 'Promoting…' : 'Promote to Vault'}
+                          {promotingId === item.id ? 'Promoting…' : 'Promote to Capture'}
                         </button>
 
                         <button

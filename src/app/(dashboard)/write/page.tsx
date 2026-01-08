@@ -9,20 +9,11 @@ import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { VersionHistory } from '@/components/VersionHistory'
-import { PulseEditor } from '@/components/PulseEditor'
-import {
-  createEmptyPulse,
-  createPulseTemplate,
-  parsePulseContent,
-  serializePulseContent,
-  pulseWordCount,
-  pulseExcerpt,
-} from '@/lib/pulse'
 import {
   Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy
 } from 'lucide-react'
 
-type VaultAsset = {
+type CaptureAsset = {
   id: string
   type: 'prompt' | 'image' | 'code' | 'text' | 'link' | 'quote' | 'fragment'
   title?: string | null
@@ -38,7 +29,7 @@ type PostAssetLink = {
   id: string
   asset_id: string
   created_at: string
-  assets?: VaultAsset[]
+  assets?: CaptureAsset[]
 }
 
 export default function WritePage() {
@@ -69,7 +60,7 @@ export default function WritePage() {
   const [tags, setTags] = useState<string[]>(defaultTags)
   const [showSettings, setShowSettings] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [showVaultDrawer, setShowVaultDrawer] = useState(false)
+  const [showCaptureDrawer, setShowCaptureDrawer] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [scheduledAt, setScheduledAt] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
@@ -86,8 +77,6 @@ export default function WritePage() {
   const [showImport, setShowImport] = useState(false)
   const [importHtml, setImportHtml] = useState('')
   const [htmlMode, setHtmlMode] = useState(false)
-  const [postType, setPostType] = useState<'post' | 'pulse'>('post')
-  const [pulse, setPulse] = useState(createEmptyPulse())
   const [showHistory, setShowHistory] = useState(false)
   const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [lastVersion, setLastVersion] = useState<{ title: string; content: string | null } | null>(null)
@@ -118,11 +107,11 @@ export default function WritePage() {
   const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'x' | 'manual'>('all')
   const [commentSort, setCommentSort] = useState<'score' | 'recent'>('score')
 
-  const [vaultDrawerAssets, setVaultDrawerAssets] = useState<VaultAsset[]>([])
-  const [vaultDrawerLoading, setVaultDrawerLoading] = useState(false)
-  const [vaultDrawerQuery, setVaultDrawerQuery] = useState('')
-  const [vaultDrawerType, setVaultDrawerType] = useState<string>('')
-  const [vaultInsertAssetId, setVaultInsertAssetId] = useState<string | null>(null)
+  const [captureDrawerAssets, setCaptureDrawerAssets] = useState<CaptureAsset[]>([])
+  const [captureDrawerLoading, setCaptureDrawerLoading] = useState(false)
+  const [captureDrawerQuery, setCaptureDrawerQuery] = useState('')
+  const [captureDrawerType, setCaptureDrawerType] = useState<string>('')
+  const [captureInsertAssetId, setCaptureInsertAssetId] = useState<string | null>(null)
 
   const escapeHtml = (input: string) =>
     input
@@ -132,7 +121,7 @@ export default function WritePage() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
 
-  const formatAssetAsHtml = (asset: VaultAsset) => {
+  const formatAssetAsHtml = (asset: CaptureAsset) => {
     const title = (asset.title || '').trim()
     const contentText = (asset.content || '').trim()
     const sourceUrl = (asset.source_url || '').trim()
@@ -166,12 +155,12 @@ export default function WritePage() {
     return `<p>${escapeHtml(contentText)}</p>`
   }
 
-  const loadVaultDrawerAssets = async (opts?: { q?: string; type?: string }) => {
-    if (vaultDrawerLoading) return
-    setVaultDrawerLoading(true)
+  const loadCaptureDrawerAssets = async (opts?: { q?: string; type?: string }) => {
+    if (captureDrawerLoading) return
+    setCaptureDrawerLoading(true)
     try {
-      const q = (opts?.q ?? vaultDrawerQuery).trim()
-      const t = (opts?.type ?? vaultDrawerType).trim()
+      const q = (opts?.q ?? captureDrawerQuery).trim()
+      const t = (opts?.type ?? captureDrawerType).trim()
 
       const params = new URLSearchParams()
       params.set('limit', '100')
@@ -182,13 +171,13 @@ export default function WritePage() {
       const resp = await fetch(`/api/assets?${params.toString()}`)
       const json = await resp.json().catch(() => null)
       if (!resp.ok) {
-        setError(json?.error || 'Failed to load vault assets.')
-        setVaultDrawerAssets([])
+        setError(json?.error || 'Failed to load capture assets.')
+        setCaptureDrawerAssets([])
         return
       }
-      setVaultDrawerAssets((json?.assets || []) as VaultAsset[])
+      setCaptureDrawerAssets((json?.assets || []) as CaptureAsset[])
     } finally {
-      setVaultDrawerLoading(false)
+      setCaptureDrawerLoading(false)
     }
   }
 
@@ -224,14 +213,10 @@ export default function WritePage() {
     return true
   }
 
-  const insertAssetIntoDraft = async (asset: VaultAsset) => {
-    if (vaultInsertAssetId) return
-    if (postType === 'pulse') {
-      setError('Vault insert is not available for Pulse posts yet.')
-      return
-    }
+  const insertAssetIntoDraft = async (asset: CaptureAsset) => {
+    if (captureInsertAssetId) return
 
-    setVaultInsertAssetId(asset.id)
+    setCaptureInsertAssetId(asset.id)
     setError(null)
     setSuccess(null)
     try {
@@ -245,13 +230,13 @@ export default function WritePage() {
       setContent(next)
       setSuccess('Inserted asset.')
     } finally {
-      setVaultInsertAssetId(null)
+      setCaptureInsertAssetId(null)
     }
   }
 
-  // Vault attachments
-  const [vaultAssets, setVaultAssets] = useState<VaultAsset[]>([])
-  const [vaultAssetsLoading, setVaultAssetsLoading] = useState(false)
+  // Capture attachments
+  const [captureAssets, setCaptureAssets] = useState<CaptureAsset[]>([])
+  const [captureAssetsLoading, setCaptureAssetsLoading] = useState(false)
   const [postAssets, setPostAssets] = useState<PostAssetLink[]>([])
   const [postAssetsLoading, setPostAssetsLoading] = useState(false)
   const [selectedAssetId, setSelectedAssetId] = useState<string>('')
@@ -293,15 +278,15 @@ export default function WritePage() {
 
   useEffect(() => {
     if (!showSettings) return
-    void loadVaultAssets()
+    void loadCaptureAssets()
     if (postId) {
       void loadPostAssets(postId)
     }
   }, [showSettings, postId])
 
-  const loadVaultAssets = async () => {
-    if (vaultAssetsLoading) return
-    setVaultAssetsLoading(true)
+  const loadCaptureAssets = async () => {
+    if (captureAssetsLoading) return
+    setCaptureAssetsLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -314,10 +299,10 @@ export default function WritePage() {
         .limit(100)
 
       if (!error) {
-        setVaultAssets((data || []) as VaultAsset[])
+        setCaptureAssets((data || []) as CaptureAsset[])
       }
     } finally {
-      setVaultAssetsLoading(false)
+      setCaptureAssetsLoading(false)
     }
   }
 
@@ -423,10 +408,10 @@ export default function WritePage() {
   }, [user, publicationId])
 
   useEffect(() => {
-    if (!showVaultDrawer) return
-    void loadVaultDrawerAssets({ q: vaultDrawerQuery, type: vaultDrawerType })
+    if (!showCaptureDrawer) return
+    void loadCaptureDrawerAssets({ q: captureDrawerQuery, type: captureDrawerType })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showVaultDrawer])
+  }, [showCaptureDrawer])
 
   const loadSelectedPublication = async () => {
     try {
@@ -525,12 +510,7 @@ export default function WritePage() {
       setOriginalSource(typeof post.original_source === 'string' ? post.original_source : '')
       setIsPremium(!!post.is_premium)
       setScheduledAt(scheduledValue)
-      const loadedType = post.content_type === 'pulse' ? 'pulse' : 'post'
-      setPostType(loadedType)
-      if (loadedType === 'pulse') {
-        setPulse(parsePulseContent(post.content || post.content_html || ''))
-      }
-      setHtmlMode(loadedType === 'pulse' ? false : shouldUseHtmlMode(post.content || ''))
+      setHtmlMode(shouldUseHtmlMode(post.content || ''))
       setExistingStatus(post.status || null)
       if (post.status === 'published') {
         setPublishIntent('publish')
@@ -851,9 +831,6 @@ export default function WritePage() {
   }
 
   const getCurrentWordCount = () => {
-    if (postType === 'pulse') {
-      return pulseWordCount(pulse)
-    }
     return getWordCount(content)
   }
 
@@ -960,7 +937,6 @@ export default function WritePage() {
     setSubtitle(parsed.subtitle || subtitle)
     setCoverImage(parsed.coverImage || coverImage)
     setContent(parsed.contentHtml)
-    setPostType('post')
     setHtmlMode(shouldUseHtmlMode(parsed.contentHtml) || html.includes('<html') || html.includes('<head'))
     setImportNotice('HTML imported. Review the content before publishing.')
   }
@@ -994,9 +970,9 @@ export default function WritePage() {
     const slug = generateSlug(title)
     const wordCount = getCurrentWordCount()
     const readingTime = calculateReadingTimeFromWords(wordCount)
-    const resolvedContent = postType === 'pulse' ? serializePulseContent(pulse) : content
-    const resolvedContentHtml = postType === 'pulse' ? null : content
-    const resolvedContentType = postType === 'pulse' ? 'pulse' : 'html'
+    const resolvedContent = content
+    const resolvedContentHtml = content
+    const resolvedContentType = 'html'
     let liveStatus = existingStatus
     if (postId) {
       const { data: latestPost } = await supabase
@@ -1064,7 +1040,7 @@ export default function WritePage() {
     } finally {
       setSaving(false)
     }
-  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent, postType, pulse])
+  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent])
 
   // Debounced auto-save
   useEffect(() => {
@@ -1073,11 +1049,11 @@ export default function WritePage() {
     
     const timer = setTimeout(autoSave, 2000)
     return () => clearTimeout(timer)
-  }, [title, subtitle, content, coverImage, postType, pulse, existingStatus])
+  }, [title, subtitle, content, coverImage, existingStatus])
 
   // Publish
   const handlePublish = async () => {
-    if (!user || !title || (postType === 'post' && !content)) {
+    if (!user || !title || !content) {
       setError('Add a title and content before publishing.')
       return
     }
@@ -1086,17 +1062,11 @@ export default function WritePage() {
     const intent = isAlreadyPublished ? 'publish' : publishIntent
     const isScheduling = intent === 'schedule'
 
-    const preflight = postType === 'pulse'
-      ? [
-          { label: 'Summary added', ok: pulse.summary.trim().length >= 40, required: true },
-          { label: 'At least 2 cards', ok: pulse.cards.length >= 2, required: true },
-          { label: 'Takeaway added', ok: pulse.takeaway.trim().length >= 20, required: false },
-        ]
-      : [
-          { label: 'Title added', ok: title.trim().length >= 5, required: true },
-          { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
-          { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
-        ]
+    const preflight = [
+      { label: 'Title added', ok: title.trim().length >= 5, required: true },
+      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
+      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
+    ]
 
     const missingRequired = preflight.filter((item) => item.required && !item.ok)
     if (missingRequired.length > 0) {
@@ -1147,14 +1117,12 @@ export default function WritePage() {
       const readingTime = calculateReadingTimeFromWords(wordCount)
 
       // Generate excerpt
-      const textContent = postType === 'pulse'
-        ? pulseExcerpt(pulse)
-        : content
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-            .replace(/<[^>]*>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
+      const textContent = content
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
       const excerpt = textContent
         ? textContent.substring(0, 160) + (textContent.length > 160 ? '...' : '')
         : ''
@@ -1165,9 +1133,9 @@ export default function WritePage() {
         title,
         subtitle: subtitle || null,
         slug,
-        content: postType === 'pulse' ? serializePulseContent(pulse) : content,
-        content_html: postType === 'pulse' ? null : content,
-        content_type: postType === 'pulse' ? 'pulse' : 'html',
+        content: content,
+        content_html: content,
+        content_type: 'html',
         cover_image_url: coverImage || null,
         reading_time_minutes: readingTime,
         excerpt,
@@ -1355,8 +1323,8 @@ export default function WritePage() {
     return publicUrl
   }
 
-  const markdownExport = postType === 'pulse' ? '' : stripHtml(content)
-  const htmlExport = postType === 'pulse' ? '' : content
+  const markdownExport = stripHtml(content)
+  const htmlExport = content
 
   if (loading) {
     return (
@@ -1375,9 +1343,7 @@ export default function WritePage() {
     : 'Publish'
 
   const previousWordCount = lastVersion?.content
-    ? postType === 'pulse'
-      ? pulseWordCount(parsePulseContent(lastVersion.content))
-      : getWordCount(lastVersion.content)
+    ? getWordCount(lastVersion.content)
     : 0
   const currentWordCount = getCurrentWordCount()
   const wordDelta = lastVersion ? currentWordCount - previousWordCount : null
@@ -1568,11 +1534,11 @@ export default function WritePage() {
 
 
 
-          {showVaultDrawer && (
+          {showCaptureDrawer && (
             <div className="fixed inset-0 z-40">
               <div
                 className="absolute inset-0 bg-black/30"
-                onClick={() => setShowVaultDrawer(false)}
+                onClick={() => setShowCaptureDrawer(false)}
               />
               <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-light)]">
@@ -1580,12 +1546,12 @@ export default function WritePage() {
                     <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                       Compose
                     </p>
-                    <h2 className="font-display text-xl">Vault</h2>
+                    <h2 className="font-display text-xl">Captures</h2>
                   </div>
                   <button
-                    onClick={() => setShowVaultDrawer(false)}
+                    onClick={() => setShowCaptureDrawer(false)}
                     className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
-                    aria-label="Close vault drawer"
+                    aria-label="Close capture drawer"
                   >
                     <X size={16} />
                   </button>
@@ -1600,14 +1566,14 @@ export default function WritePage() {
 
                   <div className="grid gap-2">
                     <input
-                      value={vaultDrawerQuery}
-                      onChange={(e) => setVaultDrawerQuery(e.target.value)}
-                      placeholder="Search vault"
+                      value={captureDrawerQuery}
+                      onChange={(e) => setCaptureDrawerQuery(e.target.value)}
+                      placeholder="Search captures"
                       className="input"
                     />
                     <select
-                      value={vaultDrawerType}
-                      onChange={(e) => setVaultDrawerType(e.target.value)}
+                      value={captureDrawerType}
+                      onChange={(e) => setCaptureDrawerType(e.target.value)}
                       className="input"
                       aria-label="Filter asset type"
                     >
@@ -1622,26 +1588,26 @@ export default function WritePage() {
                     </select>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => void loadVaultDrawerAssets({ q: vaultDrawerQuery, type: vaultDrawerType })}
-                        disabled={vaultDrawerLoading}
+                        onClick={() => void loadCaptureDrawerAssets({ q: captureDrawerQuery, type: captureDrawerType })}
+                        disabled={captureDrawerLoading}
                         className="btn btn-secondary btn-sm"
                       >
-                        {vaultDrawerLoading ? 'Searching…' : 'Search'}
+                        {captureDrawerLoading ? 'Searching…' : 'Search'}
                       </button>
-                      <a href="/vault" className="btn btn-ghost btn-sm">
-                        Open Vault
+                      <a href="/dashboard/captures" className="btn btn-ghost btn-sm">
+                        Open Captures
                       </a>
                     </div>
                   </div>
 
                   <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
-                    {vaultDrawerLoading ? (
+                    {captureDrawerLoading ? (
                       <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
-                    ) : vaultDrawerAssets.length === 0 ? (
+                    ) : captureDrawerAssets.length === 0 ? (
                       <div className="p-3 text-sm text-[var(--text-secondary)]">No matching assets.</div>
                     ) : (
                       <div className="divide-y divide-[var(--border-light)]">
-                        {vaultDrawerAssets.map((a) => {
+                        {captureDrawerAssets.map((a) => {
                           const preview = String(a.content || '').replace(/\s+/g, ' ').slice(0, 120)
                           return (
                             <div key={a.id} className="p-3 space-y-2">
@@ -1677,12 +1643,12 @@ export default function WritePage() {
                                 <div className="flex flex-col items-end gap-2">
                                   <button
                                     onClick={() => void insertAssetIntoDraft(a)}
-                                    disabled={vaultInsertAssetId === a.id || !postId}
+                                    disabled={captureInsertAssetId === a.id || !postId}
                                     className="btn btn-secondary btn-sm"
                                   >
-                                    {vaultInsertAssetId === a.id ? 'Inserting…' : 'Insert'}
+                                    {captureInsertAssetId === a.id ? 'Inserting…' : 'Insert'}
                                   </button>
-                                  <a href={`/vault/${a.id}`} className="btn btn-ghost btn-sm">
+                                  <a href={`/dashboard/captures/${a.id}`} className="btn btn-ghost btn-sm">
                                     Details
                                   </a>
                                 </div>
@@ -1698,43 +1664,6 @@ export default function WritePage() {
             </div>
           )}
 
-          <div className="mb-6">
-            <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-              Post type
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setPostType('post')}
-                className={postType === 'post' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-              >
-                Standard
-              </button>
-              <button
-                onClick={() => {
-                  setPostType('pulse')
-                  setHtmlMode(false)
-                }}
-                className={postType === 'pulse' ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-              >
-                Pulse
-              </button>
-              {postType !== 'pulse' && (
-                <button
-                  onClick={() => {
-                    setPostType('pulse')
-                    setPulse(createPulseTemplate())
-                    setHtmlMode(false)
-                  }}
-                  className="btn btn-ghost btn-sm"
-                >
-                  Start Pulse
-                </button>
-              )}
-              <span className="text-xs text-[var(--text-tertiary)]">
-                Pulse posts are capped at 6 cards.
-              </span>
-            </div>
-          </div>
 
           {showHistory && postId && (
             <div className="fixed inset-0 z-40">
@@ -2378,32 +2307,28 @@ export default function WritePage() {
 
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <span className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-              Editor mode: {postType === 'pulse' ? 'Pulse' : htmlMode ? 'HTML' : 'Visual'}
+              Editor mode: {htmlMode ? 'HTML' : 'Visual'}
             </span>
             <span className="text-xs text-[var(--text-tertiary)]">
               {getCurrentWordCount().toLocaleString()} words
             </span>
-            {postType !== 'pulse' && (
-              <button
-                onClick={() => {
-                  if (htmlMode) {
-                    const confirmSwitch = window.confirm(
-                      'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
-                    )
-                    if (!confirmSwitch) return
-                  }
-                  setHtmlMode(!htmlMode)
-                }}
-                className="btn btn-ghost btn-sm"
-              >
-                Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
-              </button>
-            )}
+            <button
+              onClick={() => {
+                if (htmlMode) {
+                  const confirmSwitch = window.confirm(
+                    'Switching to the visual editor may remove advanced HTML, scripts, or styles. Continue?'
+                  )
+                  if (!confirmSwitch) return
+                }
+                setHtmlMode(!htmlMode)
+              }}
+              className="btn btn-ghost btn-sm"
+            >
+              Switch to {htmlMode ? 'Visual editor' : 'HTML editor'}
+            </button>
           </div>
 
-          {postType === 'pulse' ? (
-            <PulseEditor pulse={pulse} onChange={setPulse} />
-          ) : htmlMode ? (
+          {htmlMode ? (
             <div className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)]">
               <textarea
                 value={content}

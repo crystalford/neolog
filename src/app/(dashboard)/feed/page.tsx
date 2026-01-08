@@ -29,7 +29,6 @@ type FeedPost = {
 export default function FeedPage() {
   const [subscriptionCount, setSubscriptionCount] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
-  const [typeFilter, setTypeFilter] = useState<'all' | 'standard' | 'pulse'>('all')
 
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
@@ -62,13 +61,11 @@ export default function FeedPage() {
     async (offset: number, limit: number) => {
       if (!userId) return { data: [], hasMore: false }
 
-      const contentType = typeFilter === 'pulse' ? 'pulse' : null
-
       const { data } = await supabase.rpc('get_subscription_feed', {
         p_user_id: userId,
         p_limit: limit,
         p_offset: offset,
-        p_content_type: contentType,
+        p_content_type: null,
       })
 
       return {
@@ -76,7 +73,7 @@ export default function FeedPage() {
         hasMore: (data?.length || 0) === limit,
       }
     },
-    [supabase, typeFilter, userId]
+    [supabase, userId]
   )
 
   const {
@@ -93,13 +90,11 @@ export default function FeedPage() {
 
   useEffect(() => {
     if (userId) loadInitial()
-  }, [loadInitial, typeFilter, userId])
+  }, [loadInitial, userId])
 
   const visiblePosts = useMemo(() => {
-    if (typeFilter === 'pulse') return posts.filter((p) => p.content_type === 'pulse')
-    if (typeFilter === 'standard') return posts.filter((p) => p.content_type !== 'pulse')
     return posts
-  }, [posts, typeFilter])
+  }, [posts])
 
   const transformedPosts = useMemo(
     () =>
@@ -184,25 +179,6 @@ export default function FeedPage() {
           </Link>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mb-8">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'standard', label: 'Standard' },
-            { id: 'pulse', label: 'Pulse' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTypeFilter(item.id as typeof typeFilter)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                typeFilter === item.id
-                  ? 'bg-[var(--accent)] text-[var(--text-inverse)] border-[var(--accent)]'
-                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
 
         <ContinueReading />
 
