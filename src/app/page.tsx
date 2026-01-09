@@ -145,9 +145,9 @@ export default async function Home() {
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Traffic-First SEO</h3>
               <p className="text-[var(--text-secondary)] mb-4">
-                Real-time optimization suggestions, traffic source tracking, and keyword insights. Built-in, not bolted on.
+                Real-time optimization suggestions, readability scoring, and keyword insights. See your SEO score while you write.
               </p>
-              <div className="text-sm text-[var(--accent)] font-medium">🚧 Coming soon: SEO analyzer</div>
+              <div className="text-sm text-green-600 font-medium">✅ Live now in Write page</div>
             </div>
 
             {/* ActivityPub Native */}
@@ -171,7 +171,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 Every post gets a unique visual generated from its content hash. No stock photos. No AI slop. Your words create your aesthetic.
               </p>
-              <div className="text-sm text-pink-600 font-medium">🚧 Coming Q1 2026</div>
+              <div className="text-sm text-green-600 font-medium">✅ Live now on all posts</div>
             </div>
 
             {/* ePub Export */}
@@ -183,7 +183,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 Export your entire publication as a properly formatted ePub book. Table of contents, chapters, metadata—done.
               </p>
-              <div className="text-sm text-[var(--accent)] font-medium">🚧 Coming Q1 2026</div>
+              <div className="text-sm text-green-600 font-medium">✅ Live now on profile pages</div>
             </div>
 
             {/* Multi-Platform Distribution */}

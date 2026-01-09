@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
+import { analyzeSEO } from '@/lib/seo-scoring'
 import {
   PenLine, Zap, Send, ArrowRight, Archive, Clock,
   Eye, MessageCircle, X
@@ -36,6 +37,7 @@ interface RecentPublished {
   published_at: string
   views: number
   reactions: number
+  seoScore: number
 }
 
 function getWordCount(content: string | null): number {
@@ -133,7 +135,7 @@ export default function DashboardHomePage() {
     // Load recent published
     const { data: published } = await supabase
       .from('posts')
-      .select('id, title, slug, published_at')
+      .select('id, title, slug, published_at, subtitle, content')
       .eq('author_id', session.user.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
@@ -162,14 +164,24 @@ export default function DashboardHomePage() {
         reactionCounts[r.post_id] = (reactionCounts[r.post_id] || 0) + 1
       })
 
-      setRecentPublished(published.map(p => ({
-        id: p.id,
-        title: p.title,
-        slug: p.slug,
-        published_at: p.published_at,
-        views: viewCounts[p.id] || 0,
-        reactions: reactionCounts[p.id] || 0,
-      })))
+      setRecentPublished(published.map(p => {
+        // Calculate SEO score
+        const seoAnalysis = analyzeSEO(
+          p.title || '',
+          p.subtitle || '',
+          p.content || ''
+        )
+
+        return {
+          id: p.id,
+          title: p.title,
+          slug: p.slug,
+          published_at: p.published_at,
+          views: viewCounts[p.id] || 0,
+          reactions: reactionCounts[p.id] || 0,
+          seoScore: seoAnalysis.score,
+        }
+      }))
     }
 
     // Calculate this week stats
@@ -482,9 +494,24 @@ export default function DashboardHomePage() {
                   href={`/dashboard/published?id=${post.id}`}
                   className={`block p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : ''}`}
                 >
-                  <p className="text-base font-medium text-[var(--text-primary)] truncate">
-                    {post.title}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-base font-medium text-[var(--text-primary)] truncate flex-1">
+                      {post.title}
+                    </p>
+                    {/* SEO Score Badge */}
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        post.seoScore >= 80
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : post.seoScore >= 60
+                          ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
+                      }`}
+                      title="SEO Score"
+                    >
+                      {post.seoScore}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3 text-xs text-[var(--text-tertiary)] mt-1">
                     <span className="flex items-center gap-1">
                       <Eye size={14} />

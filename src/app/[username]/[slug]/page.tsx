@@ -5,6 +5,7 @@ import { Header } from '@/components/Header'
 import { HtmlIframe } from '@/components/HtmlIframe'
 import { PostDensityToggle } from '@/components/PostDensityToggle'
 import { SeriesNav } from '@/components/SeriesNav'
+import { ShareBar } from '@/components/ShareButtons'
 import { generateArticleSchema, generateSEO } from '@/lib/seo'
 import { Clock, ArrowLeft } from 'lucide-react'
 
@@ -271,6 +272,14 @@ export default async function PostPage({ params, searchParams }: Props) {
               />
             </div>
           )}
+
+          {/* Share buttons */}
+          <div className="max-w-4xl mx-auto mt-12">
+            <ShareBar
+              url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${params.username}/${params.slug}`}
+              title={post.title}
+            />
+          </div>
 
           {tags.length > 0 && (
             <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">

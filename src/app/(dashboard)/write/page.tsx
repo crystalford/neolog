@@ -1647,12 +1647,6 @@ export default function WritePage() {
                   >
                     Version History
                   </button>
-                  <button
-                    onClick={() => setShowCaptureDrawer(true)}
-                    className="btn btn-secondary"
-                  >
-                    Insert Captures
-                  </button>
                 </>
               )}
 

@@ -6,12 +6,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
-  Home, Archive, PenSquare, Send, Settings, LogOut, User as UserIcon,
-  PenLine, Zap, Command, Search, Upload, BarChart3, Layers, Tag,
+  Home, PenSquare, Send, Settings, LogOut, User as UserIcon,
+  PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
   BookOpen, DollarSign
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
-import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
@@ -25,7 +24,6 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [captureOpen, setCaptureOpen] = useState(false)
   const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
@@ -76,15 +74,6 @@ export default function DashboardLayout({
         tag === 'input' ||
         tag === 'textarea' ||
         (target?.getAttribute('contenteditable') ?? '') === 'true'
-
-      // Quick capture
-      if (isModifier && event.key.toLowerCase() === 'k') {
-        if (isEditable) return
-
-        event.preventDefault()
-        setCaptureOpen(true)
-        return
-      }
 
       // Quick switch (command palette)
       if (isModifier && event.key === '/') {
@@ -191,13 +180,17 @@ export default function DashboardLayout({
     const items = [
       { href: '/dashboard', icon: Home, label: 'Home' },
       { href: '/write', icon: PenLine, label: 'Write' },
-      { href: '/dashboard/captures', icon: Archive, label: 'Captures' },
       { href: '/import', icon: Upload, label: 'Import' },
     ]
 
     // Show Published tab after first publish
     if (capabilities.showPublishedTab) {
       items.push({ href: '/dashboard/published', icon: Send, label: 'Published' })
+    }
+
+    // Show Analytics prominently
+    if (capabilities.showPublishedTab) {
+      items.push({ href: '/analytics', icon: BarChart3, label: 'Analytics' })
     }
 
     items.push({ href: '/dashboard/settings', icon: Settings, label: 'Settings' })
@@ -210,7 +203,6 @@ export default function DashboardLayout({
     if (!capabilities.showPublishedTab) return [] // Only show after first publish
 
     return [
-      { href: '/analytics', icon: BarChart3, label: 'Analytics' },
       { href: '/series', icon: Layers, label: 'Series' },
       { href: '/topics', icon: Tag, label: 'Topics' },
     ]
@@ -234,7 +226,6 @@ export default function DashboardLayout({
     // Add common actions
     items.push(
       { label: 'New Draft', href: '/write', description: 'Action' },
-      { label: 'Quick Capture', href: '#capture', description: 'Action' },
     )
     return items
   }, [primaryNav])
@@ -375,16 +366,6 @@ export default function DashboardLayout({
                 <span>New Draft</span>
               </Link>
               <button
-                onClick={() => setCaptureOpen(true)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-              >
-                <Zap size={16} />
-                <span>Quick Capture</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+K or Ctrl+K">
-                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘K' : 'Ctrl+K'}
-                </span>
-              </button>
-              <button
                 onClick={() => setCommandOpen(true)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
               >
@@ -473,14 +454,7 @@ export default function DashboardLayout({
               >
                 <Search size={16} />
               </button>
-              <button
-                onClick={() => setCaptureOpen(true)}
-                className="inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                aria-label="Quick capture"
-              >
-                <Zap size={16} />
-              </button>
-              
+
               {/* New Draft button */}
               <Link
                 href="/write"
@@ -544,12 +518,6 @@ export default function DashboardLayout({
         isOpen={commandOpen}
         onClose={() => setCommandOpen(false)}
         onOpen={() => setCommandOpen(true)}
-      />
-
-      <QuickCaptureModal
-        isOpen={captureOpen}
-        onClose={() => setCaptureOpen(false)}
-        initialPublicationId={selectedPublicationId}
       />
     </div>
   )
