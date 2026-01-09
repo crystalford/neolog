@@ -1,157 +1,397 @@
 # Neolog Roadmap
 
-Last updated: 2026-01-05
+**Mission:** Build the publishing platform that actually gets you readers.
 
-## Supply Chain Phases (realistic)
-
-### Phase V1 — Interoperable Publishing Node (ship + harden)
-- Ingest: manual capture + RSS/Atom sources + API-key webhook (Inbox artifacts)
-- Core: Inbox triage + bulk convert → drafts
-- Publish: fast publish + background side-effects
-- Broadcast: distribution pack generation (reviewable)
-- Interop read: /llms.txt
-
-### Phase VNext — Vault + Automations (make “agents” real)
-- Vault: assets table + API + (later) UI
-- Attach assets to drafts/posts (join table)
-- Automations substrate: jobs + job runs + retries + logs + idempotency
-- Optional distribution: sending/posting integrations only after reliability/consent UX
+Last updated: 2026-01-09
 
 ---
 
-## v3.1 Alignment (vision reference; incremental)
+## Our Vision
 
-The v3.1 vision describes a 6-layer pipeline:
-`CAPTURE → ORGANIZE → MONITOR → COMPOSE → DISTRIBUTE → ANALYZE`
+Neolog is a **traffic-first publishing platform** where every feature answers one question: *"Will this help creators get readers?"*
 
-This repo already covers a meaningful subset of that pipeline. The goal is to **preserve shipped supply-chain features** and convert the remaining “vision gaps” into concrete roadmap items.
+We're building:
+1. **Better discoverability** than Ghost (no cold-start)
+2. **Better ownership** than Substack (no 10% tax, full export)
+3. **Better control** than Medium (your audience, your rules)
 
-### What’s Already Built (v3.1 mapping)
-- **Capture**: `POST /api/capture` and `POST /api/vault/add` (API-key or session auth); RSS ingest into Inbox
-- **Organize**: Publications + publication-scoped Vault assets + filters + assignment UI
-- **Compose**: Rich editor + drafts/posts + asset attachment workflows
-- **Distribute**: Distribution pack generation; best-effort auto-syndication to Medium + Dev.to
-- **Analyze**: Platform/site analytics surfaces (PostHog + internal dashboards)
+Plus features nobody else has: **ActivityPub native publishing**, **generative visual identity**, and **one-click ePub exports**.
 
-### Major Gaps vs v3.1 (prioritized)
-- **Monitor system**: first-class monitors + monitored-items review queue + “promote to Vault” workflow
-- **Platform Connections**: OAuth/keyed connections per platform (as product surface), not just “generate pack”
-- **Distributions ledger**: persisted per-platform distribution records + status + retries + errors
-- **Engagement sync**: pull likes/views/comments per distribution and roll up by publication
-- **Lineage analytics**: asset → post → distribution attribution and per-asset impact reporting
-- **Quick capture UI**: global quick-add modal / command entry (e.g., ⌘K) and bulk import UX
+---
 
-### Near-Term Work (safe + compatibility)
-- Add `/api/v1/capture` alias to align docs/spec clients with existing capture behavior
-- Harden capture/vault contracts (response shapes + examples) without breaking existing clients
-- Start Monitors v0 with the already-shipped RSS substrate (review queue + promote-to-vault)
+## Current Status
 
-## Phase 1 - Distribution Pack (shipping)
-- [x] Deterministic pack generation (X/LinkedIn/Reddit + hooks)
-- [x] OG image data URL (SVG)
-- [x] Editor modal + dashboard entry point
-- [x] AI pack generation (requires OPENAI_API_KEY)
+### ✅ Shipping Now (Production-Ready)
 
-## Phase 2 - Comment Curator (shipping)
-- [x] Reddit import (top comments)
-- [x] Manual highlights
-- [x] Filters + sorting + pinning
-- [x] X import (requires paid X API)
+**Core Publishing**
+- ✅ Rich HTML editor with markdown support
+- ✅ Auto-save & version history
+- ✅ Draft management & scheduling
+- ✅ Image uploads & embeds
+- ✅ Code highlighting
+- ✅ SEO metadata (titles, descriptions, OG images)
 
-## Phase 3 - Digital Garden (shipping)
-- [x] "Where this fits" on post pages (tags + related posts)
-- [x] Profile topic map
-- [x] /@user/topics hub
-- [x] Topic intro editor (custom per tag per author)
+**Distribution**
+- ✅ RSS/Atom/JSON feeds (global + per-author)
+- ✅ Email newsletters via Resend
+- ✅ Cross-posting to Medium & Dev.to
+- ✅ Social card generation (X, LinkedIn, Reddit)
+- ✅ WebSub support (real-time RSS push)
 
-## Phase 4 - Variable Density Reading (shipping)
-- [x] Summary vs Full toggle
-- [x] Key takeaways bullets
-- [x] "On this page" anchors
-- [x] AI summaries (requires OPENAI_API_KEY)
-- [x] Expand sections (requires OPENAI_API_KEY)
+**Discovery**
+- ✅ Explore page (latest, popular, rising)
+- ✅ Search (full-text + semantic via pgvector)
+- ✅ Tag-based browsing
+- ✅ Related posts
+- ✅ Public profiles with follower counts
 
-## Phase 5 - BYOK Vault + Cost Router (shipping)
-- [x] Integration key encryption at rest
-- [x] Provider vault UI (labels, active key, rotation)
-- [x] Cost router (user key -> managed key if Pro)
-- [x] Usage tracking per provider (optional caps)
+**Analytics**
+- ✅ View tracking (total + unique)
+- ✅ Scroll depth & completion rates
+- ✅ Traffic sources
+- ✅ Engagement metrics (comments, reactions)
+- ✅ Post-specific drill-down
+- ✅ Device breakdown
 
-## Optional / Future
-- [x] Post health system (freshness score + revive queue)
-- [x] Auto-post syndication (requires platform APIs)
-- [x] Programmatic visuals engine
+**Ownership**
+- ✅ Full JSON export (content + metadata)
+- ✅ Markdown export
+- ✅ HTML archive
+- ✅ Import from HTML, Markdown, RSS
+- ✅ Content forking with attribution
 
-## Neolog for Robots (prioritized)
-1. AI Vault (BYOK) + context.md injection (now)
-2. Sources + Inbox (RSS pull) (done)
-3. Headless Inbox webhook (done)
-4. llms.txt + ?format=json (done)
-5. Agent-scoped API keys + automation triggers (done)
-5.1 OAuth signup onboarding w/ username selection (done)
-5.2 Account deletion cascades via auth user delete (done)
-6. Accept: text/markdown responses (done)
-6.1 Agent search endpoint (done)
-7. Vector search endpoint (done; requires pgvector migration + OPENAI_API_KEY)
-7.1 Auto-embed on publish (done)
-8. MCP server integration (done)
+**Monetization**
+- ✅ Stripe subscriptions (keep 100%)
+- ✅ Membership tiers
+- ✅ One-click tips
+- ✅ Subscriber management
 
-## Next Build Targets (near-term)
-- Drop Box: `POST /api/webhooks/draft` (API-key) to create inbox artifacts (drafts via conversion)
-- Vault: `POST /api/vault/add` + `assets` table (BYOK provenance-first)
-- Automations: introduce `jobs`/`job_runs` (minimal), then migrate cron routes onto it
+**Developer Tools**
+- ✅ API endpoints for publishing
+- ✅ API key management
+- ✅ Webhook ingestion
+- ✅ llms.txt (AI-friendly context)
+- ✅ MCP server integration
 
-## Cost-Gated Features
-- AI summaries (OpenAI)
-- AI distribution pack
-- X import (paid API)
+---
 
-## Heavy Hitters (planned)
-- [x] Resend (newsletter delivery, BYOK)
-- [x] PostHog (analytics, BYOK)
-- [x] Groq (speed, BYOK for expand)
-- [x] R2/S3 (sovereign storage, BYOK settings)
-- [x] HeyGen/Synthesia (video avatar, BYOK)
+## 🚧 In Progress (Next 30 Days)
 
-## Integrations Catalog (source of truth)
+### Phase 1: Protocol-Native Publishing
 
-This section is the canonical list of real integrations in the codebase.
+**ActivityPub Integration**
+- 🚧 Posts as native ActivityPub `Note` objects
+- 🚧 Actor profiles (WebFinger, .well-known)
+- 🚧 Inbox/Outbox endpoints
+- 🚧 Federation with Mastodon, fediverse clients
+- 🚧 Cross-post to fediverse automatically
 
-Legend:
-- **Shipped**: implemented end-to-end (routes + data + UI where applicable)
-- **Key slot only**: you can store keys in Settings → AI Vault, but no product feature uses it yet
-- **Planned / demo-only**: mentioned in roadmap or screenshots, but not implemented
+**Why:** Your posts appear in Mastodon feeds natively, not as links. Reach 10M+ fediverse users instantly.
 
-### Shipped (implemented)
-- Supabase (Auth + Postgres + RLS; service-role admin operations)
-- OpenAI (summaries, expand, distribution packs, embeddings + vector search)
-- Groq (LLM provider option via vault)
-- Resend (subscribe confirmations + publish notifications + weekly digest cron)
-- PostHog (analytics via BYOK)
-- X API v2 (comment import for posts; requires paid X API)
-- Reddit (comment import via public JSON)
-- Medium (auto-syndication on first publish; stored in `post_syndications`)
-- Dev.to (auto-syndication on first publish; stored in `post_syndications`)
-- HeyGen (video avatar jobs: create/status/webhook)
-- Synthesia (video avatar jobs: create/status/webhook)
-- Cloudflare R2 + Amazon S3 (presigned uploads; storage connection + vault secret)
-- RSS (sources + cron pull into inbox; global RSS feed)
-- MCP server (local integration in `scripts/mcp/server.mjs`)
+---
 
-### Key slot only (vault supports storing keys, feature not wired yet)
-- Anthropic (Claude)
-- Perplexity
-- Grok
-- Replicate
-- ElevenLabs
-- Stability (legacy)
+### Phase 2: Generative Visual Identity
 
-### Planned / demo-only (not implemented)
-- Deepgram audio notes ingest
-- Gemini video summary ingest
-- Auto-post to X/LinkedIn/Reddit/Threads (currently Neolog generates copy; only Medium/Dev.to auto-post today)
-- TikTok/Instagram video outputs
-- Firecrawl URL scraping (docs mention it, but current ingest uses built-in fetch + HTML strip)
+**Shader-Based Covers**
+- 🚧 Deterministic shader generation from content hash
+- 🚧 Unique visual per post (change text = change visual)
+- 🚧 Fast GLSL rendering
+- 🚧 Social card integration
+- 🚧 Customizable shader palettes
 
-### Non-API “integrations” (embed/support only)
-- Rich embeds: YouTube, Vimeo, Spotify, Loom, Figma, Gist (iframe/embed rendering; no keys)
+**Interactive Embeds**
+- 🚧 Procedural pattern generators
+- 🚧 Cellular automata (Conway's Life, etc.)
+- 🚧 MIDI instruments (playable in-page)
+- 🚧 WebGL scenes
+- 🚧 Shader playgrounds
+
+**Why:** No more stock photos. No AI slop. Your content creates its own aesthetic. Every post is visually distinct and memorable.
+
+---
+
+### Phase 3: ePub Export Engine
+
+**One-Click Book Creation**
+- 🚧 Export entire publication as ePub 3.0
+- 🚧 Automatic table of contents
+- 🚧 Chapter organization from series/tags
+- 🚧 Embedded metadata (author, cover, ISBN)
+- 🚧 Preserve images, formatting, code blocks
+- 🚧 MOBI/PDF conversions (optional)
+
+**Why:** Your blog IS a book. Publish incrementally, export anytime. No Gumroad needed.
+
+---
+
+## 📅 Next Quarter (Q1 2026)
+
+### Phase 4: Advanced SEO & Traffic Tools
+
+**SEO Analyzer**
+- 📅 Real-time optimization suggestions (title, meta, headings)
+- 📅 Keyword density analysis
+- 📅 Readability scores
+- 📅 Internal linking suggestions
+- 📅 Image alt-text checker
+- 📅 Competitor content gap analysis
+
+**Traffic Dashboard**
+- 📅 Traffic sources breakdown (organic, social, direct, referral)
+- 📅 Google Search Console integration
+- 📅 Ranking tracker for target keywords
+- 📅 Optimal posting time suggestions
+- 📅 Traffic prediction (based on tags, timing, length)
+- 📅 Content performance benchmarks
+
+**Why:** SEO is the #1 source of sustained traffic. Make it easy.
+
+---
+
+### Phase 5: Enhanced Import/Export
+
+**Ghost Import**
+- 📅 Full Ghost JSON import (posts + tags + metadata)
+- 📅 Preserve publication structure
+- 📅 Member/subscriber migration
+- 📅 One-click switching from Ghost
+
+**Substack Import**
+- 📅 ZIP file import (posts + subscribers)
+- 📅 Email list migration
+- 📅 Archive preservation
+- 📅 Redirect setup guide
+
+**Medium Import**
+- 📅 Bulk HTML import improvements
+- 📅 Stats preservation (claps → reactions)
+- 📅 Publication structure
+- 📅 Canonical URL handling
+
+**SEO Support Mode**
+- 📅 "Keep Ghost/Substack, boost with Neolog" option
+- 📅 Create link web for backlink juice
+- 📅 Cross-syndication without duplication penalties
+- 📅 Canonical URL management
+
+**Why:** Make switching effortless. Or support existing platforms for SEO boost.
+
+---
+
+### Phase 6: Multi-Projection Architecture
+
+**Source → Projections**
+- 📅 Write once, project to multiple formats:
+  - HTML (web, full interactivity)
+  - ActivityPub Note (fediverse)
+  - RSS/Atom item (feed readers)
+  - ePub chapter (books)
+  - JSON-LD (semantic web, AI consumption)
+  - Markdown (GitHub, dev tools)
+
+**Data Payload Exports**
+- 📅 `.ics` calendar events (from post content)
+- 📅 `.vcf` contact cards
+- 📅 GeoJSON (location data)
+- 📅 BibTeX bibliographies
+- 📅 SCORM packages (e-learning)
+
+**Why:** Content isn't just text—it's structured data. Let readers consume in any format.
+
+---
+
+## 🔮 Future Vision (Q2+ 2026)
+
+### Smart Distribution
+
+**Buffer-Style Social Scheduling**
+- Queue posts across platforms (X, LinkedIn, Mastodon, Bluesky)
+- Optimal timing per platform
+- Auto-generated variants (thread for X, long-form for LinkedIn)
+- Performance tracking per platform
+- A/B testing headlines
+
+**Traffic Amplification**
+- Automatic syndication network (with permission)
+- Cross-author recommendations
+- SEO collaboration (guest posts, backlinks)
+- Community-driven discovery boosts
+
+### Advanced Content Features
+
+**Interactive Documents**
+- PDFs with working forms & calculated fields
+- Excel sheets with macros (via WASM)
+- PowerPoint with embedded logic
+- Runnable code snippets (multiple languages)
+
+**Collaborative Publishing**
+- Co-author workflows
+- Editorial review pipelines
+- Publication teams
+- Multi-author newsletters
+
+### Federation & Portability
+
+**AT Protocol Support**
+- Publish to Bluesky natively
+- DID-based identity
+- Personal data servers (PDS)
+
+**Nostr Integration**
+- Publish to Nostr relays
+- Crypto-native identity
+- Zaps (lightning tips)
+
+### AI-Powered Growth
+
+**Smart Content Suggestions**
+- Topic gap analysis ("write about X to reach Y audience")
+- Optimal length recommendations
+- Headline A/B testing
+- Content refresh suggestions (update old posts)
+
+**Audience Insights**
+- Reader intent analysis
+- Churn prediction
+- Growth forecasts
+- Competitor benchmarking
+
+---
+
+## What We're NOT Building
+
+To stay focused on publishing and traffic, we're **archiving or removing**:
+
+- ❌ **Boost campaigns & marketplace** (promotion complexity)
+- ❌ **Curator scores & leaderboards** (gamification overhead)
+- ❌ **Wallet & referral programs** (fintech complexity)
+- ❌ **Multiple video AI providers** (niche, expensive)
+- ❌ **Deepgram/Gemini ingest automations** (over-engineered)
+- ❌ **Automated content sources & monitors** (too magical)
+
+We keep: **Writing, publishing, distributing, analyzing.** Everything else is distraction.
+
+---
+
+## Philosophy
+
+### 1. Traffic First
+Every feature must answer: "Does this help creators get readers?"
+- SEO tools ✅
+- ActivityPub reach ✅
+- Generative covers (memorable) ✅
+- Random gamification ❌
+
+### 2. Own Your Work
+You can leave Neolog anytime with:
+- All your content (ePub, JSON, Markdown)
+- All your audience (RSS, email list export)
+- All your data (analytics, traffic sources)
+
+No lock-in. Ever.
+
+### 3. Protocol Over Platform
+The web has winners already: RSS, ActivityPub, ePub, HTML.
+We embrace them, don't compete with them.
+Neolog is a **publishing node**, not a walled garden.
+
+### 4. Generative Identity
+No stock photos. No generic templates. No AI slop.
+Your content hash → deterministic shader → unique visual.
+Change a word, the aesthetic shifts. Your words are your brand.
+
+### 5. Radically Simple
+Ghost is simple. Substack is simple. We're simpler.
+Write → Publish → Get readers.
+No "monitors," "vaults," "supply chains."
+Just publishing that works.
+
+---
+
+## Technical Priorities
+
+### Performance
+- Sub-200ms page loads
+- Instant editor saves
+- Real-time analytics
+- Serverless-first architecture
+
+### Privacy
+- GDPR compliant
+- No tracking without consent
+- Anonymous analytics option
+- Right to deletion (one-click export → delete)
+
+### Accessibility
+- WCAG 2.1 AA compliant
+- Keyboard navigation
+- Screen reader optimized
+- High contrast mode
+
+### Open Source
+- MIT license
+- Self-hostable
+- No proprietary lock-in
+- Community-driven roadmap
+
+---
+
+## How to Contribute
+
+We're focused on **publishing features** that drive **traffic and ownership**.
+
+**High Priority Contributions:**
+- ActivityPub federation improvements
+- SEO analyzer enhancements
+- ePub export quality
+- Ghost/Substack import tools
+- Shader generators for covers
+- Traffic analytics insights
+
+**We're NOT accepting:**
+- New AI provider integrations (we have enough)
+- Gamification features (leaderboards, badges, etc.)
+- Complex automation systems
+- Video/audio creation tools
+- Cryptocurrency integrations
+
+---
+
+## Timeline
+
+| Quarter | Focus |
+|---------|-------|
+| **Q1 2026** | ActivityPub, Generative Covers, ePub Export |
+| **Q2 2026** | Advanced SEO, Traffic Dashboard, Import Excellence |
+| **Q3 2026** | Multi-Projection, Smart Distribution, Interactive Embeds |
+| **Q4 2026** | AI Growth Tools, Federation Expansion, Mobile Apps |
+
+---
+
+## Metrics That Matter
+
+We measure success by:
+1. **Avg. views per post** (discoverability working?)
+2. **Traffic sources diversity** (not just one channel)
+3. **Export rate** (people trust us with ownership)
+4. **Time to first 100 readers** (cold-start solved?)
+5. **Cross-platform reach** (ActivityPub, RSS adoption)
+
+NOT by:
+- Daily active users (vanity metric)
+- Posts published (quality > quantity)
+- Time on site (readers want to leave and share)
+- Feature count (simplicity wins)
+
+---
+
+## Questions or Suggestions?
+
+- **GitHub Issues:** [Report bugs or request features](https://github.com/yourusername/neolog/issues)
+- **Discussions:** [Join the conversation](https://github.com/yourusername/neolog/discussions)
+- **Email:** [roadmap@neolog.com](mailto:roadmap@neolog.com)
+
+---
+
+**Let's build the future of publishing. Together.** 🚀

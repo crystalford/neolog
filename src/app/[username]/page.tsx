@@ -6,7 +6,7 @@ import { PostCard } from '@/components/PostCard'
 import { SubscribeButton } from '@/components/SubscribeButton'
 import { SocialLinks } from '@/components/SocialLinks'
 import { generateSEO } from '@/lib/seo'
-import { Calendar, MapPin, Link as LinkIcon, Users } from 'lucide-react'
+import { Calendar, MapPin, Link as LinkIcon, Users, BookOpen, Rss, Globe, Download } from 'lucide-react'
 
 interface Props {
   params: { username: string }
@@ -180,6 +180,36 @@ export default async function ProfilePage({ params }: Props) {
                     <Users size={14} />
                     {followerCount || 0} followers
                   </span>
+                </div>
+
+                {/* Distribution & Export Actions */}
+                <div className="flex flex-wrap gap-3 mt-5">
+                  <Link
+                    href={`/${profile.username}/feed`}
+                    className="btn btn-sm btn-secondary"
+                    target="_blank"
+                  >
+                    <Rss size={14} />
+                    RSS Feed
+                  </Link>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    title="Export as ePub book - Coming Q1 2026"
+                    disabled
+                  >
+                    <BookOpen size={14} />
+                    Export as Book
+                    <span className="text-xs opacity-60">(Q1 2026)</span>
+                  </button>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    title="ActivityPub profile - Coming Q1 2026"
+                    disabled
+                  >
+                    <Globe size={14} />
+                    Fediverse
+                    <span className="text-xs opacity-60">(Q1 2026)</span>
+                  </button>
                 </div>
 
                 {/* Social links */}

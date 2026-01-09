@@ -87,29 +87,40 @@ export default function ExplorePage() {
       <main className="pt-14 pb-14">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="flex items-center justify-between pt-4 mb-5">
-            <div>
-              <h1 className="font-display text-3xl mb-2">Explore</h1>
-              <p className="text-[var(--text-secondary)]">
-                Discover great writing from the community
-              </p>
+          <div className="pt-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="font-display text-4xl md:text-5xl mb-3">Discover Great Writing</h1>
+                <p className="text-lg text-[var(--text-secondary)]">
+                  Real content from real creators. No algorithmic mystery, just good writing surfaced fairly.
+                </p>
+              </div>
+
+              {/* Links - Desktop only */}
+              <div className="hidden md:flex items-center gap-2">
+                <Link
+                  href="/visuals"
+                  className="btn btn-ghost btn-sm"
+                >
+                  <Sparkles size={16} />
+                  Visuals
+                </Link>
+              </div>
             </div>
 
-            {/* Links */}
-            <div className="flex items-center gap-2">
-              <Link
-                href="/visuals"
-                className="btn btn-ghost btn-sm"
-              >
-                <Sparkles size={16} />
-                Visuals
-              </Link>
-              <Link
-                href="/curators"
-                className="btn btn-secondary btn-sm"
-              >
-                <Award size={16} />
-                Top Curators
+            {/* Stats banner */}
+            <div className="flex flex-wrap items-center gap-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[var(--text-secondary)]">Live discovery feed</span>
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">•</div>
+              <div className="text-sm text-[var(--text-secondary)]">
+                Posts ranked by recency, engagement, and quality
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">•</div>
+              <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
+                Try semantic search →
               </Link>
             </div>
           </div>
@@ -215,13 +226,19 @@ export default function ExplorePage() {
               </div>
 
               {/* Call to action */}
-              <div className="p-4 rounded-2xl bg-[var(--accent-soft)] border border-[var(--accent)]/20">
-                <h3 className="font-display text-lg mb-2">Got something to share?</h3>
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-[var(--accent-soft)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={20} className="text-[var(--accent)]" />
+                  <h3 className="font-display text-lg font-bold">Your Turn to Get Discovered</h3>
+                </div>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
-                  Publish your HTML, markdown, or rich text. We render it exactly as you wrote it.
+                  Write once, reach everywhere. Built-in SEO, multi-platform distribution, and real analytics. Your first post could be on this page tomorrow.
                 </p>
-                <Link href="/write" className="btn btn-primary btn-sm w-full">
-                  Start writing
+                <Link href="/write" className="btn btn-primary btn-sm w-full mb-3">
+                  Start Writing Free
+                </Link>
+                <Link href="/import" className="btn btn-ghost btn-sm w-full text-xs">
+                  Or import from Ghost/Substack →
                 </Link>
               </div>
             </div>
