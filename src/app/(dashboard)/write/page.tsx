@@ -60,7 +60,6 @@ export default function WritePage() {
   const [tags, setTags] = useState<string[]>(defaultTags)
   const [showSettings, setShowSettings] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [showCaptureDrawer, setShowCaptureDrawer] = useState(false)
   const [isPremium, setIsPremium] = useState(false)
   const [scheduledAt, setScheduledAt] = useState('')
   const [canonicalUrl, setCanonicalUrl] = useState('')
@@ -104,12 +103,6 @@ export default function WritePage() {
   const [manualHighlight, setManualHighlight] = useState('')
   const [commentFilter, setCommentFilter] = useState<'all' | 'reddit' | 'x' | 'manual'>('all')
   const [commentSort, setCommentSort] = useState<'score' | 'recent'>('score')
-
-  const [captureDrawerAssets, setCaptureDrawerAssets] = useState<CaptureAsset[]>([])
-  const [captureDrawerLoading, setCaptureDrawerLoading] = useState(false)
-  const [captureDrawerQuery, setCaptureDrawerQuery] = useState('')
-  const [captureDrawerType, setCaptureDrawerType] = useState<string>('')
-  const [captureInsertAssetId, setCaptureInsertAssetId] = useState<string | null>(null)
 
   const escapeHtml = (input: string) =>
     input
@@ -404,12 +397,6 @@ export default function WritePage() {
     if (!user || !publicationId) return
     loadScheduledQueue(user.id, publicationId)
   }, [user, publicationId])
-
-  useEffect(() => {
-    if (!showCaptureDrawer) return
-    void loadCaptureDrawerAssets({ q: captureDrawerQuery, type: captureDrawerType })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCaptureDrawer])
 
   const loadSelectedPublication = async () => {
     try {
@@ -1625,26 +1612,15 @@ export default function WritePage() {
                   Import HTML
                 </button>
                 {postId && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowSettings(false)
-                        setShowHistory(true)
-                      }}
-                      className="btn btn-ghost w-full justify-start"
-                    >
-                      Version History
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowSettings(false)
-                        setShowCaptureDrawer(true)
-                      }}
-                      className="btn btn-ghost w-full justify-start"
-                    >
-                      Insert Captures
-                    </button>
-                  </>
+                  <button
+                    onClick={() => {
+                      setShowSettings(false)
+                      setShowHistory(true)
+                    }}
+                    className="btn btn-ghost w-full justify-start"
+                  >
+                    Version History
+                  </button>
                 )}
               </div>
             </div>
@@ -1716,139 +1692,6 @@ export default function WritePage() {
               </div>
             </div>
           )}
-
-
-
-          {showCaptureDrawer && (
-            <div className="fixed inset-0 z-40">
-              <div
-                className="absolute inset-0 bg-black/30"
-                onClick={() => setShowCaptureDrawer(false)}
-              />
-              <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-[var(--bg-primary)] border-l border-[var(--border-light)] shadow-2xl overflow-y-auto">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-light)]">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-                      Compose
-                    </p>
-                    <h2 className="font-display text-xl">Captures</h2>
-                  </div>
-                  <button
-                    onClick={() => setShowCaptureDrawer(false)}
-                    className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
-                    aria-label="Close capture drawer"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <div className="px-5 py-5 space-y-4">
-                  {!postId ? (
-                    <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-sm text-[var(--text-secondary)]">
-                      Save the draft first to insert and track asset usage.
-                    </div>
-                  ) : null}
-
-                  <div className="grid gap-2">
-                    <input
-                      value={captureDrawerQuery}
-                      onChange={(e) => setCaptureDrawerQuery(e.target.value)}
-                      placeholder="Search captures"
-                      className="input"
-                    />
-                    <select
-                      value={captureDrawerType}
-                      onChange={(e) => setCaptureDrawerType(e.target.value)}
-                      className="input"
-                      aria-label="Filter asset type"
-                    >
-                      <option value="">All types</option>
-                      <option value="text">text</option>
-                      <option value="fragment">fragment</option>
-                      <option value="quote">quote</option>
-                      <option value="prompt">prompt</option>
-                      <option value="code">code</option>
-                      <option value="link">link</option>
-                      <option value="image">image</option>
-                    </select>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => void loadCaptureDrawerAssets({ q: captureDrawerQuery, type: captureDrawerType })}
-                        disabled={captureDrawerLoading}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        {captureDrawerLoading ? 'Searching…' : 'Search'}
-                      </button>
-                      <a href="/dashboard/captures" className="btn btn-ghost btn-sm">
-                        Open Captures
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
-                    {captureDrawerLoading ? (
-                      <div className="p-3 text-sm text-[var(--text-secondary)]">Loading…</div>
-                    ) : captureDrawerAssets.length === 0 ? (
-                      <div className="p-3 text-sm text-[var(--text-secondary)]">No matching assets.</div>
-                    ) : (
-                      <div className="divide-y divide-[var(--border-light)]">
-                        {captureDrawerAssets.map((a) => {
-                          const preview = String(a.content || '').replace(/\s+/g, ' ').slice(0, 120)
-                          return (
-                            <div key={a.id} className="p-3 space-y-2">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-                                    {a.type}
-                                  </div>
-                                  {a.title ? (
-                                    <div className="text-sm font-medium text-[var(--text-primary)] break-words">
-                                      {a.title}
-                                    </div>
-                                  ) : null}
-                                  <div className="text-sm text-[var(--text-primary)] break-words">
-                                    {preview}{preview.length === 120 ? '…' : ''}
-                                  </div>
-                                  {a.source_platform || a.source_url ? (
-                                    <div className="text-xs text-[var(--text-tertiary)] pt-1 flex flex-wrap gap-2">
-                                      {a.source_platform ? <span>{a.source_platform}</span> : null}
-                                      {a.source_url ? (
-                                        <a
-                                          href={a.source_url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="underline"
-                                        >
-                                          source
-                                        </a>
-                                      ) : null}
-                                    </div>
-                                  ) : null}
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <button
-                                    onClick={() => void insertAssetIntoDraft(a)}
-                                    disabled={captureInsertAssetId === a.id || !postId}
-                                    className="btn btn-secondary btn-sm"
-                                  >
-                                    {captureInsertAssetId === a.id ? 'Inserting…' : 'Insert'}
-                                  </button>
-                                  <a href={`/dashboard/captures/${a.id}`} className="btn btn-ghost btn-sm">
-                                    Details
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </aside>
-            </div>
-          )}
-
 
           {showHistory && postId && (
             <div className="fixed inset-0 z-40">

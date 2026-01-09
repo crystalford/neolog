@@ -11,7 +11,6 @@ import {
   BookOpen, DollarSign
 } from 'lucide-react'
 import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
-import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
@@ -25,7 +24,6 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [captureOpen, setCaptureOpen] = useState(false)
   const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
@@ -76,15 +74,6 @@ export default function DashboardLayout({
         tag === 'input' ||
         tag === 'textarea' ||
         (target?.getAttribute('contenteditable') ?? '') === 'true'
-
-      // Quick capture
-      if (isModifier && event.key.toLowerCase() === 'k') {
-        if (isEditable) return
-
-        event.preventDefault()
-        setCaptureOpen(true)
-        return
-      }
 
       // Quick switch (command palette)
       if (isModifier && event.key === '/') {
@@ -191,7 +180,6 @@ export default function DashboardLayout({
     const items = [
       { href: '/dashboard', icon: Home, label: 'Home' },
       { href: '/write', icon: PenLine, label: 'Write' },
-      { href: '/dashboard/captures', icon: Archive, label: 'Captures' },
       { href: '/import', icon: Upload, label: 'Import' },
     ]
 
@@ -375,16 +363,6 @@ export default function DashboardLayout({
                 <span>New Draft</span>
               </Link>
               <button
-                onClick={() => setCaptureOpen(true)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-              >
-                <Zap size={16} />
-                <span>Quick Capture</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+K or Ctrl+K">
-                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘K' : 'Ctrl+K'}
-                </span>
-              </button>
-              <button
                 onClick={() => setCommandOpen(true)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
               >
@@ -473,14 +451,7 @@ export default function DashboardLayout({
               >
                 <Search size={16} />
               </button>
-              <button
-                onClick={() => setCaptureOpen(true)}
-                className="inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                aria-label="Quick capture"
-              >
-                <Zap size={16} />
-              </button>
-              
+
               {/* New Draft button */}
               <Link
                 href="/write"
@@ -544,12 +515,6 @@ export default function DashboardLayout({
         isOpen={commandOpen}
         onClose={() => setCommandOpen(false)}
         onOpen={() => setCommandOpen(true)}
-      />
-
-      <QuickCaptureModal
-        isOpen={captureOpen}
-        onClose={() => setCaptureOpen(false)}
-        initialPublicationId={selectedPublicationId}
       />
     </div>
   )
