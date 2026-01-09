@@ -89,8 +89,10 @@ export async function generateEpub(
   for (const [groupTitle, groupPosts] of Object.entries(organizedPosts)) {
     for (const post of groupPosts) {
       const filename = `chapter-${chapterIndex}.xhtml`
+
       // Use html_content if available, otherwise convert markdown
-      const html = post.html_content || marked(post.content || '')
+      // marked() returns a Promise in newer versions, so we need to await it
+      const html = post.html_content || (await marked(post.content || ''))
 
       // Simple HTML cleanup for ePub compatibility (already sanitized in DB)
       const cleanedHtml = sanitizeForEpub(html)
