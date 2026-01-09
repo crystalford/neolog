@@ -318,7 +318,12 @@ function generateSvgCover(
 </svg>
   `.trim()
 
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+  // Use btoa for browser compatibility (works in both Node and browser)
+  const base64 = typeof window !== 'undefined'
+    ? btoa(svg)
+    : Buffer.from(svg).toString('base64')
+
+  return `data:image/svg+xml;base64,${base64}`
 }
 
 function escapeXml(str: string): string {

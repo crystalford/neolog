@@ -10,6 +10,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateEpub, EpubPost, EpubAuthor, EpubMetadata } from '@/lib/epub'
 
+// Type for post with series relationship
+type PostWithSeries = {
+  id: string
+  title: string
+  slug: string
+  content: string | null
+  html_content: string | null
+  published_at: string
+  reading_time_minutes: number | null
+  series: {
+    title: string
+    slug: string
+  } | null
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const username = searchParams.get('username')
@@ -75,6 +90,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No published posts found' }, { status: 404 })
   }
 
+  // Cast to proper type
+  const typedPosts = posts as unknown as PostWithSeries[]
+
   // Prepare metadata
   const author: EpubAuthor = {
     display_name: profile.display_name || profile.username,
@@ -85,7 +103,7 @@ export async function GET(request: NextRequest) {
   }
 
   const bookTitle = seriesSlug
-    ? `${posts[0]?.series?.title || 'Series'} by ${author.display_name}`
+    ? `${typedPosts[0]?.series?.title || 'Series'} by ${author.display_name}`
     : `The Complete Works of ${author.display_name}`
 
   const metadata: EpubMetadata = {
@@ -99,7 +117,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Format posts for ePub
-  const epubPosts: EpubPost[] = posts.map(post => ({
+  const epubPosts: EpubPost[] = typedPosts.map(post => ({
     id: post.id,
     title: post.title,
     slug: post.slug,
