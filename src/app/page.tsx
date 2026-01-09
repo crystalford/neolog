@@ -286,7 +286,7 @@ export default async function Home() {
               Already Publishing?<br />Bring Your Content.
             </h2>
             <p className="text-xl text-[var(--text-secondary)] mb-10 max-w-2xl mx-auto">
-              Import from Ghost, Substack, or Medium. Keep your URLs, preserve your SEO, own your audience.
+              <strong className="text-[var(--text-primary)]">Switch in minutes.</strong> Import from Ghost, Substack, Medium, or WordPress. Keep your URLs, preserve your SEO, own your audience.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <Link

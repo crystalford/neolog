@@ -9,8 +9,10 @@ import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { VersionHistory } from '@/components/VersionHistory'
+import { SEOAnalyzer } from '@/components/SEOAnalyzer'
+import { GenerativeCover } from '@/components/GenerativeCover'
 import {
-  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy
+  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy, ExternalLink
 } from 'lucide-react'
 
 type CaptureAsset = {
@@ -1404,9 +1406,12 @@ export default function WritePage() {
             </div>
           )}
 
-
-          {/* Title, Subtitle, Cover Image, then Editor */}
-          <div className="mb-8">
+          {/* Two-column layout: Main content + Sidebar */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main content column */}
+            <div className="lg:col-span-2">
+              {/* Title, Subtitle, Cover Image, then Editor */}
+              <div className="mb-8">
             <input
               type="text"
               value={title}
@@ -1666,6 +1671,86 @@ export default function WritePage() {
               )}
             </div>
           </div>
+
+          </div> {/* End main content column */}
+
+          {/* Sidebar column */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-6 space-y-6">
+              {/* SEO Analyzer */}
+              <SEOAnalyzer
+                title={title}
+                description={subtitle}
+                content={content}
+                className="mb-6"
+              />
+
+              {/* Live Cover Preview */}
+              {(title || content) && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                  <h3 className="font-semibold mb-3 text-sm">Cover Preview</h3>
+                  <GenerativeCover
+                    contentSeed={`${postId || 'new'}-${title}-${content.slice(0, 100)}`}
+                    width={400}
+                    height={225}
+                    title={title}
+                    author={profile?.display_name || profile?.username || 'Author'}
+                    className="rounded-lg overflow-hidden"
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                    Unique generative cover based on your content
+                  </p>
+                </div>
+              )}
+
+              {/* Distribution Previews */}
+              {(title || content) && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                  <h3 className="font-semibold mb-3 text-sm">Social Preview</h3>
+
+                  {/* X (Twitter) Card Preview */}
+                  <div className="mb-4 p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <div className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                      <ExternalLink size={12} />
+                      X (Twitter) Card
+                    </div>
+                    <div className="aspect-[2/1] bg-gradient-to-br from-purple-100 to-blue-100 rounded mb-2 flex items-center justify-center text-xs text-gray-500">
+                      {coverImage ? (
+                        <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded" />
+                      ) : (
+                        'Generated cover'
+                      )}
+                    </div>
+                    <div className="text-sm font-medium line-clamp-1">{title || 'Untitled'}</div>
+                    <div className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1">
+                      {subtitle || content.replace(/<[^>]*>/g, '').slice(0, 100) || 'No description'}
+                    </div>
+                  </div>
+
+                  {/* LinkedIn Card Preview */}
+                  <div className="p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <div className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                      <ExternalLink size={12} />
+                      LinkedIn Card
+                    </div>
+                    <div className="aspect-[2/1] bg-gradient-to-br from-blue-100 to-indigo-100 rounded mb-2 flex items-center justify-center text-xs text-gray-500">
+                      {coverImage ? (
+                        <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded" />
+                      ) : (
+                        'Generated cover'
+                      )}
+                    </div>
+                    <div className="text-sm font-medium line-clamp-1">{title || 'Untitled'}</div>
+                    <div className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1">
+                      {subtitle || content.replace(/<[^>]*>/g, '').slice(0, 100) || 'No description'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          </div> {/* End grid layout */}
 
           {showImport && (
             <div className="mb-7 p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">

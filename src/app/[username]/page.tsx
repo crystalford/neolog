@@ -222,6 +222,58 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           </div>
 
+          {/* Traffic Showcase */}
+          {postsWithAuthor.length > 0 && (
+            <section className="mt-6">
+              <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-secondary)]/40 to-[var(--bg-primary)]/40 p-6">
+                <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+                  <Globe size={20} className="text-[var(--accent)]" />
+                  Distribution Reach
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {/* RSS Subscribers */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Rss size={16} className="text-orange-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">RSS Feed</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{subscriberCount || 0}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">subscribers</p>
+                  </div>
+
+                  {/* Fediverse */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe size={16} className="text-purple-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">Fediverse</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{followerCount || 0}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">followers</p>
+                  </div>
+
+                  {/* Total Posts */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BookOpen size={16} className="text-blue-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">Published</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{postsWithAuthor.length}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">posts</p>
+                  </div>
+                </div>
+
+                {/* Multi-platform distribution message */}
+                <div className="p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    <strong className="text-[var(--text-primary)]">Reaching everywhere:</strong> RSS, ActivityPub (Mastodon), X (Twitter), LinkedIn, and direct subscribers.
+                    <span className="text-[var(--accent)] font-medium ml-2">→ {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Posts */}
           {stacks && stacks.length > 0 && (
             <section className="mt-6">
