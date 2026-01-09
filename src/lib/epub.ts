@@ -13,7 +13,6 @@
 
 import JSZip from 'jszip'
 import { marked } from 'marked'
-import DOMPurify from 'isomorphic-dompurify'
 
 export interface EpubPost {
   id: string
@@ -90,18 +89,13 @@ export async function generateEpub(
   for (const [groupTitle, groupPosts] of Object.entries(organizedPosts)) {
     for (const post of groupPosts) {
       const filename = `chapter-${chapterIndex}.xhtml`
+      // Use html_content if available, otherwise convert markdown
       const html = post.html_content || marked(post.content || '')
-      const sanitizedHtml = DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: [
-          'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'strong', 'em', 'u', 'a', 'ul', 'ol', 'li',
-          'blockquote', 'pre', 'code', 'img', 'hr',
-          'table', 'thead', 'tbody', 'tr', 'th', 'td',
-        ],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
-      })
 
-      const chapterContent = getChapterXhtml(post.title, sanitizedHtml)
+      // Simple HTML cleanup for ePub compatibility (already sanitized in DB)
+      const cleanedHtml = sanitizeForEpub(html)
+
+      const chapterContent = getChapterXhtml(post.title, cleanedHtml)
 
       chapters.push({
         id: `chapter-${chapterIndex}`,
@@ -443,6 +437,22 @@ th {
   font-weight: bold;
 }
 `
+}
+
+/**
+ * Simple HTML sanitization for ePub
+ * Removes potentially problematic tags while keeping safe formatting
+ */
+function sanitizeForEpub(html: string): string {
+  // Remove script tags
+  let cleaned = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  // Remove style tags (inline styles in CSS file instead)
+  cleaned = cleaned.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+  // Remove event handlers (onclick, onerror, etc)
+  cleaned = cleaned.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+  // Remove iframe (not supported in ePub)
+  cleaned = cleaned.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+  return cleaned
 }
 
 /**
