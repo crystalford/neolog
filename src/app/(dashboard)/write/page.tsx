@@ -66,7 +66,6 @@ export default function WritePage() {
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
-  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('draft')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -78,7 +77,6 @@ export default function WritePage() {
   const [importHtml, setImportHtml] = useState('')
   const [htmlMode, setHtmlMode] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
   const [lastVersion, setLastVersion] = useState<{ title: string; content: string | null } | null>(null)
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([])
   const [showPack, setShowPack] = useState(false)
@@ -512,13 +510,6 @@ export default function WritePage() {
       setScheduledAt(scheduledValue)
       setHtmlMode(shouldUseHtmlMode(post.content || ''))
       setExistingStatus(post.status || null)
-      if (post.status === 'published') {
-        setPublishIntent('publish')
-      } else if (post.status === 'scheduled') {
-        setPublishIntent('schedule')
-      } else {
-        setPublishIntent('draft')
-      }
 
       const { data: version } = await supabase
         .from('post_versions')
@@ -994,9 +985,8 @@ export default function WritePage() {
       setSaving(false)
       return
     }
-    const intent = isAlreadyPublished ? 'publish' : publishIntent
-    const isScheduling = intent === 'schedule' && Boolean(scheduledAt)
-    const statusValue = isScheduling ? 'scheduled' : isAlreadyPublished ? 'published' : 'draft'
+    const isScheduling = Boolean(scheduledAt && scheduledAt.length > 0)
+    const statusValue = isScheduling ? 'scheduled' : 'draft'
     
     const postData = {
       author_id: user.id,
@@ -1040,7 +1030,7 @@ export default function WritePage() {
     } finally {
       setSaving(false)
     }
-  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId, publishIntent])
+  }, [user, postId, title, subtitle, content, coverImage, canonicalUrl, originalSource, isPremium, scheduledAt, existingStatus, publicationId])
 
   // Debounced auto-save
   useEffect(() => {
@@ -1053,42 +1043,17 @@ export default function WritePage() {
 
   // Publish
   const handlePublish = async () => {
-    if (!user || !title || !content) {
+    if (!user || !title.trim() || !content.trim()) {
       setError('Add a title and content before publishing.')
       return
     }
 
     const isAlreadyPublished = existingStatus === 'published'
-    const intent = isAlreadyPublished ? 'publish' : publishIntent
-    const isScheduling = intent === 'schedule'
+    const isScheduling = !!scheduledAt && scheduledAt.length > 0
 
-    const preflight = [
-      { label: 'Title added', ok: title.trim().length >= 5, required: true },
-      { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
-      { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
-    ]
-
-    const missingRequired = preflight.filter((item) => item.required && !item.ok)
-    if (missingRequired.length > 0) {
-      setError('Add a longer title and more content before publishing.')
-      return
-    }
-
-    const missingOptional = preflight.filter((item) => !item.required && !item.ok)
-    if (missingOptional.length > 0) {
-      const proceed = window.confirm(
-        `Publish anyway? Missing: ${missingOptional.map((item) => item.label).join(', ')}`
-      )
-      if (!proceed) return
-    }
-
-    if (intent === 'draft') {
-      setError('This post is still set to Draft. Switch the status to Publish or Schedule.')
-      return
-    }
-
-    if (isScheduling && !scheduledAt) {
-      setError('Pick a schedule time to schedule this post.')
+    // Simple validation - just check for basic content
+    if (title.trim().length < 3) {
+      setError('Title is too short. Add at least 3 characters.')
       return
     }
 
@@ -1334,13 +1299,7 @@ export default function WritePage() {
     )
   }
 
-  const resolvedIntent = existingStatus === 'published' ? 'publish' : publishIntent
-
-  const publishLabel = existingStatus === 'published'
-    ? 'Update'
-    : resolvedIntent === 'schedule'
-    ? 'Schedule'
-    : 'Publish'
+  const publishLabel = existingStatus === 'published' ? 'Update' : 'Publish'
 
   const previousWordCount = lastVersion?.content
     ? getWordCount(lastVersion.content)
@@ -1351,64 +1310,58 @@ export default function WritePage() {
 
   return (
     <>
-      {/* Fixed Top Bar */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-[var(--bg-primary)]/95 backdrop-blur-sm border-b border-[var(--border-light)]">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Left: Back + Status */}
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-              ← Dashboard
-            </Link>
-            {existingStatus && (
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                existingStatus === 'published'
-                  ? 'bg-green-500/10 text-green-600'
-                  : existingStatus === 'scheduled'
-                  ? 'bg-blue-500/10 text-blue-600'
-                  : 'bg-gray-500/10 text-gray-600'
-              }`}>
-                {existingStatus === 'published' ? 'Published' : existingStatus === 'scheduled' ? 'Scheduled' : 'Draft'}
-              </span>
-            )}
-          </div>
-
-          {/* Center: Auto-save indicator */}
-          {lastSaved && (
-            <span className="text-xs text-[var(--text-tertiary)]">
-              Saved {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
-
-          {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="btn btn-ghost btn-sm"
-              title="Post settings"
-            >
-              <Settings size={16} />
-            </button>
-            <button
-              onClick={() => setShowPublishConfirm(true)}
-              disabled={publishing || !title || !content}
-              className="btn btn-primary"
-            >
-              {publishing ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Publishing...
-                </>
-              ) : (
-                publishLabel
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <main className="pt-24 pb-20">
-        <div className="max-w-3xl mx-auto px-6">
+      <main className="min-h-screen">
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {/* Top Actions Bar */}
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-[var(--border-light)]">
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                ← Back
+              </Link>
+              {existingStatus && (
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  existingStatus === 'published'
+                    ? 'bg-green-500/10 text-green-600'
+                    : existingStatus === 'scheduled'
+                    ? 'bg-blue-500/10 text-blue-600'
+                    : 'bg-gray-500/10 text-gray-600'
+                }`}>
+                  {existingStatus === 'published' ? 'Published' : existingStatus === 'scheduled' ? 'Scheduled' : 'Draft'}
+                </span>
+              )}
+              {lastSaved && (
+                <span className="text-xs text-[var(--text-tertiary)]">
+                  Saved {lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="btn btn-ghost btn-sm"
+                title="Post settings"
+              >
+                <Settings size={16} />
+                Settings
+              </button>
+              <button
+                onClick={handlePublish}
+                disabled={publishing || !title.trim() || !content.trim()}
+                className="btn btn-primary"
+              >
+                {publishing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  publishLabel
+                )}
+              </button>
+            </div>
+          </div>
           {/* Error/Success Messages */}
           {hasNoPublications && (
             <div className="mb-6 p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
@@ -1934,69 +1887,6 @@ export default function WritePage() {
               </aside>
             </div>
           )}
-
-      {/* Publish Confirmation Dialog */}
-      {showPublishConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setShowPublishConfirm(false)}
-          />
-          <div className="relative w-full max-w-lg rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-2xl p-6">
-            <h3 className="font-display text-2xl text-[var(--text-primary)] mb-2">
-              Ready to {publishLabel.toLowerCase()}?
-            </h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">
-              {title || 'Untitled post'}
-            </p>
-
-            <div className="space-y-3 text-sm mb-6">
-              <div className="flex items-center justify-between py-2 border-b border-[var(--border-light)]">
-                <span className="text-[var(--text-secondary)]">Status</span>
-                <span className="font-medium text-[var(--text-primary)]">
-                  {scheduledAt ? `Scheduled for ${new Date(scheduledAt).toLocaleDateString()}` : publishLabel}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-[var(--border-light)]">
-                <span className="text-[var(--text-secondary)]">Words</span>
-                <span className="font-medium text-[var(--text-primary)]">
-                  {currentWordCount.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-[var(--border-light)]">
-                <span className="text-[var(--text-secondary)]">Tags</span>
-                <span className="font-medium text-[var(--text-primary)]">
-                  {tags.length > 0 ? tags.join(', ') : 'None'}
-                </span>
-              </div>
-              {isPremium && (
-                <div className="flex items-center justify-between py-2 border-b border-[var(--border-light)]">
-                  <span className="text-[var(--text-secondary)]">Access</span>
-                  <span className="font-medium text-[var(--accent)]">Premium only</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowPublishConfirm(false)}
-                className="btn btn-secondary flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowPublishConfirm(false)
-                  handlePublish()
-                }}
-                className="btn btn-primary flex-1"
-              >
-                {publishLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
           {showPack && (
             <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
