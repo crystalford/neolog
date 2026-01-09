@@ -192,15 +192,16 @@ export default async function ProfilePage({ params }: Props) {
                     <Rss size={14} />
                     RSS Feed
                   </Link>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    title="Export as ePub book - Coming Q1 2026"
-                    disabled
+                  <a
+                    href={`/api/export/epub?username=${profile.username}`}
+                    className="btn btn-sm btn-secondary"
+                    download
+                    title="Download all posts as an ePub book"
                   >
                     <BookOpen size={14} />
                     Export as Book
-                    <span className="text-xs opacity-60">(Q1 2026)</span>
-                  </button>
+                    <Download size={12} className="ml-1" />
+                  </a>
                   <button
                     className="btn btn-sm btn-ghost"
                     title="ActivityPub profile - Coming Q1 2026"
