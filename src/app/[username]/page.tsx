@@ -23,12 +23,20 @@ export async function generateMetadata({ params }: Props) {
 
   if (!profile) return { title: 'Not Found' }
 
-  return generateSEO({
-    title: profile.display_name || profile.username,
-    description: profile.bio || `Read posts by ${profile.display_name || profile.username}`,
-    image: profile.avatar_url || undefined,
-    url: `/${params.username}`,
-  })
+  return {
+    ...generateSEO({
+      title: profile.display_name || profile.username,
+      description: profile.bio || `Read posts by ${profile.display_name || profile.username}`,
+      image: profile.avatar_url || undefined,
+      url: `/${params.username}`,
+    }),
+    alternates: {
+      types: {
+        'application/rss+xml': `/${params.username}/feed`,
+        'application/atom+xml': `/${params.username}/feed`,
+      },
+    },
+  }
 }
 
 export default async function ProfilePage({ params }: Props) {

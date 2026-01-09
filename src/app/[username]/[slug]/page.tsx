@@ -40,16 +40,24 @@ export async function generateMetadata({ params }: Props) {
 
   if (!post) return { title: 'Not Found' }
 
-  return generateSEO({
-    title: post.title,
-    description: post.excerpt || undefined,
-    image: post.cover_image_url || undefined,
-    url: `/${params.username}/${params.slug}`,
-    type: 'article',
-    author: profile.display_name || profile.username,
-    publishedTime: post.published_at,
-    modifiedTime: post.updated_at,
-  })
+  return {
+    ...generateSEO({
+      title: post.title,
+      description: post.excerpt || undefined,
+      image: post.cover_image_url || undefined,
+      url: `/${params.username}/${params.slug}`,
+      type: 'article',
+      author: profile.display_name || profile.username,
+      publishedTime: post.published_at,
+      modifiedTime: post.updated_at,
+    }),
+    alternates: {
+      types: {
+        'application/rss+xml': `/${params.username}/feed`,
+        'application/atom+xml': `/${params.username}/feed`,
+      },
+    },
+  }
 }
 
 export default async function PostPage({ params, searchParams }: Props) {
@@ -279,6 +287,46 @@ export default async function PostPage({ params, searchParams }: Props) {
               url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${params.username}/${params.slug}`}
               title={post.title}
             />
+          </div>
+
+          {/* Author Bio/CTA */}
+          <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
+            <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6">
+              <div className="flex items-start gap-4">
+                <Link href={`/${params.username}`}>
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || profile.username}
+                      className="w-16 h-16 rounded-full ring-2 ring-[var(--border-light)]"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[var(--accent)] flex items-center justify-center text-xl font-medium text-white ring-2 ring-[var(--border-light)]">
+                      {(profile.display_name || profile.username)[0].toUpperCase()}
+                    </div>
+                  )}
+                </Link>
+                <div className="flex-1">
+                  <h3 className="font-display text-xl mb-1">
+                    Written by{' '}
+                    <Link href={`/${params.username}`} className="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
+                      {profile.display_name || profile.username}
+                    </Link>
+                  </h3>
+                  <p className="text-sm text-[var(--text-secondary)] mb-4">
+                    {profile.bio || `Follow ${profile.display_name || profile.username} for more great content`}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/${params.username}`} className="btn btn-primary btn-sm">
+                      View Profile
+                    </Link>
+                    <Link href={`/${params.username}/feed`} className="btn btn-secondary btn-sm">
+                      Subscribe via RSS
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {tags.length > 0 && (

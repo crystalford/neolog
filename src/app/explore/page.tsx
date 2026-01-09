@@ -7,7 +7,7 @@ import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { PostCardSkeleton } from '@/components/Skeleton'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
-import { TrendingUp, Clock, Sparkles, Award, Loader2 } from 'lucide-react'
+import { TrendingUp, Clock, Sparkles, Award, Loader2, Search } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
 
 type RisingPost = {
@@ -24,6 +24,9 @@ type RisingPost = {
 export default function ExplorePage() {
   const [risingPosts, setRisingPosts] = useState<RisingPost[]>([])
   const [filter, setFilter] = useState<'latest' | 'popular' | 'rising'>('latest')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [topTags, setTopTags] = useState<Array<{ id: string; name: string; slug: string; count: number }>>([])
   const supabase = createClient()
 
   const fetchPosts = useCallback(async (offset: number, limit: number) => {
@@ -31,7 +34,28 @@ export default function ExplorePage() {
       .from('posts')
       .select(`*, author:profiles(*), series:series(title, slug)`)
       .eq('status', 'published')
-      .range(offset, offset + limit - 1)
+
+    // Search filter
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,subtitle.ilike.%${searchQuery}%,excerpt.ilike.%${searchQuery}%`)
+    }
+
+    // Tag filter - need to filter by tag if selected
+    if (selectedTag) {
+      const { data: postIds } = await supabase
+        .from('post_tags')
+        .select('post_id')
+        .eq('tag_id', selectedTag)
+
+      if (postIds && postIds.length > 0) {
+        query = query.in('id', postIds.map(pt => pt.post_id))
+      } else {
+        // No posts with this tag
+        return { data: [] as PostWithAuthor[], hasMore: false }
+      }
+    }
+
+    query = query.range(offset, offset + limit - 1)
 
     if (filter === 'latest') {
       query = query.order('published_at', { ascending: false })
@@ -46,7 +70,7 @@ export default function ExplorePage() {
       data: (data || []) as PostWithAuthor[],
       hasMore: (data?.length || 0) === limit,
     }
-  }, [filter, supabase])
+  }, [filter, searchQuery, selectedTag, supabase])
 
   const {
     data: posts,
@@ -63,7 +87,41 @@ export default function ExplorePage() {
   useEffect(() => {
     loadInitial()
     loadRisingPosts()
-  }, [filter])
+    loadTopTags()
+  }, [filter, searchQuery, selectedTag])
+
+  const loadTopTags = async () => {
+    // Get top 10 most used tags
+    const { data } = await supabase
+      .from('post_tags')
+      .select('tag_id, tags(id, name, slug)')
+
+    if (data) {
+      const tagCounts = new Map<string, { id: string; name: string; slug: string; count: number }>()
+
+      data.forEach((pt: any) => {
+        if (pt.tags) {
+          const existing = tagCounts.get(pt.tags.id)
+          if (existing) {
+            existing.count++
+          } else {
+            tagCounts.set(pt.tags.id, {
+              id: pt.tags.id,
+              name: pt.tags.name,
+              slug: pt.tags.slug,
+              count: 1
+            })
+          }
+        }
+      })
+
+      const sorted = Array.from(tagCounts.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+
+      setTopTags(sorted)
+    }
+  }
 
   const loadRisingPosts = async () => {
     const { data } = await supabase.rpc('get_rising_posts', { limit_count: 5 })
@@ -108,6 +166,51 @@ export default function ExplorePage() {
               </div>
             </div>
 
+            {/* Search Bar */}
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search posts by title, subtitle, or content..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Tag Filters */}
+            {topTags.length > 0 && (
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      selectedTag === null
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                    }`}
+                  >
+                    All Topics
+                  </button>
+                  {topTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => setSelectedTag(tag.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        selectedTag === tag.id
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                          : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                      }`}
+                    >
+                      #{tag.name} ({tag.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Stats banner */}
             <div className="flex flex-wrap items-center gap-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
               <div className="flex items-center gap-2 text-sm">
@@ -116,12 +219,16 @@ export default function ExplorePage() {
               </div>
               <div className="text-sm text-[var(--text-tertiary)]">•</div>
               <div className="text-sm text-[var(--text-secondary)]">
-                Posts ranked by recency, engagement, and quality
+                {searchQuery ? `Searching for "${searchQuery}"` : selectedTag ? `Filtered by ${topTags.find(t => t.id === selectedTag)?.name}` : 'Posts ranked by recency, engagement, and quality'}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">•</div>
-              <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
-                Try semantic search →
-              </Link>
+              {!searchQuery && !selectedTag && (
+                <>
+                  <div className="text-sm text-[var(--text-tertiary)]">•</div>
+                  <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
+                    Try semantic search →
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 

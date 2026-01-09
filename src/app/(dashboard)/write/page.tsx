@@ -1417,7 +1417,7 @@ export default function WritePage() {
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Title"
-              className="font-display text-3xl md:text-4xl w-full bg-transparent border-none outline-none mb-2"
+              className="font-display text-3xl md:text-4xl w-full px-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors mb-3"
               maxLength={120}
               autoFocus
             />
@@ -1426,7 +1426,7 @@ export default function WritePage() {
               value={subtitle}
               onChange={e => setSubtitle(e.target.value)}
               placeholder="Subtitle (optional)"
-              className="text-lg w-full bg-transparent border-none outline-none mb-4 text-[var(--text-secondary)]"
+              className="text-lg w-full px-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors mb-4 text-[var(--text-secondary)]"
               maxLength={180}
             />
             <div className="mb-4">
