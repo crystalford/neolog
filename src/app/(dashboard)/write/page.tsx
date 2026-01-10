@@ -11,8 +11,9 @@ import { TagSelect } from '@/components/TagSelect'
 import { VersionHistory } from '@/components/VersionHistory'
 import { SEOAnalyzer } from '@/components/SEOAnalyzer'
 import { GenerativeCover } from '@/components/GenerativeCover'
+import { generateMetaDescription, suggestTitles, findRelatedPosts, findComplexSentences } from '@/lib/ai-assistant'
 import {
-  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy, ExternalLink
+  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy, ExternalLink, Sparkles, Lightbulb, Link2, AlertCircle
 } from 'lucide-react'
 
 type CaptureAsset = {
@@ -1421,14 +1422,29 @@ export default function WritePage() {
               maxLength={120}
               autoFocus
             />
-            <input
-              type="text"
-              value={subtitle}
-              onChange={e => setSubtitle(e.target.value)}
-              placeholder="Subtitle (optional)"
-              className="text-lg w-full px-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors mb-4 text-[var(--text-secondary)]"
-              maxLength={180}
-            />
+            <div className="relative mb-4">
+              <input
+                type="text"
+                value={subtitle}
+                onChange={e => setSubtitle(e.target.value)}
+                placeholder="Subtitle (optional)"
+                className="text-lg w-full px-4 py-3 pr-32 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors text-[var(--text-secondary)]"
+                maxLength={180}
+              />
+              {content && content.length > 100 && (
+                <button
+                  onClick={() => {
+                    const generated = generateMetaDescription(content, title)
+                    setSubtitle(generated.substring(0, 180))
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
+                  title="Generate from content"
+                >
+                  <Sparkles size={14} />
+                  Auto-fill
+                </button>
+              )}
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                 Cover image
@@ -1658,10 +1674,20 @@ export default function WritePage() {
                 Import HTML
               </button>
 
-              {lastSaved && (
-                <span className="text-xs text-[var(--text-tertiary)] ml-auto">
-                  Last saved {lastSaved.toLocaleTimeString()}
-                </span>
+              {(saving || lastSaved) && (
+                <div className="ml-auto flex items-center gap-2">
+                  {saving ? (
+                    <span className="flex items-center gap-2 text-xs text-[var(--accent)]">
+                      <Loader2 size={14} className="animate-spin" />
+                      Saving...
+                    </span>
+                  ) : lastSaved ? (
+                    <span className="flex items-center gap-2 text-xs text-green-600">
+                      <CheckCircle2 size={14} />
+                      Saved {lastSaved.toLocaleTimeString()}
+                    </span>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
@@ -1678,6 +1704,45 @@ export default function WritePage() {
                 content={content}
                 className="mb-6"
               />
+
+              {/* Title Suggestions */}
+              {title && title.length > 10 && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4 mb-6">
+                  <h3 className="font-semibold mb-2 text-sm flex items-center gap-2">
+                    <Lightbulb size={16} className="text-[var(--accent)]" />
+                    Title Ideas
+                  </h3>
+                  <ul className="space-y-2 text-xs text-[var(--text-secondary)]">
+                    {suggestTitles(title, content).map((suggestion, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-[var(--accent)] mt-0.5">•</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Readability Coach */}
+              {content && content.length > 200 && (() => {
+                const complexSentences = findComplexSentences(content)
+                return complexSentences.length > 0 ? (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 mb-6">
+                    <h3 className="font-semibold mb-2 text-sm flex items-center gap-2 text-orange-900">
+                      <AlertCircle size={16} className="text-orange-600" />
+                      Readability Tips
+                    </h3>
+                    <div className="space-y-3">
+                      {complexSentences.slice(0, 3).map((item, i) => (
+                        <div key={i} className="text-xs">
+                          <p className="text-orange-700 italic mb-1">"{item.sentence.substring(0, 80)}..."</p>
+                          <p className="text-orange-600">{item.issue}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              })()}
 
               {/* Live Cover Preview */}
               {(title || content) && (
