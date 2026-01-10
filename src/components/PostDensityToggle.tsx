@@ -213,7 +213,7 @@ export function PostDensityToggle({ postId, summary, bullets, html, model }: Pos
             </div>
           )}
           <div
-            className="prose prose-lg max-w-none"
+            className="prose prose-lg max-w-none [&>*]:break-words [&>*]:overflow-wrap-anywhere"
             dangerouslySetInnerHTML={{ __html: processed.html }}
           />
         </div>

@@ -124,6 +124,37 @@ export async function POST(request: NextRequest) {
           results.errors.push(`Failed to import: ${post.title}`)
         }
       }
+    } else if (source === 'ghost') {
+      // Ghost exports as JSON
+      const decoder = new TextDecoder()
+      const json = decoder.decode(arrayBuffer)
+      const ghostData = JSON.parse(json)
+
+      const posts = ghostData?.db?.[0]?.data?.posts || []
+
+      for (const post of posts) {
+        // Only import published posts, not drafts
+        if (post.status !== 'published') continue
+
+        try {
+          await supabase.from('posts').insert({
+            author_id: session.user.id,
+            title: post.title || 'Untitled',
+            slug: post.slug || generateSlug(post.title || 'untitled'),
+            content: post.mobiledoc || post.html || post.markdown || '',
+            content_html: post.html || '',
+            content_type: post.html ? 'html' : 'markdown',
+            excerpt: post.custom_excerpt || post.meta_description || stripHtml(post.html || '').substring(0, 160) + '...',
+            status: 'draft',
+            created_at: post.published_at || post.created_at,
+            cover_image_url: post.feature_image || null,
+          })
+          results.success++
+        } catch (err) {
+          results.failed++
+          results.errors.push(`Failed to import: ${post.title}`)
+        }
+      }
     }
 
     finalStatus = 'success'

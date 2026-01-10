@@ -141,16 +141,72 @@ export default function ImportPage() {
     <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
       <div className="mb-10">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-              Import
+              Switch in minutes
             </p>
-            <h1 className="font-display text-3xl mb-2">Import Your Content</h1>
-            <p className="text-[var(--text-secondary)] max-w-2xl">
-              Bring your existing posts from Substack, Medium, or WordPress.
+            <h1 className="font-display text-4xl mb-3">Import Your Content</h1>
+            <p className="text-lg text-[var(--text-secondary)] max-w-2xl mb-4">
+              Bring your entire publication from Ghost, Substack, Medium, or WordPress.
             </p>
+            <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
+              <span className="flex items-center gap-1">
+                <Check size={16} className="text-green-600" />
+                Keep all your posts
+              </span>
+              <span className="flex items-center gap-1">
+                <Check size={16} className="text-green-600" />
+                Preserve formatting
+              </span>
+              <span className="flex items-center gap-1">
+                <Check size={16} className="text-green-600" />
+                No data loss
+              </span>
+            </div>
       </div>
 
       <div className="space-y-8">
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Ghost */}
+              <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-lg bg-[#15171A]/10 flex items-center justify-center">
+                    <span className="text-xl font-bold text-[#15171A]">G</span>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="font-medium text-base mb-1">Import from Ghost</h2>
+                    <p className="text-sm text-[var(--text-secondary)] mb-4">
+                      Export your Ghost site and upload the JSON file
+                    </p>
+
+                    <ol className="text-sm text-[var(--text-tertiary)] mb-4 space-y-1">
+                      <li>1. Go to Ghost Admin &gt; Settings &gt; Labs</li>
+                      <li>2. Click "Export" to download your content</li>
+                      <li>3. Upload the JSON file below</li>
+                    </ol>
+
+                    <label className="btn btn-secondary cursor-pointer inline-flex">
+                      {importing ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={16} />
+                          Upload Ghost Export
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={(e) => handleFileUpload(e, 'ghost')}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {/* Substack */}
               <div className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
                 <div className="flex items-start gap-4">

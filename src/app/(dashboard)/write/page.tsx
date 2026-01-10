@@ -9,8 +9,11 @@ import { ensureProfile } from '@/lib/profile'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { VersionHistory } from '@/components/VersionHistory'
+import { SEOAnalyzer } from '@/components/SEOAnalyzer'
+import { GenerativeCover } from '@/components/GenerativeCover'
+import { generateMetaDescription, suggestTitles, findRelatedPosts, findComplexSentences } from '@/lib/ai-assistant'
 import {
-  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy
+  Loader2, Settings, BookOpen, Upload, X, CheckCircle2, Copy, ExternalLink, Sparkles, Lightbulb, Link2, AlertCircle
 } from 'lucide-react'
 
 type CaptureAsset = {
@@ -35,7 +38,7 @@ type PostAssetLink = {
 export default function WritePage() {
   // Defaults
   const fallbackCover = '/default-cover.jpg'
-  const defaultTags = ['writing', 'neolog', 'product']
+  const defaultTags: string[] = []
 
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -66,7 +69,7 @@ export default function WritePage() {
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
-  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('draft')
+  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('publish')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -1063,14 +1066,15 @@ export default function WritePage() {
     const isScheduling = intent === 'schedule'
 
     const preflight = [
-      { label: 'Title added', ok: title.trim().length >= 5, required: true },
+      { label: 'Title added', ok: title.trim().length > 0, required: true },
+      { label: 'Content added', ok: content.trim().length > 0, required: true },
       { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
       { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
     ]
 
     const missingRequired = preflight.filter((item) => item.required && !item.ok)
     if (missingRequired.length > 0) {
-      setError('Add a longer title and more content before publishing.')
+      setError('Add a title and content before publishing.')
       return
     }
 
@@ -1082,10 +1086,7 @@ export default function WritePage() {
       if (!proceed) return
     }
 
-    if (intent === 'draft') {
-      setError('This post is still set to Draft. Switch the status to Publish or Schedule.')
-      return
-    }
+    // Removed draft validation - auto-save handles drafts, button always publishes
 
     if (isScheduling && !scheduledAt) {
       setError('Pick a schedule time to schedule this post.')
@@ -1247,6 +1248,7 @@ export default function WritePage() {
       // Send notifications via API for first publish only
       if (finalPostId && !isAlreadyPublished && !isScheduling) {
         try {
+          console.log('[Publish] Calling publish API for post:', finalPostId)
           const response = await fetch('/api/posts/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1254,10 +1256,13 @@ export default function WritePage() {
           })
 
           const json = await response.json().catch(() => null)
+          console.log('[Publish] API response:', response.status, json)
 
           if (!response.ok) {
             console.error('Publish API error:', json || (await response.text()))
-            // Don't fail publishing if notifications fail
+            setError(`Failed to publish: ${json?.error || 'Unknown error'}`)
+            setPublishing(false)
+            return
           } else {
             // Kick off heavy publish side-effects in the background.
             // keepalive helps the request complete even if we redirect.
@@ -1404,26 +1409,44 @@ export default function WritePage() {
             </div>
           )}
 
-
-          {/* Title, Subtitle, Cover Image, then Editor */}
-          <div className="mb-8">
+          {/* Two-column layout: Main content + Sidebar */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main content column */}
+            <div className="lg:col-span-2">
+              {/* Title, Subtitle, Cover Image, then Editor */}
+              <div className="mb-8">
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Title"
-              className="font-display text-3xl md:text-4xl w-full bg-transparent border-none outline-none mb-2"
+              className="font-display text-3xl md:text-4xl w-full px-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors mb-3"
               maxLength={120}
               autoFocus
             />
-            <input
-              type="text"
-              value={subtitle}
-              onChange={e => setSubtitle(e.target.value)}
-              placeholder="Subtitle (optional)"
-              className="text-lg w-full bg-transparent border-none outline-none mb-4 text-[var(--text-secondary)]"
-              maxLength={180}
-            />
+            <div className="relative mb-4">
+              <input
+                type="text"
+                value={subtitle}
+                onChange={e => setSubtitle(e.target.value)}
+                placeholder="Subtitle (optional)"
+                className="text-lg w-full px-4 py-3 pr-32 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors text-[var(--text-secondary)]"
+                maxLength={180}
+              />
+              {content && content.length > 100 && (
+                <button
+                  onClick={() => {
+                    const generated = generateMetaDescription(content, title)
+                    setSubtitle(generated.substring(0, 180))
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors"
+                  title="Generate from content"
+                >
+                  <Sparkles size={14} />
+                  Auto-fill
+                </button>
+              )}
+            </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                 Cover image
@@ -1502,59 +1525,30 @@ export default function WritePage() {
               />
             </div>
 
-            {/* Publish Intent */}
+            {/* Schedule option - only for non-published posts */}
             {existingStatus !== 'published' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Status
+              <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={publishIntent === 'schedule'}
+                    onChange={(e) => setPublishIntent(e.target.checked ? 'schedule' : 'publish')}
+                    className="w-4 h-4 rounded border-[var(--border-medium)]"
+                  />
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    Schedule for later
+                  </span>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setPublishIntent('draft')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'draft'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Save as Draft
-                  </button>
-                  <button
-                    onClick={() => setPublishIntent('publish')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'publish'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Publish Now
-                  </button>
-                  <button
-                    onClick={() => setPublishIntent('schedule')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'schedule'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Schedule
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Schedule time - only show when schedule is selected */}
-            {publishIntent === 'schedule' && existingStatus !== 'published' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Schedule for
-                </label>
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="input max-w-md"
-                />
+                {publishIntent === 'schedule' && (
+                  <div className="mt-3">
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="input w-full"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -1642,12 +1636,6 @@ export default function WritePage() {
                   >
                     Version History
                   </button>
-                  <button
-                    onClick={() => setShowCaptureDrawer(true)}
-                    className="btn btn-secondary"
-                  >
-                    Insert Captures
-                  </button>
                 </>
               )}
 
@@ -1659,13 +1647,142 @@ export default function WritePage() {
                 Import HTML
               </button>
 
-              {lastSaved && (
-                <span className="text-xs text-[var(--text-tertiary)] ml-auto">
-                  Last saved {lastSaved.toLocaleTimeString()}
-                </span>
+              {(saving || lastSaved) && (
+                <div className="ml-auto flex items-center gap-2">
+                  {saving ? (
+                    <span className="flex items-center gap-2 text-xs text-[var(--accent)]">
+                      <Loader2 size={14} className="animate-spin" />
+                      Saving...
+                    </span>
+                  ) : lastSaved ? (
+                    <span className="flex items-center gap-2 text-xs text-green-600">
+                      <CheckCircle2 size={14} />
+                      Saved {lastSaved.toLocaleTimeString()}
+                    </span>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
+
+          </div> {/* End main content column */}
+
+          {/* Sidebar column */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-6 space-y-6">
+              {/* SEO Analyzer */}
+              <SEOAnalyzer
+                title={title}
+                description={subtitle}
+                content={content}
+                className="mb-6"
+              />
+
+              {/* Title Suggestions */}
+              {title && title.length > 10 && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4 mb-6">
+                  <h3 className="font-semibold mb-2 text-sm flex items-center gap-2">
+                    <Lightbulb size={16} className="text-[var(--accent)]" />
+                    Title Ideas
+                  </h3>
+                  <ul className="space-y-2 text-xs text-[var(--text-secondary)]">
+                    {suggestTitles(title, content).map((suggestion, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-[var(--accent)] mt-0.5">•</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Readability Coach */}
+              {content && content.length > 200 && (() => {
+                const complexSentences = findComplexSentences(content)
+                return complexSentences.length > 0 ? (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 mb-6">
+                    <h3 className="font-semibold mb-2 text-sm flex items-center gap-2 text-orange-900">
+                      <AlertCircle size={16} className="text-orange-600" />
+                      Readability Tips
+                    </h3>
+                    <div className="space-y-3">
+                      {complexSentences.slice(0, 3).map((item, i) => (
+                        <div key={i} className="text-xs">
+                          <p className="text-orange-700 italic mb-1">"{item.sentence.substring(0, 80)}..."</p>
+                          <p className="text-orange-600">{item.issue}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              })()}
+
+              {/* Live Cover Preview */}
+              {(title || content) && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                  <h3 className="font-semibold mb-3 text-sm">Cover Preview</h3>
+                  <GenerativeCover
+                    contentSeed={`${postId || 'new'}-${title}-${content.slice(0, 100)}`}
+                    width={400}
+                    height={225}
+                    title={title}
+                    author={profile?.display_name || profile?.username || 'Author'}
+                    className="rounded-lg overflow-hidden"
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                    Unique generative cover based on your content
+                  </p>
+                </div>
+              )}
+
+              {/* Distribution Previews */}
+              {(title || content) && (
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                  <h3 className="font-semibold mb-3 text-sm">Social Preview</h3>
+
+                  {/* X (Twitter) Card Preview */}
+                  <div className="mb-4 p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <div className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                      <ExternalLink size={12} />
+                      X (Twitter) Card
+                    </div>
+                    <div className="aspect-[2/1] bg-gradient-to-br from-purple-100 to-blue-100 rounded mb-2 flex items-center justify-center text-xs text-gray-500">
+                      {coverImage ? (
+                        <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded" />
+                      ) : (
+                        'Generated cover'
+                      )}
+                    </div>
+                    <div className="text-sm font-medium line-clamp-1">{title || 'Untitled'}</div>
+                    <div className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1">
+                      {subtitle || content.replace(/<[^>]*>/g, '').slice(0, 100) || 'No description'}
+                    </div>
+                  </div>
+
+                  {/* LinkedIn Card Preview */}
+                  <div className="p-3 rounded-lg border border-[var(--border-light)] bg-[var(--bg-primary)]">
+                    <div className="text-xs text-[var(--text-tertiary)] mb-2 flex items-center gap-1">
+                      <ExternalLink size={12} />
+                      LinkedIn Card
+                    </div>
+                    <div className="aspect-[2/1] bg-gradient-to-br from-blue-100 to-indigo-100 rounded mb-2 flex items-center justify-center text-xs text-gray-500">
+                      {coverImage ? (
+                        <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded" />
+                      ) : (
+                        'Generated cover'
+                      )}
+                    </div>
+                    <div className="text-sm font-medium line-clamp-1">{title || 'Untitled'}</div>
+                    <div className="text-xs text-[var(--text-tertiary)] line-clamp-2 mt-1">
+                      {subtitle || content.replace(/<[^>]*>/g, '').slice(0, 100) || 'No description'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          </div> {/* End grid layout */}
 
           {showImport && (
             <div className="mb-7 p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm">
@@ -1949,6 +2066,64 @@ export default function WritePage() {
                       {tags.length} selected
                     </span>
                   </div>
+
+                  {/* Quality Checklist */}
+                  <div className="mt-4 p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                    <h4 className="font-semibold text-xs uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Quality Checklist</h4>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        {title.length >= 50 && title.length <= 60 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={title.length >= 50 && title.length <= 60 ? 'text-green-700' : 'text-orange-700'}>
+                          Title length {title.length >= 50 && title.length <= 60 ? 'optimal' : `${title.length} chars (aim for 50-60)`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {subtitle && subtitle.length > 0 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={subtitle ? 'text-green-700' : 'text-orange-700'}>
+                          Meta description {subtitle ? 'added' : 'missing'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? 'text-green-700' : 'text-orange-700'}>
+                          Word count {content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? '300+' : `${content.replace(/<[^>]*>/g, '').split(/\s+/).length} (aim for 300+)`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {tags.length > 0 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={tags.length > 0 ? 'text-green-700' : 'text-orange-700'}>
+                          Tags {tags.length > 0 ? 'added' : 'missing'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {coverImage || true ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className="text-green-700">
+                          Cover image {coverImage ? 'custom' : 'auto-generated'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Advanced toggle */}
                   <div className="mt-4">
                     <button

@@ -5,6 +5,9 @@ import { Header } from '@/components/Header'
 import { HtmlIframe } from '@/components/HtmlIframe'
 import { PostDensityToggle } from '@/components/PostDensityToggle'
 import { SeriesNav } from '@/components/SeriesNav'
+import { ShareBar } from '@/components/ShareButtons'
+import { NewsletterCTA } from '@/components/NewsletterCTA'
+import { ReadingProgress } from '@/components/ReadingProgress'
 import { generateArticleSchema, generateSEO } from '@/lib/seo'
 import { Clock, ArrowLeft } from 'lucide-react'
 
@@ -39,16 +42,24 @@ export async function generateMetadata({ params }: Props) {
 
   if (!post) return { title: 'Not Found' }
 
-  return generateSEO({
-    title: post.title,
-    description: post.excerpt || undefined,
-    image: post.cover_image_url || undefined,
-    url: `/${params.username}/${params.slug}`,
-    type: 'article',
-    author: profile.display_name || profile.username,
-    publishedTime: post.published_at,
-    modifiedTime: post.updated_at,
-  })
+  return {
+    ...generateSEO({
+      title: post.title,
+      description: post.excerpt || undefined,
+      image: post.cover_image_url || undefined,
+      url: `/${params.username}/${params.slug}`,
+      type: 'article',
+      author: profile.display_name || profile.username,
+      publishedTime: post.published_at,
+      modifiedTime: post.updated_at,
+    }),
+    alternates: {
+      types: {
+        'application/rss+xml': `/${params.username}/feed`,
+        'application/atom+xml': `/${params.username}/feed`,
+      },
+    },
+  }
 }
 
 export default async function PostPage({ params, searchParams }: Props) {
@@ -155,6 +166,7 @@ export default async function PostPage({ params, searchParams }: Props) {
   return (
     <>
       <Header />
+      <ReadingProgress postId={post.id} content={post.content || ''} />
       {!isPreview && (
         <script
           type="application/ld+json"
@@ -272,6 +284,59 @@ export default async function PostPage({ params, searchParams }: Props) {
             </div>
           )}
 
+          {/* Share buttons */}
+          <div className="max-w-4xl mx-auto mt-12">
+            <ShareBar
+              url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${params.username}/${params.slug}`}
+              title={post.title}
+            />
+          </div>
+
+          {/* Newsletter CTA */}
+          <div className="max-w-4xl mx-auto mt-8">
+            <NewsletterCTA authorName={profile.display_name || profile.username} />
+          </div>
+
+          {/* Author Bio/CTA */}
+          <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
+            <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6">
+              <div className="flex items-start gap-4">
+                <Link href={`/${params.username}`}>
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || profile.username}
+                      className="w-16 h-16 rounded-full ring-2 ring-[var(--border-light)]"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[var(--accent)] flex items-center justify-center text-xl font-medium text-white ring-2 ring-[var(--border-light)]">
+                      {(profile.display_name || profile.username)[0].toUpperCase()}
+                    </div>
+                  )}
+                </Link>
+                <div className="flex-1">
+                  <h3 className="font-display text-xl mb-1">
+                    Written by{' '}
+                    <Link href={`/${params.username}`} className="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
+                      {profile.display_name || profile.username}
+                    </Link>
+                  </h3>
+                  <p className="text-sm text-[var(--text-secondary)] mb-4">
+                    {profile.bio || `Follow ${profile.display_name || profile.username} for more great content`}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/${params.username}`} className="btn btn-primary btn-sm">
+                      View Profile
+                    </Link>
+                    <Link href={`/${params.username}/feed`} className="btn btn-secondary btn-sm">
+                      Subscribe via RSS
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {tags.length > 0 && (
             <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
               <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-6">
@@ -288,23 +353,26 @@ export default async function PostPage({ params, searchParams }: Props) {
                   ))}
                 </div>
                 {relatedPosts.length > 0 && (
-                  <div className="grid gap-3">
-                    {relatedPosts.map((related: any) => (
-                      <Link
-                        key={related.id}
-                        href={`/${related.author_username}/${related.slug}`}
-                        className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
-                      >
-                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-                          More on #{primaryTag?.name}
-                        </p>
-                        <p className="text-lg font-medium text-[var(--text-primary)]">{related.title}</p>
-                        {related.excerpt && (
-                          <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">{related.excerpt}</p>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
+                  <>
+                    <h3 className="font-display text-xl mb-4 mt-6 text-[var(--text-primary)]">Continue Reading</h3>
+                    <div className="grid gap-3">
+                      {relatedPosts.map((related: any) => (
+                        <Link
+                          key={related.id}
+                          href={`/${related.author_username}/${related.slug}`}
+                          className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        >
+                          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                            More on #{primaryTag?.name}
+                          </p>
+                          <p className="text-lg font-medium text-[var(--text-primary)]">{related.title}</p>
+                          {related.excerpt && (
+                            <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">{related.excerpt}</p>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

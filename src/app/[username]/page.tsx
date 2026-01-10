@@ -6,7 +6,7 @@ import { PostCard } from '@/components/PostCard'
 import { SubscribeButton } from '@/components/SubscribeButton'
 import { SocialLinks } from '@/components/SocialLinks'
 import { generateSEO } from '@/lib/seo'
-import { Calendar, MapPin, Link as LinkIcon, Users } from 'lucide-react'
+import { Calendar, MapPin, Link as LinkIcon, Users, BookOpen, Rss, Globe, Download } from 'lucide-react'
 
 interface Props {
   params: { username: string }
@@ -23,12 +23,20 @@ export async function generateMetadata({ params }: Props) {
 
   if (!profile) return { title: 'Not Found' }
 
-  return generateSEO({
-    title: profile.display_name || profile.username,
-    description: profile.bio || `Read posts by ${profile.display_name || profile.username}`,
-    image: profile.avatar_url || undefined,
-    url: `/${params.username}`,
-  })
+  return {
+    ...generateSEO({
+      title: profile.display_name || profile.username,
+      description: profile.bio || `Read posts by ${profile.display_name || profile.username}`,
+      image: profile.avatar_url || undefined,
+      url: `/${params.username}`,
+    }),
+    alternates: {
+      types: {
+        'application/rss+xml': `/${params.username}/feed`,
+        'application/atom+xml': `/${params.username}/feed`,
+      },
+    },
+  }
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -182,6 +190,37 @@ export default async function ProfilePage({ params }: Props) {
                   </span>
                 </div>
 
+                {/* Distribution & Export Actions */}
+                <div className="flex flex-wrap gap-3 mt-5">
+                  <Link
+                    href={`/${profile.username}/feed`}
+                    className="btn btn-sm btn-secondary"
+                    target="_blank"
+                  >
+                    <Rss size={14} />
+                    RSS Feed
+                  </Link>
+                  <a
+                    href={`/api/export/epub?username=${profile.username}`}
+                    className="btn btn-sm btn-secondary"
+                    download
+                    title="Download all posts as an ePub book"
+                  >
+                    <BookOpen size={14} />
+                    Export as Book
+                    <Download size={12} className="ml-1" />
+                  </a>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    title="ActivityPub profile - Coming Q1 2026"
+                    disabled
+                  >
+                    <Globe size={14} />
+                    Fediverse
+                    <span className="text-xs opacity-60">(Q1 2026)</span>
+                  </button>
+                </div>
+
                 {/* Social links */}
                 <div className="mt-4">
                   <SocialLinks profile={profile} />
@@ -190,6 +229,58 @@ export default async function ProfilePage({ params }: Props) {
               </div>
             </div>
           </div>
+
+          {/* Traffic Showcase */}
+          {postsWithAuthor.length > 0 && (
+            <section className="mt-6">
+              <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-secondary)]/40 to-[var(--bg-primary)]/40 p-6">
+                <h2 className="font-display text-xl mb-4 flex items-center gap-2">
+                  <Globe size={20} className="text-[var(--accent)]" />
+                  Distribution Reach
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {/* RSS Subscribers */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Rss size={16} className="text-orange-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">RSS Feed</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{subscriberCount || 0}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">subscribers</p>
+                  </div>
+
+                  {/* Fediverse */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe size={16} className="text-purple-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">Fediverse</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{followerCount || 0}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">followers</p>
+                  </div>
+
+                  {/* Total Posts */}
+                  <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BookOpen size={16} className="text-blue-500" />
+                      <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">Published</span>
+                    </div>
+                    <p className="text-2xl font-bold text-[var(--text-primary)]">{postsWithAuthor.length}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">posts</p>
+                  </div>
+                </div>
+
+                {/* Multi-platform distribution message */}
+                <div className="p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    <strong className="text-[var(--text-primary)]">Reaching everywhere:</strong> RSS, ActivityPub (Mastodon), X (Twitter), LinkedIn, and direct subscribers.
+                    <span className="text-[var(--accent)] font-medium ml-2">→ {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* Posts */}
           {stacks && stacks.length > 0 && (

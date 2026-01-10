@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Clock, ArrowUpRight, Code } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
+import { GenerativeCover } from './GenerativeCover'
 
 type PostWithOptionalSeries = PostWithAuthor & {
   series?: {
@@ -38,15 +39,24 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
   if (variant === 'compact') {
     return (
       <article className="group">
-        <Link 
+        <Link
           href={`/${post.author.username}/${post.slug}`}
           className="block h-full p-3 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md transition-all"
         >
-          {post.cover_image_url && (
-            <div className="aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-tertiary)]">
+          <div className="aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-tertiary)]">
+            {post.cover_image_url ? (
               <img src={post.cover_image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            </div>
-          )}
+            ) : (
+              <GenerativeCover
+                contentSeed={`${post.id}-${post.title}`}
+                width={600}
+                height={338}
+                title={post.title}
+                author={post.author.display_name || post.author.username}
+                className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+              />
+            )}
+          </div>
           <div className="flex items-center gap-2 mb-1">
             {isDraft && (
               <span className="doc-badge doc-badge-draft bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">Draft</span>
@@ -85,15 +95,22 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         }}
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          {post.cover_image_url && (
-            <div className="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex-shrink-0">
+          <div className="w-full md:w-40 h-28 rounded-xl overflow-hidden bg-[var(--bg-tertiary)] flex-shrink-0">
+            {post.cover_image_url ? (
               <img
                 src={post.cover_image_url}
                 alt=""
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-            </div>
-          )}
+            ) : (
+              <GenerativeCover
+                contentSeed={`${post.id}-${post.title}`}
+                width={320}
+                height={224}
+                className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+              />
+            )}
+          </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               {isDraft && (
@@ -146,12 +163,23 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
       }}
     >
       <div className="block p-5 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md hover:bg-[var(--bg-secondary)]/40 transition-all duration-300">
-        {post.cover_image_url && (
-          <div className="relative aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-secondary)]">
-            <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-        )}
+        <div className="relative aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-secondary)]">
+          {post.cover_image_url ? (
+            <>
+              <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            </>
+          ) : (
+            <GenerativeCover
+              contentSeed={`${post.id}-${post.title}`}
+              width={800}
+              height={450}
+              title={post.title}
+              author={post.author.display_name || post.author.username}
+              className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+            />
+          )}
+        </div>
 
         <div className="flex items-center gap-2 mb-2">
           {isDraft && (
