@@ -9,7 +9,7 @@ import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { SEOAnalyzer } from '@/components/SEOAnalyzer'
 import { GenerativeCover } from '@/components/GenerativeCover'
-import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe } from 'lucide-react'
+import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
 
 export default function WritePage() {
   const router = useRouter()
@@ -43,6 +43,8 @@ export default function WritePage() {
   // UI state
   const [showSettings, setShowSettings] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importHtml, setImportHtml] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -219,6 +221,7 @@ export default function WritePage() {
 
     const isScheduling = publishIntent === 'schedule' && scheduledAt
     const autoSlug = slug || generateSlug(title)
+    const isUpdate = existingStatus === 'published'
 
     const postData: any = {
       author_id: user.id,
@@ -240,7 +243,7 @@ export default function WritePage() {
       postData.published_at = null
     } else {
       postData.status = 'published'
-      if (existingStatus !== 'published') {
+      if (!isUpdate) {
         postData.published_at = new Date().toISOString()
       }
       postData.scheduled_at = null
@@ -289,24 +292,34 @@ export default function WritePage() {
       setSuccess(
         isScheduling
           ? 'Post scheduled successfully!'
-          : existingStatus === 'published'
-          ? 'Post updated!'
-          : 'Post published!'
+          : isUpdate
+          ? 'Post updated successfully!'
+          : 'Post published successfully!'
       )
       setExistingStatus(isScheduling ? 'scheduled' : 'published')
 
-      // Redirect
-      setTimeout(() => {
-        if (isScheduling) {
-          router.push('/posts')
-        } else if (profile?.username) {
-          router.push(`/${profile.username}/${autoSlug}`)
-        }
-      }, 1000)
+      // Only redirect if it's a new publish, not an update
+      if (!isUpdate) {
+        setTimeout(() => {
+          if (isScheduling) {
+            router.push('/posts')
+          } else if (profile?.username) {
+            router.push(`/${profile.username}/${autoSlug}`)
+          }
+        }, 1000)
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to publish')
       setPublishing(false)
     }
+  }
+
+  const handleImportHtml = () => {
+    if (!importHtml.trim()) return
+    setContent(importHtml)
+    setImportHtml('')
+    setShowImport(false)
+    setSuccess('HTML imported successfully!')
   }
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -407,6 +420,28 @@ export default function WritePage() {
               </span>
             )}
 
+            {/* Preview/View link for published posts */}
+            {postId && existingStatus === 'published' && profile?.username && (
+              <a
+                href={`/${profile.username}/${slug || generateSlug(title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                View post
+                <ExternalLink size={14} />
+              </a>
+            )}
+
+            {/* Import HTML button */}
+            <button
+              onClick={() => setShowImport(true)}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              <Upload size={16} />
+              Import HTML
+            </button>
+
             {/* Settings button */}
             <button
               onClick={() => setShowSettings(true)}
@@ -457,45 +492,95 @@ export default function WritePage() {
 
       {/* Main editor */}
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Post title"
-          className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 mb-4"
-          autoFocus
-        />
+        <div className="space-y-4">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Post title"
+            className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 p-0"
+            autoFocus
+          />
 
-        <input
-          type="text"
-          value={subtitle}
-          onChange={(e) => setSubtitle(e.target.value)}
-          placeholder="Add a subtitle or excerpt (optional)"
-          className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 mb-8"
-        />
+          <input
+            type="text"
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Add a subtitle or excerpt (optional)"
+            className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 p-0"
+          />
 
-        <RichEditor
-          content={content}
-          onChange={setContent}
-          onImageUpload={async (file) => {
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${user.id}/${Date.now()}.${fileExt}`
+          <div className="pt-4">
+            <RichEditor
+              content={content}
+              onChange={setContent}
+              onImageUpload={async (file) => {
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
-            const { error } = await supabase.storage
-              .from('images')
-              .upload(fileName, file)
+                const { error } = await supabase.storage
+                  .from('images')
+                  .upload(fileName, file)
 
-            if (error) throw error
+                if (error) throw error
 
-            const { data: { publicUrl } } = supabase.storage
-              .from('images')
-              .getPublicUrl(fileName)
+                const { data: { publicUrl } } = supabase.storage
+                  .from('images')
+                  .getPublicUrl(fileName)
 
-            return publicUrl
-          }}
-          className="min-h-[600px]"
-        />
+                return publicUrl
+              }}
+              className="min-h-[600px]"
+            />
+          </div>
+        </div>
       </div>
+
+      {/* HTML Import Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowImport(false)}
+          />
+          <div className="relative w-full max-w-2xl bg-white rounded-lg shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Import HTML</h2>
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <textarea
+                value={importHtml}
+                onChange={(e) => setImportHtml(e.target.value)}
+                placeholder="Paste your HTML code here..."
+                className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              />
+
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportHtml}
+                  disabled={!importHtml.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings sidebar */}
       {showSettings && (

@@ -182,7 +182,14 @@ export default function PostsPage() {
           {posts.map((post) => (
             <div
               key={post.id}
-              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors group"
+              onClick={() => {
+                if (activeTab === 'published' && username) {
+                  window.open(`/${username}/${post.slug}`, '_blank')
+                } else {
+                  router.push(`/write?edit=${post.id}`)
+                }
+              }}
+              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer group"
             >
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium text-gray-900 truncate">
@@ -201,24 +208,23 @@ export default function PostsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/write?edit=${post.id}`}
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => router.push(`/write?edit=${post.id}`)}
                   className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                   title="Edit"
                 >
                   <Edit2 size={18} />
-                </Link>
+                </button>
 
                 {activeTab === 'published' && username && (
-                  <Link
-                    href={`/${username}/${post.slug}`}
-                    target="_blank"
+                  <button
+                    onClick={() => window.open(`/${username}/${post.slug}`, '_blank')}
                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                     title="View"
                   >
                     <ExternalLink size={18} />
-                  </Link>
+                  </button>
                 )}
 
                 <button
