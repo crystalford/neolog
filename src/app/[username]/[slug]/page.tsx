@@ -66,13 +66,28 @@ export default async function PostPage({ params, searchParams }: Props) {
   const supabase = createClient()
   const isPreview = searchParams?.preview === 'true'
 
-  const { data: profile } = await supabase
+  console.log('[Post Page] Loading post:', {
+    username: params.username,
+    slug: params.slug,
+    isPreview
+  })
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('username', params.username)
     .single()
 
-  if (!profile) notFound()
+  console.log('[Post Page] Profile query result:', {
+    found: !!profile,
+    error: profileError,
+    username: params.username
+  })
+
+  if (!profile) {
+    console.error('[Post Page] Profile not found for username:', params.username)
+    notFound()
+  }
 
   // If preview mode, don't filter by status
   const postQuery = supabase
@@ -86,9 +101,27 @@ export default async function PostPage({ params, searchParams }: Props) {
     postQuery.eq('status', 'published')
   }
 
-  const { data: post } = await postQuery.single()
+  const { data: post, error: postError } = await postQuery.single()
 
-  if (!post) notFound()
+  console.log('[Post Page] Post query result:', {
+    found: !!post,
+    error: postError,
+    slug: params.slug,
+    authorId: profile.id,
+    isPreview,
+    postStatus: post?.status,
+    postContentType: post?.content_type
+  })
+
+  if (!post) {
+    console.error('[Post Page] Post not found:', {
+      username: params.username,
+      slug: params.slug,
+      authorId: profile.id,
+      isPreview
+    })
+    notFound()
+  }
 
   const stackId: string | null = post.series_id || null
   const { data: stack } = stackId

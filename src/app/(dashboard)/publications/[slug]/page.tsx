@@ -57,12 +57,20 @@ export default function PublicationOverviewPage({
 
       setPublication(pub)
 
-      const { data: postRows } = await supabase
+      const { data: postRows, error: postsError } = await supabase
         .from('posts')
         .select('id, title, status, updated_at, published_at')
         .eq('publication_id', pub.id)
         .order('updated_at', { ascending: false })
         .limit(6)
+
+      console.log('[Publication Page] Posts query result:', {
+        publicationId: pub.id,
+        publicationSlug: slug,
+        count: postRows?.length || 0,
+        error: postsError,
+        posts: postRows
+      })
 
       setPosts(postRows || [])
       setLoading(false)

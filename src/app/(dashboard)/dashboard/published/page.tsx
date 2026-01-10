@@ -79,8 +79,7 @@ export default function PublishedPage() {
         title,
         slug,
         excerpt,
-        published_at,
-        view_count
+        published_at
       `)
       .eq('author_id', session.user.id)
       .eq('status', 'published')
@@ -104,7 +103,7 @@ export default function PublishedPage() {
       slug: post.slug,
       excerpt: post.excerpt,
       published_at: post.published_at,
-      view_count: post.view_count || 0,
+      view_count: 0,
       comment_count: 0,
       reaction_count: 0,
     }))
