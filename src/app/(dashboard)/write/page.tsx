@@ -1142,18 +1142,35 @@ export default function WritePage() {
         excerpt,
       }
 
+      // Set status directly based on intent
+      console.log('[Publish Flow] Starting publish', {
+        isScheduling,
+        isAlreadyPublished,
+        existingStatus,
+        publishIntent,
+        postId
+      })
+
       if (isScheduling) {
         postData.status = 'scheduled'
         postData.scheduled_at = new Date(scheduledAt).toISOString()
-      } else if (!isAlreadyPublished) {
-        // Keep as draft here; the server-side publish endpoint is responsible for
-        // transitioning to published and running first-publish side-effects.
-        postData.status = 'draft'
         postData.published_at = null
-      }
-      if (!isScheduling) {
+      } else {
+        // Publish directly - don't rely on API for status transition
+        postData.status = 'published'
+        // Only set published_at for new publishes, keep existing for updates
+        if (!isAlreadyPublished) {
+          postData.published_at = new Date().toISOString()
+        }
         postData.scheduled_at = null
       }
+
+      console.log('[Publish Flow] Post data prepared', {
+        status: postData.status,
+        published_at: postData.published_at,
+        has_content: !!postData.content,
+        title: postData.title
+      })
 
       let finalSlug = slug
       let finalPostId = postId
@@ -1210,25 +1227,48 @@ export default function WritePage() {
           return
         }
 
-        if (data) finalSlug = data.slug
+        if (data) {
+          finalSlug = data.slug
+          console.log('[Publish Flow] Post updated successfully', { postId, slug: finalSlug })
+        }
       } else {
+        console.log('[Publish Flow] Inserting new post')
         const { data, error: insertError } = await supabase
           .from('posts')
           .insert(postData)
-          .select('id, slug')
+          .select('id, slug, status, published_at')
           .single()
 
         if (insertError) {
-          console.error('Insert error:', insertError)
+          console.error('[Publish Flow] Insert error:', insertError)
           setError(`Failed to publish: ${insertError.message}`)
           setPublishing(false)
           return
         }
 
         if (data) {
+          console.log('[Publish Flow] Post inserted successfully', {
+            id: data.id,
+            slug: data.slug,
+            status: data.status,
+            published_at: data.published_at
+          })
           setPostId(data.id)
           finalPostId = data.id
           finalSlug = data.slug
+        }
+      }
+
+      // Verify the post was actually saved correctly
+      if (finalPostId && !isScheduling) {
+        const { data: verifyPost } = await supabase
+          .from('posts')
+          .select('id, status, published_at')
+          .eq('id', finalPostId)
+          .single()
+        console.log('[Publish Flow] Verification check', verifyPost)
+        if (verifyPost && verifyPost.status !== 'published') {
+          console.error('[Publish Flow] WARNING: Post status is not published!', verifyPost)
         }
       }
 
@@ -1245,40 +1285,19 @@ export default function WritePage() {
         }
       }
 
-      // Send notifications via API for first publish only
+      // Trigger publish side-effects (notifications, embeddings, etc.) for first publish only
+      // Post is already published above, so this is best-effort
       if (finalPostId && !isAlreadyPublished && !isScheduling) {
-        try {
-          console.log('[Publish] Calling publish API for post:', finalPostId)
-          const response = await fetch('/api/posts/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId: finalPostId, notify: true, fast: true }),
-          })
-
-          const json = await response.json().catch(() => null)
-          console.log('[Publish] API response:', response.status, json)
-
-          if (!response.ok) {
-            console.error('Publish API error:', json || (await response.text()))
-            setError(`Failed to publish: ${json?.error || 'Unknown error'}`)
-            setPublishing(false)
-            return
-          } else {
-            // Kick off heavy publish side-effects in the background.
-            // keepalive helps the request complete even if we redirect.
-            void fetch('/api/posts/publish-side-effects', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ postId: finalPostId, notify: true, firstPublish: true }),
-              keepalive: true,
-            }).catch(() => {
-              // ignore
-            })
-          }
-        } catch (notifyError) {
-          console.error('Notification error:', notifyError)
-          // Don't fail publishing if notifications fail
-        }
+        // Run side-effects in background without blocking
+        void fetch('/api/posts/publish-side-effects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: finalPostId, notify: true, firstPublish: true }),
+          keepalive: true,
+        }).catch((err) => {
+          console.error('Publish side-effects error:', err)
+          // Don't block - post is already published
+        })
       }
 
       // Show success and redirect to published post
@@ -1525,30 +1544,51 @@ export default function WritePage() {
               />
             </div>
 
-            {/* Schedule option - only for non-published posts */}
+            {/* Publish Intent - only for non-published posts */}
             {existingStatus !== 'published' && (
-              <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={publishIntent === 'schedule'}
-                    onChange={(e) => setPublishIntent(e.target.checked ? 'schedule' : 'publish')}
-                    className="w-4 h-4 rounded border-[var(--border-medium)]"
-                  />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    Schedule for later
-                  </span>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  When to publish
                 </label>
-                {publishIntent === 'schedule' && (
-                  <div className="mt-3">
-                    <input
-                      type="datetime-local"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="input w-full"
-                    />
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPublishIntent('publish')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'publish'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-light)]'
+                    }`}
+                  >
+                    Publish Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPublishIntent('schedule')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'schedule'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-light)]'
+                    }`}
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Schedule time - only show when schedule is selected */}
+            {publishIntent === 'schedule' && existingStatus !== 'published' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Schedule for
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="input max-w-md"
+                />
               </div>
             )}
 
@@ -1614,11 +1654,11 @@ export default function WritePage() {
               <button
                 onClick={() => setShowPublishConfirm(true)}
                 disabled={publishing || !title || !content}
-                className="btn btn-primary"
+                className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-base hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
               >
                 {publishing ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin inline mr-2" />
                     Publishing...
                   </>
                 ) : (

@@ -72,7 +72,7 @@ export default function PublishedPage() {
     setUsername(profile?.username || null)
 
     // Load published posts
-    const { data: postsData } = await supabase
+    const { data: postsData, error: postsError } = await supabase
       .from('posts')
       .select(`
         id,
@@ -86,52 +86,39 @@ export default function PublishedPage() {
       .eq('status', 'published')
       .order('published_at', { ascending: false })
 
-    // Get comment and reaction counts for each post
-    const publishedPosts: PublishedPost[] = await Promise.all(
-      (postsData || []).map(async (post) => {
-        // Get comment count
-        const { count: commentCount } = await supabase
-          .from('comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', post.id)
+    console.log('[Published Page] Query result:', {
+      count: postsData?.length || 0,
+      error: postsError,
+      userId: session.user.id,
+      posts: postsData
+    })
 
-        // Get reaction count
-        const { count: reactionCount } = await supabase
-          .from('reactions')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', post.id)
+    if (postsError) {
+      console.error('[Published Page] Error loading posts:', postsError)
+    }
 
-        return {
-          id: post.id,
-          title: post.title,
-          slug: post.slug,
-          excerpt: post.excerpt,
-          published_at: post.published_at,
-          view_count: post.view_count || 0,
-          comment_count: commentCount || 0,
-          reaction_count: reactionCount || 0,
-        }
-      })
-    )
+    // SKIP comment/reaction queries - RLS blocks them (403)
+    const publishedPosts: PublishedPost[] = (postsData || []).map((post) => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      published_at: post.published_at,
+      view_count: post.view_count || 0,
+      comment_count: 0,
+      reaction_count: 0,
+    }))
 
     setPosts(publishedPosts)
 
-    // Calculate totals
+    // Calculate totals (only view_count, rest are RLS blocked)
     const totalViews = publishedPosts.reduce((sum, p) => sum + p.view_count, 0)
-    const totalComments = publishedPosts.reduce((sum, p) => sum + p.comment_count, 0)
-    const totalReactions = publishedPosts.reduce((sum, p) => sum + p.reaction_count, 0)
-
-    // Get subscriber count
-    const { count: subCount } = await supabase
-      .from('subscriptions')
-      .select('*', { count: 'exact', head: true })
-      .eq('author_id', session.user.id)
 
     setStats({
       totalViews,
-      totalComments,
-      totalReactions,
-      subscriberCount: subCount || 0,
+      totalComments: 0,
+      totalReactions: 0,
+      subscriberCount: 0,
     })
 
     setLoading(false)

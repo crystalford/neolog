@@ -32,7 +32,7 @@ export default function ExplorePage() {
   const fetchPosts = useCallback(async (offset: number, limit: number) => {
     let query = supabase
       .from('posts')
-      .select(`*, author:profiles(*), series:series(title, slug)`)
+      .select(`*, author:profiles(*)`)
       .eq('status', 'published')
 
     // Search filter
@@ -66,6 +66,22 @@ export default function ExplorePage() {
     }
 
     const { data, error } = await query
+
+    console.log('[Explore Page] Query result:', {
+      offset,
+      limit,
+      filter,
+      searchQuery,
+      selectedTag,
+      count: data?.length || 0,
+      error,
+      posts: data
+    })
+
+    if (error) {
+      console.error('[Explore Page] Error loading posts:', error)
+    }
+
     return {
       data: (data || []) as PostWithAuthor[],
       hasMore: (data?.length || 0) === limit,
