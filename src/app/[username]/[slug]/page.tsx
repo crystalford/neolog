@@ -353,23 +353,26 @@ export default async function PostPage({ params, searchParams }: Props) {
                   ))}
                 </div>
                 {relatedPosts.length > 0 && (
-                  <div className="grid gap-3">
-                    {relatedPosts.map((related: any) => (
-                      <Link
-                        key={related.id}
-                        href={`/${related.author_username}/${related.slug}`}
-                        className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
-                      >
-                        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
-                          More on #{primaryTag?.name}
-                        </p>
-                        <p className="text-lg font-medium text-[var(--text-primary)]">{related.title}</p>
-                        {related.excerpt && (
-                          <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">{related.excerpt}</p>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
+                  <>
+                    <h3 className="font-display text-xl mb-4 mt-6 text-[var(--text-primary)]">Continue Reading</h3>
+                    <div className="grid gap-3">
+                      {relatedPosts.map((related: any) => (
+                        <Link
+                          key={related.id}
+                          href={`/${related.author_username}/${related.slug}`}
+                          className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        >
+                          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+                            More on #{primaryTag?.name}
+                          </p>
+                          <p className="text-lg font-medium text-[var(--text-primary)]">{related.title}</p>
+                          {related.excerpt && (
+                            <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-2">{related.excerpt}</p>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

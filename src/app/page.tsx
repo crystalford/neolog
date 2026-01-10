@@ -59,6 +59,22 @@ export default async function Home() {
     creators: creatorsCountRes.count || 0,
   }
 
+  // Trending tags
+  const tagCounts = new Map<string, { name: string; slug: string; count: number }>()
+  const tagData = trendingTagsRes.data || []
+  tagData.forEach((pt: any) => {
+    if (pt.tags) {
+      const key = pt.tags.slug
+      const existing = tagCounts.get(key)
+      if (existing) {
+        existing.count++
+      } else {
+        tagCounts.set(key, { name: pt.tags.name, slug: pt.tags.slug, count: 1 })
+      }
+    }
+  })
+  const trendingTags = Array.from(tagCounts.values()).sort((a, b) => b.count - a.count).slice(0, 5)
+
   return (
     <div>
       <Header />
@@ -125,6 +141,29 @@ export default async function Home() {
               <span>RSS, ActivityPub, ePub</span>
             </div>
           </div>
+
+          {/* Trending Topics */}
+          {trendingTags.length > 0 && (
+            <div className="mt-12 max-w-2xl mx-auto">
+              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp size={18} className="text-[var(--accent)]" />
+                  <h3 className="font-display text-lg">Trending Topics This Week</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trendingTags.map((tag) => (
+                    <Link
+                      key={tag.slug}
+                      href={`/explore?tag=${tag.slug}`}
+                      className="px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+                    >
+                      #{tag.name} <span className="text-[var(--text-tertiary)]">({tag.count})</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Unique Features Section */}
