@@ -256,9 +256,20 @@ export default function ExplorePage() {
                   ))}
                 </div>
               ) : posts.length === 0 ? (
-                <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)]">
-                  <Sparkles size={32} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                  <p className="text-[var(--text-secondary)]">No posts yet</p>
+                <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <Sparkles size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+                  <h3 className="font-display text-xl mb-2">No published posts yet</h3>
+                  <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+                    Be the first to share your writing! Imported posts are saved as drafts—remember to publish them.
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Link href="/write" className="btn btn-primary">
+                      Write a Post
+                    </Link>
+                    <Link href="/dashboard" className="btn btn-secondary">
+                      Check Drafts
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <>

@@ -181,8 +181,8 @@ export default async function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Traffic-First */}
             <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] flex items-center justify-center mb-4">
-                <BarChart3 size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] flex items-center justify-center mb-4 text-4xl">
+                📈
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Traffic-First SEO</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -193,8 +193,8 @@ export default async function Home() {
 
             {/* ActivityPub Native */}
             <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-4">
-                <Globe size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-4 text-4xl">
+                🌐
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Fediverse Native</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -205,8 +205,8 @@ export default async function Home() {
 
             {/* Generative Covers */}
             <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-700 flex items-center justify-center mb-4">
-                <Sparkles size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-700 flex items-center justify-center mb-4 text-4xl">
+                🎨
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Generative Covers</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -217,8 +217,8 @@ export default async function Home() {
 
             {/* ePub Export */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mb-4">
-                <FileText size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mb-4 text-4xl">
+                📚
               </div>
               <h3 className="font-display text-2xl mb-3">One-Click Book Export</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -229,8 +229,8 @@ export default async function Home() {
 
             {/* Multi-Platform Distribution */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-4">
-                <Share2 size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-4 text-4xl">
+                🚀
               </div>
               <h3 className="font-display text-2xl mb-3">Multi-Platform Reach</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -241,8 +241,8 @@ export default async function Home() {
 
             {/* Ownership */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mb-4">
-                <CheckCircle2 size={28} className="text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mb-4 text-4xl">
+                🔓
               </div>
               <h3 className="font-display text-2xl mb-3">Radical Ownership</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -258,57 +258,57 @@ export default async function Home() {
           <h3 className="font-display text-3xl text-center mb-12 text-[var(--text-secondary)]">Plus Everything You Expect</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-3">
-                <PenLine size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                ✍️
               </div>
               <h4 className="font-semibold mb-1">Rich Editor</h4>
               <p className="text-sm text-[var(--text-secondary)]">Markdown, code, embeds</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center mx-auto mb-3">
-                <Mail size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                📧
               </div>
               <h4 className="font-semibold mb-1">Newsletters</h4>
               <p className="text-sm text-[var(--text-secondary)]">Email your subscribers</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mx-auto mb-3">
-                <Boxes size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                📂
               </div>
               <h4 className="font-semibold mb-1">Series</h4>
               <p className="text-sm text-[var(--text-secondary)]">Organize related posts</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                ⏰
               </div>
               <h4 className="font-semibold mb-1">Scheduling</h4>
               <p className="text-sm text-[var(--text-secondary)]">Queue your posts</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mx-auto mb-3">
-                <Tag size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                🏷️
               </div>
               <h4 className="font-semibold mb-1">Topics</h4>
               <p className="text-sm text-[var(--text-secondary)]">Categorize content</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-3">
-                <Rss size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                📡
               </div>
               <h4 className="font-semibold mb-1">RSS Feeds</h4>
               <p className="text-sm text-[var(--text-secondary)]">Atom, JSON too</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center mx-auto mb-3">
-                <Search size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                🔍
               </div>
               <h4 className="font-semibold mb-1">Semantic Search</h4>
               <p className="text-sm text-[var(--text-secondary)]">AI-powered discovery</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center mx-auto mb-3 text-2xl">
+                💾
               </div>
               <h4 className="font-semibold mb-1">Version History</h4>
               <p className="text-sm text-[var(--text-secondary)]">Never lose work</p>
