@@ -5,16 +5,22 @@ import { PostCard } from '@/components/PostCard'
 import {
   ArrowRight,
   BarChart3,
+  BookOpen,
   Boxes,
   CheckCircle2,
   Clock,
   FileText,
   Link2,
   Globe,
+  History,
   Inbox,
+  Layers,
+  Lock,
   Mail,
   MoreHorizontal,
+  Palette,
   PenLine,
+  Rocket,
   Rss,
   Search,
   Share2,
@@ -180,9 +186,12 @@ export default async function Home() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Traffic-First */}
-            <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] flex items-center justify-center mb-4 text-4xl">
-                📈
+            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-[var(--accent)]/50 transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[var(--accent)]/30 to-[var(--accent-dark)]/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <BarChart3 className="w-8 h-8 text-[var(--accent)]" />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Traffic-First SEO</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -192,9 +201,12 @@ export default async function Home() {
             </div>
 
             {/* ActivityPub Native */}
-            <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-4 text-4xl">
-                🌐
+            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-purple-500/50 transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-purple-200 bg-purple-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/30 to-purple-700/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <Globe className="w-8 h-8 text-purple-600" />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Fediverse Native</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -204,9 +216,12 @@ export default async function Home() {
             </div>
 
             {/* Generative Covers */}
-            <div className="p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-xl transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-700 flex items-center justify-center mb-4 text-4xl">
-                🎨
+            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-pink-500/50 transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-pink-200 bg-pink-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/30 to-rose-700/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <Palette className="w-8 h-8 text-pink-600" />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Generative Covers</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -216,9 +231,12 @@ export default async function Home() {
             </div>
 
             {/* ePub Export */}
-            <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mb-4 text-4xl">
-                📚
+            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-blue-500/50 hover:shadow-xl transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/30 to-cyan-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <BookOpen className="w-8 h-8 text-blue-600" />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3">One-Click Book Export</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -228,9 +246,12 @@ export default async function Home() {
             </div>
 
             {/* Multi-Platform Distribution */}
-            <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-4 text-4xl">
-                🚀
+            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-orange-500/50 hover:shadow-xl transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-200 bg-orange-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/30 to-amber-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <Rocket className="w-8 h-8 text-orange-600" />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3">Multi-Platform Reach</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -240,9 +261,12 @@ export default async function Home() {
             </div>
 
             {/* Ownership */}
-            <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mb-4 text-4xl">
-                🔓
+            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-emerald-500/50 hover:shadow-xl transition-all duration-300">
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-green-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <Lock className="w-8 h-8 text-emerald-600" strokeWidth={1.5} />
+                </div>
               </div>
               <h3 className="font-display text-2xl mb-3">Radical Ownership</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -256,61 +280,100 @@ export default async function Home() {
         {/* Traditional Features */}
         <section className="px-6 py-16 max-w-6xl mx-auto">
           <h3 className="font-display text-3xl text-center mb-12 text-[var(--text-secondary)]">Plus Everything You Expect</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                ✍️
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Rich Editor */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <PenLine className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Rich Editor</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Rich Editor</h4>
               <p className="text-sm text-[var(--text-secondary)]">Markdown, code, embeds</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                📧
+
+            {/* Newsletters */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Mail className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Newsletters</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Newsletters</h4>
               <p className="text-sm text-[var(--text-secondary)]">Email your subscribers</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                📂
+
+            {/* Series */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Layers className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Series</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Series</h4>
               <p className="text-sm text-[var(--text-secondary)]">Organize related posts</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                ⏰
+
+            {/* Scheduling */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Clock className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Scheduling</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Scheduling</h4>
               <p className="text-sm text-[var(--text-secondary)]">Queue your posts</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                🏷️
+
+            {/* Topics */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Tag className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Topics</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Topics</h4>
               <p className="text-sm text-[var(--text-secondary)]">Categorize content</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                📡
+
+            {/* RSS Feeds */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Rss className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">RSS Feeds</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">RSS Feeds</h4>
               <p className="text-sm text-[var(--text-secondary)]">Atom, JSON too</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                🔍
+
+            {/* Semantic Search */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Sparkles className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Semantic Search</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Semantic Search</h4>
               <p className="text-sm text-[var(--text-secondary)]">AI-powered discovery</p>
             </div>
-            <div className="text-center p-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                💾
+
+            {/* Version History */}
+            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-zinc-500/20 to-slate-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <History className="w-6 h-6 text-[var(--text-primary)]" />
+                </div>
               </div>
-              <h4 className="font-semibold mb-1">Version History</h4>
+              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Version History</h4>
               <p className="text-sm text-[var(--text-secondary)]">Never lose work</p>
             </div>
           </div>
