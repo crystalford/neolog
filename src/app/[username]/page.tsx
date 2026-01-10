@@ -50,12 +50,19 @@ export default async function ProfilePage({ params }: Props) {
 
   if (!profile) notFound()
 
-  const { data: posts } = await supabase
+  const { data: posts, error: postsError } = await supabase
     .from('posts')
-    .select('*, series:series(title, slug)')
+    .select('*')
     .eq('author_id', profile.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
+
+  console.log('[Profile Page] Posts query result:', {
+    username: params.username,
+    authorId: profile.id,
+    count: posts?.length || 0,
+    error: postsError
+  })
 
   const { data: stacks } = await supabase
     .from('series')
