@@ -6,6 +6,8 @@ import { HtmlIframe } from '@/components/HtmlIframe'
 import { PostDensityToggle } from '@/components/PostDensityToggle'
 import { SeriesNav } from '@/components/SeriesNav'
 import { ShareBar } from '@/components/ShareButtons'
+import { NewsletterCTA } from '@/components/NewsletterCTA'
+import { ReadingProgress } from '@/components/ReadingProgress'
 import { generateArticleSchema, generateSEO } from '@/lib/seo'
 import { Clock, ArrowLeft } from 'lucide-react'
 
@@ -164,6 +166,7 @@ export default async function PostPage({ params, searchParams }: Props) {
   return (
     <>
       <Header />
+      <ReadingProgress postId={post.id} content={post.content || ''} />
       {!isPreview && (
         <script
           type="application/ld+json"
@@ -287,6 +290,11 @@ export default async function PostPage({ params, searchParams }: Props) {
               url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${params.username}/${params.slug}`}
               title={post.title}
             />
+          </div>
+
+          {/* Newsletter CTA */}
+          <div className="max-w-4xl mx-auto mt-8">
+            <NewsletterCTA authorName={profile.display_name || profile.username} />
           </div>
 
           {/* Author Bio/CTA */}
