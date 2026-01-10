@@ -2093,6 +2093,64 @@ export default function WritePage() {
                       {tags.length} selected
                     </span>
                   </div>
+
+                  {/* Quality Checklist */}
+                  <div className="mt-4 p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                    <h4 className="font-semibold text-xs uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Quality Checklist</h4>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        {title.length >= 50 && title.length <= 60 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={title.length >= 50 && title.length <= 60 ? 'text-green-700' : 'text-orange-700'}>
+                          Title length {title.length >= 50 && title.length <= 60 ? 'optimal' : `${title.length} chars (aim for 50-60)`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {subtitle && subtitle.length > 0 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={subtitle ? 'text-green-700' : 'text-orange-700'}>
+                          Meta description {subtitle ? 'added' : 'missing'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? 'text-green-700' : 'text-orange-700'}>
+                          Word count {content.replace(/<[^>]*>/g, '').split(/\s+/).length >= 300 ? '300+' : `${content.replace(/<[^>]*>/g, '').split(/\s+/).length} (aim for 300+)`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {tags.length > 0 ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className={tags.length > 0 ? 'text-green-700' : 'text-orange-700'}>
+                          Tags {tags.length > 0 ? 'added' : 'missing'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {coverImage || true ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : (
+                          <X size={14} className="text-orange-500" />
+                        )}
+                        <span className="text-green-700">
+                          Cover image {coverImage ? 'custom' : 'auto-generated'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Advanced toggle */}
                   <div className="mt-4">
                     <button
