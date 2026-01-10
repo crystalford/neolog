@@ -72,7 +72,7 @@ export default function PublishedPage() {
     setUsername(profile?.username || null)
 
     // Load published posts
-    const { data: postsData } = await supabase
+    const { data: postsData, error: postsError } = await supabase
       .from('posts')
       .select(`
         id,
@@ -85,6 +85,17 @@ export default function PublishedPage() {
       .eq('author_id', session.user.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
+
+    console.log('[Published Page] Query result:', {
+      count: postsData?.length || 0,
+      error: postsError,
+      userId: session.user.id,
+      posts: postsData
+    })
+
+    if (postsError) {
+      console.error('[Published Page] Error loading posts:', postsError)
+    }
 
     // Get comment and reaction counts for each post
     const publishedPosts: PublishedPost[] = await Promise.all(
