@@ -20,6 +20,7 @@ import {
   Share2,
   Sparkles,
   Tag,
+  TrendingUp,
   Webhook,
 } from 'lucide-react'
 
