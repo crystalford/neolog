@@ -1143,6 +1143,14 @@ export default function WritePage() {
       }
 
       // Set status directly based on intent
+      console.log('[Publish Flow] Starting publish', {
+        isScheduling,
+        isAlreadyPublished,
+        existingStatus,
+        publishIntent,
+        postId
+      })
+
       if (isScheduling) {
         postData.status = 'scheduled'
         postData.scheduled_at = new Date(scheduledAt).toISOString()
@@ -1150,9 +1158,19 @@ export default function WritePage() {
       } else {
         // Publish directly - don't rely on API for status transition
         postData.status = 'published'
-        postData.published_at = isAlreadyPublished ? undefined : new Date().toISOString()
+        // Only set published_at for new publishes, keep existing for updates
+        if (!isAlreadyPublished) {
+          postData.published_at = new Date().toISOString()
+        }
         postData.scheduled_at = null
       }
+
+      console.log('[Publish Flow] Post data prepared', {
+        status: postData.status,
+        published_at: postData.published_at,
+        has_content: !!postData.content,
+        title: postData.title
+      })
 
       let finalSlug = slug
       let finalPostId = postId
@@ -1209,25 +1227,48 @@ export default function WritePage() {
           return
         }
 
-        if (data) finalSlug = data.slug
+        if (data) {
+          finalSlug = data.slug
+          console.log('[Publish Flow] Post updated successfully', { postId, slug: finalSlug })
+        }
       } else {
+        console.log('[Publish Flow] Inserting new post')
         const { data, error: insertError } = await supabase
           .from('posts')
           .insert(postData)
-          .select('id, slug')
+          .select('id, slug, status, published_at')
           .single()
 
         if (insertError) {
-          console.error('Insert error:', insertError)
+          console.error('[Publish Flow] Insert error:', insertError)
           setError(`Failed to publish: ${insertError.message}`)
           setPublishing(false)
           return
         }
 
         if (data) {
+          console.log('[Publish Flow] Post inserted successfully', {
+            id: data.id,
+            slug: data.slug,
+            status: data.status,
+            published_at: data.published_at
+          })
           setPostId(data.id)
           finalPostId = data.id
           finalSlug = data.slug
+        }
+      }
+
+      // Verify the post was actually saved correctly
+      if (finalPostId && !isScheduling) {
+        const { data: verifyPost } = await supabase
+          .from('posts')
+          .select('id, status, published_at')
+          .eq('id', finalPostId)
+          .single()
+        console.log('[Publish Flow] Verification check', verifyPost)
+        if (verifyPost && verifyPost.status !== 'published') {
+          console.error('[Publish Flow] WARNING: Post status is not published!', verifyPost)
         }
       }
 
