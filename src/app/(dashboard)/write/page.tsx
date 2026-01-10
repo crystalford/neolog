@@ -636,9 +636,8 @@ export default function WritePage() {
                         Tags
                       </label>
                       <TagSelect
-                        value={tags}
+                        selectedTags={tags}
                         onChange={setTags}
-                        publicationId={publicationId}
                       />
                     </div>
 
