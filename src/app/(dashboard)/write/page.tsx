@@ -1142,16 +1142,15 @@ export default function WritePage() {
         excerpt,
       }
 
+      // Set status directly based on intent
       if (isScheduling) {
         postData.status = 'scheduled'
         postData.scheduled_at = new Date(scheduledAt).toISOString()
-      } else if (!isAlreadyPublished) {
-        // Keep as draft here; the server-side publish endpoint is responsible for
-        // transitioning to published and running first-publish side-effects.
-        postData.status = 'draft'
         postData.published_at = null
-      }
-      if (!isScheduling) {
+      } else {
+        // Publish directly - don't rely on API for status transition
+        postData.status = 'published'
+        postData.published_at = isAlreadyPublished ? undefined : new Date().toISOString()
         postData.scheduled_at = null
       }
 
@@ -1245,40 +1244,19 @@ export default function WritePage() {
         }
       }
 
-      // Send notifications via API for first publish only
+      // Trigger publish side-effects (notifications, embeddings, etc.) for first publish only
+      // Post is already published above, so this is best-effort
       if (finalPostId && !isAlreadyPublished && !isScheduling) {
-        try {
-          console.log('[Publish] Calling publish API for post:', finalPostId)
-          const response = await fetch('/api/posts/publish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ postId: finalPostId, notify: true, fast: true }),
-          })
-
-          const json = await response.json().catch(() => null)
-          console.log('[Publish] API response:', response.status, json)
-
-          if (!response.ok) {
-            console.error('Publish API error:', json || (await response.text()))
-            setError(`Failed to publish: ${json?.error || 'Unknown error'}`)
-            setPublishing(false)
-            return
-          } else {
-            // Kick off heavy publish side-effects in the background.
-            // keepalive helps the request complete even if we redirect.
-            void fetch('/api/posts/publish-side-effects', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ postId: finalPostId, notify: true, firstPublish: true }),
-              keepalive: true,
-            }).catch(() => {
-              // ignore
-            })
-          }
-        } catch (notifyError) {
-          console.error('Notification error:', notifyError)
-          // Don't fail publishing if notifications fail
-        }
+        // Run side-effects in background without blocking
+        void fetch('/api/posts/publish-side-effects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId: finalPostId, notify: true, firstPublish: true }),
+          keepalive: true,
+        }).catch((err) => {
+          console.error('Publish side-effects error:', err)
+          // Don't block - post is already published
+        })
       }
 
       // Show success and redirect to published post
