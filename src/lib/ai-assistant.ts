@@ -148,7 +148,7 @@ export async function findRelatedPosts(
   }
 
   // Score each post by keyword overlap
-  const scored = posts.map(post => {
+  const scored = posts.map((post: any) => {
     const postText = (post.title + ' ' + (post.content || '')).toLowerCase()
     const matches = topKeywords.filter(kw => postText.includes(kw))
 
