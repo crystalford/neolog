@@ -8,6 +8,7 @@ import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/pub
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
 import { SEOAnalyzer } from '@/components/SEOAnalyzer'
+import { GenerativeCover } from '@/components/GenerativeCover'
 import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe } from 'lucide-react'
 
 export default function WritePage() {
@@ -596,8 +597,20 @@ export default function WritePage() {
                           />
                         </label>
                       </div>
-                      {coverImage && (
+                      {coverImage ? (
                         <img src={coverImage} alt="Cover" className="w-full h-32 object-cover rounded-lg mt-2" />
+                      ) : (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-2">Auto-generated cover preview:</p>
+                          <GenerativeCover
+                            contentSeed={`${postId || 'new'}-${title}`}
+                            width={400}
+                            height={225}
+                            title={title || 'Your Post Title'}
+                            author={profile?.display_name || profile?.username || 'Author'}
+                            className="rounded-lg"
+                          />
+                        </div>
                       )}
                     </div>
 
