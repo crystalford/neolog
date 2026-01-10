@@ -112,18 +112,18 @@ export async function findRelatedPosts(
 
   const plain = currentTitle + ' ' + currentContent.replace(/<[^>]*>/g, ' ').toLowerCase()
   const words = plain.split(/\s+/)
-    .filter(w => w.length > 4 && !commonWords.has(w))
-    .filter(w => /^[a-z]+$/.test(w)) // Only letters
+    .filter((w: string) => w.length > 4 && !commonWords.has(w))
+    .filter((w: string) => /^[a-z]+$/.test(w)) // Only letters
 
   // Count word frequency
   const wordFreq = new Map<string, number>()
-  words.forEach(w => wordFreq.set(w, (wordFreq.get(w) || 0) + 1))
+  words.forEach((w: string) => wordFreq.set(w, (wordFreq.get(w) || 0) + 1))
 
   // Get top 10 keywords
   const topKeywords = Array.from(wordFreq.entries())
-    .sort((a, b) => b[1] - a[1])
+    .sort((a: [string, number], b: [string, number]) => b[1] - a[1])
     .slice(0, 10)
-    .map(([word]) => word)
+    .map(([word]: [string, number]) => word)
 
   if (topKeywords.length === 0) {
     return []
@@ -150,7 +150,7 @@ export async function findRelatedPosts(
   // Score each post by keyword overlap
   const scored = posts.map((post: any) => {
     const postText = (post.title + ' ' + (post.content || '')).toLowerCase()
-    const matches = topKeywords.filter(kw => postText.includes(kw))
+    const matches = topKeywords.filter((kw: string) => postText.includes(kw))
 
     let relevanceText = ''
     if (matches.length > 0) {
@@ -168,8 +168,8 @@ export async function findRelatedPosts(
 
   // Return top 5 matches
   return scored
-    .filter(p => p.score > 0)
-    .sort((a, b) => b.score - a.score)
+    .filter((p: any) => p.score > 0)
+    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, 5)
 }
 
@@ -179,11 +179,11 @@ export async function findRelatedPosts(
  */
 export function findComplexSentences(content: string): Array<{ sentence: string; issue: string }> {
   const plain = content.replace(/<[^>]*>/g, ' ').trim()
-  const sentences = plain.split(/[.!?]+/).filter(s => s.trim().length > 0)
+  const sentences = plain.split(/[.!?]+/).filter((s: string) => s.trim().length > 0)
 
   const complex: Array<{ sentence: string; issue: string }> = []
 
-  sentences.forEach(sentence => {
+  sentences.forEach((sentence: string) => {
     const words = sentence.trim().split(/\s+/)
     const wordCount = words.length
 
@@ -198,8 +198,8 @@ export function findComplexSentences(content: string): Array<{ sentence: string;
 
     // Passive voice indicators
     const passiveIndicators = ['was', 'were', 'been', 'being', 'is', 'are', 'am']
-    const pastParticiples = words.filter(w => w.endsWith('ed') || w.endsWith('en'))
-    const hasPassive = passiveIndicators.some(pi => sentence.includes(` ${pi} `)) && pastParticiples.length > 0
+    const pastParticiples = words.filter((w: string) => w.endsWith('ed') || w.endsWith('en'))
+    const hasPassive = passiveIndicators.some((pi: string) => sentence.includes(` ${pi} `)) && pastParticiples.length > 0
 
     if (hasPassive && wordCount > 12) {
       complex.push({
@@ -210,7 +210,7 @@ export function findComplexSentences(content: string): Array<{ sentence: string;
     }
 
     // Complex words (3+ syllables)
-    const complexWords = words.filter(w => {
+    const complexWords = words.filter((w: string) => {
       const syllables = w.match(/[aeiouy]+/g)?.length || 0
       return syllables >= 3
     })
