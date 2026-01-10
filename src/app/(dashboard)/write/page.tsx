@@ -37,7 +37,7 @@ type PostAssetLink = {
 export default function WritePage() {
   // Defaults
   const fallbackCover = '/default-cover.jpg'
-  const defaultTags = ['writing', 'neolog', 'product']
+  const defaultTags: string[] = []
 
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)

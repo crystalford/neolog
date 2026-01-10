@@ -217,8 +217,8 @@ export default async function Home() {
 
             {/* ePub Export */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mb-4">
-                <FileText size={28} className="text-[var(--accent)]" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center mb-4">
+                <FileText size={28} className="text-white" />
               </div>
               <h3 className="font-display text-2xl mb-3">One-Click Book Export</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -229,8 +229,8 @@ export default async function Home() {
 
             {/* Multi-Platform Distribution */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mb-4">
-                <Share2 size={28} className="text-[var(--accent)]" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center mb-4">
+                <Share2 size={28} className="text-white" />
               </div>
               <h3 className="font-display text-2xl mb-3">Multi-Platform Reach</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -241,8 +241,8 @@ export default async function Home() {
 
             {/* Ownership */}
             <div className="p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-all">
-              <div className="w-14 h-14 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center mb-4">
-                <CheckCircle2 size={28} className="text-[var(--accent)]" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mb-4">
+                <CheckCircle2 size={28} className="text-white" />
               </div>
               <h3 className="font-display text-2xl mb-3">Radical Ownership</h3>
               <p className="text-[var(--text-secondary)] mb-4">
@@ -258,57 +258,57 @@ export default async function Home() {
           <h3 className="font-display text-3xl text-center mb-12 text-[var(--text-secondary)]">Plus Everything You Expect</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <PenLine size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-3">
+                <PenLine size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Rich Editor</h4>
               <p className="text-sm text-[var(--text-secondary)]">Markdown, code, embeds</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Mail size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center mx-auto mb-3">
+                <Mail size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Newsletters</h4>
               <p className="text-sm text-[var(--text-secondary)]">Email your subscribers</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Boxes size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center mx-auto mb-3">
+                <Boxes size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Series</h4>
               <p className="text-sm text-[var(--text-secondary)]">Organize related posts</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center mx-auto mb-3">
+                <Clock size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Scheduling</h4>
               <p className="text-sm text-[var(--text-secondary)]">Queue your posts</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Tag size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center mx-auto mb-3">
+                <Tag size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Topics</h4>
               <p className="text-sm text-[var(--text-secondary)]">Categorize content</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Rss size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mx-auto mb-3">
+                <Rss size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">RSS Feeds</h4>
               <p className="text-sm text-[var(--text-secondary)]">Atom, JSON too</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Search size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lime-500 to-green-600 flex items-center justify-center mx-auto mb-3">
+                <Search size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Semantic Search</h4>
               <p className="text-sm text-[var(--text-secondary)]">AI-powered discovery</p>
             </div>
             <div className="text-center p-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-3">
-                <Clock size={20} className="text-[var(--accent)]" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center mx-auto mb-3">
+                <Clock size={20} className="text-white" />
               </div>
               <h4 className="font-semibold mb-1">Version History</h4>
               <p className="text-sm text-[var(--text-secondary)]">Never lose work</p>
@@ -382,46 +382,6 @@ export default async function Home() {
             </div>
           </section>
         )}
-
-        {/* CTA Section */}
-        <section className="px-6 py-20 max-w-5xl mx-auto text-center">
-          <div className="relative overflow-hidden p-16 rounded-3xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] text-white shadow-2xl">
-            <div className="relative z-10">
-              <h2 className="font-display text-4xl md:text-5xl font-bold mb-6">
-                Ready to Actually Get Readers?
-              </h2>
-              <p className="text-xl md:text-2xl text-white/90 mb-10 max-w-2xl mx-auto">
-                Join creators who own their content, reach their audience, and never pay platform taxes.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                <Link
-                  href={session ? "/write" : "/signup"}
-                  className="btn bg-white text-[var(--accent)] hover:bg-gray-100 btn-xl px-10 py-5 text-xl font-bold shadow-xl hover:shadow-2xl transition-all"
-                >
-                  {session ? "Start Writing Now" : "Start Free — No Credit Card"}
-                  <ArrowRight size={24} className="ml-3" />
-                </Link>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-white/80">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} />
-                  <span>Free forever plan</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} />
-                  <span>Export anytime</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} />
-                  <span>0% platform fee</span>
-                </div>
-              </div>
-            </div>
-            {/* Decorative gradient orbs */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-          </div>
-        </section>
 
         <footer className="px-6 py-12 bg-[var(--bg-primary)] border-t border-[var(--border-light)] mt-16">
           <div className="max-w-6xl mx-auto">

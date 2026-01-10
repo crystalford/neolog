@@ -188,10 +188,8 @@ export default function DashboardLayout({
       items.push({ href: '/dashboard/published', icon: Send, label: 'Published' })
     }
 
-    // Show Analytics prominently
-    if (capabilities.showPublishedTab) {
-      items.push({ href: '/analytics', icon: BarChart3, label: 'Analytics' })
-    }
+    // Always show Analytics
+    items.push({ href: '/analytics', icon: BarChart3, label: 'Analytics' })
 
     items.push({ href: '/dashboard/settings', icon: Settings, label: 'Settings' })
 
@@ -225,7 +223,7 @@ export default function DashboardLayout({
     }))
     // Add common actions
     items.push(
-      { label: 'New Draft', href: '/write', description: 'Action' },
+      { label: 'New Post', href: '/write', description: 'Action' },
     )
     return items
   }, [primaryNav])
@@ -363,7 +361,7 @@ export default function DashboardLayout({
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
               >
                 <PenLine size={16} />
-                <span>New Draft</span>
+                <span>New Post</span>
               </Link>
               <button
                 onClick={() => setCommandOpen(true)}
@@ -455,13 +453,13 @@ export default function DashboardLayout({
                 <Search size={16} />
               </button>
 
-              {/* New Draft button */}
+              {/* New Post button */}
               <Link
                 href="/write"
                 className="hidden sm:inline-flex btn btn-primary btn-sm"
               >
                 <PenLine size={16} />
-                New Draft
+                New Post
               </Link>
               
               {/* User avatar */}

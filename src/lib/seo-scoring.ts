@@ -63,7 +63,10 @@ export function analyzeTitle(title: string): SEOAnalysis['title'] {
   let score = 100
   let suggestion: string | undefined
 
-  if (length < 30) {
+  if (length === 0) {
+    score = 0
+    suggestion = 'Missing title. Add a descriptive title (50-60 characters).'
+  } else if (length < 30) {
     score = 40
     suggestion = `Title too short (${length} chars). Aim for 50-60 characters for better SEO.`
   } else if (length < 50) {
@@ -140,13 +143,23 @@ export function calculateReadability(text: string): SEOAnalysis['readability'] {
   // Remove HTML tags
   const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 
+  // Count words first to check if content exists
+  const words = plainText.split(/\s+/).filter(w => w.length > 0)
+  const wordCount = words.length
+
+  // If no content, return 0 score
+  if (wordCount === 0) {
+    return {
+      score: 0,
+      grade: 'No content',
+      optimal: false,
+      suggestion: 'Add content to your post (aim for 300+ words).',
+    }
+  }
+
   // Count sentences (. ! ? followed by space or end)
   const sentences = plainText.split(/[.!?]+/).filter(s => s.trim().length > 0)
   const sentenceCount = sentences.length || 1
-
-  // Count words
-  const words = plainText.split(/\s+/).filter(w => w.length > 0)
-  const wordCount = words.length || 1
 
   // Count syllables (rough approximation)
   const syllableCount = words.reduce((count, word) => {
@@ -228,7 +241,11 @@ export function analyzeHeadings(html: string): SEOAnalysis['headings'] {
   let suggestion: string | undefined
   let hierarchy = true
 
-  if (h1Count === 0) {
+  if (h1Count === 0 && h2Count === 0 && h3Count === 0) {
+    score = 0
+    suggestion = 'No headings found. Add headings to structure your content.'
+    hierarchy = false
+  } else if (h1Count === 0) {
     score = 40
     suggestion = 'Missing H1 heading. Add a main heading (title).'
     hierarchy = false
@@ -288,6 +305,16 @@ export function analyzeKeywords(text: string): SEOAnalysis['keywords'] {
   const plainText = text.replace(/<[^>]*>/g, ' ').toLowerCase()
   const words = plainText.split(/\s+/).filter(w => w.length > 3) // Only words > 3 chars
 
+  // If no content, return 0 score
+  if (words.length === 0) {
+    return {
+      density: 0,
+      score: 0,
+      topKeywords: [],
+      suggestion: 'Add content with focused keywords for better SEO.',
+    }
+  }
+
   const wordFreq = new Map<string, number>()
   words.forEach(word => {
     wordFreq.set(word, (wordFreq.get(word) || 0) + 1)
@@ -298,7 +325,7 @@ export function analyzeKeywords(text: string): SEOAnalysis['keywords'] {
     .slice(0, 10)
     .map(([word, count]) => ({ word, count }))
 
-  const totalWords = words.length || 1
+  const totalWords = words.length
   const topKeywordCount = topKeywords[0]?.count || 0
   const density = (topKeywordCount / totalWords) * 100
 
@@ -325,6 +352,15 @@ export function analyzeKeywords(text: string): SEOAnalysis['keywords'] {
  * Analyze internal links
  */
 export function analyzeInternalLinks(html: string): SEOAnalysis['internalLinks'] {
+  // If no content, return 0 score
+  if (!html || html.trim().length === 0) {
+    return {
+      count: 0,
+      score: 0,
+      suggestion: 'Add content and link to related posts to improve SEO.',
+    }
+  }
+
   const linkMatches = html.match(/<a[^>]*href\s*=\s*["'][^"']*["'][^>]*>/gi) || []
   const count = linkMatches.length
 

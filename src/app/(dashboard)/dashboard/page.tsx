@@ -328,7 +328,7 @@ export default function DashboardHomePage() {
               </Link>
               <Link href="/write" className="btn btn-primary text-base px-5 py-3 font-semibold">
                 <PenLine size={18} />
-                New Draft
+                New Post
               </Link>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function DashboardHomePage() {
               <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)]">
                 <PenLine size={20} className="text-[var(--text-secondary)]" />
               </span>
-              <span className="text-base font-semibold text-[var(--text-primary)]">New Draft</span>
+              <span className="text-base font-semibold text-[var(--text-primary)]">New Post</span>
             </Link>
             <Link
               href="/dashboard/captures"

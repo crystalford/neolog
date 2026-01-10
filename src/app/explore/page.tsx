@@ -153,17 +153,6 @@ export default function ExplorePage() {
                   Real content from real creators. No algorithmic mystery, just good writing surfaced fairly.
                 </p>
               </div>
-
-              {/* Links - Desktop only */}
-              <div className="hidden md:flex items-center gap-2">
-                <Link
-                  href="/visuals"
-                  className="btn btn-ghost btn-sm"
-                >
-                  <Sparkles size={16} />
-                  Visuals
-                </Link>
-              </div>
             </div>
 
             {/* Search Bar */}
