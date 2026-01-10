@@ -491,7 +491,7 @@ export default function DashboardHomePage() {
               {recentPublished.map((post, i) => (
                 <Link
                   key={post.id}
-                  href={`/dashboard/published?id=${post.id}`}
+                  href={profile?.username ? `/${profile.username}/${post.slug}` : `/write?edit=${post.id}`}
                   className={`block p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
