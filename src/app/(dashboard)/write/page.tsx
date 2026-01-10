@@ -1503,30 +1503,51 @@ export default function WritePage() {
               />
             </div>
 
-            {/* Schedule option - only for non-published posts */}
+            {/* Publish Intent - only for non-published posts */}
             {existingStatus !== 'published' && (
-              <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={publishIntent === 'schedule'}
-                    onChange={(e) => setPublishIntent(e.target.checked ? 'schedule' : 'publish')}
-                    className="w-4 h-4 rounded border-[var(--border-medium)]"
-                  />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
-                    Schedule for later
-                  </span>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  When to publish
                 </label>
-                {publishIntent === 'schedule' && (
-                  <div className="mt-3">
-                    <input
-                      type="datetime-local"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="input w-full"
-                    />
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPublishIntent('publish')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'publish'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-light)]'
+                    }`}
+                  >
+                    Publish Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPublishIntent('schedule')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      publishIntent === 'schedule'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-light)]'
+                    }`}
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Schedule time - only show when schedule is selected */}
+            {publishIntent === 'schedule' && existingStatus !== 'published' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Schedule for
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="input max-w-md"
+                />
               </div>
             )}
 
@@ -1592,11 +1613,11 @@ export default function WritePage() {
               <button
                 onClick={() => setShowPublishConfirm(true)}
                 disabled={publishing || !title || !content}
-                className="btn btn-primary"
+                className="px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold text-base hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
               >
                 {publishing ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin inline mr-2" />
                     Publishing...
                   </>
                 ) : (
