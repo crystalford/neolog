@@ -22,6 +22,7 @@ interface Post {
 export default function PostsPage() {
   const [activeTab, setActiveTab] = useState<PostStatus>('published')
   const [posts, setPosts] = useState<Post[]>([])
+  const [counts, setCounts] = useState({ published: 0, scheduled: 0, draft: 0 })
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState<string | null>(null)
 
@@ -29,8 +30,42 @@ export default function PostsPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    loadCounts()
+  }, [])
+
+  useEffect(() => {
     loadPosts()
   }, [activeTab])
+
+  const loadCounts = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    // Load counts for all statuses
+    const [publishedCount, scheduledCount, draftCount] = await Promise.all([
+      supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('author_id', session.user.id)
+        .eq('status', 'published'),
+      supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('author_id', session.user.id)
+        .eq('status', 'scheduled'),
+      supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('author_id', session.user.id)
+        .eq('status', 'draft'),
+    ])
+
+    setCounts({
+      published: publishedCount.count || 0,
+      scheduled: scheduledCount.count || 0,
+      draft: draftCount.count || 0,
+    })
+  }
 
   const loadPosts = async () => {
     setLoading(true)
@@ -78,12 +113,6 @@ export default function PostsPage() {
     setLoading(false)
   }
 
-  const counts = {
-    published: posts.filter(p => p.status === 'published').length,
-    scheduled: posts.filter(p => p.status === 'scheduled').length,
-    draft: posts.filter(p => p.status === 'draft').length,
-  }
-
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never'
     try {
@@ -119,6 +148,9 @@ export default function PostsPage() {
             }`}
           >
             {tab}
+            <span className={`ml-2 text-sm ${activeTab === tab ? 'text-blue-600' : 'text-gray-400'}`}>
+              {counts[tab]}
+            </span>
             {activeTab === tab && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
             )}
