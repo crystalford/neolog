@@ -187,10 +187,10 @@ export default async function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Traffic-First */}
             <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-[var(--accent)]/50 transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[var(--accent)]/30 to-[var(--accent-dark)]/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50/80 shadow-inner">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/30 to-cyan-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
                 <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <BarChart3 className="w-8 h-8 text-[var(--accent)]" />
+                  <BarChart3 className="w-8 h-8 text-blue-600" />
                 </div>
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Traffic-First SEO</h3>

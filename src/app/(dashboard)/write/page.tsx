@@ -69,7 +69,7 @@ export default function WritePage() {
   const [canonicalUrl, setCanonicalUrl] = useState('')
   const [originalSource, setOriginalSource] = useState('')
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
-  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('draft')
+  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('publish')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -1066,14 +1066,15 @@ export default function WritePage() {
     const isScheduling = intent === 'schedule'
 
     const preflight = [
-      { label: 'Title added', ok: title.trim().length >= 5, required: true },
+      { label: 'Title added', ok: title.trim().length > 0, required: true },
+      { label: 'Content added', ok: content.trim().length > 0, required: true },
       { label: 'At least 200 words', ok: getWordCount(content) >= 200, required: false },
       { label: 'Cover image set', ok: coverImage.trim().length > 0, required: false },
     ]
 
     const missingRequired = preflight.filter((item) => item.required && !item.ok)
     if (missingRequired.length > 0) {
-      setError('Add a longer title and more content before publishing.')
+      setError('Add a title and content before publishing.')
       return
     }
 
@@ -1085,10 +1086,7 @@ export default function WritePage() {
       if (!proceed) return
     }
 
-    if (intent === 'draft') {
-      setError('This post is still set to Draft. Switch the status to Publish or Schedule.')
-      return
-    }
+    // Removed draft validation - auto-save handles drafts, button always publishes
 
     if (isScheduling && !scheduledAt) {
       setError('Pick a schedule time to schedule this post.')
@@ -1250,6 +1248,7 @@ export default function WritePage() {
       // Send notifications via API for first publish only
       if (finalPostId && !isAlreadyPublished && !isScheduling) {
         try {
+          console.log('[Publish] Calling publish API for post:', finalPostId)
           const response = await fetch('/api/posts/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1257,10 +1256,13 @@ export default function WritePage() {
           })
 
           const json = await response.json().catch(() => null)
+          console.log('[Publish] API response:', response.status, json)
 
           if (!response.ok) {
             console.error('Publish API error:', json || (await response.text()))
-            // Don't fail publishing if notifications fail
+            setError(`Failed to publish: ${json?.error || 'Unknown error'}`)
+            setPublishing(false)
+            return
           } else {
             // Kick off heavy publish side-effects in the background.
             // keepalive helps the request complete even if we redirect.
@@ -1523,59 +1525,30 @@ export default function WritePage() {
               />
             </div>
 
-            {/* Publish Intent */}
+            {/* Schedule option - only for non-published posts */}
             {existingStatus !== 'published' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Status
+              <div className="mb-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={publishIntent === 'schedule'}
+                    onChange={(e) => setPublishIntent(e.target.checked ? 'schedule' : 'publish')}
+                    className="w-4 h-4 rounded border-[var(--border-medium)]"
+                  />
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    Schedule for later
+                  </span>
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setPublishIntent('draft')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'draft'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Save as Draft
-                  </button>
-                  <button
-                    onClick={() => setPublishIntent('publish')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'publish'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Publish Now
-                  </button>
-                  <button
-                    onClick={() => setPublishIntent('schedule')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      publishIntent === 'schedule'
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    }`}
-                  >
-                    Schedule
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Schedule time - only show when schedule is selected */}
-            {publishIntent === 'schedule' && existingStatus !== 'published' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Schedule for
-                </label>
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="input max-w-md"
-                />
+                {publishIntent === 'schedule' && (
+                  <div className="mt-3">
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="input w-full"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
