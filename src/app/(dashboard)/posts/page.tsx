@@ -17,7 +17,6 @@ interface Post {
   published_at: string | null
   scheduled_at: string | null
   updated_at: string
-  view_count: number
 }
 
 export default function PostsPage() {
@@ -55,7 +54,7 @@ export default function PostsPage() {
     // Load posts for active tab
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, slug, status, published_at, scheduled_at, updated_at, view_count, author_id, publication_id')
+      .select('id, title, slug, status, published_at, scheduled_at, updated_at, author_id, publication_id')
       .eq('author_id', session.user.id)
       .eq('status', activeTab)
       .order(activeTab === 'published' ? 'published_at' : 'updated_at', { ascending: false })
@@ -159,12 +158,7 @@ export default function PostsPage() {
                 </h3>
                 <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
                   {activeTab === 'published' && (
-                    <>
-                      <span>{formatDate(post.published_at)}</span>
-                      {post.view_count > 0 && (
-                        <span>{post.view_count} views</span>
-                      )}
-                    </>
+                    <span>{formatDate(post.published_at)}</span>
                   )}
                   {activeTab === 'scheduled' && (
                     <span>Scheduled for {formatDate(post.scheduled_at)}</span>
