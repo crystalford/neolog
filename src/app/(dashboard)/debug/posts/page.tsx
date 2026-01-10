@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 export default function DebugPostsPage() {
   const [posts, setPosts] = useState<any[]>([])
   const [counts, setCounts] = useState<any>({})
+  const [publications, setPublications] = useState<any[]>([])
+  const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,6 +19,8 @@ export default function DebugPostsPage() {
     const data = await response.json()
     setPosts(data.posts || [])
     setCounts(data.counts || {})
+    setPublications(data.publications || [])
+    setUserId(data.userId || '')
     setLoading(false)
   }
 
@@ -30,7 +34,9 @@ export default function DebugPostsPage() {
 
       <div className="mb-6 p-4 bg-blue-50 rounded-lg">
         <h2 className="font-semibold mb-2">Summary</h2>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="text-xs text-gray-500 mb-2">User ID: {userId}</div>
+        <div className="text-xs text-gray-500 mb-3">Publications: {publications.map(p => p.name).join(', ') || 'None'}</div>
+        <div className="grid grid-cols-4 gap-4 mb-4">
           <div>
             <div className="text-2xl font-bold">{counts.total || 0}</div>
             <div className="text-sm text-gray-600">Total Posts</div>
@@ -46,6 +52,16 @@ export default function DebugPostsPage() {
           <div>
             <div className="text-2xl font-bold text-purple-600">{counts.scheduled || 0}</div>
             <div className="text-sm text-gray-600">Scheduled</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-blue-200">
+          <div>
+            <div className="text-xl font-bold text-blue-600">{counts.with_publication_id || 0}</div>
+            <div className="text-sm text-gray-600">With publication_id</div>
+          </div>
+          <div>
+            <div className="text-xl font-bold text-red-600">{counts.without_publication_id || 0}</div>
+            <div className="text-sm text-gray-600">WITHOUT publication_id</div>
           </div>
         </div>
       </div>
@@ -78,6 +94,12 @@ export default function DebugPostsPage() {
                 </div>
                 <div className="text-sm text-gray-600">
                   <span className="font-medium">ID:</span> {post.id}
+                </div>
+                <div className={`text-sm ${post.publication_id ? 'text-green-600' : 'text-red-600'} font-semibold`}>
+                  <span className="font-medium">Publication ID:</span> {post.publication_id || 'NULL - THIS IS THE PROBLEM'}
+                </div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Content Type:</span> {post.content_type || 'null'}
                 </div>
               </div>
             </div>

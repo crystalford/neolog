@@ -55,16 +55,24 @@ export default function PostsPage() {
     // Load posts for active tab
     const { data, error } = await supabase
       .from('posts')
-      .select('id, title, slug, status, published_at, scheduled_at, updated_at, view_count')
+      .select('id, title, slug, status, published_at, scheduled_at, updated_at, view_count, author_id, publication_id')
       .eq('author_id', session.user.id)
       .eq('status', activeTab)
       .order(activeTab === 'published' ? 'published_at' : 'updated_at', { ascending: false })
       .limit(50)
 
-    console.log('[Posts Page] Loaded posts:', { tab: activeTab, count: data?.length || 0, error })
+    console.log('[Posts Page] Loaded posts:', {
+      tab: activeTab,
+      count: data?.length || 0,
+      error,
+      userId: session.user.id,
+      posts: data
+    })
 
     if (error) {
       console.error('[Posts Page] Error:', error)
+      // Show error to user
+      alert(`Error loading posts: ${error.message}`)
     }
 
     setPosts(data || [])
