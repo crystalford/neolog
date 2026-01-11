@@ -7,7 +7,7 @@ import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { PostCardSkeleton } from '@/components/Skeleton'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
-import { Clock, Loader2, Search } from 'lucide-react'
+import { Clock, Loader2, Search, Sparkles } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
 
 export default function ExplorePage() {
