@@ -478,8 +478,8 @@ export default function DashboardHomePage() {
               Recent Published
             </h3>
             {recentPublished.length > 0 && (
-              <Link 
-                href="/dashboard/published"
+              <Link
+                href="/posts"
                 className="text-xs text-[var(--accent)] hover:underline font-medium"
               >
                 See all →

@@ -183,9 +183,9 @@ export default function DashboardLayout({
       { href: '/import', icon: Upload, label: 'Import' },
     ]
 
-    // Show Published tab after first publish
+    // Show Posts tab after first publish
     if (capabilities.showPublishedTab) {
-      items.push({ href: '/dashboard/published', icon: Send, label: 'Published' })
+      items.push({ href: '/posts', icon: Send, label: 'Posts' })
     }
 
     // Always show Analytics

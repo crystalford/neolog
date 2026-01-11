@@ -491,14 +491,13 @@ export default function WritePage() {
       )}
 
       {/* Main editor */}
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="space-y-4">
+      <div className="max-w-6xl mx-auto px-6 py-12">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Post title"
-            className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 p-0"
+            className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 mb-4"
             autoFocus
           />
 
@@ -507,10 +506,10 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Add a subtitle or excerpt (optional)"
-            className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 p-0"
+            className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 mb-8"
           />
 
-          <div className="pt-4">
+          <div>
             <RichEditor
               content={content}
               onChange={setContent}
@@ -533,7 +532,6 @@ export default function WritePage() {
               className="min-h-[600px]"
             />
           </div>
-        </div>
       </div>
 
       {/* HTML Import Modal */}
