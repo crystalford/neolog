@@ -9,7 +9,7 @@ import { ShareBar } from '@/components/ShareButtons'
 import { NewsletterCTA } from '@/components/NewsletterCTA'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { generateArticleSchema, generateSEO } from '@/lib/seo'
-import { Clock, ArrowLeft } from 'lucide-react'
+import { Clock, ArrowLeft, Edit2 } from 'lucide-react'
 
 interface Props {
   params: {
@@ -65,6 +65,9 @@ export async function generateMetadata({ params }: Props) {
 export default async function PostPage({ params, searchParams }: Props) {
   const supabase = createClient()
   const isPreview = searchParams?.preview === 'true'
+
+  // Get current user session
+  const { data: { session } } = await supabase.auth.getSession()
 
   console.log('[Post Page] Loading post:', {
     username: params.username,
@@ -122,6 +125,9 @@ export default async function PostPage({ params, searchParams }: Props) {
     })
     notFound()
   }
+
+  // Check if current user is the author
+  const isOwnPost = session?.user?.id === post.author_id
 
   const stackId: string | null = post.series_id || null
   const { data: stack } = stackId
@@ -215,13 +221,25 @@ export default async function PostPage({ params, searchParams }: Props) {
         <article className="px-6 py-12">
           <div className="max-w-4xl mx-auto">
             <header className="mb-8">
-              <Link
-                href={`/${params.username}`}
-                className="inline-flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-6 transition-colors"
-              >
-                <ArrowLeft size={16} />
-                Back to {profile.display_name || profile.username}
-              </Link>
+              <div className="flex items-center justify-between mb-6">
+                <Link
+                  href={`/${params.username}`}
+                  className="inline-flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  Back to {profile.display_name || profile.username}
+                </Link>
+
+                {isOwnPost && (
+                  <Link
+                    href={`/write?edit=${post.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Edit2 size={16} />
+                    Edit Post
+                  </Link>
+                )}
+              </div>
 
               <h1 className="font-display text-4xl md:text-5xl mb-4 leading-tight text-[var(--text-primary)]">
                 {post.title}

@@ -7,23 +7,11 @@ import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { PostCardSkeleton } from '@/components/Skeleton'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
-import { TrendingUp, Clock, Sparkles, Award, Loader2, Search } from 'lucide-react'
+import { Clock, Loader2, Search } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
 
-type RisingPost = {
-  post_id: string
-  title: string
-  slug: string
-  author_username: string
-  author_display_name: string | null
-  total_views: number
-  upvote_count: number
-  published_at: string
-}
-
 export default function ExplorePage() {
-  const [risingPosts, setRisingPosts] = useState<RisingPost[]>([])
-  const [filter, setFilter] = useState<'latest' | 'popular' | 'rising'>('latest')
+  const [filter, setFilter] = useState<'latest'>('latest')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [topTags, setTopTags] = useState<Array<{ id: string; name: string; slug: string; count: number }>>([])
@@ -56,14 +44,7 @@ export default function ExplorePage() {
     }
 
     query = query.range(offset, offset + limit - 1)
-
-    if (filter === 'latest') {
-      query = query.order('published_at', { ascending: false })
-    } else if (filter === 'popular') {
-      query = query.order('fork_count', { ascending: false })
-    } else {
-      query = query.order('upvote_count', { ascending: false })
-    }
+    query = query.order('published_at', { ascending: false })
 
     const { data, error } = await query
 
@@ -102,7 +83,6 @@ export default function ExplorePage() {
 
   useEffect(() => {
     loadInitial()
-    loadRisingPosts()
     loadTopTags()
   }, [filter, searchQuery, selectedTag])
 
@@ -137,11 +117,6 @@ export default function ExplorePage() {
 
       setTopTags(sorted)
     }
-  }
-
-  const loadRisingPosts = async () => {
-    const { data } = await supabase.rpc('get_rising_posts', { limit_count: 5 })
-    if (data) setRisingPosts(data)
   }
 
   const formatTimeAgo = (dateStr: string) => {
@@ -240,29 +215,6 @@ export default function ExplorePage() {
           <div className="grid lg:grid-cols-4 gap-6">
             {/* Main content */}
             <div className="lg:col-span-3">
-              {/* Filters */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {[
-                  { id: 'latest', label: 'Latest', icon: Clock },
-                  { id: 'popular', label: 'Most Forked', icon: Sparkles },
-                  { id: 'rising', label: 'Rising', icon: TrendingUp },
-                ].map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setFilter(id as typeof filter)}
-                    className={`
-                      flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all
-                      ${filter === id
-                        ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
-                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                      }
-                    `}
-                  >
-                    <Icon size={16} />
-                    {label}
-                  </button>
-                ))}
-              </div>
 
               {/* Posts grid */}
               {loading ? (
@@ -310,44 +262,6 @@ export default function ExplorePage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Rising posts */}
-              <div className="rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden">
-                <div className="p-3 border-b border-[var(--border-light)] flex items-center gap-2">
-                  <TrendingUp size={18} className="text-[var(--accent)]" />
-                  <h2 className="font-display text-lg">Rising Now</h2>
-                </div>
-                
-                {risingPosts.length === 0 ? (
-                  <div className="p-4 text-sm text-[var(--text-tertiary)]">
-                    No rising posts yet
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[var(--border-light)]">
-                    {risingPosts.map((post, i) => (
-                      <Link
-                        key={post.post_id}
-                        href={`/${post.author_username}/${post.slug}`}
-                        className="block p-3 hover:bg-[var(--bg-tertiary)] transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="w-6 h-6 rounded-full bg-[var(--accent-soft)] flex items-center justify-center text-xs font-medium text-[var(--accent)]">
-                            {i + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm line-clamp-2 mb-1">
-                              {post.title}
-                            </h3>
-                            <p className="text-xs text-[var(--text-tertiary)]">
-                              {post.author_display_name || post.author_username} - {formatTimeAgo(post.published_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Call to action */}
               <div className="p-6 rounded-2xl bg-gradient-to-br from-[var(--accent-soft)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30">
                 <div className="flex items-center gap-2 mb-3">

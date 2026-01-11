@@ -76,10 +76,12 @@ export function GenerativeCover({
   }
 
   return (
-    <div className={`relative ${className}`} style={{ width, height }}>
+    <div className={`relative ${className}`}>
       <img
         src={dataUrl}
         alt={title || 'Generative cover'}
+        width={width}
+        height={height}
         className="w-full h-full object-cover"
       />
       {showPatternName && (

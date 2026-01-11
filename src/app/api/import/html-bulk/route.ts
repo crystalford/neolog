@@ -155,6 +155,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
 
+  const publicationId = form.get('publication_id') as string
+  if (!publicationId) {
+    return NextResponse.json({ error: 'publication_id is required' }, { status: 400 })
+  }
+
   const files = form.getAll('files').filter(Boolean) as File[]
   if (files.length === 0) {
     return NextResponse.json({ error: 'No files provided' }, { status: 400 })
@@ -240,6 +245,7 @@ export async function POST(request: NextRequest) {
       .from('posts')
       .insert({
         author_id: session.user.id,
+        publication_id: publicationId,
         title,
         subtitle: subtitle || null,
         slug,

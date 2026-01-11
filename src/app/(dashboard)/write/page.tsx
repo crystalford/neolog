@@ -1,14 +1,17 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { RichEditor } from '@/components/RichEditor'
-import { Loader2, Settings, X, CheckCircle2, ChevronDown } from 'lucide-react'
+import { TagSelect } from '@/components/TagSelect'
+import { SEOAnalyzer } from '@/components/SEOAnalyzer'
+import { GenerativeCover } from '@/components/GenerativeCover'
+import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
 
-export default function WritePageV2() {
+export default function WritePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -24,13 +27,24 @@ export default function WritePageV2() {
   // Post data
   const [postId, setPostId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
+  const [subtitle, setSubtitle] = useState('')
   const [content, setContent] = useState('')
+  const [coverImage, setCoverImage] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [slug, setSlug] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
+  const [canonicalUrl, setCanonicalUrl] = useState('')
+  const [isPremium, setIsPremium] = useState(false)
   const [publicationId, setPublicationId] = useState<string | null>(null)
   const [publications, setPublications] = useState<any[]>([])
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
+  const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('publish')
 
   // UI state
   const [showSettings, setShowSettings] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importHtml, setImportHtml] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -85,9 +99,26 @@ export default function WritePageV2() {
       if (post) {
         setPostId(post.id)
         setTitle(post.title || '')
+        setSubtitle(post.subtitle || '')
         setContent(post.content || '')
+        setCoverImage(post.cover_image_url || '')
+        setSlug(post.slug || '')
+        setScheduledAt(post.scheduled_at || '')
+        setCanonicalUrl(post.canonical_url || '')
+        setIsPremium(post.is_premium || false)
         setPublicationId(post.publication_id)
         setExistingStatus(post.status)
+
+        // Load tags
+        const { data: tagRows } = await supabase
+          .from('post_tags')
+          .select('tag:tags(name)')
+          .eq('post_id', post.id)
+
+        if (tagRows) {
+          const tagNames = tagRows.map((row: any) => row.tag?.name).filter(Boolean)
+          setTags(tagNames)
+        }
       }
     }
 
@@ -103,7 +134,15 @@ export default function WritePageV2() {
     }, 5000)
 
     return () => clearTimeout(timer)
-  }, [title, content, user])
+  }, [title, subtitle, content, coverImage, tags, user])
+
+  const generateSlug = (text: string) => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .slice(0, 80)
+  }
 
   const saveDraft = async () => {
     if (!user || !title || !publicationId) return
@@ -111,46 +150,67 @@ export default function WritePageV2() {
 
     setSaving(true)
 
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .slice(0, 80)
+    const autoSlug = slug || generateSlug(title)
 
-    const postData = {
+    const postData: any = {
       author_id: user.id,
       publication_id: publicationId,
       title,
+      subtitle: subtitle || null,
       content,
       content_html: content,
       content_type: 'html',
-      slug,
+      slug: autoSlug,
+      cover_image_url: coverImage || null,
+      canonical_url: canonicalUrl || null,
+      is_premium: isPremium,
       status: 'draft',
     }
 
-    if (postId) {
-      await supabase
-        .from('posts')
-        .update(postData)
-        .eq('id', postId)
-    } else {
-      const { data } = await supabase
-        .from('posts')
-        .insert(postData)
-        .select('id')
-        .single()
+    try {
+      if (postId) {
+        await supabase
+          .from('posts')
+          .update(postData)
+          .eq('id', postId)
+      } else {
+        const { data } = await supabase
+          .from('posts')
+          .insert(postData)
+          .select('id')
+          .single()
 
-      if (data) {
-        setPostId(data.id)
-        // Update URL to include edit param
-        const url = new URL(window.location.href)
-        url.searchParams.set('edit', data.id)
-        window.history.replaceState({}, '', url)
+        if (data) {
+          setPostId(data.id)
+          // Update URL to include edit param
+          const url = new URL(window.location.href)
+          url.searchParams.set('edit', data.id)
+          window.history.replaceState({}, '', url)
+
+          // Save tags
+          if (tags.length > 0) {
+            await supabase.rpc('set_post_tags', {
+              p_post_id: data.id,
+              p_tag_names: tags,
+            })
+          }
+        }
       }
-    }
 
-    setSaving(false)
-    setLastSaved(new Date())
+      // Update tags if post exists
+      if (postId && tags.length > 0) {
+        await supabase.rpc('set_post_tags', {
+          p_post_id: postId,
+          p_tag_names: tags,
+        })
+      }
+
+      setSaving(false)
+      setLastSaved(new Date())
+    } catch (err) {
+      console.error('Save error:', err)
+      setSaving(false)
+    }
   }
 
   const handlePublish = async () => {
@@ -159,61 +219,135 @@ export default function WritePageV2() {
     setPublishing(true)
     setError(null)
 
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .slice(0, 80)
+    const isScheduling = publishIntent === 'schedule' && scheduledAt
+    const autoSlug = slug || generateSlug(title)
+    const isUpdate = existingStatus === 'published'
 
-    const postData = {
+    const postData: any = {
       author_id: user.id,
       publication_id: publicationId,
       title,
+      subtitle: subtitle || null,
       content,
       content_html: content,
       content_type: 'html',
-      slug,
-      status: 'published',
-      published_at: existingStatus === 'published' ? undefined : new Date().toISOString(),
+      slug: autoSlug,
+      cover_image_url: coverImage || null,
+      canonical_url: canonicalUrl || null,
+      is_premium: isPremium,
+      status: isScheduling ? 'scheduled' : 'published',
     }
 
-    if (postId) {
-      const { error: updateError } = await supabase
-        .from('posts')
-        .update(postData)
-        .eq('id', postId)
-
-      if (updateError) {
-        setError(updateError.message)
-        setPublishing(false)
-        return
-      }
+    if (isScheduling) {
+      postData.scheduled_at = new Date(scheduledAt).toISOString()
+      postData.published_at = null
     } else {
-      const { data, error: insertError } = await supabase
-        .from('posts')
-        .insert(postData)
-        .select('id, slug')
-        .single()
-
-      if (insertError) {
-        setError(insertError.message)
-        setPublishing(false)
-        return
+      postData.status = 'published'
+      if (!isUpdate) {
+        postData.published_at = new Date().toISOString()
       }
-
-      setPostId(data.id)
+      postData.scheduled_at = null
     }
 
-    setPublishing(false)
-    setSuccess(existingStatus === 'published' ? 'Post updated!' : 'Post published!')
-    setExistingStatus('published')
+    try {
+      let finalPostId = postId
 
-    // Redirect to published post
-    setTimeout(() => {
-      if (profile?.username) {
-        router.push(`/${profile.username}/${slug}`)
+      if (postId) {
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update(postData)
+          .eq('id', postId)
+
+        if (updateError) {
+          setError(updateError.message)
+          setPublishing(false)
+          return
+        }
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('posts')
+          .insert(postData)
+          .select('id, slug')
+          .single()
+
+        if (insertError) {
+          setError(insertError.message)
+          setPublishing(false)
+          return
+        }
+
+        setPostId(data.id)
+        finalPostId = data.id
       }
-    }, 1000)
+
+      // Save tags
+      if (finalPostId && tags.length > 0) {
+        await supabase.rpc('set_post_tags', {
+          p_post_id: finalPostId,
+          p_tag_names: tags,
+        })
+      }
+
+      setPublishing(false)
+      setSuccess(
+        isScheduling
+          ? 'Post scheduled successfully!'
+          : isUpdate
+          ? 'Post updated successfully!'
+          : 'Post published successfully!'
+      )
+      setExistingStatus(isScheduling ? 'scheduled' : 'published')
+
+      // Only redirect if it's a new publish, not an update
+      if (!isUpdate) {
+        setTimeout(() => {
+          if (isScheduling) {
+            router.push('/posts')
+          } else if (profile?.username) {
+            router.push(`/${profile.username}/${autoSlug}`)
+          }
+        }, 1000)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to publish')
+      setPublishing(false)
+    }
+  }
+
+  const handleImportHtml = () => {
+    if (!importHtml.trim()) return
+    setContent(importHtml)
+    setImportHtml('')
+    setShowImport(false)
+    setSuccess('HTML imported successfully!')
+  }
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setUploadingCover(true)
+
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
+
+      const { error } = await supabase.storage
+        .from('images')
+        .upload(fileName, file)
+
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName)
+
+      setCoverImage(publicUrl)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setUploadingCover(false)
+    }
   }
 
   if (loading) {
@@ -244,7 +378,7 @@ export default function WritePageV2() {
     <main className="min-h-screen bg-white">
       {/* Top bar */}
       <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
               ← All posts
@@ -259,7 +393,7 @@ export default function WritePageV2() {
                   setPublicationId(newId)
                   writeSelectedPublicationId(newId)
                 }}
-                className="text-sm border-none bg-transparent text-gray-600 hover:text-gray-900 cursor-pointer pr-6 appearance-none"
+                className="text-sm border-none bg-transparent text-gray-600 hover:text-gray-900 cursor-pointer pr-6 appearance-none focus:outline-none"
               >
                 {publications.map((pub) => (
                   <option key={pub.id} value={pub.id}>
@@ -286,11 +420,33 @@ export default function WritePageV2() {
               </span>
             )}
 
+            {/* Preview/View link for published posts */}
+            {postId && existingStatus === 'published' && profile?.username && (
+              <a
+                href={`/${profile.username}/${slug || generateSlug(title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                View post
+                <ExternalLink size={14} />
+              </a>
+            )}
+
+            {/* Import HTML button */}
+            <button
+              onClick={() => setShowImport(true)}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              <Upload size={16} />
+              Import HTML
+            </button>
+
             {/* Settings button */}
             <button
               onClick={() => setShowSettings(true)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Settings"
+              title="Post settings"
             >
               <Settings size={20} className="text-gray-600" />
             </button>
@@ -304,8 +460,10 @@ export default function WritePageV2() {
               {publishing ? (
                 <>
                   <Loader2 size={16} className="animate-spin inline mr-2" />
-                  Publishing...
+                  {publishIntent === 'schedule' ? 'Scheduling...' : 'Publishing...'}
                 </>
+              ) : publishIntent === 'schedule' ? (
+                'Schedule'
               ) : existingStatus === 'published' ? (
                 'Update'
               ) : (
@@ -334,37 +492,95 @@ export default function WritePageV2() {
 
       {/* Main editor */}
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Post title"
-          className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 mb-8"
-          autoFocus
-        />
+        <div className="space-y-4">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Post title"
+            className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 p-0"
+            autoFocus
+          />
 
-        <RichEditor
-          content={content}
-          onChange={setContent}
-          onImageUpload={async (file) => {
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${user.id}/${Date.now()}.${fileExt}`
+          <input
+            type="text"
+            value={subtitle}
+            onChange={(e) => setSubtitle(e.target.value)}
+            placeholder="Add a subtitle or excerpt (optional)"
+            className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 p-0"
+          />
 
-            const { error } = await supabase.storage
-              .from('images')
-              .upload(fileName, file)
+          <div className="pt-4">
+            <RichEditor
+              content={content}
+              onChange={setContent}
+              onImageUpload={async (file) => {
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
-            if (error) throw error
+                const { error } = await supabase.storage
+                  .from('images')
+                  .upload(fileName, file)
 
-            const { data: { publicUrl } } = supabase.storage
-              .from('images')
-              .getPublicUrl(fileName)
+                if (error) throw error
 
-            return publicUrl
-          }}
-          className="min-h-[600px]"
-        />
+                const { data: { publicUrl } } = supabase.storage
+                  .from('images')
+                  .getPublicUrl(fileName)
+
+                return publicUrl
+              }}
+              className="min-h-[600px]"
+            />
+          </div>
+        </div>
       </div>
+
+      {/* HTML Import Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowImport(false)}
+          />
+          <div className="relative w-full max-w-2xl bg-white rounded-lg shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Import HTML</h2>
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <textarea
+                value={importHtml}
+                onChange={(e) => setImportHtml(e.target.value)}
+                placeholder="Paste your HTML code here..."
+                className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              />
+
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <button
+                  onClick={() => setShowImport(false)}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportHtml}
+                  disabled={!importHtml.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings sidebar */}
       {showSettings && (
@@ -386,53 +602,193 @@ export default function WritePageV2() {
               </div>
 
               <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Post Status
-                  </label>
-                  <div className="text-sm text-gray-600">
-                    {existingStatus === 'published' ? 'Published' : 'Draft'}
+                {/* Publishing */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Calendar size={16} />
+                    Publishing
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Post Status
+                      </label>
+                      <div className="text-sm text-gray-600">
+                        {existingStatus === 'published' ? 'Published' : existingStatus === 'scheduled' ? 'Scheduled' : 'Draft'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Publish Options
+                      </label>
+                      <select
+                        value={publishIntent}
+                        onChange={(e) => setPublishIntent(e.target.value as any)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="publish">Publish now</option>
+                        <option value="schedule">Schedule for later</option>
+                        <option value="draft">Save as draft</option>
+                      </select>
+                    </div>
+
+                    {publishIntent === 'schedule' && (
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Schedule Date & Time
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={scheduledAt}
+                          onChange={(e) => setScheduledAt(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Publication
-                  </label>
-                  <select
-                    value={publicationId || ''}
-                    onChange={(e) => {
-                      const newId = e.target.value
-                      setPublicationId(newId)
-                      writeSelectedPublicationId(newId)
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    {publications.map((pub) => (
-                      <option key={pub.id} value={pub.id}>
-                        {pub.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* SEO & Display */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Globe size={16} />
+                    SEO & Display
+                  </h3>
 
-                {postId && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Post URL
-                    </label>
-                    <div className="text-sm text-gray-600 break-all">
-                      {profile?.username && existingStatus === 'published' && (
-                        <a
-                          href={`/${profile.username}/${title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 80)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View post →
-                        </a>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Cover Image
+                      </label>
+                      <input
+                        type="url"
+                        value={coverImage}
+                        onChange={(e) => setCoverImage(e.target.value)}
+                        placeholder="https://example.com/image.jpg"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                      />
+                      <div className="flex items-center gap-2">
+                        <label className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer text-sm flex items-center gap-2">
+                          <Upload size={14} />
+                          {uploadingCover ? 'Uploading...' : 'Upload'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleCoverUpload}
+                            className="hidden"
+                            disabled={uploadingCover}
+                          />
+                        </label>
+                      </div>
+                      {coverImage ? (
+                        <img src={coverImage} alt="Cover" className="w-full h-32 object-cover rounded-lg mt-2" />
+                      ) : (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-2">Auto-generated cover preview:</p>
+                          <GenerativeCover
+                            contentSeed={`${postId || 'new'}-${title}`}
+                            width={400}
+                            height={225}
+                            title={title || 'Your Post Title'}
+                            author={profile?.display_name || profile?.username || 'Author'}
+                            className="rounded-lg"
+                          />
+                        </div>
                       )}
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        URL Slug
+                      </label>
+                      <input
+                        type="text"
+                        value={slug || generateSlug(title)}
+                        onChange={(e) => setSlug(e.target.value)}
+                        placeholder="url-slug"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {profile?.username && `/${profile.username}/${slug || generateSlug(title)}`}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                        <Tag size={14} />
+                        Tags
+                      </label>
+                      <TagSelect
+                        selectedTags={tags}
+                        onChange={setTags}
+                      />
+                    </div>
+
+                    <SEOAnalyzer
+                      title={title}
+                      description={subtitle}
+                      content={content}
+                    />
+                  </div>
+                </div>
+
+                {/* Advanced */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Link2 size={16} />
+                    Advanced
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Canonical URL
+                      </label>
+                      <input
+                        type="url"
+                        value={canonicalUrl}
+                        onChange={(e) => setCanonicalUrl(e.target.value)}
+                        placeholder="https://original-site.com/post"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        If this was originally published elsewhere
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Lock size={16} className="text-gray-600" />
+                        <div>
+                          <p className="text-sm font-medium">Premium Only</p>
+                          <p className="text-xs text-gray-500">Restrict to paid subscribers</p>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isPremium}
+                        onChange={(e) => setIsPremium(e.target.checked)}
+                        className="w-5 h-5 rounded border-gray-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {postId && existingStatus === 'published' && (
+                  <div className="pt-6 border-t border-gray-200">
+                    <label className="block text-sm font-medium mb-2">
+                      View Published Post
+                    </label>
+                    <a
+                      href={`/${profile?.username}/${slug || generateSlug(title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      Open in new tab →
+                    </a>
                   </div>
                 )}
               </div>
