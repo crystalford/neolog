@@ -724,11 +724,19 @@ export default function WritePage() {
                       />
                     </div>
 
-                    <SEOAnalyzer
-                      title={title}
-                      description={subtitle}
-                      content={content}
-                    />
+                    <details className="group border border-gray-200 rounded-lg">
+                      <summary className="cursor-pointer px-3 py-2 font-medium text-sm flex items-center justify-between hover:bg-gray-50">
+                        <span>SEO Analysis</span>
+                        <span className="text-xs text-gray-500">(optional)</span>
+                      </summary>
+                      <div className="px-3 pb-3 pt-2">
+                        <SEOAnalyzer
+                          title={title}
+                          description={subtitle}
+                          content={content}
+                        />
+                      </div>
+                    </details>
                   </div>
                 </div>
 
