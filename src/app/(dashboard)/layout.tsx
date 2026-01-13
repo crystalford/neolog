@@ -10,10 +10,15 @@ import {
   PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
   BookOpen, DollarSign
 } from 'lucide-react'
-import { DashboardCommandPalette } from '@/components/DashboardCommandPalette'
+import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
+
+const DashboardCommandPalette = dynamic(
+  () => import('@/components/DashboardCommandPalette').then((mod) => mod.DashboardCommandPalette),
+  { ssr: false }
+)
 
 export default function DashboardLayout({
   children,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { QuickCaptureModal } from '@/components/QuickCaptureModal'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -14,6 +14,11 @@ interface Capture {
   created_at: string
   processed?: boolean
 }
+
+const QuickCaptureModal = dynamic(
+  () => import('@/components/QuickCaptureModal').then((mod) => mod.QuickCaptureModal),
+  { ssr: false }
+)
 
 export default function CapturesPage() {
   const [captures, setCaptures] = useState<Capture[]>([])
@@ -50,7 +55,9 @@ export default function CapturesPage() {
 
   return (
     <main className="px-8 py-10 max-w-4xl mx-auto">
-      <QuickCaptureModal isOpen={captureModalOpen} onClose={() => setCaptureModalOpen(false)} />
+      {captureModalOpen && (
+        <QuickCaptureModal isOpen={captureModalOpen} onClose={() => setCaptureModalOpen(false)} />
+      )}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl font-semibold text-[var(--text-primary)]">Captures</h1>

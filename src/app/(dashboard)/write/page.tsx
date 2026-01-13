@@ -7,9 +7,14 @@ import { createClient } from '@/lib/supabase/client'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { RichEditor } from '@/components/RichEditor'
 import { TagSelect } from '@/components/TagSelect'
-import { SEOAnalyzer } from '@/components/SEOAnalyzer'
+import dynamic from 'next/dynamic'
 import { GenerativeCover } from '@/components/GenerativeCover'
 import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
+
+const SEOAnalyzer = dynamic(
+  () => import('@/components/SEOAnalyzer').then((mod) => mod.SEOAnalyzer),
+  { ssr: false }
+)
 
 export default function WritePage() {
   const router = useRouter()
