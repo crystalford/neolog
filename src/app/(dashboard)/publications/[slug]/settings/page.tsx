@@ -279,6 +279,9 @@ export default function PublicationSettingsPage({
             >
               {saving ? 'Saving...' : 'Save settings'}
             </button>
+            <Link href={`/publications/${slug}/fediverse`} className="btn btn-secondary btn-sm">
+              Fediverse dashboard
+            </Link>
             {isDirty && (
               <button
                 onClick={() =>

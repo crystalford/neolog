@@ -149,22 +149,25 @@ export default function PublicationOverviewPage({
       </div>
 
       <div className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm p-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl text-[var(--text-primary)]">Recent activity</h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Latest updates across this publication.
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-xl text-[var(--text-primary)]">Recent activity</h2>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Latest updates across this publication.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/publications/${slug}/analytics`} className="btn btn-secondary btn-sm">
+                View analytics
+              </Link>
+              <Link href={`/publications/${slug}/fediverse`} className="btn btn-secondary btn-sm">
+                Fediverse
+              </Link>
+              <Link href={`/publications/${slug}/settings`} className="btn btn-secondary btn-sm">
+                Settings
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/publications/${slug}/analytics`} className="btn btn-secondary btn-sm">
-              View analytics
-            </Link>
-            <Link href={`/publications/${slug}/settings`} className="btn btn-secondary btn-sm">
-              Settings
-            </Link>
-          </div>
-        </div>
 
         {posts.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6 text-center">
@@ -198,5 +201,4 @@ export default function PublicationOverviewPage({
     </main>
   )
 }
-
 
