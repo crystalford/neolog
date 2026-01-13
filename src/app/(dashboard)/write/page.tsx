@@ -5,11 +5,38 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
-import { RichEditor } from '@/components/RichEditor'
-import { TagSelect } from '@/components/TagSelect'
 import dynamic from 'next/dynamic'
-import { GenerativeCover } from '@/components/GenerativeCover'
 import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
+
+const RichEditor = dynamic(
+  () => import('@/components/RichEditor').then((mod) => mod.RichEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[420px] bg-[var(--bg-secondary)] rounded-lg animate-pulse" />
+    ),
+  }
+)
+
+const TagSelect = dynamic(
+  () => import('@/components/TagSelect').then((mod) => mod.TagSelect),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-11 bg-[var(--bg-secondary)] rounded-lg animate-pulse" />
+    ),
+  }
+)
+
+const GenerativeCover = dynamic(
+  () => import('@/components/GenerativeCover').then((mod) => mod.GenerativeCover),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-32 w-full bg-[var(--bg-secondary)] rounded-lg animate-pulse" />
+    ),
+  }
+)
 
 const SEOAnalyzer = dynamic(
   () => import('@/components/SEOAnalyzer').then((mod) => mod.SEOAnalyzer),
