@@ -15,46 +15,46 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, display_name, username')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, owner_id, logo_url, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  if (!profile) return { title: 'Not Found' }
+  if (!publication || !publication.is_active) return { title: 'Not Found' }
 
   const { data: stack } = await supabase
     .from('series')
     .select('title, description, cover_image_url')
-    .eq('author_id', profile.id)
+    .eq('author_id', publication.owner_id)
     .eq('slug', params.slug)
     .single()
 
   if (!stack) return { title: 'Not Found' }
 
   return generateSEO({
-    title: `${stack.title} - ${profile.display_name || profile.username}`,
-    description: stack.description || `A stack by ${profile.display_name || profile.username}`,
+    title: `${stack.title} - ${publication.name}`,
+    description: stack.description || `A stack by ${publication.name}`,
     image: stack.cover_image_url || undefined,
-    url: `/${params.username}/stack/${params.slug}`,
+    url: `/${publication.slug}/stack/${params.slug}`,
   })
 }
 
 export default async function StackHubPage({ params }: Props) {
   const supabase = createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, display_name, username, avatar_url')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, owner_id, logo_url, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  if (!profile) notFound()
+  if (!publication || !publication.is_active) notFound()
 
   const { data: stack } = await supabase
     .from('series')
     .select('id, title, slug, description, cover_image_url, created_at')
-    .eq('author_id', profile.id)
+    .eq('author_id', publication.owner_id)
     .eq('slug', params.slug)
     .single()
 
@@ -64,6 +64,7 @@ export default async function StackHubPage({ params }: Props) {
     .from('posts')
     .select('id, title, slug, excerpt, published_at, series_order')
     .eq('series_id', stack.id)
+    .eq('publication_id', publication.id)
     .eq('status', 'published')
     .order('series_order', { ascending: true })
 
@@ -79,7 +80,7 @@ export default async function StackHubPage({ params }: Props) {
     itemListElement: postsInStack.map((p: any, idx: number) => ({
       '@type': 'ListItem',
       position: idx + 1,
-      url: `${baseUrl}/${params.username}/${p.slug}`,
+      url: `${baseUrl}/${publication.slug}/${p.slug}`,
       name: p.title,
     })),
   }
@@ -95,25 +96,25 @@ export default async function StackHubPage({ params }: Props) {
         <div className="px-6 py-12">
           <div className="max-w-4xl mx-auto">
             <Link
-              href={`/${params.username}`}
+              href={`/${publication.slug}`}
               className="inline-flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-6 transition-colors"
             >
               <ArrowLeft size={16} />
-              Back to {profile.display_name || profile.username}
+              Back to {publication.name}
             </Link>
 
             <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6">
               <div className="flex items-start gap-4">
-                {profile.avatar_url ? (
+                {publication.logo_url ? (
                   <img
-                    src={profile.avatar_url}
-                    alt={profile.display_name || profile.username}
+                    src={publication.logo_url}
+                    alt={publication.name}
                     loading="lazy"
-                    className="w-12 h-12 rounded-full"
+                    className="w-12 h-12 rounded-2xl"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-[var(--text-primary)] flex items-center justify-center text-sm font-medium text-[var(--text-inverse)]">
-                    {(profile.display_name || profile.username)[0].toUpperCase()}
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--text-primary)] flex items-center justify-center text-sm font-medium text-[var(--text-inverse)]">
+                    {publication.name[0].toUpperCase()}
                   </div>
                 )}
 
@@ -137,17 +138,17 @@ export default async function StackHubPage({ params }: Props) {
                 />
               )}
 
-              <div className="mt-6 grid grid-cols-2 gap-2 max-w-sm">
-                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
-                  <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{postsInStack.length}</p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
-                  <p className="text-xs text-[var(--text-tertiary)]">Author</p>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">@{profile.username}</p>
+                <div className="mt-6 grid grid-cols-2 gap-2 max-w-sm">
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{postsInStack.length}</p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                    <p className="text-xs text-[var(--text-tertiary)]">Publication</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">@{publication.slug}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
             <section className="mt-8">
               <h2 className="font-display text-xl mb-4">Posts in this stack</h2>
@@ -161,7 +162,7 @@ export default async function StackHubPage({ params }: Props) {
                   {postsInStack.map((post, index) => (
                     <Link
                       key={post.id}
-                      href={`/${params.username}/${post.slug}`}
+                      href={`/${publication.slug}/${post.slug}`}
                       className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
                     >
                       <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">

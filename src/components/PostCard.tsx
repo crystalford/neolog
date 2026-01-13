@@ -11,6 +11,11 @@ type PostWithOptionalSeries = PostWithAuthor & {
     title: string
     slug: string
   } | null
+  publication?: {
+    slug: string
+    name?: string | null
+    logo_url?: string | null
+  } | null
 }
 
 interface PostCardProps {
@@ -21,8 +26,20 @@ interface PostCardProps {
 export function PostCard({ post, variant = 'default' }: PostCardProps) {
   const router = useRouter()
 
-  const postHref = `/${post.author.username}/${post.slug}`
-  const stackHref = post.series?.slug ? `/${post.author.username}/stack/${post.series.slug}` : null
+  const entity = post.publication
+    ? {
+        slug: post.publication.slug,
+        name: post.publication.name || post.publication.slug,
+        logoUrl: post.publication.logo_url || null,
+      }
+    : {
+        slug: post.author.username,
+        name: post.author.display_name || post.author.username,
+        logoUrl: post.author.avatar_url || null,
+      }
+
+  const postHref = `/${entity.slug}/${post.slug}`
+  const stackHref = post.series?.slug ? `/${entity.slug}/stack/${post.series.slug}` : null
 
   const isDraft = post.status === 'draft';
   const publishedDate = post.published_at 
@@ -40,7 +57,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
     return (
       <article className="group">
         <Link
-          href={`/${post.author.username}/${post.slug}`}
+          href={postHref}
           className="block h-full p-3 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] shadow-sm hover:border-[var(--border-medium)] hover:shadow-md transition-all"
         >
           <div className="aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-tertiary)]">
@@ -57,7 +74,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
                 width={600}
                 height={338}
                 title={post.title}
-                author={post.author.display_name || post.author.username}
+                author={entity.name}
                 className="w-full h-full group-hover:scale-105 transition-transform duration-500"
               />
             )}
@@ -71,7 +88,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             {post.title}
           </h2>
           <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-            <span className="truncate">{post.author.display_name || post.author.username}</span>
+            <span className="truncate">{entity.name}</span>
             {!isDraft && publishedDate && (
               <>
                 <span>-</span>
@@ -139,7 +156,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               <p className="text-sm text-[var(--text-secondary)] line-clamp-2">{post.excerpt}</p>
             )}
             <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-              <span>{post.author.display_name || post.author.username}</span>
+              <span>{entity.name}</span>
               {!isDraft && publishedDate && (
                 <>
                   <span>-</span>
@@ -186,7 +203,7 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
               width={800}
               height={450}
               title={post.title}
-              author={post.author.display_name || post.author.username}
+              author={entity.name}
               className="w-full h-full group-hover:scale-105 transition-transform duration-500"
             />
           )}
@@ -203,20 +220,20 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         {/* Author and published date, demoted if not draft */}
         <div className="flex items-center gap-3 mb-2">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            {post.author.avatar_url ? (
+            {entity.logoUrl ? (
               <img
-                src={post.author.avatar_url}
-                alt={post.author.display_name || post.author.username}
+                src={entity.logoUrl}
+                alt={entity.name}
                 loading="lazy"
                 className="w-7 h-7 rounded-full"
               />
             ) : (
               <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center text-xs font-medium text-white">
-                {(post.author.display_name || post.author.username)[0].toUpperCase()}
+                {entity.name[0].toUpperCase()}
               </div>
             )}
             <span className="text-sm text-[var(--text-secondary)]">
-              {post.author.display_name || post.author.username}
+              {entity.name}
             </span>
           </div>
           {!isDraft && publishedDate && (

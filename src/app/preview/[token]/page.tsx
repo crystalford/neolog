@@ -29,7 +29,8 @@ export default async function PreviewPage({ params }: Props) {
     .from('posts')
     .select(`
       *,
-      author:profiles(id, username, display_name, avatar_url)
+      author:profiles(id, username, display_name, avatar_url),
+      publication:publications(id, slug, name, logo_url)
     `)
     .eq('id', postId)
     .single()
@@ -92,21 +93,21 @@ export default async function PreviewPage({ params }: Props) {
 
           {/* Author & meta */}
           <div className="flex items-center gap-4 mb-8 pb-8 border-b border-[var(--border-light)]">
-            <Link href={`/${post.author.username}`} className="flex items-center gap-3 group">
-              {post.author.avatar_url ? (
-                <img 
-                  src={post.author.avatar_url} 
-                  alt={post.author.display_name || post.author.username}
-                  className="w-10 h-10 rounded-full"
+            <Link href={`/${post.publication?.slug || post.author.username}`} className="flex items-center gap-3 group">
+              {post.publication?.logo_url || post.author.avatar_url ? (
+                <img
+                  src={post.publication?.logo_url || post.author.avatar_url}
+                  alt={post.publication?.name || post.author.display_name || post.author.username}
+                  className="w-10 h-10 rounded-2xl"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
-                  {(post.author.display_name || post.author.username)[0].toUpperCase()}
+                <div className="w-10 h-10 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-white font-medium">
+                  {(post.publication?.name || post.author.display_name || post.author.username)[0].toUpperCase()}
                 </div>
               )}
               <div>
                 <p className="font-medium group-hover:text-[var(--accent)] transition-colors">
-                  {post.author.display_name || post.author.username}
+                  {post.publication?.name || post.author.display_name || post.author.username}
                 </p>
                 <p className="text-sm text-[var(--text-tertiary)]">
                   Draft - {post.reading_time_minutes || 1} min read

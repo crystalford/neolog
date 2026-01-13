@@ -101,10 +101,12 @@ export function ForkTree({ postId, rootPostId, currentPostId }: ForkTreeProps) {
 
                 {/* Nodes at this depth */}
                 <div className="space-y-2 pl-4">
-                  {nodes.map((node) => (
+                  {nodes.map((node) => {
+                    const publicationSlug = (node as any).publication_slug || node.author_username
+                    return (
                     <Link
                       key={node.id}
-                      href={`/${node.author_username}/${node.id}`}
+                      href={`/${publicationSlug}/${node.id}`}
                       className={`block p-3 rounded-lg border transition-all ${
                         node.id === currentPostId
                           ? 'bg-[var(--accent-soft)] border-[var(--accent)]'
@@ -137,7 +139,8 @@ export function ForkTree({ postId, rootPostId, currentPostId }: ForkTreeProps) {
                         )}
                       </div>
                     </Link>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}

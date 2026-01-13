@@ -18,6 +18,7 @@ type ContinuePost = {
   author_username: string
   author_display_name: string | null
   author_avatar_url: string | null
+  publication_slug?: string | null
 }
 
 export function ContinueReading() {
@@ -71,7 +72,7 @@ export function ContinueReading() {
         {posts.map(post => (
           <Link
             key={post.post_id}
-            href={`/${post.author_username}/${post.slug}`}
+            href={`/${post.publication_slug || post.author_username}/${post.slug}`}
             className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors group"
           >
             {/* Progress indicator */}

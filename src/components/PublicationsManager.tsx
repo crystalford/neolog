@@ -144,7 +144,7 @@ export function PublicationsManager() {
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Workspace</p>
           <h1 className="font-display text-3xl text-[var(--text-primary)]">Publications</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Manage all your blogs and publications in one place.
+            Your first publication is your main site. Create more whenever you need them.
           </p>
         </div>
         <button
@@ -317,10 +317,10 @@ export function PublicationsManager() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Slug * (URL: /publications/your-slug)
+                    Slug * (URL: /your-slug)
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-[var(--text-tertiary)]">/publications/</span>
+                    <span className="text-sm text-[var(--text-tertiary)]">/</span>
                     <input
                       type="text"
                       value={newPub.slug}

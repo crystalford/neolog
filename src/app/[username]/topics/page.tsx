@@ -11,22 +11,22 @@ interface Props {
 export default async function TopicsPage({ params }: Props) {
   const supabase = createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, username, display_name')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  if (!profile) notFound()
+  if (!publication || !publication.is_active) notFound()
 
   const { data: tagRows } = await supabase
     .from('post_tags')
-    .select('tag:tags(id, name, slug, color), post:posts(id, title, slug, published_at, excerpt, author_id, status)')
+    .select('tag:tags(id, name, slug, color), post:posts(id, title, slug, published_at, excerpt, author_id, publication_id, status)')
 
   const { data: introRows } = await supabase
     .from('author_topic_intros')
     .select('tag_id, intro')
-    .eq('creator_id', profile.id)
+    .eq('creator_id', publication.owner_id)
 
   const introMap = new Map<string, string>()
   ;(introRows || []).forEach((row: any) => {
@@ -39,7 +39,7 @@ export default async function TopicsPage({ params }: Props) {
     const tag = row.tag
     const post = row.post
     if (!tag || !post) return
-    if (post.author_id !== profile.id || post.status !== 'published') return
+    if (post.status !== 'published' || post.publication_id !== publication.id) return
     const existing = tagMap.get(tag.id)
     if (existing) {
       existing.posts.push(post)
@@ -77,11 +77,11 @@ export default async function TopicsPage({ params }: Props) {
       <main className="pt-16 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <Link
-            href={`/${profile.username}`}
+            href={`/${publication.slug}`}
             className="inline-flex items-center gap-1.5 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] mb-6 pt-6"
           >
             <ArrowLeft size={14} />
-            Back to {profile.display_name || profile.username}
+            Back to {publication.name}
           </Link>
 
           <div className="flex items-center gap-4 mb-8">
@@ -91,7 +91,7 @@ export default async function TopicsPage({ params }: Props) {
             <div>
               <h1 className="font-display text-3xl">Topics</h1>
               <p className="text-[var(--text-secondary)]">
-                {topics.length} topic{topics.length !== 1 ? 's' : ''} by {profile.display_name || profile.username}
+                {topics.length} topic{topics.length !== 1 ? 's' : ''} by {publication.name}
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ export default async function TopicsPage({ params }: Props) {
                     {topic.posts.map((post) => (
                       <Link
                         key={post.id}
-                        href={`/${profile.username}/${post.slug}`}
+                        href={`/${publication.slug}/${post.slug}`}
                         className="block rounded-xl border border-[var(--border-light)] px-4 py-3 hover:border-[var(--border-medium)] transition-colors"
                       >
                         <div className="flex items-center justify-between gap-3">

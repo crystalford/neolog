@@ -36,15 +36,15 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient()
 
-  // Get profile
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .single()
+  // Get publication
+  const { data: publication, error: publicationError } = await supabase
+    .from('publications')
+    .select('id, name, slug, description, logo_url, owner_id, is_active')
+    .eq('slug', username)
+    .maybeSingle()
 
-  if (profileError || !profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  if (publicationError || !publication || !publication.is_active) {
+    return NextResponse.json({ error: 'Publication not found' }, { status: 404 })
   }
 
   // Build query for posts
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       reading_time_minutes,
       series:series(title, slug)
     `)
-    .eq('author_id', profile.id)
+    .eq('publication_id', publication.id)
     .eq('status', 'published')
     .order('published_at', { ascending: true })
 
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       .from('series')
       .select('id')
       .eq('slug', seriesSlug)
-      .eq('author_id', profile.id)
+      .eq('author_id', publication.owner_id)
       .single()
 
     if (!series) {
@@ -95,11 +95,11 @@ export async function GET(request: NextRequest) {
 
   // Prepare metadata
   const author: EpubAuthor = {
-    display_name: profile.display_name || profile.username,
-    username: profile.username,
-    bio: profile.bio || undefined,
-    website: profile.website || undefined,
-    avatar_url: profile.avatar_url || undefined,
+    display_name: publication.name,
+    username: publication.slug,
+    bio: publication.description || undefined,
+    website: undefined,
+    avatar_url: publication.logo_url || undefined,
   }
 
   const bookTitle = seriesSlug
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     author,
     language: 'en',
     publisher: 'Neolog',
-    description: profile.bio || `A collection of posts by ${author.display_name}`,
+    description: publication.description || `A collection of posts by ${author.display_name}`,
     identifier: `neolog-${username}-${Date.now()}`,
     pubDate: new Date().toISOString().split('T')[0],
   }

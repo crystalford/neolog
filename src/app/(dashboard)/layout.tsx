@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
-import { onSelectedPublicationIdChange, readSelectedPublicationId } from '@/lib/publicationContext'
+import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
 
 const DashboardCommandPalette = dynamic(
@@ -30,6 +30,7 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
   const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null)
+  const [selectedPublicationSlug, setSelectedPublicationSlug] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -43,6 +44,47 @@ export default function DashboardLayout({
 
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    const loadPublicationSlug = async () => {
+      if (!user) return
+
+      let publicationId = selectedPublicationId
+
+      if (!publicationId) {
+        const { data: fallback } = await supabase
+          .from('publications')
+          .select('id, slug')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (fallback && fallback[0]) {
+          publicationId = fallback[0].id
+          setSelectedPublicationId(fallback[0].id)
+          writeSelectedPublicationId(fallback[0].id)
+          setSelectedPublicationSlug(fallback[0].slug)
+          return
+        }
+      }
+
+      if (!publicationId) {
+        setSelectedPublicationSlug(null)
+        return
+      }
+
+      const { data } = await supabase
+        .from('publications')
+        .select('slug')
+        .eq('id', publicationId)
+        .eq('owner_id', user.id)
+        .maybeSingle()
+
+      setSelectedPublicationSlug(data?.slug || null)
+    }
+
+    void loadPublicationSlug()
+  }, [selectedPublicationId, user, supabase])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hostname.startsWith('www.')) {
@@ -208,9 +250,9 @@ export default function DashboardLayout({
     return [
       { href: '/series', icon: Layers, label: 'Series' },
       { href: '/topics', icon: Tag, label: 'Topics' },
-      { href: '/fediverse', icon: Globe, label: 'Fediverse' },
+      { href: selectedPublicationSlug ? `/publications/${selectedPublicationSlug}/fediverse` : '/fediverse', icon: Globe, label: 'Fediverse' },
     ]
-  }, [capabilities])
+  }, [capabilities, selectedPublicationSlug])
 
   // Grow section for monetization features
   const growNav = useMemo(() => {
@@ -387,7 +429,7 @@ export default function DashboardLayout({
         <div className="border-t border-[var(--border-light)] px-3 py-4 space-y-1">
           {profile && (
             <Link
-              href={`/${profile.username}`}
+              href={`/${selectedPublicationSlug || profile.username}`}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
               {profile.avatar_url ? (
@@ -471,7 +513,7 @@ export default function DashboardLayout({
               {/* User avatar */}
               {profile && (
                 <Link
-                  href={`/${profile.username}`}
+                  href={`/${selectedPublicationSlug || profile.username}`}
                   className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
                 >
                   {profile.avatar_url ? (

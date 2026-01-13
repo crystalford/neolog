@@ -15,7 +15,7 @@ type SeriesPost = {
   title: string
   slug: string
   series_order: number
-  author_username: string
+  publication_slug: string
 }
 
 export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
@@ -41,13 +41,18 @@ export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
       
       const { data: postsData } = await supabase
         .from('posts')
-        .select('id, title, slug, series_order, author:profiles(username)')
+        .select('id, title, slug, series_order, publication:publications(slug), author:profiles(username)')
         .eq('series_id', seriesId)
         .eq('status', 'published')
         .order('series_order', { ascending: true })
       
       if (postsData) {
-        setPosts(postsData.map((p: any) => ({ ...p, author_username: p.author.username })))
+        setPosts(
+          postsData.map((p: any) => ({
+            ...p,
+            publication_slug: p.publication?.slug || p.author?.username || 'unknown',
+          }))
+        )
       }
     }
   }
@@ -81,7 +86,7 @@ export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
           {posts.map((post, i) => (
             <Link
               key={post.id}
-              href={`/${post.author_username}/${post.slug}`}
+              href={`/${post.publication_slug}/${post.slug}`}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                 post.id === currentPostId 
                   ? 'bg-[var(--accent-soft)] text-[var(--accent)]' 
@@ -101,7 +106,7 @@ export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
       {(prevPost || nextPost) && (
         <div className="border-t border-[var(--border-light)] p-3 flex gap-2">
           {prevPost ? (
-            <Link href={`/${prevPost.author_username}/${prevPost.slug}`}
+            <Link href={`/${prevPost.publication_slug}/${prevPost.slug}`}
               className="flex-1 flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
               <ChevronLeft size={16} />
               <div className="text-left min-w-0">
@@ -111,7 +116,7 @@ export function SeriesNav({ seriesId, currentPostId }: SeriesNavProps) {
             </Link>
           ) : <div className="flex-1" />}
           {nextPost && (
-            <Link href={`/${nextPost.author_username}/${nextPost.slug}`}
+            <Link href={`/${nextPost.publication_slug}/${nextPost.slug}`}
               className="flex-1 flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-right">
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-[var(--text-tertiary)]">Next</p>

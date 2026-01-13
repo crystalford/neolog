@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { SubscribeButton } from '@/components/SubscribeButton'
 import { FediverseBadge } from '@/components/FediverseBadge'
-import { SocialLinks } from '@/components/SocialLinks'
 import { generateSEO } from '@/lib/seo'
-import { Calendar, MapPin, Link as LinkIcon, Users, BookOpen, Rss, Globe, Download } from 'lucide-react'
+import { Calendar, Link as LinkIcon, Users, BookOpen, Rss, Globe, Download } from 'lucide-react'
 
 interface Props {
   params: { username: string }
@@ -15,82 +15,95 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
-   
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name, username, bio, avatar_url')
-    .eq('username', params.username)
-    .single()
 
-  if (!profile) return { title: 'Not Found' }
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('name, slug, description, logo_url, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
+
+  if (!publication || !publication.is_active) return { title: 'Not Found' }
 
   return {
     ...generateSEO({
-      title: profile.display_name || profile.username,
-      description: profile.bio || `Read posts by ${profile.display_name || profile.username}`,
-      image: profile.avatar_url || undefined,
-      url: `/${params.username}`,
+      title: publication.name,
+      description: publication.description || `Read posts from ${publication.name}`,
+      image: publication.logo_url || undefined,
+      url: `/${publication.slug}`,
     }),
     alternates: {
       types: {
-        'application/rss+xml': `/${params.username}/feed`,
-        'application/atom+xml': `/${params.username}/feed`,
+        'application/rss+xml': `/${publication.slug}/feed`,
+        'application/atom+xml': `/${publication.slug}/feed`,
       },
     },
   }
 }
 
-export default async function ProfilePage({ params }: Props) {
+export default async function PublicationPage({ params }: Props) {
   const supabase = createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, description, logo_url, website_url, owner_id, is_active, created_at')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  if (!profile) notFound()
+  if (!publication || !publication.is_active) notFound()
+
+  const { data: ownerProfile } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .eq('id', publication.owner_id)
+    .maybeSingle()
 
   const { data: posts, error: postsError } = await supabase
     .from('posts')
-    .select('*')
-    .eq('author_id', profile.id)
+    .select('*, author:profiles(id, username, display_name, avatar_url), publication:publications(id, slug, name, logo_url)')
+    .eq('publication_id', publication.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
 
-  console.log('[Profile Page] Posts query result:', {
-    username: params.username,
-    authorId: profile.id,
+  console.log('[Publication Page] Posts query result:', {
+    slug: params.username,
+    publicationId: publication.id,
     count: posts?.length || 0,
-    error: postsError
+    error: postsError,
   })
 
   const { data: stacks } = await supabase
     .from('series')
     .select('id, title, slug, description, cover_image_url, post_count, created_at')
-    .eq('author_id', profile.id)
+    .eq('author_id', publication.owner_id)
     .order('created_at', { ascending: false })
 
-  const { count: followerCount } = await supabase
-    .from('follows')
-    .select('*', { count: 'exact', head: true })
-    .eq('following_id', profile.id)
+  let followerCount = 0
+  const admin = createAdminClient()
+  if (admin) {
+    const { count } = await admin
+      .from('activitypub_publication_followers')
+      .select('*', { count: 'exact', head: true })
+      .eq('publication_id', publication.id)
+    followerCount = count || 0
+  }
 
   const { data: subscriberCount } = await supabase
-    .rpc('get_subscriber_count', { target_creator_id: profile.id })
+    .rpc('get_subscriber_count', { target_creator_id: publication.owner_id })
 
   let topicTags: Array<{ id: string; name: string; slug: string; color: string; count: number }> = []
   if (posts && posts.length > 0) {
     const postIds = posts.map((post) => post.id)
     const { data: tagRows } = await supabase
       .from('post_tags')
-      .select('tag:tags(id, name, slug, color), post_id')
+      .select('tag:tags(id, name, slug, color), post:posts(id, publication_id, status)')
       .in('post_id', postIds)
 
     const tagMap = new Map<string, { id: string; name: string; slug: string; color: string; count: number }>()
     ;(tagRows || []).forEach((row: any) => {
       const tag = row.tag
-      if (!tag) return
+      const post = row.post
+      if (!tag || !post) return
+      if (post.publication_id !== publication.id || post.status !== 'published') return
       const existing = tagMap.get(tag.id)
       if (existing) {
         existing.count += 1
@@ -101,19 +114,16 @@ export default async function ProfilePage({ params }: Props) {
     topicTags = Array.from(tagMap.values()).sort((a, b) => b.count - a.count).slice(0, 8)
   }
 
-  const joinedDate = new Date(profile.created_at).toLocaleDateString('en-US', {
+  const foundedDate = new Date(publication.created_at).toLocaleDateString('en-US', {
     month: 'long',
-    year: 'numeric'
+    year: 'numeric',
   })
 
-  const postsWithAuthor = posts?.map(post => ({
-    ...post,
-    author: profile
-  })) || []
+  const postsWithAuthor = posts || []
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
   const fediverseDomain = new URL(appUrl).hostname
-  const fediverseHandle = `@${profile.username}@${fediverseDomain}`
+  const fediverseHandle = `@${publication.slug}@${fediverseDomain}`
   const fediverseSearchUrl = `https://mastodon.social/search?q=${encodeURIComponent(fediverseHandle)}`
 
   return (
@@ -121,120 +131,109 @@ export default async function ProfilePage({ params }: Props) {
       <Header />
       <main className="pt-14 pb-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
-          {/* Profile Header */}
+          {/* Publication Header */}
           <div className="pt-6 pb-6 border-b border-[var(--border-light)]">
             <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6">
               <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-              {profile.avatar_url ? (
-                <img 
-                  src={profile.avatar_url} 
-                  alt={profile.display_name || profile.username}
-                  loading="lazy"
-                  className="w-20 h-20 rounded-full"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl font-medium text-white">
-                  {(profile.display_name || profile.username)[0].toUpperCase()}
-                </div>
-              )}
-               
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h1 className="font-display text-3xl mb-1">
-                      {profile.display_name || profile.username}
-                    </h1>
-                    <p className="text-[var(--text-secondary)]">@{profile.username}</p>
-                  </div>
-                   
-                  {/* FIXED: Renamed authorId to creatorId and added creatorUsername */}
-                  <SubscribeButton 
-                    creatorId={profile.id} 
-                    creatorUsername={profile.username} 
+                {publication.logo_url ? (
+                  <img
+                    src={publication.logo_url}
+                    alt={publication.name}
+                    loading="lazy"
+                    className="w-20 h-20 rounded-2xl object-cover"
                   />
-                </div>
-                 
-                <p className="mt-4 text-[var(--text-secondary)]">
-                  {profile.bio || 'No bio yet. Add a short line in settings.'}
-                </p>
+                ) : (
+                  <div className="w-20 h-20 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-2xl font-medium text-white">
+                    {publication.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
 
-                <div className="grid grid-cols-3 gap-2 mt-5 max-w-md">
-                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
-                    <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{postsWithAuthor.length}</p>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h1 className="font-display text-3xl mb-1">
+                        {publication.name}
+                      </h1>
+                      <p className="text-[var(--text-secondary)]">@{publication.slug}</p>
+                    </div>
+
+                    <SubscribeButton
+                      creatorId={publication.owner_id}
+                      creatorUsername={publication.slug}
+                    />
                   </div>
-                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
-                    <p className="text-xs text-[var(--text-tertiary)]">Followers</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{followerCount || 0}</p>
+
+                  <p className="mt-4 text-[var(--text-secondary)]">
+                    {publication.description || 'No description yet. Add a short line in settings.'}
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2 mt-5 max-w-md">
+                    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                      <p className="text-xs text-[var(--text-tertiary)]">Posts</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{postsWithAuthor.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                      <p className="text-xs text-[var(--text-tertiary)]">Followers</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{followerCount || 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
+                      <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{subscriberCount || 0}</p>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] p-3">
-                    <p className="text-xs text-[var(--text-tertiary)]">Subscribers</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{subscriberCount || 0}</p>
-                  </div>
-                </div>
-                 
-                <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-[var(--text-tertiary)]">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} />
-                    Joined {joinedDate}
-                  </span>
-                   
-                  {profile.location && (
+
+                  <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-[var(--text-tertiary)]">
                     <span className="flex items-center gap-1">
-                      <MapPin size={14} />
-                      {profile.location}
+                      <Calendar size={14} />
+                      Founded {foundedDate}
                     </span>
-                  )}
-                   
-                  {profile.website && (
-                    <a 
-                      href={profile.website}
+
+                    {publication.website_url && (
+                      <a
+                        href={publication.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
+                      >
+                        <LinkIcon size={14} />
+                        {publication.website_url.replace(/^https?:\/\//, '')}
+                      </a>
+                    )}
+
+                    {ownerProfile?.display_name && (
+                      <span className="flex items-center gap-1">
+                        <Users size={14} />
+                        Editor: {ownerProfile.display_name}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Distribution & Export Actions */}
+                  <div className="flex flex-wrap gap-3 mt-5">
+                    <Link
+                      href={`/${publication.slug}/feed`}
+                      className="btn btn-sm btn-secondary"
                       target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
                     >
-                      <LinkIcon size={14} />
-                      {profile.website.replace(/^https?:\/\//, '')}
+                      <Rss size={14} />
+                      RSS Feed
+                    </Link>
+                    <a
+                      href={`/api/export/epub?username=${publication.slug}`}
+                      className="btn btn-sm btn-secondary"
+                      download
+                      title="Download all posts as an ePub book"
+                    >
+                      <BookOpen size={14} />
+                      Export as Book
+                      <Download size={12} className="ml-1" />
                     </a>
-                  )}
-                   
-                  <span className="flex items-center gap-1">
-                    <Users size={14} />
-                    {followerCount || 0} followers
-                  </span>
+                    <FediverseBadge
+                      handle={fediverseHandle}
+                      searchUrl={fediverseSearchUrl}
+                    />
+                  </div>
                 </div>
-
-                {/* Distribution & Export Actions */}
-                <div className="flex flex-wrap gap-3 mt-5">
-                  <Link
-                    href={`/${profile.username}/feed`}
-                    className="btn btn-sm btn-secondary"
-                    target="_blank"
-                  >
-                    <Rss size={14} />
-                    RSS Feed
-                  </Link>
-                  <a
-                    href={`/api/export/epub?username=${profile.username}`}
-                    className="btn btn-sm btn-secondary"
-                    download
-                    title="Download all posts as an ePub book"
-                  >
-                    <BookOpen size={14} />
-                    Export as Book
-                    <Download size={12} className="ml-1" />
-                  </a>
-                  <FediverseBadge
-                    handle={fediverseHandle}
-                    searchUrl={fediverseSearchUrl}
-                  />
-                </div>
-
-                {/* Social links */}
-                <div className="mt-4">
-                  <SocialLinks profile={profile} />
-                </div>
-              </div>
               </div>
             </div>
           </div>
@@ -303,7 +302,7 @@ export default async function ProfilePage({ params }: Props) {
                 {stacks.map((stack) => (
                   <Link
                     key={stack.id}
-                    href={`/${profile.username}/stack/${stack.slug}`}
+                    href={`/${publication.slug}/stack/${stack.slug}`}
                     className="block rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/40 hover:bg-[var(--bg-secondary)]/60 transition-colors overflow-hidden"
                   >
                     {stack.cover_image_url && (
@@ -334,7 +333,7 @@ export default async function ProfilePage({ params }: Props) {
 
           <section className="mt-6">
             <h2 className="font-display text-xl mb-4">Posts</h2>
-             
+
             {postsWithAuthor.length === 0 ? (
               <p className="text-[var(--text-secondary)] text-center py-12">
                 No posts yet. Check back soon.
@@ -342,7 +341,7 @@ export default async function ProfilePage({ params }: Props) {
             ) : (
               <div className="space-y-6">
                 {postsWithAuthor.map((post) => (
-                  <PostCard key={post.id} post={post} />
+                  <PostCard key={post.id} post={post as any} />
                 ))}
               </div>
             )}
@@ -355,12 +354,12 @@ export default async function ProfilePage({ params }: Props) {
                   <div>
                     <h2 className="font-display text-xl">Topic map</h2>
                     <p className="text-sm text-[var(--text-tertiary)]">
-                      The subjects this writer comes back to the most.
+                      The subjects this publication comes back to the most.
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
                     <Link
-                      href={`/${profile.username}/topics`}
+                      href={`/${publication.slug}/topics`}
                       className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                     >
                       View topics

@@ -20,7 +20,7 @@ export default function ExplorePage() {
   const fetchPosts = useCallback(async (offset: number, limit: number) => {
     let query = supabase
       .from('posts')
-      .select(`*, author:profiles(*)`)
+      .select(`*, author:profiles(*), publication:publications(id, slug, name, logo_url)`)
       .eq('status', 'published')
 
     // Search filter

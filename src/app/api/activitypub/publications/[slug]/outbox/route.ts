@@ -53,7 +53,7 @@ export async function GET(
     content: post.content,
     content_html: post.content_html,
     published_at: post.published_at,
-    author_username: post.author?.username || slug,
+    author_username: slug,
   }))
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'

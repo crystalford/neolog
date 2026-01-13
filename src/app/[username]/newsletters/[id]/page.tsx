@@ -15,43 +15,51 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
   
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('name, slug, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
+
+  if (!publication || !publication.is_active) return { title: 'Not Found' }
+
   const { data: newsletter } = await supabase
     .from('newsletters')
-    .select('subject, author:profiles(display_name, username)')
+    .select('subject')
     .eq('id', params.id)
+    .eq('author_id', publication.owner_id)
     .eq('is_public', true)
     .single()
   
   if (!newsletter) return { title: 'Not Found' }
 
-  const author = Array.isArray(newsletter.author) ? newsletter.author[0] : newsletter.author
-  const authorName = author?.display_name || author?.username || 'Neolog'
+  const authorName = publication.name || 'Neolog'
 
   return generateSEO({
     title: newsletter.subject,
     description: `Newsletter from ${authorName}`,
-    url: `/${params.username}/newsletters/${params.id}`,
+    url: `/${publication.slug}/newsletters/${params.id}`,
   })
 }
 
 export default async function NewsletterDetailPage({ params }: Props) {
   const supabase = createClient()
   
-  // Get profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', params.username)
-    .single()
+  // Get publication
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, logo_url, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
   
-  if (!profile) notFound()
+  if (!publication || !publication.is_active) notFound()
 
   // Get newsletter
   const { data: newsletter } = await supabase
     .from('newsletters')
     .select('*')
     .eq('id', params.id)
-    .eq('author_id', profile.id)
+    .eq('author_id', publication.owner_id)
     .eq('is_public', true)
     .not('sent_at', 'is', null)
     .single()
@@ -73,7 +81,7 @@ export default async function NewsletterDetailPage({ params }: Props) {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="pt-8 mb-8">
             <Link 
-              href={`/${params.username}/newsletters`}
+              href={`/${publication.slug}/newsletters`}
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-6"
             >
               <ArrowLeft size={14} />
@@ -85,20 +93,20 @@ export default async function NewsletterDetailPage({ params }: Props) {
             </h1>
             
             <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
-              <Link href={`/${params.username}`} className="flex items-center gap-2 hover:text-[var(--accent)]">
-                {profile.avatar_url ? (
+              <Link href={`/${publication.slug}`} className="flex items-center gap-2 hover:text-[var(--accent)]">
+                {publication.logo_url ? (
                   <img
-                    src={profile.avatar_url}
-                    alt={`${profile.display_name || profile.username} avatar`}
+                    src={publication.logo_url}
+                    alt={`${publication.name} logo`}
                     loading="lazy"
-                    className="w-6 h-6 rounded-full"
+                    className="w-6 h-6 rounded-2xl"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-xs">
-                    {(profile.display_name || profile.username)[0].toUpperCase()}
+                  <div className="w-6 h-6 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-white text-xs">
+                    {publication.name[0].toUpperCase()}
                   </div>
                 )}
-                {profile.display_name || profile.username}
+                {publication.name}
               </Link>
               
               <span className="flex items-center gap-1">
@@ -121,8 +129,8 @@ export default async function NewsletterDetailPage({ params }: Props) {
             <p className="text-[var(--text-secondary)] mb-6">
               Subscribe to get future newsletters directly in your inbox
             </p>
-            <Link href={`/${params.username}`} className="btn btn-primary">
-              Subscribe to {profile.display_name || profile.username}
+            <Link href={`/${publication.slug}`} className="btn btn-primary">
+              Subscribe to {publication.name}
             </Link>
           </div>
         </div>
@@ -130,4 +138,3 @@ export default async function NewsletterDetailPage({ params }: Props) {
     </>
   )
 }
-

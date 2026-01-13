@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     // Load post (ownership check)
     const { data: post, error: postError } = await db
       .from('posts')
-      .select('*, author:profiles(username, display_name)')
+      .select('*, author:profiles(username, display_name), publication:publications(slug)')
       .eq('id', postId)
       .eq('author_id', actorUserIdStrict)
       .single()
@@ -235,7 +235,8 @@ export async function POST(request: NextRequest) {
 
     // 3) Auto-syndication (best-effort)
     try {
-      const canonicalUrl = `${BASE_URL}/${post.author.username}/${post.slug}`
+      const publicationSlug = post.publication?.slug || post.author.username
+      const canonicalUrl = `${BASE_URL}/${publicationSlug}/${post.slug}`
       const plain = stripHtml(post.content_html || post.content || '')
       const summary = post.excerpt || getSentences(plain, 2).join(' ')
       const sentenceList = getSentences(plain, 4)
@@ -522,7 +523,7 @@ export async function POST(request: NextRequest) {
                   content: post.content,
                   content_html: post.content_html,
                   published_at: post.published_at || new Date().toISOString(),
-                  author_username: post.author.username,
+                  author_username: publication.slug,
                 },
                 BASE_URL,
                 actorUrl

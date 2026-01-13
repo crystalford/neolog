@@ -21,33 +21,43 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-  // Get all published posts
-  const { data: posts } = await supabase
-    .from('posts')
-    .select('slug, updated_at, author:profiles(username)')
-    .eq('status', 'published')
-    .order('published_at', { ascending: false })
+  const { data: publications } = await supabase
+    .from('publications')
+    .select('id, slug, owner_id, created_at, is_active')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
     .limit(5000)
 
-  const postPages = (posts || []).map((post: any) => ({
-    url: `${BASE_URL}/${post.author.username}/${post.slug}`,
-    lastModified: new Date(post.updated_at),
+  const publicationPages = (publications || []).map((publication: any) => ({
+    url: `${BASE_URL}/${publication.slug}`,
+    lastModified: publication.created_at ? new Date(publication.created_at) : new Date(),
     changeFrequency: 'weekly' as const,
     priority: 0.6,
   }))
 
-  // Get all profiles
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('username, updated_at')
+  const publicationSlugByOwner = new Map<string, string>()
+  ;(publications || []).forEach((publication: any) => {
+    if (!publicationSlugByOwner.has(publication.owner_id)) {
+      publicationSlugByOwner.set(publication.owner_id, publication.slug)
+    }
+  })
+
+  // Get all published posts
+  const { data: posts } = await supabase
+    .from('posts')
+    .select('slug, updated_at, publication:publications(slug)')
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
     .limit(5000)
 
-  const profilePages = (profiles || []).map((profile: any) => ({
-    url: `${BASE_URL}/${profile.username}`,
-    lastModified: profile.updated_at ? new Date(profile.updated_at) : new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: 0.5,
-  }))
+  const postPages = (posts || [])
+    .filter((post: any) => post?.publication?.slug)
+    .map((post: any) => ({
+      url: `${BASE_URL}/${post.publication.slug}/${post.slug}`,
+      lastModified: new Date(post.updated_at),
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }))
 
   // Get all tags
   const { data: tags } = await supabase
@@ -65,17 +75,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Get all stacks (series)
   const { data: stacks } = await supabase
     .from('series')
-    .select('slug, created_at, author:profiles(username)')
+    .select('slug, created_at, author_id')
     .limit(5000)
 
   const stackPages = (stacks || [])
-    .filter((stack: any) => stack?.author?.username && stack?.slug)
+    .filter((stack: any) => stack?.slug && publicationSlugByOwner.has(stack.author_id))
     .map((stack: any) => ({
-      url: `${BASE_URL}/${stack.author.username}/stack/${stack.slug}`,
+      url: `${BASE_URL}/${publicationSlugByOwner.get(stack.author_id)}/stack/${stack.slug}`,
       lastModified: stack.created_at ? new Date(stack.created_at) : new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.5,
     }))
 
-  return [...staticPages, ...postPages, ...profilePages, ...tagPages, ...stackPages]
+  return [...staticPages, ...publicationPages, ...postPages, ...tagPages, ...stackPages]
 }

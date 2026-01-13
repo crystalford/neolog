@@ -24,18 +24,18 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, display_name, username')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, logo_url, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  if (!profile) return { title: 'Not Found' }
+  if (!publication || !publication.is_active) return { title: 'Not Found' }
 
   const { data: post } = await supabase
     .from('posts')
     .select('title, excerpt, cover_image_url, published_at, updated_at')
-    .eq('author_id', profile.id)
+    .eq('publication_id', publication.id)
     .eq('slug', params.slug)
     .eq('status', 'published')
     .single()
@@ -47,16 +47,16 @@ export async function generateMetadata({ params }: Props) {
       title: post.title,
       description: post.excerpt || undefined,
       image: post.cover_image_url || undefined,
-      url: `/${params.username}/${params.slug}`,
+      url: `/${publication.slug}/${params.slug}`,
       type: 'article',
-      author: profile.display_name || profile.username,
+      author: publication.name,
       publishedTime: post.published_at,
       modifiedTime: post.updated_at,
     }),
     alternates: {
       types: {
-        'application/rss+xml': `/${params.username}/feed`,
-        'application/atom+xml': `/${params.username}/feed`,
+        'application/rss+xml': `/${publication.slug}/feed`,
+        'application/atom+xml': `/${publication.slug}/feed`,
       },
     },
   }
@@ -70,33 +70,33 @@ export default async function PostPage({ params, searchParams }: Props) {
   const { data: { session } } = await supabase.auth.getSession()
 
   console.log('[Post Page] Loading post:', {
-    username: params.username,
+    publicationSlug: params.username,
     slug: params.slug,
     isPreview
   })
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', params.username)
-    .single()
+  const { data: publication, error: publicationError } = await supabase
+    .from('publications')
+    .select('id, name, slug, description, logo_url, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
 
-  console.log('[Post Page] Profile query result:', {
-    found: !!profile,
-    error: profileError,
-    username: params.username
+  console.log('[Post Page] Publication query result:', {
+    found: !!publication,
+    error: publicationError,
+    slug: params.username
   })
 
-  if (!profile) {
-    console.error('[Post Page] Profile not found for username:', params.username)
+  if (!publication || !publication.is_active) {
+    console.error('[Post Page] Publication not found for slug:', params.username)
     notFound()
   }
 
   // If preview mode, don't filter by status
   const postQuery = supabase
     .from('posts')
-    .select('*')
-    .eq('author_id', profile.id)
+    .select('*, author:profiles(id, username, display_name, avatar_url)')
+    .eq('publication_id', publication.id)
     .eq('slug', params.slug)
 
   // Only filter by published status if not in preview mode
@@ -110,7 +110,7 @@ export default async function PostPage({ params, searchParams }: Props) {
     found: !!post,
     error: postError,
     slug: params.slug,
-    authorId: profile.id,
+    publicationId: publication.id,
     isPreview,
     postStatus: post?.status,
     postContentType: post?.content_type
@@ -118,9 +118,9 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   if (!post) {
     console.error('[Post Page] Post not found:', {
-      username: params.username,
+      publicationSlug: publication.slug,
       slug: params.slug,
-      authorId: profile.id,
+      publicationId: publication.id,
       isPreview
     })
     notFound()
@@ -128,6 +128,7 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   // Check if current user is the author
   const isOwnPost = session?.user?.id === post.author_id
+  const authorProfile = (post as any).author || null
 
   const stackId: string | null = post.series_id || null
   const { data: stack } = stackId
@@ -149,14 +150,17 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   const primaryTag = tags[0]
   let relatedPosts: any[] = []
-  if (primaryTag?.slug) {
-    const { data: related } = await supabase
-      .rpc('get_posts_by_tag', {
-        p_tag_slug: primaryTag.slug,
-        p_limit: 6,
-        p_offset: 0,
-      })
-    relatedPosts = (related || []).filter((item: any) => item.id !== post.id).slice(0, 3)
+  if (primaryTag?.id) {
+    const { data: relatedRows } = await supabase
+      .from('post_tags')
+      .select('post:posts(id, title, slug, excerpt, published_at, status, publication_id, author:profiles(username, display_name, avatar_url), publication:publications(slug, name, logo_url))')
+      .eq('tag_id', primaryTag.id)
+
+    relatedPosts = (relatedRows || [])
+      .map((row: any) => row.post)
+      .filter((item: any) => item && item.id !== post.id && item.status === 'published')
+      .filter((item: any) => item.publication_id === publication.id)
+      .slice(0, 3)
   }
 
   const { data: curatedComments } = await supabase
@@ -195,9 +199,9 @@ export default async function PostPage({ params, searchParams }: Props) {
     title: post.title,
     description: post.excerpt || undefined,
     image: post.cover_image_url || undefined,
-    url: `/${params.username}/${params.slug}`,
-    author: profile.display_name || profile.username,
-    authorUrl: `/${params.username}`,
+    url: `/${publication.slug}/${params.slug}`,
+    author: publication.name,
+    authorUrl: `/${publication.slug}`,
     publishedTime: post.published_at || undefined,
     modifiedTime: post.updated_at || undefined,
   })
@@ -223,11 +227,11 @@ export default async function PostPage({ params, searchParams }: Props) {
             <header className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <Link
-                  href={`/${params.username}`}
+                  href={`/${publication.slug}`}
                   className="inline-flex items-center gap-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <ArrowLeft size={16} />
-                  Back to {profile.display_name || profile.username}
+                  Back to {publication.name}
                 </Link>
 
                 {isOwnPost && (
@@ -250,25 +254,28 @@ export default async function PostPage({ params, searchParams }: Props) {
               )}
 
               <div className="flex items-center gap-4 pt-4 border-t border-[var(--border-light)]">
-                <Link href={`/${params.username}`} className="flex items-center gap-3 group">
-                  {profile.avatar_url ? (
+                <Link href={`/${publication.slug}`} className="flex items-center gap-3 group">
+                  {publication.logo_url ? (
                     <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name || profile.username}
+                      src={publication.logo_url}
+                      alt={publication.name}
                       loading="lazy"
-                      className="w-10 h-10 rounded-full"
+                      className="w-10 h-10 rounded-2xl"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-[var(--text-primary)] flex items-center justify-center text-sm font-medium text-[var(--text-inverse)]">
-                      {(profile.display_name || profile.username)[0].toUpperCase()}
+                    <div className="w-10 h-10 rounded-2xl bg-[var(--text-primary)] flex items-center justify-center text-sm font-medium text-[var(--text-inverse)]">
+                      {publication.name[0].toUpperCase()}
                     </div>
                   )}
                   <div>
                     <p className="font-medium text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors">
-                      {profile.display_name || profile.username}
+                      {publication.name}
                     </p>
                     <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
                       {publishedDate && <time>{publishedDate}</time>}
+                      {authorProfile?.display_name && (
+                        <span>By {authorProfile.display_name}</span>
+                      )}
                       {post.reading_time_minutes && (
                         <span className="flex items-center gap-1">
                           <Clock size={14} />
@@ -299,7 +306,7 @@ export default async function PostPage({ params, searchParams }: Props) {
             {stackId && stack?.slug && (
               <div className="mb-8">
                 <Link
-                  href={`/${params.username}/stack/${stack.slug}`}
+                  href={`/${publication.slug}/stack/${stack.slug}`}
                   className="block rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] p-4 hover:bg-[var(--bg-tertiary)] transition-colors"
                 >
                   <p className="text-xs text-[var(--text-tertiary)]">Part of stack</p>
@@ -340,48 +347,48 @@ export default async function PostPage({ params, searchParams }: Props) {
           {/* Share buttons */}
           <div className="max-w-4xl mx-auto mt-12">
             <ShareBar
-              url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${params.username}/${params.slug}`}
+              url={`https://${process.env.NEXT_PUBLIC_SITE_URL || 'neolog.io'}/${publication.slug}/${params.slug}`}
               title={post.title}
             />
           </div>
 
           {/* Newsletter CTA */}
           <div className="max-w-4xl mx-auto mt-8">
-            <NewsletterCTA authorName={profile.display_name || profile.username} />
+            <NewsletterCTA authorName={publication.name} />
           </div>
 
-          {/* Author Bio/CTA */}
+          {/* Publication Bio/CTA */}
           <div className="max-w-4xl mx-auto mt-12 border-t border-[var(--border-light)] pt-8">
             <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] p-6">
               <div className="flex items-start gap-4">
-                <Link href={`/${params.username}`}>
-                  {profile.avatar_url ? (
+                <Link href={`/${publication.slug}`}>
+                  {publication.logo_url ? (
                     <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name || profile.username}
-                      className="w-16 h-16 rounded-full ring-2 ring-[var(--border-light)]"
+                      src={publication.logo_url}
+                      alt={publication.name}
+                      className="w-16 h-16 rounded-2xl ring-2 ring-[var(--border-light)]"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-full bg-[var(--accent)] flex items-center justify-center text-xl font-medium text-white ring-2 ring-[var(--border-light)]">
-                      {(profile.display_name || profile.username)[0].toUpperCase()}
+                    <div className="w-16 h-16 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-xl font-medium text-white ring-2 ring-[var(--border-light)]">
+                      {publication.name[0].toUpperCase()}
                     </div>
                   )}
                 </Link>
                 <div className="flex-1">
                   <h3 className="font-display text-xl mb-1">
-                    Written by{' '}
-                    <Link href={`/${params.username}`} className="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
-                      {profile.display_name || profile.username}
+                    Published by{' '}
+                    <Link href={`/${publication.slug}`} className="text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
+                      {publication.name}
                     </Link>
                   </h3>
                   <p className="text-sm text-[var(--text-secondary)] mb-4">
-                    {profile.bio || `Follow ${profile.display_name || profile.username} for more great content`}
+                    {publication.description || `Follow ${publication.name} for more great content`}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <Link href={`/${params.username}`} className="btn btn-primary btn-sm">
-                      View Profile
+                    <Link href={`/${publication.slug}`} className="btn btn-primary btn-sm">
+                      View publication
                     </Link>
-                    <Link href={`/${params.username}/feed`} className="btn btn-secondary btn-sm">
+                    <Link href={`/${publication.slug}/feed`} className="btn btn-secondary btn-sm">
                       Subscribe via RSS
                     </Link>
                   </div>
@@ -412,7 +419,7 @@ export default async function PostPage({ params, searchParams }: Props) {
                       {relatedPosts.map((related: any) => (
                         <Link
                           key={related.id}
-                          href={`/${related.author_username}/${related.slug}`}
+                          href={`/${related.publication?.slug || publication.slug}/${related.slug}`}
                           className="block p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-colors"
                         >
                           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">

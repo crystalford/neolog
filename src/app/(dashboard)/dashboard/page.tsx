@@ -35,6 +35,7 @@ interface RecentPublished {
   title: string
   slug: string
   published_at: string
+  publicationSlug: string | null
   views: number
   reactions: number
   seoScore: number
@@ -135,7 +136,7 @@ export default function DashboardHomePage() {
     // Load recent published
     const { data: published } = await supabase
       .from('posts')
-      .select('id, title, slug, published_at, subtitle, content')
+      .select('id, title, slug, published_at, subtitle, content, publication:publications(slug)')
       .eq('author_id', session.user.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
@@ -172,11 +173,14 @@ export default function DashboardHomePage() {
           p.content || ''
         )
 
+        const publication = Array.isArray(p.publication) ? p.publication[0] : p.publication
+
         return {
           id: p.id,
           title: p.title,
           slug: p.slug,
           published_at: p.published_at,
+          publicationSlug: publication?.slug || null,
           views: viewCounts[p.id] || 0,
           reactions: reactionCounts[p.id] || 0,
           seoScore: seoAnalysis.score,
@@ -491,7 +495,7 @@ export default function DashboardHomePage() {
               {recentPublished.map((post, i) => (
                 <Link
                   key={post.id}
-                  href={profile?.username ? `/${profile.username}/${post.slug}` : `/write?edit=${post.id}`}
+                  href={post.publicationSlug ? `/${post.publicationSlug}/${post.slug}` : `/write?edit=${post.id}`}
                   className={`block p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--accent)] transition-colors ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -540,4 +544,3 @@ export default function DashboardHomePage() {
     </main>
   )
 }
-

@@ -371,11 +371,13 @@ export default function WritePage() {
 
       // Only redirect if it's a new publish, not an update
       if (!isUpdate) {
+        const selectedPublication = publications.find((pub) => pub.id === publicationId)
+        const publicationSlug = selectedPublication?.slug || profile?.username
         setTimeout(() => {
           if (isScheduling) {
             router.push('/posts')
-          } else if (profile?.username) {
-            router.push(`/${profile.username}/${autoSlug}`)
+          } else if (publicationSlug) {
+            router.push(`/${publicationSlug}/${autoSlug}`)
           }
         }, 1000)
       }
@@ -485,6 +487,9 @@ export default function WritePage() {
     )
   }
 
+  const selectedPublication = publications.find((pub) => pub.id === publicationId)
+  const publicationSlug = selectedPublication?.slug || profile?.username
+
   return (
     <main className="min-h-screen bg-white">
       {/* Top bar */}
@@ -497,22 +502,28 @@ export default function WritePage() {
 
             {/* Publication selector */}
             <div className="relative">
-              <select
-                value={publicationId || ''}
-                onChange={(e) => {
-                  const newId = e.target.value
-                  setPublicationId(newId)
-                  writeSelectedPublicationId(newId)
-                }}
-                className="text-sm border-none bg-transparent text-gray-600 hover:text-gray-900 cursor-pointer pr-6 appearance-none focus:outline-none"
-              >
-                {publications.map((pub) => (
-                  <option key={pub.id} value={pub.id}>
-                    {pub.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {publications.length > 1 ? (
+                <>
+                  <select
+                    value={publicationId || ''}
+                    onChange={(e) => {
+                      const newId = e.target.value
+                      setPublicationId(newId)
+                      writeSelectedPublicationId(newId)
+                    }}
+                    className="text-sm border-none bg-transparent text-gray-600 hover:text-gray-900 cursor-pointer pr-6 appearance-none focus:outline-none"
+                  >
+                    {publications.map((pub) => (
+                      <option key={pub.id} value={pub.id}>
+                        {pub.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </>
+              ) : (
+                <span className="text-sm text-gray-600">{publications[0]?.name || 'Publication'}</span>
+              )}
             </div>
           </div>
 
@@ -532,9 +543,9 @@ export default function WritePage() {
             )}
 
             {/* Preview/View link for published posts */}
-            {postId && existingStatus === 'published' && profile?.username && (
+            {postId && existingStatus === 'published' && publicationSlug && (
               <a
-                href={`/${profile.username}/${slug || generateSlug(title)}`}
+                href={`/${publicationSlug}/${slug || generateSlug(title)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -822,7 +833,7 @@ export default function WritePage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        {profile?.username && `/${profile.username}/${slug || generateSlug(title)}`}
+                        {publicationSlug && `/${publicationSlug}/${slug || generateSlug(title)}`}
                       </p>
                     </div>
 
@@ -895,13 +906,13 @@ export default function WritePage() {
                   </div>
                 </div>
 
-                {postId && existingStatus === 'published' && (
+                {postId && existingStatus === 'published' && publicationSlug && (
                   <div className="pt-6 border-t border-gray-200">
                     <label className="block text-sm font-medium mb-2">
                       View Published Post
                     </label>
                     <a
-                      href={`/${profile?.username}/${slug || generateSlug(title)}`}
+                      href={`/${publicationSlug}/${slug || generateSlug(title)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline text-sm"

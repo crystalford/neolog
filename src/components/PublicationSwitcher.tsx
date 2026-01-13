@@ -117,6 +117,10 @@ export function PublicationSwitcher({
     return null
   }
 
+  if (publications.length <= 1) {
+    return null
+  }
+
   return (
     <div className="relative">
       <button

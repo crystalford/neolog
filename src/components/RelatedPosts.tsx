@@ -17,6 +17,7 @@ type RelatedPost = {
   author_username: string
   author_display_name: string | null
   author_avatar_url: string | null
+  publication_slug?: string | null
   shared_tags: number
 }
 
@@ -57,33 +58,36 @@ export function RelatedPosts({ postId }: RelatedPostsProps) {
       </h2>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        {posts.map(post => (
-          <Link
-            key={post.id}
-            href={`/${post.author_username}/${post.slug}`}
-            className="group rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden hover:border-[var(--border-medium)] transition-colors"
-          >
-            {post.cover_image_url && (
-              <div className="aspect-video overflow-hidden">
-                <img 
-                  src={post.cover_image_url}
-                  alt={post.title}
-                  loading="lazy"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+        {posts.map((post) => {
+          const postSlug = post.publication_slug || post.author_username
+          return (
+            <Link
+              key={post.id}
+              href={`/${postSlug}/${post.slug}`}
+              className="group rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] overflow-hidden hover:border-[var(--border-medium)] transition-colors"
+            >
+              {post.cover_image_url && (
+                <div className="aspect-video overflow-hidden">
+                  <img 
+                    src={post.cover_image_url}
+                    alt={post.title}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              )}
+              
+              <div className="p-4">
+                <h3 className="font-medium line-clamp-2 group-hover:text-[var(--accent)] transition-colors">
+                  {post.title}
+                </h3>
+                <p className="text-sm text-[var(--text-tertiary)] mt-2">
+                  {post.author_display_name || post.author_username}
+                </p>
               </div>
-            )}
-            
-            <div className="p-4">
-              <h3 className="font-medium line-clamp-2 group-hover:text-[var(--accent)] transition-colors">
-                {post.title}
-              </h3>
-              <p className="text-sm text-[var(--text-tertiary)] mt-2">
-                {post.author_display_name || post.author_username}
-              </p>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          )
+        })}
       </div>
     </section>
   )

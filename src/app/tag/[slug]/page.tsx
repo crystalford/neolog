@@ -43,44 +43,29 @@ export default async function TagPage({ params }: Props) {
   }
   
   // Get posts with this tag
-  const { data: posts } = await supabase
-    .rpc('get_posts_by_tag', {
-      p_tag_slug: params.slug,
-      p_limit: 50,
-      p_offset: 0,
-    })
-
-  const postIds = (posts || []).map((p: any) => p.id)
-  const { data: seriesByPost } = postIds.length
-    ? await supabase
-        .from('posts')
-        .select('id, series:series(title, slug)')
-        .in('id', postIds)
-    : { data: [] }
-
-  const seriesMap = new Map<string, any>()
-  ;(seriesByPost || []).forEach((row: any) => {
-    seriesMap.set(row.id, row.series)
-  })
+  const { data: taggedPosts } = await supabase
+    .from('post_tags')
+    .select('post:posts(id, title, slug, excerpt, cover_image_url, published_at, reading_time_minutes, status, author:profiles(id, username, display_name, avatar_url), publication:publications(id, slug, name, logo_url), series:series(title, slug))')
+    .eq('tag_id', tag.id)
+    .limit(100)
   
   // Transform for PostCard
-  const transformedPosts = (posts || []).map((post: any) => ({
-    id: post.id,
-    title: post.title,
-    slug: post.slug,
-    excerpt: post.excerpt,
-    cover_image_url: post.cover_image_url,
-    published_at: post.published_at,
-    reading_time_minutes: post.reading_time_minutes,
-    status: 'published' as const,
-    author: {
-      id: post.author_id,
-      username: post.author_username,
-      display_name: post.author_display_name,
-      avatar_url: post.author_avatar_url,
-    },
-    series: seriesMap.get(post.id) || null,
-  }))
+  const transformedPosts = (taggedPosts || [])
+    .map((row: any) => row.post)
+    .filter((post: any) => post && post.status === 'published')
+    .map((post: any) => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      cover_image_url: post.cover_image_url,
+      published_at: post.published_at,
+      reading_time_minutes: post.reading_time_minutes,
+      status: 'published' as const,
+      author: post.author,
+      publication: post.publication,
+      series: post.series || null,
+    }))
 
   return (
     <>
@@ -139,4 +124,3 @@ export default async function TagPage({ params }: Props) {
     </>
   )
 }
-

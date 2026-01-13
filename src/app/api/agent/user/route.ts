@@ -58,37 +58,37 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createClient()
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, bio, website_url')
-      .eq('username', username)
-      .single()
+    const { data: publication } = await supabase
+      .from('publications')
+      .select('id, name, slug, description, website_url, owner_id, is_active')
+      .eq('slug', username)
+      .maybeSingle()
 
-    if (!profile) {
+    if (!publication || !publication.is_active) {
       finalStatus = 'success'
-      finalMeta = { ...finalMeta, result: 'user_not_found' }
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 })
+      finalMeta = { ...finalMeta, result: 'publication_not_found' }
+      return NextResponse.json({ error: 'Publication not found.' }, { status: 404 })
     }
 
     const { data: posts } = await supabase
       .from('posts')
       .select('id, title, slug, excerpt, published_at, canonical_url')
-      .eq('author_id', profile.id)
+      .eq('publication_id', publication.id)
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(20)
 
     if (wantsText(request)) {
       const origin = new URL(request.url).origin
-      const display = profile.display_name || profile.username
-      let md = `# ${display} (@${profile.username})\n\n`
-      if (profile.bio) {
-        md += `${profile.bio}\n\n`
+      const display = publication.name
+      let md = `# ${display} (@${publication.slug})\n\n`
+      if (publication.description) {
+        md += `${publication.description}\n\n`
       }
-      if (profile.website_url) {
-        md += `Website: ${profile.website_url}\n\n`
+      if (publication.website_url) {
+        md += `Website: ${publication.website_url}\n\n`
       }
-      md += `Profile: ${origin}/${profile.username}\n\n`
+      md += `Profile: ${origin}/${publication.slug}\n\n`
       md += `## Recent posts\n\n`
 
       const list = posts || []
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         md += `No published posts yet.\n`
       } else {
         for (const post of list) {
-          const url = `${origin}/${profile.username}/${post.slug}`
+          const url = `${origin}/${publication.slug}/${post.slug}`
           const date = post.published_at ? new Date(post.published_at).toISOString().slice(0, 10) : ''
           const suffix = date ? ` - ${date}` : ''
           md += `- ${post.title} (${url})${suffix}\n`
@@ -112,10 +112,10 @@ export async function GET(request: NextRequest) {
     finalMeta = { ...finalMeta, result: 'success', posts_count: (posts || []).length }
     return NextResponse.json({
       profile: {
-        username: profile.username,
-        display_name: profile.display_name,
-        bio: profile.bio,
-        website_url: profile.website_url,
+        username: publication.slug,
+        display_name: publication.name,
+        bio: publication.description,
+        website_url: publication.website_url,
       },
       posts: posts || [],
     })

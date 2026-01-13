@@ -65,36 +65,36 @@ export async function GET(request: NextRequest) {
 
     const supabase = createClient()
 
-    let authorId: string | null = null
-    let authorUsername: string | null = null
+    let publicationId: string | null = null
+    let publicationSlug: string | null = null
 
     if (username) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .eq('username', username)
+      const { data: publication } = await supabase
+        .from('publications')
+        .select('id, slug, name, is_active')
+        .eq('slug', username)
         .maybeSingle()
 
-      if (!profile) {
+      if (!publication || !publication.is_active) {
         finalStatus = 'success'
-        finalMeta = { ...finalMeta, result: 'user_not_found' }
-        return NextResponse.json({ error: 'User not found.' }, { status: 404 })
+        finalMeta = { ...finalMeta, result: 'publication_not_found' }
+        return NextResponse.json({ error: 'Publication not found.' }, { status: 404 })
       }
 
-      authorId = profile.id
-      authorUsername = profile.username
+      publicationId = publication.id
+      publicationSlug = publication.slug
     }
 
     // Simple search: title/excerpt match. (Vector search can be added later.)
     let query = supabase
       .from('posts')
-      .select('id, title, slug, excerpt, published_at, author:profiles(username, display_name)')
+      .select('id, title, slug, excerpt, published_at, author:profiles(username, display_name), publication:publications(slug, name)')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(limit)
 
-    if (authorId) {
-      query = query.eq('author_id', authorId)
+    if (publicationId) {
+      query = query.eq('publication_id', publicationId)
     }
 
     // Use `or()` to match either title or excerpt.
@@ -110,8 +110,8 @@ export async function GET(request: NextRequest) {
     const origin = new URL(request.url).origin
 
     if (wantsText(request)) {
-      let md = authorUsername
-        ? `# Search results for "${q}" by @${authorUsername}\n\n`
+      let md = publicationSlug
+        ? `# Search results for "${q}" by @${publicationSlug}\n\n`
         : `# Search results for "${q}"\n\n`
 
       const list = posts || []
@@ -124,10 +124,11 @@ export async function GET(request: NextRequest) {
 
       for (const post of list as any[]) {
         const author = Array.isArray(post.author) ? post.author[0] : post.author
-        const u = author?.username
+        const pub = Array.isArray(post.publication) ? post.publication[0] : post.publication
+        const u = pub?.slug
         const url = u ? `${origin}/${u}/${post.slug}` : `${origin}/`
         const date = post.published_at ? new Date(post.published_at).toISOString().slice(0, 10) : ''
-        const by = author?.display_name || author?.username ? ` - ${author?.display_name || author?.username}` : ''
+        const by = pub?.name || author?.display_name || author?.username ? ` - ${pub?.name || author?.display_name || author?.username}` : ''
         const suffix = date ? ` (${date})` : ''
         md += `- ${post.title}${by}${suffix}\n  ${url}\n`
         if (post.excerpt) {
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest) {
     finalMeta = { ...finalMeta, result: 'success', results_count: (posts || []).length }
     return NextResponse.json({
       query: q,
-      username: authorUsername,
+      username: publicationSlug,
       results: posts || [],
     })
   } catch (e: any) {

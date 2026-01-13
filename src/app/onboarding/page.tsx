@@ -150,6 +150,25 @@ export default function OnboardingPage() {
       return false
     }
 
+    const { data: publicationData, error: publicationError } = await supabase
+      .from('publications')
+      .select('id')
+      .eq('slug', normalized)
+      .limit(1)
+
+    if (publicationError) {
+      setUsernameStatus('idle')
+      setUsernameMessage('Could not check username availability.')
+      return false
+    }
+
+    const publicationTaken = Array.isArray(publicationData) && publicationData.length > 0
+    if (publicationTaken) {
+      setUsernameStatus('taken')
+      setUsernameMessage('That name is already used by a publication.')
+      return false
+    }
+
     setUsernameStatus('available')
     setUsernameMessage(null)
     return true
@@ -237,16 +256,16 @@ export default function OnboardingPage() {
       setProfile(currentProfile)
     }
       
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          username: normalizeUsername(username),
-          display_name: displayName,
-          bio: bio || null,
-          avatar_url: avatarUrl || null,
-          onboarded_at: new Date().toISOString(),
-        })
-        .eq('id', currentProfile.id)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        username: normalizeUsername(username),
+        display_name: displayName,
+        bio: bio || null,
+        avatar_url: avatarUrl || null,
+        onboarded_at: new Date().toISOString(),
+      })
+      .eq('id', currentProfile.id)
 
       if (error) {
         if ((error as any).code === '23505') {
@@ -258,6 +277,37 @@ export default function OnboardingPage() {
         }
         setSaving(false)
         return
+      }
+
+      const { data: existingPublications, error: publicationLookupError } = await supabase
+        .from('publications')
+        .select('id')
+        .eq('owner_id', currentProfile.id)
+        .limit(1)
+
+      if (publicationLookupError) {
+        setSaveError('Unable to finish setup. Please try again.')
+        setSaving(false)
+        return
+      }
+
+      if (!existingPublications || existingPublications.length === 0) {
+        const { error: publicationError } = await supabase
+          .from('publications')
+          .insert({
+            owner_id: currentProfile.id,
+            name: displayName.trim() || username.trim(),
+            slug: normalizeUsername(username),
+            description: bio || null,
+          })
+          .select('id')
+          .single()
+
+        if (publicationError) {
+          setSaveError('Unable to create your publication. Please try again.')
+          setSaving(false)
+          return
+        }
       }
 
       router.push('/dashboard')
@@ -312,7 +362,7 @@ export default function OnboardingPage() {
             <div className="text-center mb-8">
               <h1 className="font-display text-3xl mb-2">Welcome to Neolog!</h1>
               <p className="text-[var(--text-secondary)]">
-                Let's set up your profile so readers can find you
+                Let's set up your publication so readers can find you
               </p>
             </div>
 
@@ -347,19 +397,19 @@ export default function OnboardingPage() {
                     />
                   </label>
                 </div>
-                <p className="text-sm text-[var(--text-tertiary)]">Add a profile photo</p>
+                <p className="text-sm text-[var(--text-tertiary)]">Add a logo</p>
               </div>
 
               {/* Display name */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  What should we call you?
+                  Publication name
                 </label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder="Your publication"
                   className="input text-lg py-3"
                   autoFocus
                 />
@@ -368,7 +418,7 @@ export default function OnboardingPage() {
               {/* Username */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Choose your username
+                  Publication handle
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-[var(--text-tertiary)]">@</span>
@@ -411,12 +461,12 @@ export default function OnboardingPage() {
               {/* Bio */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Tell readers about yourself
+                  Tell readers what this publication is about
                 </label>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Writer, thinker, builder..."
+                  placeholder="What people can expect to read here..."
                   className="input min-h-[100px] resize-none"
                   maxLength={160}
                 />

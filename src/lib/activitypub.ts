@@ -203,7 +203,7 @@ export function createPublicationActor(
     name: publication.name,
     preferredUsername: publication.slug,
     summary: publication.description || '',
-    url: `${baseUrl}/p/${publication.slug}`,
+    url: `${baseUrl}/${publication.slug}`,
     icon: publication.logo_url
       ? {
           type: 'Image',

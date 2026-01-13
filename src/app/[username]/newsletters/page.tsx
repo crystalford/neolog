@@ -14,40 +14,40 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const supabase = createClient()
   
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name, username')
-    .eq('username', params.username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('name, slug, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
   
-  if (!profile) return { title: 'Not Found' }
+  if (!publication || !publication.is_active) return { title: 'Not Found' }
 
-  const name = profile.display_name || profile.username
+  const name = publication.name
 
   return generateSEO({
     title: `Newsletter Archive - ${name}`,
     description: `Past newsletters from ${name}`,
-    url: `/${params.username}/newsletters`,
+    url: `/${publication.slug}/newsletters`,
   })
 }
 
 export default async function NewsletterArchivePage({ params }: Props) {
   const supabase = createClient()
   
-  // Get profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', params.username)
-    .single()
+  // Get publication
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, owner_id, is_active')
+    .eq('slug', params.username)
+    .maybeSingle()
   
-  if (!profile) notFound()
+  if (!publication || !publication.is_active) notFound()
 
   // Get public newsletters
   const { data: newsletters } = await supabase
     .from('newsletters')
     .select('*')
-    .eq('author_id', profile.id)
+    .eq('author_id', publication.owner_id)
     .eq('is_public', true)
     .not('sent_at', 'is', null)
     .order('sent_at', { ascending: false })
@@ -67,11 +67,11 @@ export default async function NewsletterArchivePage({ params }: Props) {
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="pt-8 mb-8">
             <Link 
-              href={`/${params.username}`}
+              href={`/${publication.slug}`}
               className="inline-flex items-center gap-1 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] mb-4"
             >
               <ArrowLeft size={14} />
-              Back to {profile.display_name || profile.username}
+              Back to {publication.name}
             </Link>
             
             <div className="flex items-center gap-4">
@@ -81,7 +81,7 @@ export default async function NewsletterArchivePage({ params }: Props) {
               <div>
                 <h1 className="font-display text-3xl">Newsletter Archive</h1>
                 <p className="text-[var(--text-secondary)]">
-                  Past newsletters from {profile.display_name || profile.username}
+                  Past newsletters from {publication.name}
                 </p>
               </div>
             </div>
@@ -100,7 +100,7 @@ export default async function NewsletterArchivePage({ params }: Props) {
               {newsletters.map(newsletter => (
                 <Link
                   key={newsletter.id}
-                  href={`/${params.username}/newsletters/${newsletter.id}`}
+                  href={`/${publication.slug}/newsletters/${newsletter.id}`}
                   className="block p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
                 >
                   <h2 className="font-display text-xl mb-2 hover:text-[var(--accent)] transition-colors">
@@ -134,4 +134,3 @@ export default async function NewsletterArchivePage({ params }: Props) {
     </>
   )
 }
-

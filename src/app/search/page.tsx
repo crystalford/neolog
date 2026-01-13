@@ -35,13 +35,13 @@ type SearchResultWithSeries = SearchResult & {
   series?: SeriesInfo | null
 }
 
-type UserResult = {
+type PublicationResult = {
   id: string
-  username: string
-  display_name: string | null
-  bio: string | null
-  avatar_url: string | null
-  post_count: number
+  slug: string
+  name: string
+  description: string | null
+  logo_url: string | null
+  total_posts: number | null
 }
 
 export default function SearchPage() {
@@ -53,10 +53,10 @@ export default function SearchPage() {
   const initialSemantic = searchParams.get('semantic') === '1'
   
   const [query, setQuery] = useState(initialQuery)
-  const [tab, setTab] = useState<'posts' | 'people'>('posts')
+  const [tab, setTab] = useState<'posts' | 'publications'>('posts')
   const [semantic, setSemantic] = useState(initialSemantic)
   const [posts, setPosts] = useState<SearchResultWithSeries[]>([])
-  const [users, setUsers] = useState<UserResult[]>([])
+  const [publications, setPublications] = useState<PublicationResult[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -77,6 +77,27 @@ export default function SearchPage() {
       return results.map((r) => ({
         ...r,
         series: map.get(r.id) || null,
+      }))
+    },
+    [supabase],
+  )
+
+  const attachPublication = useCallback(
+    async (results: SearchResultWithSeries[]) => {
+      const ids = results.map((r) => r.id).filter(Boolean)
+      if (ids.length === 0) return results
+
+      const { data } = await supabase
+        .from('posts')
+        .select('id, publication:publications(id, slug, name, logo_url)')
+        .in('id', ids)
+
+      const map = new Map<string, any>()
+      ;(data || []).forEach((row: any) => map.set(row.id, row.publication))
+
+      return results.map((r) => ({
+        ...r,
+        publication: map.get(r.id) || null,
       }))
     },
     [supabase],
@@ -132,8 +153,9 @@ export default function SearchPage() {
             rank: i + 1,
           }))
 
-          const enriched = await attachSeries(mapped)
-          setPosts(enriched)
+          const withSeries = await attachSeries(mapped)
+          const withPublication = await attachPublication(withSeries)
+          setPosts(withPublication)
         }
       } catch (e: any) {
         setPosts([])
@@ -144,21 +166,26 @@ export default function SearchPage() {
         .rpc('search_posts', { p_query: searchQuery, p_limit: 30 })
       
       if (postResults) {
-        const enriched = await attachSeries(postResults as SearchResultWithSeries[])
-        setPosts(enriched)
+        const withSeries = await attachSeries(postResults as SearchResultWithSeries[])
+        const withPublication = await attachPublication(withSeries)
+        setPosts(withPublication)
       }
     }
 
-    // Search users
-    const { data: userResults } = await supabase
-      .rpc('search_users', { p_query: searchQuery, p_limit: 20 })
-    
-    if (userResults) {
-      setUsers(userResults)
+    // Search publications
+    const { data: publicationResults } = await supabase
+      .from('publications')
+      .select('id, slug, name, description, logo_url, total_posts')
+      .eq('is_active', true)
+      .or(`name.ilike.%${searchQuery}%,slug.ilike.%${searchQuery}%`)
+      .limit(20)
+
+    if (publicationResults) {
+      setPublications(publicationResults as PublicationResult[])
     }
 
     setLoading(false)
-  }, [router, supabase])
+  }, [router, supabase, attachSeries, attachPublication])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -168,7 +195,7 @@ export default function SearchPage() {
   const clearSearch = () => {
     setQuery('')
     setPosts([])
-    setUsers([])
+    setPublications([])
     setSearched(false)
     setSemantic(false)
     setError(null)
@@ -191,6 +218,7 @@ export default function SearchPage() {
       display_name: post.author_display_name,
       avatar_url: post.author_avatar_url,
     },
+    publication: (post as any).publication || null,
     series: post.series || null,
   }))
 
@@ -212,8 +240,8 @@ export default function SearchPage() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search posts and people..."
-                aria-label="Search posts and people"
+                placeholder="Search posts and publications..."
+                aria-label="Search posts and publications"
                 className="input input-with-icon pr-12 py-3 text-lg"
                 autoFocus
               />
@@ -277,18 +305,18 @@ export default function SearchPage() {
                   )}
                 </button>
                 <button
-                  onClick={() => setTab('people')}
+                  onClick={() => setTab('publications')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                    tab === 'people'
+                    tab === 'publications'
                       ? 'bg-[var(--bg-primary)] shadow-sm font-medium'
                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   <Users size={16} />
-                  People
-                  {users.length > 0 && (
+                  Publications
+                  {publications.length > 0 && (
                     <span className="text-xs text-[var(--text-tertiary)]">
-                      ({users.length})
+                      ({publications.length})
                     </span>
                   )}
                 </button>
@@ -314,53 +342,53 @@ export default function SearchPage() {
               )}
 
               {/* People tab */}
-              {tab === 'people' && (
-                users.length === 0 ? (
+              {tab === 'publications' && (
+                publications.length === 0 ? (
                   <div className="text-center py-16">
                     <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                    <h2 className="font-display text-xl mb-2">No people found</h2>
+                    <h2 className="font-display text-xl mb-2">No publications found</h2>
                     <p className="text-[var(--text-secondary)]">
                       Try a different name or remove a filter.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {users.map((user) => (
+                    {publications.map((publication) => (
                       <Link
-                        key={user.id}
-                        href={`/${user.username}`}
+                        key={publication.id}
+                        href={`/${publication.slug}`}
                         className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
                       >
-                        {user.avatar_url ? (
+                        {publication.logo_url ? (
                           <img 
-                            src={user.avatar_url}
-                            alt={user.display_name || user.username}
+                            src={publication.logo_url}
+                            alt={publication.name}
                             loading="lazy"
-                            className="w-12 h-12 rounded-full"
+                            className="w-12 h-12 rounded-2xl"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium text-lg">
-                            {(user.display_name || user.username)[0].toUpperCase()}
+                          <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] flex items-center justify-center text-white font-medium text-lg">
+                            {publication.name[0].toUpperCase()}
                           </div>
                         )}
                         
                         <div className="flex-1 min-w-0">
                           <p className="font-medium">
-                            {user.display_name || user.username}
+                            {publication.name}
                           </p>
                           <p className="text-sm text-[var(--text-tertiary)]">
-                            @{user.username}
+                            @{publication.slug}
                           </p>
-                          {user.bio && (
+                          {publication.description && (
                             <p className="text-sm text-[var(--text-secondary)] mt-1 line-clamp-1">
-                              {user.bio}
+                              {publication.description}
                             </p>
                           )}
                         </div>
                         
                         <div className="text-right">
                           <p className="text-sm text-[var(--text-tertiary)]">
-                            {user.post_count} post{user.post_count !== 1 ? 's' : ''}
+                            {publication.total_posts || 0} post{publication.total_posts === 1 ? '' : 's'}
                           </p>
                         </div>
                       </Link>
@@ -374,7 +402,7 @@ export default function SearchPage() {
               <SearchIcon size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">Search Neolog</h2>
               <p className="text-[var(--text-secondary)]">
-                Find posts and people across the platform
+                Find posts and publications across the platform
               </p>
             </div>
           )}

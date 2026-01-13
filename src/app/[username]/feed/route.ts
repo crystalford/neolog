@@ -10,42 +10,49 @@ export async function GET(
   const { username } = params
   const format = request.nextUrl.searchParams.get('format') || 'rss'
 
-  // Get profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('username', username)
-    .single()
+  // Get publication
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, description, logo_url, owner_id, is_active')
+    .eq('slug', username)
+    .maybeSingle()
 
-  if (!profile) {
-    return new Response('User not found', { status: 404 })
+  if (!publication || !publication.is_active) {
+    return new Response('Publication not found', { status: 404 })
   }
+
+  const { data: ownerProfile } = await supabase
+    .from('profiles')
+    .select('id, display_name, username')
+    .eq('id', publication.owner_id)
+    .maybeSingle()
 
   // Get published posts
   const { data: posts } = await supabase
     .from('posts')
     .select('*')
-    .eq('author_id', profile.id)
+    .eq('publication_id', publication.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(50)
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://neolog.ai'
   const feedUrl = `${baseUrl}/${username}/feed`
-  const profileUrl = `${baseUrl}/${username}`
+  const profileUrl = `${baseUrl}/${publication.slug}`
 
   // Return appropriate format
   if (format === 'json') {
-    return generateJSONFeed(profile, posts || [], baseUrl, feedUrl, profileUrl)
+    return generateJSONFeed(publication, ownerProfile, posts || [], baseUrl, feedUrl, profileUrl)
   } else if (format === 'atom') {
-    return generateAtomFeed(profile, posts || [], baseUrl, feedUrl, profileUrl)
+    return generateAtomFeed(publication, ownerProfile, posts || [], baseUrl, feedUrl, profileUrl)
   } else {
-    return generateRSSFeed(profile, posts || [], baseUrl, feedUrl, profileUrl)
+    return generateRSSFeed(publication, ownerProfile, posts || [], baseUrl, feedUrl, profileUrl)
   }
 }
 
 function generateRSSFeed(
-  profile: any,
+  publication: any,
+  ownerProfile: any,
   posts: any[],
   baseUrl: string,
   feedUrl: string,
@@ -59,7 +66,7 @@ function generateRSSFeed(
        .replace(/'/g, '&apos;') || ''
 
   const items = posts.map(post => {
-    const postUrl = `${baseUrl}/${profile.username}/${post.slug}`
+    const postUrl = `${baseUrl}/${publication.slug}/${post.slug}`
     const pubDate = new Date(post.published_at).toUTCString()
     
     return `
@@ -70,7 +77,7 @@ function generateRSSFeed(
       <pubDate>${pubDate}</pubDate>
       <description><![CDATA[${post.excerpt || post.subtitle || ''}]]></description>
       ${post.content_html ? `<content:encoded><![CDATA[${post.content_html}]]></content:encoded>` : ''}
-      <author>${escapeXml(profile.display_name || profile.username)}</author>
+      <author>${escapeXml(publication.name)}</author>
     </item>`
   }).join('\n')
 
@@ -86,9 +93,9 @@ function generateRSSFeed(
   xmlns:content="http://purl.org/rss/1.0/modules/content/"
   xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>${escapeXml(profile.display_name || profile.username)} on Neolog</title>
+    <title>${escapeXml(publication.name)} on Neolog</title>
     <link>${profileUrl}</link>
-    <description>${escapeXml(profile.bio || `Posts by ${profile.display_name || profile.username}`)}</description>
+    <description>${escapeXml(publication.description || `Posts by ${publication.name}`)}</description>
     <language>en</language>
     <lastBuildDate>${lastBuildDate}</lastBuildDate>
     <atom:link href="${feedUrl}" rel="self" type="application/rss+xml"/>
@@ -108,7 +115,8 @@ function generateRSSFeed(
 }
 
 function generateAtomFeed(
-  profile: any,
+  publication: any,
+  ownerProfile: any,
   posts: any[],
   baseUrl: string,
   feedUrl: string,
@@ -122,7 +130,7 @@ function generateAtomFeed(
        .replace(/'/g, '&apos;') || ''
 
   const entries = posts.map(post => {
-    const postUrl = `${baseUrl}/${profile.username}/${post.slug}`
+    const postUrl = `${baseUrl}/${publication.slug}/${post.slug}`
     const published = new Date(post.published_at).toISOString()
     const updated = new Date(post.updated_at).toISOString()
     
@@ -136,7 +144,7 @@ function generateAtomFeed(
     <summary>${escapeXml(post.excerpt || post.subtitle || '')}</summary>
     ${post.content_html ? `<content type="html"><![CDATA[${post.content_html}]]></content>` : ''}
     <author>
-      <name>${escapeXml(profile.display_name || profile.username)}</name>
+      <name>${escapeXml(publication.name)}</name>
       <uri>${profileUrl}</uri>
     </author>
   </entry>`
@@ -148,8 +156,8 @@ function generateAtomFeed(
 
   const atom = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>${escapeXml(profile.display_name || profile.username)} on Neolog</title>
-  <subtitle>${escapeXml(profile.bio || `Posts by ${profile.display_name || profile.username}`)}</subtitle>
+  <title>${escapeXml(publication.name)} on Neolog</title>
+  <subtitle>${escapeXml(publication.description || `Posts by ${publication.name}`)}</subtitle>
   <link href="${profileUrl}" rel="alternate" type="text/html"/>
   <link href="${feedUrl}?format=atom" rel="self" type="application/atom+xml"/>
   <link href="${feedUrl}" rel="alternate" type="application/rss+xml"/>
@@ -157,7 +165,7 @@ function generateAtomFeed(
   <id>${profileUrl}</id>
   <updated>${updated}</updated>
   <author>
-    <name>${escapeXml(profile.display_name || profile.username)}</name>
+    <name>${escapeXml(publication.name)}</name>
     <uri>${profileUrl}</uri>
   </author>
   ${entries}
@@ -172,7 +180,8 @@ function generateAtomFeed(
 }
 
 function generateJSONFeed(
-  profile: any,
+  publication: any,
+  ownerProfile: any,
   posts: any[],
   baseUrl: string,
   feedUrl: string,
@@ -180,20 +189,20 @@ function generateJSONFeed(
 ) {
   const feed = {
     version: 'https://jsonfeed.org/version/1.1',
-    title: `${profile.display_name || profile.username} on Neolog`,
+    title: `${publication.name} on Neolog`,
     home_page_url: profileUrl,
     feed_url: `${feedUrl}?format=json`,
-    description: profile.bio || `Posts by ${profile.display_name || profile.username}`,
+    description: publication.description || `Posts by ${publication.name}`,
     authors: [
       {
-        name: profile.display_name || profile.username,
+        name: publication.name,
         url: profileUrl,
-        avatar: profile.avatar_url,
+        avatar: publication.logo_url || ownerProfile?.avatar_url || null,
       }
     ],
     items: posts.map(post => ({
-      id: `${baseUrl}/${profile.username}/${post.slug}`,
-      url: `${baseUrl}/${profile.username}/${post.slug}`,
+      id: `${baseUrl}/${publication.slug}/${post.slug}`,
+      url: `${baseUrl}/${publication.slug}/${post.slug}`,
       title: post.title,
       content_html: post.content_html || post.content,
       summary: post.excerpt || post.subtitle,
@@ -201,7 +210,7 @@ function generateJSONFeed(
       date_modified: new Date(post.updated_at).toISOString(),
       authors: [
         {
-          name: profile.display_name || profile.username,
+          name: publication.name,
           url: profileUrl,
         }
       ],

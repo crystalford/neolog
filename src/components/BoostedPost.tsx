@@ -13,6 +13,7 @@ type BoostedPost = {
   author_username: string
   author_display_name: string | null
   bid_cents: number
+  publication_slug?: string | null
 }
 
 interface BoostedPostCardProps {
@@ -95,9 +96,11 @@ export function BoostedPostCard({
     return null // Don't show anything if no boost available
   }
 
+  const postSlug = boost.publication_slug || boost.author_username
+
   return (
     <Link
-      href={`/${boost.author_username}/${boost.post_slug}`}
+      href={`/${postSlug}/${boost.post_slug}`}
       onClick={handleClick}
       className={`block p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors ${className}`}
     >
@@ -220,20 +223,23 @@ export function RecommendedBoost({
         <Sparkles size={12} className="text-[var(--accent)]" />
         Promoted
       </p>
-      {boosts.map((boost) => (
-        <Link
-          key={boost.campaign_id}
-          href={`/${boost.author_username}/${boost.post_slug}`}
-          className="block p-3 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-        >
-          <h4 className="font-medium text-sm line-clamp-2 mb-1">
-            {boost.post_title}
-          </h4>
-          <p className="text-xs text-[var(--text-tertiary)]">
-            {boost.author_display_name || boost.author_username}
-          </p>
-        </Link>
-      ))}
+      {boosts.map((boost) => {
+        const postSlug = boost.publication_slug || boost.author_username
+        return (
+          <Link
+            key={boost.campaign_id}
+            href={`/${postSlug}/${boost.post_slug}`}
+            className="block p-3 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+          >
+            <h4 className="font-medium text-sm line-clamp-2 mb-1">
+              {boost.post_title}
+            </h4>
+            <p className="text-xs text-[var(--text-tertiary)]">
+              {boost.author_display_name || boost.author_username}
+            </p>
+          </Link>
+        )
+      })}
     </div>
   )
 }

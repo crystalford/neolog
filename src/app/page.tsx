@@ -48,6 +48,7 @@ export default async function Home() {
           'published_at',
           'reading_time_minutes',
           'author:profiles(id, username, display_name, avatar_url)',
+          'publication:publications(id, slug, name, logo_url)',
           'series:series(title, slug)',
         ].join(','),
       )

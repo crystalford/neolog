@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
     const segments = pathname.split('/').filter(Boolean)
     if (segments.length === 1 && !RESERVED.has(segments[0])) {
       const url = request.nextUrl.clone()
-      url.pathname = `/api/activitypub/${segments[0]}`
+      url.pathname = `/api/activitypub/publications/${segments[0]}`
       return NextResponse.rewrite(url)
     }
   }

@@ -60,22 +60,22 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createClient()
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, username, display_name, bio')
-      .eq('username', username)
-      .single()
+    const { data: publication } = await supabase
+      .from('publications')
+      .select('id, name, slug, description, is_active')
+      .eq('slug', username)
+      .maybeSingle()
 
-    if (!profile) {
+    if (!publication || !publication.is_active) {
       finalStatus = 'success'
-      finalMeta = { ...finalMeta, result: 'author_not_found' }
-      return NextResponse.json({ error: 'Author not found.' }, { status: 404 })
+      finalMeta = { ...finalMeta, result: 'publication_not_found' }
+      return NextResponse.json({ error: 'Publication not found.' }, { status: 404 })
     }
 
     const { data: post } = await supabase
       .from('posts')
       .select('id, title, subtitle, slug, excerpt, content, content_html, published_at, canonical_url, original_source')
-      .eq('author_id', profile.id)
+      .eq('publication_id', publication.id)
       .eq('slug', slug)
       .eq('status', 'published')
       .single()
@@ -92,11 +92,11 @@ export async function GET(request: NextRequest) {
       if (post.subtitle) {
         md += `*${post.subtitle}*\n\n`
       }
-      md += `by ${profile.display_name || profile.username} (@${profile.username})\n\n`
+      md += `by ${publication.name} (@${publication.slug})\n\n`
       if (post.published_at) {
         md += `Published: ${new Date(post.published_at).toISOString()}\n\n`
       }
-      md += `Link: ${origin}/${profile.username}/${post.slug}\n\n`
+      md += `Link: ${origin}/${publication.slug}/${post.slug}\n\n`
       if (post.canonical_url) {
         md += `Canonical: ${post.canonical_url}\n\n`
       }
@@ -131,9 +131,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       post,
       author: {
-        username: profile.username,
-        display_name: profile.display_name,
-        bio: profile.bio,
+        username: publication.slug,
+        display_name: publication.name,
+        bio: publication.description,
       },
     })
   } catch (e: any) {

@@ -16,34 +16,34 @@ export async function GET(
   const supabase = createClient()
   const username = params.username
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, username, display_name, bio')
-    .eq('username', username)
-    .single()
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('id, name, slug, description, is_active')
+    .eq('slug', username)
+    .maybeSingle()
 
-  if (!profile) {
+  if (!publication || !publication.is_active) {
     return new NextResponse('Not found', { status: 404 })
   }
 
   const { data: posts } = await supabase
     .from('posts')
     .select('title, slug, excerpt, content_html, published_at')
-    .eq('author_id', profile.id)
+    .eq('publication_id', publication.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
     .limit(20)
 
   const lines = [
-    `# ${profile.display_name || profile.username}`,
-    profile.bio ? `\n${profile.bio}` : '',
+    `# ${publication.name}`,
+    publication.description ? `\n${publication.description}` : '',
     '\n## Latest posts',
   ]
 
   ;(posts || []).forEach((post) => {
     const summary = post.excerpt || stripHtml(post.content_html || '').slice(0, 240)
     lines.push(
-      `- ${post.title} - /${profile.username}/${post.slug}`,
+      `- ${post.title} - /${publication.slug}/${post.slug}`,
       summary ? `  - ${summary}` : ''
     )
   })
