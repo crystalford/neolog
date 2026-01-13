@@ -40,6 +40,16 @@ export async function GET(request: NextRequest) {
     return new Response('Profile not found', { status: 404 })
   }
 
+  // Get primary publication
+  const { data: publications } = await supabase
+    .from('publications')
+    .select('id, slug')
+    .eq('owner_id', session.user.id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const publicationSlug = publications?.[0]?.slug || profile.username
+
   // Get all posts (including drafts)
   const { data: posts } = await supabase
     .from('posts')
@@ -72,13 +82,13 @@ export async function GET(request: NextRequest) {
 
   if (format === 'markdown') {
     finalStatus = 'success'
-    return generateMarkdownExport(profile, posts || [], exportDate)
+    return generateMarkdownExport(profile, posts || [], publicationSlug, exportDate)
   } else if (format === 'html') {
     finalStatus = 'success'
-    return generateHTMLExport(profile, posts || [], baseUrl, exportDate)
+    return generateHTMLExport(profile, posts || [], publicationSlug, baseUrl, exportDate)
   } else {
     finalStatus = 'success'
-    return generateJSONExport(profile, posts || [], drafts || [], upvotes || [], baseUrl, exportDate)
+    return generateJSONExport(profile, posts || [], drafts || [], upvotes || [], baseUrl, exportDate, publicationSlug)
   }
   } catch (e: any) {
     finalErrorMessage = e?.message || 'Export failed'
@@ -105,7 +115,8 @@ function generateJSONExport(
   drafts: any[],
   upvotes: any[],
   baseUrl: string,
-  exportDate: string
+  exportDate: string,
+  publicationSlug: string
 ) {
   const exportData = {
     _meta: {
@@ -136,8 +147,8 @@ function generateJSONExport(
       created_at: post.created_at,
       updated_at: post.updated_at,
       published_at: post.published_at,
-      url: post.status === 'published' 
-        ? `${baseUrl}/${profile.username}/${post.slug}` 
+      url: publicationSlug && post.status === 'published' 
+        ? `${baseUrl}/${publicationSlug}/${post.slug}` 
         : null,
       // Fork metadata
       forked_from_id: post.forked_from_id,
@@ -167,7 +178,7 @@ function generateJSONExport(
     },
   }
 
-  const filename = `neolog-export-${profile.username}-${exportDate.split('T')[0]}.json`
+  const filename = `neolog-export-${publicationSlug}-${exportDate.split('T')[0]}.json`
 
   return new Response(JSON.stringify(exportData, null, 2), {
     headers: {
@@ -180,11 +191,12 @@ function generateJSONExport(
 function generateMarkdownExport(
   profile: any,
   posts: any[],
+  publicationSlug: string,
   exportDate: string
 ) {
   const publishedPosts = posts.filter(p => p.status === 'published')
   
-  let markdown = `# ${profile.display_name || profile.username}\n\n`
+  let markdown = `# ${profile.display_name || publicationSlug}\n\n`
   markdown += `Exported from Neolog on ${exportDate}\n\n`
   markdown += `---\n\n`
 
@@ -210,7 +222,7 @@ function generateMarkdownExport(
     markdown += `---\n\n`
   }
 
-  const filename = `neolog-export-${profile.username}-${exportDate.split('T')[0]}.md`
+  const filename = `neolog-export-${publicationSlug}-${exportDate.split('T')[0]}.md`
 
   return new Response(markdown, {
     headers: {
@@ -223,6 +235,7 @@ function generateMarkdownExport(
 function generateHTMLExport(
   profile: any,
   posts: any[],
+  publicationSlug: string,
   baseUrl: string,
   exportDate: string
 ) {
@@ -233,7 +246,7 @@ function generateHTMLExport(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${profile.display_name || profile.username} - Neolog Export</title>
+  <title>${profile.display_name || publicationSlug} - Neolog Export</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -288,15 +301,15 @@ function generateHTMLExport(
   </main>
   
   <footer>
-    <p class="meta">
+        <p class="meta">
       This archive contains ${publishedPosts.length} posts.
-      <br>Original profile: <a href="${baseUrl}/${profile.username}">${baseUrl}/${profile.username}</a>
+      <br>Original profile: <a href="${baseUrl}/${publicationSlug}">${baseUrl}/${publicationSlug}</a>
     </p>
   </footer>
 </body>
 </html>`
 
-  const filename = `neolog-export-${profile.username}-${exportDate.split('T')[0]}.html`
+  const filename = `neolog-export-${publicationSlug}-${exportDate.split('T')[0]}.html`
 
   return new Response(html, {
     headers: {
