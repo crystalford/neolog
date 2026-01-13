@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyActivityPubRequest } from '@/lib/activitypub-signature'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchRemoteActor, sendSignedActivity } from '@/lib/activitypub-outbound'
 
 export const runtime = 'nodejs'
 
@@ -72,6 +73,51 @@ export async function POST(
 
   if (insertError && insertError.code !== '23505') {
     return NextResponse.json({ error: 'Failed to store activity' }, { status: 500 })
+  }
+
+  if (body.type === 'Follow' && body.actor && body.object) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
+    const expectedObject = `${baseUrl}/${username}`
+    if (body.object === expectedObject) {
+      const remoteActor = await fetchRemoteActor(body.actor)
+      const inboxUrl = remoteActor?.endpoints?.sharedInbox || remoteActor?.inbox || null
+
+      const domain = (() => {
+        try {
+          return new URL(body.actor).hostname
+        } catch {
+          return null
+        }
+      })()
+
+      await admin
+        .from('activitypub_followers')
+        .upsert(
+          {
+            user_id: profile.id,
+            actor: body.actor,
+            inbox_url: remoteActor?.inbox || null,
+            shared_inbox: remoteActor?.endpoints?.sharedInbox || null,
+            preferred_username: remoteActor?.preferredUsername || null,
+            display_name: remoteActor?.name || null,
+            domain,
+            status: 'accepted',
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,actor' }
+        )
+
+      if (inboxUrl) {
+        const acceptActivity = {
+          '@context': 'https://www.w3.org/ns/activitystreams',
+          id: `${expectedObject}#accept-${Date.now()}`,
+          type: 'Accept',
+          actor: expectedObject,
+          object: body,
+        }
+        await sendSignedActivity(profile.id, username, inboxUrl, acceptActivity)
+      }
+    }
   }
 
   return NextResponse.json({ ok: true }, { status: 202 })

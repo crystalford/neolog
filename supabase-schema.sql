@@ -61,6 +61,26 @@ create table public.activitypub_inbox (
 );
 
 -- =============================================
+-- ACTIVITYPUB FOLLOWERS TABLE
+-- Stores federated followers for delivery
+-- =============================================
+create table public.activitypub_followers (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  actor text not null,
+  inbox_url text,
+  shared_inbox text,
+  preferred_username text,
+  display_name text,
+  domain text,
+  status text default 'accepted' check (status in ('accepted', 'rejected', 'pending')),
+  followed_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  last_seen_at timestamp with time zone,
+
+  constraint activitypub_followers_unique unique (user_id, actor)
+);
+
+-- =============================================
 -- POSTS TABLE
 -- The core content table with forking support
 -- =============================================
@@ -434,6 +454,7 @@ create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 alter table public.profiles enable row level security;
 alter table public.activitypub_keys enable row level security;
 alter table public.activitypub_inbox enable row level security;
+alter table public.activitypub_followers enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
