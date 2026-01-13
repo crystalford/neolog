@@ -357,8 +357,12 @@ export default function WritePage() {
       return
     }
     const previousContent = content
+    const importedDivider = `
+<hr class="import-divider" />
+<p class="import-label">Imported HTML</p>
+`
     const nextContent = importAction === 'append'
-      ? `${content ? `${content}\n\n` : ''}${cleaned}`
+      ? `${content ? `${content}\n\n` : ''}${importedDivider}${cleaned}`
       : cleaned
     setContent(nextContent)
     setImportInfo({ previousContent, stats: getImportStats(cleaned) })
