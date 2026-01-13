@@ -50,6 +50,12 @@ export default function WritePage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [importHtml, setImportHtml] = useState('')
+  const [importMode, setImportMode] = useState<'clean' | 'full'>('clean')
+  const [importAction, setImportAction] = useState<'replace' | 'append'>('replace')
+  const [importInfo, setImportInfo] = useState<null | {
+    previousContent: string
+    stats: { words: number; headings: number; images: number }
+  }>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingPost, setDeletingPost] = useState(false)
@@ -320,12 +326,51 @@ export default function WritePage() {
     }
   }
 
+  const sanitizeImportedHtml = (html: string, mode: 'clean' | 'full') => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    if (mode === 'clean') {
+      doc.querySelectorAll('script, style, nav, header, footer, aside, noscript, iframe').forEach((el) => el.remove())
+    } else {
+      doc.querySelectorAll('script, noscript').forEach((el) => el.remove())
+    }
+    return doc.body?.innerHTML?.trim() || ''
+  }
+
+  const getImportStats = (html: string) => {
+    const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    const words = text ? text.split(' ').length : 0
+    const headings = (html.match(/<h[1-6][^>]*>/gi) || []).length
+    const images = (html.match(/<img[^>]*>/gi) || []).length
+    return { words, headings, images }
+  }
+
   const handleImportHtml = () => {
     if (!importHtml.trim()) return
-    setContent(importHtml)
+    if (importAction === 'replace' && content.trim()) {
+      const confirmed = window.confirm('Replace the current editor content? This will overwrite your draft.')
+      if (!confirmed) return
+    }
+    const cleaned = sanitizeImportedHtml(importHtml, importMode)
+    if (!cleaned) {
+      setError('Import failed: no usable content found.')
+      return
+    }
+    const previousContent = content
+    const nextContent = importAction === 'append'
+      ? `${content ? `${content}\n\n` : ''}${cleaned}`
+      : cleaned
+    setContent(nextContent)
+    setImportInfo({ previousContent, stats: getImportStats(cleaned) })
     setImportHtml('')
     setShowImport(false)
     setSuccess('HTML imported successfully!')
+  }
+
+  const undoImport = () => {
+    if (!importInfo) return
+    setContent(importInfo.previousContent)
+    setImportInfo(null)
   }
 
   const handleDeletePost = async () => {
@@ -531,7 +576,24 @@ export default function WritePage() {
       {success && (
         <div className="max-w-6xl mx-auto px-6 pt-4">
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-            {success}
+            <div className="flex items-center justify-between gap-4">
+              <span>{success}</span>
+              {importInfo && (
+                <div className="flex items-center gap-3 text-xs text-green-700">
+                  <span>
+                    {importInfo.stats.words.toLocaleString()} words
+                    {importInfo.stats.headings ? ` · ${importInfo.stats.headings} headings` : ''}
+                    {importInfo.stats.images ? ` · ${importInfo.stats.images} images` : ''}
+                  </span>
+                  <button
+                    onClick={undoImport}
+                    className="underline text-green-700 hover:text-green-800"
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -607,6 +669,49 @@ export default function WritePage() {
                 placeholder="Paste your HTML code here..."
                 className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Import mode</label>
+                  <select
+                    value={importMode}
+                    onChange={(e) => setImportMode(e.target.value as 'clean' | 'full')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="clean">Clean article (recommended)</option>
+                    <option value="full">Full HTML (scripts removed)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Clean removes headers, footers, nav, and extra layout elements.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Insert into editor</label>
+                  <select
+                    value={importAction}
+                    onChange={(e) => setImportAction(e.target.value as 'replace' | 'append')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="replace">Replace current content</option>
+                    <option value="append">Append to end</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    We'll keep your current content intact if you choose append.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">Preview</p>
+                <div
+                  className="prose prose-sm max-w-none bg-white rounded-md border border-gray-200 p-3 max-h-48 overflow-y-auto"
+                  dangerouslySetInnerHTML={{
+                    __html: importHtml.trim()
+                      ? sanitizeImportedHtml(importHtml, importMode)
+                      : '<p>Paste HTML to preview how it will look.</p>',
+                  }}
+                />
+              </div>
 
               <div className="flex items-center justify-end gap-3 mt-4">
                 <button
