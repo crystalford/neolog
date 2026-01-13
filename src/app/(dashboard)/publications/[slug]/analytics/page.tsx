@@ -169,7 +169,12 @@ export default function PublicationAnalyticsPage({
           </Link>
         </div>
         {topPosts.length === 0 ? (
-          <p className="text-sm text-[var(--text-tertiary)]">No published posts yet.</p>
+          <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6 text-center">
+            <p className="text-sm text-[var(--text-secondary)] mb-4">No published posts yet.</p>
+            <Link href="/write" className="btn btn-primary btn-sm">
+              Start a post
+            </Link>
+          </div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
             {topPosts.map((post) => (

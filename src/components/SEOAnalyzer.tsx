@@ -224,13 +224,13 @@ export function SEOAnalyzer({ title, description, content, className = '' }: SEO
           </div>
           <div className="text-xs text-[var(--text-tertiary)]">
             {analysis.score >= 80 ? (
-              <span className="text-green-600 font-medium">🔥 High potential</span>
+              <span className="text-green-600 font-medium">High potential</span>
             ) : analysis.score >= 60 ? (
-              <span className="text-yellow-600 font-medium">⚡ Good potential</span>
+              <span className="text-yellow-600 font-medium">Good potential</span>
             ) : (
-              <span className="text-[var(--text-secondary)]">📈 Needs optimization</span>
+              <span className="text-[var(--text-secondary)]">Needs optimization</span>
             )}
-            {' — '}
+            {' - '}
             Based on SEO score, readability, and content length ({analysis.wordCount} words)
           </div>
         </div>
@@ -239,11 +239,11 @@ export function SEOAnalyzer({ title, description, content, className = '' }: SEO
       {/* Top suggestions */}
       {analysis.suggestions.length > 0 && (
         <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
-          <div className="text-sm font-medium mb-2">💡 Quick Wins:</div>
+          <div className="text-sm font-medium mb-2">Quick Wins:</div>
           <ul className="space-y-1">
             {analysis.suggestions.slice(0, 3).map((suggestion, i) => (
               <li key={i} className="text-xs text-[var(--text-secondary)] pl-4 relative">
-                <span className="absolute left-0">•</span>
+                <span className="absolute left-0">-</span>
                 {suggestion}
               </li>
             ))}

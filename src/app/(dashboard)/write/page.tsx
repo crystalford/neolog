@@ -47,6 +47,7 @@ export default function WritePage() {
   const [importHtml, setImportHtml] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [deletingPost, setDeletingPost] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -322,6 +323,46 @@ export default function WritePage() {
     setSuccess('HTML imported successfully!')
   }
 
+  const handleDeletePost = async () => {
+    if (!postId) {
+      setError('Save the draft before deleting.')
+      return
+    }
+
+    if (!user?.id) {
+      setError('You must be signed in to delete a post.')
+      return
+    }
+
+    const confirmed = window.confirm('Delete this post? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeletingPost(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('author_id', user.id)
+
+      if (deleteError) {
+        throw deleteError
+      }
+
+      setSuccess('Post deleted.')
+      setTimeout(() => {
+        router.push('/posts')
+      }, 600)
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete post')
+    } finally {
+      setDeletingPost(false)
+    }
+  }
+
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
@@ -381,7 +422,7 @@ export default function WritePage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
-              ← All posts
+              <- All posts
             </Link>
 
             {/* Publication selector */}
@@ -497,6 +538,7 @@ export default function WritePage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Post title"
+            aria-label="Post title"
             className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 mb-4"
             autoFocus
           />
@@ -506,6 +548,7 @@ export default function WritePage() {
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Add a subtitle or excerpt (optional)"
+            aria-label="Post subtitle"
             className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 mb-8"
           />
 
@@ -793,8 +836,24 @@ export default function WritePage() {
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline text-sm"
                     >
-                      Open in new tab →
+                      Open in new tab ->
                     </a>
+                  </div>
+                )}
+
+                {postId && (
+                  <div className="pt-6 border-t border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Danger Zone</h3>
+                    <button
+                      onClick={handleDeletePost}
+                      disabled={deletingPost}
+                      className="w-full px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deletingPost ? 'Deleting...' : 'Delete post'}
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2">
+                      This deletes the post and its tags. This action cannot be undone.
+                    </p>
                   </div>
                 )}
               </div>

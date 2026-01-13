@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
+import { generateSEO } from '@/lib/seo'
 import { Mail, Calendar, Users, ArrowLeft } from 'lucide-react'
 
 interface Props {
@@ -21,10 +22,13 @@ export async function generateMetadata({ params }: Props) {
   
   if (!profile) return { title: 'Not Found' }
 
-  return {
-    title: `Newsletter Archive - ${profile.display_name || profile.username} - Neolog`,
-    description: `Past newsletters from ${profile.display_name || profile.username}`,
-  }
+  const name = profile.display_name || profile.username
+
+  return generateSEO({
+    title: `Newsletter Archive - ${name}`,
+    description: `Past newsletters from ${name}`,
+    url: `/${params.username}/newsletters`,
+  })
 }
 
 export default async function NewsletterArchivePage({ params }: Props) {

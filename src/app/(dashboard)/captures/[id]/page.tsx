@@ -223,7 +223,7 @@ export default function CaptureAssetDetailPage() {
   if (loading) {
     return (
       <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto">
-        <div className="text-sm text-[var(--text-secondary)]">Loading…</div>
+        <div className="text-sm text-[var(--text-secondary)]">Loading...</div>
       </main>
     )
   }
@@ -340,7 +340,7 @@ export default function CaptureAssetDetailPage() {
         <div className="flex items-center justify-between gap-2">
           <button onClick={save} disabled={saving || Boolean(previewMetaError)} className="btn btn-primary inline-flex items-center gap-2">
             <Save className="h-4 w-4" />
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving...' : 'Save'}
           </button>
 
           <button
@@ -349,7 +349,7 @@ export default function CaptureAssetDetailPage() {
             className="btn btn-secondary inline-flex items-center gap-2"
           >
             <Trash2 className="h-4 w-4" />
-            {deleting ? 'Deleting…' : 'Delete'}
+            {deleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>

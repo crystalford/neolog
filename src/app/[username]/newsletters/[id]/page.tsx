@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
+import { generateSEO } from '@/lib/seo'
 import { Mail, Calendar, ArrowLeft, Share2 } from 'lucide-react'
 
 interface Props {
@@ -23,9 +24,14 @@ export async function generateMetadata({ params }: Props) {
   
   if (!newsletter) return { title: 'Not Found' }
 
-  return {
-    title: `${newsletter.subject} - Neolog`,
-  }
+  const author = Array.isArray(newsletter.author) ? newsletter.author[0] : newsletter.author
+  const authorName = author?.display_name || author?.username || 'Neolog'
+
+  return generateSEO({
+    title: newsletter.subject,
+    description: `Newsletter from ${authorName}`,
+    url: `/${params.username}/newsletters/${params.id}`,
+  })
 }
 
 export default async function NewsletterDetailPage({ params }: Props) {
@@ -84,6 +90,7 @@ export default async function NewsletterDetailPage({ params }: Props) {
                   <img
                     src={profile.avatar_url}
                     alt={`${profile.display_name || profile.username} avatar`}
+                    loading="lazy"
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (

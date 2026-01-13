@@ -166,7 +166,7 @@ export function calculateReadability(text: string): SEOAnalysis['readability'] {
     return count + countSyllables(word)
   }, 0)
 
-  // Flesch Reading Ease = 206.835 - 1.015 × (words/sentences) - 84.6 × (syllables/words)
+  // Flesch Reading Ease = 206.835 - 1.015 * (words/sentences) - 84.6 * (syllables/words)
   const avgWordsPerSentence = wordCount / sentenceCount
   const avgSyllablesPerWord = syllableCount / wordCount
 
@@ -255,7 +255,7 @@ export function analyzeHeadings(html: string): SEOAnalysis['headings'] {
     hierarchy = false
   } else if (h2Count === 0 && h3Count > 0) {
     score = 70
-    suggestion = 'H3 used without H2. Maintain proper heading hierarchy (H1 → H2 → H3).'
+    suggestion = 'H3 used without H2. Maintain proper heading hierarchy (H1 -> H2 -> H3).'
     hierarchy = false
   } else if (h2Count === 0) {
     score = 80

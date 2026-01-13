@@ -120,7 +120,7 @@ export async function GET(
     return NextResponse.json({ ok: true, asset })
   }
 
-  // Used in: via post_assets → posts
+  // Used in: via post_assets -> posts
   const { data: links, error: linksError } = await db
     .from('post_assets')
     .select('post_id, created_at')
@@ -391,3 +391,4 @@ export async function DELETE(
     }
   }
 }
+

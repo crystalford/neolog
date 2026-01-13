@@ -7,9 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
 import {
   Plus, Search, PenLine, Calendar, Layers, Hash,
-  Clock, ArrowRight, MoreHorizontal, Trash2, Edit2, Eye
+  Clock, ArrowRight, Trash2, Edit2
 } from 'lucide-react'
-import type { Post } from '@/types/database'
 
 interface DraftWithProgress {
   id: string
@@ -57,7 +56,7 @@ export default function WorkspacePage() {
   
   const router = useRouter()
   const supabase = createClient()
-  const { capabilities, publishedCount } = useUserMaturity(userId)
+  const { capabilities } = useUserMaturity(userId)
 
   useEffect(() => {
     loadWorkspace()
@@ -243,6 +242,7 @@ export default function WorkspacePage() {
               placeholder="Search drafts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search drafts"
               className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-white/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
             />
           </div>
@@ -261,7 +261,7 @@ export default function WorkspacePage() {
                       </h3>
                       <div className="flex items-center gap-4 mt-2 text-base text-[var(--text-secondary)]">
                         <span>{draft.word_count.toLocaleString()} words</span>
-                        <span>·</span>
+                        <span>-</span>
                         <span className="flex items-center gap-2">
                           <Clock size={14} />
                           {formatRelativeTime(draft.updated_at)}
@@ -371,7 +371,7 @@ export default function WorkspacePage() {
             <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
               <Calendar size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
-                Nothing scheduled
+                No scheduled posts yet
               </h2>
               <p className="text-base text-[var(--text-secondary)] mb-6">
                 Schedule a draft to publish it automatically.
@@ -403,7 +403,7 @@ export default function WorkspacePage() {
                         </h3>
                         <p className="text-base text-[var(--text-secondary)]">
                           {stack.post_count} post{stack.post_count !== 1 ? 's' : ''}
-                          {stack.description && ` · ${stack.description.slice(0, 50)}...`}
+                          {stack.description && ` - ${stack.description.slice(0, 50)}...`}
                         </p>
                       </div>
                     </div>
@@ -456,3 +456,4 @@ export default function WorkspacePage() {
     </main>
   )
 }
+

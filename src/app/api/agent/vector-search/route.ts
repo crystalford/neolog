@@ -294,7 +294,7 @@ export async function GET(req: NextRequest) {
       for (const r of ordered) {
         const u = r.author?.username || "unknown";
         const score = typeof r.score === "number" ? r.score.toFixed(4) : "-";
-        lines.push(`- **${r.title || "(untitled)"}** (@${u}) — score: ${score}`);
+        lines.push(`- **${r.title || "(untitled)"}** (@${u}) - score: ${score}`);
       }
 
       lines.push("");
@@ -329,3 +329,4 @@ export async function GET(req: NextRequest) {
     }
   }
 }
+

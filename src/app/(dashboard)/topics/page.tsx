@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 type TopicRow = {
@@ -126,7 +127,10 @@ export default function TopicsDashboardPage() {
       {topics.length === 0 ? (
         <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
           <h2 className="font-display text-xl mb-2">No topics yet</h2>
-          <p className="text-[var(--text-secondary)]">Add tags to your posts to see topics here.</p>
+          <p className="text-[var(--text-secondary)] mb-6">Add tags to your posts to see topics here.</p>
+          <Link href="/write" className="btn btn-primary">
+            Start a post
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
@@ -154,6 +158,7 @@ export default function TopicsDashboardPage() {
                   )
                 }}
                 placeholder="Write a short intro for this topic..."
+                aria-label={`Intro for ${topic.name}`}
                 className="input min-h-[120px]"
               />
             </div>

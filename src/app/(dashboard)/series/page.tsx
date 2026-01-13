@@ -154,6 +154,7 @@ export default function SeriesPage() {
                       <button
                         onClick={() => setActiveMenu(activeMenu === s.id ? null : s.id)}
                         className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)]"
+                        aria-label="Open stack menu"
                       >
                         <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
                       </button>

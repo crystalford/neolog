@@ -45,7 +45,12 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         >
           <div className="aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-tertiary)]">
             {post.cover_image_url ? (
-              <img src={post.cover_image_url} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <img
+                src={post.cover_image_url}
+                alt={post.title || 'Post cover'}
+                loading="lazy"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
             ) : (
               <GenerativeCover
                 contentSeed={`${post.id}-${post.title}`}
@@ -99,7 +104,8 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
             {post.cover_image_url ? (
               <img
                 src={post.cover_image_url}
-                alt=""
+                alt={post.title || 'Post cover'}
+                loading="lazy"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             ) : (
@@ -166,7 +172,12 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         <div className="relative aspect-[16/9] mb-4 rounded-xl overflow-hidden bg-[var(--bg-secondary)]">
           {post.cover_image_url ? (
             <>
-              <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <img
+                src={post.cover_image_url}
+                alt={post.title || 'Post cover'}
+                loading="lazy"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </>
           ) : (
@@ -193,7 +204,12 @@ export function PostCard({ post, variant = 'default' }: PostCardProps) {
         <div className="flex items-center gap-3 mb-2">
           <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             {post.author.avatar_url ? (
-              <img src={post.author.avatar_url} alt="" className="w-7 h-7 rounded-full" />
+              <img
+                src={post.author.avatar_url}
+                alt={post.author.display_name || post.author.username}
+                loading="lazy"
+                className="w-7 h-7 rounded-full"
+              />
             ) : (
               <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center text-xs font-medium text-white">
                 {(post.author.display_name || post.author.username)[0].toUpperCase()}

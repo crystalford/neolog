@@ -119,7 +119,7 @@ export default function PublicationOverviewPage({
           <div>
             <h1 className="font-display text-3xl text-[var(--text-primary)]">{publication.name}</h1>
             <p className="text-sm text-[var(--text-secondary)]">
-              @{publication.slug}{publication.custom_domain ? ` · ${publication.custom_domain}` : ''}
+              @{publication.slug}{publication.custom_domain ? ` - ${publication.custom_domain}` : ''}
             </p>
           </div>
         </div>
@@ -167,8 +167,13 @@ export default function PublicationOverviewPage({
         </div>
 
         {posts.length === 0 ? (
-          <div className="text-sm text-[var(--text-tertiary)]">
-            No posts yet for this publication.
+          <div className="rounded-xl border border-dashed border-[var(--border-light)] bg-[var(--bg-secondary)]/40 p-6 text-center">
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
+              No posts yet for this publication.
+            </p>
+            <Link href="/write" className="btn btn-primary btn-sm">
+              Start a post
+            </Link>
           </div>
         ) : (
           <div className="divide-y divide-[var(--border-light)]">
@@ -179,7 +184,7 @@ export default function PublicationOverviewPage({
                     {post.title || 'Untitled'}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {post.status} · Updated {new Date(post.updated_at).toLocaleDateString()}
+                    {post.status} - Updated {new Date(post.updated_at).toLocaleDateString()}
                   </p>
                 </div>
                 <Link href={`/write?edit=${post.id}`} className="btn btn-secondary btn-sm">
@@ -193,3 +198,5 @@ export default function PublicationOverviewPage({
     </main>
   )
 }
+
+

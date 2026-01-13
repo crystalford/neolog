@@ -140,6 +140,7 @@ export default function ListsPage() {
                       <button
                         onClick={() => setShowMenu(showMenu === list.id ? null : list.id)}
                         className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                        aria-label="Open list menu"
                       >
                         <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
                       </button>

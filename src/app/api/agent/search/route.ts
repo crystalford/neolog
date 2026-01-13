@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
         const u = author?.username
         const url = u ? `${origin}/${u}/${post.slug}` : `${origin}/`
         const date = post.published_at ? new Date(post.published_at).toISOString().slice(0, 10) : ''
-        const by = author?.display_name || author?.username ? ` — ${author?.display_name || author?.username}` : ''
+        const by = author?.display_name || author?.username ? ` - ${author?.display_name || author?.username}` : ''
         const suffix = date ? ` (${date})` : ''
         md += `- ${post.title}${by}${suffix}\n  ${url}\n`
         if (post.excerpt) {
@@ -165,3 +165,4 @@ export async function GET(request: NextRequest) {
     }
   }
 }
+

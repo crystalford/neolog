@@ -172,7 +172,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
         <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-[var(--border-light)]">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--text-primary)]">Quick Capture</p>
-            <p className="text-xs text-[var(--text-tertiary)]">Save snippets, quotes, ideas, or links to use in your posts later · Ctrl+Enter to save</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Save snippets, quotes, ideas, or links to use in your posts later - Ctrl+Enter to save</p>
           </div>
           <button
             onClick={close}
@@ -259,7 +259,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
             Cancel
           </button>
           <button onClick={submit} className="btn btn-primary btn-sm" disabled={!canSave}>
-            {saving ? 'Saving…' : 'Save to Captures'}
+            {saving ? 'Saving...' : 'Save to Captures'}
           </button>
         </div>
       </div>

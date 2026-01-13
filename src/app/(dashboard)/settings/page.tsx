@@ -122,7 +122,7 @@ export default function SettingsPage() {
     devto: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Dev.to uses an API key from dev.to/settings/account' },
     posthog: { pattern: /^phc_[A-Za-z0-9]{10,}/, hint: 'PostHog keys start with phc_' },
     heygen: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'HeyGen keys are long alphanumeric strings' },
-    synthesia: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Synthesia keys are long strings; paste the API key from Synthesia → Integrations' },
+    synthesia: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Synthesia keys are long strings; paste the API key from Synthesia -> Integrations' },
   }
 
   const getIntegrationHint = (provider: string, value: string) => {
@@ -603,7 +603,7 @@ export default function SettingsPage() {
           return
         }
         if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
-          setError('Username must be 3–30 characters and only use a-z, 0-9, and _.')
+          setError('Username must be 3"30 characters and only use a-z, 0-9, and _.')
           return
         }
         console.error('Username update error:', error)
@@ -764,7 +764,7 @@ export default function SettingsPage() {
                       )}
                     </button>
                     <p className="text-xs text-[var(--text-tertiary)]">
-                      3–30 chars. a-z, 0-9, underscore.
+                      3"30 chars. a-z, 0-9, underscore.
                     </p>
                   </div>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
@@ -1477,3 +1477,4 @@ export default function SettingsPage() {
     </main>
   )
 }
+

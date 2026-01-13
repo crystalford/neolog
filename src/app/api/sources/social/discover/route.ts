@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              'No feed link found on that page. Try pasting the site’s RSS/Atom/JSON Feed URL directly (often /feed, /rss, /atom.xml, /feed.json).',
+              "No feed link found on that page. Try pasting the site's RSS/Atom/JSON Feed URL directly (often /feed, /rss, /atom.xml, /feed.json).",
           },
           { status: 404 },
         )

@@ -1,12 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
+import { generateSEO } from '@/lib/seo'
 import { Hash, TrendingUp } from 'lucide-react'
 
-export const metadata = {
-  title: 'Browse Tags - Neolog',
-  description: 'Explore topics and discover posts by category',
-}
+export const metadata = generateSEO({
+  title: 'Browse Topics',
+  description: 'Explore topics and discover posts by category.',
+  url: '/tags',
+})
 
 export default async function TagsPage() {
   const supabase = createClient()

@@ -28,7 +28,9 @@ export function middleware(request: NextRequest) {
   }
 
   const { pathname, searchParams } = request.nextUrl
-  if (searchParams.get('format') !== 'json') {
+  const accept = request.headers.get('accept') || ''
+  const wantsJson = searchParams.get('format') === 'json' || accept.includes('application/json')
+  if (!wantsJson) {
     return NextResponse.next()
   }
 

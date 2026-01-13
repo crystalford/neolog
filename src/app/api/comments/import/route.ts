@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
       if (!xKey?.key) {
         finalErrorMessage = 'X API key not configured.'
         return NextResponse.json({
-          error: 'X API key not configured. Add it in Settings → AI Capture (BYOK) under "X (Twitter) API".',
+          error: 'X API key not configured. Add it in Settings -> AI Capture (BYOK) under "X (Twitter) API".',
         }, { status: 400 })
       }
 
@@ -309,3 +309,4 @@ export async function POST(request: NextRequest) {
     }
   }
 }
+

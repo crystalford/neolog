@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Could not resolve channel id. Try a URL that contains /channel/UC… (or open the channel page and copy its URL).',
+            'Could not resolve channel id. Try a URL that contains /channel/UC... (or open the channel page and copy its URL).',
         },
         { status: 422 },
       )

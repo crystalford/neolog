@@ -123,6 +123,7 @@ export default async function ProfilePage({ params }: Props) {
                 <img 
                   src={profile.avatar_url} 
                   alt={profile.display_name || profile.username}
+                  loading="lazy"
                   className="w-20 h-20 rounded-full"
                 />
               ) : (
@@ -282,7 +283,7 @@ export default async function ProfilePage({ params }: Props) {
                 <div className="p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
                   <p className="text-sm text-[var(--text-secondary)]">
                     <strong className="text-[var(--text-primary)]">Reaching everywhere:</strong> RSS, ActivityPub (Mastodon), X (Twitter), LinkedIn, and direct subscribers.
-                    <span className="text-[var(--accent)] font-medium ml-2">→ {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
+                    <span className="text-[var(--accent)] font-medium ml-2">-> {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
                   </p>
                 </div>
               </div>
@@ -308,6 +309,7 @@ export default async function ProfilePage({ params }: Props) {
                       <img
                         src={stack.cover_image_url}
                         alt={stack.title}
+                        loading="lazy"
                         className="w-full h-36 object-cover"
                       />
                     )}
@@ -389,5 +391,4 @@ export default async function ProfilePage({ params }: Props) {
     </>
   )
 }
-
 

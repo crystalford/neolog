@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Eye, TrendingUp, Users, Clock, MapPin,
-  Smartphone, Monitor, Tablet, Globe, Calendar
+  Eye, TrendingUp, Users, Clock, Monitor, Globe
 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -193,7 +192,10 @@ export function AnalyticsDashboard({ postId }: { postId?: string }) {
     return (
       <div className="text-center py-16 text-[var(--text-tertiary)]">
         <Eye size={48} className="mx-auto mb-4 opacity-50" />
-        <p>No analytics data available</p>
+        <p className="text-[var(--text-secondary)]">No analytics yet.</p>
+        <p className="text-xs text-[var(--text-tertiary)] mt-2">
+          Publish a post or wait for views to start tracking.
+        </p>
       </div>
     )
   }

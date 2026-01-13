@@ -43,7 +43,7 @@ export async function GET(
   ;(posts || []).forEach((post) => {
     const summary = post.excerpt || stripHtml(post.content_html || '').slice(0, 240)
     lines.push(
-      `- ${post.title} — /${profile.username}/${post.slug}`,
+      `- ${post.title} - /${profile.username}/${post.slug}`,
       summary ? `  - ${summary}` : ''
     )
   })
@@ -56,3 +56,4 @@ export async function GET(
     },
   })
 }
+

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { 
-  CreditCard, Plus, Loader2, Edit2, Trash2, Check, 
-  DollarSign, Users, ToggleLeft, ToggleRight 
+  CreditCard, Plus, Loader2, Edit2, Trash2, Check,
+  Users, ToggleLeft, ToggleRight
 } from 'lucide-react'
 
 type Tier = {
@@ -166,6 +166,7 @@ export default function TiersPage() {
                         onClick={() => toggleTier(tier.id, tier.is_active)}
                         className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
                         title={tier.is_active ? 'Deactivate' : 'Activate'}
+                        aria-label={tier.is_active ? 'Deactivate tier' : 'Activate tier'}
                       >
                         {tier.is_active ? (
                           <ToggleRight size={20} className="text-[var(--success)]" />

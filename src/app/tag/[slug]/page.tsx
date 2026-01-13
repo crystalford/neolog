@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
+import { generateSEO } from '@/lib/seo'
 import { Hash, ArrowLeft } from 'lucide-react'
 
 interface Props {
@@ -20,10 +21,11 @@ export async function generateMetadata({ params }: Props) {
   
   if (!tag) return { title: 'Tag Not Found' }
   
-  return {
-    title: `#${tag.name} - Neolog`,
+  return generateSEO({
+    title: `#${tag.name}`,
     description: tag.description || `Posts tagged with ${tag.name}`,
-  }
+    url: `/tag/${params.slug}`,
+  })
 }
 
 export default async function TagPage({ params }: Props) {

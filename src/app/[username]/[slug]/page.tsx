@@ -255,6 +255,7 @@ export default async function PostPage({ params, searchParams }: Props) {
                     <img
                       src={profile.avatar_url}
                       alt={profile.display_name || profile.username}
+                      loading="lazy"
                       className="w-10 h-10 rounded-full"
                     />
                   ) : (
@@ -314,6 +315,7 @@ export default async function PostPage({ params, searchParams }: Props) {
               <img
                 src={post.cover_image_url}
                 alt={post.title}
+                loading="lazy"
                 className="w-full rounded-xl mb-8"
               />
             )}

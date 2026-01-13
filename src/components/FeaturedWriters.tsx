@@ -68,7 +68,12 @@ export function FeaturedWriters() {
             className="flex items-center gap-3 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors group"
           >
             {writer.avatar_url ? (
-              <img src={writer.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+              <img
+                src={writer.avatar_url}
+                alt={writer.display_name || writer.username}
+                loading="lazy"
+                className="w-12 h-12 rounded-full object-cover"
+              />
             ) : (
               <div className="w-12 h-12 rounded-full bg-[var(--accent)] flex items-center justify-center text-lg text-white font-medium">
                 {(writer.display_name || writer.username)[0].toUpperCase()}

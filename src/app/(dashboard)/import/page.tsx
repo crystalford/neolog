@@ -418,7 +418,7 @@ export default function ImportPage() {
                           <ul className="text-xs text-[var(--text-tertiary)] space-y-1">
                             {htmlResults.failures.slice(0, 10).map((failure, index) => (
                               <li key={`${failure.filename || 'file'}-${index}`}>
-                                • {failure.filename ? `${failure.filename}: ` : ''}{failure.error}
+                                - {failure.filename ? `${failure.filename}: ` : ''}{failure.error}
                               </li>
                             ))}
                           </ul>
@@ -498,7 +498,7 @@ export default function ImportPage() {
                   </div>
 
                   <p className="text-xs text-[var(--text-tertiary)] mt-3">
-                    Tip: Draft imports are safest; published imports won’t run publish side-effects (embeddings/syndication) until you explicitly Update.
+                    Tip: Draft imports are safest; published imports won't run publish side-effects (embeddings/syndication) until you explicitly Update.
                   </p>
                 </div>
               </div>

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   let finalErrorMessage: string | undefined = undefined
 
   // Compatibility alias for external clients expecting /api/v1/capture.
-  // Internally, Neolog’s capture endpoint is /api/capture.
+  // Internally, Neolog's capture endpoint is /api/capture.
   const forwardUrl = new URL('/api/capture', request.url)
 
   const headers = new Headers(request.headers)

@@ -67,7 +67,8 @@ export function RelatedPosts({ postId }: RelatedPostsProps) {
               <div className="aspect-video overflow-hidden">
                 <img 
                   src={post.cover_image_url}
-                  alt=""
+                  alt={post.title}
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>

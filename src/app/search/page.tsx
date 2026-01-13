@@ -213,6 +213,7 @@ export default function SearchPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search posts and people..."
+                aria-label="Search posts and people"
                 className="input input-with-icon pr-12 py-3 text-lg"
                 autoFocus
               />
@@ -221,6 +222,7 @@ export default function SearchPage() {
                   type="button"
                   onClick={clearSearch}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                  aria-label="Clear search"
                 >
                   <X size={20} />
                 </button>
@@ -332,7 +334,8 @@ export default function SearchPage() {
                         {user.avatar_url ? (
                           <img 
                             src={user.avatar_url}
-                            alt=""
+                            alt={user.display_name || user.username}
+                            loading="lazy"
                             className="w-12 h-12 rounded-full"
                           />
                         ) : (

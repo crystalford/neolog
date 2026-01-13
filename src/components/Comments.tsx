@@ -221,7 +221,8 @@ export function Comments({ postId, postAuthorId }: CommentsProps) {
             {comment.author_avatar_url ? (
               <img 
                 src={comment.author_avatar_url}
-                alt=""
+                alt={comment.author_display_name || comment.author_username}
+                loading="lazy"
                 className="w-8 h-8 rounded-full"
               />
             ) : (
@@ -281,6 +282,7 @@ export function Comments({ postId, postAuthorId }: CommentsProps) {
               <button
                 onClick={() => handleDelete(comment.id)}
                 className="flex items-center gap-1.5 text-sm text-[var(--text-tertiary)] hover:text-[var(--error)] transition-colors"
+                aria-label="Delete comment"
               >
                 <Trash2 size={14} />
               </button>

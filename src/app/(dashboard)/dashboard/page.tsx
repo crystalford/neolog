@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
 import { analyzeSEO } from '@/lib/seo-scoring'
 import {
-  PenLine, Zap, Send, ArrowRight, Archive, Clock,
+  PenLine, Zap, Send, ArrowRight, Archive,
   Eye, MessageCircle, X
 } from 'lucide-react'
 import type { Profile } from '@/types/database'
@@ -287,7 +287,7 @@ export default function DashboardHomePage() {
             </h2>
             <div className="flex items-center gap-4 text-base text-[var(--text-secondary)] mb-4">
               <span>{focusDraft.word_count.toLocaleString()} words</span>
-              <span>·</span>
+              <span>-</span>
               <span>Updated {formatRelativeTime(focusDraft.updated_at)}</span>
             </div>
             {/* Progress bar */}
@@ -439,7 +439,7 @@ export default function DashboardHomePage() {
                 href="/dashboard/captures"
                 className="text-xs text-[var(--accent)] hover:underline font-medium"
               >
-                See all →
+                See all
               </Link>
             )}
           </div>
@@ -455,7 +455,7 @@ export default function DashboardHomePage() {
                     {capture.title || `${capture.type} capture`}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {capture.type} · {formatRelativeTime(capture.created_at)}
+                    {capture.type} - {formatRelativeTime(capture.created_at)}
                   </p>
                 </Link>
               ))}
@@ -482,7 +482,7 @@ export default function DashboardHomePage() {
                 href="/posts"
                 className="text-xs text-[var(--accent)] hover:underline font-medium"
               >
-                See all →
+                See all
               </Link>
             )}
           </div>

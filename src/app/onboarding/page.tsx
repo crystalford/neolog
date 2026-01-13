@@ -252,7 +252,7 @@ export default function OnboardingPage() {
         if ((error as any).code === '23505') {
           setSaveError('That username is already taken.')
         } else if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
-          setSaveError('Username must be 3–30 characters and only use a-z, 0-9, and _.')
+          setSaveError('Username must be 3-30 characters and only use a-z, 0-9, and _.')
         } else {
         setSaveError('Unable to finish setup. Please try again.')
         }
@@ -392,18 +392,18 @@ export default function OnboardingPage() {
                 </div>
                 {(profile?.username?.startsWith('user_') || username.startsWith('user_')) && (
                   <p className="mt-2 text-sm text-[var(--text-tertiary)]">
-                    We created a temporary username for you — pick the one you want now.
+                    We created a temporary username for you - pick the one you want now.
                   </p>
                 )}
                 <div className="mt-2 text-sm">
                   {usernameStatus === 'checking' ? (
-                    <span className="text-[var(--text-tertiary)]">Checking availability…</span>
+                    <span className="text-[var(--text-tertiary)]">Checking availability...</span>
                   ) : usernameMessage ? (
                     <span className="text-red-500">{usernameMessage}</span>
                   ) : usernameStatus === 'available' ? (
                     <span className="text-[var(--text-secondary)]">Looks good.</span>
                   ) : (
-                    <span className="text-[var(--text-tertiary)]">3–30 chars, a-z, 0-9, underscore.</span>
+                    <span className="text-[var(--text-tertiary)]">3-30 chars, a-z, 0-9, underscore.</span>
                   )}
                 </div>
               </div>

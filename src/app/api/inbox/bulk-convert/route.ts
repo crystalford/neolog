@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'inboxItemIds is required' }, { status: 400 })
     }
 
-    // Validate publication ownership (avoid converting into someone else’s publication)
+    // Validate publication ownership (avoid converting into someone else's publication)
     const { data: publication, error: publicationError } = await supabase
       .from('publications')
       .select('id, owner_id, is_active')

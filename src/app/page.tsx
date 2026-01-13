@@ -106,7 +106,7 @@ export default async function Home() {
               href={session ? "/write" : "/signup"}
               className="btn btn-primary btn-xl px-10 py-5 text-xl font-semibold shadow-xl hover:shadow-2xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
-              {session ? "Start Writing" : "Start Free — Get Readers"}
+              {session ? "Start Writing" : "Start Free - Get Readers"}
               <ArrowRight size={24} className="ml-3" />
             </Link>
             <Link
@@ -197,7 +197,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 Real-time optimization suggestions, readability scoring, and keyword insights. See your SEO score while you write.
               </p>
-              <div className="text-sm text-green-600 font-medium">✅ Live now in Write page</div>
+              <div className="text-sm text-green-600 font-medium">Live now in Write page</div>
             </div>
 
             {/* ActivityPub Native */}
@@ -210,9 +210,9 @@ export default async function Home() {
               </div>
               <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Fediverse Native</h3>
               <p className="text-[var(--text-secondary)] mb-4">
-                Your posts appear in Mastodon feeds automatically. Not as links—as native content. Reach 10M+ fediverse users instantly.
+                Your posts appear in Mastodon feeds automatically. Not as links - as native content. Reach 10M+ fediverse users instantly.
               </p>
-              <div className="text-sm text-purple-600 font-medium">🚧 Coming Q1 2026</div>
+              <div className="text-sm text-purple-600 font-medium">Coming Q1 2026</div>
             </div>
 
             {/* Generative Covers */}
@@ -227,7 +227,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 Every post gets a unique visual generated from its content hash. No stock photos. No AI slop. Your words create your aesthetic.
               </p>
-              <div className="text-sm text-green-600 font-medium">✅ Live now on all posts</div>
+              <div className="text-sm text-green-600 font-medium">Live now on all posts</div>
             </div>
 
             {/* ePub Export */}
@@ -240,9 +240,9 @@ export default async function Home() {
               </div>
               <h3 className="font-display text-2xl mb-3">One-Click Book Export</h3>
               <p className="text-[var(--text-secondary)] mb-4">
-                Export your entire publication as a properly formatted ePub book. Table of contents, chapters, metadata—done.
+                Export your entire publication as a properly formatted ePub book. Table of contents, chapters, metadata - done.
               </p>
-              <div className="text-sm text-green-600 font-medium">✅ Live now on profile pages</div>
+              <div className="text-sm text-green-600 font-medium">Live now on profile pages</div>
             </div>
 
             {/* Multi-Platform Distribution */}
@@ -257,7 +257,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 One post becomes: a webpage, ActivityPub object, RSS item, ePub chapter, and social posts for X/LinkedIn/Reddit.
               </p>
-              <div className="text-sm text-green-600 font-medium">✅ Medium & Dev.to live now</div>
+              <div className="text-sm text-green-600 font-medium">Medium & Dev.to live now</div>
             </div>
 
             {/* Ownership */}
@@ -272,7 +272,7 @@ export default async function Home() {
               <p className="text-[var(--text-secondary)] mb-4">
                 Export everything (JSON, Markdown, ePub). RSS feeds are first-class. No algorithmic mystery. You can leave anytime.
               </p>
-              <div className="text-sm text-green-600 font-medium">✅ Available now</div>
+              <div className="text-sm text-green-600 font-medium">Available now</div>
             </div>
           </div>
         </section>
@@ -500,7 +500,7 @@ export default async function Home() {
             </div>
             <div className="pt-8 border-t border-[var(--border-light)] text-center">
               <p className="text-sm text-[var(--text-tertiary)]">
-                © 2026 Neolog. Open source. MIT License. Own your content.
+                (c) 2026 Neolog. Open source. MIT License. Own your content.
               </p>
             </div>
           </div>
@@ -509,4 +509,3 @@ export default async function Home() {
     </div>
   )
 }
-

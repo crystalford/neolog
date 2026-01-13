@@ -361,7 +361,10 @@ export default function SeriesDetailPage({ params }: Props) {
 
             {posts.length === 0 ? (
               <div className="text-center py-12 rounded-lg bg-[var(--bg-secondary)]">
-                <p className="text-[var(--text-secondary)]">No posts in this stack yet</p>
+                <p className="text-[var(--text-secondary)]">No posts in this stack yet.</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                  Add an existing post or start a new one.
+                </p>
                 <Link href="/write" className="btn btn-secondary btn-sm mt-4">
                   <Plus size={14} />
                   Create a post
@@ -379,6 +382,7 @@ export default function SeriesDetailPage({ params }: Props) {
                         onClick={() => movePost(post.id, 'up')}
                         disabled={index === 0}
                         className="p-1 hover:bg-[var(--bg-tertiary)] rounded disabled:opacity-30"
+                        aria-label="Move post up"
                       >
                         <ChevronUp size={14} />
                       </button>
@@ -386,6 +390,7 @@ export default function SeriesDetailPage({ params }: Props) {
                         onClick={() => movePost(post.id, 'down')}
                         disabled={index === posts.length - 1}
                         className="p-1 hover:bg-[var(--bg-tertiary)] rounded disabled:opacity-30"
+                        aria-label="Move post down"
                       >
                         <ChevronDown size={14} />
                       </button>
@@ -417,6 +422,7 @@ export default function SeriesDetailPage({ params }: Props) {
                     <button
                       onClick={() => removePostFromSeries(post.id)}
                       className="p-2 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:text-[var(--error)]"
+                      aria-label="Remove post from stack"
                     >
                       <X size={16} />
                     </button>

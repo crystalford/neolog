@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props) {
   if (!stack) return { title: 'Not Found' }
 
   return generateSEO({
-    title: `${stack.title} — ${profile.display_name || profile.username}`,
+    title: `${stack.title} - ${profile.display_name || profile.username}`,
     description: stack.description || `A stack by ${profile.display_name || profile.username}`,
     image: stack.cover_image_url || undefined,
     url: `/${params.username}/stack/${params.slug}`,
@@ -108,6 +108,7 @@ export default async function StackHubPage({ params }: Props) {
                   <img
                     src={profile.avatar_url}
                     alt={profile.display_name || profile.username}
+                    loading="lazy"
                     className="w-12 h-12 rounded-full"
                   />
                 ) : (
@@ -131,6 +132,7 @@ export default async function StackHubPage({ params }: Props) {
                 <img
                   src={stack.cover_image_url}
                   alt={stack.title}
+                  loading="lazy"
                   className="w-full rounded-xl mt-6"
                 />
               )}

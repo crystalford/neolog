@@ -197,15 +197,15 @@ export default function ExplorePage() {
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 <span className="text-[var(--text-secondary)]">Live discovery feed</span>
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">•</div>
+              <div className="text-sm text-[var(--text-tertiary)]">-</div>
               <div className="text-sm text-[var(--text-secondary)]">
                 {searchQuery ? `Searching for "${searchQuery}"` : selectedTag ? `Filtered by ${topTags.find(t => t.id === selectedTag)?.name}` : 'Posts ranked by recency, engagement, and quality'}
               </div>
               {!searchQuery && !selectedTag && (
                 <>
-                  <div className="text-sm text-[var(--text-tertiary)]">•</div>
+                  <div className="text-sm text-[var(--text-tertiary)]">-</div>
                   <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
-                    Try semantic search →
+                    Try semantic search ->
                   </Link>
                 </>
               )}
@@ -228,7 +228,7 @@ export default function ExplorePage() {
                   <Sparkles size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
                   <h3 className="font-display text-xl mb-2">No published posts yet</h3>
                   <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-                    Be the first to share your writing! Imported posts are saved as drafts—remember to publish them.
+                    Be the first to share your writing! Imported posts are saved as drafts - remember to publish them.
                   </p>
                   <div className="flex items-center justify-center gap-3">
                     <Link href="/write" className="btn btn-primary">
@@ -275,7 +275,7 @@ export default function ExplorePage() {
                   Start Writing Free
                 </Link>
                 <Link href="/import" className="btn btn-ghost btn-sm w-full text-xs">
-                  Or import from Ghost/Substack →
+                  Or import from Ghost/Substack ->
                 </Link>
               </div>
             </div>
@@ -285,5 +285,4 @@ export default function ExplorePage() {
     </>
   )
 }
-
 

@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       : content
 
   // V1 behavior: store as an inbox artifact (consistent with supply chain).
-  // Draft creation happens via Inbox → Draft conversion.
+// Draft creation happens via Inbox -> Draft conversion.
   const rawData = {
     title,
     content,
@@ -111,3 +111,4 @@ export async function POST(request: NextRequest) {
   })
   return NextResponse.json({ ok: true, inboxItemId: data.id })
 }
+

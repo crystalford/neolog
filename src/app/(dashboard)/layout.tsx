@@ -370,7 +370,7 @@ export default function DashboardLayout({
                 <Search size={16} />
                 <span>Search</span>
                 <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+/ or Ctrl+/">
-                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘/' : 'Ctrl+/'}
+                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? 'Cmd+/' : 'Ctrl+/'}
                 </span>
               </button>
             </div>
@@ -441,7 +441,7 @@ export default function DashboardLayout({
               >
                 <Search size={14} />
                 <span>Search...</span>
-                <span className="text-[10px] ml-4 opacity-60">⌘/</span>
+                <span className="text-[10px] ml-4 opacity-60">Cmd+/</span>
               </button>
               
               {/* Mobile buttons */}

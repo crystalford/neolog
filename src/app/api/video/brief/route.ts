@@ -8,7 +8,7 @@ import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 
 const buildFallback = (title: string, excerpt: string) =>
-  `Today’s brief: ${title}. ${excerpt || 'Summarize the key points and why they matter.'}`
+  `Today's brief: ${title}. ${excerpt || 'Summarize the key points and why they matter.'}`
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()

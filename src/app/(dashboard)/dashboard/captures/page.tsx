@@ -1,11 +1,11 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from 'react'
 import { QuickCaptureModal } from '@/components/QuickCaptureModal'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Plus } from 'lucide-react'
+import { Plus, Archive } from 'lucide-react'
 
 interface Capture {
   id: string
@@ -36,25 +36,63 @@ export default function CapturesPage() {
     }
   }
 
-  if (loading) return <main className="p-8">Loading captures…</main>
+  if (loading) {
+    return (
+      <main className="px-8 py-10 max-w-4xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-40 skeleton rounded" />
+          <div className="h-24 skeleton rounded-2xl" />
+          <div className="h-24 skeleton rounded-2xl" />
+        </div>
+      </main>
+    )
+  }
 
   return (
-    <main className="p-8 max-w-4xl mx-auto">
-      <QuickCaptureModal isOpen={captureModalOpen} onClose={()=>setCaptureModalOpen(false)} />
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Captures</h1>
-        <button onClick={()=>setCaptureModalOpen(true)} className="btn btn-primary"><Plus size={16}/> Add Capture</button>
+    <main className="px-8 py-10 max-w-4xl mx-auto">
+      <QuickCaptureModal isOpen={captureModalOpen} onClose={() => setCaptureModalOpen(false)} />
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-[var(--text-primary)]">Captures</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-2">
+            Save raw ideas, links, quotes, and fragments. Everything starts here.
+          </p>
+        </div>
+        <button onClick={() => setCaptureModalOpen(true)} className="btn btn-primary">
+          <Plus size={16} /> Add Capture
+        </button>
       </div>
 
       {captures.length === 0 ? (
-        <div className="p-8 border rounded">No captures yet. <Link href="/dashboard/settings">Configure sources</Link></div>
+        <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-10 text-center shadow">
+          <Archive size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+          <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
+            No captures yet
+          </h2>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">
+            Add a capture now or connect sources to pull in material automatically.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button onClick={() => setCaptureModalOpen(true)} className="btn btn-primary">
+              <Plus size={16} />
+              Add Capture
+            </button>
+            <Link href="/dashboard/settings" className="btn btn-secondary">
+              Configure sources
+            </Link>
+          </div>
+        </div>
       ) : (
         <ul className="space-y-4">
           {captures.map(c => (
-            <li key={c.id} className="p-4 border rounded hover:bg-gray-50 cursor-pointer">
+            <li key={c.id} className="p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--border-medium)] transition-colors">
               <Link href={`/dashboard/captures/${c.id}`}>
-                <div className="text-sm font-medium">{c.title || c.content.slice(0,80)}</div>
-                <div className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</div>
+                <div className="text-base font-medium text-[var(--text-primary)]">
+                  {c.title || c.content.slice(0, 80)}
+                </div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-1">
+                  {new Date(c.created_at).toLocaleString()}
+                </div>
               </Link>
             </li>
           ))}

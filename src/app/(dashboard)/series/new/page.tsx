@@ -164,9 +164,9 @@ export default function NewSeriesPage() {
                 <div className="mb-4 p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                   <p className="text-sm text-[var(--text-secondary)] mb-2">Drafts that will be created</p>
                   <ul className="text-sm text-[var(--text-tertiary)] space-y-1">
-                    {willCreateDrafts.infographic && <li>• Infographic (HTML)</li>}
-                    {willCreateDrafts.essay && <li>• Essay</li>}
-                    {willCreateDrafts.research && <li>• Research Dump</li>}
+                    {willCreateDrafts.infographic && <li>Infographic (HTML)</li>}
+                    {willCreateDrafts.essay && <li>Essay</li>}
+                    {willCreateDrafts.research && <li>Research Dump</li>}
                   </ul>
                 </div>
               )}

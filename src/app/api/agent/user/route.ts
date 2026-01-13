@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         for (const post of list) {
           const url = `${origin}/${profile.username}/${post.slug}`
           const date = post.published_at ? new Date(post.published_at).toISOString().slice(0, 10) : ''
-          const suffix = date ? ` — ${date}` : ''
+          const suffix = date ? ` - ${date}` : ''
           md += `- ${post.title} (${url})${suffix}\n`
         }
       }
@@ -137,3 +137,4 @@ export async function GET(request: NextRequest) {
     }
   }
 }
+

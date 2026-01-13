@@ -168,7 +168,7 @@ export default function FeedPage() {
               <p className="text-[var(--text-secondary)]">
                 {subscriptionCount > 0
                   ? `Posts from ${subscriptionCount} creator${subscriptionCount === 1 ? '' : 's'} you follow`
-                  : 'Subscribe to creators to see their posts here'}
+                  : 'Follow creators to see their posts here'}
               </p>
             </div>
           </div>
@@ -232,7 +232,6 @@ export default function FeedPage() {
       </main>
   )
     }
-
 
 
 

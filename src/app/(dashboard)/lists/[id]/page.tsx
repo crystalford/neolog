@@ -196,6 +196,7 @@ export default function ListDetailPage({ params }: Props) {
                       disabled={removing === item.id}
                       className="absolute top-4 right-4 p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-light)] opacity-0 group-hover:opacity-100 transition-opacity hover:border-[var(--error)] hover:text-[var(--error)]"
                       title="Remove from list"
+                      aria-label="Remove from list"
                     >
                       {removing === item.id ? (
                         <Loader2 size={14} className="animate-spin" />

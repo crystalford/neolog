@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
         summary,
         '',
         'Key takeaways:',
-        sentenceList.slice(0, 3).map((s) => `• ${s}`).join('\n'),
+        sentenceList.slice(0, 3).map((s) => `- ${s}`).join('\n'),
         '',
         `Read more: ${link}`,
       ].filter(Boolean).join('\n'),

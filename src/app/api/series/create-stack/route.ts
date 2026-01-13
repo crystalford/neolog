@@ -196,10 +196,10 @@ export async function POST(request: NextRequest) {
       let seriesOrder = 1
 
       if (infographicHtml) {
-        const htmlDoc = ensureFullHtmlDoc(infographicHtml, `${title} — Infographic`)
+        const htmlDoc = ensureFullHtmlDoc(infographicHtml, `${title} - Infographic`)
         const { data, error } = await insertPostWithFallback(db, {
           author_id: userId,
-          title: `${title} — Infographic`,
+          title: `${title} - Infographic`,
           slug: slugify(`${title}-infographic`),
           content: htmlDoc,
           content_html: htmlDoc,
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
         const html = toMarkdownHtml(essay)
         const { data, error } = await insertPostWithFallback(db, {
           author_id: userId,
-          title: `${title} — Essay`,
+          title: `${title} - Essay`,
           slug: slugify(`${title}-essay`),
           content: essay,
           content_html: html,
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
         const html = toMarkdownHtml(researchDoc)
         const { data, error } = await insertPostWithFallback(db, {
           author_id: userId,
-          title: `${title} — Research Dump`,
+          title: `${title} - Research Dump`,
           slug: slugify(`${title}-research-dump`),
           content: researchDoc,
           content_html: html,
@@ -271,3 +271,4 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true, seriesId, created })
 }
+

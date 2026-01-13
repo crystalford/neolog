@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       finalStatus = 'success'
       finalMeta = { ...finalMeta, result: 'missing_key' }
       return NextResponse.json({
-        error: 'Synthesia API key not configured. Add it in Settings → AI Capture (BYOK).',
+        error: 'Synthesia API key not configured. Add it in Settings -> AI Capture (BYOK).',
       }, { status: 400 })
     }
 
@@ -147,3 +147,4 @@ export async function POST(request: NextRequest) {
     }
   }
 }
+
