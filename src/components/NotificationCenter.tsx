@@ -13,6 +13,9 @@ interface Notification {
   type: string
   created_at: string
   read: boolean
+  title?: string
+  body?: string | null
+  url?: string | null
   data: any
   actor_username?: string
   actor_display_name?: string
@@ -131,6 +134,12 @@ export function NotificationCenter() {
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id)
 
+    if (notification.url) {
+      router.push(notification.url)
+      setIsOpen(false)
+      return
+    }
+
     // Navigate based on notification type
     switch (notification.type) {
       case 'new_comment':
@@ -141,6 +150,9 @@ export function NotificationCenter() {
         break
       case 'post_upvote':
       case 'post_reaction':
+      case 'fediverse_like':
+      case 'fediverse_boost':
+      case 'fediverse_reply':
         router.push(`/${notification.data.post_author}/${notification.data.post_slug}`)
         break
       case 'new_follower':
@@ -158,13 +170,16 @@ export function NotificationCenter() {
     switch (type) {
       case 'new_comment':
       case 'comment_reply':
+      case 'fediverse_reply':
         return <MessageCircle size={18} className="text-blue-500" />
       case 'post_upvote':
       case 'post_reaction':
+      case 'fediverse_like':
         return <Heart size={18} className="text-red-500" />
       case 'new_follower':
         return <UserPlus size={18} className="text-green-500" />
       case 'post_milestone':
+      case 'fediverse_boost':
         return <TrendingUp size={18} className="text-purple-500" />
       default:
         return <Bell size={18} className="text-[var(--text-tertiary)]" />
@@ -183,12 +198,18 @@ export function NotificationCenter() {
         return `${actor} upvoted your post "${notification.data.post_title}"`
       case 'post_reaction':
         return `${actor} reacted to your post "${notification.data.post_title}"`
+      case 'fediverse_like':
+        return `${actor} liked your post "${notification.data.post_title}"`
+      case 'fediverse_boost':
+        return `${actor} boosted your post "${notification.data.post_title}"`
+      case 'fediverse_reply':
+        return `${actor} replied to your post "${notification.data.post_title}"`
       case 'new_follower':
         return `${actor} started following you`
       case 'post_milestone':
         return `Your post "${notification.data.post_title}" reached ${notification.data.milestone} views!`
       default:
-        return notification.data.message || 'New notification'
+        return notification.title || notification.data?.message || 'New notification'
     }
   }
 

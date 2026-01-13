@@ -2333,6 +2333,9 @@ create table public.notifications (
     'comment_upvote',
     'post_upvote',
     'post_forked',
+    'fediverse_like',
+    'fediverse_boost',
+    'fediverse_reply',
     'referral_conversion',
     'boost_exhausted'
   )),

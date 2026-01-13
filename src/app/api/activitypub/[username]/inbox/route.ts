@@ -75,12 +75,44 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to store activity' }, { status: 500 })
   }
 
+  if (insertError?.code === '23505') {
+    return NextResponse.json({ ok: true, deduped: true }, { status: 202 })
+  }
+
   if (body.actor) {
     await admin
       .from('activitypub_followers')
       .update({ last_seen_at: new Date().toISOString() })
       .eq('user_id', profile.id)
       .eq('actor', body.actor)
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
+  const extractPostSlug = (target: string | null) => {
+    if (!target) return null
+    try {
+      const url = new URL(target.split('#')[0])
+      if (url.hostname !== new URL(baseUrl).hostname) {
+        return null
+      }
+      const segments = url.pathname.split('/').filter(Boolean)
+      if (segments.length < 2) return null
+      if (segments[0] !== username) return null
+      return segments[1]
+    } catch {
+      return null
+    }
+  }
+
+  const formatActorLabel = (actorUrl: string) => {
+    try {
+      const url = new URL(actorUrl)
+      const parts = url.pathname.split('/').filter(Boolean)
+      const handle = parts[parts.length - 1] || url.hostname
+      return `@${handle}@${url.hostname}`
+    } catch {
+      return actorUrl
+    }
   }
 
   if (body.type === 'Undo' && body.actor && body.object) {
@@ -95,7 +127,6 @@ export async function POST(
   }
 
   if (body.type === 'Follow' && body.actor && body.object) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
     const expectedObject = `${baseUrl}/${username}`
     if (body.object === expectedObject) {
       const remoteActor = await fetchRemoteActor(body.actor)
@@ -135,6 +166,63 @@ export async function POST(
           object: body,
         }
         await sendSignedActivity(profile.id, username, inboxUrl, acceptActivity)
+      }
+    }
+  }
+
+  if ((body.type === 'Like' || body.type === 'Announce') && body.actor) {
+    const target = typeof body.object === 'string' ? body.object : body.object?.id
+    const slug = extractPostSlug(target || null)
+    if (slug) {
+      const { data: post } = await admin
+        .from('posts')
+        .select('id, title, slug')
+        .eq('author_id', profile.id)
+        .eq('slug', slug)
+        .maybeSingle()
+
+      if (post) {
+        const actorLabel = formatActorLabel(body.actor)
+        const type = body.type === 'Like' ? 'fediverse_like' : 'fediverse_boost'
+        await admin.from('notifications').insert({
+          user_id: profile.id,
+          type,
+          title:
+            body.type === 'Like'
+              ? `${actorLabel} liked your post "${post.title}"`
+              : `${actorLabel} boosted your post "${post.title}"`,
+          body: target || null,
+          url: `/${username}/${post.slug}`,
+          actor_id: null,
+          post_id: post.id,
+        })
+      }
+    }
+  }
+
+  if (body.type === 'Create' && body.actor && body.object) {
+    const inReplyTo = body.object?.inReplyTo || body.object?.in_reply_to
+    const target = typeof inReplyTo === 'string' ? inReplyTo : inReplyTo?.id
+    const slug = extractPostSlug(target || null)
+    if (slug) {
+      const { data: post } = await admin
+        .from('posts')
+        .select('id, title, slug')
+        .eq('author_id', profile.id)
+        .eq('slug', slug)
+        .maybeSingle()
+
+      if (post) {
+        const actorLabel = formatActorLabel(body.actor)
+        await admin.from('notifications').insert({
+          user_id: profile.id,
+          type: 'fediverse_reply',
+          title: `${actorLabel} replied to your post "${post.title}"`,
+          body: body.object?.content || null,
+          url: `/${username}/${post.slug}`,
+          actor_id: null,
+          post_id: post.id,
+        })
       }
     }
   }
