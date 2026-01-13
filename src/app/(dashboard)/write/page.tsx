@@ -544,7 +544,7 @@ export default function WritePage() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Post title"
             aria-label="Post title"
-            className="w-full text-5xl font-bold border-none outline-none placeholder-gray-300 mb-4"
+            className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-white transition-colors"
             autoFocus
           />
 
@@ -554,7 +554,7 @@ export default function WritePage() {
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Add a subtitle or excerpt (optional)"
             aria-label="Post subtitle"
-            className="w-full text-xl text-gray-600 border-none outline-none placeholder-gray-400 mb-8"
+            className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-white transition-colors"
           />
 
           <div>
