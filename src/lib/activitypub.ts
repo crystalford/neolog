@@ -111,10 +111,12 @@ export function createActor(profile: {
   twitter_username?: string
   github_username?: string
   linkedin_url?: string
+  public_key_pem?: string
 }, baseUrl: string): APActor {
   const actorUrl = `${baseUrl}/${profile.username}`
   const inboxUrl = `${baseUrl}/api/activitypub/${profile.username}/inbox`
   const outboxUrl = `${baseUrl}/api/activitypub/${profile.username}/outbox`
+  const publicKeyPem = profile.public_key_pem || '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----'
 
   return {
     '@context': [
@@ -139,7 +141,7 @@ export function createActor(profile: {
     publicKey: {
       id: `${actorUrl}#main-key`,
       owner: actorUrl,
-      publicKeyPem: '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----', // TODO: Generate real key
+      publicKeyPem,
     },
     attachment: [
       profile.website && {
@@ -228,8 +230,7 @@ export function createOutboxCollection(
   page?: number,
   pageSize: number = 20
 ): APOrderedCollection | APOrderedCollectionPage {
-  const actorUrl = `${baseUrl}/${username}`
-  const outboxUrl = `${actorUrl}/outbox`
+  const outboxUrl = `${baseUrl}/api/activitypub/${username}/outbox`
 
   // If no page specified, return collection overview
   if (page === undefined) {

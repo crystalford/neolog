@@ -32,6 +32,18 @@ create table public.profiles (
 );
 
 -- =============================================
+-- ACTIVITYPUB KEYS TABLE
+-- Stores per-user ActivityPub keypairs for signing
+-- =============================================
+create table public.activitypub_keys (
+  user_id uuid references public.profiles(id) on delete cascade primary key,
+  public_key_pem text not null,
+  private_key_pem text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- =============================================
 -- POSTS TABLE
 -- The core content table with forking support
 -- =============================================
@@ -403,6 +415,7 @@ create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 
 -- Enable RLS on all tables
 alter table public.profiles enable row level security;
+alter table public.activitypub_keys enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
