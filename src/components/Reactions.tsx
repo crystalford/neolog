@@ -91,7 +91,7 @@ export function Reactions({ postId }: ReactionsProps) {
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {REACTIONS.map(({ key, icon: Icon, color }) => {
+      {REACTIONS.map(({ key, icon: Icon, color, label }) => {
         const count = counts[key] || 0
         const active = userReactions.includes(key)
         if (count === 0 && !active) return null
