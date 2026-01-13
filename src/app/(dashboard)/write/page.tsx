@@ -422,7 +422,7 @@ export default function WritePage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
-              <- All posts
+              {'<- All posts'}
             </Link>
 
             {/* Publication selector */}
