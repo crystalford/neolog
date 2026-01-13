@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createOutboxCollection } from '@/lib/activitypub'
+import { createOutboxCollection, APCreateActivity, APNote } from '@/lib/activitypub'
 
 export async function GET(
   request: NextRequest,
@@ -39,7 +39,7 @@ export async function GET(
   // Get posts
   const { data: posts, error: postsError } = await supabase
     .from('posts')
-    .select('id, title, slug, content, html_content, published_at')
+    .select('id, title, slug, content, content_html, published_at')
     .eq('author_id', profile.id)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
@@ -60,6 +60,21 @@ export async function GET(
   // Generate collection or page
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
   const collection = createOutboxCollection(username, apPosts, appUrl, page)
+
+  if ('orderedItems' in collection && Array.isArray(collection.orderedItems)) {
+    const notes = collection.orderedItems as APNote[]
+    const activities: APCreateActivity[] = notes.map((note) => ({
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      id: `${note.id}#create`,
+      type: 'Create',
+      actor: `${appUrl}/${username}`,
+      published: note.published,
+      to: note.to,
+      cc: note.cc,
+      object: note,
+    }))
+    collection.orderedItems = activities
+  }
 
   return NextResponse.json(collection, {
     headers: {

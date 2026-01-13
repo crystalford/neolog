@@ -29,6 +29,19 @@ export function middleware(request: NextRequest) {
 
   const { pathname, searchParams } = request.nextUrl
   const accept = request.headers.get('accept') || ''
+  const wantsActivityPub =
+    accept.includes('application/activity+json') ||
+    accept.includes('application/ld+json')
+
+  if (wantsActivityPub) {
+    const segments = pathname.split('/').filter(Boolean)
+    if (segments.length === 1 && !RESERVED.has(segments[0])) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/api/activitypub/${segments[0]}`
+      return NextResponse.rewrite(url)
+    }
+  }
+
   const wantsJson = searchParams.get('format') === 'json' || accept.includes('application/json')
   if (!wantsJson) {
     return NextResponse.next()

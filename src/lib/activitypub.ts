@@ -74,7 +74,7 @@ export interface APOrderedCollection {
   totalItems: number
   first?: string // URL to first page
   last?: string // URL to last page
-  orderedItems?: APNote[] // If small enough to inline
+  orderedItems?: Array<APNote | APCreateActivity> // If small enough to inline
 }
 
 export interface APOrderedCollectionPage {
@@ -83,9 +83,20 @@ export interface APOrderedCollectionPage {
   id: string
   partOf: string // Parent collection URL
   totalItems: number
-  orderedItems: APNote[]
+  orderedItems: Array<APNote | APCreateActivity>
   next?: string // URL to next page
   prev?: string // URL to previous page
+}
+
+export interface APCreateActivity {
+  '@context': string | string[]
+  type: 'Create'
+  id: string
+  actor: string
+  published: string
+  to: string[]
+  cc: string[]
+  object: APNote
 }
 
 /**
@@ -102,6 +113,8 @@ export function createActor(profile: {
   linkedin_url?: string
 }, baseUrl: string): APActor {
   const actorUrl = `${baseUrl}/${profile.username}`
+  const inboxUrl = `${baseUrl}/api/activitypub/${profile.username}/inbox`
+  const outboxUrl = `${baseUrl}/api/activitypub/${profile.username}/outbox`
 
   return {
     '@context': [
@@ -121,10 +134,8 @@ export function createActor(profile: {
           url: profile.avatar_url,
         }
       : undefined,
-    inbox: `${actorUrl}/inbox`,
-    outbox: `${actorUrl}/outbox`,
-    followers: `${actorUrl}/followers`,
-    following: `${actorUrl}/following`,
+    inbox: inboxUrl,
+    outbox: outboxUrl,
     publicKey: {
       id: `${actorUrl}#main-key`,
       owner: actorUrl,
@@ -163,7 +174,7 @@ export function createNote(
     title: string
     slug: string
     content?: string
-    html_content?: string
+    content_html?: string
     published_at: string
     author_username: string
   },
@@ -173,8 +184,8 @@ export function createNote(
   const postUrl = `${baseUrl}/${post.author_username}/${post.slug}`
   const noteId = `${postUrl}#note`
 
-  // Use html_content if available, otherwise wrap content in basic HTML
-  const htmlContent = post.html_content || `<p>${escapeHtml(post.content || '')}</p>`
+  // Use content_html if available, otherwise wrap content in basic HTML
+  const htmlContent = post.content_html || `<p>${escapeHtml(post.content || '')}</p>`
 
   // Extract hashtags from content (simple regex)
   const hashtagMatches = (post.content || '').match(/#\w+/g) || []
@@ -209,7 +220,7 @@ export function createOutboxCollection(
     title: string
     slug: string
     content?: string
-    html_content?: string
+    content_html?: string
     published_at: string
     author_username: string
   }>,
