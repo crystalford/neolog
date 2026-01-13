@@ -130,6 +130,7 @@ export function NotificationBell() {
       <button
         onClick={handleToggle}
         className="relative w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
+        aria-label={showDropdown ? 'Close notifications' : 'Open notifications'}
       >
         <Bell size={18} className="text-[var(--text-secondary)]" />
         {unreadCount > 0 && (

@@ -85,6 +85,7 @@ export function MobileNav() {
           <button
             onClick={() => setIsOpen(false)}
             className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+            aria-label="Close menu"
           >
             <X size={20} />
           </button>

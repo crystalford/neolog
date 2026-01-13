@@ -47,6 +47,7 @@ export function ShareButtons({ url, title, className = '' }: ShareButtonsProps) 
         onClick={handleShare}
         className="flex items-center gap-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
         title="Share"
+        aria-label="Share this post"
       >
         <Share2 size={18} />
       </button>
@@ -138,6 +139,7 @@ export function ShareBar({ url, title }: { url: string; title: string }) {
           rel="noopener noreferrer"
           className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
           title="Share on Twitter"
+          aria-label="Share on Twitter"
         >
           <Twitter size={16} className="text-[var(--text-tertiary)]" />
         </a>
@@ -148,6 +150,7 @@ export function ShareBar({ url, title }: { url: string; title: string }) {
           rel="noopener noreferrer"
           className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
           title="Share on LinkedIn"
+          aria-label="Share on LinkedIn"
         >
           <Linkedin size={16} className="text-[var(--text-tertiary)]" />
         </a>
@@ -156,6 +159,7 @@ export function ShareBar({ url, title }: { url: string; title: string }) {
           onClick={copyLink}
           className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
           title="Copy link"
+          aria-label="Copy link"
         >
           {copied ? (
             <Check size={16} className="text-[var(--success)]" />

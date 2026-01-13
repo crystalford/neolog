@@ -122,6 +122,7 @@ export function AddToListButton({ postId }: AddToListButtonProps) {
         onClick={() => setShowModal(true)}
         className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
         title="Add to list"
+        aria-label="Add to list"
       >
         <BookOpen size={18} className="text-[var(--text-tertiary)]" />
       </button>
@@ -136,6 +137,7 @@ export function AddToListButton({ postId }: AddToListButtonProps) {
               <button 
                 onClick={() => setShowModal(false)}
                 className="p-1 rounded hover:bg-[var(--bg-secondary)]"
+                aria-label="Close list dialog"
               >
                 <X size={18} />
               </button>
@@ -184,6 +186,7 @@ export function AddToListButton({ postId }: AddToListButtonProps) {
                   onClick={createList}
                   disabled={!newListName.trim() || creating}
                   className="btn btn-primary btn-sm"
+                  aria-label="Create list"
                 >
                   {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 </button>

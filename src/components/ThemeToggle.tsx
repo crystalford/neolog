@@ -31,7 +31,10 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
   // Prevent hydration mismatch
   if (!mounted) {
     return (
-      <button className={`w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center ${className}`}>
+      <button
+        className={`w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center ${className}`}
+        aria-label="Toggle theme"
+      >
         <Sun size={16} className="text-[var(--text-tertiary)]" />
       </button>
     )
@@ -42,6 +45,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
       onClick={toggleTheme}
       className={`w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors ${className}`}
       title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+      aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
     >
       {theme === 'light' ? (
         <Moon size={16} className="text-[var(--text-secondary)]" />

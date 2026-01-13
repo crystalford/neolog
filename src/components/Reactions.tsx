@@ -74,10 +74,14 @@ export function Reactions({ postId }: ReactionsProps) {
   if (total === 0 && userReactions.length === 0) {
     return (
       <div className="flex items-center gap-1">
-        {REACTIONS.map(({ key, icon: Icon, color }) => (
-          <button key={key} onClick={() => toggleReaction(key)}
+        {REACTIONS.map(({ key, icon: Icon, color, label }) => (
+          <button
+            key={key}
+            onClick={() => toggleReaction(key)}
             className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors opacity-40 hover:opacity-100"
-            title={`React with ${key}`}>
+            title={`React with ${label}`}
+            aria-label={`React with ${label}`}
+          >
             <Icon size={18} style={{ color }} />
           </button>
         ))}
@@ -92,18 +96,28 @@ export function Reactions({ postId }: ReactionsProps) {
         const active = userReactions.includes(key)
         if (count === 0 && !active) return null
         return (
-          <button key={key} onClick={() => toggleReaction(key)} disabled={loading === key}
+          <button
+            key={key}
+            onClick={() => toggleReaction(key)}
+            disabled={loading === key}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm transition-all ${
               active ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-secondary)]'
-            }`}>
+            }`}
+            aria-label={`${label} reaction`}
+            aria-pressed={active}
+          >
             <Icon size={16} style={{ color }} className={active ? '' : 'opacity-60'} />
             <span className={active ? 'font-medium' : 'text-[var(--text-tertiary)]'}>{count}</span>
           </button>
         )
       })}
-      {REACTIONS.filter(r => !counts[r.key] && !userReactions.includes(r.key)).slice(0, 2).map(({ key, icon: Icon, color }) => (
-        <button key={key} onClick={() => toggleReaction(key)}
-          className="p-1.5 rounded-full hover:bg-[var(--bg-secondary)] transition-colors opacity-30 hover:opacity-100">
+      {REACTIONS.filter(r => !counts[r.key] && !userReactions.includes(r.key)).slice(0, 2).map(({ key, icon: Icon, color, label }) => (
+        <button
+          key={key}
+          onClick={() => toggleReaction(key)}
+          className="p-1.5 rounded-full hover:bg-[var(--bg-secondary)] transition-colors opacity-30 hover:opacity-100"
+          aria-label={`React with ${label}`}
+        >
           <Icon size={14} style={{ color }} />
         </button>
       ))}

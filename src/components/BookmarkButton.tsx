@@ -74,6 +74,7 @@ export function BookmarkButton({ postId, className = '', size = 'md' }: Bookmark
           : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
       } ${className}`}
       title={bookmarked ? 'Remove from saved' : 'Save for later'}
+      aria-label={bookmarked ? 'Remove bookmark' : 'Save bookmark'}
     >
       {loading ? (
         <Loader2 size={iconSize} className="animate-spin" />

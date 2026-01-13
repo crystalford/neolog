@@ -72,6 +72,7 @@ export function DashboardCommandPalette({
             placeholder="Search actions, pages, posts..."
             className="w-full bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
             autoFocus
+            aria-label="Search commands"
           />
           <span className="text-xs text-[var(--text-tertiary)] border border-[var(--border-light)] rounded px-2 py-1">
             ESC

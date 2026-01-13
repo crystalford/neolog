@@ -92,6 +92,7 @@ export function CommentModeration({
         onClick={() => setShowReportModal(true)}
         className="p-1 rounded hover:bg-[var(--bg-secondary)] text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
         title="Report"
+        aria-label="Report comment"
       >
         <Flag size={14} />
       </button>
@@ -104,6 +105,7 @@ export function CommentModeration({
         <button
           onClick={() => setShowMenu(!showMenu)}
           className="p-1 rounded hover:bg-[var(--bg-secondary)] text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Comment actions"
         >
           <MoreHorizontal size={14} />
         </button>

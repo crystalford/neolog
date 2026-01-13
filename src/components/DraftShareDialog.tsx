@@ -186,6 +186,7 @@ export function DraftShareDialog({ postId, isOpen, onClose }: DraftShareDialogPr
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+              aria-label="Close share dialog"
             >
               <X size={20} />
             </button>
@@ -303,6 +304,7 @@ export function DraftShareDialog({ postId, isOpen, onClose }: DraftShareDialogPr
                               onClick={() => copyToClipboard(link)}
                               className="p-2 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
                               title="Copy link"
+                              aria-label="Copy share link"
                             >
                               {copied === link.id ? (
                                 <Check size={16} className="text-green-500" />
@@ -314,6 +316,7 @@ export function DraftShareDialog({ postId, isOpen, onClose }: DraftShareDialogPr
                               onClick={() => toggleLinkStatus(link.id, link.is_active)}
                               className="p-2 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
                               title={link.is_active ? 'Deactivate' : 'Activate'}
+                              aria-label={link.is_active ? 'Deactivate share link' : 'Activate share link'}
                             >
                               {link.is_active ? (
                                 <EyeOff size={16} />
@@ -325,6 +328,7 @@ export function DraftShareDialog({ postId, isOpen, onClose }: DraftShareDialogPr
                               onClick={() => deleteLink(link.id)}
                               className="p-2 rounded hover:bg-[var(--bg-tertiary)] text-red-600 transition-colors"
                               title="Delete"
+                              aria-label="Delete share link"
                             >
                               <Trash2 size={16} />
                             </button>

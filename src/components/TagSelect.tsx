@@ -103,6 +103,7 @@ export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProp
             <button 
               onClick={() => removeTag(tag)}
               className="ml-1 hover:text-[var(--accent-hover)]"
+              aria-label={`Remove ${tag}`}
             >
               <X size={14} />
             </button>
@@ -123,6 +124,7 @@ export function TagSelect({ selectedTags, onChange, maxTags = 5 }: TagSelectProp
             onFocus={() => setIsOpen(true)}
             placeholder={`Add tags (${selectedTags.length}/${maxTags})`}
             className="w-full input"
+            aria-label="Add tags"
           />
 
           {/* Dropdown */}

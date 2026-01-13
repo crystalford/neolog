@@ -47,7 +47,11 @@ export function KeyboardShortcuts() {
             <Command size={20} className="text-[var(--accent)]" />
             Keyboard Shortcuts
           </h2>
-          <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-[var(--bg-secondary)] rounded-lg">
+          <button
+            onClick={() => setShowHelp(false)}
+            className="p-2 hover:bg-[var(--bg-secondary)] rounded-lg"
+            aria-label="Close shortcuts"
+          >
             <X size={18} />
           </button>
         </div>

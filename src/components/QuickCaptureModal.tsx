@@ -177,6 +177,7 @@ export function QuickCaptureModal({ isOpen, onClose, initialPublicationId }: Qui
           <button
             onClick={close}
             className="text-xs text-[var(--text-tertiary)] border border-[var(--border-light)] rounded px-2 py-1 hover:bg-[var(--bg-secondary)] transition-colors"
+            aria-label="Close quick capture"
           >
             ESC
           </button>
