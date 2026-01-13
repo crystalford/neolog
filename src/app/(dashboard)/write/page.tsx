@@ -50,7 +50,6 @@ export default function WritePage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [importHtml, setImportHtml] = useState('')
-  const [showImportRaw, setShowImportRaw] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingPost, setDeletingPost] = useState(false)
@@ -640,44 +639,12 @@ export default function WritePage() {
                 </button>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium">HTML input</label>
-                    <button
-                      onClick={() => setShowImportRaw(!showImportRaw)}
-                      className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                      type="button"
-                    >
-                      {showImportRaw ? 'Hide raw HTML' : 'Show raw HTML'}
-                    </button>
-                  </div>
-                  <textarea
-                    value={importHtml}
-                    onChange={(e) => setImportHtml(e.target.value)}
-                    placeholder="Paste your HTML code here..."
-                    className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  />
-                  {showImportRaw && (
-                    <pre className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 whitespace-pre-wrap">
-                      {importHtml || 'Paste HTML to see the raw source here.'}
-                    </pre>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Preview</label>
-                  <div className="prose prose-sm max-w-none rounded-lg border border-gray-200 bg-white p-3 h-64 overflow-y-auto">
-                    {importHtml.trim() ? (
-                      <div dangerouslySetInnerHTML={{ __html: importHtml }} />
-                    ) : (
-                      <p className="text-gray-400">Paste HTML to preview how it will look.</p>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    This preview shows raw HTML and may include scripts or styles. The editor will store the HTML you import.
-                  </p>
-                </div>
-              </div>
+              <textarea
+                value={importHtml}
+                onChange={(e) => setImportHtml(e.target.value)}
+                placeholder="Paste your HTML code here..."
+                className="w-full h-64 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              />
 
               <div className="flex items-center justify-end gap-3 mt-4">
                 <button
