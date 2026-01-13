@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Clock, ArrowUpRight, Code } from 'lucide-react'
+import { ArrowUpRight, Code } from 'lucide-react'
 import type { PostWithAuthor } from '@/types/database'
 import { GenerativeCover } from './GenerativeCover'
 

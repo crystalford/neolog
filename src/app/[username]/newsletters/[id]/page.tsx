@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { generateSEO } from '@/lib/seo'
-import { Mail, Calendar, ArrowLeft, Share2 } from 'lucide-react'
+import { Mail, Calendar, ArrowLeft } from 'lucide-react'
 
 interface Props {
   params: {
@@ -130,5 +130,4 @@ export default async function NewsletterDetailPage({ params }: Props) {
     </>
   )
 }
-
 

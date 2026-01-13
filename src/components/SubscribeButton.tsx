@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { UserPlus, UserMinus, Loader2, Check } from 'lucide-react'
+import { UserPlus, Loader2, Check } from 'lucide-react'
 
 interface SubscribeButtonProps {
   creatorId: string

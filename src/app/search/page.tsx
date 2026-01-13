@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
-import { PostCardListSkeleton, ProfileSkeleton } from '@/components/Skeleton'
+import { PostCardListSkeleton } from '@/components/Skeleton'
 import { 
   Search as SearchIcon, FileText, Users, Loader2, X
 } from 'lucide-react'

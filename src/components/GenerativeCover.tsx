@@ -7,7 +7,7 @@
  * The visual is unique to each post and changes if the content changes.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { hashString, hashToParams, getShaderPattern, generateCoverDataUrl } from '@/lib/shaders'
 
 interface GenerativeCoverProps {

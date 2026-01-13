@@ -1,7 +1,5 @@
 'use client'
 
-import { AlertTriangle, RefreshCw } from 'lucide-react'
-
 export default function GlobalError({
   error,
   reset,

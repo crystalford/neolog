@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Plus, X, Check, Loader2, Search } from 'lucide-react'
+import { Users, Plus, X, Loader2, Search } from 'lucide-react'
 
 interface CoAuthorsProps {
   postId: string

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Lock, Loader2, CreditCard, Check } from 'lucide-react'
+import { Lock, Loader2, Check } from 'lucide-react'
 
 interface PaywallProps {
   postId: string

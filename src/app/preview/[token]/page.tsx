@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/Header'
-import { Clock, Eye, AlertTriangle } from 'lucide-react'
+import { Eye, AlertTriangle } from 'lucide-react'
 
 interface Props {
   params: { token: string }

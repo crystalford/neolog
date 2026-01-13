@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, ExternalLink, Edit2, Trash2 } from 'lucide-react'
+import { MoreHorizontal, ExternalLink, Edit2 } from 'lucide-react'
 
 type PostStatus = 'published' | 'scheduled' | 'draft'
 

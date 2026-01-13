@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { FileText, Users, TrendingUp, Eye } from 'lucide-react'
+import { FileText, Users, Eye } from 'lucide-react'
 
 export function PlatformStats() {
   const [stats, setStats] = useState({ posts: 0, writers: 0, views: 0 })
