@@ -326,15 +326,27 @@ export default function WritePage() {
     }
   }
 
+  const stripScripts = (html: string) =>
+    html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '').trim()
+
   const sanitizeImportedHtml = (html: string, mode: 'clean' | 'full') => {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    if (mode === 'clean') {
-      doc.querySelectorAll('script, style, nav, header, footer, aside, noscript, iframe').forEach((el) => el.remove())
-    } else {
-      doc.querySelectorAll('script, noscript').forEach((el) => el.remove())
+    if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+      return stripScripts(html)
     }
-    return doc.body?.innerHTML?.trim() || ''
+    try {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(html, 'text/html')
+      if (mode === 'clean') {
+        doc
+          .querySelectorAll('script, style, nav, header, footer, aside, noscript, iframe')
+          .forEach((el) => el.remove())
+      } else {
+        doc.querySelectorAll('script, noscript').forEach((el) => el.remove())
+      }
+      return doc.body?.innerHTML?.trim() || ''
+    } catch {
+      return stripScripts(html)
+    }
   }
 
   const getImportStats = (html: string) => {
@@ -352,7 +364,13 @@ export default function WritePage() {
       if (!confirmed) return
     }
     const cleaned = sanitizeImportedHtml(importHtml, importMode)
-    if (!cleaned) {
+    let finalHtml = cleaned
+    let usedFallback = false
+    if (!finalHtml) {
+      finalHtml = stripScripts(importHtml)
+      usedFallback = true
+    }
+    if (!finalHtml) {
       setError('Import failed: no usable content found.')
       return
     }
@@ -362,13 +380,13 @@ export default function WritePage() {
 <p class="import-label">Imported HTML</p>
 `
     const nextContent = importAction === 'append'
-      ? `${content ? `${content}\n\n` : ''}${importedDivider}${cleaned}`
-      : cleaned
+      ? `${content ? `${content}\n\n` : ''}${importedDivider}${finalHtml}`
+      : finalHtml
     setContent(nextContent)
-    setImportInfo({ previousContent, stats: getImportStats(cleaned) })
+    setImportInfo({ previousContent, stats: getImportStats(finalHtml) })
     setImportHtml('')
     setShowImport(false)
-    setSuccess('HTML imported successfully!')
+    setSuccess(usedFallback ? 'HTML imported (raw). Review formatting.' : 'HTML imported successfully!')
   }
 
   const undoImport = () => {
@@ -710,9 +728,14 @@ export default function WritePage() {
                 <div
                   className="prose prose-sm max-w-none bg-white rounded-md border border-gray-200 p-3 max-h-48 overflow-y-auto"
                   dangerouslySetInnerHTML={{
-                    __html: importHtml.trim()
-                      ? sanitizeImportedHtml(importHtml, importMode)
-                      : '<p>Paste HTML to preview how it will look.</p>',
+                    __html: (() => {
+                      if (!importHtml.trim()) {
+                        return '<p>Paste HTML to preview how it will look.</p>'
+                      }
+                      const preview = sanitizeImportedHtml(importHtml, importMode)
+                      if (preview) return preview
+                      return '<p>Preview unavailable. The raw HTML will be imported.</p>'
+                    })(),
                   }}
                 />
               </div>
