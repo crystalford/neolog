@@ -136,6 +136,7 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+              aria-label="Close export dialog"
             >
               <X size={20} />
             </button>
@@ -159,6 +160,7 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
                           ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
                           : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
                       } ${f.badge === 'Premium' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      aria-pressed={format === f.value}
                     >
                       {f.badge && (
                         <span className="absolute top-2 right-2 px-2 py-1 text-xs rounded-full bg-[var(--accent)] text-white">

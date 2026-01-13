@@ -172,6 +172,7 @@ export function RichEditor({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={title}
       className={`p-2 rounded-md transition-all ${
         active
           ? 'bg-[var(--accent)] text-white'

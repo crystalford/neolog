@@ -222,6 +222,7 @@ export function NotificationCenter() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+        aria-label={isOpen ? 'Close notifications' : 'Open notifications'}
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -247,6 +248,7 @@ export function NotificationCenter() {
                       onClick={markAllAsRead}
                       className="p-1.5 rounded hover:bg-[var(--bg-secondary)] transition-colors"
                       title="Mark all as read"
+                      aria-label="Mark all notifications as read"
                     >
                       <CheckCheck size={16} />
                     </button>
@@ -255,6 +257,7 @@ export function NotificationCenter() {
                     onClick={clearAll}
                     className="p-1.5 rounded hover:bg-[var(--bg-secondary)] transition-colors"
                     title="Clear all"
+                    aria-label="Clear all notifications"
                   >
                     <X size={16} />
                   </button>
@@ -270,6 +273,7 @@ export function NotificationCenter() {
                       ? 'bg-[var(--bg-primary)] shadow-sm font-medium'
                       : 'text-[var(--text-secondary)]'
                   }`}
+                  aria-pressed={filter === 'all'}
                 >
                   All
                 </button>
@@ -280,6 +284,7 @@ export function NotificationCenter() {
                       ? 'bg-[var(--bg-primary)] shadow-sm font-medium'
                       : 'text-[var(--text-secondary)]'
                   }`}
+                  aria-pressed={filter === 'unread'}
                 >
                   Unread {unreadCount > 0 && `(${unreadCount})`}
                 </button>
@@ -308,6 +313,7 @@ export function NotificationCenter() {
                       className={`w-full text-left p-4 border-b border-[var(--border-light)] hover:bg-[var(--bg-secondary)] transition-colors ${
                         !notification.read ? 'bg-[var(--accent-softer)]' : ''
                       }`}
+                      aria-label={getNotificationText(notification)}
                     >
                       <div className="flex gap-3">
                         <div className="flex-shrink-0 mt-0.5">
@@ -340,6 +346,7 @@ export function NotificationCenter() {
                     setIsOpen(false)
                   }}
                   className="text-sm text-[var(--accent)] hover:underline"
+                  aria-label="View all notifications"
                 >
                   View all notifications
                 </button>

@@ -69,6 +69,7 @@ export function BlockUserButton({ userId, username, onAction }: BlockUserButtonP
       <button
         onClick={() => setShowMenu(!showMenu)}
         className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] transition-colors"
+        aria-label="User actions"
       >
         <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
       </button>
