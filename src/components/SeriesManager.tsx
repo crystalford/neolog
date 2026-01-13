@@ -322,7 +322,7 @@ export function SeriesManager() {
           <BookOpen size={48} className="mx-auto mb-4 opacity-50" />
           <p className="text-lg mb-2">No stacks yet</p>
           <p className="text-sm">
-            Organize your posts into stacks to help readers follow along
+            Organize posts into stacks so readers can follow a series.
           </p>
         </div>
       ) : (
@@ -354,6 +354,7 @@ export function SeriesManager() {
                       setShowCreateForm(false)
                     }}
                     className="p-2 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
+                    aria-label={`Edit ${s.title}`}
                   >
                     <Edit2 size={16} />
                   </button>
@@ -367,12 +368,14 @@ export function SeriesManager() {
                       }
                     }}
                     className="p-2 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
+                    aria-label={`Manage posts for ${s.title}`}
                   >
                     <GripVertical size={16} />
                   </button>
                   <button
                     onClick={() => handleDelete(s.id)}
                     className="p-2 rounded hover:bg-[var(--bg-tertiary)] text-red-600 transition-colors"
+                    aria-label={`Delete ${s.title}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -385,7 +388,7 @@ export function SeriesManager() {
                   <h4 className="text-sm font-medium mb-3">Posts in this stack</h4>
                   {seriesPosts.length === 0 ? (
                     <p className="text-sm text-[var(--text-tertiary)]">
-                      No posts in this stack yet
+                      No posts in this stack yet. Add one to get started.
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -408,6 +411,7 @@ export function SeriesManager() {
                               onClick={() => movePost(s.id, post.id, 'up')}
                               disabled={index === 0}
                               className="p-1 rounded hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label={`Move ${post.title} up`}
                             >
                               <ArrowUp size={14} />
                             </button>
@@ -415,6 +419,7 @@ export function SeriesManager() {
                               onClick={() => movePost(s.id, post.id, 'down')}
                               disabled={index === seriesPosts.length - 1}
                               className="p-1 rounded hover:bg-[var(--bg-secondary)] disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label={`Move ${post.title} down`}
                             >
                               <ArrowDown size={14} />
                             </button>

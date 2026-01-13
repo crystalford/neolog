@@ -149,7 +149,7 @@ export default async function ProfilePage({ params }: Props) {
                 </div>
                  
                 <p className="mt-4 text-[var(--text-secondary)]">
-                  {profile.bio || 'No bio yet.'}
+                  {profile.bio || 'No bio yet. Add a short line in settings.'}
                 </p>
 
                 <div className="grid grid-cols-3 gap-2 mt-5 max-w-md">
@@ -336,7 +336,7 @@ export default async function ProfilePage({ params }: Props) {
              
             {postsWithAuthor.length === 0 ? (
               <p className="text-[var(--text-secondary)] text-center py-12">
-                No posts yet
+                No posts yet. Check back soon.
               </p>
             ) : (
               <div className="space-y-6">

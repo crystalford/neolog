@@ -243,7 +243,7 @@ export function DraftShareDialog({ postId, isOpen, onClose }: DraftShareDialogPr
                 <div className="text-center py-12 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
                   <LinkIcon size={48} className="mx-auto mb-4 text-[var(--text-tertiary)] opacity-50" />
                   <p className="text-[var(--text-secondary)]">
-                    No share links yet. Create one to get started.
+                    No share links yet. Create one to share this draft.
                   </p>
                 </div>
               ) : (

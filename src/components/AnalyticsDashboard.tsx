@@ -192,7 +192,7 @@ export function AnalyticsDashboard({ postId }: { postId?: string }) {
     return (
       <div className="text-center py-16 text-[var(--text-tertiary)]">
         <Eye size={48} className="mx-auto mb-4 opacity-50" />
-        <p className="text-[var(--text-secondary)]">No analytics yet.</p>
+        <p className="text-[var(--text-secondary)]">No analytics yet. Publish a post to start tracking.</p>
         <p className="text-xs text-[var(--text-tertiary)] mt-2">
           Publish a post or wait for views to start tracking.
         </p>

@@ -162,7 +162,7 @@ export function PublicationsManager() {
           <BookOpen size={48} className="mx-auto mb-4 text-[var(--text-tertiary)] opacity-50" />
           <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)]">No publications yet</h3>
           <p className="text-sm text-[var(--text-secondary)] mb-6">
-            Create your first publication to start publishing
+            Create your first publication to start publishing.
           </p>
           <button
             onClick={() => setShowCreateDialog(true)}

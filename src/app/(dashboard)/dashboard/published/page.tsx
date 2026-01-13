@@ -272,7 +272,7 @@ export default function PublishedPage() {
                     No matches found
                   </h2>
                   <p className="text-base text-[var(--text-secondary)] mb-6">
-                    Try a different search term.
+                    Try a different keyword or clear filters.
                   </p>
                 </>
               ) : (
@@ -282,7 +282,7 @@ export default function PublishedPage() {
                     Nothing published yet
                   </h2>
                   <p className="text-base text-[var(--text-secondary)] mb-6">
-                    Write, refine, publish. Your first piece awaits.
+                    Publish your first post to start tracking performance.
                   </p>
                   <div className="flex gap-4 justify-center">
                     <Link href="/dashboard/workspace" className="btn btn-secondary text-base px-5 py-3 font-medium">

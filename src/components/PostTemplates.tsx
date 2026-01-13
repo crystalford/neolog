@@ -376,7 +376,7 @@ function example() {
       {filteredTemplates.length === 0 && (
         <div className="text-center py-12 text-[var(--text-tertiary)]">
           <FileText size={48} className="mx-auto mb-4 opacity-50" />
-          <p>No templates in this category</p>
+          <p>No templates in this category yet</p>
         </div>
       )}
     </div>

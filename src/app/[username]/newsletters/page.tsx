@@ -92,7 +92,7 @@ export default async function NewsletterArchivePage({ params }: Props) {
               <Mail size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">No newsletters yet</h2>
               <p className="text-[var(--text-secondary)]">
-                Check back later for past newsletters
+                Check back later for past newsletters.
               </p>
             </div>
           ) : (
@@ -134,5 +134,4 @@ export default async function NewsletterArchivePage({ params }: Props) {
     </>
   )
 }
-
 

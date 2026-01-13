@@ -148,7 +148,7 @@ export function AddToListButton({ postId }: AddToListButtonProps) {
                 </div>
               ) : lists.length === 0 ? (
                 <p className="text-center text-[var(--text-secondary)] py-8 px-4">
-                  You don't have any lists yet
+                  No lists yet. Create one to save posts.
                 </p>
               ) : (
                 <div className="py-2">

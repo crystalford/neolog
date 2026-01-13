@@ -74,7 +74,7 @@ export default async function TagsPage() {
               <Hash size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">No topics yet</h2>
               <p className="text-[var(--text-secondary)]">
-                Topics will appear here once posts are tagged
+                Topics appear once posts are tagged.
               </p>
             </div>
           )}
@@ -83,5 +83,4 @@ export default async function TagsPage() {
     </>
   )
 }
-
 

@@ -239,7 +239,7 @@ export function CoAuthors({ postId, isAuthor }: CoAuthorsProps) {
                 ))}
               </div>
             ) : searchQuery.length >= 2 ? (
-              <p className="text-center text-[var(--text-tertiary)] py-4">No users found</p>
+              <p className="text-center text-[var(--text-tertiary)] py-4">No matching users yet</p>
             ) : (
               <p className="text-center text-[var(--text-tertiary)] py-4">
                 Type at least 2 characters to search

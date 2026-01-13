@@ -80,7 +80,7 @@ export function DashboardCommandPalette({
         <div className="max-h-[420px] overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-sm text-[var(--text-tertiary)]">
-              No matching results.
+              No matching commands.
             </div>
           ) : (
             <ul className="py-2">

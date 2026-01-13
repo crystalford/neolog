@@ -301,7 +301,7 @@ export default function SearchPage() {
                     <FileText size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
                     <h2 className="font-display text-xl mb-2">No posts found</h2>
                     <p className="text-[var(--text-secondary)]">
-                      Try a different search term
+                      Try a different keyword or remove a filter.
                     </p>
                   </div>
                 ) : (
@@ -320,7 +320,7 @@ export default function SearchPage() {
                     <Users size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
                     <h2 className="font-display text-xl mb-2">No people found</h2>
                     <p className="text-[var(--text-secondary)]">
-                      Try a different search term
+                      Try a different name or remove a filter.
                     </p>
                   </div>
                 ) : (

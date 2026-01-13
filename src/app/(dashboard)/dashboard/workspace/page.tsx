@@ -295,6 +295,7 @@ export default function WorkspacePage() {
                         onClick={() => handleDeleteDraft(draft.id)}
                         className="p-3 rounded-xl text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-secondary)] opacity-0 group-hover:opacity-100 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--error)]"
                         title="Delete draft"
+                        aria-label={`Delete ${draft.title || 'draft'}`}
                       >
                         <Trash2 size={18} />
                       </button>
@@ -311,8 +312,8 @@ export default function WorkspacePage() {
               </h2>
               <p className="text-base text-[var(--text-secondary)] mb-6">
                 {search 
-                  ? 'Try a different search term.'
-                  : 'Turn a capture into something or start fresh.'}
+                  ? 'Try a different keyword or clear filters.'
+                  : 'Turn a capture into a draft or start fresh.'}
               </p>
               {!search && (
                 <div className="flex gap-4 justify-center">

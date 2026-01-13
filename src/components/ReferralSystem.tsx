@@ -276,7 +276,7 @@ export function ReferralSystem() {
           <div className="text-center py-12 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-light)]">
             <LinkIcon size={48} className="mx-auto mb-4 text-[var(--text-tertiary)] opacity-50" />
             <p className="text-[var(--text-secondary)] mb-4">
-              No referral links yet
+              No referral links yet. Create one to share.
             </p>
             <button onClick={createReferralLink} className="btn btn-primary">
               Create Your First Link

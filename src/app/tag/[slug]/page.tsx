@@ -124,7 +124,7 @@ export default async function TagPage({ params }: Props) {
               <Hash size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
               <h2 className="font-display text-xl mb-2">No posts yet</h2>
               <p className="text-[var(--text-secondary)]">
-                Be the first to write about #{tag.name}
+                Be the first to write about #{tag.name}.
               </p>
             </div>
           ) : (
@@ -139,5 +139,4 @@ export default async function TagPage({ params }: Props) {
     </>
   )
 }
-
 
