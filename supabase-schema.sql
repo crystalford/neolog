@@ -44,6 +44,18 @@ create table public.activitypub_keys (
 );
 
 -- =============================================
+-- ACTIVITYPUB PUBLICATION KEYS TABLE
+-- Stores per-publication ActivityPub keypairs
+-- =============================================
+create table public.activitypub_publication_keys (
+  publication_id uuid references public.publications(id) on delete cascade primary key,
+  public_key_pem text not null,
+  private_key_pem text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- =============================================
 -- ACTIVITYPUB INBOX TABLE
 -- Stores incoming federated activities
 -- =============================================
@@ -58,6 +70,23 @@ create table public.activitypub_inbox (
   received_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
   constraint activitypub_inbox_unique unique (user_id, activity_id)
+);
+
+-- =============================================
+-- ACTIVITYPUB PUBLICATION INBOX TABLE
+-- Stores incoming activities for publications
+-- =============================================
+create table public.activitypub_publication_inbox (
+  id uuid default uuid_generate_v4() primary key,
+  publication_id uuid references public.publications(id) on delete cascade not null,
+  activity_id text not null,
+  activity_type text not null,
+  actor text,
+  object jsonb,
+  raw jsonb not null,
+  received_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint activitypub_publication_inbox_unique unique (publication_id, activity_id)
 );
 
 -- =============================================
@@ -81,6 +110,26 @@ create table public.activitypub_followers (
 );
 
 -- =============================================
+-- ACTIVITYPUB PUBLICATION FOLLOWERS TABLE
+-- Stores federated followers for publications
+-- =============================================
+create table public.activitypub_publication_followers (
+  id uuid default uuid_generate_v4() primary key,
+  publication_id uuid references public.publications(id) on delete cascade not null,
+  actor text not null,
+  inbox_url text,
+  shared_inbox text,
+  preferred_username text,
+  display_name text,
+  domain text,
+  status text default 'accepted' check (status in ('accepted', 'rejected', 'pending')),
+  followed_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  last_seen_at timestamp with time zone,
+
+  constraint activitypub_publication_followers_unique unique (publication_id, actor)
+);
+
+-- =============================================
 -- ACTIVITYPUB DELIVERIES TABLE
 -- Tracks outbound federation delivery attempts
 -- =============================================
@@ -101,6 +150,29 @@ create table public.activitypub_deliveries (
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
 
   constraint activitypub_deliveries_unique unique (activity_id, inbox_url)
+);
+
+-- =============================================
+-- ACTIVITYPUB PUBLICATION DELIVERIES TABLE
+-- Tracks outbound federation delivery attempts for publications
+-- =============================================
+create table public.activitypub_publication_deliveries (
+  id uuid default uuid_generate_v4() primary key,
+  publication_id uuid references public.publications(id) on delete cascade not null,
+  activity_id text not null,
+  activity_type text not null,
+  inbox_url text not null,
+  payload jsonb not null,
+  status text default 'pending' check (status in ('pending', 'sent', 'failed')),
+  attempt_count integer default 0,
+  last_attempt_at timestamp with time zone,
+  next_attempt_at timestamp with time zone,
+  last_error text,
+  response_status integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint activitypub_publication_deliveries_unique unique (activity_id, inbox_url)
 );
 
 -- =============================================
@@ -476,9 +548,13 @@ create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 -- Enable RLS on all tables
 alter table public.profiles enable row level security;
 alter table public.activitypub_keys enable row level security;
+alter table public.activitypub_publication_keys enable row level security;
 alter table public.activitypub_inbox enable row level security;
+alter table public.activitypub_publication_inbox enable row level security;
 alter table public.activitypub_followers enable row level security;
+alter table public.activitypub_publication_followers enable row level security;
 alter table public.activitypub_deliveries enable row level security;
+alter table public.activitypub_publication_deliveries enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
@@ -522,6 +598,42 @@ using (auth.uid() = user_id);
 create policy "Users can view their ActivityPub inbox"
 on public.activitypub_inbox for select
 using (auth.uid() = user_id);
+
+create policy "Publication owners can view their ActivityPub followers"
+on public.activitypub_publication_followers for select
+using (
+  exists (
+    select 1 from public.publications
+    where id = publication_id and owner_id = auth.uid()
+  )
+);
+
+create policy "Publication owners can manage their ActivityPub followers"
+on public.activitypub_publication_followers for update
+using (
+  exists (
+    select 1 from public.publications
+    where id = publication_id and owner_id = auth.uid()
+  )
+);
+
+create policy "Publication owners can view their ActivityPub deliveries"
+on public.activitypub_publication_deliveries for select
+using (
+  exists (
+    select 1 from public.publications
+    where id = publication_id and owner_id = auth.uid()
+  )
+);
+
+create policy "Publication owners can view their ActivityPub inbox"
+on public.activitypub_publication_inbox for select
+using (
+  exists (
+    select 1 from public.publications
+    where id = publication_id and owner_id = auth.uid()
+  )
+);
 
 -- POSTS policies
 create policy "Published posts are viewable by everyone"

@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { getOrCreateActorKeys } from '@/lib/activitypub-keys'
+import { getOrCreatePublicationKeys } from '@/lib/activitypub-publication-keys'
 
 type RemoteActor = {
   id: string
@@ -68,6 +69,49 @@ export async function sendSignedActivity(
   const keyId = `${actorUrl}#main-key`
 
   const { privateKeyPem } = await getOrCreateActorKeys(localUserId)
+  const body = JSON.stringify(activity)
+  const { date, digest, signatureHeader } = signRequest('POST', inboxUrl, body, keyId, privateKeyPem)
+
+  try {
+    const response = await fetch(inboxUrl, {
+      method: 'POST',
+      headers: {
+        Host: new URL(inboxUrl).host,
+        Date: date,
+        Digest: digest,
+        Signature: signatureHeader,
+        'Content-Type': 'application/activity+json',
+        Accept: 'application/activity+json',
+      },
+      body,
+    })
+
+    const responseText = await response.text().catch(() => '')
+    return {
+      ok: response.ok,
+      status: response.status,
+      error: response.ok ? null : responseText || response.statusText,
+    }
+  } catch (error: any) {
+    return {
+      ok: false,
+      status: 0,
+      error: error?.message || 'Network error',
+    }
+  }
+}
+
+export async function sendSignedActivityForPublication(
+  publicationId: string,
+  publicationSlug: string,
+  inboxUrl: string,
+  activity: Record<string, unknown>
+) {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
+  const actorUrl = `${baseUrl}/api/activitypub/publications/${publicationSlug}`
+  const keyId = `${actorUrl}#main-key`
+
+  const { privateKeyPem } = await getOrCreatePublicationKeys(publicationId)
   const body = JSON.stringify(activity)
   const { date, digest, signatureHeader } = signRequest('POST', inboxUrl, body, keyId, privateKeyPem)
 

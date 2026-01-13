@@ -167,6 +167,83 @@ export function createActor(profile: {
   }
 }
 
+export function createPublicationActor(
+  publication: {
+    slug: string
+    name: string
+    description?: string | null
+    logo_url?: string | null
+    website_url?: string | null
+    twitter_url?: string | null
+    github_url?: string | null
+    public_key_pem?: string
+  },
+  baseUrl: string
+): APActor {
+  const actorUrl = `${baseUrl}/api/activitypub/publications/${publication.slug}`
+  const inboxUrl = `${baseUrl}/api/activitypub/publications/${publication.slug}/inbox`
+  const outboxUrl = `${baseUrl}/api/activitypub/publications/${publication.slug}/outbox`
+  const publicKeyPem = publication.public_key_pem || '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----'
+
+  const extractHandle = (value: string | null | undefined, prefix: string) => {
+    if (!value) return null
+    return value.replace(new RegExp(`^https?:\\/\\/(www\\.)?${prefix}\\/`, 'i'), '')
+  }
+
+  const twitterHandle = extractHandle(publication.twitter_url, 'twitter.com')
+  const githubHandle = extractHandle(publication.github_url, 'github.com')
+
+  return {
+    '@context': [
+      'https://www.w3.org/ns/activitystreams',
+      'https://w3id.org/security/v1',
+    ],
+    type: 'Organization',
+    id: actorUrl,
+    name: publication.name,
+    preferredUsername: publication.slug,
+    summary: publication.description || '',
+    url: `${baseUrl}/p/${publication.slug}`,
+    icon: publication.logo_url
+      ? {
+          type: 'Image',
+          mediaType: 'image/jpeg',
+          url: publication.logo_url,
+        }
+      : undefined,
+    inbox: inboxUrl,
+    outbox: outboxUrl,
+    followers: `${actorUrl}/followers`,
+    following: `${actorUrl}/following`,
+    publicKey: {
+      id: `${actorUrl}#main-key`,
+      owner: actorUrl,
+      publicKeyPem,
+    },
+    attachment: [
+      publication.website_url && {
+        type: 'PropertyValue' as const,
+        name: 'Website',
+        value: `<a href="${publication.website_url}" rel="noopener noreferrer">${publication.website_url}</a>`,
+      },
+      twitterHandle && {
+        type: 'PropertyValue' as const,
+        name: 'Twitter',
+        value: `<a href="https://twitter.com/${twitterHandle}" rel="noopener noreferrer">@${twitterHandle}</a>`,
+      },
+      githubHandle && {
+        type: 'PropertyValue' as const,
+        name: 'GitHub',
+        value: `<a href="https://github.com/${githubHandle}" rel="noopener noreferrer">@${githubHandle}</a>`,
+      },
+    ].filter(Boolean) as Array<{
+      type: 'PropertyValue'
+      name: string
+      value: string
+    }>,
+  }
+}
+
 /**
  * Create ActivityPub Note from a Neolog post
  */
@@ -208,6 +285,45 @@ export function createNote(
     url: postUrl,
     to: ['https://www.w3.org/ns/activitystreams#Public'], // Public post
     cc: [`${actorUrl}/followers`], // Notify followers
+    tag: tags.length > 0 ? tags : undefined,
+  }
+}
+
+export function createNoteForActor(
+  post: {
+    id: string
+    title: string
+    slug: string
+    content?: string
+    content_html?: string
+    published_at: string
+    author_username: string
+  },
+  baseUrl: string,
+  actorUrl: string
+): APNote {
+  const postUrl = `${baseUrl}/${post.author_username}/${post.slug}`
+  const noteId = `${postUrl}#note`
+
+  const htmlContent = post.content_html || `<p>${escapeHtml(post.content || '')}</p>`
+  const hashtagMatches = (post.content || '').match(/#\w+/g) || []
+  const tags = hashtagMatches.map(tag => ({
+    type: 'Hashtag' as const,
+    name: tag,
+    href: `${baseUrl}/tag/${tag.slice(1)}`,
+  }))
+
+  return {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    type: 'Article',
+    id: noteId,
+    attributedTo: actorUrl,
+    content: `<h1>${escapeHtml(post.title)}</h1>\n${htmlContent}`,
+    summary: post.title,
+    published: post.published_at,
+    url: postUrl,
+    to: ['https://www.w3.org/ns/activitystreams#Public'],
+    cc: [`${actorUrl}/followers`],
     tag: tags.length > 0 ? tags : undefined,
   }
 }
@@ -263,6 +379,51 @@ export function createOutboxCollection(
   }
 }
 
+export function createOutboxCollectionForActor(
+  actorUrl: string,
+  posts: Array<{
+    id: string
+    title: string
+    slug: string
+    content?: string
+    content_html?: string
+    published_at: string
+    author_username: string
+  }>,
+  baseUrl: string,
+  outboxUrl: string,
+  page?: number,
+  pageSize: number = 20
+): APOrderedCollection | APOrderedCollectionPage {
+  if (page === undefined) {
+    return {
+      '@context': 'https://www.w3.org/ns/activitystreams',
+      type: 'OrderedCollection',
+      id: outboxUrl,
+      totalItems: posts.length,
+      first: posts.length > 0 ? `${outboxUrl}?page=1` : undefined,
+      last: posts.length > 0 ? `${outboxUrl}?page=${Math.ceil(posts.length / pageSize)}` : undefined,
+    }
+  }
+
+  const startIndex = (page - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  const pagePosts = posts.slice(startIndex, endIndex)
+
+  const notes = pagePosts.map(post => createNoteForActor(post, baseUrl, actorUrl))
+
+  return {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    type: 'OrderedCollectionPage',
+    id: `${outboxUrl}?page=${page}`,
+    partOf: outboxUrl,
+    totalItems: posts.length,
+    orderedItems: notes,
+    next: endIndex < posts.length ? `${outboxUrl}?page=${page + 1}` : undefined,
+    prev: page > 1 ? `${outboxUrl}?page=${page - 1}` : undefined,
+  }
+}
+
 /**
  * WebFinger resource for user discovery
  */
@@ -296,6 +457,29 @@ export function createWebFingerResource(
         rel: 'http://webfinger.net/rel/profile-page',
         type: 'text/html',
         href: actorUrl,
+      },
+    ],
+  }
+}
+
+export function createWebFingerResourceForActor(
+  subject: string,
+  actorUrl: string,
+  profileUrl: string
+): WebFingerResource {
+  return {
+    subject,
+    aliases: [actorUrl, profileUrl],
+    links: [
+      {
+        rel: 'self',
+        type: 'application/activity+json',
+        href: actorUrl,
+      },
+      {
+        rel: 'http://webfinger.net/rel/profile-page',
+        type: 'text/html',
+        href: profileUrl,
       },
     ],
   }

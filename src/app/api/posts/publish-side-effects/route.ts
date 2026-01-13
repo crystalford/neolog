@@ -9,8 +9,8 @@ import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from
 import { sendNewPostNotifications } from '@/lib/email'
 import { postToDevto, postToMedium } from '@/lib/syndication'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
-import { createNote } from '@/lib/activitypub'
-import { sendSignedActivity } from '@/lib/activitypub-outbound'
+import { createNote, createNoteForActor } from '@/lib/activitypub'
+import { sendSignedActivity, sendSignedActivityForPublication } from '@/lib/activitypub-outbound'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
@@ -487,6 +487,122 @@ export async function POST(request: NextRequest) {
           results.federation = {
             attempted: inboxes.length,
             delivered: resultsList.filter((result) => result.ok).length,
+          }
+        }
+
+        if (post.publication_id) {
+          const { data: publication } = await admin
+            .from('publications')
+            .select('id, slug, is_active')
+            .eq('id', post.publication_id)
+            .maybeSingle()
+
+          if (publication?.is_active) {
+            const { data: publicationFollowers } = await admin
+              .from('activitypub_publication_followers')
+              .select('inbox_url, shared_inbox')
+              .eq('publication_id', publication.id)
+              .eq('status', 'accepted')
+
+            const pubInboxes = Array.from(
+              new Set(
+                (publicationFollowers || [])
+                  .map((f) => f.shared_inbox || f.inbox_url)
+                  .filter(Boolean)
+              )
+            ) as string[]
+
+            if (pubInboxes.length > 0) {
+              const actorUrl = `${BASE_URL}/api/activitypub/publications/${publication.slug}`
+              const note = createNoteForActor(
+                {
+                  id: post.id,
+                  title: post.title,
+                  slug: post.slug,
+                  content: post.content,
+                  content_html: post.content_html,
+                  published_at: post.published_at || new Date().toISOString(),
+                  author_username: post.author.username,
+                },
+                BASE_URL,
+                actorUrl
+              )
+
+              const activity = {
+                '@context': 'https://www.w3.org/ns/activitystreams',
+                id: `${note.id}#create`,
+                type: 'Create',
+                actor: actorUrl,
+                published: note.published,
+                to: note.to,
+                cc: note.cc,
+                object: note,
+              }
+
+              const now = new Date()
+              const retryScheduleMinutes = [5, 15, 60, 240]
+
+              const resultsList = await Promise.all(
+                pubInboxes.map(async (inboxUrl) => {
+                  const { error: insertError } = await admin
+                    .from('activitypub_publication_deliveries')
+                    .upsert(
+                      {
+                        publication_id: publication.id,
+                        activity_id: activity.id,
+                        activity_type: activity.type,
+                        inbox_url: inboxUrl,
+                        payload: activity,
+                        status: 'pending',
+                        attempt_count: 0,
+                        last_attempt_at: null,
+                        next_attempt_at: null,
+                        last_error: null,
+                        response_status: null,
+                        updated_at: now.toISOString(),
+                      },
+                      { onConflict: 'activity_id,inbox_url' }
+                    )
+
+                  if (insertError) {
+                    return { ok: false, status: 0, error: insertError.message }
+                  }
+
+                  const delivery = await sendSignedActivityForPublication(
+                    publication.id,
+                    publication.slug,
+                    inboxUrl,
+                    activity
+                  )
+
+                  const attemptCount = 1
+                  const nextRetryAt = delivery.ok
+                    ? null
+                    : new Date(now.getTime() + retryScheduleMinutes[0] * 60 * 1000).toISOString()
+
+                  await admin
+                    .from('activitypub_publication_deliveries')
+                    .update({
+                      status: delivery.ok ? 'sent' : 'failed',
+                      attempt_count: attemptCount,
+                      last_attempt_at: now.toISOString(),
+                      next_attempt_at: nextRetryAt,
+                      last_error: delivery.error,
+                      response_status: delivery.status || null,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('activity_id', activity.id)
+                    .eq('inbox_url', inboxUrl)
+
+                  return delivery
+                })
+              )
+
+              results.publication_federation = {
+                attempted: pubInboxes.length,
+                delivered: resultsList.filter((result) => result.ok).length,
+              }
+            }
           }
         }
       }

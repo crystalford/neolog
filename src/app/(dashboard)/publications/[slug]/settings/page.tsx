@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { FediverseBadge } from '@/components/FediverseBadge'
 
 interface Publication {
   id: string
@@ -99,6 +100,11 @@ export default function PublicationSettingsPage({
     formState.accent_color !== (publication.accent_color || '#2563eb') ||
     formState.custom_domain !== (publication.custom_domain || '')
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
+  const fediverseDomain = new URL(appUrl).hostname
+  const fediverseHandle = `@${publication.slug}@${fediverseDomain}`
+  const fediverseSearchUrl = `https://mastodon.social/search?q=${encodeURIComponent(fediverseHandle)}`
+
   const saveSettings = async () => {
     if (!publication) return
     setSaving(true)
@@ -181,6 +187,15 @@ export default function PublicationSettingsPage({
                 {publication.slug}
               </div>
             </div>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-2">
+              Fediverse handle
+            </label>
+            <FediverseBadge handle={fediverseHandle} searchUrl={fediverseSearchUrl} />
+            <p className="text-xs text-[var(--text-tertiary)] mt-2">
+              Followers on Mastodon and other ActivityPub apps will see posts from this publication.
+            </p>
           </div>
 
           <div>

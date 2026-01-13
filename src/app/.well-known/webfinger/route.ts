@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createWebFingerResource } from '@/lib/activitypub'
+import { createWebFingerResource, createWebFingerResourceForActor } from '@/lib/activitypub'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -52,15 +52,36 @@ export async function GET(request: NextRequest) {
     .eq('username', username)
     .single()
 
-  if (error || !profile) {
+  if (!error && profile) {
+    const webFingerResource = createWebFingerResource(username, appDomain, appUrl)
+    return NextResponse.json(webFingerResource, {
+      headers: {
+        'Content-Type': 'application/jrd+json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  }
+
+  const { data: publication } = await supabase
+    .from('publications')
+    .select('slug, is_active')
+    .eq('slug', username)
+    .maybeSingle()
+
+  if (!publication || !publication.is_active) {
     return NextResponse.json(
       { error: 'User not found' },
       { status: 404 }
     )
   }
 
-  // Generate WebFinger resource
-  const webFingerResource = createWebFingerResource(username, appDomain, appUrl)
+  const actorUrl = `${appUrl}/api/activitypub/publications/${publication.slug}`
+  const profileUrl = `${appUrl}/p/${publication.slug}`
+  const webFingerResource = createWebFingerResourceForActor(
+    `acct:${publication.slug}@${appDomain}`,
+    actorUrl,
+    profileUrl
+  )
 
   return NextResponse.json(webFingerResource, {
     headers: {
