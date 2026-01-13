@@ -283,7 +283,7 @@ export default async function ProfilePage({ params }: Props) {
                 <div className="p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
                   <p className="text-sm text-[var(--text-secondary)]">
                     <strong className="text-[var(--text-primary)]">Reaching everywhere:</strong> RSS, ActivityPub (Mastodon), X (Twitter), LinkedIn, and direct subscribers.
-                    <span className="text-[var(--accent)] font-medium ml-2">-> {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
+                    <span className="text-[var(--accent)] font-medium ml-2">{'->'} {(subscriberCount || 0) + (followerCount || 0)} total reach</span>
                   </p>
                 </div>
               </div>
@@ -391,4 +391,3 @@ export default async function ProfilePage({ params }: Props) {
     </>
   )
 }
-

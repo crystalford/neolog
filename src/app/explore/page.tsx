@@ -205,7 +205,7 @@ export default function ExplorePage() {
                 <>
                   <div className="text-sm text-[var(--text-tertiary)]">-</div>
                   <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
-                    Try semantic search ->
+                    {'Try semantic search ->'}
                   </Link>
                 </>
               )}
@@ -275,7 +275,7 @@ export default function ExplorePage() {
                   Start Writing Free
                 </Link>
                 <Link href="/import" className="btn btn-ghost btn-sm w-full text-xs">
-                  Or import from Ghost/Substack ->
+                  {'Or import from Ghost/Substack ->'}
                 </Link>
               </div>
             </div>
@@ -285,4 +285,3 @@ export default function ExplorePage() {
     </>
   )
 }
-

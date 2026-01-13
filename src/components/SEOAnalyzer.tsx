@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   TrendingUp,
   FileText,
-  Image,
+  Image as ImageIcon,
   Link2,
   Eye,
   Hash,
@@ -166,7 +166,7 @@ export function SEOAnalyzer({ title, description, content, className = '' }: SEO
             {getScoreIcon(analysis.images.score)}
             <div className="flex-1 text-sm">
               <div className="font-medium">
-                <Image size={12} className="inline mr-1" />
+                <ImageIcon size={12} className="inline mr-1" />
                 Images: {analysis.images.withAlt}/{analysis.images.total} with alt text
               </div>
               {analysis.images.suggestion && (

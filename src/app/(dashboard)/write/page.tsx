@@ -836,7 +836,7 @@ export default function WritePage() {
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:underline text-sm"
                     >
-                      Open in new tab ->
+                      {'Open in new tab ->'}
                     </a>
                   </div>
                 )}
