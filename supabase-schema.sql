@@ -81,6 +81,29 @@ create table public.activitypub_followers (
 );
 
 -- =============================================
+-- ACTIVITYPUB DELIVERIES TABLE
+-- Tracks outbound federation delivery attempts
+-- =============================================
+create table public.activitypub_deliveries (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  activity_id text not null,
+  activity_type text not null,
+  inbox_url text not null,
+  payload jsonb not null,
+  status text default 'pending' check (status in ('pending', 'sent', 'failed')),
+  attempt_count integer default 0,
+  last_attempt_at timestamp with time zone,
+  next_attempt_at timestamp with time zone,
+  last_error text,
+  response_status integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint activitypub_deliveries_unique unique (activity_id, inbox_url)
+);
+
+-- =============================================
 -- POSTS TABLE
 -- The core content table with forking support
 -- =============================================
@@ -455,6 +478,7 @@ alter table public.profiles enable row level security;
 alter table public.activitypub_keys enable row level security;
 alter table public.activitypub_inbox enable row level security;
 alter table public.activitypub_followers enable row level security;
+alter table public.activitypub_deliveries enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
@@ -480,8 +504,24 @@ create policy "Users can update own profile"
   using (auth.uid() = id);
 
 create policy "Users can insert own profile"
-  on public.profiles for insert
-  with check (auth.uid() = id);
+on public.profiles for insert
+with check (auth.uid() = id);
+
+create policy "Users can view their ActivityPub followers"
+on public.activitypub_followers for select
+using (auth.uid() = user_id);
+
+create policy "Users can manage their ActivityPub followers"
+on public.activitypub_followers for update
+using (auth.uid() = user_id);
+
+create policy "Users can view their ActivityPub deliveries"
+on public.activitypub_deliveries for select
+using (auth.uid() = user_id);
+
+create policy "Users can view their ActivityPub inbox"
+on public.activitypub_inbox for select
+using (auth.uid() = user_id);
 
 -- POSTS policies
 create policy "Published posts are viewable by everyone"

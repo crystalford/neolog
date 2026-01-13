@@ -71,18 +71,31 @@ export async function sendSignedActivity(
   const body = JSON.stringify(activity)
   const { date, digest, signatureHeader } = signRequest('POST', inboxUrl, body, keyId, privateKeyPem)
 
-  const response = await fetch(inboxUrl, {
-    method: 'POST',
-    headers: {
-      Host: new URL(inboxUrl).host,
-      Date: date,
-      Digest: digest,
-      Signature: signatureHeader,
-      'Content-Type': 'application/activity+json',
-      Accept: 'application/activity+json',
-    },
-    body,
-  })
+  try {
+    const response = await fetch(inboxUrl, {
+      method: 'POST',
+      headers: {
+        Host: new URL(inboxUrl).host,
+        Date: date,
+        Digest: digest,
+        Signature: signatureHeader,
+        'Content-Type': 'application/activity+json',
+        Accept: 'application/activity+json',
+      },
+      body,
+    })
 
-  return response.ok
+    const responseText = await response.text().catch(() => '')
+    return {
+      ok: response.ok,
+      status: response.status,
+      error: response.ok ? null : responseText || response.statusText,
+    }
+  } catch (error: any) {
+    return {
+      ok: false,
+      status: 0,
+      error: error?.message || 'Network error',
+    }
+  }
 }

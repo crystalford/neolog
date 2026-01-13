@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   Home, PenSquare, Send, Settings, LogOut, User as UserIcon,
   PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
-  BookOpen, DollarSign
+  BookOpen, DollarSign, Globe
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -208,6 +208,7 @@ export default function DashboardLayout({
     return [
       { href: '/series', icon: Layers, label: 'Series' },
       { href: '/topics', icon: Tag, label: 'Topics' },
+      { href: '/fediverse', icon: Globe, label: 'Fediverse' },
     ]
   }, [capabilities])
 

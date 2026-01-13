@@ -75,6 +75,25 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to store activity' }, { status: 500 })
   }
 
+  if (body.actor) {
+    await admin
+      .from('activitypub_followers')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('user_id', profile.id)
+      .eq('actor', body.actor)
+  }
+
+  if (body.type === 'Undo' && body.actor && body.object) {
+    const target = typeof body.object === 'string' ? body.object : body.object?.id
+    if (target) {
+      await admin
+        .from('activitypub_followers')
+        .update({ status: 'rejected', last_seen_at: new Date().toISOString() })
+        .eq('user_id', profile.id)
+        .eq('actor', body.actor)
+    }
+  }
+
   if (body.type === 'Follow' && body.actor && body.object) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
     const expectedObject = `${baseUrl}/${username}`

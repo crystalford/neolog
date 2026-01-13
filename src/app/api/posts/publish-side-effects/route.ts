@@ -425,15 +425,68 @@ export async function POST(request: NextRequest) {
             object: note,
           }
 
+          const now = new Date()
+          const retryScheduleMinutes = [5, 15, 60, 240]
+
           const resultsList = await Promise.all(
-            inboxes.map((inboxUrl) =>
-              sendSignedActivity(actorUserIdStrict, post.author.username, inboxUrl, activity)
-            )
+            inboxes.map(async (inboxUrl) => {
+              const { error: insertError } = await admin
+                .from('activitypub_deliveries')
+                .upsert(
+                  {
+                    user_id: actorUserIdStrict,
+                    activity_id: activity.id,
+                    activity_type: activity.type,
+                    inbox_url: inboxUrl,
+                    payload: activity,
+                    status: 'pending',
+                    attempt_count: 0,
+                    last_attempt_at: null,
+                    next_attempt_at: null,
+                    last_error: null,
+                    response_status: null,
+                    updated_at: now.toISOString(),
+                  },
+                  { onConflict: 'activity_id,inbox_url' }
+                )
+
+              if (insertError) {
+                return { ok: false, status: 0, error: insertError.message }
+              }
+
+              const delivery = await sendSignedActivity(
+                actorUserIdStrict,
+                post.author.username,
+                inboxUrl,
+                activity
+              )
+
+              const attemptCount = 1
+              const nextRetryAt = delivery.ok
+                ? null
+                : new Date(now.getTime() + retryScheduleMinutes[0] * 60 * 1000).toISOString()
+
+              await admin
+                .from('activitypub_deliveries')
+                .update({
+                  status: delivery.ok ? 'sent' : 'failed',
+                  attempt_count: attemptCount,
+                  last_attempt_at: now.toISOString(),
+                  next_attempt_at: nextRetryAt,
+                  last_error: delivery.error,
+                  response_status: delivery.status || null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('activity_id', activity.id)
+                .eq('inbox_url', inboxUrl)
+
+              return delivery
+            })
           )
 
           results.federation = {
             attempted: inboxes.length,
-            delivered: resultsList.filter(Boolean).length,
+            delivered: resultsList.filter((result) => result.ok).length,
           }
         }
       }
