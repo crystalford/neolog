@@ -110,6 +110,9 @@ export default async function ProfilePage({ params }: Props) {
     author: profile
   })) || []
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
+  const fediverseHandle = `@${profile.username}@${new URL(appUrl).hostname}`
+
   return (
     <>
       <Header />
@@ -218,15 +221,14 @@ export default async function ProfilePage({ params }: Props) {
                     Export as Book
                     <Download size={12} className="ml-1" />
                   </a>
-                  <button
-                    className="btn btn-sm btn-ghost"
-                    title="ActivityPub profile - Coming Q1 2026"
-                    disabled
+                  <div
+                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs text-[var(--text-secondary)]"
+                    title="Use this handle to follow from Mastodon or any ActivityPub client"
                   >
                     <Globe size={14} />
-                    Fediverse
-                    <span className="text-xs opacity-60">(Q1 2026)</span>
-                  </button>
+                    <span className="font-medium text-[var(--text-primary)]">Fediverse</span>
+                    <span className="text-[var(--text-tertiary)]">{fediverseHandle}</span>
+                  </div>
                 </div>
 
                 {/* Social links */}
