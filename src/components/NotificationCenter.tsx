@@ -27,7 +27,7 @@ export function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [filter, setFilter] = useState<'all' | 'unread'>('all')
+  const [filter, setFilter] = useState<'all' | 'unread' | 'fediverse'>('all')
 
   const supabase = createClient()
   const router = useRouter()
@@ -235,6 +235,8 @@ export function NotificationCenter() {
 
   const filteredNotifications = filter === 'unread'
     ? notifications.filter(n => !n.read)
+    : filter === 'fediverse'
+    ? notifications.filter(n => n.type.startsWith('fediverse_'))
     : notifications
 
   return (
@@ -308,6 +310,17 @@ export function NotificationCenter() {
                   aria-pressed={filter === 'unread'}
                 >
                   Unread {unreadCount > 0 && `(${unreadCount})`}
+                </button>
+                <button
+                  onClick={() => setFilter('fediverse')}
+                  className={`flex-1 px-3 py-1.5 rounded text-sm transition-all ${
+                    filter === 'fediverse'
+                      ? 'bg-[var(--bg-primary)] shadow-sm font-medium'
+                      : 'text-[var(--text-secondary)]'
+                  }`}
+                  aria-pressed={filter === 'fediverse'}
+                >
+                  Fediverse
                 </button>
               </div>
             </div>
