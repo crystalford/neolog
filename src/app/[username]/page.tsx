@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Header } from '@/components/Header'
 import { PostCard } from '@/components/PostCard'
 import { SubscribeButton } from '@/components/SubscribeButton'
+import { FediverseBadge } from '@/components/FediverseBadge'
 import { SocialLinks } from '@/components/SocialLinks'
 import { generateSEO } from '@/lib/seo'
 import { Calendar, MapPin, Link as LinkIcon, Users, BookOpen, Rss, Globe, Download } from 'lucide-react'
@@ -111,7 +112,9 @@ export default async function ProfilePage({ params }: Props) {
   })) || []
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.com'
-  const fediverseHandle = `@${profile.username}@${new URL(appUrl).hostname}`
+  const fediverseDomain = new URL(appUrl).hostname
+  const fediverseHandle = `@${profile.username}@${fediverseDomain}`
+  const fediverseSearchUrl = `https://mastodon.social/search?q=${encodeURIComponent(fediverseHandle)}`
 
   return (
     <>
@@ -221,14 +224,10 @@ export default async function ProfilePage({ params }: Props) {
                     Export as Book
                     <Download size={12} className="ml-1" />
                   </a>
-                  <div
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] px-3 py-1.5 text-xs text-[var(--text-secondary)]"
-                    title="Use this handle to follow from Mastodon or any ActivityPub client"
-                  >
-                    <Globe size={14} />
-                    <span className="font-medium text-[var(--text-primary)]">Fediverse</span>
-                    <span className="text-[var(--text-tertiary)]">{fediverseHandle}</span>
-                  </div>
+                  <FediverseBadge
+                    handle={fediverseHandle}
+                    searchUrl={fediverseSearchUrl}
+                  />
                 </div>
 
                 {/* Social links */}
