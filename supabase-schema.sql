@@ -44,6 +44,23 @@ create table public.activitypub_keys (
 );
 
 -- =============================================
+-- ACTIVITYPUB INBOX TABLE
+-- Stores incoming federated activities
+-- =============================================
+create table public.activitypub_inbox (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  activity_id text not null,
+  activity_type text not null,
+  actor text,
+  object jsonb,
+  raw jsonb not null,
+  received_at timestamp with time zone default timezone('utc'::text, now()) not null,
+
+  constraint activitypub_inbox_unique unique (user_id, activity_id)
+);
+
+-- =============================================
 -- POSTS TABLE
 -- The core content table with forking support
 -- =============================================
@@ -416,6 +433,7 @@ create index subscriber_tags_tag_idx on public.subscriber_tags(tag);
 -- Enable RLS on all tables
 alter table public.profiles enable row level security;
 alter table public.activitypub_keys enable row level security;
+alter table public.activitypub_inbox enable row level security;
 alter table public.posts enable row level security;
 alter table public.post_versions enable row level security;
 alter table public.post_distribution_packs enable row level security;
