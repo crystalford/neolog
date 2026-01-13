@@ -919,19 +919,6 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
   color: var(--text-tertiary);
 }
 
-.rich-editor .import-divider {
-  border: 0;
-  border-top: 1px solid var(--border-light);
-  margin: 2rem 0 0.75rem;
-}
-
-.rich-editor .import-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  margin: 0 0 1.5rem;
-}
 
 /* ================================
    SPECIAL COMPONENTS
