@@ -906,7 +906,7 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
 
 .rich-editor {
   min-height: 100%;
-  padding: 1.5rem;
+  padding: 0;
   font-family: var(--font-body);
   font-size: 1.0625rem;
   line-height: 1.8;
