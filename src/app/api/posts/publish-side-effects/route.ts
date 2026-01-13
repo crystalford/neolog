@@ -9,6 +9,8 @@ import { embedTextWithOpenAI, pickTextForEmbedding, sha256, vectorLiteral } from
 import { sendNewPostNotifications } from '@/lib/email'
 import { postToDevto, postToMedium } from '@/lib/syndication'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
+import { createNote } from '@/lib/activitypub'
+import { sendSignedActivity } from '@/lib/activitypub-outbound'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
@@ -375,6 +377,65 @@ export async function POST(request: NextRequest) {
       })
       if (res.ok) {
         results.pack = { ok: true }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 5) ActivityPub fan-out (best-effort)
+    try {
+      const admin = createAdminClient()
+      if (admin) {
+        const { data: followers } = await admin
+          .from('activitypub_followers')
+          .select('inbox_url, shared_inbox')
+          .eq('user_id', actorUserIdStrict)
+          .eq('status', 'accepted')
+
+        const inboxes = Array.from(
+          new Set(
+            (followers || [])
+              .map((f) => f.shared_inbox || f.inbox_url)
+              .filter(Boolean)
+          )
+        ) as string[]
+
+        if (inboxes.length > 0) {
+          const note = createNote(
+            {
+              id: post.id,
+              title: post.title,
+              slug: post.slug,
+              content: post.content,
+              content_html: post.content_html,
+              published_at: post.published_at || new Date().toISOString(),
+              author_username: post.author.username,
+            },
+            BASE_URL
+          )
+
+          const activity = {
+            '@context': 'https://www.w3.org/ns/activitystreams',
+            id: `${note.id}#create`,
+            type: 'Create',
+            actor: `${BASE_URL}/${post.author.username}`,
+            published: note.published,
+            to: note.to,
+            cc: note.cc,
+            object: note,
+          }
+
+          const resultsList = await Promise.all(
+            inboxes.map((inboxUrl) =>
+              sendSignedActivity(actorUserIdStrict, post.author.username, inboxUrl, activity)
+            )
+          )
+
+          results.federation = {
+            attempted: inboxes.length,
+            delivered: resultsList.filter(Boolean).length,
+          }
+        }
       }
     } catch {
       // ignore
