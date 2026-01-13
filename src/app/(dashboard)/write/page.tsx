@@ -156,13 +156,47 @@ export default function WritePage() {
       .slice(0, 80)
   }
 
+  const ensureUniqueSlug = async (baseSlug: string, currentPostId?: string | null) => {
+    if (!user || !baseSlug) return baseSlug
+    const normalized = baseSlug.replace(/-+$/g, '')
+    let candidate = normalized
+    for (let i = 0; i < 50; i++) {
+      let query = supabase
+        .from('posts')
+        .select('id')
+        .eq('author_id', user.id)
+        .eq('slug', candidate)
+        .limit(1)
+
+      if (currentPostId) {
+        query = query.neq('id', currentPostId)
+      }
+
+      const { data, error } = await query
+      if (error) {
+        return candidate
+      }
+      if (!data || data.length === 0) {
+        return candidate
+      }
+      candidate = `${normalized}-${i + 2}`
+    }
+    return `${normalized}-${Date.now().toString(36)}`
+  }
+
   const saveDraft = async () => {
     if (!user || !title || !publicationId) return
     if (existingStatus === 'published') return // Don't auto-save published posts
 
     setSaving(true)
 
-    const autoSlug = slug || generateSlug(title)
+    let autoSlug = slug || generateSlug(title)
+    if (!postId) {
+      autoSlug = await ensureUniqueSlug(autoSlug, postId)
+      if (autoSlug !== slug) {
+        setSlug(autoSlug)
+      }
+    }
 
     const postData: any = {
       author_id: user.id,
@@ -232,7 +266,11 @@ export default function WritePage() {
     setError(null)
 
     const isScheduling = publishIntent === 'schedule' && scheduledAt
-    const autoSlug = slug || generateSlug(title)
+    let autoSlug = slug || generateSlug(title)
+    autoSlug = await ensureUniqueSlug(autoSlug, postId)
+    if (autoSlug !== slug && !postId) {
+      setSlug(autoSlug)
+    }
     const isUpdate = existingStatus === 'published'
 
     const postData: any = {
@@ -329,6 +367,20 @@ export default function WritePage() {
   const stripScripts = (html: string) =>
     html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '').trim()
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const toPlainHtml = (html: string) => {
+    const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!text) return ''
+    return `<p>${escapeHtml(text)}</p>`
+  }
+
   const sanitizeImportedHtml = (html: string, mode: 'clean' | 'full') => {
     if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
       return stripScripts(html)
@@ -349,6 +401,38 @@ export default function WritePage() {
     }
   }
 
+  const resolveImportHtml = (html: string, mode: 'clean' | 'full') => {
+    let sanitized = sanitizeImportedHtml(html, mode)
+    let usedFallback = false
+    let fallbackMode: 'full' | 'plain' | null = null
+
+    if (!sanitized && mode === 'clean') {
+      sanitized = sanitizeImportedHtml(html, 'full')
+      if (sanitized) {
+        usedFallback = true
+        fallbackMode = 'full'
+      }
+    }
+
+    if (!sanitized) {
+      sanitized = stripScripts(html)
+      if (sanitized) {
+        usedFallback = true
+        fallbackMode = 'plain'
+      }
+    }
+
+    if (!sanitized) {
+      sanitized = toPlainHtml(html)
+      if (sanitized) {
+        usedFallback = true
+        fallbackMode = 'plain'
+      }
+    }
+
+    return { html: sanitized, usedFallback, fallbackMode }
+  }
+
   const getImportStats = (html: string) => {
     const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
     const words = text ? text.split(' ').length : 0
@@ -363,13 +447,8 @@ export default function WritePage() {
       const confirmed = window.confirm('Replace the current editor content? This will overwrite your draft.')
       if (!confirmed) return
     }
-    const cleaned = sanitizeImportedHtml(importHtml, importMode)
-    let finalHtml = cleaned
-    let usedFallback = false
-    if (!finalHtml) {
-      finalHtml = stripScripts(importHtml)
-      usedFallback = true
-    }
+    const resolved = resolveImportHtml(importHtml, importMode)
+    const finalHtml = resolved.html
     if (!finalHtml) {
       setError('Import failed: no usable content found.')
       return
@@ -386,7 +465,13 @@ export default function WritePage() {
     setImportInfo({ previousContent, stats: getImportStats(finalHtml) })
     setImportHtml('')
     setShowImport(false)
-    setSuccess(usedFallback ? 'HTML imported (raw). Review formatting.' : 'HTML imported successfully!')
+    if (resolved.usedFallback && resolved.fallbackMode === 'full') {
+      setSuccess('HTML imported (full mode). Review formatting.')
+    } else if (resolved.usedFallback) {
+      setSuccess('HTML imported (plain text). Review formatting.')
+    } else {
+      setSuccess('HTML imported successfully!')
+    }
   }
 
   const undoImport = () => {
@@ -732,9 +817,9 @@ export default function WritePage() {
                       if (!importHtml.trim()) {
                         return '<p>Paste HTML to preview how it will look.</p>'
                       }
-                      const preview = sanitizeImportedHtml(importHtml, importMode)
+                      const preview = resolveImportHtml(importHtml, importMode).html
                       if (preview) return preview
-                      return '<p>Preview unavailable. The raw HTML will be imported.</p>'
+                      return '<p>Preview unavailable. The HTML will be imported as plain text.</p>'
                     })(),
                   }}
                 />
