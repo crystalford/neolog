@@ -33,6 +33,7 @@ export default function FediverseDashboardPage() {
   const [followers, setFollowers] = useState<Follower[]>([])
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -94,6 +95,21 @@ export default function FediverseDashboardPage() {
     await loadData()
   }
 
+  const handleRetryFailed = async () => {
+    setRetrying(true)
+    try {
+      const response = await fetch('/api/activitypub/retry', { method: 'POST' })
+      if (!response.ok) {
+        setError('Retry failed. Please try again.')
+      }
+    } catch {
+      setError('Retry failed. Please try again.')
+    } finally {
+      setRetrying(false)
+      await loadData()
+    }
+  }
+
   const stats = useMemo(() => {
     const accepted = followers.filter((f) => f.status === 'accepted').length
     const failed = deliveries.filter((d) => d.status === 'failed').length
@@ -121,14 +137,24 @@ export default function FediverseDashboardPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={loadData}
-          className="btn btn-secondary btn-sm"
-          disabled={loading}
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRetryFailed}
+            className="btn btn-secondary btn-sm"
+            disabled={loading || retrying}
+          >
+            <RefreshCw size={14} />
+            {retrying ? 'Retrying...' : 'Retry Failed'}
+          </button>
+          <button
+            onClick={loadData}
+            className="btn btn-secondary btn-sm"
+            disabled={loading}
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
