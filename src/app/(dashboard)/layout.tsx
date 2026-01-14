@@ -429,7 +429,7 @@ export default function DashboardLayout({
         <div className="border-t border-[var(--border-light)] px-3 py-4 space-y-1">
           {profile && (
             <Link
-              href={`/${selectedPublicationSlug || profile.username}`}
+              href={selectedPublicationSlug ? `/${selectedPublicationSlug}` : '/publications'}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
             >
               {profile.avatar_url ? (
@@ -513,7 +513,7 @@ export default function DashboardLayout({
               {/* User avatar */}
               {profile && (
                 <Link
-                  href={`/${selectedPublicationSlug || profile.username}`}
+                  href={selectedPublicationSlug ? `/${selectedPublicationSlug}` : '/publications'}
                   className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
                 >
                   {profile.avatar_url ? (
