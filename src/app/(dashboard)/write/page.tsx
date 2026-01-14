@@ -599,14 +599,22 @@ export default function WritePage() {
       {/* Error/Success messages */}
       {error && (
         <div className="max-w-6xl mx-auto px-6 pt-4">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"
+          >
             {error}
           </div>
         </div>
       )}
       {success && (
         <div className="max-w-6xl mx-auto px-6 pt-4">
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700"
+          >
             {success}
           </div>
         </div>
