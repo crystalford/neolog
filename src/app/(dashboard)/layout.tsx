@@ -428,23 +428,40 @@ export default function DashboardLayout({
         {/* User Section */}
         <div className="border-t border-[var(--border-light)] px-3 py-4 space-y-1">
           {profile && (
-            <Link
-              href={selectedPublicationSlug ? `/${selectedPublicationSlug}` : '/publications'}
-              className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-            >
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.display_name || profile.username}
-                  className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                />
-              ) : (
-                <UserIcon size={16} className="flex-shrink-0" />
-              )}
-              <span className="truncate text-sm">
-                {profile.display_name || profile.username}
-              </span>
-            </Link>
+            selectedPublicationSlug ? (
+              <Link
+                href={`/${selectedPublicationSlug}`}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.display_name || profile.username}
+                    className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <UserIcon size={16} className="flex-shrink-0" />
+                )}
+                <span className="truncate text-sm">
+                  {profile.display_name || profile.username}
+                </span>
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)]">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.display_name || profile.username}
+                    className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <UserIcon size={16} className="flex-shrink-0" />
+                )}
+                <span className="truncate text-sm">
+                  {profile.display_name || profile.username}
+                </span>
+              </div>
+            )
           )}
 
           <button
@@ -512,20 +529,34 @@ export default function DashboardLayout({
               
               {/* User avatar */}
               {profile && (
-                <Link
-                  href={selectedPublicationSlug ? `/${selectedPublicationSlug}` : '/publications'}
-                  className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
-                >
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.display_name || profile.username}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <UserIcon size={16} />
-                  )}
-                </Link>
+                selectedPublicationSlug ? (
+                  <Link
+                    href={`/${selectedPublicationSlug}`}
+                    className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                  >
+                    {profile.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.display_name || profile.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <UserIcon size={16} />
+                    )}
+                  </Link>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center">
+                    {profile.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.display_name || profile.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <UserIcon size={16} />
+                    )}
+                  </div>
+                )
               )}
             </div>
           </div>
