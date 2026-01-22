@@ -13,6 +13,8 @@ export function SyndicationSettings() {
     const [connections, setConnections] = useState<SyndicationConnection[]>([])
     const [loading, setLoading] = useState(true)
     const [devtoApiKey, setDevtoApiKey] = useState('')
+    const [hashnodeApiKey, setHashnodeApiKey] = useState('')
+    const [hashnodePublicationId, setHashnodePublicationId] = useState('')
     const [connecting, setConnecting] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -69,6 +71,48 @@ export function SyndicationSettings() {
         }
     }
 
+    const handleConnectHashnode = async () => {
+        if (!hashnodeApiKey.trim()) {
+            setError('Please enter your Hashnode API key')
+            return
+        }
+        if (!hashnodePublicationId.trim()) {
+            setError('Please enter your Hashnode publication ID')
+            return
+        }
+
+        setConnecting('hashnode')
+        setError(null)
+        setSuccess(null)
+
+        try {
+            const response = await fetch('/api/syndication/hashnode/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apiKey: hashnodeApiKey,
+                    publicationId: hashnodePublicationId
+                }),
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                setError(data.error || 'Failed to connect')
+                return
+            }
+
+            setSuccess(`Connected to Hashnode as @${data.username}`)
+            setHashnodeApiKey('')
+            setHashnodePublicationId('')
+            await loadConnections()
+        } catch (err) {
+            setError('Network error. Please try again.')
+        } finally {
+            setConnecting(null)
+        }
+    }
+
     const handleDisconnect = async (platform: string) => {
         if (!confirm(`Disconnect from ${platform}?`)) return
 
@@ -103,18 +147,11 @@ export function SyndicationSettings() {
             docsUrl: 'https://dev.to/settings/extensions',
         },
         {
-            id: 'medium',
-            name: 'Medium',
-            description: 'Coming soon',
-            color: 'from-gray-800 to-gray-900',
-            disabled: true,
-        },
-        {
             id: 'hashnode',
             name: 'Hashnode',
-            description: 'Coming soon',
+            description: 'Reach 500K+ developers',
             color: 'from-blue-600 to-blue-700',
-            disabled: true,
+            docsUrl: 'https://hashnode.com/settings/developer',
         },
         {
             id: 'linkedin',
@@ -232,6 +269,53 @@ export function SyndicationSettings() {
                                                 </>
                                             ) : (
                                                 'Connect Dev.to'
+                                            )}
+                                        </button>
+                                    </div>
+                                ) : platform.id === 'hashnode' ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                                                Hashnode API Key
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={hashnodeApiKey}
+                                                onChange={(e) => setHashnodeApiKey(e.target.value)}
+                                                placeholder="Enter your Hashnode API key"
+                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors mb-2"
+                                            />
+                                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                                                Publication ID
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={hashnodePublicationId}
+                                                onChange={(e) => setHashnodePublicationId(e.target.value)}
+                                                placeholder="Enter your publication ID"
+                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                                            />
+                                            <a
+                                                href={platform.docsUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-[var(--accent)] hover:underline mt-1 inline-flex items-center gap-1"
+                                            >
+                                                Get your API key & Publication ID <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                        <button
+                                            onClick={handleConnectHashnode}
+                                            disabled={connecting === 'hashnode'}
+                                            className="btn btn-primary btn-sm"
+                                        >
+                                            {connecting === 'hashnode' ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Connecting...
+                                                </>
+                                            ) : (
+                                                'Connect Hashnode'
                                             )}
                                         </button>
                                     </div>
