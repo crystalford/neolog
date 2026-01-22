@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
 import { PublicationDomainSection } from '@/components/PublicationDomainSection'
+import { SyndicationSettings } from '@/components/SyndicationSettings'
 import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
@@ -880,6 +881,11 @@ export default function SettingsPage() {
         {/* Custom Domain Section */}
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <PublicationDomainSection />
+        </section>
+
+        {/* Cross-Platform Publishing Section */}
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <SyndicationSettings />
         </section>
 
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
