@@ -877,6 +877,11 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Custom Domain Section */}
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <PublicationDomainSection />
+        </section>
+
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
