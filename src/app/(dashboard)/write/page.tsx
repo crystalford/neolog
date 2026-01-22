@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
+import { SyndicationOptions } from '@/components/SyndicationOptions'
 import dynamic from 'next/dynamic'
 import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
 
@@ -71,6 +72,7 @@ export default function WritePage() {
   const [publications, setPublications] = useState<any[]>([])
   const [existingStatus, setExistingStatus] = useState<string | null>(null)
   const [publishIntent, setPublishIntent] = useState<'draft' | 'publish' | 'schedule'>('publish')
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
 
   // UI state
   const [showSettings, setShowSettings] = useState(false)
@@ -359,13 +361,32 @@ export default function WritePage() {
         })
       }
 
+      // Cross-platform publishing (if platforms selected and not scheduling)
+      if (finalPostId && selectedPlatforms.length > 0 && !isScheduling) {
+        try {
+          await fetch('/api/syndication/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              postId: finalPostId,
+              platforms: selectedPlatforms,
+            }),
+          })
+          // Don't block on syndication errors
+        } catch (syndicationError) {
+          console.error('Syndication error:', syndicationError)
+        }
+      }
+
       setPublishing(false)
       setSuccess(
         isScheduling
           ? 'Post scheduled successfully!'
           : isUpdate
-          ? 'Post updated successfully!'
-          : 'Post published successfully!'
+            ? 'Post updated successfully!'
+            : selectedPlatforms.length > 0
+              ? 'Post published and cross-posted successfully!'
+              : 'Post published successfully!'
       )
       setExistingStatus(isScheduling ? 'scheduled' : 'published')
 
@@ -622,48 +643,48 @@ export default function WritePage() {
 
       {/* Main editor */}
       <div className="max-w-6xl mx-auto px-6 py-12">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Post title"
-            aria-label="Post title"
-            className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
-            autoFocus
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Post title"
+          aria-label="Post title"
+          className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
+          autoFocus
+        />
+
+        <input
+          type="text"
+          value={subtitle}
+          onChange={(e) => setSubtitle(e.target.value)}
+          placeholder="Add a subtitle or excerpt (optional)"
+          aria-label="Post subtitle"
+          className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
+        />
+
+        <div>
+          <RichEditor
+            content={content}
+            onChange={setContent}
+            onImageUpload={async (file) => {
+              const fileExt = file.name.split('.').pop()
+              const fileName = `${user.id}/${Date.now()}.${fileExt}`
+
+              const { error } = await supabase.storage
+                .from('images')
+                .upload(fileName, file)
+
+              if (error) throw error
+
+              const { data: { publicUrl } } = supabase.storage
+                .from('images')
+                .getPublicUrl(fileName)
+
+              return publicUrl
+            }}
+            className="min-h-[600px]"
           />
-
-          <input
-            type="text"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="Add a subtitle or excerpt (optional)"
-            aria-label="Post subtitle"
-            className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
-          />
-
-          <div>
-            <RichEditor
-              content={content}
-              onChange={setContent}
-              onImageUpload={async (file) => {
-                const fileExt = file.name.split('.').pop()
-                const fileName = `${user.id}/${Date.now()}.${fileExt}`
-
-                const { error } = await supabase.storage
-                  .from('images')
-                  .upload(fileName, file)
-
-                if (error) throw error
-
-                const { data: { publicUrl } } = supabase.storage
-                  .from('images')
-                  .getPublicUrl(fileName)
-
-                return publicUrl
-              }}
-              className="min-h-[600px]"
-            />
-          </div>
+        </div>
       </div>
 
       {/* HTML Import Modal */}
@@ -895,6 +916,22 @@ export default function WritePage() {
                         If this was originally published elsewhere
                       </p>
                     </div>
+
+                    {/* Cross-Platform Publishing */}
+                    {publishIntent === 'publish' && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <SyndicationOptions
+                          selectedPlatforms={selectedPlatforms}
+                          onToggle={(platform) => {
+                            setSelectedPlatforms(prev =>
+                              prev.includes(platform)
+                                ? prev.filter(p => p !== platform)
+                                : [...prev, platform]
+                            )
+                          }}
+                        />
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between p-3 border border-gray-300 rounded-lg">
                       <div className="flex items-center gap-2">
