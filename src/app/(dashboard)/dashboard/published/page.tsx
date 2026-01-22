@@ -264,7 +264,7 @@ export default function PublishedPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
+            <div className="rounded-2xl border border-[var(--border-light)] bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] p-16 text-center shadow-lg">
               {search ? (
                 <>
                   <Search size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
@@ -277,15 +277,20 @@ export default function PublishedPage() {
                 </>
               ) : (
                 <>
-                  <TrendingUp size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-                  <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
-                    Nothing published yet
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <Sparkles size={40} className="text-white" />
+                  </div>
+                  <h2 className="font-display text-2xl text-[var(--text-primary)] mb-3 font-bold">
+                    Ready to share your ideas?
                   </h2>
-                  <p className="text-base text-[var(--text-secondary)] mb-6">
-                    Publish your first post to start tracking performance.
+                  <p className="text-base text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
+                    Your published posts will appear here. Start writing and share your thoughts with the world.
                   </p>
                   <div className="flex gap-4 justify-center">
-                    <Link href="/dashboard/workspace" className="btn btn-secondary text-base px-5 py-3 font-medium">
+                    <Link href="/write" className="btn btn-primary text-base px-6 py-3 font-medium shadow-md hover:shadow-lg transition-shadow">
+                      Write Your First Post
+                    </Link>
+                    <Link href="/dashboard/workspace" className="btn btn-secondary text-base px-6 py-3 font-medium">
                       View Drafts
                     </Link>
                     <Link href="/write" className="btn btn-primary text-base px-5 py-3 font-semibold">
