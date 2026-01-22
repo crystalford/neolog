@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
-import { 
+import { PublicationDomainSection } from '@/components/PublicationDomainSection'
+import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
   KeyRound,
@@ -23,12 +24,12 @@ export default function SettingsPage() {
   const [usageCaps, setUsageCaps] = useState<{
     openai: { day: string; month: string }
     groq: { day: string; month: string }
-  }>( {
+  }>({
     openai: { day: '', month: '' },
     groq: { day: '', month: '' },
   })
   const [usageCapsSaving, setUsageCapsSaving] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
@@ -39,7 +40,7 @@ export default function SettingsPage() {
     linkedin_url: '',
     context_md: '',
   })
-  
+
   const [emailPrefs, setEmailPrefs] = useState({
     email_new_follower: true,
     email_new_comment: true,
@@ -47,7 +48,7 @@ export default function SettingsPage() {
     email_post_upvote: false,
     email_weekly_digest: false,
   })
-  
+
   const [copied, setCopied] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -77,7 +78,7 @@ export default function SettingsPage() {
     public_base_url: '',
   })
   const [storageSaving, setStorageSaving] = useState(false)
-  
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -153,7 +154,7 @@ export default function SettingsPage() {
         const tokenLimit = row?.token_limit
 
         if ((provider === 'openai' || provider === 'groq') && (period === 'day' || period === 'month')) {
-          ;(next as any)[provider][period] = tokenLimit == null ? '' : String(tokenLimit)
+          ; (next as any)[provider][period] = tokenLimit == null ? '' : String(tokenLimit)
         }
       }
 
@@ -645,8 +646,8 @@ export default function SettingsPage() {
     }
   }
 
-  const baseUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
+  const baseUrl = typeof window !== 'undefined'
+    ? window.location.origin
     : 'https://neolog.ai'
 
   if (loading) {
@@ -664,642 +665,642 @@ export default function SettingsPage() {
   return (
     <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
       <div className="mb-10">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-            Publisher settings
-          </p>
-          <h1 className="font-display text-3xl">Settings</h1>
-          <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
-            Manage your profile, notifications, and exports for your publication.
-          </p>
-        </div>
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+          Publisher settings
+        </p>
+        <h1 className="font-display text-3xl">Settings</h1>
+        <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
+          Manage your profile, notifications, and exports for your publication.
+        </p>
+      </div>
 
-        {error && (
-          <div className="mb-6 p-4 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 text-sm text-[var(--error)]">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-6 p-4 rounded-xl border border-[var(--success)]/30 bg-[var(--success)]/10 text-sm text-[var(--success)]">
-            {success}
-          </div>
-        )}
+      {error && (
+        <div className="mb-6 p-4 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 text-sm text-[var(--error)]">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-6 p-4 rounded-xl border border-[var(--success)]/30 bg-[var(--success)]/10 text-sm text-[var(--success)]">
+          {success}
+        </div>
+      )}
 
       <div className="space-y-8">
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <User size={20} className="text-[var(--accent)]" />
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <User size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Profile</h2>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
+                Profile Picture
+              </label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {formData.avatar_url ? (
+                    <img
+                      src={formData.avatar_url}
+                      alt="Avatar"
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl text-white font-medium">
+                      {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+
+                  <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
+                    {uploadingAvatar ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Camera size={14} className="text-[var(--text-secondary)]" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                      disabled={uploadingAvatar}
+                    />
+                  </label>
                 </div>
-                <h2 className="font-display text-lg">Profile</h2>
+
+                <div className="text-sm text-[var(--text-tertiary)]">
+                  <p>Click the camera icon to upload</p>
+                  <p>JPG, PNG, or GIF. Max 2MB.</p>
+                </div>
               </div>
+            </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
-                    Profile Picture
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {formData.avatar_url ? (
-                        <img 
-                          src={formData.avatar_url}
-                          alt="Avatar"
-                          className="w-20 h-20 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl text-white font-medium">
-                          {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
-                        </div>
-                      )}
-                      
-                      <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
-                        {uploadingAvatar ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Camera size={14} className="text-[var(--text-secondary)]" />
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarUpload}
-                          className="hidden"
-                          disabled={uploadingAvatar}
-                        />
-                      </label>
-                    </div>
-                    
-                    <div className="text-sm text-[var(--text-tertiary)]">
-                      <p>Click the camera icon to upload</p>
-                      <p>JPG, PNG, or GIF. Max 2MB.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    value={usernameDraft}
-                    onChange={(e) => setUsernameDraft(e.target.value)}
-                    className="input"
-                  />
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <button
-                      onClick={handleUsernameSave}
-                      disabled={usernameSaving || !usernameDraft}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      {usernameSaving ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Check size={16} />
-                          Update username
-                        </>
-                      )}
-                    </button>
-                    <p className="text-xs text-[var(--text-tertiary)]">
-                      3"30 chars. a-z, 0-9, underscore.
-                    </p>
-                  </div>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    Your profile URL: {baseUrl}/{profile?.username}
-                  </p>
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    Changing your username can break old links.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Display Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.display_name}
-                    onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                    className="input"
-                    placeholder="Your display name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Bio
-                  </label>
-                  <textarea
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    className="input min-h-[100px] resize-y"
-                    placeholder="Tell readers about yourself"
-                    maxLength={500}
-                  />
-                  <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                    {formData.bio.length}/500
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Website
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.website_url}
-                    onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                    className="input"
-                    placeholder="https://yoursite.com"
-                  />
-                </div>
-
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      Twitter
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.twitter_url}
-                      onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
-                      className="input"
-                      placeholder="https://twitter.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      GitHub
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.github_url}
-                      onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                      className="input"
-                      placeholder="https://github.com/..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                      LinkedIn
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.linkedin_url}
-                      onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                      className="input"
-                      placeholder="https://linkedin.com/in/..."
-                    />
-                  </div>
-                </div>
-
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Username
+              </label>
+              <input
+                type="text"
+                value={usernameDraft}
+                onChange={(e) => setUsernameDraft(e.target.value)}
+                className="input"
+              />
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="btn btn-primary"
+                  onClick={handleUsernameSave}
+                  disabled={usernameSaving || !usernameDraft}
+                  className="btn btn-secondary btn-sm"
                 >
-                  {saving ? (
+                  {usernameSaving ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Saving...
+                      Updating...
                     </>
                   ) : (
                     <>
                       <Check size={16} />
-                      Save Profile
+                      Update username
                     </>
                   )}
                 </button>
+                <p className="text-xs text-[var(--text-tertiary)]">
+                  3"30 chars. a-z, 0-9, underscore.
+                </p>
               </div>
-            </section>
-
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Globe size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">Context memory</h2>
-              </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
-                This context is injected into AI prompts to keep tone and facts consistent.
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                Your profile URL: {baseUrl}/{profile?.username}
               </p>
-              <textarea
-                value={formData.context_md}
-                onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
-                placeholder="e.g. My tone is concise, data-first, skeptical of hype. Avoid the word 'delve'."
-                className="input min-h-[160px] font-mono"
+              <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                Changing your username can break old links.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={formData.display_name}
+                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                className="input"
+                placeholder="Your display name"
               />
-            </section>
+            </div>
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Bell size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">Email Notifications</h2>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
-                  { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
-                  { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
-                  { key: 'email_post_upvote', label: 'Upvotes', desc: 'When someone upvotes your post' },
-                  { key: 'email_weekly_digest', label: 'Weekly digest', desc: 'Summary of activity on your posts' },
-                ].map(({ key, label, desc }) => (
-                  <label 
-                    key={key}
-                    className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium">{label}</p>
-                      <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={(emailPrefs as any)[key]}
-                      onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
-                      className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-                    />
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Rss size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">Your Feeds</h2>
-              </div>
-
-              <p className="text-[var(--text-secondary)] mb-4">
-                Your content is available in multiple formats. Share these with your audience.
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Bio
+              </label>
+              <textarea
+                value={formData.bio}
+                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                className="input min-h-[100px] resize-y"
+                placeholder="Tell readers about yourself"
+                maxLength={500}
+              />
+              <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
+                {formData.bio.length}/500
               </p>
+            </div>
 
-              <div className="space-y-3">
-                {[
-                  { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
-                  { label: 'Atom Feed', url: `${baseUrl}/${profile?.username}/feed?format=atom` },
-                  { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
-                ].map(({ label, url }) => (
-                  <div 
-                    key={label}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]"
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Website
+              </label>
+              <input
+                type="url"
+                value={formData.website_url}
+                onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                className="input"
+                placeholder="https://yoursite.com"
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  Twitter
+                </label>
+                <input
+                  type="url"
+                  value={formData.twitter_url}
+                  onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
+                  className="input"
+                  placeholder="https://twitter.com/..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  GitHub
+                </label>
+                <input
+                  type="url"
+                  value={formData.github_url}
+                  onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
+                  className="input"
+                  placeholder="https://github.com/..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                  LinkedIn
+                </label>
+                <input
+                  type="url"
+                  value={formData.linkedin_url}
+                  onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                  className="input"
+                  placeholder="https://linkedin.com/in/..."
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn btn-primary"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  Save Profile
+                </>
+              )}
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Globe size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Context memory</h2>
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            This context is injected into AI prompts to keep tone and facts consistent.
+          </p>
+          <textarea
+            value={formData.context_md}
+            onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
+            placeholder="e.g. My tone is concise, data-first, skeptical of hype. Avoid the word 'delve'."
+            className="input min-h-[160px] font-mono"
+          />
+        </section>
+
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Bell size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Email Notifications</h2>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
+              { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
+              { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
+              { key: 'email_post_upvote', label: 'Upvotes', desc: 'When someone upvotes your post' },
+              { key: 'email_weekly_digest', label: 'Weekly digest', desc: 'Summary of activity on your posts' },
+            ].map(({ key, label, desc }) => (
+              <label
+                key={key}
+                className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
+              >
+                <div>
+                  <p className="font-medium">{label}</p>
+                  <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={(emailPrefs as any)[key]}
+                  onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
+                  className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Rss size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Your Feeds</h2>
+          </div>
+
+          <p className="text-[var(--text-secondary)] mb-4">
+            Your content is available in multiple formats. Share these with your audience.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
+              { label: 'Atom Feed', url: `${baseUrl}/${profile?.username}/feed?format=atom` },
+              { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
+            ].map(({ label, url }) => (
+              <div
+                key={label}
+                className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm">{label}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] truncate">
+                    {url}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 ml-3">
+                  <button
+                    onClick={() => copyToClipboard(url, label)}
+                    className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                    title="Copy URL"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm">{label}</p>
-                      <p className="text-xs text-[var(--text-tertiary)] truncate">
-                        {url}
+                    {copied === label ? (
+                      <Check size={16} className="text-[var(--success)]" />
+                    ) : (
+                      <Copy size={16} className="text-[var(--text-tertiary)]" />
+                    )}
+                  </button>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
+                    title="Open feed"
+                  >
+                    <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Download size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Export Your Data</h2>
+          </div>
+
+          <p className="text-[var(--text-secondary)] mb-4">
+            Download all your content. Your data is yours - no lock-in.
+          </p>
+
+          <div className="grid gap-3">
+            {[
+              { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data: posts, drafts, settings' },
+              { format: 'markdown', label: 'Markdown Export', desc: 'All posts as markdown files' },
+              { format: 'html', label: 'HTML Archive', desc: 'Self-contained HTML with all posts' },
+            ].map(({ format, label, desc }) => (
+              <a
+                key={format}
+                href={`/api/export?format=${format}`}
+                className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+              >
+                <div>
+                  <p className="font-medium">{label}</p>
+                  <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                </div>
+                <Download size={18} className="text-[var(--text-tertiary)]" />
+              </a>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <KeyRound size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">AI Capture (BYOK)</h2>
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            Add your own keys to unlock AI summaries, expansions, and research tools.
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)] mb-6">
+            Active keys are used first. Pro users can fall back to managed keys when no active key is set.
+          </p>
+
+          <div className="space-y-4">
+            {aiProviders.map((provider) => {
+              const providerKeys = getProviderKeys(provider.id)
+              const draftValue = integrationDrafts[provider.id] || ''
+              const hint = getIntegrationHint(provider.id, draftValue)
+              return (
+                <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
+                        {provider.label}
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)]">
+                        {isConnected(provider.id) ? 'Active' : 'Not connected'}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 ml-3">
-                      <button
-                        onClick={() => copyToClipboard(url, label)}
-                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                        title="Copy URL"
-                      >
-                        {copied === label ? (
-                          <Check size={16} className="text-[var(--success)]" />
-                        ) : (
-                          <Copy size={16} className="text-[var(--text-tertiary)]" />
-                        )}
-                      </button>
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                        title="Open feed"
-                      >
-                        <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
-                      </a>
-                    </div>
+                    {isConnected(provider.id) && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] bg-[var(--accent-soft)] text-[var(--accent)]">
+                        Active
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            </section>
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Download size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">Export Your Data</h2>
-              </div>
 
-              <p className="text-[var(--text-secondary)] mb-4">
-                Download all your content. Your data is yours - no lock-in.
-              </p>
-
-              <div className="grid gap-3">
-                {[
-                  { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data: posts, drafts, settings' },
-                  { format: 'markdown', label: 'Markdown Export', desc: 'All posts as markdown files' },
-                  { format: 'html', label: 'HTML Archive', desc: 'Self-contained HTML with all posts' },
-                ].map(({ format, label, desc }) => (
-                  <a
-                    key={format}
-                    href={`/api/export?format=${format}`}
-                    className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium">{label}</p>
-                      <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
-                    </div>
-                    <Download size={18} className="text-[var(--text-tertiary)]" />
-                  </a>
-                ))}
-              </div>
-            </section>
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <KeyRound size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">AI Capture (BYOK)</h2>
-              </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
-                Add your own keys to unlock AI summaries, expansions, and research tools.
-              </p>
-              <p className="text-xs text-[var(--text-tertiary)] mb-6">
-                Active keys are used first. Pro users can fall back to managed keys when no active key is set.
-              </p>
-
-              <div className="space-y-4">
-                {aiProviders.map((provider) => {
-                  const providerKeys = getProviderKeys(provider.id)
-                  const draftValue = integrationDrafts[provider.id] || ''
-                  const hint = getIntegrationHint(provider.id, draftValue)
-                  return (
-                    <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-                      <div className="flex items-center justify-between gap-3 mb-3">
-                        <div>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">
-                            {provider.label}
-                          </p>
-                          <p className="text-xs text-[var(--text-tertiary)]">
-                            {isConnected(provider.id) ? 'Active' : 'Not connected'}
-                          </p>
+                  {providerKeys.length > 0 ? (
+                    <div className="space-y-2 mb-4">
+                      {providerKeys.map((key, index) => (
+                        <div key={key.id} className="flex items-center justify-between text-xs">
+                          <div>
+                            <p className="text-[var(--text-primary)] font-medium">
+                              {key.label || `Key ${providerKeys.length - index}`}
+                            </p>
+                            <p className="text-[var(--text-tertiary)]">
+                              {key.is_active ? 'Active' : 'Inactive'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!key.is_active && (
+                              <button
+                                onClick={() => setActiveIntegration(key.id)}
+                                className="btn btn-secondary btn-sm"
+                              >
+                                Set active
+                              </button>
+                            )}
+                            <button
+                              onClick={() => deleteIntegration(key.id)}
+                              className="btn btn-secondary btn-sm text-[var(--error)]"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
-                        {isConnected(provider.id) && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.2em] bg-[var(--accent-soft)] text-[var(--accent)]">
-                            Active
-                          </span>
-                        )}
-                      </div>
-
-                      {providerKeys.length > 0 ? (
-                        <div className="space-y-2 mb-4">
-                          {providerKeys.map((key, index) => (
-                            <div key={key.id} className="flex items-center justify-between text-xs">
-                              <div>
-                                <p className="text-[var(--text-primary)] font-medium">
-                                  {key.label || `Key ${providerKeys.length - index}`}
-                                </p>
-                                <p className="text-[var(--text-tertiary)]">
-                                  {key.is_active ? 'Active' : 'Inactive'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {!key.is_active && (
-                                  <button
-                                    onClick={() => setActiveIntegration(key.id)}
-                                    className="btn btn-secondary btn-sm"
-                                  >
-                                    Set active
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => deleteIntegration(key.id)}
-                                  className="btn btn-secondary btn-sm text-[var(--error)]"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-[var(--text-tertiary)] mb-4">
-                          No keys saved yet.
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="text"
-                          value={integrationLabels[provider.id] || ''}
-                          onChange={(event) =>
-                            setIntegrationLabels((prev) => ({
-                              ...prev,
-                              [provider.id]: event.target.value,
-                            }))
-                          }
-                          placeholder="Label (optional)"
-                          className="input flex-1 min-w-[160px]"
-                        />
-                        <input
-                          type="password"
-                          value={draftValue}
-                          onChange={(event) =>
-                            setIntegrationDrafts((prev) => ({
-                              ...prev,
-                              [provider.id]: event.target.value,
-                            }))
-                          }
-                          placeholder={isConnected(provider.id) ? '************' : 'Paste API key'}
-                          className="input flex-1 min-w-[200px]"
-                        />
-                        <button
-                          onClick={() => saveIntegration(provider.id)}
-                          disabled={integrationSaving === provider.id}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          {integrationSaving === provider.id ? 'Saving...' : 'Save'}
-                        </button>
-                      </div>
-                      {hint && (
-                        <p className={`text-xs mt-2 ${hint.tone === 'error' ? 'text-[var(--error)]' : 'text-[var(--warning)]'}`}>
-                          {hint.text}
-                        </p>
-                      )}
+                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            </section>
+                  ) : (
+                    <p className="text-xs text-[var(--text-tertiary)] mb-4">
+                      No keys saved yet.
+                    </p>
+                  )}
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-                  <Shield size={20} className="text-[var(--accent)]" />
-                </div>
-                <h2 className="font-display text-lg">AI usage caps</h2>
-              </div>
-              <p className="text-sm text-[var(--text-secondary)] mb-6">
-                Optional daily/monthly token caps per provider. Leave blank for unlimited.
-              </p>
-
-              <div className="grid gap-4">
-                {([
-                  { id: 'openai', label: 'OpenAI' },
-                  { id: 'groq', label: 'Groq' },
-                ] as const).map((provider) => (
-                  <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-                    <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <label className="text-sm text-[var(--text-secondary)]">
-                        Daily cap (tokens)
-                        <input
-                          type="number"
-                          min={1}
-                          inputMode="numeric"
-                          value={(usageCaps as any)[provider.id].day}
-                          onChange={(event) =>
-                            setUsageCaps((prev) => ({
-                              ...prev,
-                              [provider.id]: {
-                                ...(prev as any)[provider.id],
-                                day: event.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Unlimited"
-                          className="input mt-2"
-                        />
-                      </label>
-                      <label className="text-sm text-[var(--text-secondary)]">
-                        Monthly cap (tokens)
-                        <input
-                          type="number"
-                          min={1}
-                          inputMode="numeric"
-                          value={(usageCaps as any)[provider.id].month}
-                          onChange={(event) =>
-                            setUsageCaps((prev) => ({
-                              ...prev,
-                              [provider.id]: {
-                                ...(prev as any)[provider.id],
-                                month: event.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Unlimited"
-                          className="input mt-2"
-                        />
-                      </label>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={integrationLabels[provider.id] || ''}
+                      onChange={(event) =>
+                        setIntegrationLabels((prev) => ({
+                          ...prev,
+                          [provider.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Label (optional)"
+                      className="input flex-1 min-w-[160px]"
+                    />
+                    <input
+                      type="password"
+                      value={draftValue}
+                      onChange={(event) =>
+                        setIntegrationDrafts((prev) => ({
+                          ...prev,
+                          [provider.id]: event.target.value,
+                        }))
+                      }
+                      placeholder={isConnected(provider.id) ? '************' : 'Paste API key'}
+                      className="input flex-1 min-w-[200px]"
+                    />
+                    <button
+                      onClick={() => saveIntegration(provider.id)}
+                      disabled={integrationSaving === provider.id}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      {integrationSaving === provider.id ? 'Saving...' : 'Save'}
+                    </button>
                   </div>
-                ))}
-
-                <div className="flex items-center justify-end">
-                  <button
-                    onClick={saveUsageCaps}
-                    disabled={usageCapsSaving}
-                    className="btn btn-secondary"
-                  >
-                    {usageCapsSaving ? 'Saving...' : 'Save caps'}
-                  </button>
+                  {hint && (
+                    <p className={`text-xs mt-2 ${hint.tone === 'error' ? 'text-[var(--error)]' : 'text-[var(--warning)]'}`}>
+                      {hint.text}
+                    </p>
+                  )}
                 </div>
-              </div>
-            </section>
+              )
+            })}
+          </div>
+        </section>
 
-            <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--bg-primary)] flex items-center justify-center">
-                  <Mail size={20} className="text-[var(--text-tertiary)]" />
-                </div>
-                <h2 className="font-display text-lg">Account</h2>
-              </div>
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Shield size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">AI usage caps</h2>
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">
+            Optional daily/monthly token caps per provider. Leave blank for unlimited.
+          </p>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                    Email Address
+          <div className="grid gap-4">
+            {([
+              { id: 'openai', label: 'OpenAI' },
+              { id: 'groq', label: 'Groq' },
+            ] as const).map((provider) => (
+              <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Daily cap (tokens)
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={(usageCaps as any)[provider.id].day}
+                      onChange={(event) =>
+                        setUsageCaps((prev) => ({
+                          ...prev,
+                          [provider.id]: {
+                            ...(prev as any)[provider.id],
+                            day: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Unlimited"
+                      className="input mt-2"
+                    />
                   </label>
-                  <input
-                    type="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
-                  />
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Monthly cap (tokens)
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={(usageCaps as any)[provider.id].month}
+                      onChange={(event) =>
+                        setUsageCaps((prev) => ({
+                          ...prev,
+                          [provider.id]: {
+                            ...(prev as any)[provider.id],
+                            month: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Unlimited"
+                      className="input mt-2"
+                    />
+                  </label>
                 </div>
               </div>
-            </section>
+            ))}
 
-            <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
-                  <Shield size={20} className="text-[var(--error)]" />
-                </div>
-                <h2 className="font-display text-lg">Danger Zone</h2>
-              </div>
+            <div className="flex items-center justify-end">
+              <button
+                onClick={saveUsageCaps}
+                disabled={usageCapsSaving}
+                className="btn btn-secondary"
+              >
+                {usageCapsSaving ? 'Saving...' : 'Save caps'}
+              </button>
+            </div>
+          </div>
+        </section>
 
-              <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle size={20} className="text-[var(--error)] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-[var(--error)]">Delete Account</p>
-                  <p className="text-sm text-[var(--text-secondary)] mt-1">
-                    This will permanently delete your account, all posts, comments, and data. 
-                    This action cannot be undone.
-                  </p>
-                </div>
-              </div>
-              
-              {!showDeleteConfirm ? (
-                <button 
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="btn bg-[var(--error)] text-white hover:opacity-90"
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--bg-primary)] flex items-center justify-center">
+              <Mail size={20} className="text-[var(--text-tertiary)]" />
+            </div>
+            <h2 className="font-display text-lg">Account</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={user?.email || ''}
+                disabled
+                className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
+              <Shield size={20} className="text-[var(--error)]" />
+            </div>
+            <h2 className="font-display text-lg">Danger Zone</h2>
+          </div>
+
+          <div className="flex items-start gap-3 mb-4">
+            <AlertTriangle size={20} className="text-[var(--error)] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-[var(--error)]">Delete Account</p>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
+                This will permanently delete your account, all posts, comments, and data.
+                This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="btn bg-[var(--error)] text-white hover:opacity-90"
+            >
+              <Trash2 size={16} />
+              Delete Account
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-medium">
+                Type <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded">{profile?.username}</code> to confirm:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                className="input"
+                placeholder="Enter your username"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== profile?.username || deleting}
+                  className="btn bg-[var(--error)] text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  <Trash2 size={16} />
-                  Delete Account
+                  {deleting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Permanently Delete'
+                  )}
                 </button>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">
-                    Type <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded">{profile?.username}</code> to confirm:
-                  </p>
-                  <input
-                    type="text"
-                    value={deleteConfirmText}
-                    onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    className="input"
-                    placeholder="Enter your username"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={deleteConfirmText !== profile?.username || deleting}
-                      className="btn bg-[var(--error)] text-white hover:opacity-90 disabled:opacity-50"
-                    >
-                      {deleting ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        'Permanently Delete'
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDeleteConfirm(false)
-                        setDeleteConfirmText('')
-                      }}
-                      className="btn btn-secondary"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
-        </div>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteConfirmText('')
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
