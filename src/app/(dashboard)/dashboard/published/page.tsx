@@ -41,7 +41,7 @@ export default function PublishedPage() {
   const [activeTab, setActiveTab] = useState<'posts' | 'analytics' | 'engagement'>('posts')
   const [search, setSearch] = useState('')
   const [username, setUsername] = useState<string | null>(null)
-  
+
   const router = useRouter()
   const supabase = createClient()
   const { capabilities } = useUserMaturity(userId)
@@ -52,7 +52,7 @@ export default function PublishedPage() {
 
   const loadPublished = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login')
       return
@@ -203,7 +203,7 @@ export default function PublishedPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Search published posts"
-                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-white/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
+                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
               />
             </div>
           )}
@@ -213,7 +213,7 @@ export default function PublishedPage() {
               {filteredPosts.map((post, i) => (
                 <div
                   key={post.id}
-                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-[var(--bg-primary)]/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
                   <div className="flex items-start justify-between gap-6">
                     <div className="flex-1 min-w-0">
@@ -264,7 +264,7 @@ export default function PublishedPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
               {search ? (
                 <>
                   <Search size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
@@ -313,7 +313,7 @@ export default function PublishedPage() {
                   .map((post, idx) => (
                     <div
                       key={post.id}
-                      className="flex items-center justify-between p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow"
+                      className="flex items-center justify-between p-4 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/90 shadow"
                     >
                       <div className="flex items-center gap-4">
                         <span className="w-8 h-8 rounded bg-[var(--bg-secondary)] text-base flex items-center justify-center text-[var(--text-tertiary)] font-bold">
@@ -338,7 +338,7 @@ export default function PublishedPage() {
           </div>
 
           {/* More Analytics Placeholder */}
-          <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-12 text-center shadow">
+          <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-12 text-center shadow">
             <BarChart2 size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
             <p className="text-base text-[var(--text-secondary)]">
               Deeper analytics coming soon.
@@ -351,7 +351,7 @@ export default function PublishedPage() {
       {activeTab === 'engagement' && capabilities.showEngagementPanel && (
         <div className="space-y-8">
           {/* Subscribers */}
-          <div className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-8 shadow">
+          <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/80 p-8 shadow">
             <div className="flex items-center gap-4 mb-6">
               <Users size={24} className="text-[var(--text-secondary)]" />
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">Subscribers</h2>
@@ -360,18 +360,18 @@ export default function PublishedPage() {
               {stats.subscriberCount}
             </p>
             <p className="text-base text-[var(--text-secondary)] mt-2">
-              {stats.subscriberCount === 0 
+              {stats.subscriberCount === 0
                 ? 'Share your work to grow your audience.'
                 : stats.subscriberCount === 1
-                ? 'Your first subscriber! Keep going.'
-                : 'People who want to hear from you.'}
+                  ? 'Your first subscriber! Keep going.'
+                  : 'People who want to hear from you.'}
             </p>
           </div>
 
           {/* Recent Comments Preview */}
           <div>
             <h2 className="text-base font-semibold text-[var(--text-secondary)] mb-4">Recent Engagement</h2>
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-12 text-center shadow">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-12 text-center shadow">
               <MessageSquare size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
               <p className="text-base text-[var(--text-secondary)] mb-6">
                 View all comments and reactions in one place.

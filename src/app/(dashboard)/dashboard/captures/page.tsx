@@ -71,7 +71,7 @@ export default function CapturesPage() {
       </div>
 
       {captures.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-10 text-center shadow">
+        <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-10 text-center shadow">
           <Archive size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
           <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
             No captures yet
@@ -92,7 +92,7 @@ export default function CapturesPage() {
       ) : (
         <ul className="space-y-4">
           {captures.map(c => (
-            <li key={c.id} className="p-4 rounded-2xl border border-[var(--border-light)] bg-white/90 shadow hover:border-[var(--border-medium)] transition-colors">
+            <li key={c.id} className="p-4 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/90 shadow hover:border-[var(--border-medium)] transition-colors">
               <Link href={`/dashboard/captures/${c.id}`}>
                 <div className="text-base font-medium text-[var(--text-primary)]">
                   {c.title || c.content.slice(0, 80)}

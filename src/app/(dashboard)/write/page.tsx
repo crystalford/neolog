@@ -491,9 +491,9 @@ export default function WritePage() {
   const publicationSlug = selectedPublication?.slug || profile?.username
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-[var(--bg-primary)]">
       {/* Top bar */}
-      <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className="border-b border-gray-200 bg-[var(--bg-primary)] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
@@ -628,7 +628,7 @@ export default function WritePage() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Post title"
             aria-label="Post title"
-            className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-white transition-colors"
+            className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
             autoFocus
           />
 
@@ -638,7 +638,7 @@ export default function WritePage() {
             onChange={(e) => setSubtitle(e.target.value)}
             placeholder="Add a subtitle or excerpt (optional)"
             aria-label="Post subtitle"
-            className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-white transition-colors"
+            className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
           />
 
           <div>
@@ -673,7 +673,7 @@ export default function WritePage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowImport(false)}
           />
-          <div className="relative w-full max-w-2xl bg-white rounded-lg shadow-2xl">
+          <div className="relative w-full max-w-2xl bg-[var(--bg-primary)] rounded-lg shadow-2xl">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">Import HTML</h2>
@@ -719,7 +719,7 @@ export default function WritePage() {
             className="absolute inset-0 bg-black/20"
             onClick={() => setShowSettings(false)}
           />
-          <div className="relative w-full max-w-md h-full bg-white shadow-2xl overflow-y-auto">
+          <div className="relative w-full max-w-md h-full bg-[var(--bg-primary)] shadow-2xl overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">Post Settings</h2>

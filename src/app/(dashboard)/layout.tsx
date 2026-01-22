@@ -325,11 +325,10 @@ export default function DashboardLayout({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                  }`}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                    }`}
                 >
                   <Icon size={18} className="flex-shrink-0" />
                   <span>{link.label}</span>
@@ -353,11 +352,10 @@ export default function DashboardLayout({
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                      }`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                        }`}
                     >
                       <Icon size={18} className="flex-shrink-0" />
                       <span>{link.label}</span>
@@ -383,11 +381,10 @@ export default function DashboardLayout({
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-                      }`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_var(--border-light)]'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+                        }`}
                     >
                       <Icon size={18} className="flex-shrink-0" />
                       <span>{link.label}</span>
@@ -447,7 +444,10 @@ export default function DashboardLayout({
                 </span>
               </Link>
             ) : (
-              <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)]">
+              <Link
+                href="/dashboard/settings"
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+              >
                 {profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
@@ -460,7 +460,7 @@ export default function DashboardLayout({
                 <span className="truncate text-sm">
                   {profile.display_name || profile.username}
                 </span>
-              </div>
+              </Link>
             )
           )}
 
@@ -483,10 +483,10 @@ export default function DashboardLayout({
               <Link href="/" className="lg:hidden flex items-center gap-2">
                 <span className="logo-mark">N</span>
               </Link>
-              
+
               {/* Page Title */}
               <h1 className="text-lg font-display text-[var(--text-primary)]">{activeLabel}</h1>
-              
+
               {/* Publication Switcher (if applicable) */}
               {capabilities.showPublicationsManagement && (
                 <div className="hidden sm:block">
@@ -497,7 +497,7 @@ export default function DashboardLayout({
                 </div>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* Search */}
               <button
@@ -508,7 +508,7 @@ export default function DashboardLayout({
                 <span>Search...</span>
                 <span className="text-[10px] ml-4 opacity-60">Cmd+/</span>
               </button>
-              
+
               {/* Mobile buttons */}
               <button
                 onClick={() => setCommandOpen(true)}
@@ -526,7 +526,7 @@ export default function DashboardLayout({
                 <PenLine size={16} />
                 New Post
               </Link>
-              
+
               {/* User avatar */}
               {profile && (
                 selectedPublicationSlug ? (
@@ -545,7 +545,10 @@ export default function DashboardLayout({
                     )}
                   </Link>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center">
+                  <Link
+                    href="/dashboard/settings"
+                    className="w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-light)] overflow-hidden flex items-center justify-center"
+                  >
                     {profile.avatar_url ? (
                       <img
                         src={profile.avatar_url}
@@ -555,12 +558,12 @@ export default function DashboardLayout({
                     ) : (
                       <UserIcon size={16} />
                     )}
-                  </div>
+                  </Link>
                 )
               )}
             </div>
           </div>
-          
+
           {/* Mobile Navigation Tabs */}
           <div className="lg:hidden flex border-t border-[var(--border-light)] overflow-x-auto">
             {primaryNav.map((link) => {
@@ -571,11 +574,10 @@ export default function DashboardLayout({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2 px-3 text-xs transition-colors ${
-                    isActive
-                      ? 'text-[var(--text-primary)] border-b-2 border-[var(--accent)]'
-                      : 'text-[var(--text-tertiary)]'
-                  }`}
+                  className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-2 px-3 text-xs transition-colors ${isActive
+                    ? 'text-[var(--text-primary)] border-b-2 border-[var(--accent)]'
+                    : 'text-[var(--text-tertiary)]'
+                    }`}
                 >
                   <Icon size={18} />
                   <span className="truncate">{link.label}</span>

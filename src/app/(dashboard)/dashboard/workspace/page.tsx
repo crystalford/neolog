@@ -53,7 +53,7 @@ export default function WorkspacePage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'drafts' | 'scheduled' | 'stacks' | 'topics'>('drafts')
   const [search, setSearch] = useState('')
-  
+
   const router = useRouter()
   const supabase = createClient()
   const { capabilities } = useUserMaturity(userId)
@@ -64,7 +64,7 @@ export default function WorkspacePage() {
 
   const loadWorkspace = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login')
       return
@@ -83,28 +83,28 @@ export default function WorkspacePage() {
     const draftsList: DraftWithProgress[] = []
     const scheduledList: DraftWithProgress[] = []
 
-    ;(postsData || []).forEach(post => {
-      const wordCount = getWordCount(post.content)
-      const progress = getProgressFromWordCount(wordCount)
-      const item: DraftWithProgress = {
-        id: post.id,
-        title: post.title,
-        slug: post.slug,
-        content: post.content,
-        updated_at: post.updated_at,
-        created_at: post.created_at,
-        word_count: wordCount,
-        progress_percent: progress.percent,
-        progress_label: progress.label,
-        scheduled_at: post.scheduled_at,
-      }
+      ; (postsData || []).forEach(post => {
+        const wordCount = getWordCount(post.content)
+        const progress = getProgressFromWordCount(wordCount)
+        const item: DraftWithProgress = {
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          content: post.content,
+          updated_at: post.updated_at,
+          created_at: post.created_at,
+          word_count: wordCount,
+          progress_percent: progress.percent,
+          progress_label: progress.label,
+          scheduled_at: post.scheduled_at,
+        }
 
-      if (post.status === 'scheduled') {
-        scheduledList.push(item)
-      } else {
-        draftsList.push(item)
-      }
-    })
+        if (post.status === 'scheduled') {
+          scheduledList.push(item)
+        } else {
+          draftsList.push(item)
+        }
+      })
 
     setDrafts(draftsList)
     setScheduled(scheduledList)
@@ -215,11 +215,10 @@ export default function WorkspacePage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`px-5 py-2 rounded-xl text-base font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white/90 text-[var(--text-primary)] shadow'
+            className={`px-5 py-2 rounded-xl text-base font-medium transition-colors ${activeTab === tab.id
+                ? 'bg-[var(--bg-primary)]/90 text-[var(--text-primary)] shadow'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             {tab.label}
             {tab.count !== null && (
@@ -243,7 +242,7 @@ export default function WorkspacePage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search drafts"
-              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-white/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
+              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/80 text-base focus:outline-none focus:border-[var(--accent)] shadow"
             />
           </div>
 
@@ -252,7 +251,7 @@ export default function WorkspacePage() {
               {filteredDrafts.map((draft, i) => (
                 <div
                   key={draft.id}
-                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-[var(--bg-primary)]/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
                   <div className="flex items-start justify-between gap-6">
                     <div className="flex-1 min-w-0">
@@ -274,7 +273,7 @@ export default function WorkspacePage() {
                           <span className="text-[var(--text-tertiary)]">{draft.progress_label}</span>
                         </div>
                         <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className="h-full bg-[var(--accent)] rounded-full transition-all"
                             style={{ width: `${draft.progress_percent}%` }}
                           />
@@ -305,13 +304,13 @@ export default function WorkspacePage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
               <PenLine size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 {search ? 'No matches found' : 'No drafts yet'}
               </h2>
               <p className="text-base text-[var(--text-secondary)] mb-6">
-                {search 
+                {search
                   ? 'Try a different keyword or clear filters.'
                   : 'Turn a capture into a draft or start fresh.'}
               </p>
@@ -339,7 +338,7 @@ export default function WorkspacePage() {
               {scheduled.map((item, i) => (
                 <div
                   key={item.id}
-                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
+                  className={`group p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-[var(--bg-primary)]/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
@@ -369,7 +368,7 @@ export default function WorkspacePage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
               <Calendar size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 No scheduled posts yet
@@ -391,7 +390,7 @@ export default function WorkspacePage() {
                 <Link
                   key={stack.id}
                   href={`/series/${stack.slug}`}
-                  className={`group block p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-white/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
+                  className={`group block p-5 rounded-2xl border transition-colors shadow ${i % 2 === 1 ? 'bg-[var(--bg-secondary)]/40' : 'bg-[var(--bg-primary)]/90'} hover:border-[var(--accent)] border-[var(--border-light)]`}
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
@@ -414,14 +413,14 @@ export default function WorkspacePage() {
               ))}
               <Link
                 href="/series/new"
-                className="block p-5 rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 hover:border-[var(--accent)] transition-colors text-center shadow"
+                className="block p-5 rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 hover:border-[var(--accent)] transition-colors text-center shadow"
               >
                 <Plus size={22} className="mx-auto text-[var(--text-tertiary)] mb-2" />
                 <p className="text-base text-[var(--text-secondary)]">Create new stack</p>
               </Link>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-white/70 p-16 text-center shadow">
+            <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
               <Layers size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 No stacks yet
@@ -440,7 +439,7 @@ export default function WorkspacePage() {
 
       {/* Topics Tab */}
       {activeTab === 'topics' && (
-        <div className="rounded-2xl border border-[var(--border-light)] bg-white/80 p-12 text-center shadow">
+        <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/80 p-12 text-center shadow">
           <Hash size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
           <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
             Manage Topics

@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
-import { 
-  ArrowRight, Loader2, Camera, Check, Sparkles, 
+import {
+  ArrowRight, Loader2, Camera, Check, Sparkles,
   PenLine, Users, Rss
 } from 'lucide-react'
 
@@ -15,7 +15,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  
+
   // Form data
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
@@ -26,7 +26,7 @@ export default function OnboardingPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [interests, setInterests] = useState<string[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
-  
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -36,7 +36,7 @@ export default function OnboardingPage() {
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       router.push('/login')
       return
@@ -48,13 +48,13 @@ export default function OnboardingPage() {
 
     if (profileData) {
       setProfile(profileData)
-      
+
       // If onboarding already completed, go to dashboard
       if (profileData.onboarded_at) {
         router.push('/dashboard')
         return
       }
-      
+
       // Pre-fill existing data
       setDisplayName(profileData.display_name || '')
       setUsername(profileData.username || '')
@@ -243,29 +243,29 @@ export default function OnboardingPage() {
       setStep(3)
     } else if (step === 3) {
       // Save and finish
-    setSaving(true)
-    setSaveError(null)
+      setSaving(true)
+      setSaveError(null)
 
-    const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
-    if (!currentProfile) {
-      setSaveError('Unable to load your profile. Please try again.')
-      setSaving(false)
-      return
-    }
-    if (!profile) {
-      setProfile(currentProfile)
-    }
-      
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        username: normalizeUsername(username),
-        display_name: displayName,
-        bio: bio || null,
-        avatar_url: avatarUrl || null,
-        onboarded_at: new Date().toISOString(),
-      })
-      .eq('id', currentProfile.id)
+      const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
+      if (!currentProfile) {
+        setSaveError('Unable to load your profile. Please try again.')
+        setSaving(false)
+        return
+      }
+      if (!profile) {
+        setProfile(currentProfile)
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: normalizeUsername(username),
+          display_name: displayName,
+          bio: bio || null,
+          avatar_url: avatarUrl || null,
+          onboarded_at: new Date().toISOString(),
+        })
+        .eq('id', currentProfile.id)
 
       if (error) {
         if ((error as any).code === '23505') {
@@ -273,7 +273,7 @@ export default function OnboardingPage() {
         } else if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
           setSaveError('Username must be 3-30 characters and only use a-z, 0-9, and _.')
         } else {
-        setSaveError('Unable to finish setup. Please try again.')
+          setSaveError('Unable to finish setup. Please try again.')
         }
         setSaving(false)
         return
@@ -322,8 +322,8 @@ export default function OnboardingPage() {
   ]
 
   const toggleInterest = (topic: string) => {
-    setInterests(prev => 
-      prev.includes(topic) 
+    setInterests(prev =>
+      prev.includes(topic)
         ? prev.filter(t => t !== topic)
         : [...prev, topic]
     )
@@ -341,7 +341,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-[var(--bg-secondary)]">
-        <div 
+        <div
           className="h-full bg-[var(--accent)] transition-all duration-500"
           style={{ width: `${(step / 3) * 100}%` }}
         />
@@ -353,7 +353,7 @@ export default function OnboardingPage() {
           <div className="w-10 h-10 bg-[var(--accent)] rounded-lg flex items-center justify-center font-mono text-lg font-bold text-white">
             N
           </div>
-          <span className="font-display text-2xl">neolog</span>
+          <span className="font-display text-2xl">Neolog</span>
         </div>
 
         {/* Step 1: Basic info */}
@@ -371,7 +371,7 @@ export default function OnboardingPage() {
               <div className="flex flex-col items-center">
                 <div className="relative mb-3">
                   {avatarUrl ? (
-                    <img 
+                    <img
                       src={avatarUrl}
                       alt="Avatar"
                       className="w-24 h-24 rounded-full object-cover"
@@ -381,7 +381,7 @@ export default function OnboardingPage() {
                       {displayName ? displayName[0].toUpperCase() : user?.email?.[0].toUpperCase()}
                     </div>
                   )}
-                  
+
                   <label className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-[var(--bg-primary)] border-2 border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
                     {uploadingAvatar ? (
                       <Loader2 size={18} className="animate-spin" />
@@ -493,11 +493,10 @@ export default function OnboardingPage() {
                 <button
                   key={topic}
                   onClick={() => toggleInterest(topic)}
-                  className={`px-4 py-2 rounded-full text-sm transition-all ${
-                    interests.includes(topic)
+                  className={`px-4 py-2 rounded-full text-sm transition-all ${interests.includes(topic)
                       ? 'bg-[var(--accent)] text-white'
                       : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)]'
-                  }`}
+                    }`}
                 >
                   {interests.includes(topic) && <Check size={14} className="inline mr-1" />}
                   {topic}
@@ -517,7 +516,7 @@ export default function OnboardingPage() {
             <div className="w-20 h-20 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-6">
               <Sparkles size={32} className="text-[var(--accent)]" />
             </div>
-            
+
             <h1 className="font-display text-3xl mb-2">You're all set!</h1>
             <p className="text-[var(--text-secondary)] mb-8">
               Here's what you can do on Neolog
