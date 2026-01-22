@@ -39,13 +39,17 @@ export default function LoginPage() {
   }
 
   const handleOAuthLogin = async (provider: 'google' | 'github' | 'twitter') => {
+    setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
-    if (error) setError(error.message)
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    }
   }
 
   return (

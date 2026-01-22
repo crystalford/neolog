@@ -133,10 +133,10 @@ export default async function PostPage({ params, searchParams }: Props) {
   const stackId: string | null = post.series_id || null
   const { data: stack } = stackId
     ? await supabase
-        .from('series')
-        .select('title, slug')
-        .eq('id', stackId)
-        .maybeSingle()
+      .from('series')
+      .select('title, slug')
+      .eq('id', stackId)
+      .maybeSingle()
     : { data: null }
 
   const { data: tagRows } = await supabase
@@ -179,10 +179,10 @@ export default async function PostPage({ params, searchParams }: Props) {
 
   const publishedDate = post.published_at
     ? new Date(post.published_at).toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      })
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    })
     : null
   const htmlContent = post.content_html || post.content || ''
   const isFullHtml = /<!doctype/i.test(htmlContent) || /<html[\s>]/i.test(htmlContent)
@@ -354,7 +354,10 @@ export default async function PostPage({ params, searchParams }: Props) {
 
           {/* Newsletter CTA */}
           <div className="max-w-4xl mx-auto mt-8">
-            <NewsletterCTA authorName={publication.name} />
+            <NewsletterCTA
+              authorName={publication.name}
+              authorId={publication.owner_id}
+            />
           </div>
 
           {/* Publication Bio/CTA */}

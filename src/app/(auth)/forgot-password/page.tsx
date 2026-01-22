@@ -46,7 +46,15 @@ export default function ForgotPasswordPage() {
       {error && (
         <div className="mb-6 p-4 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20 flex items-start gap-3">
           <AlertCircle size={18} className="text-[var(--error)] flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-[var(--error)]">{error}</p>
+          <div className="flex-1">
+            <p className="text-sm text-[var(--error)]">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-sm text-[var(--error)] underline mt-1 hover:no-underline"
+            >
+              Try again
+            </button>
+          </div>
         </div>
       )}
 

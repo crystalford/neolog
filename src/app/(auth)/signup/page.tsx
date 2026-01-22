@@ -60,6 +60,7 @@ export default function SignupPage() {
   }
 
   const handleOAuthSignup = async (provider: 'google' | 'github' | 'twitter') => {
+    setLoading(true)
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -69,6 +70,7 @@ export default function SignupPage() {
 
     if (error) {
       setError(error.message)
+      setLoading(false)
     }
   }
 
