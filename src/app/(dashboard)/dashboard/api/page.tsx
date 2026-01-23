@@ -37,7 +37,7 @@ export default function ApiPage() {
                 <section className="rounded-2xl bg-blue-50 border border-blue-200 p-6">
                     <h3 className="font-semibold text-blue-900 mb-2">API Documentation</h3>
                     <p className="text-sm text-blue-800 mb-4">
-                        Learn how to use the Neolog Publishing API to publish content from external platforms like Canopticon.
+                        Learn how to use the Neolog Publishing API to publish content from external platforms like your application.
                     </p>
                     <a
                         href="/docs/api"

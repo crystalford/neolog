@@ -112,7 +112,7 @@ export function ApiKeyManager() {
                 <div className="flex-1">
                     <h3 className="font-display text-xl mb-1">API Keys</h3>
                     <p className="text-sm text-[var(--text-secondary)]">
-                        Use API keys to publish content to Neolog from external platforms like Canopticon.
+                        Use API keys to publish content to Neolog from external platforms like your application.
                     </p>
                 </div>
             </div>
@@ -161,7 +161,7 @@ export function ApiKeyManager() {
                         type="text"
                         value={newKeyName}
                         onChange={(e) => setNewKeyName(e.target.value)}
-                        placeholder="e.g., Canopticon Integration"
+                        placeholder="e.g., Production Integration"
                         className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
                     />
                     <button
