@@ -17,6 +17,12 @@ export function SyndicationSettings() {
     const [hashnodePublicationId, setHashnodePublicationId] = useState('')
     const [blueskyIdentifier, setBlueskyIdentifier] = useState('')
     const [blueskyPassword, setBlueskyPassword] = useState('')
+    const [twitterApiKey, setTwitterApiKey] = useState('')
+    const [twitterApiSecret, setTwitterApiSecret] = useState('')
+    const [twitterAccessToken, setTwitterAccessToken] = useState('')
+    const [twitterAccessSecret, setTwitterAccessSecret] = useState('')
+    const [mastodonInstance, setMastodonInstance] = useState('')
+    const [mastodonAccessToken, setMastodonAccessToken] = useState('')
     const [connecting, setConnecting] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -208,6 +214,30 @@ export function SyndicationSettings() {
             name: 'Bluesky',
             description: 'Reach 5M+ users on AT Protocol',
             color: 'from-blue-400 to-blue-600',
+            requiresCredentials: true,
+            disabled: false,
+        },
+        {
+            id: 'reddit',
+            name: 'Reddit',
+            description: 'Post to 430M+ users in communities',
+            color: 'from-orange-500 to-red-600',
+            requiresOAuth: true,
+            disabled: false,
+        },
+        {
+            id: 'twitter',
+            name: 'Twitter/X',
+            description: 'Share with 500M+ users',
+            color: 'from-black to-gray-800',
+            requiresCredentials: true,
+            disabled: false,
+        },
+        {
+            id: 'mastodon',
+            name: 'Mastodon',
+            description: 'Decentralized social network',
+            color: 'from-purple-600 to-blue-600',
             requiresCredentials: true,
             disabled: false,
         },
