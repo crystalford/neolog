@@ -259,7 +259,10 @@ export default function DashboardLayout({
     if (!capabilities.showPublishedTab) return []
 
     return [
-      { href: '/tiers', icon: DollarSign, label: 'Tiers' },
+      { href: '/dashboard/domain', icon: Globe, label: 'Custom Domain' },
+      { href: '/dashboard/distribution', icon: Globe, label: 'Distribution' },
+      { href: '/dashboard/api', icon: Command, label: 'API' },
+      { href: '/dashboard/monetization', icon: DollarSign, label: 'Monetization' },
     ]
   }, [capabilities])
 

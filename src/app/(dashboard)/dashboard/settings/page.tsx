@@ -4,9 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
-import { PublicationDomainSection } from '@/components/PublicationDomainSection'
-import { SyndicationSettings } from '@/components/SyndicationSettings'
-import { ApiKeyManager } from '@/components/ApiKeyManager'
 import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
@@ -877,21 +874,6 @@ export default function SettingsPage() {
               )}
             </button>
           </div>
-        </section>
-
-        {/* Custom Domain Section */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <PublicationDomainSection />
-        </section>
-
-        {/* Cross-Platform Publishing Section */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <SyndicationSettings />
-        </section>
-
-        {/* API Keys Section */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <ApiKeyManager />
         </section>
 
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
