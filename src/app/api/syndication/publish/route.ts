@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         // Get user's connections
         const { data: connections } = await supabase
             .from('syndication_connections')
-            .select('platform, access_token')
+            .select('platform, access_token, platform_metadata')
             .eq('user_id', session.user.id)
             .eq('is_active', true)
             .in('platform', platforms)
