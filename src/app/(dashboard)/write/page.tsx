@@ -106,11 +106,32 @@ export default function WritePage() {
     setProfile(profileData)
 
     // Load publications
-    const { data: pubs } = await supabase
+    let { data: pubs } = await supabase
       .from('publications')
       .select('id, name, slug')
       .eq('owner_id', session.user.id)
       .order('created_at', { ascending: false })
+
+    // Auto-create publication if none exists (for legacy users)
+    if (!pubs || pubs.length === 0) {
+      const username = profileData?.username || session.user.email?.split('@')[0] || 'user'
+      const displayName = profileData?.display_name || username
+
+      const { data: newPub, error: pubError } = await supabase
+        .from('publications')
+        .insert({
+          owner_id: session.user.id,
+          name: displayName,
+          slug: username.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+          description: profileData?.bio || null,
+        })
+        .select('id, name, slug')
+        .single()
+
+      if (!pubError && newPub) {
+        pubs = [newPub]
+      }
+    }
 
     setPublications(pubs || [])
 
