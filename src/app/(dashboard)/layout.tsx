@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   Home, PenSquare, Send, Settings, LogOut, User as UserIcon,
   PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
-  BookOpen, DollarSign, Globe
+  BookOpen, DollarSign, Globe, Share2
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -253,7 +253,7 @@ export default function DashboardLayout({
   const growNav = useMemo(() => {
     return [
       { href: '/dashboard/domain', icon: Globe, label: 'Custom Domain' },
-      { href: '/dashboard/distribution', icon: Globe, label: 'Distribution' },
+      { href: '/dashboard/distribution', icon: Share2, label: 'Distribution' },
       { href: '/dashboard/api', icon: Command, label: 'API' },
       { href: '/dashboard/monetization', icon: DollarSign, label: 'Monetization' },
     ]

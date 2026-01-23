@@ -1,6 +1,7 @@
 'use client'
 
 import { ApiKeyManager } from '@/components/ApiKeyManager'
+import { AICaptureSettings } from '@/components/AICaptureSettings'
 import { Code2 } from 'lucide-react'
 
 export default function ApiPage() {
@@ -22,10 +23,15 @@ export default function ApiPage() {
                     </div>
                 </div>
 
-                {/* API Keys */}
+                {/* Publishing API Keys */}
                 <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-6 shadow-sm mb-6">
                     <ApiKeyManager />
                 </section>
+
+                {/* AI Capture (BYOK) */}
+                <div className="mb-6">
+                    <AICaptureSettings />
+                </div>
 
                 {/* Documentation Link */}
                 <section className="rounded-2xl bg-blue-50 border border-blue-200 p-6">
