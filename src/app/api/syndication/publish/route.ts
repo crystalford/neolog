@@ -88,6 +88,56 @@ export async function POST(request: NextRequest) {
                     )
                     platformPostId = result.id.toString()
                     platformUrl = result.url
+                } else if (connection.platform === 'hashnode') {
+                    const { publishToHashnode } = await import('@/lib/syndication/hashnode')
+
+                    // Extract API key and publication ID from stored token
+                    const [apiKey, publicationId] = connection.access_token.split('|||')
+
+                    if (!apiKey || !publicationId) {
+                        throw new Error('Invalid Hashnode connection data')
+                    }
+
+                    const result = await publishToHashnode(
+                        {
+                            title: post.title,
+                            content: post.content || '',
+                            tags,
+                            canonicalUrl,
+                            coverImage: post.cover_image_url || undefined,
+                        },
+                        apiKey,
+                        publicationId
+                    )
+                    platformPostId = result.id
+                    platformUrl = result.url
+                } else if (connection.platform === 'linkedin') {
+                    const { publishToLinkedIn } = await import('@/lib/syndication/linkedin')
+
+                    // Get platform user ID from connection
+                    const { data: conn } = await supabase
+                        .from('syndication_connections')
+                        .select('platform_user_id')
+                        .eq('user_id', session.user.id)
+                        .eq('platform', 'linkedin')
+                        .single()
+
+                    if (!conn?.platform_user_id) {
+                        throw new Error('LinkedIn user ID not found')
+                    }
+
+                    const result = await publishToLinkedIn(
+                        {
+                            title: post.title,
+                            excerpt: post.excerpt || post.title,
+                            url: canonicalUrl,
+                            coverImage: post.cover_image_url || undefined,
+                        },
+                        connection.access_token,
+                        conn.platform_user_id
+                    )
+                    platformPostId = result.id
+                    platformUrl = result.url
                 }
 
                 // Record syndication

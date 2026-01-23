@@ -145,6 +145,7 @@ export function SyndicationSettings() {
             description: 'Reach 1M+ developers',
             color: 'from-black to-gray-800',
             docsUrl: 'https://dev.to/settings/extensions',
+            disabled: false,
         },
         {
             id: 'hashnode',
@@ -152,13 +153,15 @@ export function SyndicationSettings() {
             description: 'Reach 500K+ developers',
             color: 'from-blue-600 to-blue-700',
             docsUrl: 'https://hashnode.com/settings/developer',
+            disabled: false,
         },
         {
             id: 'linkedin',
             name: 'LinkedIn',
-            description: 'Coming soon',
+            description: 'Reach 900M+ professionals',
             color: 'from-blue-700 to-blue-800',
-            disabled: true,
+            requiresOAuth: true,
+            disabled: false,
         },
     ]
 
@@ -318,6 +321,18 @@ export function SyndicationSettings() {
                                                 'Connect Hashnode'
                                             )}
                                         </button>
+                                    </div>
+                                ) : platform.id === 'linkedin' && platform.requiresOAuth ? (
+                                    <div>
+                                        <a
+                                            href="/api/syndication/linkedin/connect"
+                                            className="btn btn-primary btn-sm inline-flex items-center gap-2"
+                                        >
+                                            Connect with LinkedIn
+                                        </a>
+                                        <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                                            You'll be redirected to LinkedIn to authorize Neolog
+                                        </p>
                                     </div>
                                 ) : null}
                             </div>
