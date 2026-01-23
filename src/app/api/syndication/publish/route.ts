@@ -161,6 +161,64 @@ export async function POST(request: NextRequest) {
                     )
                     platformPostId = result.uri
                     platformUrl = result.url
+                } else if (connection.platform === 'reddit') {
+                    const { submitRedditLink } = await import('@/lib/syndication/reddit')
+
+                    // Extract access token and refresh token
+                    const [accessToken] = connection.access_token.split('|||')
+
+                    // Get subreddit from metadata (user would select this in UI)
+                    const subreddit = connection.platform_metadata?.subreddit || 'test'
+
+                    const result = await submitRedditLink(
+                        accessToken,
+                        subreddit,
+                        post.title,
+                        canonicalUrl
+                    )
+                    platformPostId = result.id
+                    platformUrl = result.url
+                } else if (connection.platform === 'twitter') {
+                    const { createTweet } = await import('@/lib/syndication/twitter')
+
+                    // Extract Twitter credentials
+                    const [apiKey, apiSecret, accessToken, accessSecret] = connection.access_token.split('|||')
+
+                    if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
+                        throw new Error('Invalid Twitter connection data')
+                    }
+
+                    const tweetText = post.excerpt
+                        ? `${post.title}\n\n${post.excerpt}\n\n${canonicalUrl}`
+                        : `${post.title}\n\n${canonicalUrl}`
+
+                    const result = await createTweet(
+                        { apiKey, apiSecret, accessToken, accessSecret },
+                        tweetText
+                    )
+                    platformPostId = result.id
+                    platformUrl = result.url
+                } else if (connection.platform === 'mastodon') {
+                    const { createMastodonStatus } = await import('@/lib/syndication/mastodon')
+
+                    // Extract instance and access token
+                    const [instance, accessToken] = connection.access_token.split('|||')
+
+                    if (!instance || !accessToken) {
+                        throw new Error('Invalid Mastodon connection data')
+                    }
+
+                    const statusText = post.excerpt
+                        ? `${post.title}\n\n${post.excerpt}\n\n${canonicalUrl}`
+                        : `${post.title}\n\n${canonicalUrl}`
+
+                    const result = await createMastodonStatus(
+                        instance,
+                        accessToken,
+                        statusText
+                    )
+                    platformPostId = result.id
+                    platformUrl = result.url
                 }
 
                 // Record syndication
