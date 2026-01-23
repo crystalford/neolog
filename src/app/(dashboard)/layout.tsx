@@ -225,15 +225,10 @@ export default function DashboardLayout({
   // Enhanced Navigation with essential features
   const primaryNav = useMemo(() => {
     const items = [
-      { href: '/dashboard', icon: Home, label: 'Home' },
+      { href: '/dashboard', icon: Home, label: 'Dashboard' },
       { href: '/write', icon: PenLine, label: 'Write' },
       { href: '/import', icon: Upload, label: 'Import' },
     ]
-
-    // Show Posts tab after first publish
-    if (capabilities.showPublishedTab) {
-      items.push({ href: '/posts', icon: Send, label: 'Posts' })
-    }
 
     // Always show Analytics
     items.push({ href: '/analytics', icon: BarChart3, label: 'Analytics' })
@@ -302,7 +297,7 @@ export default function DashboardLayout({
     primaryNav.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )?.label ||
-    (pathname === '/write' || pathname.startsWith('/write/') ? 'Write' : 'Home')
+    (pathname === '/write' || pathname.startsWith('/write/') ? 'Write' : 'Dashboard')
 
   return (
     <div className="dashboard-shell flex min-h-screen bg-[var(--bg-secondary)]">
@@ -396,31 +391,7 @@ export default function DashboardLayout({
             </div>
           )}
 
-          {/* Quick Actions */}
-          <div className="mt-6 pt-6 border-t border-[var(--border-light)]">
-            <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-3">
-              Quick Actions
-            </p>
-            <div className="space-y-1">
-              <Link
-                href="/write"
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-              >
-                <PenLine size={16} />
-                <span>New Post</span>
-              </Link>
-              <button
-                onClick={() => setCommandOpen(true)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-              >
-                <Search size={16} />
-                <span>Search</span>
-                <span className="ml-auto text-[10px] text-[var(--text-tertiary)]" title="Cmd+/ or Ctrl+/">
-                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? 'Cmd+/' : 'Ctrl+/'}
-                </span>
-              </button>
-            </div>
-          </div>
+
         </nav>
 
         {/* User Section */}
