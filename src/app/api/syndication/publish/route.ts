@@ -138,6 +138,29 @@ export async function POST(request: NextRequest) {
                     )
                     platformPostId = result.id
                     platformUrl = result.url
+                } else if (connection.platform === 'bluesky') {
+                    const { createBlueskyPost } = await import('@/lib/syndication/bluesky')
+
+                    // Extract credentials from stored token
+                    const [identifier, password] = connection.access_token.split('|||')
+
+                    if (!identifier || !password) {
+                        throw new Error('Invalid Bluesky connection data')
+                    }
+
+                    const postText = post.excerpt
+                        ? `${post.title}\n\n${post.excerpt}`
+                        : post.title
+
+                    const result = await createBlueskyPost(
+                        { identifier, password },
+                        {
+                            text: postText,
+                            url: canonicalUrl,
+                        }
+                    )
+                    platformPostId = result.uri
+                    platformUrl = result.url
                 }
 
                 // Record syndication

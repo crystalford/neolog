@@ -15,6 +15,8 @@ export function SyndicationSettings() {
     const [devtoApiKey, setDevtoApiKey] = useState('')
     const [hashnodeApiKey, setHashnodeApiKey] = useState('')
     const [hashnodePublicationId, setHashnodePublicationId] = useState('')
+    const [blueskyIdentifier, setBlueskyIdentifier] = useState('')
+    const [blueskyPassword, setBlueskyPassword] = useState('')
     const [connecting, setConnecting] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -113,6 +115,44 @@ export function SyndicationSettings() {
         }
     }
 
+    const handleConnectBluesky = async () => {
+        if (!blueskyIdentifier.trim() || !blueskyPassword.trim()) {
+            setError('Please enter both username and app password')
+            return
+        }
+
+        setConnecting('bluesky')
+        setError(null)
+        setSuccess(null)
+
+        try {
+            const response = await fetch('/api/syndication/bluesky/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    identifier: blueskyIdentifier,
+                    password: blueskyPassword,
+                }),
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                setError(data.error || 'Failed to connect')
+                return
+            }
+
+            setSuccess(`Connected to Bluesky as @${data.username}`)
+            setBlueskyIdentifier('')
+            setBlueskyPassword('')
+            await loadConnections()
+        } catch (err) {
+            setError('Network error. Please try again.')
+        } finally {
+            setConnecting(null)
+        }
+    }
+
     const handleDisconnect = async (platform: string) => {
         if (!confirm(`Disconnect from ${platform}?`)) return
 
@@ -161,6 +201,14 @@ export function SyndicationSettings() {
             description: 'Reach 900M+ professionals',
             color: 'from-blue-700 to-blue-800',
             requiresOAuth: true,
+            disabled: false,
+        },
+        {
+            id: 'bluesky',
+            name: 'Bluesky',
+            description: 'Reach 5M+ users on AT Protocol',
+            color: 'from-blue-400 to-blue-600',
+            requiresCredentials: true,
             disabled: false,
         },
     ]
@@ -333,6 +381,54 @@ export function SyndicationSettings() {
                                         <p className="text-xs text-[var(--text-tertiary)] mt-2">
                                             You'll be redirected to LinkedIn to authorize Neolog
                                         </p>
+                                    </div>
+                                ) : platform.id === 'bluesky' && platform.requiresCredentials ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                                                Username or Email
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={blueskyIdentifier}
+                                                onChange={(e) => setBlueskyIdentifier(e.target.value)}
+                                                placeholder="username.bsky.social"
+                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors mb-2"
+                                            />
+                                            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                                                App Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={blueskyPassword}
+                                                onChange={(e) => setBlueskyPassword(e.target.value)}
+                                                placeholder="Enter your app password"
+                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                                            />
+                                            <a
+                                                href="https://bsky.app/settings/app-passwords"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-[var(--accent)] hover:underline mt-2 inline-flex items-center gap-1"
+                                            >
+                                                Create app password
+                                                <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                        <button
+                                            onClick={handleConnectBluesky}
+                                            disabled={connecting === 'bluesky'}
+                                            className="btn btn-primary btn-sm"
+                                        >
+                                            {connecting === 'bluesky' ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    Connecting...
+                                                </>
+                                            ) : (
+                                                'Connect Bluesky'
+                                            )}
+                                        </button>
                                     </div>
                                 ) : null}
                             </div>
