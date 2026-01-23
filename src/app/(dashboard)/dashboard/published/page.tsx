@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
 import {
   Search, Eye, MessageSquare, Heart, BarChart2,
-  Users, TrendingUp, Calendar, ExternalLink, Edit2
+  Users, TrendingUp, Calendar, ExternalLink, Edit2, Sparkles
 } from 'lucide-react'
 
 interface PublishedPost {
