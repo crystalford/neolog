@@ -421,8 +421,8 @@ body {
   font-weight: 500;
   line-height: 1.25;
   letter-spacing: -0.01em;
-  border-radius: 0.25rem;
-  /* 4px - Tighter */
+  border-radius: 0.5rem;
+  /* Reverted to 8px - Softer */
   cursor: pointer;
   transition: all var(--transition-fast);
   border: 1px solid transparent;
@@ -440,25 +440,19 @@ body {
   pointer-events: none;
 }
 
-/* Primary Button - Bold, tactile, premium */
+/* Primary Button - Soft, friendly, standard */
 .btn-primary {
   background: var(--bg-inverse);
   color: var(--text-inverse);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  /* Subtle definition */
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  /* Inner highlight */
+  border: 1px solid transparent;
+  /* Simplified border */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: #171717;
-  /* Slightly lighter/black hover */
   transform: translateY(-1px);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -472,21 +466,19 @@ body {
   color: currentColor;
 }
 
-/* Secondary Button - Crisp and minimal */
+/* Secondary Button - Soft borders */
 .btn-secondary {
   background: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-medium);
-  /* Thinner border */
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-color: var(--text-secondary);
-  /* Darker border on hover */
-  transform: translateY(-0.5px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary:active:not(:disabled) {

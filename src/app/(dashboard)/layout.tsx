@@ -490,12 +490,11 @@ export default function DashboardLayout({
                 <Search size={16} />
               </button>
 
-              {/* New Post button */}
+              {/* New Post button - Larger, Text Only, Prominent */}
               <Link
                 href="/write"
-                className="hidden sm:inline-flex btn btn-primary btn-sm"
+                className="hidden sm:inline-flex btn btn-primary px-6 py-2 text-base font-semibold shadow-md hover:shadow-lg transition-all"
               >
-                <PenLine size={16} />
                 New Post
               </Link>
 
