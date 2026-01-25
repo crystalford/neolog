@@ -184,8 +184,7 @@ export default function DashboardPage() {
               {posts.length} {posts.length === 1 ? 'post' : 'posts'} total
             </p>
           </div>
-          <Link href="/write" className="btn btn-primary">
-            <PenLine size={16} />
+          <Link href="/write" className="btn btn-primary btn-xl px-10 py-5 text-xl font-semibold shadow-xl hover:shadow-2xl">
             New Post
           </Link>
         </div>
@@ -197,8 +196,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setFilter('all')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'all'
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
             >
               All
@@ -206,8 +205,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setFilter('published')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'published'
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
             >
               Published
@@ -215,8 +214,8 @@ export default function DashboardPage() {
             <button
               onClick={() => setFilter('draft')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${filter === 'draft'
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
             >
               Drafts
@@ -242,16 +241,15 @@ export default function DashboardPage() {
       {/* Posts List */}
       {posts.length === 0 ? (
         <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]">
-          <PenLine size={48} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+
           <h3 className="font-display text-xl font-semibold text-[var(--text-primary)] mb-2">
             {filter === 'published' ? 'No published posts yet' : filter === 'draft' ? 'No drafts yet' : 'No posts yet'}
           </h3>
           <p className="text-sm text-[var(--text-secondary)] mb-6">
             {filter === 'published' ? 'Publish your first post to see it here' : filter === 'draft' ? 'Start writing to create your first draft' : 'Start writing your first post'}
           </p>
-          <Link href="/write" className="btn btn-primary">
-            <PenLine size={16} />
-            Create Post
+          <Link href="/write" className="btn btn-primary btn-xl px-10 py-5 text-xl font-semibold shadow-xl hover:shadow-2xl">
+            New Post
           </Link>
         </div>
       ) : (
@@ -280,10 +278,10 @@ export default function DashboardPage() {
                   {post.status === 'published' && (
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-medium ${post.seoScore >= 80
-                          ? 'bg-green-100 text-green-700 border border-green-200'
-                          : post.seoScore >= 60
-                            ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                            : 'bg-red-100 text-red-700 border border-red-200'
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : post.seoScore >= 60
+                          ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
                         }`}
                       title="SEO Score"
                     >

@@ -555,6 +555,14 @@ body {
   font-weight: 500;
 }
 
+.btn-xl {
+  padding: 1.25rem 2.5rem;
+  font-size: 1.25rem;
+  border-radius: 0.5rem;
+  /* 8px */
+  font-weight: 600;
+}
+
 /* Icon-only buttons */
 .btn-icon {
   display: inline-flex;
