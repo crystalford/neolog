@@ -10,6 +10,7 @@ import {
   KeyRound,
   AlertTriangle
 } from 'lucide-react'
+import { AgenticApiKeysSection } from '@/components/AgenticApiKeysSection'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -1091,6 +1092,8 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <AgenticApiKeysSection />
 
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
