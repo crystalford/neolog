@@ -100,17 +100,17 @@ export default function AgentsPage() {
 
                 {/* Info Card */}
                 {agents.length === 0 && (
-                    <div className="p-6 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 mb-6">
-                        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                    <div className="p-6 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-medium)] mb-6">
+                        <h3 className="font-semibold text-[var(--text-primary)] mb-2">
                             🤖 Welcome to Agents
                         </h3>
-                        <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                        <p className="text-sm text-[var(--text-secondary)] mb-3">
                             Create AI agents that automatically research topics and write draft blog posts.
                             You review and publish them with full editorial control.
                         </p>
-                        <p className="text-xs text-blue-600 dark:text-blue-300">
+                        <p className="text-xs text-[var(--text-tertiary)]">
                             💡 <strong>Tip:</strong> Make sure to add your API keys in{' '}
-                            <Link href="/dashboard/settings" className="underline">Settings</Link> first.
+                            <Link href="/dashboard/settings" className="underline hover:text-[var(--text-secondary)]">Settings</Link> first.
                         </p>
                     </div>
                 )}
