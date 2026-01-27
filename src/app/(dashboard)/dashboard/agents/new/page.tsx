@@ -159,17 +159,16 @@ export default function NewAgentPage() {
                 </div>
 
                 {/* Info Box */}
-                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-medium)]">
+                    <p className="text-sm text-[var(--text-secondary)]">
                         💡 <strong>Reminder:</strong> Make sure you've added your{' '}
                         {formData.model_provider === 'openai' ? 'OpenAI' : 'Anthropic'} and Tavily API keys in{' '}
-                        <Link href="/dashboard/settings" className="underline">
+                        <Link href="/dashboard/settings" className="underline hover:text-[var(--text-primary)]">
                             Settings
                         </Link>
                         .
                     </p>
                 </div>
-
                 {/* Submit */}
                 <div className="flex gap-3">
                     <button type="submit" disabled={loading} className="btn btn-primary">
