@@ -49,8 +49,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
       {messages.length === 0 ? (
-        // Empty State - Centered vertically like ChatGPT/Claude/Gemini
-        <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-6 pb-20">
+        // Empty State - Everything centered like Gemini
+        <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-6">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center mb-6">
             <MessageSquare size={32} className="text-white" />
           </div>
@@ -64,7 +64,7 @@ export default function DashboardPage() {
           </p>
 
           {/* Suggested Prompts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-8">
             <button
               onClick={() => setInput("I want to write about...")}
               className="group p-5 text-left rounded-2xl border-2 border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:shadow-lg transition-all"
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Input - Centered on welcome screen */}
+          {/* Input - Centered with everything else */}
           <div className="w-full max-w-3xl">
             <div className="flex gap-3 items-end">
               <textarea
