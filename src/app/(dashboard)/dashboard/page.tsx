@@ -49,7 +49,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)]">
       {messages.length === 0 ? (
-        // Empty State - Everything centered like Gemini
+        // Empty State - Layout like Gemini
         <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-6">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center mb-6">
             <MessageSquare size={32} className="text-white" />
@@ -59,67 +59,12 @@ export default function DashboardPage() {
             What do you want to create?
           </h1>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-12 max-w-xl text-center">
+          <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-xl text-center">
             Start a conversation to create blog posts, organize ideas, or turn your thoughts into published content.
           </p>
 
-          {/* Suggested Prompts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mb-8">
-            <button
-              onClick={() => setInput("I want to write about...")}
-              className="group p-5 text-left rounded-2xl border-2 border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:shadow-lg transition-all"
-            >
-              <div className="text-2xl mb-3">✍️</div>
-              <p className="font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent)] transition-colors">
-                Write an article
-              </p>
-              <p className="text-sm text-[var(--text-tertiary)]">
-                Start from scratch or import ideas
-              </p>
-            </button>
-
-            <button
-              onClick={() => setInput("Help me organize my thoughts about...")}
-              className="group p-5 text-left rounded-2xl border-2 border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:shadow-lg transition-all"
-            >
-              <div className="text-2xl mb-3">🧠</div>
-              <p className="font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent)] transition-colors">
-                Organize ideas
-              </p>
-              <p className="text-sm text-[var(--text-tertiary)]">
-                Turn messy thoughts into structure
-              </p>
-            </button>
-
-            <button
-              onClick={() => setInput("I have a conversation I want to turn into a post...")}
-              className="group p-5 text-left rounded-2xl border-2 border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:shadow-lg transition-all"
-            >
-              <div className="text-2xl mb-3">💬</div>
-              <p className="font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent)] transition-colors">
-                Import a chat
-              </p>
-              <p className="text-sm text-[var(--text-tertiary)]">
-                Paste ChatGPT, Claude, or Gemini logs
-              </p>
-            </button>
-
-            <button
-              onClick={() => setInput("Research and write about...")}
-              className="group p-5 text-left rounded-2xl border-2 border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:shadow-lg transition-all"
-            >
-              <div className="text-2xl mb-3">🔍</div>
-              <p className="font-semibold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent)] transition-colors">
-                Deep research
-              </p>
-              <p className="text-sm text-[var(--text-tertiary)]">
-                AI researches and drafts for you
-              </p>
-            </button>
-          </div>
-
-          {/* Input - Centered with everything else */}
-          <div className="w-full max-w-3xl">
+          {/* Input - Centered */}
+          <div className="w-full max-w-3xl mb-6">
             <div className="flex gap-3 items-end">
               <textarea
                 value={input}
@@ -146,10 +91,42 @@ export default function DashboardPage() {
                 <Send size={20} />
               </button>
             </div>
-            <p className="text-xs text-[var(--text-tertiary)] text-center mt-3">
-              Neolog can make mistakes. Verify important information.
-            </p>
           </div>
+
+          {/* Suggested Prompts - Small chips below input like Gemini */}
+          <div className="flex flex-wrap gap-2 justify-center max-w-3xl">
+            <button
+              onClick={() => setInput("I want to write about...")}
+              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              ✍️ Write an article
+            </button>
+
+            <button
+              onClick={() => setInput("Help me organize my thoughts about...")}
+              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              🧠 Organize ideas
+            </button>
+
+            <button
+              onClick={() => setInput("I have a conversation I want to turn into a post...")}
+              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              💬 Import a chat
+            </button>
+
+            <button
+              onClick={() => setInput("Research and write about...")}
+              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              🔍 Deep research
+            </button>
+          </div>
+
+          <p className="text-xs text-[var(--text-tertiary)] text-center mt-8">
+            Neolog can make mistakes. Verify important information.
+          </p>
         </div>
       ) : (
         // Chat View - Messages + Fixed input at bottom
