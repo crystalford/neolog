@@ -51,15 +51,11 @@ export default function DashboardPage() {
       {messages.length === 0 ? (
         // Empty State - Layout like Gemini
         <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center mb-6">
-            <MessageSquare size={32} className="text-white" />
-          </div>
-
           <h1 className="font-display text-4xl font-bold text-[var(--text-primary)] mb-3 text-center">
             What do you want to create?
           </h1>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-xl text-center">
+          <p className="text-lg text-[var(--text-secondary)] mb-12 max-w-xl text-center">
             Start a conversation to create blog posts, organize ideas, or turn your thoughts into published content.
           </p>
 
