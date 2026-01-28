@@ -1,5 +1,7 @@
 'use client'
 
+import { chatWithManager, ChatMessage } from '@/app/actions/chat'
+import Link from 'next/link'
 import { useState } from 'react'
 import { MessageSquare, Send, Loader2 } from 'lucide-react'
 
@@ -17,26 +19,45 @@ export default function DashboardPage() {
   const handleSend = async () => {
     if (!input.trim()) return
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       role: 'user',
       content: input,
-      timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    // Optimistically add user message
+    const newHistory = [...messages, { ...userMessage, timestamp: new Date() }]
+    setMessages(newHistory as Message[]) // Cast to Message for UI
     setInput('')
     setLoading(true)
 
-    // TODO: Connect to chat API
-    setTimeout(() => {
+    // Call Real AI
+    const response = await chatWithManager(newHistory.map(m => ({ role: m.role, content: m.content })))
+
+    setLoading(false)
+
+    if (response.success && response.message) {
       const aiMessage: Message = {
         role: 'assistant',
-        content: "I'm here to help you create content. What would you like to write about? I can help you:\n\n• Research and write articles\n• Import and organize your ideas\n• Create drafts from conversations\n• Turn chats into blog posts",
+        content: response.message,
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, aiMessage])
-      setLoading(false)
-    }, 1000)
+      setMessages(prev => [...prev, aiMessage])
+    } else if (response.error === 'NO_API_KEYS') {
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: "I'd love to help, but I need an API key to think! \n\nPlease go to **Settings** > **API Keys** to add your OpenAI or Anthropic key.",
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } else {
+      // Generic error
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: `Error: ${response.error || 'Something went wrong.'}`,
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, errorMessage])
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
