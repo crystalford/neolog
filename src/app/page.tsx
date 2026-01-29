@@ -105,14 +105,14 @@ export default async function Home() {
           <div className="flex flex-col sm:flex-row gap-4 mb-16">
             <Link
               href={session ? "/write" : "/signup"}
-              className="btn btn-primary btn-xl px-10 py-5 text-xl font-semibold shadow-xl hover:shadow-2xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="btn btn-primary btn-lg"
             >
               {session ? "Start Writing" : "Start Free - Get Readers"}
               <ArrowRight size={24} className="ml-3" />
             </Link>
             <Link
               href="/explore"
-              className="btn btn-secondary btn-xl px-10 py-5 text-xl font-semibold"
+              className="btn btn-secondary btn-lg"
             >
               Explore Posts
             </Link>
