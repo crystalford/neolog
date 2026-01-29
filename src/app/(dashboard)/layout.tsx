@@ -14,6 +14,7 @@ import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
+import { Logo } from '@/components/Logo'
 
 const DashboardCommandPalette = dynamic(
   () => import('@/components/DashboardCommandPalette').then((mod) => mod.DashboardCommandPalette),
@@ -305,9 +306,8 @@ export default function DashboardLayout({
       {/* Sidebar - 5 Primary Destinations */}
       <aside className="w-[248px] bg-[var(--bg-primary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-4 pt-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="logo-mark logo-mark-lg">N</span>
-            <span className="font-display text-xl">Neolog</span>
+          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <Logo />
           </Link>
         </div>
 
@@ -453,8 +453,8 @@ export default function DashboardLayout({
           <div className="px-6 lg:px-8 py-3 flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Mobile: Logo */}
-              <Link href="/" className="lg:hidden flex items-center gap-2">
-                <span className="logo-mark">N</span>
+              <Link href="/" className="lg:hidden flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Logo />
               </Link>
 
               {/* Page Title */}
