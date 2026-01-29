@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import { Logo } from '@/components/Logo'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
@@ -32,11 +33,8 @@ export function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
       <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <span className="logo-mark">N</span>
-          <span className="font-display text-lg tracking-tight text-[var(--text-primary)]">
-            Neolog
-          </span>
+        <Link href="/" className="hover:opacity-80 transition-opacity">
+          <Logo />
         </Link>
 
         <nav className="hidden md:flex items-center gap-4 text-sm text-[var(--text-secondary)]">

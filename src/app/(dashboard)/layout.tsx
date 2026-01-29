@@ -491,10 +491,10 @@ export default function DashboardLayout({
                 <Search size={16} />
               </button>
 
-              {/* New Post button - Massive, Homepage Style */}
+              {/* New Post button */}
               <Link
                 href="/write"
-                className="hidden sm:inline-flex btn btn-primary btn-xl px-10 py-5 text-xl font-semibold shadow-xl hover:shadow-2xl transition-all"
+                className="hidden sm:inline-flex btn btn-primary btn-sm"
               >
                 New Post
               </Link>
