@@ -39,9 +39,12 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-6 text-sm text-[var(--text-secondary)]">
-          <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors font-medium">
+        <nav className="hidden md:flex items-center gap-2">
+          <Link href="/explore" className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-all">
             Explore
+          </Link>
+          <Link href="/search" className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-all">
+            Search
           </Link>
         </nav>
 
