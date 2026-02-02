@@ -29,24 +29,24 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/90 backdrop-blur-sm border-b border-[var(--border-light)]">
-      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-b border-[var(--border-medium)]">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
           <span className="logo-mark">N</span>
-          <span className="font-display text-lg tracking-tight text-[var(--text-primary)]">
+          <span className="font-display text-lg font-semibold tracking-tight text-[var(--text-primary)]">
             Neolog
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-4 text-sm text-[var(--text-secondary)]">
-          <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors">
+        <nav className="hidden md:flex items-center gap-6 text-sm text-[var(--text-secondary)]">
+          <Link href="/explore" className="hover:text-[var(--text-primary)] transition-colors font-medium">
             Explore
           </Link>
         </nav>
 
         {/* Auth buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {loading ? null : user ? (
             <Link
               href="/dashboard"
@@ -58,7 +58,7 @@ export function Header() {
             <>
               <Link
                 href="/login"
-                className="btn btn-secondary btn-sm"
+                className="btn btn-ghost btn-sm"
               >
                 Sign in
               </Link>

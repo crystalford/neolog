@@ -68,31 +68,35 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)]">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-[var(--bg-primary)]">
       {messages.length === 0 ? (
         // Empty State - Layout like Gemini
-        <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto px-6">
-          <h1 className="font-display text-4xl font-bold text-[var(--text-primary)] mb-3 text-center">
+        <div className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto px-6">
+          <div className="mb-8 flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)]">
+            <MessageSquare size={28} className="text-white" />
+          </div>
+          
+          <h1 className="font-display text-5xl font-bold text-[var(--text-primary)] mb-4 text-center tracking-tight">
             What do you want to create?
           </h1>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-12 max-w-xl text-center">
+          <p className="text-lg text-[var(--text-secondary)] mb-16 max-w-2xl text-center leading-relaxed">
             Start a conversation to create blog posts, organize ideas, or turn your thoughts into published content.
           </p>
 
           {/* Input - Centered */}
           <div className="w-full max-w-3xl mb-6">
-            <div className="flex gap-3 items-end">
+            <div className="relative">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Message Neolog..."
-                className="flex-1 input resize-none min-h-[56px] max-h-[200px] text-base"
+                placeholder="Ask Neolog anything..."
+                className="w-full input resize-none min-h-[64px] max-h-[200px] text-base pr-16 bg-[var(--bg-card)] border-[var(--border-medium)] focus:border-[var(--accent)]"
                 rows={1}
                 style={{
                   height: 'auto',
-                  minHeight: '56px',
+                  minHeight: '64px',
                 }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement
@@ -103,66 +107,66 @@ export default function DashboardPage() {
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || loading}
-                className="btn btn-primary h-[56px] w-[56px] flex items-center justify-center flex-shrink-0"
+                className="absolute right-3 bottom-3 btn btn-primary h-10 w-10 flex items-center justify-center flex-shrink-0 rounded-lg disabled:opacity-50"
               >
-                <Send size={20} />
+                <Send size={18} />
               </button>
             </div>
           </div>
 
           {/* Suggested Prompts - Small chips below input like Gemini */}
-          <div className="flex flex-wrap gap-2 justify-center max-w-3xl">
+          <div className="flex flex-wrap gap-2.5 justify-center max-w-3xl">
             <button
               onClick={() => setInput("I want to write about...")}
-              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="px-4 py-2.5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium"
             >
-              ✍️ Write an article
+              Write an article
             </button>
 
             <button
               onClick={() => setInput("Help me organize my thoughts about...")}
-              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="px-4 py-2.5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium"
             >
-              🧠 Organize ideas
+              Organize ideas
             </button>
 
             <button
               onClick={() => setInput("I have a conversation I want to turn into a post...")}
-              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="px-4 py-2.5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium"
             >
-              💬 Import a chat
+              Import a chat
             </button>
 
             <button
               onClick={() => setInput("Research and write about...")}
-              className="px-4 py-2 rounded-full border border-[var(--border-light)] bg-[var(--bg-primary)] hover:border-[var(--accent)] hover:bg-[var(--bg-secondary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="px-4 py-2.5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] transition-all text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium"
             >
-              🔍 Deep research
+              Deep research
             </button>
           </div>
 
-          <p className="text-xs text-[var(--text-tertiary)] text-center mt-8">
+          <p className="text-xs text-[var(--text-tertiary)] text-center mt-10">
             Neolog can make mistakes. Verify important information.
           </p>
         </div>
       ) : (
         // Chat View - Messages + Fixed input at bottom
         <>
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto w-full py-8 px-6">
+          <div className="flex-1 overflow-y-auto bg-[var(--bg-primary)]">
+            <div className="max-w-4xl mx-auto w-full py-8 px-6">
               {messages.map((message, index) => (
-                <div key={index} className="mb-8">
+                <div key={index} className="mb-10">
                   {message.role === 'assistant' && (
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center flex-shrink-0">
-                        <MessageSquare size={16} className="text-white" />
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] flex items-center justify-center flex-shrink-0 shadow-lg">
+                        <MessageSquare size={18} className="text-white" />
                       </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm text-[var(--text-primary)] mb-2">Neolog</p>
-                        <div className="prose prose-sm max-w-none text-[var(--text-primary)]">
+                      <div className="flex-1 pt-1">
+                        <p className="font-semibold text-sm text-[var(--text-primary)] mb-3">Neolog</p>
+                        <div className="prose prose-sm max-w-none text-[var(--text-secondary)]">
                           <p className="whitespace-pre-wrap leading-relaxed m-0">{message.content}</p>
                         </div>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                        <p className="text-xs text-[var(--text-tertiary)] mt-3">
                           {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
@@ -170,11 +174,11 @@ export default function DashboardPage() {
                   )}
 
                   {message.role === 'user' && (
-                    <div className="flex items-start gap-3 justify-end">
+                    <div className="flex items-start gap-4 justify-end">
                       <div className="flex-1 flex justify-end">
-                        <div className="max-w-[85%]">
-                          <div className="bg-[var(--accent)] text-white rounded-2xl px-5 py-3">
-                            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <div className="max-w-[80%]">
+                          <div className="bg-[var(--accent)] text-white rounded-2xl px-5 py-3.5 shadow-lg">
+                            <p className="whitespace-pre-wrap leading-relaxed text-sm">{message.content}</p>
                           </div>
                           <p className="text-xs text-[var(--text-tertiary)] mt-2 text-right">
                             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -187,12 +191,12 @@ export default function DashboardPage() {
               ))}
 
               {loading && (
-                <div className="flex items-start gap-3 mb-8">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center">
-                    <MessageSquare size={16} className="text-white" />
+                <div className="flex items-start gap-4 mb-8">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] flex items-center justify-center shadow-lg">
+                    <MessageSquare size={18} className="text-white" />
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Loader2 size={16} className="animate-spin text-[var(--text-tertiary)]" />
+                  <div className="flex items-center gap-2 mt-2">
+                    <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
                     <span className="text-sm text-[var(--text-tertiary)]">Thinking...</span>
                   </div>
                 </div>
@@ -201,19 +205,19 @@ export default function DashboardPage() {
           </div>
 
           {/* Input Area - Fixed at bottom when chatting */}
-          <div className="border-t border-[var(--border-light)] bg-[var(--bg-primary)] p-6">
-            <div className="max-w-3xl mx-auto">
-              <div className="flex gap-3 items-end">
+          <div className="border-t border-[var(--border-medium)] bg-[var(--bg-primary)] p-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="relative">
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyPress}
                   placeholder="Message Neolog..."
-                  className="flex-1 input resize-none min-h-[56px] max-h-[200px] text-base"
+                  className="w-full input resize-none min-h-[64px] max-h-[200px] text-base pr-16 bg-[var(--bg-card)] border-[var(--border-medium)] focus:border-[var(--accent)]"
                   rows={1}
                   style={{
                     height: 'auto',
-                    minHeight: '56px',
+                    minHeight: '64px',
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement
@@ -224,12 +228,12 @@ export default function DashboardPage() {
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || loading}
-                  className="btn btn-primary h-[56px] w-[56px] flex items-center justify-center flex-shrink-0"
+                  className="absolute right-3 bottom-3 btn btn-primary h-10 w-10 flex items-center justify-center flex-shrink-0 rounded-lg disabled:opacity-50"
                 >
-                  <Send size={20} />
+                  <Send size={18} />
                 </button>
               </div>
-              <p className="text-xs text-[var(--text-tertiary)] text-center mt-3">
+              <p className="text-xs text-[var(--text-tertiary)] text-center mt-4">
                 Neolog can make mistakes. Verify important information.
               </p>
             </div>
