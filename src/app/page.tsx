@@ -33,24 +33,12 @@ import {
 export default async function Home() {
   const supabase = createClient()
 
-  const [{ data: auth }, featuredPostsRes, postsCountRes, creatorsCountRes, trendingTagsRes] = await Promise.all([
+  const results = await Promise.all([
     supabase.auth.getSession(),
     supabase
       .from('posts')
       .select(
-        [
-          'id',
-          'title',
-          'slug',
-          'subtitle',
-          'excerpt',
-          'cover_image_url',
-          'published_at',
-          'reading_time_minutes',
-          'author:profiles(id, username, display_name, avatar_url)',
-          'publication:publications(id, slug, name, logo_url)',
-          'series:series(title, slug)',
-        ].join(','),
+        `id,title,slug,subtitle,excerpt,cover_image_url,published_at,reading_time_minutes,author:profiles(id,username,display_name,avatar_url),publication:publications(id,slug,name,logo_url),series:series(title,slug)`
       )
       .eq('status', 'published')
       .order('published_at', { ascending: false })
@@ -60,7 +48,13 @@ export default async function Home() {
     supabase.from('post_tags').select('tag_id, tags(id, name, slug)').limit(1000),
   ])
 
-  const session = auth?.session ?? null
+  const authRes = results[0]
+  const featuredPostsRes = results[1]
+  const postsCountRes = results[2]
+  const creatorsCountRes = results[3]
+  const trendingTagsRes = results[4]
+
+  const session = authRes.data?.session ?? null
   const featuredPosts = featuredPostsRes.data || []
   const stats = {
     posts: postsCountRes.count || 0,
