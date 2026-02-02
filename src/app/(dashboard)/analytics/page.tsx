@@ -178,46 +178,46 @@ export default function AnalyticsPage() {
 
       {/* Overview Stats */}
       <div className="grid md:grid-cols-4 gap-6 mb-12">
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center">
+        <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center">
               <Eye size={20} className="text-white" />
             </div>
-            <span className="text-sm font-medium text-blue-900">Total Views</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">Total Views</span>
           </div>
-          <p className="text-3xl font-bold text-blue-900">{stats.totalViews.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalViews.toLocaleString()}</p>
         </div>
 
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-green-500 flex items-center justify-center">
+        <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--success)] flex items-center justify-center">
               <Activity size={20} className="text-white" />
             </div>
-            <span className="text-sm font-medium text-green-900">Published Posts</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">Published Posts</span>
           </div>
-          <p className="text-3xl font-bold text-green-900">{stats.totalPosts}</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalPosts}</p>
         </div>
 
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-purple-500 flex items-center justify-center">
+        <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-purple)] flex items-center justify-center">
               <Clock size={20} className="text-white" />
             </div>
-            <span className="text-sm font-medium text-purple-900">Avg. Time</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">Avg. Time</span>
           </div>
-          <p className="text-3xl font-bold text-purple-900">
+          <p className="text-3xl font-bold text-[var(--text-primary)]">
             {Math.floor(stats.avgTimeOnPage / 60)}:{(stats.avgTimeOnPage % 60).toString().padStart(2, '0')}
           </p>
         </div>
 
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center">
+        <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-cyan)] flex items-center justify-center">
               <Users size={20} className="text-white" />
             </div>
-            <span className="text-sm font-medium text-orange-900">Unique Readers</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">Unique Readers</span>
           </div>
-          <p className="text-3xl font-bold text-orange-900">{stats.totalReaders.toLocaleString()}</p>
+          <p className="text-3xl font-bold text-[var(--text-primary)]">{stats.totalReaders.toLocaleString()}</p>
         </div>
       </div>
 

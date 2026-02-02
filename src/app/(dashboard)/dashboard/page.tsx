@@ -72,7 +72,7 @@ export default function DashboardPage() {
       {messages.length === 0 ? (
         // Empty State - Layout like Gemini
         <div className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto px-6">
-          <div className="mb-8 flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)]">
+          <div className="mb-8 flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--accent)]">
             <MessageSquare size={28} className="text-white" />
           </div>
           
@@ -158,7 +158,7 @@ export default function DashboardPage() {
                 <div key={index} className="mb-10">
                   {message.role === 'assistant' && (
                     <div className="flex items-start gap-4 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] flex items-center justify-center flex-shrink-0 shadow-lg">
+                      <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
                         <MessageSquare size={18} className="text-white" />
                       </div>
                       <div className="flex-1 pt-1">
@@ -192,7 +192,7 @@ export default function DashboardPage() {
 
               {loading && (
                 <div className="flex items-start gap-4 mb-8">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] flex items-center justify-center shadow-lg">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center">
                     <MessageSquare size={18} className="text-white" />
                   </div>
                   <div className="flex items-center gap-2 mt-2">

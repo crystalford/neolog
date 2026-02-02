@@ -122,29 +122,11 @@
 }
 
 /* ================================
-   DASHBOARD THEME
+   DASHBOARD THEME - Uses global dark theme
    ================================ */
 
 .dashboard-shell {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f6f7f9;
-  --bg-tertiary: #eef1f4;
-  --bg-inverse: #0f1115;
-
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-tertiary: #9ca3af;
-  --text-inverse: #ffffff;
-
-  --accent: #0070f3;
-  --accent-hover: #0057c2;
-  --accent-soft: rgba(0, 112, 243, 0.12);
-  --accent-softer: rgba(0, 112, 243, 0.06);
-
-  --border-light: rgba(17, 24, 39, 0.08);
-  --border-medium: rgba(17, 24, 39, 0.14);
-  --border-heavy: rgba(17, 24, 39, 0.28);
-
+  /* Inherit from root dark theme - no overrides needed */
   --font-display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
