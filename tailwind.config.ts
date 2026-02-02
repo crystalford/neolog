@@ -22,8 +22,8 @@ const config: Config = {
         error: 'var(--error)',
       },
       fontFamily: {
-        display: ['Newsreader', 'Georgia', 'serif'],
-        body: ['Plus Jakarta Sans', '-apple-system', 'sans-serif'],
+        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
         mono: ['IBM Plex Mono', 'monospace'],
       },
       animation: {

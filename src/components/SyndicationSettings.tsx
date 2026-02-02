@@ -258,14 +258,14 @@ export function SyndicationSettings() {
             </div>
 
             {error && (
-                <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-                    <p className="text-sm text-red-700">{error}</p>
+                <div className="p-4 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20">
+                    <p className="text-sm text-[var(--error)]">{error}</p>
                 </div>
             )}
 
             {success && (
-                <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                    <p className="text-sm text-green-700">{success}</p>
+                <div className="p-4 rounded-lg bg-[var(--success)]/10 border border-[var(--success)]/20">
+                    <p className="text-sm text-[var(--success)]">{success}</p>
                 </div>
             )}
 
@@ -295,7 +295,7 @@ export function SyndicationSettings() {
                                         </div>
                                     </div>
                                     {connected && (
-                                        <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium flex items-center gap-1">
+                                        <span className="px-3 py-1 rounded-full bg-[var(--success)]/20 text-[var(--success)] text-xs font-medium flex items-center gap-1">
                                             <Check size={12} />
                                             Connected
                                         </span>
@@ -327,7 +327,7 @@ export function SyndicationSettings() {
                                                 value={devtoApiKey}
                                                 onChange={(e) => setDevtoApiKey(e.target.value)}
                                                 placeholder="Enter your Dev.to API key"
-                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                                                className="input"
                                             />
                                             <a
                                                 href={platform.docsUrl}
@@ -364,7 +364,7 @@ export function SyndicationSettings() {
                                                 value={hashnodeApiKey}
                                                 onChange={(e) => setHashnodeApiKey(e.target.value)}
                                                 placeholder="Enter your Hashnode API key"
-                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors mb-2"
+                                                className="input mb-3"
                                             />
                                             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                                                 Publication ID
@@ -374,7 +374,7 @@ export function SyndicationSettings() {
                                                 value={hashnodePublicationId}
                                                 onChange={(e) => setHashnodePublicationId(e.target.value)}
                                                 placeholder="Enter your publication ID"
-                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                                                className="input"
                                             />
                                             <a
                                                 href={platform.docsUrl}
@@ -423,7 +423,7 @@ export function SyndicationSettings() {
                                                 value={blueskyIdentifier}
                                                 onChange={(e) => setBlueskyIdentifier(e.target.value)}
                                                 placeholder="username.bsky.social"
-                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors mb-2"
+                                                className="input mb-3"
                                             />
                                             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                                                 App Password
@@ -433,7 +433,7 @@ export function SyndicationSettings() {
                                                 value={blueskyPassword}
                                                 onChange={(e) => setBlueskyPassword(e.target.value)}
                                                 placeholder="Enter your app password"
-                                                className="w-full px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                                                className="input"
                                             />
                                             <a
                                                 href="https://bsky.app/settings/app-passwords"

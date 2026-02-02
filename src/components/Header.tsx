@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+import { ThemeToggle } from './ThemeToggle'
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
@@ -50,6 +51,7 @@ export function Header() {
 
         {/* Auth buttons */}
         <div className="flex items-center gap-2.5">
+          <ThemeToggle />
           {loading ? null : user ? (
             <Link
               href="/dashboard"
