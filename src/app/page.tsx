@@ -33,7 +33,7 @@ import {
 export default async function Home() {
   const supabase = createClient()
 
-  const [{ data: auth }, featuredPostsRes, postsCountRes, creatorsCountRes, trendingTagsRes] = await Promise.all([
+  const [authRes, featuredPostsRes, postsCountRes, creatorsCountRes, trendingTagsRes] = await Promise.all([
     supabase.auth.getSession(),
     supabase
       .from('posts')
@@ -48,7 +48,7 @@ export default async function Home() {
     supabase.from('post_tags').select('tag_id, tags(id, name, slug)').limit(1000),
   ])
 
-  const session = auth?.session ?? null
+  const session = authRes.data?.session ?? null
   const featuredPosts = featuredPostsRes.data || []
   const stats = {
     posts: postsCountRes.count || 0,
