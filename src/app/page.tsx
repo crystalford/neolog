@@ -95,7 +95,7 @@ export default async function Home() {
             <h1 className="font-display text-6xl md:text-8xl font-bold leading-[1.1] tracking-tighter text-[var(--text-primary)] mb-6 text-balance">
               Publish once.
               <br />
-              <span className="bg-gradient-to-r from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] bg-clip-text text-transparent">
+              <span className="text-[var(--accent)]">
                 Reach everywhere.
               </span>
             </h1>
@@ -392,7 +392,7 @@ export default async function Home() {
               <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 tracking-tight">
                 Already Publishing?
                 <br />
-                <span className="bg-gradient-to-r from-[var(--accent)] to-[var(--accent-purple)] bg-clip-text text-transparent">
+                <span className="text-[var(--accent)]">
                   Bring Your Content.
                 </span>
               </h2>

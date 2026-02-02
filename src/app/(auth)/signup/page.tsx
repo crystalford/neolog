@@ -77,14 +77,14 @@ export default function SignupPage() {
   if (success) {
     return (
       <div className="animate-fade-up text-center">
-        <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
-          <Mail size={28} className="text-success" />
+        <div className="w-16 h-16 rounded-full bg-[var(--success)]/10 flex items-center justify-center mx-auto mb-6">
+          <Mail size={28} className="text-[var(--success)]" />
         </div>
         <h1 className="font-display text-3xl mb-2">Check your email</h1>
-        <p className="text-text-muted mb-8">
-          We've sent a confirmation link to <strong className="text-text-primary">{email}</strong>
+        <p className="text-[var(--text-secondary)] mb-8">
+          We've sent a confirmation link to <strong className="text-[var(--text-primary)]">{email}</strong>
         </p>
-        <Link href="/login" className="text-accent hover:underline text-sm">
+        <Link href="/login" className="text-[var(--accent)] hover:underline text-sm">
           Back to sign in
         </Link>
       </div>
@@ -94,21 +94,21 @@ export default function SignupPage() {
   return (
     <div className="animate-fade-up">
       <h1 className="font-display text-3xl text-center mb-2">Create your account</h1>
-      <p className="text-text-muted text-center mb-8">Start publishing in seconds</p>
+      <p className="text-[var(--text-secondary)] text-center mb-8">Start publishing in seconds</p>
 
       {error && (
-        <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-          {error}
+        <div className="mb-6 p-4 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/20">
+          <p className="text-sm text-[var(--error)]">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSignup} className="space-y-4">
+      <form onSubmit={handleSignup} className="space-y-5">
         <div>
-          <label htmlFor="username" className="block text-sm text-text-muted mb-1.5">
+          <label htmlFor="username" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             Username
           </label>
           <div className="relative">
-            <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
+            <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input
               id="username"
               type="text"
@@ -122,17 +122,17 @@ export default function SignupPage() {
               maxLength={30}
             />
           </div>
-          <p className="text-xs text-text-muted mt-1.5">
-            neolog.com/<span className="text-accent">{username || 'yourname'}</span>
+          <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
+            neolog.com/<span className="text-[var(--accent)]">{username || 'yourname'}</span>
           </p>
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm text-text-muted mb-1.5">
+          <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             Email
           </label>
           <div className="relative">
-            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input
               id="email"
               type="email"
@@ -147,11 +147,11 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm text-text-muted mb-1.5">
+          <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
             Password
           </label>
           <div className="relative">
-            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input
               id="password"
               type="password"
@@ -164,7 +164,7 @@ export default function SignupPage() {
               minLength={8}
             />
           </div>
-          <p className="text-xs text-text-muted mt-1.5">
+          <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
             At least 8 characters
           </p>
         </div>
@@ -198,9 +198,9 @@ export default function SignupPage() {
         </button>
       </div>
 
-      <p className="mt-8 text-center text-sm text-text-muted">
+      <p className="mt-10 text-center text-sm text-[var(--text-secondary)]">
         Already have an account?{' '}
-        <Link href="/login" className="text-accent hover:underline">
+        <Link href="/login" className="text-[var(--accent)] hover:underline font-medium">
           Sign in
         </Link>
       </p>
