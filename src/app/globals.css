@@ -11,41 +11,46 @@
  */
 
 :root {
-  /* Core palette - crisp and bold */
-  --bg-primary: #ffffff;
-  --bg-secondary: #fafafa;
-  --bg-tertiary: #f4f4f5;
-  --bg-inverse: #0a0a0a;
+  /* Premium Dark Theme - Vercel/v0 Inspired */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --bg-card: #0f0f0f;
+  --bg-inverse: #ffffff;
 
-  /* Text hierarchy - stronger contrast */
-  --text-primary: #0a0a0a;
-  --text-secondary: #525252;
-  --text-tertiary: #a3a3a3;
-  --text-inverse: #ffffff;
+  /* Text hierarchy - high contrast for dark mode */
+  --text-primary: #ededed;
+  --text-secondary: #a1a1a1;
+  --text-tertiary: #666666;
+  --text-inverse: #000000;
 
-  /* Accent - minimal black */
-  --accent: #000000;
-  --accent-hover: #1a1a1a;
-  --accent-soft: rgba(0, 0, 0, 0.05);
-  --accent-softer: rgba(0, 0, 0, 0.02);
+  /* Vibrant Accent - Electric Blue */
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.15);
+  --accent-softer: rgba(59, 130, 246, 0.08);
+  
+  /* Secondary accent for variety */
+  --accent-purple: #a855f7;
+  --accent-cyan: #06b6d4;
 
-  /* Semantic - stronger and clearer */
-  --success: #16a34a;
-  --warning: #eab308;
-  --error: #dc2626;
+  /* Semantic - vibrant colors for dark mode */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
 
-  /* Borders - subtle and refined */
-  --border-light: rgba(0, 0, 0, 0.08);
-  --border-medium: rgba(0, 0, 0, 0.15);
-  --border-heavy: rgba(0, 0, 0, 0.3);
+  /* Borders - subtle on dark */
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.1);
+  --border-heavy: rgba(255, 255, 255, 0.2);
 
-  /* Surfaces - softer shadows */
-  --surface-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --surface-shadow-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
-  --surface-shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+  /* Surfaces - elevated shadows */
+  --surface-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.4);
+  --surface-shadow-hover: 0 8px 24px 0 rgba(0, 0, 0, 0.5);
+  --surface-shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
 
   /* Typography - modern sans-serif focus */
-  --font-display: 'Newsreader', Georgia, serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
 
@@ -64,13 +69,13 @@
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition-fast: 120ms var(--ease-out-expo);
   --transition-medium: 200ms var(--ease-out-expo);
-  --transition-medium: 200ms var(--ease-out-expo);
   --transition-slow: 350ms var(--ease-out-expo);
 
-  /* Re-introduced for Matte Buttons */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* Radius - modern rounded corners */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 /* Dark mode - deeper blacks, higher contrast */
@@ -428,34 +433,36 @@ body {
   cursor: not-allowed;
 }
 
-/* Primary Button - Matte Black/White */
+/* Primary Button - Vibrant Blue */
 .btn-primary {
-  @apply bg-[var(--bg-inverse)] text-[var(--text-inverse)] shadow-sm;
+  @apply bg-[var(--accent)] text-white shadow-lg;
   border: 1px solid transparent;
 }
 
 .btn-primary:hover:not(:disabled) {
+  @apply bg-[var(--accent-hover)];
   transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 30px -5px rgba(59, 130, 246, 0.4);
 }
 
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* Secondary Button - Matte Surface */
+/* Secondary Button - Subtle Surface */
 .btn-secondary {
-  @apply bg-[var(--bg-primary)] text-[var(--text-primary)];
+  @apply bg-[var(--bg-card)] text-[var(--text-primary)];
   border: 1px solid var(--border-medium);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: var(--surface-shadow);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  @apply bg-[var(--bg-secondary)] border-[var(--text-secondary)];
+  @apply bg-[var(--bg-tertiary)] border-[var(--border-heavy)];
+  transform: translateY(-1px);
 }
 
 .btn-secondary:active:not(:disabled) {
-  @apply bg-[var(--bg-tertiary)];
+  transform: translateY(0);
 }
 
 /* Accent Button */
@@ -472,10 +479,12 @@ body {
 /* Ghost Button */
 .btn-ghost {
   @apply bg-transparent text-[var(--text-secondary)];
+  border: 1px solid transparent;
 }
 
 .btn-ghost:hover:not(:disabled) {
-  @apply bg-[var(--bg-secondary)] text-[var(--text-primary)];
+  @apply bg-[var(--bg-card)] text-[var(--text-primary)];
+  border-color: var(--border-light);
 }
 
 /* Sizes */

@@ -29,30 +29,34 @@ export function Logo({ className = "", size = "default", showText = true }: Logo
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                 >
-                    {/* Left vertical stroke - The "Accent" */}
+                    {/* Modern geometric N shape */}
                     <path
-                        d="M7 4C7 2.89543 7.89543 2 9 2H10C11.1046 2 12 2.89543 12 4V28C12 29.1046 11.1046 30 10 30H9C7.89543 30 7 29.1046 7 28V4Z"
+                        d="M6 4C6 2.89543 6.89543 2 8 2H10C11.1046 2 12 2.89543 12 4V28C12 29.1046 11.1046 30 10 30H8C6.89543 30 6 29.1046 6 28V4Z"
                         fill="url(#accent-gradient)"
                     />
-
-                    {/* Right part - Parallel Structure */}
-                    {/* Main vertical right */}
+                    
                     <path
-                        d="M20 4 C20 2.895 20.895 2 22 2 H23 C24.105 2 25 2.895 25 4 V28 C25 29.105 24.105 30 23 30 H22 C20.895 30 20 29.105 20 28 V4 Z"
-                        fill="currentColor"
+                        d="M20 4C20 2.89543 20.8954 2 22 2H24C25.1046 2 26 2.89543 26 4V28C26 29.1046 25.1046 30 24 30H22C20.8954 30 20 29.1046 20 28V4Z"
+                        fill="url(#accent-gradient-2)"
                     />
-
-                    {/* Connecting Diagonal */}
+                    
                     <path
-                        d="M12 4L20 28H14L7 4H12Z"
-                        fill="currentColor"
-                        opacity="0.4"
+                        d="M12 6L20 26H14L7 6H12Z"
+                        fill="url(#accent-gradient-3)"
                     />
 
                     <defs>
-                        <linearGradient id="accent-gradient" x1="6" y1="2" x2="6" y2="30" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#FF4500" />
-                            <stop offset="1" stopColor="#FF6500" />
+                        <linearGradient id="accent-gradient" x1="9" y1="2" x2="9" y2="30" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#3b82f6" />
+                            <stop offset="1" stopColor="#2563eb" />
+                        </linearGradient>
+                        <linearGradient id="accent-gradient-2" x1="23" y1="2" x2="23" y2="30" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#06b6d4" />
+                            <stop offset="1" stopColor="#0891b2" />
+                        </linearGradient>
+                        <linearGradient id="accent-gradient-3" x1="13.5" y1="6" x2="13.5" y2="26" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#a855f7" />
+                            <stop offset="1" stopColor="#7c3aed" />
                         </linearGradient>
                     </defs>
                 </svg>

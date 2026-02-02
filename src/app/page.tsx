@@ -84,100 +84,116 @@ export default async function Home() {
   const trendingTags = Array.from(tagCounts.values()).sort((a, b) => b.count - a.count).slice(0, 5)
 
   return (
-    <div>
+    <div className="bg-[var(--bg-primary)] min-h-screen">
       <Header />
-      <main className="pt-14 bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
-        {/* Hero Section */}
-        <section className="flex flex-col items-center justify-center px-6 py-24 max-w-5xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20 mb-6">
-            <Sparkles size={16} className="text-[var(--accent)]" />
-            <span className="text-sm font-medium text-[var(--accent)]">The publishing platform that actually gets you readers</span>
-          </div>
+      <main className="pt-14">
+        {/* Hero Section - Vercel-inspired */}
+        <section className="relative flex flex-col items-center justify-center px-6 py-32 max-w-6xl mx-auto text-center overflow-hidden">
+          {/* Subtle grid background */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+          
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] mb-8 backdrop-blur-sm">
+              <Sparkles size={14} className="text-[var(--accent)]" />
+              <span className="text-xs font-medium text-[var(--text-secondary)]">The publishing platform that gets you readers</span>
+            </div>
 
-          <h1 className="font-display text-5xl md:text-7xl font-bold leading-tight tracking-tight text-[var(--text-primary)] mb-6">
-            Publish once.<br />Reach everywhere.
-          </h1>
-          <p className="text-xl md:text-2xl text-[var(--text-secondary)] mb-12 max-w-3xl leading-relaxed">
-            Built-in discovery. Advanced SEO. Multi-platform distribution. Zero revenue tax.
-            <span className="font-semibold text-[var(--text-primary)]"> You own everything.</span>
-          </p>
+            <h1 className="font-display text-6xl md:text-8xl font-bold leading-[1.1] tracking-tighter text-[var(--text-primary)] mb-6 text-balance">
+              Publish once.
+              <br />
+              <span className="bg-gradient-to-r from-[var(--accent)] via-[var(--accent-purple)] to-[var(--accent-cyan)] bg-clip-text text-transparent">
+                Reach everywhere.
+              </span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-[var(--text-secondary)] mb-12 max-w-2xl mx-auto leading-relaxed">
+              Built-in discovery. Advanced SEO. Multi-platform distribution.
+              <br />
+              <span className="text-[var(--text-primary)]">Zero revenue tax. You own everything.</span>
+            </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-16">
-            <Link
-              href={session ? "/write" : "/signup"}
-              className="btn btn-primary btn-lg"
-            >
-              {session ? "Start Writing" : "Start Free - Get Readers"}
-              <ArrowRight size={24} className="ml-3" />
-            </Link>
-            <Link
-              href="/explore"
-              className="btn btn-secondary btn-lg"
-            >
-              Explore Posts
-            </Link>
-          </div>
+            <div className="flex flex-col sm:flex-row gap-3 mb-16 justify-center">
+              <Link
+                href={session ? "/write" : "/signup"}
+                className="btn btn-primary btn-lg group"
+              >
+                {session ? "Start Writing" : "Get Started Free"}
+                <ArrowRight size={20} className="ml-2 transition-transform group-hover:translate-x-1" />
+              </Link>
+              <Link
+                href="/explore"
+                className="btn btn-secondary btn-lg"
+              >
+                Explore Posts
+              </Link>
+            </div>
 
-          {/* Comparison badges */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-[var(--text-tertiary)] mb-8">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-green-500" />
-              <span>Better discovery than <strong className="text-[var(--text-secondary)]">Ghost</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-green-500" />
-              <span>No 10% tax like <strong className="text-[var(--text-secondary)]">Substack</strong></span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-green-500" />
-              <span>Your audience, not <strong className="text-[var(--text-secondary)]">Medium's</strong></span>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="flex items-center gap-8 text-sm text-[var(--text-secondary)]">
-            <div className="flex items-center gap-2">
-              <FileText size={16} />
-              <span>{stats.posts} posts published</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <PenLine size={16} />
-              <span>{stats.creators} creators</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Globe size={16} />
-              <span>RSS, ActivityPub, ePub</span>
-            </div>
-          </div>
-
-          {/* Trending Topics */}
-          {trendingTags.length > 0 && (
-            <div className="mt-12 max-w-2xl mx-auto">
-              <div className="p-6 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)]">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp size={18} className="text-[var(--accent)]" />
-                  <h3 className="font-display text-lg">Trending Topics This Week</h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {trendingTags.map((tag) => (
-                    <Link
-                      key={tag.slug}
-                      href={`/explore?tag=${tag.slug}`}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
-                    >
-                      #{tag.name} <span className="text-[var(--text-tertiary)]">({tag.count})</span>
-                    </Link>
-                  ))}
-                </div>
+            {/* Comparison badges */}
+            <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-[var(--text-tertiary)] mb-10">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]">
+                <CheckCircle2 size={14} className="text-[var(--success)]" />
+                <span>Better discovery than <strong className="text-[var(--text-secondary)]">Ghost</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]">
+                <CheckCircle2 size={14} className="text-[var(--success)]" />
+                <span>No 10% tax like <strong className="text-[var(--text-secondary)]">Substack</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)]">
+                <CheckCircle2 size={14} className="text-[var(--success)]" />
+                <span>Your audience, not <strong className="text-[var(--text-secondary)]">Medium's</strong></span>
               </div>
             </div>
-          )}
+
+            {/* Stats */}
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-[var(--text-tertiary)]">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+                <span>{stats.posts} posts published</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-purple)]" />
+                <span>{stats.creators} creators</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-cyan)]" />
+                <span>RSS, ActivityPub, ePub</span>
+              </div>
+            </div>
+          </div>
+
+            {/* Trending Topics */}
+            {trendingTags.length > 0 && (
+              <div className="mt-16 max-w-3xl mx-auto">
+                <div className="p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp size={16} className="text-[var(--accent)]" />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Trending Topics</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {trendingTags.map((tag) => (
+                      <Link
+                        key={tag.slug}
+                        href={`/explore?tag=${tag.slug}`}
+                        className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition-all"
+                      >
+                        #{tag.name} <span className="text-[var(--text-tertiary)]">({tag.count})</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Unique Features Section */}
-        <section className="px-6 py-20 max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
+        <section className="px-6 py-24 max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] mb-6">
+              <Boxes size={14} className="text-[var(--accent)]" />
+              <span className="text-xs font-medium text-[var(--text-secondary)]">Features</span>
+            </div>
+            <h2 className="font-display text-5xl md:text-6xl font-bold mb-6 tracking-tight">
               Features Nobody Else Has
             </h2>
             <p className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto">
@@ -185,245 +201,243 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Traffic-First */}
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-[var(--accent)]/50 transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/30 to-cyan-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <BarChart3 className="w-8 h-8 text-blue-600" />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[var(--accent)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                  <BarChart3 className="w-6 h-6 text-[var(--accent)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">Traffic-First SEO</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  Real-time optimization suggestions, readability scoring, and keyword insights. See your SEO score while you write.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--success)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live now
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Traffic-First SEO</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                Real-time optimization suggestions, readability scoring, and keyword insights. See your SEO score while you write.
-              </p>
-              <div className="text-sm text-green-600 font-medium">Live now in Write page</div>
             </div>
 
             {/* ActivityPub Native */}
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-purple-500/50 transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-purple-200 bg-purple-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/30 to-purple-700/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <Globe className="w-8 h-8 text-purple-600" />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent-purple)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)]">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[var(--accent-purple)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-purple)]/10 border border-[var(--accent-purple)]/20">
+                  <Globe className="w-6 h-6 text-[var(--accent-purple)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">Fediverse Native</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  Your posts appear in Mastodon feeds automatically. Not as links - as native content. Reach 10M+ fediverse users instantly.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent-purple)]">
+                  <Clock size={12} />
+                  Coming Q1 2026
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Fediverse Native</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                Your posts appear in Mastodon feeds automatically. Not as links - as native content. Reach 10M+ fediverse users instantly.
-              </p>
-              <div className="text-sm text-purple-600 font-medium">Coming Q1 2026</div>
             </div>
 
             {/* Generative Covers */}
-            <div className="group p-8 rounded-2xl bg-gradient-to-br from-[var(--bg-primary)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30 shadow-lg hover:shadow-2xl hover:border-pink-500/50 transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-pink-200 bg-pink-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-pink-500/30 to-rose-700/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <Palette className="w-8 h-8 text-pink-600" />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent-cyan)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(6,182,212,0.15)]">
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[var(--accent-cyan)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/20">
+                  <Palette className="w-6 h-6 text-[var(--accent-cyan)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">Generative Covers</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  Every post gets a unique visual generated from its content hash. No stock photos. No AI slop. Your words create your aesthetic.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--success)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live now
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3 text-[var(--text-primary)]">Generative Covers</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                Every post gets a unique visual generated from its content hash. No stock photos. No AI slop. Your words create your aesthetic.
-              </p>
-              <div className="text-sm text-green-600 font-medium">Live now on all posts</div>
             </div>
 
             {/* ePub Export */}
-            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-blue-500/50 hover:shadow-xl transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/30 to-cyan-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <BookOpen className="w-8 h-8 text-blue-600" />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent)]/50 transition-all duration-300">
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                  <BookOpen className="w-6 h-6 text-[var(--accent)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">One-Click Book Export</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  Export your entire publication as a properly formatted ePub book. Table of contents, chapters, metadata - done.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--success)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live now
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3">One-Click Book Export</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                Export your entire publication as a properly formatted ePub book. Table of contents, chapters, metadata - done.
-              </p>
-              <div className="text-sm text-green-600 font-medium">Live now on profile pages</div>
             </div>
 
             {/* Multi-Platform Distribution */}
-            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-orange-500/50 hover:shadow-xl transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-200 bg-orange-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500/30 to-amber-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <Rocket className="w-8 h-8 text-orange-600" />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent-purple)]/50 transition-all duration-300">
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-purple)]/10 border border-[var(--accent-purple)]/20">
+                  <Rocket className="w-6 h-6 text-[var(--accent-purple)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">Multi-Platform Reach</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  One post becomes: a webpage, ActivityPub object, RSS item, ePub chapter, and social posts for X/LinkedIn/Reddit.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--success)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live now
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3">Multi-Platform Reach</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                One post becomes: a webpage, ActivityPub object, RSS item, ePub chapter, and social posts for X/LinkedIn/Reddit.
-              </p>
-              <div className="text-sm text-green-600 font-medium">Medium & Dev.to live now</div>
             </div>
 
             {/* Ownership */}
-            <div className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-emerald-500/50 hover:shadow-xl transition-all duration-300">
-              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50/80 shadow-inner">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-green-600/30 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-90 group-hover:opacity-100 transition-opacity">
-                  <Lock className="w-8 h-8 text-emerald-600" strokeWidth={1.5} />
+            <div className="group relative p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--accent-cyan)]/50 transition-all duration-300">
+              <div className="relative z-10">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/20">
+                  <Lock className="w-6 h-6 text-[var(--accent-cyan)]" />
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-2 text-[var(--text-primary)]">Radical Ownership</h3>
+                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
+                  Export everything (JSON, Markdown, ePub). RSS feeds are first-class. No algorithmic mystery. You can leave anytime.
+                </p>
+                <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--success)]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                  Live now
                 </div>
               </div>
-              <h3 className="font-display text-2xl mb-3">Radical Ownership</h3>
-              <p className="text-[var(--text-secondary)] mb-4">
-                Export everything (JSON, Markdown, ePub). RSS feeds are first-class. No algorithmic mystery. You can leave anytime.
-              </p>
-              <div className="text-sm text-green-600 font-medium">Available now</div>
             </div>
           </div>
         </section>
 
         {/* Traditional Features */}
-        <section className="px-6 py-16 max-w-6xl mx-auto">
-          <h3 className="font-display text-3xl text-center mb-12 text-[var(--text-secondary)]">Plus Everything You Expect</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="px-6 py-20 max-w-7xl mx-auto">
+          <h3 className="font-display text-2xl text-center mb-12 text-[var(--text-secondary)]">Plus Everything You Expect</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
             {/* Rich Editor */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <PenLine className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <PenLine className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Rich Editor</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Markdown, code, embeds</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Rich Editor</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Markdown, code, embeds</p>
             </div>
 
             {/* Newsletters */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Mail className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Mail className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Newsletters</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Email your subscribers</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Newsletters</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Email your subscribers</p>
             </div>
 
             {/* Series */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Layers className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Layers className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Series</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Organize related posts</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Series</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Organize related posts</p>
             </div>
 
             {/* Scheduling */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Clock className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Clock className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Scheduling</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Queue your posts</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Scheduling</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Queue your posts</p>
             </div>
 
             {/* Topics */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Tag className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Tag className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Topics</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Categorize content</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Topics</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Categorize content</p>
             </div>
 
             {/* RSS Feeds */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-amber-500/20 to-yellow-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Rss className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Rss className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">RSS Feeds</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Atom, JSON too</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">RSS Feeds</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Atom, JSON too</p>
             </div>
 
             {/* Semantic Search */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Sparkles className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <Sparkles className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Semantic Search</h4>
-              <p className="text-sm text-[var(--text-secondary)]">AI-powered discovery</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Semantic Search</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">AI-powered discovery</p>
             </div>
 
             {/* Version History */}
-            <div className="group relative flex flex-col items-center text-center p-6 rounded-2xl border border-[var(--border-light)]/50 bg-[var(--bg-primary)]/50 backdrop-blur-sm hover:bg-[var(--bg-primary)] hover:border-[var(--border-medium)] transition-all duration-300">
-              <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 shadow-inner">
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-zinc-500/20 to-slate-500/20 opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-100" />
-                <div className="relative z-10 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <History className="w-6 h-6 text-[var(--text-primary)]" />
-                </div>
+            <div className="group relative flex flex-col items-center text-center p-5 rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all duration-300">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)]">
+                <History className="w-5 h-5 text-[var(--text-secondary)]" />
               </div>
-              <h4 className="text-lg font-medium text-[var(--text-primary)] mb-1">Version History</h4>
-              <p className="text-sm text-[var(--text-secondary)]">Never lose work</p>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Version History</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Never lose work</p>
             </div>
           </div>
         </section>
 
         {/* Import Section */}
-        <section className="px-6 py-20 max-w-5xl mx-auto">
-          <div className="bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-3xl border-2 border-[var(--accent)]/20 p-12 text-center shadow-2xl">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/30 mb-6">
-              <Inbox size={16} className="text-[var(--accent)]" />
-              <span className="text-sm font-medium text-[var(--accent)]">Switch in 60 seconds</span>
-            </div>
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-              Already Publishing?<br />Bring Your Content.
-            </h2>
-            <p className="text-xl text-[var(--text-secondary)] mb-10 max-w-2xl mx-auto">
-              <strong className="text-[var(--text-primary)]">Switch in minutes.</strong> Import from Ghost, Substack, Medium, or WordPress. Keep your URLs, preserve your SEO, own your audience.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-              <Link
-                href="/import"
-                className="btn btn-primary btn-lg px-8 py-4 text-lg font-semibold"
-              >
-                Import Your Content
-                <ArrowRight size={20} className="ml-2" />
-              </Link>
-              <Link
-                href="/roadmap"
-                className="btn btn-secondary btn-lg px-8 py-4 text-lg font-semibold"
-              >
-                See What's Coming
-              </Link>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-[var(--text-tertiary)]">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-green-500" />
-                <span>Ghost JSON</span>
+        <section className="px-6 py-24 max-w-5xl mx-auto">
+          <div className="relative overflow-hidden bg-[var(--bg-card)] rounded-2xl border border-[var(--border-medium)] p-12 text-center">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(59,130,246,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(59,130,246,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-medium)] mb-6">
+                <Inbox size={14} className="text-[var(--accent)]" />
+                <span className="text-xs font-medium text-[var(--text-secondary)]">Switch in 60 seconds</span>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-green-500" />
-                <span>Substack ZIP</span>
+              <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 tracking-tight">
+                Already Publishing?
+                <br />
+                <span className="bg-gradient-to-r from-[var(--accent)] to-[var(--accent-purple)] bg-clip-text text-transparent">
+                  Bring Your Content.
+                </span>
+              </h2>
+              <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-2xl mx-auto">
+                <span className="text-[var(--text-primary)]">Switch in minutes.</span> Import from Ghost, Substack, Medium, or WordPress. Keep your URLs, preserve your SEO, own your audience.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+                <Link
+                  href="/import"
+                  className="btn btn-primary btn-lg group"
+                >
+                  Import Your Content
+                  <ArrowRight size={20} className="ml-2 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <Link
+                  href="/roadmap"
+                  className="btn btn-secondary btn-lg"
+                >
+                  See What's Coming
+                </Link>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-green-500" />
-                <span>Medium HTML</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-green-500" />
-                <span>RSS/Atom</span>
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-[var(--text-tertiary)]">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-[var(--success)]" />
+                  <span>Ghost JSON</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-[var(--success)]" />
+                  <span>Substack ZIP</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-[var(--success)]" />
+                  <span>Medium HTML</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-[var(--success)]" />
+                  <span>RSS/Atom</span>
+                </div>
               </div>
             </div>
           </div>
@@ -431,12 +445,12 @@ export default async function Home() {
 
         {/* Featured Posts */}
         {featuredPosts.length > 0 && (
-          <section className="px-6 py-16 max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="font-display text-3xl">Recent Posts on Neolog</h2>
-              <Link href="/explore" className="text-[var(--accent)] hover:underline flex items-center gap-1">
+          <section className="px-6 py-20 max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-10">
+              <h2 className="font-display text-3xl font-semibold">Recent Posts on Neolog</h2>
+              <Link href="/explore" className="text-[var(--accent)] hover:text-[var(--accent-hover)] flex items-center gap-1.5 text-sm font-medium transition-colors group">
                 Explore all
-                <ArrowRight size={16} />
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -447,61 +461,61 @@ export default async function Home() {
           </section>
         )}
 
-        <footer className="px-6 py-12 bg-[var(--bg-primary)] border-t border-[var(--border-light)] mt-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid md:grid-cols-4 gap-8 mb-8">
+        <footer className="px-6 py-16 bg-[var(--bg-secondary)] border-t border-[var(--border-medium)] mt-24">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-4 gap-12 mb-12">
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                   <span className="logo-mark">N</span>
                   <span className="font-display text-lg font-bold text-[var(--text-primary)]">Neolog</span>
                 </div>
-                <p className="text-sm text-[var(--text-secondary)]">
+                <p className="text-sm text-[var(--text-tertiary)] leading-relaxed">
                   The publishing platform that actually gets you readers.
                 </p>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Platform</h4>
-                <nav className="flex flex-col gap-2">
-                  <Link href="/explore" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Platform</h4>
+                <nav className="flex flex-col gap-2.5">
+                  <Link href="/explore" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Explore
                   </Link>
-                  <Link href="/search" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <Link href="/search" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Search
                   </Link>
-                  <Link href="/import" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <Link href="/import" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Import
                   </Link>
                 </nav>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Resources</h4>
-                <nav className="flex flex-col gap-2">
-                  <Link href="/roadmap" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Resources</h4>
+                <nav className="flex flex-col gap-2.5">
+                  <Link href="/roadmap" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Roadmap
                   </Link>
-                  <Link href="/readme" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <Link href="/readme" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     README
                   </Link>
-                  <Link href="/architecture" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <Link href="/architecture" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Architecture
                   </Link>
                 </nav>
               </div>
               <div>
-                <h4 className="font-semibold mb-3">Legal</h4>
-                <nav className="flex flex-col gap-2">
-                  <Link href="/tos" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Legal</h4>
+                <nav className="flex flex-col gap-2.5">
+                  <Link href="/tos" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Terms
                   </Link>
-                  <Link href="/privacy" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <Link href="/privacy" className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
                     Privacy
                   </Link>
                 </nav>
               </div>
             </div>
-            <div className="pt-8 border-t border-[var(--border-light)] text-center">
-              <p className="text-sm text-[var(--text-tertiary)]">
-                (c) 2026 Neolog. Open source. MIT License. Own your content.
+            <div className="pt-8 border-t border-[var(--border-medium)] text-center">
+              <p className="text-xs text-[var(--text-tertiary)]">
+                © 2026 Neolog. Open source. MIT License. Own your content.
               </p>
             </div>
           </div>
