@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, ExternalLink, Edit2 } from 'lucide-react'
+import { MoreHorizontal, ExternalLink, Edit2, Sparkles } from 'lucide-react'
 
 type PostStatus = 'published' | 'scheduled' | 'draft'
 
@@ -125,34 +125,34 @@ export default function PostsPage() {
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Posts</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-display font-semibold text-[var(--text-primary)]">Posts</h1>
         <Link
           href="/write"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          className="btn btn-primary"
         >
           Create new
         </Link>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 border-b border-gray-200 mb-6">
+      <div className="flex gap-6 border-b border-[var(--border-medium)] mb-8">
         {(['published', 'scheduled', 'draft'] as PostStatus[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`pb-3 px-1 font-medium capitalize transition-colors relative ${
               activeTab === tab
-                ? 'text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'text-[var(--accent)]'
+                : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
             }`}
           >
             {tab}
-            <span className={`ml-2 text-sm ${activeTab === tab ? 'text-blue-600' : 'text-gray-400'}`}>
+            <span className={`ml-2 text-sm ${activeTab === tab ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}`}>
               {counts[tab]}
             </span>
             {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent)]" />
             )}
           </button>
         ))}
@@ -160,19 +160,23 @@ export default function PostsPage() {
 
       {/* Posts List */}
       {loading ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-20 bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-gray-500 mb-4">
+        <div className="text-center py-20 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+          <Sparkles size={56} className="mx-auto mb-6 text-[var(--text-tertiary)]" />
+          <h3 className="font-display text-2xl font-semibold mb-3 text-[var(--text-primary)]">
             No {activeTab} posts yet
+          </h3>
+          <p className="text-[var(--text-secondary)] mb-8">
+            {activeTab === 'draft' ? 'Start writing your first draft' : activeTab === 'scheduled' ? 'Schedule a post to publish later' : 'Publish your first post to see it here'}
           </p>
           <Link
             href="/write"
-            className="text-blue-600 hover:underline"
+            className="btn btn-primary"
           >
             Write your first post
           </Link>
@@ -189,13 +193,13 @@ export default function PostsPage() {
                   router.push(`/write?edit=${post.id}`)
                 }
               }}
-              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer group"
+              className="flex items-center justify-between p-5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] hover:border-[var(--border-heavy)] hover:bg-[var(--bg-tertiary)] transition-all cursor-pointer group"
             >
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-gray-900 truncate">
+                <h3 className="font-medium text-[var(--text-primary)] truncate">
                   {post.title || 'Untitled'}
                 </h3>
-                <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                <div className="flex items-center gap-4 mt-1.5 text-sm text-[var(--text-tertiary)]">
                   {activeTab === 'published' && (
                     <span>{formatDate(post.published_at)}</span>
                   )}
@@ -208,10 +212,10 @@ export default function PostsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => router.push(`/write?edit=${post.id}`)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded-lg transition-all"
                   title="Edit"
                 >
                   <Edit2 size={18} />
@@ -220,7 +224,7 @@ export default function PostsPage() {
                 {activeTab === 'published' && username && (
                   <button
                     onClick={() => window.open(`/${username}/${post.slug}`, '_blank')}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded-lg transition-all"
                     title="View"
                   >
                     <ExternalLink size={18} />
@@ -228,7 +232,7 @@ export default function PostsPage() {
                 )}
 
                 <button
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded-lg transition-all"
                   title="More options"
                 >
                   <MoreHorizontal size={18} />
