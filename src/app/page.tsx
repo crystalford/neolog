@@ -38,19 +38,7 @@ export default async function Home() {
     supabase
       .from('posts')
       .select(
-        [
-          'id',
-          'title',
-          'slug',
-          'subtitle',
-          'excerpt',
-          'cover_image_url',
-          'published_at',
-          'reading_time_minutes',
-          'author:profiles(id, username, display_name, avatar_url)',
-          'publication:publications(id, slug, name, logo_url)',
-          'series:series(title, slug)',
-        ].join(','),
+        `id,title,slug,subtitle,excerpt,cover_image_url,published_at,reading_time_minutes,author:profiles(id,username,display_name,avatar_url),publication:publications(id,slug,name,logo_url),series:series(title,slug)`
       )
       .eq('status', 'published')
       .order('published_at', { ascending: false })
