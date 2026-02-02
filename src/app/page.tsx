@@ -159,31 +159,29 @@ export default async function Home() {
                 <span>RSS, ActivityPub, ePub</span>
               </div>
             </div>
-          </div>
 
-            {/* Trending Topics */}
-            {trendingTags.length > 0 && (
-              <div className="mt-16 max-w-3xl mx-auto">
-                <div className="p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp size={16} className="text-[var(--accent)]" />
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Trending Topics</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {trendingTags.map((tag) => (
-                      <Link
-                        key={tag.slug}
-                        href={`/explore?tag=${tag.slug}`}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition-all"
-                      >
-                        #{tag.name} <span className="text-[var(--text-tertiary)]">({tag.count})</span>
-                      </Link>
-                    ))}
-                  </div>
+          {/* Trending Topics */}
+          {trendingTags.length > 0 && (
+            <div className="mt-16 max-w-3xl mx-auto relative z-10">
+              <div className="p-6 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)] backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp size={16} className="text-[var(--accent)]" />
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Trending Topics</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trendingTags.map((tag) => (
+                    <Link
+                      key={tag.slug}
+                      href={`/explore?tag=${tag.slug}`}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition-all"
+                    >
+                      #{tag.name} <span className="text-[var(--text-tertiary)]">({tag.count})</span>
+                    </Link>
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </section>
 
         {/* Unique Features Section */}
