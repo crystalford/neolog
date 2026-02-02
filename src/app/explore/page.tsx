@@ -133,13 +133,13 @@ export default function ExplorePage() {
   return (
     <>
       <Header />
-      <main className="pt-14 pb-14">
+      <main className="pt-14 pb-14 bg-[var(--bg-primary)] min-h-screen">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           {/* Header */}
-          <div className="pt-8 mb-8">
-            <div className="flex items-center justify-between mb-6">
+          <div className="pt-12 mb-10">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="font-display text-4xl md:text-5xl mb-3">Discover Great Writing</h1>
+                <h1 className="font-display text-5xl md:text-6xl font-bold mb-4 tracking-tight">Discover Great Writing</h1>
                 <p className="text-lg text-[var(--text-secondary)]">
                   Real content from real creators. No algorithmic mystery, just good writing surfaced fairly.
                 </p>
@@ -147,7 +147,7 @@ export default function ExplorePage() {
             </div>
 
             {/* Search Bar */}
-            <div className="mb-4">
+            <div className="mb-6">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                 <input
@@ -155,21 +155,21 @@ export default function ExplorePage() {
                   placeholder="Search posts by title, subtitle, or content..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-primary)] outline-none focus:border-[var(--accent)] transition-colors"
+                  className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text-tertiary)]"
                 />
               </div>
             </div>
 
             {/* Tag Filters */}
             {topTags.length > 0 && (
-              <div className="mb-4">
+              <div className="mb-6">
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setSelectedTag(null)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                       selectedTag === null
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg'
+                        : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-medium)] hover:border-[var(--border-heavy)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     All Topics
@@ -178,10 +178,10 @@ export default function ExplorePage() {
                     <button
                       key={tag.id}
                       onClick={() => setSelectedTag(tag.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
                         selectedTag === tag.id
-                          ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                          : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--border-medium)]'
+                          ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-lg'
+                          : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-medium)] hover:border-[var(--border-heavy)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       #{tag.name} ({tag.count})
@@ -192,20 +192,20 @@ export default function ExplorePage() {
             )}
 
             {/* Stats banner */}
-            <div className="flex flex-wrap items-center gap-6 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+            <div className="flex flex-wrap items-center gap-6 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
               <div className="flex items-center gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse"></div>
                 <span className="text-[var(--text-secondary)]">Live discovery feed</span>
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">-</div>
+              <div className="text-sm text-[var(--text-tertiary)]">·</div>
               <div className="text-sm text-[var(--text-secondary)]">
                 {searchQuery ? `Searching for "${searchQuery}"` : selectedTag ? `Filtered by ${topTags.find(t => t.id === selectedTag)?.name}` : 'Posts ranked by recency, engagement, and quality'}
               </div>
               {!searchQuery && !selectedTag && (
                 <>
-                  <div className="text-sm text-[var(--text-tertiary)]">-</div>
-                  <Link href="/search" className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1">
-                    {'Try semantic search ->'}
+                  <div className="text-sm text-[var(--text-tertiary)]">·</div>
+                  <Link href="/search" className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] flex items-center gap-1 font-medium transition-colors">
+                    Try semantic search →
                   </Link>
                 </>
               )}
@@ -224,10 +224,10 @@ export default function ExplorePage() {
                   ))}
                 </div>
               ) : posts.length === 0 ? (
-                <div className="text-center py-16 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                  <Sparkles size={48} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
-                  <h3 className="font-display text-xl mb-2">No published posts yet</h3>
-                  <p className="text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+                <div className="text-center py-20 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+                  <Sparkles size={56} className="mx-auto mb-6 text-[var(--text-tertiary)]" />
+                  <h3 className="font-display text-2xl font-semibold mb-3 text-[var(--text-primary)]">No published posts yet</h3>
+                  <p className="text-[var(--text-secondary)] mb-8 max-w-md mx-auto leading-relaxed">
                     Be the first to share your writing! Imported posts are saved as drafts - remember to publish them.
                   </p>
                   <div className="flex items-center justify-center gap-3">
@@ -263,20 +263,23 @@ export default function ExplorePage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Call to action */}
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-[var(--accent-soft)] to-[var(--bg-secondary)] border-2 border-[var(--accent)]/30">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles size={20} className="text-[var(--accent)]" />
-                  <h3 className="font-display text-lg font-bold">Your Turn to Get Discovered</h3>
+              <div className="relative overflow-hidden p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/10 via-transparent to-[var(--accent-purple)]/5" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles size={20} className="text-[var(--accent)]" />
+                    <h3 className="font-display text-lg font-semibold text-[var(--text-primary)]">Your Turn to Get Discovered</h3>
+                  </div>
+                  <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
+                    Write once, reach everywhere. Built-in SEO, multi-platform distribution, and real analytics. Your first post could be on this page tomorrow.
+                  </p>
+                  <Link href="/write" className="btn btn-primary w-full mb-3">
+                    Start Writing Free
+                  </Link>
+                  <Link href="/import" className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors flex items-center justify-center gap-1">
+                    Or import from Ghost/Substack →
+                  </Link>
                 </div>
-                <p className="text-sm text-[var(--text-secondary)] mb-4">
-                  Write once, reach everywhere. Built-in SEO, multi-platform distribution, and real analytics. Your first post could be on this page tomorrow.
-                </p>
-                <Link href="/write" className="btn btn-primary btn-sm w-full mb-3">
-                  Start Writing Free
-                </Link>
-                <Link href="/import" className="btn btn-ghost btn-sm w-full text-xs">
-                  {'Or import from Ghost/Substack ->'}
-                </Link>
               </div>
             </div>
           </div>
