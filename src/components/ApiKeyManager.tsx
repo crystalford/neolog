@@ -162,7 +162,7 @@ export function ApiKeyManager() {
                         value={newKeyName}
                         onChange={(e) => setNewKeyName(e.target.value)}
                         placeholder="e.g., Production Integration"
-                        className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                        className="input flex-1"
                     />
                     <button
                         onClick={handleCreateKey}

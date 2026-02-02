@@ -224,10 +224,12 @@ export default function ExplorePage() {
                   ))}
                 </div>
               ) : posts.length === 0 ? (
-                <div className="text-center py-20 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
-                  <Sparkles size={56} className="mx-auto mb-6 text-[var(--text-tertiary)]" />
+                <div className="flex flex-col items-center justify-center py-24 px-6">
+                  <div className="w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-medium)] flex items-center justify-center mb-6">
+                    <FileText size={32} className="text-[var(--text-tertiary)]" />
+                  </div>
                   <h3 className="font-display text-2xl font-semibold mb-3 text-[var(--text-primary)]">No published posts yet</h3>
-                  <p className="text-[var(--text-secondary)] mb-8 max-w-md mx-auto leading-relaxed">
+                  <p className="text-[var(--text-secondary)] mb-8 max-w-md text-center leading-relaxed">
                     Be the first to share your writing! Imported posts are saved as drafts - remember to publish them.
                   </p>
                   <div className="flex items-center justify-center gap-3">
@@ -266,8 +268,7 @@ export default function ExplorePage() {
               <div className="relative overflow-hidden p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
                 <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/10 via-transparent to-[var(--accent-purple)]/5" />
                 <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles size={20} className="text-[var(--accent)]" />
+                  <div className="mb-4">
                     <h3 className="font-display text-lg font-semibold text-[var(--text-primary)]">Your Turn to Get Discovered</h3>
                   </div>
                   <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">

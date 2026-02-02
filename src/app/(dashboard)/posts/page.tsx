@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, ExternalLink, Edit2, Sparkles } from 'lucide-react'
+import { MoreHorizontal, ExternalLink, Edit2, FileText } from 'lucide-react'
 
 type PostStatus = 'published' | 'scheduled' | 'draft'
 
@@ -166,12 +166,14 @@ export default function PostsPage() {
           ))}
         </div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-20 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
-          <Sparkles size={56} className="mx-auto mb-6 text-[var(--text-tertiary)]" />
+        <div className="flex flex-col items-center justify-center py-24 px-6">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-medium)] flex items-center justify-center mb-6">
+            <FileText size={32} className="text-[var(--text-tertiary)]" />
+          </div>
           <h3 className="font-display text-2xl font-semibold mb-3 text-[var(--text-primary)]">
             No {activeTab} posts yet
           </h3>
-          <p className="text-[var(--text-secondary)] mb-8">
+          <p className="text-[var(--text-secondary)] mb-8 max-w-md text-center">
             {activeTab === 'draft' ? 'Start writing your first draft' : activeTab === 'scheduled' ? 'Schedule a post to publish later' : 'Publish your first post to see it here'}
           </p>
           <Link
