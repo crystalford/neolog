@@ -651,7 +651,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
+      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
         <div className="h-8 w-32 skeleton rounded mb-8" />
         <div className="space-y-4">
           <div className="h-20 skeleton rounded-xl" />
@@ -662,12 +662,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
       <div className="mb-10">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
             Publisher settings
           </p>
-          <h1 className="font-display text-3xl">Settings</h1>
+          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Settings</h1>
           <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
             Manage your profile, notifications, and exports for your publication.
           </p>
