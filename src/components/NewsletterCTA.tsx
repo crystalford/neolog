@@ -85,7 +85,7 @@ export function NewsletterCTA({ authorName, authorId, className = '' }: Newslett
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
-              className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+              className="input flex-1"
               autoComplete="email"
               required
             />

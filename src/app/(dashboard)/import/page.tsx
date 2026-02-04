@@ -138,12 +138,12 @@ export default function ImportPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
       <div className="mb-10">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
               Switch in minutes
             </p>
-            <h1 className="font-display text-4xl mb-3">Import Your Content</h1>
+            <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Import Your Content</h1>
             <p className="text-lg text-[var(--text-secondary)] max-w-2xl mb-4">
               Bring your entire publication from Ghost, Substack, Medium, or WordPress.
             </p>

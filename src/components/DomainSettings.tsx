@@ -272,7 +272,7 @@ export function DomainSettings({ publicationId, currentDomain, isVerified }: Dom
                             value={domain}
                             onChange={(e) => setDomain(e.target.value)}
                             placeholder="blog.example.com"
-                            className="w-full px-4 py-3 rounded-lg border border-[var(--border-light)] bg-white outline-none focus:border-[var(--accent)] transition-colors"
+                            className="input"
                             required
                         />
                         <p className="text-xs text-[var(--text-tertiary)] mt-2">

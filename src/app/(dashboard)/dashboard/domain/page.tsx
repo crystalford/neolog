@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 export default function CustomDomainPage() {
     return (
         <main className="min-h-screen bg-[var(--bg-primary)] p-6">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
                     <div className="flex items-center gap-3 mb-3">

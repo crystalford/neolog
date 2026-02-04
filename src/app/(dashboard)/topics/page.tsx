@@ -100,7 +100,7 @@ export default function TopicsDashboardPage() {
 
   if (loading) {
     return (
-      <main className="px-6 lg:px-12 py-12 max-w-5xl mx-auto">
+      <main className="px-6 lg:px-12 py-12 max-w-7xl mx-auto">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 skeleton rounded" />
           <div className="h-4 w-32 skeleton rounded" />
@@ -115,7 +115,7 @@ export default function TopicsDashboardPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-5xl mx-auto">
+    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
       <div className="mb-8">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Topics</p>
         <h1 className="font-display text-3xl text-[var(--text-primary)]">Topic intros</h1>

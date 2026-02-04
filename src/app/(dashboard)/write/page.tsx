@@ -535,7 +535,7 @@ export default function WritePage() {
   return (
     <main className="min-h-screen bg-[var(--bg-primary)]">
       {/* Top bar */}
-      <div className="border-b border-gray-200 bg-[var(--bg-primary)] sticky top-0 z-10">
+      <div className="border-b border-[var(--border-medium)] bg-[var(--bg-primary)] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
@@ -644,7 +644,7 @@ export default function WritePage() {
           <div
             role="alert"
             aria-live="assertive"
-            className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"
+            className="p-4 bg-[var(--error)]/10 border border-[var(--error)]/20 rounded-lg text-sm text-[var(--error)]"
           >
             {error}
           </div>
@@ -655,7 +655,7 @@ export default function WritePage() {
           <div
             role="status"
             aria-live="polite"
-            className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700"
+            className="p-4 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-lg text-sm text-[var(--success)]"
           >
             {success}
           </div>
@@ -670,7 +670,7 @@ export default function WritePage() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Post title"
           aria-label="Post title"
-          className="w-full text-5xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-gray-300 mb-4 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
+          className="w-full text-3xl font-bold border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-4 outline-none placeholder-[var(--text-tertiary)] mb-4 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors text-[var(--text-primary)]"
           autoFocus
         />
 
@@ -680,7 +680,7 @@ export default function WritePage() {
           onChange={(e) => setSubtitle(e.target.value)}
           placeholder="Add a subtitle or excerpt (optional)"
           aria-label="Post subtitle"
-          className="w-full text-xl text-gray-600 border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-gray-400 mb-8 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
+          className="w-full text-lg text-[var(--text-secondary)] border border-transparent rounded-2xl bg-[var(--bg-secondary)] px-5 py-3 outline-none placeholder-[var(--text-tertiary)] mb-8 focus:border-[var(--border-medium)] focus:bg-[var(--bg-primary)] transition-colors"
         />
 
         <div>

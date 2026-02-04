@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getAgents, deleteAgent } from '@/app/actions/agents'
 import { dispatchAgent } from '@/app/actions/dispatchAgent'
-import { Sparkles, Plus, Loader2, Trash2, Settings as SettingsIcon, Calendar, Zap } from 'lucide-react'
+import { Plus, Loader2, Trash2, Settings as SettingsIcon, Calendar, Zap, Bot } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Agent {
@@ -84,11 +84,10 @@ export default function AgentsPage() {
             <div className="mb-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-3">
-                            <Sparkles size={32} className="text-[var(--accent)]" />
+                        <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">
                             Agents
                         </h1>
-                        <p className="text-sm text-[var(--text-secondary)] mt-1">
+                        <p className="text-sm text-[var(--text-secondary)] mt-2">
                             AI agents that research and write blog posts for you
                         </p>
                     </div>
@@ -118,16 +117,18 @@ export default function AgentsPage() {
 
             {/* Agents Grid */}
             {agents.length === 0 ? (
-                <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]">
-                    <Sparkles size={48} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-                    <h3 className="font-display text-xl font-semibold text-[var(--text-primary)] mb-2">
+                <div className="flex flex-col items-center justify-center py-24 px-6">
+                    <div className="w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-medium)] flex items-center justify-center mb-6">
+                        <Bot size={32} className="text-[var(--text-tertiary)]" />
+                    </div>
+                    <h3 className="font-display text-2xl font-semibold text-[var(--text-primary)] mb-3">
                         No agents yet
                     </h3>
-                    <p className="text-sm text-[var(--text-secondary)] mb-6">
-                        Create your first AI agent to start generating content
+                    <p className="text-sm text-[var(--text-secondary)] mb-8 max-w-md text-center">
+                        Create your first AI agent to automatically research topics and generate draft blog posts.
                     </p>
                     <Link href="/dashboard/agents/new" className="btn btn-primary">
-                        <Plus size={16} />
+                        <Plus size={18} />
                         Create Your First Agent
                     </Link>
                 </div>
