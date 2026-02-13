@@ -3,8 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveProviderKey } from '@/lib/ai-provider'
 import { NextRequest, NextResponse } from 'next/server'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
+import {
+  runAnalysis,
+  scrubPiiFromTranscript,
+  extractTags,
+  generateClipSuggestions,
+  generatePostSuggestions,
+  upsertEntities,
+} from '@/lib/video-analysis'
 import OpenAI from 'openai'
-import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 300
 
@@ -12,8 +19,7 @@ export const maxDuration = 300
  * POST /api/video-upload/process
  *
  * One-shot pipeline: given a video_upload_id that's been uploaded,
- * runs transcription → analysis → generates outputs.
- * This is the "just process it" endpoint the UI calls after upload.
+ * runs transcription → analysis → entity extraction → generates outputs.
  */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Upload not found' }, { status: 404 })
     }
 
-    // Check keys are available
+    // Resolve keys
     const openaiKey = await resolveProviderKey(session.user.id, 'openai')
     if (!openaiKey) {
       finalErrorMessage = 'OpenAI API key required'
@@ -77,7 +83,6 @@ export async function POST(request: NextRequest) {
     // ========== STEP 1: Transcribe ==========
     let transcript = upload.transcript
     let transcriptSegments = upload.transcript_segments
-    let duration = upload.duration_seconds
 
     if (!transcript) {
       if (admin) {
@@ -87,7 +92,6 @@ export async function POST(request: NextRequest) {
           .eq('id', video_upload_id)
       }
 
-      // Download file
       const { data: fileData, error: downloadError } = await supabase.storage
         .from('videos')
         .download(upload.storage_path)
@@ -120,7 +124,7 @@ export async function POST(request: NextRequest) {
         text: s.text,
       })) || []
       const language = (transcription as any).language || null
-      duration = (transcription as any).duration || null
+      const duration = (transcription as any).duration || null
 
       const transcriptUpdate: Record<string, any> = {
         transcript,
@@ -151,107 +155,47 @@ export async function POST(request: NextRequest) {
           .eq('id', video_upload_id)
       }
 
-      const analysisPrompt = `You are a personal content analyst. Analyze this transcript from a raw video recording and extract structured information.
+      const { analysis, modelUsed } = await runAnalysis(
+        transcript,
+        openaiKey.key,
+        anthropicKey?.key || null,
+      )
 
-Return a JSON object with this exact structure:
-{
-  "summary": "2-3 sentence summary",
-  "categories": [{"name": "category", "confidence": 0.0-1.0}],
-  "ideas": ["idea 1"],
-  "projects": ["project 1"],
-  "action_items": ["task 1"],
-  "life_events": ["event 1"],
-  "topics": ["topic1"],
-  "mood": "overall tone",
-  "key_quotes": ["best verbatim quotes for social media, max 5"]
-}
-
-Categories: work, personal, ideas, health, relationships, projects, learning, goals, reflection, creative, business, tech.
-Return ONLY the JSON. No markdown, no code fences.`
-
-      let analysisText = ''
-      let modelUsed = ''
-      const userPrompt = `Transcript:\n\n${transcript}`
-
-      // Prefer Anthropic for analysis (better at structured extraction), fallback to OpenAI
-      if (anthropicKey) {
-        const anthropic = new Anthropic({ apiKey: anthropicKey.key })
-        const message = await anthropic.messages.create({
-          model: 'claude-3-5-sonnet-20240620',
-          max_tokens: 4096,
-          system: analysisPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-          temperature: 0.3,
-        })
-        const textContent = message.content.find(c => c.type === 'text')
-        if (textContent && textContent.type === 'text') {
-          analysisText = textContent.text
-        }
-        modelUsed = 'claude-3-5-sonnet'
-      } else {
-        const openai = new OpenAI({ apiKey: openaiKey.key })
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: analysisPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.3,
-        })
-        analysisText = completion.choices[0].message.content || ''
-        modelUsed = 'gpt-4o'
-      }
-
-      // Parse JSON
-      let analysis
-      try {
-        const cleaned = analysisText
-          .replace(/^```json?\s*/i, '')
-          .replace(/\s*```$/i, '')
-          .trim()
-        analysis = JSON.parse(cleaned)
-      } catch {
-        finalErrorMessage = 'Analysis produced invalid JSON'
-        if (admin) {
-          await admin
-            .from('video_uploads')
-            .update({ status: 'error', error_message: finalErrorMessage, updated_at: new Date().toISOString() })
-            .eq('id', video_upload_id)
-        }
-        return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
-      }
-
-      // Generate tags, clips, posts
-      const tags = [
-        ...(analysis.categories?.map((c: any) => c.name) || []),
-        ...(analysis.topics || []),
-      ].filter(Boolean).map((t: string) => t.toLowerCase())
-      const uniqueTags = [...new Set(tags)]
-
+      // PII scrub transcript
+      const scrubbedTranscript = scrubPiiFromTranscript(transcript)
+      const uniqueTags = extractTags(analysis)
       const generatedClips = generateClipSuggestions(transcriptSegments || [], analysis.key_quotes || [])
       const generatedPosts = generatePostSuggestions(analysis)
+
+      const updateData: Record<string, any> = {
+        analysis,
+        analysis_model: modelUsed,
+        tags: uniqueTags,
+        generated_clips: generatedClips,
+        generated_posts: generatedPosts,
+        status: 'processed',
+        processed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      if (scrubbedTranscript !== transcript) {
+        updateData.transcript = scrubbedTranscript
+      }
 
       if (admin) {
         await admin
           .from('video_uploads')
-          .update({
-            analysis,
-            analysis_model: modelUsed,
-            tags: uniqueTags,
-            generated_clips: generatedClips,
-            generated_posts: generatedPosts,
-            status: 'processed',
-            processed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq('id', video_upload_id)
+
+        await upsertEntities(admin, session.user.id, video_upload_id, analysis)
       }
 
       finalMeta.analysis_model = modelUsed
       finalMeta.tags_count = uniqueTags.length
       finalMeta.clips_count = generatedClips.length
+      finalMeta.pii_found = analysis.pii_detected?.length || 0
     } else {
-      // Already analyzed
       if (admin) {
         await admin
           .from('video_uploads')
@@ -262,7 +206,6 @@ Return ONLY the JSON. No markdown, no code fences.`
 
     finalStatus = 'success'
 
-    // Fetch final state
     const { data: result } = await supabase
       .from('video_uploads')
       .select('*')
@@ -308,70 +251,4 @@ Return ONLY the JSON. No markdown, no code fences.`
       // best-effort
     }
   }
-}
-
-function generateClipSuggestions(
-  segments: Array<{ start: number; end: number; text: string }>,
-  keyQuotes: string[],
-) {
-  if (!segments.length || !keyQuotes.length) return []
-
-  const clips: Array<{ start: number; end: number; title: string; transcript: string; platform: string }> = []
-
-  for (const quote of keyQuotes.slice(0, 5)) {
-    const quoteLower = quote.toLowerCase()
-    for (let i = 0; i < segments.length; i++) {
-      const seg = segments[i]
-      if (quoteLower.includes(seg.text.toLowerCase().trim()) ||
-          seg.text.toLowerCase().trim().includes(quoteLower.substring(0, 30))) {
-        const startIdx = Math.max(0, i - 1)
-        const endIdx = Math.min(segments.length - 1, i + 2)
-        const clipSegments = segments.slice(startIdx, endIdx + 1)
-        const clipTranscript = clipSegments.map(s => s.text).join(' ').trim()
-
-        clips.push({
-          start: clipSegments[0].start,
-          end: clipSegments[clipSegments.length - 1].end,
-          title: quote.length > 60 ? quote.substring(0, 57) + '...' : quote,
-          transcript: clipTranscript,
-          platform: 'general',
-        })
-        break
-      }
-    }
-  }
-
-  return clips
-}
-
-function generatePostSuggestions(analysis: any) {
-  const posts: Array<{ title: string; content: string; type: string }> = []
-
-  if (analysis.summary) {
-    posts.push({
-      title: `Daily Log: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
-      content: analysis.summary,
-      type: 'log',
-    })
-  }
-
-  if (analysis.ideas?.length > 0) {
-    for (const idea of analysis.ideas.slice(0, 3)) {
-      posts.push({
-        title: idea.length > 80 ? idea.substring(0, 77) + '...' : idea,
-        content: idea,
-        type: 'idea',
-      })
-    }
-  }
-
-  if (analysis.projects?.length > 0) {
-    posts.push({
-      title: `Project Update: ${analysis.projects[0]}`,
-      content: `Working on: ${analysis.projects.join(', ')}`,
-      type: 'project_update',
-    })
-  }
-
-  return posts
 }
