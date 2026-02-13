@@ -548,3 +548,77 @@ export type VideoBrief = {
   created_at: string
   updated_at: string
 }
+
+// =============================================
+// VIDEO UPLOAD & ANALYSIS TYPES
+// =============================================
+
+export type VideoUploadStatus =
+  | 'uploaded'
+  | 'transcribing'
+  | 'analyzing'
+  | 'processed'
+  | 'error'
+  | 'deleting'
+  | 'deleted'
+
+export type TranscriptSegment = {
+  start: number
+  end: number
+  text: string
+}
+
+export type VideoAnalysis = {
+  summary: string
+  categories: Array<{
+    name: string
+    confidence: number
+  }>
+  ideas: string[]
+  projects: string[]
+  action_items: string[]
+  life_events: string[]
+  topics: string[]
+  mood: string | null
+  key_quotes: string[]
+}
+
+export type GeneratedPost = {
+  title: string
+  content: string
+  type: 'log' | 'idea' | 'project_update' | 'reflection' | 'social_clip'
+}
+
+export type SuggestedClip = {
+  start: number
+  end: number
+  title: string
+  transcript: string
+  platform: 'x' | 'linkedin' | 'tiktok' | 'instagram' | 'general'
+}
+
+export type VideoUpload = {
+  id: string
+  user_id: string
+  file_name: string
+  file_size_bytes: number
+  mime_type: string
+  duration_seconds: number | null
+  storage_path: string
+  storage_provider: 'supabase' | 's3' | 'r2'
+  status: VideoUploadStatus
+  transcript: string | null
+  transcript_segments: TranscriptSegment[] | null
+  transcript_language: string | null
+  transcript_model: string | null
+  analysis: VideoAnalysis | null
+  analysis_model: string | null
+  generated_posts: GeneratedPost[] | null
+  generated_clips: SuggestedClip[] | null
+  tags: string[]
+  error_message: string | null
+  source_deleted: boolean
+  processed_at: string | null
+  created_at: string
+  updated_at: string
+}
