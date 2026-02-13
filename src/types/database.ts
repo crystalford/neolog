@@ -548,3 +548,182 @@ export type VideoBrief = {
   created_at: string
   updated_at: string
 }
+
+// =============================================
+// VIDEO UPLOAD & ANALYSIS TYPES
+// =============================================
+
+export type VideoUploadStatus =
+  | 'uploaded'
+  | 'transcribing'
+  | 'analyzing'
+  | 'processed'
+  | 'error'
+  | 'deleting'
+  | 'deleted'
+
+export type TranscriptSegment = {
+  start: number
+  end: number
+  text: string
+}
+
+export type VideoAnalysis = {
+  // Core summary
+  summary: string
+  categories: Array<{
+    name: string
+    confidence: number
+  }>
+  mood: string | null
+  energy_level: 'high' | 'medium' | 'low' | null
+
+  // Ideas & Creativity
+  ideas: Array<{
+    text: string
+    type: 'business' | 'creative' | 'product' | 'content' | 'philosophical' | 'other'
+    confidence: number
+  }>
+  questions: string[]                     // unanswered questions, "I wonder if...", "what if..."
+  recurring_themes: string[]              // things that keep coming up across the recording
+
+  // Work & Projects
+  projects: Array<{
+    name: string
+    status: 'active' | 'idea' | 'stalled' | 'completed' | 'mentioned'
+    updates: string[]
+  }>
+  action_items: string[]
+  decisions: Array<{
+    decision: string
+    reasoning: string | null
+  }>
+  blockers: string[]                      // obstacles, friction, what's stopping progress
+
+  // Personal
+  life_events: string[]
+  habits: Array<{
+    habit: string
+    sentiment: 'positive' | 'negative' | 'neutral'  // doing well, struggling, observing
+  }>
+  goals: Array<{
+    goal: string
+    timeframe: 'short_term' | 'long_term' | 'unspecified'
+  }>
+  commitments: string[]                   // promises to self or others
+  values_expressed: string[]              // principles, beliefs, what matters
+
+  // People & Relationships
+  people_mentioned: Array<{
+    name: string
+    context: string                       // how they were mentioned
+    relationship: string | null           // collaborator, friend, influence, etc.
+  }>
+
+  // Knowledge & Learning
+  references: Array<{
+    title: string
+    type: 'book' | 'article' | 'video' | 'podcast' | 'person' | 'concept' | 'tool' | 'other'
+  }>
+  skills_mentioned: string[]
+  lessons_learned: string[]
+
+  // Content Pipeline
+  content_ideas: Array<{
+    topic: string
+    format: 'article' | 'video' | 'thread' | 'newsletter' | 'social_post' | 'other'
+  }>
+  stories_told: string[]                  // narratives repeated or shared (best content candidates)
+  strong_opinions: string[]               // convictions worth turning into essays
+
+  // Meta
+  topics: string[]
+  key_quotes: string[]
+
+  // Privacy
+  pii_detected: Array<{
+    type: 'credit_card' | 'ssn' | 'phone' | 'address' | 'password' | 'email' | 'financial_account' | 'other'
+    description: string                   // what was found (NOT the actual data)
+    approximate_location: string          // e.g. "around 2:30 mark"
+  }>
+  contains_sensitive_content: boolean
+  redacted_sections: string[]             // descriptions of what was removed
+}
+
+export type GeneratedPost = {
+  title: string
+  content: string
+  type: 'log' | 'idea' | 'project_update' | 'reflection' | 'social_clip' | 'opinion' | 'question' | 'lesson'
+}
+
+export type SuggestedClip = {
+  start: number
+  end: number
+  title: string
+  transcript: string
+  platform: 'x' | 'linkedin' | 'tiktok' | 'instagram' | 'general'
+}
+
+// Entity: a living, accumulating concept tracked across sessions
+export type EntityType =
+  | 'project'
+  | 'idea'
+  | 'person'
+  | 'goal'
+  | 'question'
+  | 'habit'
+  | 'topic'
+  | 'commitment'
+  | 'skill'
+  | 'blocker'
+
+export type Entity = {
+  id: string
+  user_id: string
+  type: EntityType
+  name: string
+  slug: string
+  summary: string | null
+  status: 'active' | 'dormant' | 'resolved' | 'abandoned' | null
+  first_mentioned_at: string
+  last_mentioned_at: string
+  mention_count: number
+  metadata: Record<string, any>           // type-specific structured data
+  created_at: string
+  updated_at: string
+}
+
+export type EntityMention = {
+  id: string
+  entity_id: string
+  video_upload_id: string
+  context: string                         // what was said about this entity
+  sentiment: 'positive' | 'negative' | 'neutral' | null
+  created_at: string
+}
+
+export type VideoUpload = {
+  id: string
+  user_id: string
+  file_name: string
+  file_size_bytes: number
+  mime_type: string
+  duration_seconds: number | null
+  storage_path: string
+  storage_provider: 'supabase' | 's3' | 'r2'
+  status: VideoUploadStatus
+  transcript: string | null
+  transcript_segments: TranscriptSegment[] | null
+  transcript_language: string | null
+  transcript_model: string | null
+  analysis: VideoAnalysis | null
+  analysis_model: string | null
+  generated_posts: GeneratedPost[] | null
+  generated_clips: SuggestedClip[] | null
+  tags: string[]
+  error_message: string | null
+  source_deleted: boolean
+  processed_at: string | null
+  created_at: string
+  updated_at: string
+}
