@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
+import { inngest } from '@/inngest/client'
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 const VALID_VIDEO_TYPES = [
@@ -20,6 +21,12 @@ const VALID_AUDIO_TYPES = [
 ]
 const VALID_TYPES = [...VALID_VIDEO_TYPES, ...VALID_AUDIO_TYPES]
 
+/**
+ * POST /api/video-upload
+ *
+ * Upload a video/audio file. After saving to storage and creating the DB record,
+ * fires an Inngest event to process the file asynchronously (transcribe → analyze → entities).
+ */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()
   let runId: string | null = null
@@ -74,7 +81,6 @@ export async function POST(request: NextRequest) {
 
     // Generate storage path
     const timestamp = Date.now()
-    const ext = file.name.split('.').pop() || 'mp4'
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
 
@@ -83,7 +89,7 @@ export async function POST(request: NextRequest) {
       .from('videos')
       .upload(storagePath, buffer, {
         contentType: file.type,
-        cacheControl: '86400', // 1 day cache
+        cacheControl: '86400',
       })
 
     if (uploadError) {
@@ -109,10 +115,23 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('DB insert error:', dbError)
-      // Clean up uploaded file
       await supabase.storage.from('videos').remove([storagePath])
       finalErrorMessage = 'Failed to save upload record'
       return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
+    }
+
+    // Fire Inngest event to process asynchronously
+    try {
+      await inngest.send({
+        name: 'video-upload/process',
+        data: {
+          video_upload_id: record.id,
+          user_id: session.user.id,
+        },
+      })
+    } catch (inngestError) {
+      console.error('Inngest event failed, falling back to manual processing:', inngestError)
+      // Don't fail the upload — user can trigger processing manually via /process endpoint
     }
 
     finalStatus = 'success'

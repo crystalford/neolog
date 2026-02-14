@@ -92,17 +92,9 @@ export default function UploadsPage() {
 
         const uploadData = await uploadRes.json()
 
-        // Start processing
-        setUploadProgress(`Processing ${file.name}...`)
+        // Processing starts automatically via Inngest
+        setUploadProgress(`Queued ${file.name} for processing...`)
         setProcessingIds((prev: Set<string>) => new Set(prev).add(uploadData.id))
-
-        fetch('/api/video-upload/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ video_upload_id: uploadData.id }),
-        }).catch(err => {
-          console.error('Processing request failed:', err)
-        })
 
         await fetchUploads()
       } catch (err) {
@@ -114,6 +106,28 @@ export default function UploadsPage() {
     setUploading(false)
     setUploadProgress(null)
     await fetchUploads()
+  }
+
+  const handleReprocess = async (id: string) => {
+    try {
+      setProcessingIds((prev: Set<string>) => new Set(prev).add(id))
+      const res = await fetch('/api/video-upload/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_upload_id: id }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(`Reprocess failed: ${err.error}`)
+        setProcessingIds((prev: Set<string>) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+    } catch (err) {
+      console.error('Reprocess error:', err)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -351,11 +365,20 @@ export default function UploadsPage() {
                 </div>
 
                 {/* Error message */}
-                {upload.status === 'error' && upload.error_message && (
-                  <div className="px-5 pb-4 pt-0">
-                    <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">
-                      {upload.error_message}
+                {upload.status === 'error' && (
+                  <div className="px-5 pb-4 pt-0 flex items-center gap-3">
+                    <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2 flex-1">
+                      {upload.error_message || 'Processing failed'}
                     </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleReprocess(upload.id)
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors flex-shrink-0"
+                    >
+                      Retry
+                    </button>
                   </div>
                 )}
 

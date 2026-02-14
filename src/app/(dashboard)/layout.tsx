@@ -8,7 +8,7 @@ import type { User } from '@supabase/supabase-js'
 import {
   Home, PenSquare, Send, Settings, LogOut, User as UserIcon,
   PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
-  BookOpen, DollarSign, Globe, Share2, Sparkles, Video
+  BookOpen, DollarSign, Globe, Share2, Sparkles, Video, Brain
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -229,6 +229,7 @@ export default function DashboardLayout({
       { href: '/write', icon: PenLine, label: 'Write' },
       { href: '/import', icon: Upload, label: 'Import' },
       { href: '/dashboard/uploads', icon: Video, label: 'Uploads' },
+      { href: '/dashboard/brain', icon: Brain, label: 'Brain' },
     ]
 
     // Always show Analytics
