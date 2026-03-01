@@ -723,6 +723,71 @@ export type VideoUpload = {
   tags: string[]
   error_message: string | null
   source_deleted: boolean
+  session_id: string | null
+  processed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// =============================================
+// CLIP SESSION TYPES
+// =============================================
+
+export type ClipSessionStatus = 'collecting' | 'processing' | 'synthesized' | 'error'
+
+// A single cut from a source clip: which upload, which timestamps
+export type EditDecision = {
+  source_upload_id: string
+  source_file_name: string
+  start: number              // seconds
+  end: number                // seconds
+  transcript_excerpt: string // what's being said in this segment
+}
+
+// A complete edit plan: an ordered sequence of hard cuts that tell one story
+export type EditPlan = {
+  id: string                           // uuid, stable reference
+  title: string                        // "The Case for Building in Public"
+  narrative_summary: string            // what story this edit tells
+  platform: 'short_form' | 'long_form' | 'general'
+  target_duration_seconds: number
+  segments: EditDecision[]             // ordered, played back-to-back as hard cuts
+  assembled_storage_path: string | null // set after video is assembled
+}
+
+// Cross-clip synthesis: themes, arcs, connections across all clips in a session
+export type ClipSynthesis = {
+  themes: string[]
+  narrative_arcs: Array<{
+    title: string
+    description: string
+    clip_ids: string[]        // upload IDs involved
+    strength: number          // 0-1
+  }>
+  connections: Array<{
+    from_clip_id: string
+    to_clip_id: string
+    connection: string        // how they relate
+  }>
+  best_moments: Array<{
+    upload_id: string
+    start: number
+    end: number
+    reason: string
+  }>
+}
+
+export type ClipSession = {
+  id: string
+  user_id: string
+  title: string | null
+  status: ClipSessionStatus
+  synthesis: ClipSynthesis | null
+  synthesis_model: string | null
+  edit_plans: EditPlan[] | null
+  clip_count: number
+  total_duration_seconds: number | null
+  error_message: string | null
   processed_at: string | null
   created_at: string
   updated_at: string

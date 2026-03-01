@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import * as tus from 'tus-js-client'
 import {
   Upload, Video, FileAudio, Loader2, CheckCircle2, AlertCircle,
   Clock, Trash2, ChevronDown, ChevronUp, Play, Lightbulb,
   FolderOpen, Quote, Tag, Brain, Scissors, FileText, HelpCircle,
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
-  AlertTriangle
+  AlertTriangle, X, Pause, RotateCcw, Layers,
 } from 'lucide-react'
 import type { VideoUpload } from '@/types/database'
 
@@ -16,15 +17,28 @@ type UploadListItem = Pick<VideoUpload,
   'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'created_at' | 'updated_at'
 >
 
+type ActiveUpload = {
+  id: string
+  file: File
+  storagePath: string
+  progress: number        // 0-100
+  bytesUploaded: number
+  bytesTotal: number
+  status: 'uploading' | 'paused' | 'complete' | 'error'
+  error: string | null
+  tusUpload: tus.Upload | null
+}
+
 export default function UploadsPage() {
   const [uploads, setUploads] = useState<UploadListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<string | null>(null)
+  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [dragActive, setDragActive] = useState(false)
+  const activeUploadsRef = useRef<ActiveUpload[]>([])
+  activeUploadsRef.current = activeUploads
 
   const fetchUploads = useCallback(async () => {
     try {
@@ -40,22 +54,17 @@ export default function UploadsPage() {
     }
   }, [])
 
-  useEffect(() => {
-    fetchUploads()
-  }, [fetchUploads])
+  useEffect(() => { fetchUploads() }, [fetchUploads])
 
-  // Poll for processing status updates
+  // Poll for processing status
   useEffect(() => {
     if (processingIds.size === 0) return
-
     const interval = setInterval(async () => {
       await fetchUploads()
-
-      // Check if any processing items are done
-      setProcessingIds((prev: Set<string>) => {
+      setProcessingIds(prev => {
         const next = new Set(prev)
         for (const id of prev) {
-          const upload = uploads.find((u: UploadListItem) => u.id === id)
+          const upload = uploads.find(u => u.id === id)
           if (upload && (upload.status === 'processed' || upload.status === 'error')) {
             next.delete(id)
           }
@@ -63,131 +72,176 @@ export default function UploadsPage() {
         return next
       })
     }, 5000)
-
     return () => clearInterval(interval)
   }, [processingIds, uploads, fetchUploads])
 
-  const handleUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
+  const startTusUpload = useCallback(async (file: File, sessionId?: string) => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
 
-    setUploading(true)
+    const timestamp = Date.now()
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
+    const uploadId = crypto.randomUUID()
 
-    for (const file of Array.from(files)) {
-      try {
-        setUploadProgress(`Uploading ${file.name}...`)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const projectId = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
 
-        const formData = new FormData()
-        formData.append('file', file)
-
-        const uploadRes = await fetch('/api/video-upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json()
-          alert(`Upload failed: ${err.error}`)
-          continue
-        }
-
-        const uploadData = await uploadRes.json()
-
-        // Processing starts automatically via Inngest
-        setUploadProgress(`Queued ${file.name} for processing...`)
-        setProcessingIds((prev: Set<string>) => new Set(prev).add(uploadData.id))
-
-        await fetchUploads()
-      } catch (err) {
-        console.error('Upload error:', err)
-        alert('Upload failed. Please try again.')
-      }
+    const activeUpload: ActiveUpload = {
+      id: uploadId,
+      file,
+      storagePath,
+      progress: 0,
+      bytesUploaded: 0,
+      bytesTotal: file.size,
+      status: 'uploading',
+      error: null,
+      tusUpload: null,
     }
 
-    setUploading(false)
-    setUploadProgress(null)
-    await fetchUploads()
+    setActiveUploads(prev => [...prev, activeUpload])
+
+    const updateUpload = (patch: Partial<ActiveUpload>) => {
+      setActiveUploads(prev => prev.map(u => u.id === uploadId ? { ...u, ...patch } : u))
+    }
+
+    const tusUpload = new tus.Upload(file, {
+      endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        'x-upsert': 'true',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName: 'videos',
+        objectName: storagePath,
+        contentType: file.type,
+        cacheControl: '86400',
+      },
+      chunkSize: 6 * 1024 * 1024, // 6MB — Supabase TUS requirement
+      onError: (error) => {
+        console.error('TUS upload error:', error)
+        updateUpload({ status: 'error', error: error.message })
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const progress = Math.round((bytesUploaded / bytesTotal) * 100)
+        updateUpload({ progress, bytesUploaded, bytesTotal })
+      },
+      onSuccess: async () => {
+        updateUpload({ status: 'complete', progress: 100 })
+
+        // Register with backend → creates DB record + fires Inngest
+        try {
+          const res = await fetch('/api/video-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storage_path: storagePath,
+              file_name: file.name,
+              file_size_bytes: file.size,
+              mime_type: file.type,
+              ...(sessionId ? { session_id: sessionId } : {}),
+            }),
+          })
+
+          if (res.ok) {
+            const data = await res.json()
+            setProcessingIds(prev => new Set(prev).add(data.id))
+            await fetchUploads()
+          }
+        } catch (err) {
+          console.error('Failed to register upload:', err)
+        }
+
+        // Remove from active uploads after a short delay
+        setTimeout(() => {
+          setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
+        }, 2000)
+      },
+    })
+
+    updateUpload({ tusUpload })
+
+    // Resume any previous upload for this file
+    tusUpload.findPreviousUploads().then(previous => {
+      if (previous.length) tusUpload.resumeFromPreviousUpload(previous[0])
+      tusUpload.start()
+    })
+  }, [fetchUploads])
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    for (const file of fileArray) {
+      startTusUpload(file)
+    }
+  }, [startTusUpload])
+
+  const handlePauseResume = (upload: ActiveUpload) => {
+    if (!upload.tusUpload) return
+    if (upload.status === 'uploading') {
+      upload.tusUpload.abort()
+      setActiveUploads(prev => prev.map(u => u.id === upload.id ? { ...u, status: 'paused' } : u))
+    } else if (upload.status === 'paused') {
+      upload.tusUpload.start()
+      setActiveUploads(prev => prev.map(u => u.id === upload.id ? { ...u, status: 'uploading' } : u))
+    }
+  }
+
+  const handleCancelUpload = (upload: ActiveUpload) => {
+    if (upload.tusUpload) upload.tusUpload.abort()
+    setActiveUploads(prev => prev.filter(u => u.id !== upload.id))
   }
 
   const handleReprocess = async (id: string) => {
-    try {
-      setProcessingIds((prev: Set<string>) => new Set(prev).add(id))
-      const res = await fetch('/api/video-upload/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_upload_id: id }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        alert(`Reprocess failed: ${err.error}`)
-        setProcessingIds((prev: Set<string>) => {
-          const next = new Set(prev)
-          next.delete(id)
-          return next
-        })
-      }
-    } catch (err) {
-      console.error('Reprocess error:', err)
+    setProcessingIds(prev => new Set(prev).add(id))
+    const res = await fetch('/api/video-upload/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_upload_id: id }),
+    })
+    if (!res.ok) {
+      setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this upload and all its data?')) return
-
-    try {
-      const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        setUploads((prev: UploadListItem[]) => prev.filter((u: UploadListItem) => u.id !== id))
-        if (expandedId === id) {
-          setExpandedId(null)
-          setExpandedData(null)
-        }
-      }
-    } catch (err) {
-      console.error('Delete error:', err)
+    const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setUploads(prev => prev.filter(u => u.id !== id))
+      if (expandedId === id) { setExpandedId(null); setExpandedData(null) }
     }
   }
 
   const toggleExpand = async (id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null)
-      setExpandedData(null)
-      return
-    }
-
+    if (expandedId === id) { setExpandedId(null); setExpandedData(null); return }
     setExpandedId(id)
     setExpandedData(null)
-
-    try {
-      const res = await fetch(`/api/video-upload/${id}`)
-      if (res.ok) {
-        const data = await res.json()
-        setExpandedData(data.upload)
-      }
-    } catch (err) {
-      console.error('Failed to fetch detail:', err)
+    const res = await fetch(`/api/video-upload/${id}`)
+    if (res.ok) {
+      const data = await res.json()
+      setExpandedData(data.upload)
     }
   }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
+    setDragActive(e.type === 'dragenter' || e.type === 'dragover')
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    handleUpload(e.dataTransfer.files)
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
   }
 
   const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
   }
@@ -200,30 +254,41 @@ export default function UploadsPage() {
   }
 
   const statusConfig: Record<string, { label: string; icon: typeof Loader2; color: string }> = {
-    uploaded: { label: 'Uploaded', icon: Clock, color: 'text-[var(--text-tertiary)]' },
-    transcribing: { label: 'Transcribing...', icon: Loader2, color: 'text-blue-400' },
-    analyzing: { label: 'Analyzing...', icon: Brain, color: 'text-purple-400' },
-    processed: { label: 'Processed', icon: CheckCircle2, color: 'text-green-400' },
-    error: { label: 'Error', icon: AlertCircle, color: 'text-red-400' },
-    deleting: { label: 'Deleting...', icon: Loader2, color: 'text-[var(--text-tertiary)]' },
-    deleted: { label: 'Deleted', icon: Trash2, color: 'text-[var(--text-tertiary)]' },
+    uploaded:    { label: 'Uploaded',       icon: Clock,        color: 'text-[var(--text-tertiary)]' },
+    transcribing:{ label: 'Transcribing...', icon: Loader2,      color: 'text-blue-400' },
+    analyzing:   { label: 'Analyzing...',    icon: Brain,        color: 'text-purple-400' },
+    processed:   { label: 'Processed',       icon: CheckCircle2, color: 'text-green-400' },
+    error:       { label: 'Error',           icon: AlertCircle,  color: 'text-red-400' },
+    deleting:    { label: 'Deleting...',     icon: Loader2,      color: 'text-[var(--text-tertiary)]' },
+    deleted:     { label: 'Deleted',         icon: Trash2,       color: 'text-[var(--text-tertiary)]' },
   }
+
+  const hasActiveUploads = activeUploads.length > 0
 
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-display font-bold text-[var(--text-primary)] mb-2">
-          Video Uploads
-        </h2>
-        <p className="text-[var(--text-secondary)]">
-          Upload raw video or audio recordings. Neolog will transcribe, analyze, and extract ideas, projects, and shareable content.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-[var(--text-primary)] mb-2">
+            Video Uploads
+          </h2>
+          <p className="text-[var(--text-secondary)]">
+            Upload raw video or audio recordings. Neolog transcribes, analyzes, and extracts ideas, projects, and content.
+          </p>
+        </div>
+        <a
+          href="/dashboard/sessions"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-medium)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-heavy)] transition-colors flex-shrink-0"
+        >
+          <Layers size={15} />
+          Sessions
+        </a>
       </div>
 
       {/* Upload Zone */}
       <div
-        className={`relative border-2 border-dashed rounded-xl p-10 text-center transition-all mb-8 ${
+        className={`relative border-2 border-dashed rounded-xl p-10 text-center transition-all mb-6 ${
           dragActive
             ? 'border-[var(--accent)] bg-[var(--accent)]/5'
             : 'border-[var(--border-medium)] hover:border-[var(--border-heavy)] bg-[var(--bg-card)]'
@@ -233,40 +298,89 @@ export default function UploadsPage() {
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        {uploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
-            <p className="text-sm text-[var(--text-secondary)]">{uploadProgress}</p>
-          </div>
-        ) : (
-          <>
-            <Upload size={32} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
-            <p className="text-[var(--text-primary)] font-medium mb-1">
-              Drop video or audio files here
-            </p>
-            <p className="text-sm text-[var(--text-tertiary)] mb-4">
-              MP4, MOV, WebM, AVI, MP3, M4A, WAV — up to 500MB
-            </p>
-            <label className="btn btn-primary btn-sm cursor-pointer inline-flex">
-              Browse Files
-              <input
-                type="file"
-                className="hidden"
-                accept="video/*,audio/*"
-                multiple
-                onChange={(e) => handleUpload(e.target.files)}
-              />
-            </label>
-          </>
-        )}
+        <Upload size={32} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
+        <p className="text-[var(--text-primary)] font-medium mb-1">
+          Drop video or audio files here
+        </p>
+        <p className="text-sm text-[var(--text-tertiary)] mb-4">
+          MP4, MOV, WebM, AVI, MP3, M4A, WAV — any size, uploads resume if interrupted
+        </p>
+        <label className="btn btn-primary btn-sm cursor-pointer inline-flex">
+          Browse Files
+          <input
+            type="file"
+            className="hidden"
+            accept="video/*,audio/*"
+            multiple
+            onChange={e => e.target.files && handleFiles(e.target.files)}
+          />
+        </label>
       </div>
+
+      {/* Active Uploads */}
+      {hasActiveUploads && (
+        <div className="mb-6 space-y-3">
+          {activeUploads.map(upload => (
+            <div
+              key={upload.id}
+              className="border border-[var(--border-medium)] rounded-xl bg-[var(--bg-card)] px-5 py-4"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <Video size={16} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">
+                  {upload.file.name}
+                </span>
+                <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
+                  {formatBytes(upload.bytesUploaded)} / {formatBytes(upload.bytesTotal)}
+                </span>
+                <button
+                  onClick={() => handlePauseResume(upload)}
+                  className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                  title={upload.status === 'uploading' ? 'Pause' : 'Resume'}
+                >
+                  {upload.status === 'uploading' ? <Pause size={14} /> : <RotateCcw size={14} />}
+                </button>
+                <button
+                  onClick={() => handleCancelUpload(upload)}
+                  className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
+                  title="Cancel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Progress bar */}
+              <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    upload.status === 'complete' ? 'bg-green-400' :
+                    upload.status === 'error' ? 'bg-red-400' :
+                    upload.status === 'paused' ? 'bg-[var(--text-tertiary)]' :
+                    'bg-[var(--accent)]'
+                  }`}
+                  style={{ width: `${upload.progress}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-[var(--text-tertiary)]">
+                  {upload.status === 'complete' ? 'Upload complete — queued for processing' :
+                   upload.status === 'error' ? upload.error :
+                   upload.status === 'paused' ? 'Paused' :
+                   `${upload.progress}%`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Uploads List */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-[var(--text-tertiary)]" />
         </div>
-      ) : uploads.length === 0 ? (
+      ) : uploads.length === 0 && !hasActiveUploads ? (
         <div className="text-center py-16 text-[var(--text-tertiary)]">
           <Video size={40} className="mx-auto mb-3 opacity-50" />
           <p className="font-medium">No uploads yet</p>
@@ -274,7 +388,7 @@ export default function UploadsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {uploads.map((upload) => {
+          {uploads.map(upload => {
             const status = statusConfig[upload.status] || statusConfig.uploaded
             const StatusIcon = status.icon
             const isExpanded = expandedId === upload.id
@@ -286,33 +400,24 @@ export default function UploadsPage() {
                 key={upload.id}
                 className="border border-[var(--border-medium)] rounded-xl bg-[var(--bg-card)] overflow-hidden"
               >
-                {/* Row */}
                 <div
                   className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors"
                   onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}
                 >
-                  {/* Icon */}
                   <div className="flex-shrink-0">
-                    {isVideo ? (
-                      <Video size={20} className="text-[var(--text-tertiary)]" />
-                    ) : (
-                      <FileAudio size={20} className="text-[var(--text-tertiary)]" />
-                    )}
+                    {isVideo
+                      ? <Video size={20} className="text-[var(--text-tertiary)]" />
+                      : <FileAudio size={20} className="text-[var(--text-tertiary)]" />}
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                       {upload.file_name}
                     </p>
                     <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-xs text-[var(--text-tertiary)]">
-                        {formatBytes(upload.file_size_bytes)}
-                      </span>
+                      <span className="text-xs text-[var(--text-tertiary)]">{formatBytes(upload.file_size_bytes)}</span>
                       {upload.duration_seconds && (
-                        <span className="text-xs text-[var(--text-tertiary)]">
-                          {formatDuration(upload.duration_seconds)}
-                        </span>
+                        <span className="text-xs text-[var(--text-tertiary)]">{formatDuration(upload.duration_seconds)}</span>
                       )}
                       <span className="text-xs text-[var(--text-tertiary)]">
                         {new Date(upload.created_at).toLocaleDateString()}
@@ -320,32 +425,24 @@ export default function UploadsPage() {
                     </div>
                   </div>
 
-                  {/* Tags */}
                   {upload.tags && upload.tags.length > 0 && (
                     <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-                      {upload.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]"
-                        >
+                      {upload.tags.slice(0, 3).map(tag => (
+                        <span key={tag} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
                           {tag}
                         </span>
                       ))}
                       {upload.tags.length > 3 && (
-                        <span className="text-[10px] text-[var(--text-tertiary)]">
-                          +{upload.tags.length - 3}
-                        </span>
+                        <span className="text-[10px] text-[var(--text-tertiary)]">+{upload.tags.length - 3}</span>
                       )}
                     </div>
                   )}
 
-                  {/* Status */}
                   <div className={`flex items-center gap-1.5 flex-shrink-0 ${status.color}`}>
                     <StatusIcon size={14} className={isAnimating ? 'animate-spin' : ''} />
                     <span className="text-xs font-medium">{status.label}</span>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {upload.status === 'processed' && (
                       <button className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
@@ -353,10 +450,7 @@ export default function UploadsPage() {
                       </button>
                     )}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDelete(upload.id)
-                      }}
+                      onClick={e => { e.stopPropagation(); handleDelete(upload.id) }}
                       className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
                     >
                       <Trash2 size={14} />
@@ -364,17 +458,13 @@ export default function UploadsPage() {
                   </div>
                 </div>
 
-                {/* Error message */}
                 {upload.status === 'error' && (
                   <div className="px-5 pb-4 pt-0 flex items-center gap-3">
                     <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2 flex-1">
                       {upload.error_message || 'Processing failed'}
                     </p>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleReprocess(upload.id)
-                      }}
+                      onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
                       className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors flex-shrink-0"
                     >
                       Retry
@@ -382,7 +472,6 @@ export default function UploadsPage() {
                   </div>
                 )}
 
-                {/* Expanded Detail */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border-light)] px-5 py-5">
                     {!expandedData ? (
@@ -408,16 +497,15 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
   const a = upload.analysis
 
   const tabs = [
-    { key: 'analysis' as const, label: 'Intelligence', icon: Brain },
-    { key: 'personal' as const, label: 'Personal', icon: Target },
-    { key: 'transcript' as const, label: 'Transcript', icon: FileText },
-    { key: 'clips' as const, label: 'Clips', icon: Scissors, count: upload.generated_clips?.length || 0 },
-    { key: 'posts' as const, label: 'Posts', icon: FileText, count: upload.generated_posts?.length || 0 },
+    { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
+    { key: 'personal' as const,    label: 'Personal',     icon: Target },
+    { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
+    { key: 'clips' as const,       label: 'Clips',        icon: Scissors, count: upload.generated_clips?.length || 0 },
+    { key: 'posts' as const,       label: 'Posts',        icon: FileText, count: upload.generated_posts?.length || 0 },
   ]
 
   return (
     <div>
-      {/* PII Warning */}
       {a?.contains_sensitive_content && (
         <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-lg bg-red-400/10 border border-red-400/20">
           <Shield size={14} className="text-red-400 flex-shrink-0" />
@@ -427,9 +515,8 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-5 border-b border-[var(--border-light)] pb-px overflow-x-auto">
-        {tabs.map((tab) => {
+        {tabs.map(tab => {
           const Icon = tab.icon
           return (
             <button
@@ -453,10 +540,8 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         })}
       </div>
 
-      {/* Intelligence Tab (Work, Ideas, Projects) */}
       {activeTab === 'analysis' && a && (
         <div className="space-y-5">
-          {/* Summary + Mood + Energy */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>
@@ -477,21 +562,18 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             )}
           </div>
 
-          {/* Categories */}
           {a.categories?.length > 0 && (
             <Section icon={Tag} title="Categories">
               <div className="flex flex-wrap gap-2">
                 {a.categories.map((cat: any, i: number) => (
                   <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
-                    {cat.name}
-                    <span className="ml-1 text-[var(--text-tertiary)]">{Math.round(cat.confidence * 100)}%</span>
+                    {cat.name}<span className="ml-1 text-[var(--text-tertiary)]">{Math.round(cat.confidence * 100)}%</span>
                   </span>
                 ))}
               </div>
             </Section>
           )}
 
-          {/* Ideas */}
           {a.ideas?.length > 0 && (
             <Section icon={Lightbulb} title="Ideas">
               <div className="space-y-2">
@@ -510,7 +592,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Questions */}
           {a.questions?.length > 0 && (
             <Section icon={HelpCircle} title="Open Questions">
               <ul className="space-y-1.5">
@@ -524,7 +605,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Projects */}
           {a.projects?.length > 0 && (
             <Section icon={FolderOpen} title="Projects">
               <div className="space-y-3">
@@ -547,7 +627,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Action Items */}
           {a.action_items?.length > 0 && (
             <Section icon={CheckCircle2} title="Action Items">
               <ul className="space-y-1.5">
@@ -561,7 +640,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Decisions */}
           {a.decisions?.length > 0 && (
             <Section icon={TrendingUp} title="Decisions">
               <div className="space-y-2">
@@ -575,7 +653,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Blockers */}
           {a.blockers?.length > 0 && (
             <Section icon={AlertTriangle} title="Blockers & Friction">
               <ul className="space-y-1.5">
@@ -589,7 +666,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Strong Opinions */}
           {a.strong_opinions?.length > 0 && (
             <Section icon={MessageCircle} title="Strong Opinions">
               <div className="space-y-2">
@@ -600,7 +676,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Key Quotes */}
           {a.key_quotes?.length > 0 && (
             <Section icon={Quote} title="Key Quotes">
               <div className="space-y-2">
@@ -613,7 +688,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Recurring Themes */}
           {a.recurring_themes?.length > 0 && (
             <Section icon={TrendingUp} title="Recurring Themes">
               <div className="flex flex-wrap gap-2">
@@ -626,10 +700,8 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         </div>
       )}
 
-      {/* Personal Tab (Goals, Habits, People, Learning) */}
       {activeTab === 'personal' && a && (
         <div className="space-y-5">
-          {/* Goals */}
           {a.goals?.length > 0 && (
             <Section icon={Target} title="Goals">
               <div className="space-y-2">
@@ -646,21 +718,18 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Commitments */}
           {a.commitments?.length > 0 && (
             <Section icon={CheckCircle2} title="Commitments">
               <ul className="space-y-1.5">
                 {a.commitments.map((c: string, i: number) => (
                   <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-2">
-                    <span className="text-blue-400 mt-0.5">-</span>
-                    {c}
+                    <span className="text-blue-400 mt-0.5">-</span>{c}
                   </li>
                 ))}
               </ul>
             </Section>
           )}
 
-          {/* Habits */}
           {a.habits?.length > 0 && (
             <Section icon={Zap} title="Habits">
               <div className="space-y-1.5">
@@ -676,7 +745,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* People */}
           {a.people_mentioned?.length > 0 && (
             <Section icon={Users} title="People Mentioned">
               <div className="space-y-2">
@@ -694,7 +762,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Values */}
           {a.values_expressed?.length > 0 && (
             <Section icon={Shield} title="Values Expressed">
               <div className="flex flex-wrap gap-2">
@@ -705,7 +772,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Life Events */}
           {a.life_events?.length > 0 && (
             <Section icon={Play} title="Life Events">
               <ul className="space-y-1.5">
@@ -716,7 +782,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* References */}
           {a.references?.length > 0 && (
             <Section icon={BookOpen} title="References & Learning">
               <div className="space-y-1.5">
@@ -731,7 +796,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Lessons Learned */}
           {a.lessons_learned?.length > 0 && (
             <Section icon={Lightbulb} title="Lessons Learned">
               <ul className="space-y-1.5">
@@ -745,7 +809,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Content Ideas */}
           {a.content_ideas?.length > 0 && (
             <Section icon={FileText} title="Content Pipeline">
               <div className="space-y-1.5">
@@ -760,7 +823,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
             </Section>
           )}
 
-          {/* Stories */}
           {a.stories_told?.length > 0 && (
             <Section icon={MessageCircle} title="Stories Told">
               <ul className="space-y-1.5">
@@ -773,7 +835,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         </div>
       )}
 
-      {/* Transcript Tab */}
       {activeTab === 'transcript' && (
         <div>
           {upload.transcript ? (
@@ -801,7 +862,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         </div>
       )}
 
-      {/* Clips Tab */}
       {activeTab === 'clips' && (
         <div>
           {upload.generated_clips && upload.generated_clips.length > 0 ? (
@@ -811,7 +871,7 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h5 className="text-sm font-medium text-[var(--text-primary)]">{clip.title}</h5>
                     <span className="text-[10px] text-[var(--text-tertiary)] font-mono flex-shrink-0">
-                      {formatTimestamp(clip.start)} - {formatTimestamp(clip.end)}
+                      {formatTimestamp(clip.start)} – {formatTimestamp(clip.end)}
                     </span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{clip.transcript}</p>
@@ -824,7 +884,6 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
         </div>
       )}
 
-      {/* Posts Tab */}
       {activeTab === 'posts' && (
         <div>
           {upload.generated_posts && upload.generated_posts.length > 0 ? (

@@ -3,29 +3,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 import { inngest } from '@/inngest/client'
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
-const VALID_VIDEO_TYPES = [
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-  'video/x-msvideo',
-  'video/x-matroska',
+const VALID_TYPES = [
+  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska',
+  'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/x-m4a',
 ]
-const VALID_AUDIO_TYPES = [
-  'audio/mpeg',
-  'audio/mp4',
-  'audio/wav',
-  'audio/webm',
-  'audio/ogg',
-  'audio/x-m4a',
-]
-const VALID_TYPES = [...VALID_VIDEO_TYPES, ...VALID_AUDIO_TYPES]
 
 /**
  * POST /api/video-upload
  *
- * Upload a video/audio file. After saving to storage and creating the DB record,
- * fires an Inngest event to process the file asynchronously (transcribe → analyze → entities).
+ * Registers a video/audio file that has already been uploaded directly to Supabase
+ * Storage via TUS resumable upload from the browser. Creates the DB record and fires
+ * the Inngest processing event.
+ *
+ * Body: { storage_path, file_name, file_size_bytes, mime_type, session_id? }
  */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()
@@ -43,95 +33,66 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const run = await startJobRun('video-upload.upload', { user_id: session.user.id })
+      const run = await startJobRun('video-upload.register', { user_id: session.user.id })
       runId = run.id
     } catch {
       // best-effort
     }
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    const body = await request.json()
+    const { storage_path, file_name, file_size_bytes, mime_type, session_id } = body
 
-    if (!file) {
-      finalErrorMessage = 'No file provided'
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
-
-    finalMeta = {
-      user_id: session.user.id,
-      file_type: file.type,
-      file_size: file.size,
-      file_name: file.name,
-    }
-
-    // Validate file type
-    if (!VALID_TYPES.includes(file.type)) {
-      finalErrorMessage = 'Invalid file type. Supported: MP4, MOV, WebM, AVI, MKV, MP3, M4A, WAV, OGG'
+    if (!storage_path || !file_name || !file_size_bytes || !mime_type) {
+      finalErrorMessage = 'Missing required fields: storage_path, file_name, file_size_bytes, mime_type'
       return NextResponse.json({ error: finalErrorMessage }, { status: 400 })
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      finalErrorMessage = 'File too large (max 500MB)'
+    if (!VALID_TYPES.includes(mime_type)) {
+      finalErrorMessage = 'Invalid file type'
       return NextResponse.json({ error: finalErrorMessage }, { status: 400 })
     }
 
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // Generate storage path
-    const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
-
-    // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('videos')
-      .upload(storagePath, buffer, {
-        contentType: file.type,
-        cacheControl: '86400',
-      })
-
-    if (uploadError) {
-      console.error('Video upload error:', uploadError)
-      finalErrorMessage = 'Upload failed'
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    // Verify the storage path belongs to this user
+    if (!storage_path.startsWith(`${session.user.id}/`)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Record in database
+    finalMeta = { user_id: session.user.id, file_name, file_size_bytes, mime_type }
+
     const { data: record, error: dbError } = await supabase
       .from('video_uploads')
       .insert({
         user_id: session.user.id,
-        file_name: file.name,
-        file_size_bytes: file.size,
-        mime_type: file.type,
-        storage_path: storagePath,
+        file_name,
+        file_size_bytes,
+        mime_type,
+        storage_path,
         storage_provider: 'supabase',
         status: 'uploaded',
+        ...(session_id ? { session_id } : {}),
       })
       .select()
       .single()
 
     if (dbError) {
       console.error('DB insert error:', dbError)
-      await supabase.storage.from('videos').remove([storagePath])
       finalErrorMessage = 'Failed to save upload record'
       return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
     }
 
-    // Fire Inngest event to process asynchronously
+    // Update session clip count if provided
+    if (session_id) {
+      await supabase.rpc('increment_session_clip_count', { session_id })
+        .then(() => {}) // best-effort
+    }
+
     try {
       await inngest.send({
         name: 'video-upload/process',
-        data: {
-          video_upload_id: record.id,
-          user_id: session.user.id,
-        },
+        data: { video_upload_id: record.id, user_id: session.user.id },
       })
     } catch (inngestError) {
-      console.error('Inngest event failed, falling back to manual processing:', inngestError)
-      // Don't fail the upload — user can trigger processing manually via /process endpoint
+      console.error('Inngest event failed:', inngestError)
     }
 
     finalStatus = 'success'
@@ -144,9 +105,9 @@ export async function POST(request: NextRequest) {
       created_at: record.created_at,
     })
   } catch (error) {
-    console.error('Video upload error:', error)
-    finalErrorMessage = 'Upload failed'
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    console.error('Video register error:', error)
+    finalErrorMessage = 'Registration failed'
+    return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   } finally {
     try {
       if (runId) {
