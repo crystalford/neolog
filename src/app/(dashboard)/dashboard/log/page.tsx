@@ -1,140 +1,183 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Inbox, Upload, Mic, Send, Sparkles, Video, FileText, Clock } from 'lucide-react'
+import { Upload, Send, ArrowUpRight } from 'lucide-react'
 
-// Placeholder entity types for today's extractions
-const ENTITY_ICONS: Record<string, string> = {
-  idea: '💡',
-  project: '🏗',
-  question: '❓',
-  commitment: '🎯',
-  person: '🤝',
-  goal: '⚡',
-  decision: '🔑',
-  habit: '🔄',
-  blocker: '🚧',
-}
+const mockExtractions = [
+  { emoji: '💡', name: 'AI documentary idea', type: 'Idea', time: '12m ago' },
+  { emoji: '🏗', name: 'Neolog', type: 'Project', time: '12m ago' },
+  { emoji: '❓', name: 'How do I sell without selling?', type: 'Question', time: '12m ago' },
+  { emoji: '🎯', name: 'Ship uploads this week', type: 'Commitment', time: '12m ago' },
+  { emoji: '📖', name: 'The Crystal Ford', type: 'Creative', time: '12m ago' },
+]
+
+const days = [
+  { date: 'Sat, Mar 8', sessions: 1, entities: 17 },
+  { date: 'Thu, Mar 6', sessions: 2, entities: 31 },
+  { date: 'Tue, Mar 4', sessions: 1, entities: 11 },
+]
 
 export default function DailyLogPage() {
-  const [inputText, setInputText] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [input, setInput] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!inputText.trim()) return
-    setIsSubmitting(true)
-    // TODO: wire up to capture endpoint
-    setTimeout(() => {
-      setInputText('')
-      setIsSubmitting(false)
-    }, 1000)
-  }
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
 
   return (
-    <div className="flex flex-col h-full min-h-[calc(100vh-4rem)]">
-      <div className="flex-1 overflow-y-auto px-6 py-8 max-w-4xl mx-auto w-full">
+    <div style={{ maxWidth: '760px', margin: '0 auto', padding: '2.5rem 2rem', fontFamily: 'var(--font-sans)' }}>
 
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-[var(--text-tertiary)] text-sm mb-2">
-            <Clock size={14} />
-            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-          </div>
-          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Daily Log</h1>
-          <p className="text-[var(--text-secondary)] mt-1">Drop a video, paste notes, or type a brain dump. Neolog does the rest.</p>
-        </div>
+      {/* Date / session label */}
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
+        {dateStr} · SESSION 1
+      </p>
+      <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '2rem' }}>
+        Daily Log
+      </h1>
 
-        {/* Upload zone */}
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="group relative mb-8 border-2 border-dashed border-[var(--border-medium)] hover:border-[var(--accent)] rounded-xl p-8 text-center cursor-pointer transition-all duration-200 hover:bg-[var(--accent)]/5"
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*,audio/*"
-            className="hidden"
-            onChange={() => {/* TODO: trigger upload */}}
-          />
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] flex items-center justify-center group-hover:border-[var(--accent)] transition-colors">
-              <Upload size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--accent)]" />
-            </div>
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">Drop a video or audio file</p>
-              <p className="text-sm text-[var(--text-tertiary)] mt-1">Up to 4GB · MP4, MOV, MP3, M4A, WAV</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-[var(--text-tertiary)]">
-              <span className="flex items-center gap-1.5"><Video size={12} /> Videos</span>
-              <span className="flex items-center gap-1.5"><Mic size={12} /> Audio</span>
-              <span className="flex items-center gap-1.5"><FileText size={12} /> Transcripts</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Today's extractions (placeholder) */}
-        <div className="mb-8">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">
-            Today's Extractions
-          </h2>
-          <div className="space-y-2">
-            {[
-              { type: 'idea', text: 'No uploads yet today. Drop a video to start.' },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] opacity-50"
+      {/* Glass input zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false) }}
+        style={{
+          position: 'relative',
+          background: dragging ? 'rgba(124,106,245,0.06)' : 'rgba(13,13,22,0.7)',
+          backdropFilter: 'blur(16px)',
+          border: `1px solid ${dragging ? 'var(--border-glow)' : 'var(--border-medium)'}`,
+          borderRadius: '10px',
+          padding: '1rem 1rem 0.75rem',
+          marginBottom: '0.75rem',
+          transition: 'all 0.2s',
+          boxShadow: dragging ? '0 0 24px -4px rgba(124,106,245,0.2)' : 'none',
+        }}
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Drop a recording or type a thought..."
+          rows={3}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            color: 'var(--text-primary)',
+            fontSize: '14px',
+            lineHeight: 1.6,
+            fontFamily: 'var(--font-sans)',
+            marginBottom: '0.5rem',
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            {['Video', 'Voice', 'Text'].map((mode) => (
+              <button
+                key={mode}
+                onClick={() => mode === 'Video' || mode === 'Voice' ? fileRef.current?.click() : undefined}
+                style={{
+                  padding: '0.2rem 0.65rem', borderRadius: '4px',
+                  border: '1px solid var(--border-light)',
+                  background: 'transparent', color: 'var(--text-tertiary)',
+                  fontSize: '11px', cursor: 'pointer', transition: 'all 0.15s',
+                  fontFamily: 'var(--font-sans)',
+                }}
               >
-                <span className="text-base mt-0.5">{ENTITY_ICONS[item.type]}</span>
-                <p className="text-sm text-[var(--text-secondary)]">{item.text}</p>
-              </div>
+                {mode}
+              </button>
             ))}
-          </div>
-        </div>
-
-        {/* Recent sessions */}
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">
-            Recent Sessions
-          </h2>
-          <div className="space-y-2">
-            <div className="p-4 rounded-lg bg-[var(--bg-card)] border border-[var(--border-light)] text-sm text-[var(--text-tertiary)] text-center py-8">
-              No sessions yet. Upload a video to get started.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom input bar */}
-      <div className="sticky bottom-0 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-t border-[var(--border-medium)] px-6 py-4">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex items-end gap-3">
-          <div className="flex-1 relative">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  void handleSubmit(e)
-                }
-              }}
-              placeholder="Type a brain dump, paste notes, or ask your log a question..."
-              rows={2}
-              className="w-full resize-none rounded-xl border border-[var(--border-medium)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-colors"
-            />
+            <input ref={fileRef} type="file" accept="video/*,audio/*" style={{ display: 'none' }} />
           </div>
           <button
-            type="submit"
-            disabled={!inputText.trim() || isSubmitting}
-            className="btn btn-primary flex-shrink-0 h-11 px-5 flex items-center gap-2"
+            disabled={!input.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '6px',
+              background: input.trim() ? 'var(--accent)' : 'transparent',
+              border: `1px solid ${input.trim() ? 'transparent' : 'var(--border-light)'}`,
+              color: input.trim() ? '#fff' : 'var(--text-tertiary)',
+              cursor: input.trim() ? 'pointer' : 'default',
+              transition: 'all 0.2s',
+              flexShrink: 0,
+            }}
           >
-            {isSubmitting ? <Sparkles size={16} className="animate-spin" /> : <Send size={16} />}
-            <span>{isSubmitting ? 'Logging...' : 'Log'}</span>
+            <Send size={13} />
           </button>
-        </form>
+        </div>
       </div>
+
+      {/* Drop hint */}
+      <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '2.5rem', paddingLeft: '0.25rem' }}>
+        Drag a video or audio file anywhere to upload ↑
+      </p>
+
+      {/* Today's extractions */}
+      <section style={{ marginBottom: '3rem' }}>
+        <p style={{ fontSize: '10px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          Extracted today —
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {mockExtractions.map((e, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '0.55rem 0.75rem',
+                borderRadius: '6px',
+                border: '1px solid transparent',
+                transition: 'all 0.15s',
+                cursor: 'default',
+              }}
+              onMouseEnter={(el) => { (el.currentTarget as HTMLDivElement).style.background = 'rgba(124,106,245,0.04)'; (el.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-light)' }}
+              onMouseLeave={(el) => { (el.currentTarget as HTMLDivElement).style.background = 'transparent'; (el.currentTarget as HTMLDivElement).style.borderColor = 'transparent' }}
+            >
+              <span style={{ fontSize: '13px', flexShrink: 0, width: '18px', textAlign: 'center' }}>{e.emoji}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-primary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+              <span style={{
+                fontSize: '10px', padding: '0.1rem 0.45rem', borderRadius: '3px',
+                background: 'rgba(124,106,245,0.1)', color: 'var(--accent)',
+                fontWeight: 500, flexShrink: 0,
+              }}>{e.type}</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{e.time}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Recent sessions */}
+      <section>
+        <p style={{ fontSize: '10px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '0.75rem', fontWeight: 600 }}>
+          Recent sessions —
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {days.map((day, i) => (
+            <div
+              key={i}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0.6rem 0.75rem',
+                borderRadius: '6px',
+                border: '1px solid transparent',
+                transition: 'all 0.15s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(el) => { (el.currentTarget as HTMLDivElement).style.background = 'rgba(124,106,245,0.04)'; (el.currentTarget as HTMLDivElement).style.borderColor = 'var(--border-light)' }}
+              onMouseLeave={(el) => { (el.currentTarget as HTMLDivElement).style.background = 'transparent'; (el.currentTarget as HTMLDivElement).style.borderColor = 'transparent' }}
+            >
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>{day.date}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  {day.sessions} session{day.sessions !== 1 ? 's' : ''} · {day.entities} entities
+                </span>
+                <ArrowUpRight size={12} style={{ color: 'var(--text-tertiary)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
     </div>
   )
 }

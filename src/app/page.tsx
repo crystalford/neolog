@@ -1,249 +1,282 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { Header } from '@/components/Header'
-import { ArrowRight, Upload, Zap, Layers, CheckCircle2 } from 'lucide-react'
 
-export default async function Home() {
-  const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+const entityCards = [
+  { emoji: '💡', label: 'AI documentary idea', type: 'Idea', session: '2h ago' },
+  { emoji: '🏗', label: 'Neolog', type: 'Project', session: '23 sessions' },
+  { emoji: '❓', label: 'How do I sell without selling?', type: 'Question', session: '5d ago' },
+  { emoji: '🎯', label: 'Ship uploads this week', type: 'Commitment', session: '1d ago' },
+  { emoji: '📖', label: 'The Crystal Ford', type: 'Creative', session: '3 sessions' },
+]
 
+export default function HomePage() {
   return (
-    <div className="bg-[var(--bg-primary)] min-h-screen">
-      <Header />
-      <main className="pt-14">
+    <div
+      className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-x-hidden"
+      style={{ fontFamily: 'var(--font-sans)' }}
+    >
+      {/* Ambient bloom */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: '-15%',
+          right: '-5%',
+          width: '55vw',
+          height: '55vh',
+          background: 'radial-gradient(ellipse, rgba(124,106,245,0.09) 0%, transparent 70%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          bottom: '-10%',
+          left: '-5%',
+          width: '40vw',
+          height: '40vh',
+          background: 'radial-gradient(ellipse, rgba(124,106,245,0.05) 0%, transparent 70%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
 
-        {/* ── HERO ─────────────────────────────────────────── */}
-        <section className="relative flex flex-col items-center justify-center px-6 py-32 md:py-44 max-w-5xl mx-auto text-center overflow-hidden">
-          {/* Grid bg */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+      {/* Nav */}
+      <header
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          borderBottom: '1px solid var(--border-light)',
+          background: 'rgba(9,9,16,0.8)',
+          backdropFilter: 'blur(16px)',
+        }}
+      >
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '26px', height: '26px', borderRadius: '5px',
+              background: 'var(--text-primary)', color: 'var(--text-inverse)',
+              fontWeight: 700, fontSize: '13px', letterSpacing: '-0.02em',
+              flexShrink: 0,
+            }}>N</span>
+            <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.02em' }}>Neolog</span>
+          </div>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <Link href="/sign-in" style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '0.4rem 0.75rem', borderRadius: '6px', textDecoration: 'none', transition: 'color 0.15s' }}>
+              Sign in
+            </Link>
+            <Link href="/sign-up" style={{
+              fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)',
+              padding: '0.4rem 0.9rem', borderRadius: '6px',
+              border: '1px solid var(--border-medium)',
+              background: 'rgba(255,255,255,0.04)',
+              textDecoration: 'none', transition: 'all 0.15s',
+            }}>
+              Get started →
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] mb-8 backdrop-blur-sm">
-              <Zap size={13} className="text-[var(--accent)]" />
-              <span className="text-xs font-medium text-[var(--text-secondary)]">An extension of the mind</span>
-            </div>
+      {/* Hero */}
+      <section style={{ position: 'relative', zIndex: 1, minHeight: 'calc(100vh - 56px)', display: 'flex', alignItems: 'center' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '6rem 2rem', width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
 
-            <h1 className="font-display text-6xl md:text-8xl font-bold leading-[1.05] tracking-tighter text-[var(--text-primary)] mb-6">
-              Neolog
+          {/* Left — Editorial text */}
+          <div>
+            <p style={{
+              fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'var(--text-tertiary)', marginBottom: '1.75rem', fontWeight: 600,
+            }}>
+              Personal Intelligence System
+            </p>
+
+            <h1 style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(3rem, 5vw, 5.5rem)',
+              fontWeight: 400,
+              lineHeight: 1.08,
+              letterSpacing: '-0.02em',
+              marginBottom: '1.5rem',
+              color: 'var(--text-primary)',
+            }}>
+              Your thinking,<br />
+              <span style={{
+                background: 'linear-gradient(135deg, #a78bfa 0%, #7c6af5 50%, #c4b5fd 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>
+                made permanent.
+              </span>
             </h1>
 
-            <p className="text-lg md:text-2xl text-[var(--text-secondary)] mb-4 max-w-2xl mx-auto leading-relaxed font-light">
-              Talk. Record. Log.
-              <br />
-              <span className="text-[var(--text-primary)]">Neolog listens to everything you create and builds a living map of your thinking.</span>
+            <p style={{ fontSize: '17px', color: 'var(--text-secondary)', lineHeight: 1.65, maxWidth: '480px', marginBottom: '2.5rem' }}>
+              Talk. Record. Neolog listens to everything you create and builds a living map of your thinking — ideas, projects, questions, patterns.
             </p>
 
-            <p className="text-base text-[var(--text-tertiary)] mb-12 max-w-xl mx-auto">
-              Drop in a raw, unedited video. Neolog transcribes it, extracts your ideas, projects, questions, and patterns — and accumulates them across every session.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link
-                href={session ? '/dashboard/log' : '/signup'}
-                className="btn btn-primary btn-lg group"
-              >
-                {session ? 'Open your log' : 'Get started free'}
-                <ArrowRight size={18} className="ml-2 transition-transform group-hover:translate-x-1" />
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Link href="/sign-up" style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.7rem 1.4rem', borderRadius: '8px',
+                background: 'var(--accent)', color: '#fff',
+                fontWeight: 500, fontSize: '14px', textDecoration: 'none',
+                boxShadow: '0 0 24px -4px rgba(124,106,245,0.5)',
+                transition: 'all 0.2s',
+              }}>
+                Start logging →
               </Link>
-              {!session && (
-                <Link href="/login" className="btn btn-secondary btn-lg">
-                  Sign in
-                </Link>
-              )}
+              <Link href="#how-it-works" style={{
+                display: 'inline-flex', alignItems: 'center',
+                padding: '0.7rem 1.4rem', borderRadius: '8px',
+                border: '1px solid var(--border-medium)',
+                color: 'var(--text-secondary)', fontSize: '14px', textDecoration: 'none',
+                transition: 'all 0.2s',
+              }}>
+                See how it works
+              </Link>
             </div>
-          </div>
-        </section>
 
-        {/* ── THE PROBLEM ─────────────────────────────────── */}
-        <section className="px-6 py-20 max-w-4xl mx-auto text-center">
-          <h2 className="font-display text-4xl md:text-5xl font-bold mb-6 tracking-tight leading-tight">
-            You create more than you publish.
-          </h2>
-          <p className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed">
-            Your best ideas happen in car rides, shower thoughts, and 2AM recordings. They turn into raw video files on a hard drive. They never become anything — not because the ideas aren't good, but because <span className="text-[var(--text-primary)]">you are the bottleneck.</span>
-          </p>
-          <p className="text-lg text-[var(--text-secondary)] mt-6 max-w-2xl mx-auto leading-relaxed">
-            Neolog removes you from that equation.
-          </p>
-        </section>
-
-        {/* ── HOW IT WORKS ─────────────────────────────────── */}
-        <section className="px-6 py-24 max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 tracking-tight">How it works</h2>
-            <p className="text-[var(--text-secondary)]">Three steps. No editing required.</p>
+            <p style={{ marginTop: '2rem', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              Built for people who think faster than they publish.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                step: '01',
-                icon: Upload,
-                title: 'Record & Upload',
-                desc: 'Drop in a raw video or audio file — phone recording, voice memo, anything. No structure needed. Neolog handles gigabyte-scale files with resumable upload so nothing gets lost.',
-                color: 'var(--accent)',
-              },
-              {
-                step: '02',
-                icon: Zap,
-                title: 'Synthesize',
-                desc: 'AI transcribes the audio, then extracts ideas, projects, questions, decisions, commitments, people, patterns. These become entities in your Knowledge Graph — and they accumulate across every session.',
-                color: 'var(--accent-purple)',
-              },
-              {
-                step: '03',
-                icon: Layers,
-                title: 'Publish & Represent',
-                desc: 'Neolog generates social posts about your work (as an outside observer, not you talking about yourself), builds project portfolio entries, and assembles video clips — all from evidence in your logs.',
-                color: 'var(--accent-cyan)',
-              },
-            ].map(({ step, icon: Icon, title, desc, color }) => (
+          {/* Right — Floating entity cards */}
+          <div style={{ position: 'relative', height: '400px' }}>
+            {entityCards.map((card, i) => (
               <div
-                key={step}
-                className="group relative p-8 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)] hover:border-[var(--border-heavy)] transition-all duration-300"
-                style={{ '--card-color': color } as React.CSSProperties}
+                key={i}
+                style={{
+                  position: 'absolute',
+                  background: 'rgba(13,13,22,0.8)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: '10px',
+                  padding: '0.75rem 1rem',
+                  width: '260px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                  // Staggered positions
+                  top: `${[12, 80, 148, 220, 292][i]}px`,
+                  left: `${[20, 60, 10, 50, 25][i]}px`,
+                  transform: `rotate(${[-1.5, 1, -0.5, 1.2, -1][i]}deg)`,
+                  zIndex: entityCards.length - i,
+                  transition: 'transform 0.3s',
+                }}
               >
-                <div className="text-[10px] font-mono text-[var(--text-tertiary)] tracking-widest mb-4">{step}</div>
-                <div
-                  className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl"
-                  style={{ background: `${color}18`, border: `1px solid ${color}30` }}
-                >
-                  <Icon size={20} style={{ color }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '14px' }}>{card.emoji}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, letterSpacing: '-0.01em' }}>{card.label}</span>
                 </div>
-                <h3 className="font-display text-xl font-semibold mb-3 text-[var(--text-primary)]">{title}</h3>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{desc}</p>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '10px', padding: '0.1rem 0.4rem', borderRadius: '4px',
+                    background: 'rgba(124,106,245,0.12)', color: 'var(--accent)',
+                    fontWeight: 500,
+                  }}>{card.type}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{card.session}</span>
+                </div>
+              </div>
+            ))}
+
+            {/* Subtle glow behind cards */}
+            <div aria-hidden style={{
+              position: 'absolute', top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '300px', height: '300px',
+              background: 'radial-gradient(circle, rgba(124,106,245,0.08) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section id="how-it-works" style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-light)', background: 'rgba(13,13,22,0.6)' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '5rem 2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3rem' }}>
+            {[
+              { num: '01', title: 'Record', desc: 'Drop a raw video, voice note, or type a brain dump. No editing, no formatting required.' },
+              { num: '02', title: 'Extract', desc: 'Neolog transcribes, then pulls out ideas, projects, questions, goals, and patterns across every session.' },
+              { num: '03', title: 'Publish', desc: 'Social posts, portfolio entries, and a bio update themselves. The system narrates you.' },
+            ].map((step) => (
+              <div key={step.num}>
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>{step.num}</p>
+                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '-0.01em' }}>{step.title}</h3>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>{step.desc}</p>
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ── WHAT IT EXTRACTS ─────────────────────────────── */}
-        <section className="px-6 py-24 bg-[var(--bg-secondary)] border-y border-[var(--border-medium)]">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
-              <h2 className="font-display text-4xl md:text-5xl font-bold mb-4 tracking-tight">
-                Everything you say. Permanently structured.
-              </h2>
-              <p className="text-[var(--text-secondary)] max-w-2xl mx-auto">
-                Neolog doesn't create categories for you to fill in. It listens to how you naturally talk and extracts the things that matter.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { emoji: '💡', label: 'Ideas', desc: 'Novel connections & sparks' },
-                { emoji: '🏗', label: 'Projects', desc: 'Everything you are actively building' },
-                { emoji: '❓', label: 'Questions', desc: 'The "what ifs" you ask into the void' },
-                { emoji: '🎯', label: 'Commitments', desc: 'Promises tracked across sessions' },
-                { emoji: '🔑', label: 'Decisions', desc: 'Choices made and the logic behind them' },
-                { emoji: '🤝', label: 'People', desc: 'Who you mention and how' },
-                { emoji: '⚡', label: 'Energy', desc: 'Flow states and friction patterns' },
-                { emoji: '🔄', label: 'Habits', desc: 'What you do and want to change' },
-                { emoji: '🚧', label: 'Blockers', desc: 'What\'s stopping you from moving' },
-                { emoji: '🧠', label: 'Beliefs', desc: 'Values revealed by what you react to' },
-                { emoji: '📈', label: 'Content ideas', desc: 'Articles, threads, video seeds' },
-                { emoji: '🔀', label: 'Contradictions', desc: 'When you argue against yourself' },
-              ].map(({ emoji, label, desc }) => (
-                <div key={label} className="p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors">
-                  <div className="text-xl mb-2">{emoji}</div>
-                  <div className="text-sm font-semibold text-[var(--text-primary)] mb-1">{label}</div>
-                  <div className="text-xs text-[var(--text-tertiary)] leading-snug">{desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── THE OUTPUT ───────────────────────────────────── */}
-        <section className="px-6 py-24 max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="font-display text-4xl md:text-5xl font-bold mb-6 tracking-tight leading-tight">
-                It describes you.<br />
-                <span className="text-[var(--accent)]">You don't describe yourself.</span>
-              </h2>
-              <p className="text-[var(--text-secondary)] leading-relaxed mb-6">
-                Most people who do great things can't sell themselves. They're too close to the work, too uncomfortable with self-promotion, too busy building to stop and describe what they built.
-              </p>
-              <p className="text-[var(--text-secondary)] leading-relaxed mb-8">
-                Neolog generates an outside-observer account of your work — your portfolio, your bio, your social presence — from the evidence in your logs. Accurate. Updated. In your voice.
-              </p>
-              <ul className="space-y-2">
-                {[
-                  'Social posts written about your work (not by you)',
-                  'Project portfolio entries with case studies',
-                  'A living bio that updates with each session',
-                  'Video clips assembled from your best moments',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2.5 text-sm text-[var(--text-secondary)]">
-                    <CheckCircle2 size={15} className="text-[var(--success)] mt-0.5 flex-shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="relative p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-medium)]">
-              <div className="text-xs text-[var(--text-tertiary)] mb-3 font-mono">AUTO-GENERATED POST · X</div>
-              <p className="text-sm text-[var(--text-primary)] leading-relaxed mb-4">
-                "He's been building Neolog for three months — an AI that takes his raw, unedited recordings and turns them into structured intelligence. Today he's working on the pipeline that strips audio from 4GB iPhone videos and feeds them into Whisper for transcription."
-              </p>
-              <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
-                Generated from Mar 9 morning log · pending approval
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── FOR WHO ──────────────────────────────────────── */}
-        <section className="px-6 py-20 max-w-4xl mx-auto text-center">
-          <h2 className="font-display text-4xl font-bold mb-6 tracking-tight">
-            Built for people who think faster than they publish.
+      {/* What it extracts */}
+      <section style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-light)' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '5rem 2rem' }}>
+          <p style={{ fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '1rem' }}>What gets extracted</p>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3.5vw, 3rem)', fontWeight: 400, marginBottom: '3rem', maxWidth: '600px', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+            Everything you say, permanently structured.
           </h2>
-          <p className="text-[var(--text-secondary)] text-lg max-w-2xl mx-auto leading-relaxed">
-            Builders. Founders who are also making things. Creators who are drowning in raw footage. People with too many ideas and not enough time to organize them. If your hard drive is full of recordings that never became anything — Neolog is for you.
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+            {[
+              { emoji: '💡', label: 'Ideas', desc: 'Raw sparks, captured.' },
+              { emoji: '🏗', label: 'Projects', desc: 'What you\'re building.' },
+              { emoji: '❓', label: 'Questions', desc: 'What you\'re wrestling with.' },
+              { emoji: '🤝', label: 'People', desc: 'Who matters in your work.' },
+              { emoji: '🎯', label: 'Commitments', desc: 'What you said you\'d do.' },
+              { emoji: '📖', label: 'Creative Works', desc: 'Books, scripts, essays building.' },
+            ].map((item) => (
+              <div key={item.label} style={{
+                padding: '1rem 1.25rem',
+                border: '1px solid var(--border-light)',
+                borderRadius: '8px',
+                background: 'rgba(13,13,22,0.4)',
+                transition: 'border-color 0.2s',
+              }}>
+                <span style={{ fontSize: '20px', display: 'block', marginBottom: '0.5rem' }}>{item.emoji}</span>
+                <p style={{ fontWeight: 600, fontSize: '13px', marginBottom: '0.25rem' }}>{item.label}</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-light)', textAlign: 'center' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '6rem 2rem' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 400, lineHeight: 1.1, marginBottom: '1.5rem', letterSpacing: '-0.02em' }}>
+            Stop losing your best thinking.
+          </h2>
+          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.65 }}>
+            Every recording, note, and idea — organised, searchable, and working for you.
           </p>
-        </section>
+          <Link href="/sign-up" style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '0.8rem 2rem', borderRadius: '8px',
+            background: 'var(--accent)', color: '#fff',
+            fontWeight: 500, fontSize: '15px', textDecoration: 'none',
+            boxShadow: '0 0 32px -6px rgba(124,106,245,0.5)',
+          }}>
+            Start logging — it's free
+          </Link>
+        </div>
+      </section>
 
-        {/* ── CTA ──────────────────────────────────────────── */}
-        <section className="px-6 py-24 max-w-3xl mx-auto">
-          <div className="relative overflow-hidden bg-[var(--bg-card)] rounded-2xl border border-[var(--border-medium)] p-12 text-center">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(59,130,246,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(59,130,246,0.05)_1px,transparent_1px)] bg-[size:4rem_4rem]" />
-            <div className="relative z-10">
-              <h2 className="font-display text-4xl font-bold mb-4 tracking-tight">
-                Start logging.
-              </h2>
-              <p className="text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
-                Drop in a video. See what Neolog extracts. No setup, no categories to configure.
-              </p>
-              <Link
-                href={session ? '/dashboard/log' : '/signup'}
-                className="btn btn-primary btn-lg group"
-              >
-                {session ? 'Open your log' : 'Create free account'}
-                <ArrowRight size={18} className="ml-2 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
+      {/* Footer */}
+      <footer style={{ borderTop: '1px solid var(--border-light)', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Neolog 2026</span>
+          <div style={{ display: 'flex', gap: '1.5rem' }}>
+            {['Privacy', 'Terms'].map(l => (
+              <Link key={l} href="#" style={{ fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>{l}</Link>
+            ))}
           </div>
-        </section>
-
-        {/* ── FOOTER ───────────────────────────────────────── */}
-        <footer className="px-6 py-12 bg-[var(--bg-secondary)] border-t border-[var(--border-medium)]">
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2.5">
-              <span className="logo-mark">N</span>
-              <span className="font-display text-lg font-semibold">Neolog</span>
-            </div>
-            <nav className="flex flex-wrap items-center gap-6 text-sm text-[var(--text-tertiary)]">
-              <Link href="/dashboard/log" className="hover:text-[var(--text-primary)] transition-colors">Log in</Link>
-              <Link href="/tos" className="hover:text-[var(--text-primary)] transition-colors">Terms</Link>
-              <Link href="/privacy" className="hover:text-[var(--text-primary)] transition-colors">Privacy</Link>
-            </nav>
-            <p className="text-xs text-[var(--text-tertiary)]">© 2026 Neolog</p>
-          </div>
-        </footer>
-
-      </main>
+        </div>
+      </footer>
     </div>
   )
 }
