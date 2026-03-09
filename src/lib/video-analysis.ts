@@ -112,8 +112,8 @@ export async function runAnalysis(
   if (anthropicKey) {
     const anthropic = new Anthropic({ apiKey: anthropicKey })
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 8192,
+      model: 'claude-3-5-sonnet-latest',
+      max_tokens: 4096,
       system: ANALYSIS_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
       temperature: 0.3,
