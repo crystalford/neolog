@@ -22,9 +22,11 @@ export default function SettingsPage() {
 
   const [usageCaps, setUsageCaps] = useState<{
     openai: { day: string; month: string }
+    anthropic: { day: string; month: string }
     groq: { day: string; month: string }
   }>({
     openai: { day: '', month: '' },
+    anthropic: { day: '', month: '' },
     groq: { day: '', month: '' },
   })
   const [usageCapsSaving, setUsageCapsSaving] = useState(false)
@@ -144,6 +146,7 @@ export default function SettingsPage() {
       const data = await response.json()
       const next = {
         openai: { day: '', month: '' },
+        anthropic: { day: '', month: '' },
         groq: { day: '', month: '' },
       }
 
@@ -152,7 +155,7 @@ export default function SettingsPage() {
         const period = row?.period
         const tokenLimit = row?.token_limit
 
-        if ((provider === 'openai' || provider === 'groq') && (period === 'day' || period === 'month')) {
+        if ((provider === 'openai' || provider === 'anthropic' || provider === 'groq') && (period === 'day' || period === 'month')) {
           ;(next as any)[provider][period] = tokenLimit == null ? '' : String(tokenLimit)
         }
       }
@@ -182,6 +185,8 @@ export default function SettingsPage() {
       const limits = [
         { provider: 'openai', period: 'day', token_limit: parseLimit(usageCaps.openai.day) },
         { provider: 'openai', period: 'month', token_limit: parseLimit(usageCaps.openai.month) },
+        { provider: 'anthropic', period: 'day', token_limit: parseLimit(usageCaps.anthropic.day) },
+        { provider: 'anthropic', period: 'month', token_limit: parseLimit(usageCaps.anthropic.month) },
         { provider: 'groq', period: 'day', token_limit: parseLimit(usageCaps.groq.day) },
         { provider: 'groq', period: 'month', token_limit: parseLimit(usageCaps.groq.month) },
       ]
@@ -1165,6 +1170,7 @@ export default function SettingsPage() {
               <div className="grid gap-4">
                 {([
                   { id: 'openai', label: 'OpenAI' },
+                  { id: 'anthropic', label: 'Anthropic (Claude)' },
                   { id: 'groq', label: 'Groq' },
                 ] as const).map((provider) => (
                   <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
