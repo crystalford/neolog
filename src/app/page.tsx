@@ -64,10 +64,10 @@ export default function HomePage() {
             <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.02em' }}>Neolog</span>
           </div>
           <nav style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <Link href="/sign-in" style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '0.4rem 0.75rem', borderRadius: '6px', textDecoration: 'none', transition: 'color 0.15s' }}>
+            <Link href="/login" style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '0.4rem 0.75rem', borderRadius: '6px', textDecoration: 'none', transition: 'color 0.15s' }}>
               Sign in
             </Link>
-            <Link href="/sign-up" style={{
+            <Link href="/login" style={{
               fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)',
               padding: '0.4rem 0.9rem', borderRadius: '6px',
               border: '1px solid var(--border-medium)',
@@ -118,7 +118,7 @@ export default function HomePage() {
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Link href="/sign-up" style={{
+              <Link href="/dashboard" style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                 padding: '0.7rem 1.4rem', borderRadius: '8px',
                 background: 'var(--accent)', color: '#fff',
@@ -254,7 +254,7 @@ export default function HomePage() {
           <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.65 }}>
             Every recording, note, and idea — organised, searchable, and working for you.
           </p>
-          <Link href="/sign-up" style={{
+          <Link href="/dashboard" style={{
             display: 'inline-flex', alignItems: 'center',
             padding: '0.8rem 2rem', borderRadius: '8px',
             background: 'var(--accent)', color: '#fff',
