@@ -1,111 +1,188 @@
-import { createClient } from '@/lib/supabase/server'
-import { CalendarDays, Clock, Layers } from 'lucide-react'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { LogCard, type LogEntry } from '@/components/LogCard'
+import { format, isToday, isYesterday, isSameDay } from 'date-fns'
+import { Plus, ExternalLink } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+function formatDateHeader(date: Date): string {
+  if (isToday(date)) return 'Today'
+  if (isYesterday(date)) return 'Yesterday'
+  return format(date, 'EEEE, MMMM d · yyyy')
+}
 
-export default async function TimelinePage() {
+export default function TimelinePage() {
+  const [entries, setEntries] = useState<LogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [username, setUsername] = useState<string | null>(null)
+  const router = useRouter()
   const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
 
-  const { data: uploads } = await supabase
-    .from('video_uploads')
-    .select('id, original_filename, status, created_at, transcript, analysis')
-    .eq('user_id', session.user.id)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  useEffect(() => {
+    loadEntries()
+  }, [])
 
-  // Group uploads by date
-  const grouped: Record<string, typeof uploads> = {}
-  for (const upload of uploads ?? []) {
-    const dateKey = new Date(upload.created_at).toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
-    })
-    if (!grouped[dateKey]) grouped[dateKey] = []
-    grouped[dateKey]!.push(upload)
+  async function loadEntries() {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { router.push('/login'); return }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', session.user.id)
+      .single()
+
+    setUsername(profile?.username || null)
+
+    const { data } = await supabase
+      .from('log_entries')
+      .select(`
+        id, entry_type, title, body, logged_at, software_tags,
+        cost_delta, is_public, source_upload_id, meta,
+        asset:assets(id, name, category)
+      `)
+      .eq('user_id', session.user.id)
+      .order('logged_at', { ascending: false })
+      .limit(200)
+
+    setEntries((data || []) as unknown as LogEntry[])
+    setLoading(false)
   }
 
-  const entryCount = (upload: any): number => {
-    try {
-      const analysis = typeof upload.analysis === 'string' ? JSON.parse(upload.analysis) : upload.analysis
-      if (!analysis) return 0
-      const keys = ['ideas', 'projects', 'questions', 'commitments', 'decisions', 'people', 'action_items']
-      return keys.reduce((acc: number, k: string) => acc + (Array.isArray(analysis[k]) ? analysis[k].length : 0), 0)
-    } catch { return 0 }
+  type DayGroup = { label: string; date: Date; entries: LogEntry[] }
+  const dayGroups: DayGroup[] = []
+  for (const entry of entries) {
+    const d = new Date(entry.logged_at)
+    const last = dayGroups[dayGroups.length - 1]
+    if (!last || !isSameDay(last.date, d)) {
+      dayGroups.push({ label: formatDateHeader(d), date: d, entries: [] })
+    }
+    dayGroups[dayGroups.length - 1].entries.push(entry)
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
-      {/* Date / session label (static for Timeline overview) */}
-      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-        ALL TIME · CHRONOLOGICAL
-      </p>
-      <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-        Timeline
-      </h1>
-      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-        A chronological log of every session and what was extracted.
-      </p>
-
-      {Object.keys(grouped).length === 0 ? (
-        <div className="text-center py-20 text-[var(--text-tertiary)]">
-          <span className="text-4xl mx-auto mb-4 opacity-50 block text-center">🗓️</span>
-          <p className="text-lg font-medium mb-2">No sessions yet</p>
-          <p className="text-sm">Upload a video or audio file to start building your timeline.</p>
-          <Link href="/dashboard/uploads" className="mt-6 btn btn-primary btn-sm inline-flex">
-            Go to Uploads
+    <div className="max-w-2xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            ALL TIME · CHRONOLOGICAL
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            The Log
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+            Your complete life record — auto-generated and manually added.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {username && (
+            <Link
+              href={`/${username}/log`}
+              target="_blank"
+              className="btn btn-secondary btn-sm flex items-center gap-1"
+            >
+              <ExternalLink size={13} />
+              Public
+            </Link>
+          )}
+          <Link href="/dashboard/log/new" className="btn btn-primary btn-sm flex items-center gap-1">
+            <Plus size={14} />
+            New Entry
           </Link>
         </div>
+      </div>
+
+      {/* Feed */}
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-20 skeleton rounded-xl" />
+          ))}
+        </div>
+      ) : dayGroups.length === 0 ? (
+        <div className="text-center py-24 opacity-40">
+          <span className="text-5xl block mb-4">📋</span>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            The log is empty
+          </p>
+          <p className="text-xs mt-2 text-[var(--text-tertiary)]">
+            Upload a session or add a manual entry to begin.
+          </p>
+          <div className="flex gap-3 items-center justify-center mt-6">
+            <Link href="/dashboard/log/new" className="btn btn-primary btn-sm">
+              <Plus size={13} /> New Entry
+            </Link>
+            <Link href="/dashboard/uploads" className="btn btn-secondary btn-sm">
+              Upload Session
+            </Link>
+          </div>
+        </div>
       ) : (
-        <div className="space-y-10">
-          {Object.entries(grouped).map(([date, entries]) => (
-            <div key={date}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{date}</h2>
-                <div className="flex-1 h-px bg-[var(--border-light)]" />
+        <div>
+          {dayGroups.map((group) => (
+            <div key={group.label}>
+              {/* Day header */}
+              <div
+                className="flex items-center gap-3 py-3 sticky top-16 z-10"
+                style={{ background: 'var(--bg-primary)' }}
+              >
+                <span style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-tertiary)',
+                  fontWeight: 700,
+                  opacity: 0.7,
+                }}>
+                  {group.label}
+                </span>
+                <div className="flex-1 h-px bg-[var(--border-light)] opacity-40" />
+                <span style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '9px',
+                  color: 'var(--text-tertiary)',
+                  opacity: 0.4,
+                }}>
+                  {group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}
+                </span>
               </div>
-              <div className="space-y-3 pl-5">
-                {entries?.map((upload) => {
-                  const count = entryCount(upload)
-                  const time = new Date(upload.created_at).toLocaleTimeString('en-US', {
-                    hour: 'numeric', minute: '2-digit'
-                  })
-                  return (
-                    <Link
-                      key={upload.id}
-                      href={`/dashboard/uploads/${upload.id}`}
-                      className="block p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors group"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">
-                            {upload.original_filename}
-                          </p>
-                          <div className="flex items-center gap-3 mt-1.5 text-xs text-[var(--text-tertiary)]">
-                            <span className="flex items-center gap-1"><Clock size={11} />{time}</span>
-                            {count > 0 && (
-                              <span className="flex items-center gap-1"><Layers size={11} />{count} entities</span>
-                            )}
-                          </div>
-                        </div>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${
-                          upload.status === 'completed'
-                            ? 'bg-[var(--success)]/10 text-[var(--success)]'
-                            : upload.status === 'error'
-                            ? 'bg-[var(--error)]/10 text-[var(--error)]'
-                            : 'bg-[var(--accent)]/10 text-[var(--accent)]'
-                        }`}>
-                          {upload.status}
-                        </span>
-                      </div>
-                    </Link>
-                  )
-                })}
+
+              {/* Cards */}
+              <div style={{
+                border: '1px solid var(--border-light)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                marginBottom: '8px',
+              }}>
+                {group.entries.map((entry) => (
+                  <LogCard
+                    key={entry.id}
+                    entry={entry}
+                    username={username || undefined}
+                    showPrivacyBadge
+                  />
+                ))}
               </div>
             </div>
           ))}
+
+          <div className="py-12 text-center">
+            <p style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '9px',
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+              opacity: 0.4,
+            }}>
+              End of log
+            </p>
+          </div>
         </div>
       )}
     </div>

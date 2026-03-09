@@ -93,37 +93,17 @@ export default function SettingsPage() {
   const aiProviders = [
     { id: 'openai', label: 'OpenAI' },
     { id: 'anthropic', label: 'Anthropic (Claude)' },
-    { id: 'perplexity', label: 'Perplexity' },
-    { id: 'grok', label: 'Grok (Speed)' },
-    { id: 'x', label: 'X (Twitter) API' },
     { id: 'groq', label: 'Groq (Speed)' },
     { id: 'replicate', label: 'Replicate (Flux)' },
     { id: 'elevenlabs', label: 'ElevenLabs (Voice)' },
-    { id: 'resend', label: 'Resend (Newsletter)' },
-    { id: 'medium', label: 'Medium (Syndication)' },
-    { id: 'devto', label: 'Dev.to (Syndication)' },
-    { id: 'posthog', label: 'PostHog (Analytics)' },
-    { id: 'r2', label: 'Cloudflare R2 (Storage)' },
-    { id: 's3', label: 'Amazon S3 (Storage)' },
-    { id: 'heygen', label: 'HeyGen (Video Avatar)' },
-    { id: 'synthesia', label: 'Synthesia (Video Avatar)' },
-    { id: 'stability', label: 'Stability (Legacy)' },
   ]
 
   const providerValidation: Record<string, { pattern?: RegExp; hint: string }> = {
     openai: { pattern: /^sk-(proj-)?[A-Za-z0-9]{10,}/, hint: 'OpenAI keys start with sk-' },
     anthropic: { pattern: /^sk-ant-[A-Za-z0-9-]{10,}/, hint: 'Anthropic keys start with sk-ant-' },
     groq: { pattern: /^gsk_[A-Za-z0-9]{10,}/, hint: 'Groq keys start with gsk_' },
-    perplexity: { pattern: /^pplx-[A-Za-z0-9]{10,}/, hint: 'Perplexity keys start with pplx-' },
-    x: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'X uses a Bearer token (long string) from the Developer Portal' },
     elevenlabs: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'ElevenLabs keys are long alphanumeric strings' },
     replicate: { pattern: /^r8_[A-Za-z0-9]{10,}/, hint: 'Replicate keys start with r8_' },
-    resend: { pattern: /^re_[A-Za-z0-9]{10,}/, hint: 'Resend keys start with re_' },
-    medium: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Medium uses an Integration Token (long string) from Medium settings' },
-    devto: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Dev.to uses an API key from dev.to/settings/account' },
-    posthog: { pattern: /^phc_[A-Za-z0-9]{10,}/, hint: 'PostHog keys start with phc_' },
-    heygen: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'HeyGen keys are long alphanumeric strings' },
-    synthesia: { pattern: /^[A-Za-z0-9._%\-]{20,}$/, hint: 'Synthesia keys are long strings; paste the API key from Synthesia -> Integrations' },
   }
 
   const getIntegrationHint = (provider: string, value: string) => {
@@ -663,16 +643,16 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
       <div className="mb-10">
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-          PUBLISHER PREFERENCES
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
+          CONTROL ROOM
         </p>
-        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
           Settings
         </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-          Manage your profile, integrations, and preferences.
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '600px' }}>
+          Configure your AI assistant, manage your profile, and control your data.
         </p>
       </div>
 
@@ -688,6 +668,100 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-8">
+        {/* 1. Assistant Persona & Memory */}
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Globe size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">Assistant Persona & Memory</h2>
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-4">
+            This context primes your AI assistant for any conversations and helps it understand your style, preferences, and facts.
+          </p>
+          <textarea
+            value={formData.context_md}
+            onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
+            placeholder="e.g. My tone is concise, data-first, skeptical of hype."
+            className="input min-h-[160px] font-mono text-sm leading-relaxed"
+            style={{ background: 'rgba(0,0,0,0.1)' }}
+          />
+        </section>
+
+        {/* 2. API Keys */}
+        <AgenticApiKeysSection />
+
+        {/* 3. AI Usage Caps */}
+        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
+              <Shield size={20} className="text-[var(--accent)]" />
+            </div>
+            <h2 className="font-display text-lg">AI usage caps</h2>
+          </div>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">
+            Set daily/monthly token limits to control costs. Leave blank for unlimited.
+          </p>
+
+          <div className="grid gap-4">
+            {([
+              { id: 'openai', label: 'OpenAI' },
+              { id: 'anthropic', label: 'Anthropic (Claude)' },
+            ] as const).map((provider) => (
+              <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
+                <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Daily cap
+                    <input
+                      type="number"
+                      value={(usageCaps as any)[provider.id].day}
+                      onChange={(event) =>
+                        setUsageCaps((prev) => ({
+                          ...prev,
+                          [provider.id]: {
+                            ...(prev as any)[provider.id],
+                            day: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Unlimited"
+                      className="input mt-2"
+                    />
+                  </label>
+                  <label className="text-sm text-[var(--text-secondary)]">
+                    Monthly cap
+                    <input
+                      type="number"
+                      value={(usageCaps as any)[provider.id].month}
+                      onChange={(event) =>
+                        setUsageCaps((prev) => ({
+                          ...prev,
+                          [provider.id]: {
+                            ...(prev as any)[provider.id],
+                            month: event.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Unlimited"
+                      className="input mt-2"
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-end">
+              <button
+                onClick={saveUsageCaps}
+                disabled={usageCapsSaving}
+                className="btn btn-secondary btn-sm"
+              >
+                {usageCapsSaving ? 'Saving...' : 'Save AI caps'}
+              </button>
+            </div>
+          </div>
+        </section>
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -879,24 +953,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Globe size={20} className="text-[var(--accent)]" />
-            </div>
-            <h2 className="font-display text-lg">Context memory</h2>
-          </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-4">
-            This context is injected into AI prompts to keep tone and facts consistent.
-          </p>
-          <textarea
-            value={formData.context_md}
-            onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
-            placeholder="e.g. My tone is concise, data-first, skeptical of hype. Avoid the word 'delve'."
-            className="input min-h-[160px] font-mono"
-          />
-        </section>
-
+        {/* 5. Notifications */}
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -910,28 +967,27 @@ export default function SettingsPage() {
               { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
               { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
               { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
-              { key: 'email_post_upvote', label: 'Upvotes', desc: 'When someone upvotes your post' },
-              { key: 'email_weekly_digest', label: 'Weekly digest', desc: 'Summary of activity on your posts' },
             ].map(({ key, label, desc }) => (
               <label
                 key={key}
                 className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
               >
                 <div>
-                  <p className="font-medium">{label}</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                  <p className="font-medium text-sm">{label}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
                 </div>
                 <input
                   type="checkbox"
                   checked={(emailPrefs as any)[key]}
                   onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
-                  className="w-5 h-5 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
+                  className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
                 />
               </label>
             ))}
           </div>
         </section>
 
+        {/* 6. Feeds */}
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -940,14 +996,9 @@ export default function SettingsPage() {
             <h2 className="font-display text-lg">Your Feeds</h2>
           </div>
 
-          <p className="text-[var(--text-secondary)] mb-4">
-            Your content is available in multiple formats. Share these with your audience.
-          </p>
-
           <div className="space-y-3">
             {[
               { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
-              { label: 'Atom Feed', url: `${baseUrl}/${profile?.username}/feed?format=atom` },
               { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
             ].map(({ label, url }) => (
               <div
@@ -964,28 +1015,20 @@ export default function SettingsPage() {
                   <button
                     onClick={() => copyToClipboard(url, label)}
                     className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                    title="Copy URL"
                   >
                     {copied === label ? (
-                      <Check size={16} className="text-[var(--success)]" />
+                      <Check size={14} className="text-[var(--success)]" />
                     ) : (
-                      <Copy size={16} className="text-[var(--text-tertiary)]" />
+                      <Copy size={14} className="text-[var(--text-tertiary)]" />
                     )}
                   </button>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                    title="Open feed"
-                  >
-                    <ExternalLink size={16} className="text-[var(--text-tertiary)]" />
-                  </a>
                 </div>
               </div>
             ))}
           </div>
         </section>
+
+        {/* 7. Export */}
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
@@ -994,15 +1037,10 @@ export default function SettingsPage() {
             <h2 className="font-display text-lg">Export Your Data</h2>
           </div>
 
-          <p className="text-[var(--text-secondary)] mb-4">
-            Download all your content. Your data is yours - no lock-in.
-          </p>
-
           <div className="grid gap-3">
             {[
-              { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data: posts, drafts, settings' },
-              { format: 'markdown', label: 'Markdown Export', desc: 'All posts as markdown files' },
-              { format: 'html', label: 'HTML Archive', desc: 'Self-contained HTML with all posts' },
+              { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data export' },
+              { format: 'markdown', label: 'Markdown Archive', desc: 'All posts as markdown files' },
             ].map(({ format, label, desc }) => (
               <a
                 key={format}
@@ -1010,139 +1048,49 @@ export default function SettingsPage() {
                 className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
               >
                 <div>
-                  <p className="font-medium">{label}</p>
-                  <p className="text-sm text-[var(--text-tertiary)]">{desc}</p>
+                  <p className="font-medium text-sm">{label}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
                 </div>
-                <Download size={18} className="text-[var(--text-tertiary)]" />
+                <Download size={16} className="text-[var(--text-tertiary)]" />
               </a>
             ))}
           </div>
         </section>
-
-
+        {/* 8. Account */}
         <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Shield size={20} className="text-[var(--accent)]" />
-            </div>
-            <h2 className="font-display text-lg">AI usage caps</h2>
-          </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-6">
-            Optional daily/monthly token caps per provider. Leave blank for unlimited.
-          </p>
-
-          <div className="grid gap-4">
-            {([
-              { id: 'openai', label: 'OpenAI' },
-              { id: 'groq', label: 'Groq' },
-            ] as const).map((provider) => (
-              <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-sm text-[var(--text-secondary)]">
-                    Daily cap (tokens)
-                    <input
-                      type="number"
-                      min={1}
-                      inputMode="numeric"
-                      value={(usageCaps as any)[provider.id].day}
-                      onChange={(event) =>
-                        setUsageCaps((prev) => ({
-                          ...prev,
-                          [provider.id]: {
-                            ...(prev as any)[provider.id],
-                            day: event.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Unlimited"
-                      className="input mt-2"
-                    />
-                  </label>
-                  <label className="text-sm text-[var(--text-secondary)]">
-                    Monthly cap (tokens)
-                    <input
-                      type="number"
-                      min={1}
-                      inputMode="numeric"
-                      value={(usageCaps as any)[provider.id].month}
-                      onChange={(event) =>
-                        setUsageCaps((prev) => ({
-                          ...prev,
-                          [provider.id]: {
-                            ...(prev as any)[provider.id],
-                            month: event.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Unlimited"
-                      className="input mt-2"
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
-
-            <div className="flex items-center justify-end">
-              <button
-                onClick={saveUsageCaps}
-                disabled={usageCapsSaving}
-                className="btn btn-secondary"
-              >
-                {usageCapsSaving ? 'Saving...' : 'Save caps'}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <AgenticApiKeysSection />
-
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--bg-primary)] flex items-center justify-center">
-              <Mail size={20} className="text-[var(--text-tertiary)]" />
+              <KeyRound size={20} className="text-[var(--accent)]" />
             </div>
             <h2 className="font-display text-lg">Account</h2>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={user?.email || ''}
-                disabled
-                className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)]"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={user?.email || ''}
+              disabled
+              className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)] opacity-60"
+            />
           </div>
         </section>
 
+        {/* 9. Danger Zone */}
         <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
-              <Shield size={20} className="text-[var(--error)]" />
+              <Trash2 size={20} className="text-[var(--error)]" />
             </div>
-            <h2 className="font-display text-lg">Danger Zone</h2>
-          </div>
-
-          <div className="flex items-start gap-3 mb-4">
-            <AlertTriangle size={20} className="text-[var(--error)] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-[var(--error)]">Delete Account</p>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">
-                This will permanently delete your account, all posts, comments, and data.
-                This action cannot be undone.
-              </p>
-            </div>
+            <h2 className="font-display text-lg text-[var(--error)]">Danger Zone</h2>
           </div>
 
           {!showDeleteConfirm ? (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="btn bg-[var(--error)] text-white hover:opacity-90"
+              className="btn bg-[var(--error)] text-white hover:opacity-90 btn-sm"
             >
               <Trash2 size={16} />
               Delete Account
@@ -1164,23 +1112,16 @@ export default function SettingsPage() {
                 <button
                   onClick={handleDeleteAccount}
                   disabled={deleteConfirmText !== profile?.username || deleting}
-                  className="btn bg-[var(--error)] text-white hover:opacity-90 disabled:opacity-50"
+                  className="btn bg-[var(--error)] text-white hover:opacity-90 disabled:opacity-50 btn-sm"
                 >
-                  {deleting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    'Permanently Delete'
-                  )}
+                  {deleting ? 'Deleting...' : 'Permanently Delete'}
                 </button>
                 <button
                   onClick={() => {
                     setShowDeleteConfirm(false)
                     setDeleteConfirmText('')
                   }}
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-sm"
                 >
                   Cancel
                 </button>

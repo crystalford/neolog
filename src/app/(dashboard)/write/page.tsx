@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { SyndicationOptions } from '@/components/SyndicationOptions'
 import dynamic from 'next/dynamic'
-import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink } from 'lucide-react'
+import { Loader2, Settings, X, CheckCircle2, ChevronDown, Upload, Calendar, Tag, Link2, Lock, Globe, ExternalLink, ChevronLeft } from 'lucide-react'
 
 const RichEditor = dynamic(
   () => import('@/components/RichEditor').then((mod) => mod.RichEditor),
@@ -529,13 +529,17 @@ export default function WritePage() {
   const publicationSlug = selectedPublication?.slug || profile?.username
 
   return (
-    <main className="min-h-screen bg-[var(--bg-primary)]">
+    <main className="min-h-screen bg-[var(--bg-primary)]" style={{ fontFamily: 'var(--font-sans)' }}>
       {/* Top bar */}
-      <div className="border-b border-[var(--border-medium)] bg-[var(--bg-primary)] sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="border-b border-[var(--border-light)] bg-[var(--bg-primary)]/80 backdrop-blur-xl sticky top-0 z-[100]">
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/workspace" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
-              {'<- Workspace'}
+            <Link 
+              href="/dashboard/workspace" 
+              className="p-2 -ml-2 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all"
+              title="Back to Workspace"
+            >
+              <ChevronLeft size={20} />
             </Link>
 
             {/* Publication selector */}
@@ -615,7 +619,7 @@ export default function WritePage() {
             <button
               onClick={handlePublish}
               disabled={publishing || !title || !content}
-              className="btn btn-primary flex items-center justify-center min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary btn-sm flex items-center justify-center min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {publishing ? (
                 <>
@@ -659,7 +663,7 @@ export default function WritePage() {
       )}
 
       {/* Main editor */}
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <input
           type="text"
           value={title}

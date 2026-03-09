@@ -211,6 +211,12 @@ export default async function PublicationPage({ params }: Props) {
                   {/* Distribution & Export Actions */}
                   <div className="flex flex-wrap gap-3 mt-5">
                     <Link
+                      href={`/${publication.slug}/log`}
+                      className="btn btn-sm btn-primary"
+                    >
+                      📋 The Log
+                    </Link>
+                    <Link
                       href={`/${publication.slug}/feed`}
                       className="btn btn-sm btn-secondary"
                       target="_blank"

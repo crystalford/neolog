@@ -180,19 +180,17 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-            MEASURE
-          </p>
-          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            Analytics
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Track performance across all your published posts
-          </p>
-        </div>
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
+      <div className="mb-8">
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          MEASURE
+        </p>
+        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+          Analytics
+        </h1>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          Track performance across all your published posts
+        </p>
       </div>
 
       {/* Overview Stats */}
