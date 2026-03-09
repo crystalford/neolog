@@ -43,7 +43,7 @@ export default function CapturesPage() {
 
   if (loading) {
     return (
-      <main className="px-8 py-10 max-w-4xl mx-auto">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-40 skeleton rounded" />
           <div className="h-24 skeleton rounded-2xl" />
@@ -54,14 +54,19 @@ export default function CapturesPage() {
   }
 
   return (
-    <main className="px-8 py-10 max-w-4xl mx-auto">
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       {captureModalOpen && (
         <QuickCaptureModal isOpen={captureModalOpen} onClose={() => setCaptureModalOpen(false)} />
       )}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-[var(--text-primary)]">Captures</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            RAW INPUT
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Captures
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
             Save raw ideas, links, quotes, and fragments. Everything starts here.
           </p>
         </div>

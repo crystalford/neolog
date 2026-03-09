@@ -157,7 +157,7 @@ export default function PublishedPage() {
 
   if (loading) {
     return (
-      <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="animate-pulse space-y-8">
           <div className="h-8 w-48 skeleton rounded" />
           <div className="grid grid-cols-4 gap-6">
@@ -176,11 +176,18 @@ export default function PublishedPage() {
   }
 
   return (
-    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
-      <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6">
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Published</h1>
-          <p className="text-base text-[var(--text-secondary)] mt-2">Published posts are an optional exposure state. Your workspace is where continuity lives.</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            PUBLISH
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Published
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            Published posts are an optional exposure state. Your workspace is where continuity lives.
+          </p>
         </div>
         <Link href="/dashboard/workspace" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
           View Drafts

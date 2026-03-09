@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Brain, Lightbulb, FolderOpen, Users, Target, HelpCircle,
-  Zap, CheckCircle2, AlertTriangle, BookOpen, Loader2,
+  Brain, Loader2,
   TrendingUp, ChevronDown, ChevronUp, Search, ArrowUpDown,
 } from 'lucide-react'
 
@@ -34,16 +33,16 @@ type EntityMention = {
 }
 
 const ENTITY_TYPES = [
-  { key: 'all', label: 'All', icon: Brain },
-  { key: 'project', label: 'Projects', icon: FolderOpen },
-  { key: 'idea', label: 'Ideas', icon: Lightbulb },
-  { key: 'person', label: 'People', icon: Users },
-  { key: 'goal', label: 'Goals', icon: Target },
-  { key: 'question', label: 'Questions', icon: HelpCircle },
-  { key: 'habit', label: 'Habits', icon: Zap },
-  { key: 'commitment', label: 'Commitments', icon: CheckCircle2 },
-  { key: 'skill', label: 'Skills', icon: BookOpen },
-  { key: 'blocker', label: 'Blockers', icon: AlertTriangle },
+  { key: 'all', label: 'All', emoji: '🧠' },
+  { key: 'project', label: 'Projects', emoji: '🏗' },
+  { key: 'idea', label: 'Ideas', emoji: '💡' },
+  { key: 'person', label: 'People', emoji: '🤝' },
+  { key: 'goal', label: 'Goals', emoji: '🚩' },
+  { key: 'question', label: 'Questions', emoji: '❓' },
+  { key: 'habit', label: 'Habits', emoji: '🔁' },
+  { key: 'commitment', label: 'Commitments', emoji: '🎯' },
+  { key: 'skill', label: 'Skills', emoji: '📖' },
+  { key: 'blocker', label: 'Blockers', emoji: '🚧' },
 ]
 
 export default function BrainPage() {
@@ -113,9 +112,9 @@ export default function BrainPage() {
     }
   }
 
-  const typeIcon = (type: string) => {
+  const typeEmoji = (type: string) => {
     const config = ENTITY_TYPES.find(t => t.key === type)
-    return config?.icon || Brain
+    return config?.emoji || '🧠'
   }
 
   const typeColor = (type: string) => {
@@ -188,7 +187,6 @@ export default function BrainPage() {
       {/* Type Tabs */}
       <div className="flex gap-1 mb-6 overflow-x-auto pb-1">
         {ENTITY_TYPES.map((type) => {
-          const Icon = type.icon
           const count = typeCounts[type.key] || 0
           const isActive = activeType === type.key
 
@@ -198,11 +196,11 @@ export default function BrainPage() {
               onClick={() => setActiveType(type.key)}
               className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                 isActive
-                  ? 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  ? 'bg-[var(--accent)]/10 text-[var(--text-primary)] border border-[var(--accent)]/30'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] bg-[var(--bg-card)] border border-[var(--border-medium)]'
               }`}
             >
-              <Icon size={13} />
+              <span className="text-sm mr-0.5">{type.emoji}</span>
               {type.label}
               {count > 0 && (
                 <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] ${
@@ -223,14 +221,14 @@ export default function BrainPage() {
         </div>
       ) : entities.length === 0 ? (
         <div className="text-center py-16 text-[var(--text-tertiary)]">
-          <Brain size={40} className="mx-auto mb-3 opacity-50" />
+          <span className="text-4xl mx-auto mb-3 opacity-50 block text-center">🧠</span>
           <p className="font-medium">No entities yet</p>
           <p className="text-sm mt-1">Upload and process recordings to start building your knowledge graph</p>
         </div>
       ) : (
         <div className="space-y-2">
           {entities.map((entity) => {
-            const Icon = typeIcon(entity.type)
+            const emoji = typeEmoji(entity.type)
             const isExpanded = expandedId === entity.id
 
             return (
@@ -242,7 +240,7 @@ export default function BrainPage() {
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors"
                   onClick={() => toggleExpand(entity.id)}
                 >
-                  <Icon size={16} className={typeColor(entity.type)} />
+                  <span className="text-lg flex-shrink-0" style={{ width: '24px', textAlign: 'center' }}>{emoji}</span>
 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">

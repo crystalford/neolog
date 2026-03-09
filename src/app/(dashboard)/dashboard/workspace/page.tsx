@@ -177,7 +177,7 @@ export default function WorkspacePage() {
 
   if (loading) {
     return (
-      <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="animate-pulse space-y-8">
           <div className="h-8 w-48 skeleton rounded" />
           <div className="h-12 skeleton rounded-2xl" />
@@ -192,11 +192,18 @@ export default function WorkspacePage() {
   }
 
   return (
-    <main className="px-8 py-10 max-w-5xl mx-auto animate-fade-up bg-gradient-to-b from-[var(--bg-primary)] to-[var(--bg-secondary)] min-h-screen">
-      <div className="flex items-center justify-between mb-10">
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)] tracking-tight">Workspace</h1>
-          <p className="text-base text-[var(--text-secondary)] mt-2">Active projects. Where creation happens.</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            PUBLISH
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Workspace
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            Active projects. Where creation happens.
+          </p>
         </div>
         <Link href="/write" className="btn btn-primary text-lg px-6 py-3 font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
           <Plus size={18} />
