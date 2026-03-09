@@ -301,7 +301,7 @@ export default function UploadsPage() {
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <Upload size={32} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
+        <span className="text-4xl mx-auto mb-3 opacity-70 block text-center">📤</span>
         <p className="text-[var(--text-primary)] font-medium mb-1">
           Drop video or audio files here
         </p>
@@ -385,7 +385,7 @@ export default function UploadsPage() {
         </div>
       ) : uploads.length === 0 && !hasActiveUploads ? (
         <div className="text-center py-16 text-[var(--text-tertiary)]">
-          <Video size={40} className="mx-auto mb-3 opacity-50" />
+          <span className="text-4xl mx-auto mb-3 opacity-50 block text-center">🎬</span>
           <p className="font-medium">No uploads yet</p>
           <p className="text-sm mt-1">Upload a video to get started</p>
         </div>

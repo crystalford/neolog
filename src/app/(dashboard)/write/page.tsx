@@ -534,8 +534,8 @@ export default function WritePage() {
       <div className="border-b border-[var(--border-medium)] bg-[var(--bg-primary)] sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
-              {'<- All posts'}
+            <Link href="/dashboard/workspace" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+              {'<- Workspace'}
             </Link>
 
             {/* Publication selector */}
@@ -557,10 +557,10 @@ export default function WritePage() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-0 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" />
                 </>
               ) : (
-                <span className="text-sm text-gray-600">{publications[0]?.name || 'Publication'}</span>
+                <span className="text-sm text-[var(--text-secondary)]">{publications[0]?.name || 'Publication'}</span>
               )}
             </div>
           </div>
@@ -568,13 +568,13 @@ export default function WritePage() {
           <div className="flex items-center gap-3">
             {/* Save status */}
             {saving && (
-              <span className="flex items-center gap-2 text-sm text-gray-500">
+              <span className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <Loader2 size={14} className="animate-spin" />
                 Saving...
               </span>
             )}
             {!saving && lastSaved && (
-              <span className="flex items-center gap-2 text-sm text-green-600">
+              <span className="flex items-center gap-2 text-sm text-[var(--success)]">
                 <CheckCircle2 size={14} />
                 Saved
               </span>
@@ -586,7 +586,7 @@ export default function WritePage() {
                 href={`/${publicationSlug}/${slug || generateSlug(title)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                className="text-sm text-[var(--accent)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors"
               >
                 View post
                 <ExternalLink size={14} />
@@ -596,7 +596,7 @@ export default function WritePage() {
             {/* Import HTML button */}
             <button
               onClick={() => setShowImport(true)}
-              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors"
             >
               <Upload size={16} />
               Import HTML
@@ -605,17 +605,17 @@ export default function WritePage() {
             {/* Settings button */}
             <button
               onClick={() => setShowSettings(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-[var(--bg-secondary)] rounded-lg transition-colors"
               title="Post settings"
             >
-              <Settings size={20} className="text-gray-600" />
+              <Settings size={20} className="text-[var(--text-secondary)]" />
             </button>
 
             {/* Publish button */}
             <button
               onClick={handlePublish}
               disabled={publishing || !title || !content}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary flex items-center justify-center min-w-[100px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {publishing ? (
                 <>
@@ -659,7 +659,7 @@ export default function WritePage() {
       )}
 
       {/* Main editor */}
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-6 py-12">
         <input
           type="text"
           value={title}

@@ -50,7 +50,7 @@ export default async function TimelinePage() {
 
       {Object.keys(grouped).length === 0 ? (
         <div className="text-center py-20 text-[var(--text-tertiary)]">
-          <CalendarDays size={40} className="mx-auto mb-4 opacity-30" />
+          <span className="text-4xl mx-auto mb-4 opacity-50 block text-center">🗓️</span>
           <p className="text-lg font-medium mb-2">No sessions yet</p>
           <p className="text-sm">Upload a video or audio file to start building your timeline.</p>
           <Link href="/dashboard/uploads" className="mt-6 btn btn-primary btn-sm inline-flex">

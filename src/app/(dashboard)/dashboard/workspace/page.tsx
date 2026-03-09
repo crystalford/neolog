@@ -312,7 +312,7 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
-              <PenLine size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <span className="text-4xl mx-auto mb-4 opacity-70 block text-center">✍️</span>
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 {search ? 'No matches found' : 'No drafts yet'}
               </h2>
@@ -376,7 +376,7 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
-              <Calendar size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <span className="text-4xl mx-auto mb-4 opacity-70 block text-center">📅</span>
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 No scheduled posts yet
               </h2>
@@ -428,7 +428,7 @@ export default function WorkspacePage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-16 text-center shadow">
-              <Layers size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+              <span className="text-4xl mx-auto mb-4 opacity-70 block text-center">📚</span>
               <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
                 No stacks yet
               </h2>
@@ -447,7 +447,7 @@ export default function WorkspacePage() {
       {/* Topics Tab */}
       {activeTab === 'topics' && (
         <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-primary)]/80 p-12 text-center shadow">
-          <Hash size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+          <span className="text-4xl mx-auto mb-4 opacity-70 block text-center">🏷️</span>
           <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
             Manage Topics
           </h2>

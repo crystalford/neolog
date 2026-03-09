@@ -77,7 +77,7 @@ export default function SessionsPage() {
         </div>
       ) : sessions.length === 0 ? (
         <div className="text-center py-16 text-[var(--text-tertiary)]">
-          <Layers size={40} className="mx-auto mb-3 opacity-50" />
+          <span className="text-4xl mx-auto mb-3 opacity-50 block text-center">🎞️</span>
           <p className="font-medium">No sessions yet</p>
           <p className="text-sm mt-1 mb-6">Create a session to group clips for AI synthesis</p>
           <button onClick={handleCreate} className="btn btn-primary btn-sm">

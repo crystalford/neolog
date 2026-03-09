@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="animate-pulse">
           <div className="h-8 bg-[var(--bg-secondary)] rounded w-64 mb-8"></div>
           <div className="grid md:grid-cols-4 gap-6 mb-12">
@@ -139,9 +139,9 @@ export default function AnalyticsPage() {
 
   if (!user) {
     return (
-      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="text-center py-16">
-          <BarChart3 size={64} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <span className="text-6xl mx-auto mb-4 opacity-70 block text-center">📊</span>
           <h2 className="font-display text-2xl mb-2">Sign in to view analytics</h2>
           <p className="text-[var(--text-secondary)]">Track your post performance and reader engagement</p>
         </div>
@@ -151,10 +151,22 @@ export default function AnalyticsPage() {
 
   if (posts.length === 0) {
     return (
-      <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
-        <h1 className="font-display text-4xl mb-8">Analytics</h1>
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+              MEASURE
+            </p>
+            <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+              Analytics
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Track performance across all your published posts
+            </p>
+          </div>
+        </div>
         <div className="text-center py-16 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-secondary)]">
-          <BarChart3 size={64} className="mx-auto mb-4 text-[var(--text-tertiary)]" />
+          <span className="text-6xl mx-auto mb-4 opacity-70 block text-center">📈</span>
           <h2 className="font-display text-2xl mb-2">No published posts yet</h2>
           <p className="text-[var(--text-secondary)] mb-6">
             Publish your first post to start tracking analytics
@@ -168,12 +180,19 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="font-display text-4xl mb-2">Analytics</h1>
-        <p className="text-[var(--text-secondary)]">
-          Track performance across all your published posts
-        </p>
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            MEASURE
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Analytics
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            Track performance across all your published posts
+          </p>
+        </div>
       </div>
 
       {/* Overview Stats */}
