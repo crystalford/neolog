@@ -26,7 +26,7 @@ export default function DailyLogPage() {
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
 
   return (
-    <div style={{ maxWidth: '760px', margin: '0 auto', padding: '2.5rem 2rem', fontFamily: 'var(--font-sans)' }}>
+    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
 
       {/* Date / session label */}
       <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>

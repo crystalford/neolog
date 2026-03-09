@@ -150,7 +150,7 @@ export default function BrainPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-display font-bold text-[var(--text-primary)] mb-2 flex items-center gap-3">

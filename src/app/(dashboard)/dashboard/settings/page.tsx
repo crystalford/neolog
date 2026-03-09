@@ -663,7 +663,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="px-6 lg:px-12 py-10 max-w-6xl mx-auto">
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="mb-10">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
           Publisher settings

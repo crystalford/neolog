@@ -23,7 +23,7 @@ const MOCK_POSTS = [
 
 export default function PostQueuePage() {
   return (
-    <div className="px-6 py-8 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Post Queue</h1>
         <p className="text-[var(--text-secondary)] mt-1">

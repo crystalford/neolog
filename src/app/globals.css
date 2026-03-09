@@ -550,18 +550,15 @@ svg.lucide[class*="text-[var(--text-secondary)]"] {
 .input {
   width: 100%;
   padding: 0.625rem 0.875rem;
-  /* Slightly tighter */
   font-family: var(--font-body);
   font-size: 0.9375rem;
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background: var(--bg-card);
   border: 1px solid var(--border-medium);
-  border-radius: 0.25rem;
-  /* 4px - Match buttons */
+  border-radius: 0.375rem;
   transition: all var(--transition-fast);
   outline: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  /* Subtle depth */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .input-with-icon {

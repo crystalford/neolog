@@ -54,9 +54,9 @@ export default function LoginPage() {
 
   return (
     <div className="animate-fade-up">
-      <div className="text-center mb-10">
-        <h1 className="font-display text-3xl mb-2">Welcome back</h1>
-        <p className="text-[var(--text-secondary)]">Sign in to continue writing</p>
+      <div className="text-center mb-8">
+        <h1 className="font-serif text-4xl font-normal mb-2 text-[var(--text-primary)] tracking-tight">Welcome back</h1>
+        <p className="text-[var(--text-secondary)] text-sm">Sign in to your living map</p>
       </div>
 
       {error && (
@@ -138,9 +138,9 @@ export default function LoginPage() {
         </button>
       </div>
 
-      <p className="mt-10 text-center text-sm text-[var(--text-secondary)]">
+      <p className="mt-8 text-center text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors">
         Don't have an account?{' '}
-        <Link href="/signup" className="text-[var(--accent)] hover:underline font-medium">
+        <Link href="/signup" className="text-[var(--text-primary)] font-medium border-b border-[var(--border-medium)] pb-0.5 hover:border-[var(--text-primary)] transition-colors">
           Sign up free
         </Link>
       </p>

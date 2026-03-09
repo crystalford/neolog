@@ -36,7 +36,7 @@ export default async function TimelinePage() {
   }
 
   return (
-    <div className="px-6 py-8 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Timeline</h1>
         <p className="text-[var(--text-secondary)] mt-1">A chronological log of every session and what was extracted.</p>

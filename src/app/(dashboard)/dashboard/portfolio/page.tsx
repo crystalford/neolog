@@ -26,7 +26,7 @@ export default async function PortfolioPage() {
   const name = profile?.display_name || profile?.username || 'You'
 
   return (
-    <div className="px-6 py-8 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Portfolio</h1>

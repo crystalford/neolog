@@ -513,9 +513,7 @@ export default function WritePage() {
     )
   }
 
-  if (publications.length === 0) {
-    return (
-      <main className="px-6 py-10 max-w-4xl mx-auto">
+      <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Create a Publication First</h1>
           <p className="text-gray-600 mb-6">
@@ -526,8 +524,6 @@ export default function WritePage() {
           </Link>
         </div>
       </main>
-    )
-  }
 
   const selectedPublication = publications.find((pub) => pub.id === publicationId)
   const publicationSlug = selectedPublication?.slug || profile?.username
