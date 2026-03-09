@@ -312,7 +312,7 @@ export default function DashboardLayout({
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                     }`}
                   >
                     <Icon size={14} className="flex-shrink-0" />
@@ -324,7 +324,7 @@ export default function DashboardLayout({
           </div>
 
           {/* INTELLIGENCE */}
-          <div className="mt-3 pt-3 border-t border-[var(--border-light)]/50">
+          <div className="mt-4">
             <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1 font-semibold opacity-60">Intelligence</p>
             <div className="space-y-0.5">
               {secondaryNav.map((link) => {
@@ -335,7 +335,7 @@ export default function DashboardLayout({
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                     }`}
                   >
                     <Icon size={14} className="flex-shrink-0" />
@@ -347,7 +347,7 @@ export default function DashboardLayout({
           </div>
 
           {/* PUBLISH */}
-          <div className="mt-3 pt-3 border-t border-[var(--border-light)]/50">
+          <div className="mt-4">
             <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1 font-semibold opacity-60">Publish</p>
             <div className="space-y-0.5">
               {growNav.map((link) => {
@@ -358,7 +358,7 @@ export default function DashboardLayout({
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                       isActive
                         ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                        : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                     }`}
                   >
                     <Icon size={14} className="flex-shrink-0" />
@@ -370,13 +370,13 @@ export default function DashboardLayout({
           </div>
 
           {/* Settings — bottom of nav */}
-          <div className="mt-3 pt-3 border-t border-[var(--border-light)]/50">
+          <div className="mt-4">
             <div className="space-y-0.5">
               <Link href="/analytics"
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname.startsWith('/analytics')
                     ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                 }`}
               >
                 <BarChart3 size={14} className="flex-shrink-0" />
@@ -386,7 +386,7 @@ export default function DashboardLayout({
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === '/dashboard/settings'
                     ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                 }`}
               >
                 <Settings size={14} className="flex-shrink-0" />

@@ -29,8 +29,15 @@ export default async function PortfolioPage() {
     <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Portfolio</h1>
-          <p className="text-[var(--text-secondary)] mt-1">Auto-generated from your logs. Updated with each upload.</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            NARRATIVE ENGINE
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Portfolio
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+            Auto-generated from your logs. Updated with each upload.
+          </p>
         </div>
         <button className="btn btn-secondary btn-sm flex items-center gap-2">
           <Sparkles size={14} />

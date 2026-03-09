@@ -99,7 +99,7 @@ export const processUpload = inngest.createFunction(
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = context
 
-      // Audio-only files don't need extraction
+      // Audio-only or text files don't need extraction
       if (!isVideoMimeType(upload.mime_type)) {
         return { path: upload.storage_path, extracted: false }
       }
@@ -186,10 +186,17 @@ export const processUpload = inngest.createFunction(
         .from('videos')
         .download(storagePath)
 
-      if (downloadError || !fileData) throw new Error('Failed to download audio from storage')
+      if (downloadError || !fileData) throw new Error('Failed to download file from storage')
 
       const arrayBuffer = await fileData.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
+
+      // If it's a text file, skip transcription and return its content
+      if (context.upload.mime_type === 'text/plain') {
+        const textContent = buffer.toString('utf-8')
+        return { text: textContent, segments: [], language: null, duration: null }
+      }
+
       const ext = getAudioExtension(mimeType)
       const openai = new OpenAI({ apiKey: context.openaiKey })
 

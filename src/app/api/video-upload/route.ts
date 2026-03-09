@@ -6,6 +6,7 @@ import { inngest } from '@/inngest/client'
 const VALID_TYPES = [
   'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska',
   'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/x-m4a',
+  'text/plain',
 ]
 
 /**

@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { Upload, Send, ArrowUpRight } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import { Upload, Send, ArrowUpRight, Loader2, CheckCircle2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import * as tus from 'tus-js-client'
 
 const mockExtractions = [
   { emoji: '💡', name: 'AI documentary idea', type: 'Idea', time: '12m ago' },
@@ -20,7 +22,96 @@ const days = [
 export default function DailyLogPage() {
   const [input, setInput] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const startTusUpload = useCallback(async (file: File) => {
+    setIsUploading(true)
+    setUploadProgress(0)
+    setUploadSuccess(false)
+    
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      setIsUploading(false)
+      return
+    }
+
+    const timestamp = Date.now()
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const projectId = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
+
+    const tusUpload = new tus.Upload(file, {
+      endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        'x-upsert': 'true',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName: 'videos',
+        objectName: storagePath,
+        contentType: file.type || 'text/plain',
+        cacheControl: '86400',
+      },
+      chunkSize: 6 * 1024 * 1024,
+      onError: (error) => {
+        console.error('TUS upload error:', error)
+        setIsUploading(false)
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const progress = Math.round((bytesUploaded / bytesTotal) * 100)
+        setUploadProgress(progress)
+      },
+      onSuccess: async () => {
+        try {
+          // Register with backend -> creates DB record + fires Inngest
+          await fetch('/api/video-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storage_path: storagePath,
+              file_name: file.name,
+              file_size_bytes: file.size,
+              mime_type: file.type || 'text/plain',
+            }),
+          })
+          setUploadSuccess(true)
+          setTimeout(() => setUploadSuccess(false), 3000)
+        } catch (err) {
+          console.error('Failed to register upload:', err)
+        } finally {
+          setIsUploading(false)
+        }
+      },
+    })
+
+    tusUpload.findPreviousUploads().then(previous => {
+      if (previous.length) tusUpload.resumeFromPreviousUpload(previous[0])
+      tusUpload.start()
+    })
+  }, [])
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    if (fileArray.length > 0) {
+      startTusUpload(fileArray[0]) // Only take the first one for simplicity in the log page
+    }
+  }, [startTusUpload])
+
+  const handleTextSubmit = () => {
+    if (!input.trim()) return
+    const file = new File([input], 'text_log.txt', { type: 'text/plain' })
+    startTusUpload(file)
+    setInput('')
+  }
 
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
@@ -40,7 +131,7 @@ export default function DailyLogPage() {
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false) }}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
         style={{
           position: 'relative',
           background: dragging ? 'rgba(124,106,245,0.06)' : 'rgba(13,13,22,0.7)',
@@ -88,22 +179,23 @@ export default function DailyLogPage() {
                 {mode}
               </button>
             ))}
-            <input ref={fileRef} type="file" accept="video/*,audio/*" style={{ display: 'none' }} />
+            <input ref={fileRef} type="file" accept="video/*,audio/*,text/plain" onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }} style={{ display: 'none' }} />
           </div>
           <button
-            disabled={!input.trim()}
+            onClick={handleTextSubmit}
+            disabled={!input.trim() || isUploading}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: '30px', height: '30px', borderRadius: '6px',
-              background: input.trim() ? 'var(--accent)' : 'transparent',
-              border: `1px solid ${input.trim() ? 'transparent' : 'var(--border-light)'}`,
-              color: input.trim() ? '#fff' : 'var(--text-tertiary)',
-              cursor: input.trim() ? 'pointer' : 'default',
+              background: isUploading ? 'transparent' : input.trim() ? 'var(--accent)' : 'transparent',
+              border: `1px solid ${input.trim() || isUploading ? 'transparent' : 'var(--border-light)'}`,
+              color: isUploading ? 'var(--accent)' : input.trim() ? '#fff' : 'var(--text-tertiary)',
+              cursor: input.trim() && !isUploading ? 'pointer' : 'default',
               transition: 'all 0.2s',
               flexShrink: 0,
             }}
           >
-            <Send size={13} />
+            {isUploading ? <Loader2 size={13} className="animate-spin" /> : uploadSuccess ? <CheckCircle2 size={13} className="text-green-500" /> : <Send size={13} />}
           </button>
         </div>
       </div>

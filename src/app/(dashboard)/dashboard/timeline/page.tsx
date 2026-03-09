@@ -37,10 +37,16 @@ export default async function TimelinePage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Timeline</h1>
-        <p className="text-[var(--text-secondary)] mt-1">A chronological log of every session and what was extracted.</p>
-      </div>
+      {/* Date / session label (static for Timeline overview) */}
+      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+        ALL TIME · CHRONOLOGICAL
+      </p>
+      <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+        Timeline
+      </h1>
+      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+        A chronological log of every session and what was extracted.
+      </p>
 
       {Object.keys(grouped).length === 0 ? (
         <div className="text-center py-20 text-[var(--text-tertiary)]">

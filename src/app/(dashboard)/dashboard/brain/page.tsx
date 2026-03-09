@@ -153,11 +153,13 @@ export default function BrainPage() {
     <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-display font-bold text-[var(--text-primary)] mb-2 flex items-center gap-3">
-          <Brain size={28} className="text-[var(--accent)]" />
-          Brain
-        </h2>
-        <p className="text-[var(--text-secondary)]">
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          GRAPH INTELLIGENCE
+        </p>
+        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+          Entities
+        </h1>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
           Your accumulated intelligence across all recordings. Every idea, project, person, and question — tracked and growing over time.
         </p>
       </div>

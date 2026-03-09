@@ -665,12 +665,14 @@ export default function SettingsPage() {
   return (
     <main className="max-w-4xl mx-auto px-6 py-8 md:py-12">
       <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-          Publisher settings
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+          PUBLISHER PREFERENCES
         </p>
-        <h1 className="font-display text-3xl">Settings</h1>
-        <p className="text-[var(--text-secondary)] mt-2 max-w-2xl">
-          Manage your profile, notifications, and exports for your publication.
+        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+          Settings
+        </h1>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          Manage your profile, integrations, and preferences.
         </p>
       </div>
 

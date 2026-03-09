@@ -270,10 +270,13 @@ export default function UploadsPage() {
       {/* Header */}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-display font-bold text-[var(--text-primary)] mb-2">
-            Video Uploads
-          </h2>
-          <p className="text-[var(--text-secondary)]">
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+            MANAGE MEDIA
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+            Uploads
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
             Upload raw video or audio recordings. Neolog transcribes, analyzes, and extracts ideas, projects, and content.
           </p>
         </div>
