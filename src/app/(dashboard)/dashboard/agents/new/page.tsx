@@ -151,7 +151,6 @@ export default function NewAgentPage() {
                                 <>
                                     <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
                                     <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                                    <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
                                 </>
                             )}
                         </select>
