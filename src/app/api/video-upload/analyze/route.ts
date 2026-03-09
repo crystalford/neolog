@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     } else if (anthropicKey) {
       const anthropic = new Anthropic({ apiKey: anthropicKey.key })
       const message = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-7-sonnet-20250219',
         max_tokens: 4096,
         system: ANALYSIS_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],

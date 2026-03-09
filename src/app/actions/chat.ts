@@ -90,7 +90,7 @@ FORMAT:
         } else if (keys.anthropic) {
             const anthropic = new Anthropic({ apiKey: keys.anthropic })
             const message = await anthropic.messages.create({
-                model: 'claude-3-5-sonnet-20241022',
+                model: 'claude-3-7-sonnet-20250219',
                 max_tokens: 4096,
                 system: systemPrompt,
                 messages: history.map(h => ({ role: h.role, content: h.content })),

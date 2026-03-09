@@ -175,7 +175,7 @@ ${clipSummaries}`
       if (anthropicKey) {
         const anthropic = new Anthropic({ apiKey: anthropicKey })
         const response = await anthropic.messages.create({
-          model: 'claude-opus-4-6',
+          model: 'claude-opus-4-5',
           max_tokens: 8192,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -216,7 +216,7 @@ ${clipSummaries}`
       await admin.from('clip_sessions').update({
         status: 'synthesized',
         synthesis: result.synthesis,
-        synthesis_model: context.anthropicKey ? 'claude-opus-4-6' : 'gpt-4o',
+        synthesis_model: context.anthropicKey ? 'claude-opus-4-5' : 'gpt-4o',
         edit_plans: result.edit_plans,
         total_duration_seconds: totalDuration,
         processed_at: new Date().toISOString(),
