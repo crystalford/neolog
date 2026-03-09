@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { decryptApiKey } from '@/lib/encryption'
+import { getActiveIntegrationKey } from '@/lib/integrations'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -38,20 +38,19 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
 
         const agentList = agents?.map(a => `- ${a.name}: ${a.description} (${a.model_provider})`).join('\n') || 'No custom agents configured.'
 
-        // 3. Get API keys
-        const { data: apiKeys, error: keysError } = await supabase
-            .from('user_api_keys')
-            .select('*')
-            .eq('user_id', user.id)
+        // 3. Get API keys from modern integration system
+        const [openaiKey, anthropicKey] = await Promise.all([
+            getActiveIntegrationKey(user.id, 'openai'),
+            getActiveIntegrationKey(user.id, 'anthropic')
+        ])
 
-        if (keysError || !apiKeys || apiKeys.length === 0) {
-            return { success: false, error: 'NO_API_KEYS' }
+        const keys: Record<string, string> = {
+            openai: openaiKey || '',
+            anthropic: anthropicKey || ''
         }
 
-        // Map keys
-        const keys: Record<string, string> = {}
-        for (const key of apiKeys) {
-            keys[key.provider] = decryptApiKey(key.encrypted_key)
+        if (!keys.openai && !keys.anthropic) {
+            return { success: false, error: 'NO_API_KEYS' }
         }
 
         // 4. Construct System Prompt

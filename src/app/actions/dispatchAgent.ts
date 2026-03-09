@@ -1,8 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getActiveIntegrationKey } from '@/lib/integrations'
 import { searchWithTavily, formatSearchResults } from '@/lib/tavily'
-import { decryptApiKey } from '@/lib/encryption'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -39,31 +39,28 @@ export async function dispatchAgent(agentId: string): Promise<DispatchAgentResul
             return { success: false, error: 'Agent not found' }
         }
 
-        // 3. Get user's API keys
-        const { data: apiKeys, error: keysError } = await supabase
-            .from('user_api_keys')
-            .select('*')
-            .eq('user_id', user.id)
+        // 3. Get user's API keys from modern integration system
+        const [openaiKey, anthropicKey, tavilyKey] = await Promise.all([
+            getActiveIntegrationKey(user.id, 'openai'),
+            getActiveIntegrationKey(user.id, 'anthropic'),
+            getActiveIntegrationKey(user.id, 'tavily')
+        ])
 
-        if (keysError || !apiKeys || apiKeys.length === 0) {
-            return { success: false, error: 'No API keys found. Please add your keys in settings.' }
-        }
-
-        // Map keys by provider
-        const keys: Record<string, string> = {}
-        for (const key of apiKeys) {
-            keys[key.provider] = decryptApiKey(key.encrypted_key)
+        const keys: Record<string, string> = {
+            openai: openaiKey || '',
+            anthropic: anthropicKey || '',
+            tavily: tavilyKey || '',
         }
 
         // Validate required keys
         if (!keys.tavily) {
-            return { success: false, error: 'Tavily API key required for research' }
+            return { success: false, error: 'Tavily API key required for research. Add it in Settings > Integrations.' }
         }
         if (agent.model_provider === 'openai' && !keys.openai) {
-            return { success: false, error: 'OpenAI API key required' }
+            return { success: false, error: 'OpenAI API key required. Add it in Settings > Integrations.' }
         }
         if (agent.model_provider === 'anthropic' && !keys.anthropic) {
-            return { success: false, error: 'Anthropic API key required' }
+            return { success: false, error: 'Anthropic API key required. Add it in Settings > Integrations.' }
         }
 
         // 4. Create agent run record

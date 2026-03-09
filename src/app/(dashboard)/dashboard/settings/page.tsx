@@ -8,9 +8,8 @@ import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
   KeyRound,
-  AlertTriangle
+  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert
 } from 'lucide-react'
-import { AgenticApiKeysSection } from '@/components/AgenticApiKeysSection'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -648,158 +647,439 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
-      <div className="mb-10">
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
+    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
+      <div className="mb-12">
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.15em', color: 'var(--text-tertiary)', marginBottom: '0.75rem', fontWeight: 600 }}>
           CONTROL ROOM
         </p>
-        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 300, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
           Settings
         </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '600px' }}>
-          Configure your AI assistant, manage your profile, and control your data.
+        <p className="text-sm text-[var(--text-secondary)] max-w-xl leading-relaxed">
+          Configure your intelligence layer, manage your global persona, and control your sovereign data.
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 text-sm text-[var(--error)]">
+        <div className="mb-8 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-sm text-red-500 flex items-center gap-3">
+          <AlertTriangle size={18} />
           {error}
         </div>
       )}
       {success && (
-        <div className="mb-6 p-4 rounded-xl border border-[var(--success)]/30 bg-[var(--success)]/10 text-sm text-[var(--success)]">
+        <div className="mb-8 p-4 rounded-xl border border-[var(--success)]/20 bg-[var(--success)]/5 text-sm text-[var(--success)] flex items-center gap-3">
+          <Check size={18} />
           {success}
         </div>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-12">
         {/* 1. Assistant Persona & Memory */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+        <section>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Globe size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Globe size={20} strokeWidth={1.5} />
             </div>
-            <h2 className="font-display text-lg">Assistant Persona & Memory</h2>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Assistant Persona & Memory</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Prime your intelligence layer with your style and preferences.</p>
+            </div>
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-4">
-            This context primes your AI assistant for any conversations and helps it understand your style, preferences, and facts.
-          </p>
-          <textarea
-            value={formData.context_md}
-            onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
-            placeholder="e.g. My tone is concise, data-first, skeptical of hype."
-            className="input min-h-[160px] font-mono text-sm leading-relaxed"
-            style={{ background: 'rgba(0,0,0,0.1)' }}
-          />
+          
+          <div className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--accent)] to-violet-500 rounded-2xl blur opacity-[0.03] group-focus-within:opacity-10 transition duration-500"></div>
+            <textarea
+              value={formData.context_md}
+              onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
+              placeholder="e.g. My tone is concise, data-first, skeptical of hype. I am a software engineer focused on agentic coding."
+              className="relative w-full min-h-[180px] p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] outline-none font-mono text-sm leading-relaxed transition-all resize-y"
+              style={{ background: 'rgba(13,13,22,0.4)', backdropFilter: 'blur(12px)' }}
+            />
+          </div>
         </section>
 
-        {/* 2. API Keys */}
-        <AgenticApiKeysSection />
 
-        {/* 3. AI Usage Caps */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+        {/* 2. Integrations (BYOK) */}
+        <section>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Shield size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Link2 size={20} strokeWidth={1.5} />
             </div>
-            <h2 className="font-display text-lg">AI usage caps</h2>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Intelligence Integrations (BYOK)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Plug in your own model keys for maximum control and lower costs.</p>
+            </div>
           </div>
-          <p className="text-sm text-[var(--text-secondary)] mb-6">
-            Set daily/monthly token limits to control costs. Leave blank for unlimited.
-          </p>
 
           <div className="grid gap-4">
-            {([
-              { id: 'openai', label: 'OpenAI' },
-              { id: 'anthropic', label: 'Anthropic (Claude)' },
-              { id: 'groq', label: 'Groq (Speed)' },
-            ] as const).map((provider) => (
-              <div key={provider.id} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4">
-                <p className="text-sm font-medium text-[var(--text-primary)] mb-3">{provider.label}</p>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-sm text-[var(--text-secondary)]">
-                    Daily cap
-                    <input
-                      type="number"
-                      value={(usageCaps as any)[provider.id].day}
-                      onChange={(event) =>
-                        setUsageCaps((prev) => ({
-                          ...prev,
-                          [provider.id]: {
-                            ...(prev as any)[provider.id],
-                            day: event.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Unlimited"
-                      className="input mt-2"
-                    />
-                  </label>
-                  <label className="text-sm text-[var(--text-secondary)]">
-                    Monthly cap
-                    <input
-                      type="number"
-                      value={(usageCaps as any)[provider.id].month}
-                      onChange={(event) =>
-                        setUsageCaps((prev) => ({
-                          ...prev,
-                          [provider.id]: {
-                            ...(prev as any)[provider.id],
-                            month: event.target.value,
-                          },
-                        }))
-                      }
-                      placeholder="Unlimited"
-                      className="input mt-2"
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
+            {aiProviders.map((provider) => {
+              const keys = getProviderKeys(provider.id)
+              const draft = integrationDrafts[provider.id] || ''
+              const label = integrationLabels[provider.id] || ''
+              const hint = getIntegrationHint(provider.id, draft)
 
-            <div className="flex items-center justify-end">
+              return (
+                <div key={provider.id} className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] transition-all hover:border-[var(--border-medium)]" style={{ background: 'rgba(13,13,22,0.2)' }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{provider.label}</span>
+                      {isConnected(provider.id) && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-wider">
+                          <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                          Active
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {keys.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {keys.map((k) => (
+                        <div key={k.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--border-light)] text-[10px] font-mono">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[var(--text-secondary)] opacity-60">••••{k.label ? ` [${k.label}]` : ''}</span>
+                            {!k.is_active && (
+                              <button
+                                onClick={() => setActiveIntegration(k.id)}
+                                className="text-[var(--accent)] hover:opacity-80 font-bold uppercase tracking-widest"
+                              >
+                                Activate
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => deleteIntegration(k.id)}
+                            className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors uppercase font-bold tracking-widest"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!isConnected(provider.id) && (
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={draft}
+                          onChange={(e) => setIntegrationDrafts({ ...integrationDrafts, [provider.id]: e.target.value })}
+                          placeholder={`Enter ${provider.label} API Key...`}
+                          className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                        />
+                        <button
+                          onClick={() => saveIntegration(provider.id)}
+                          disabled={integrationSaving === provider.id || !draft}
+                          className="px-5 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-30 transition-all"
+                        >
+                          {integrationSaving === provider.id ? '...' : 'Connect'}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => setIntegrationLabels({ ...integrationLabels, [provider.id]: e.target.value })}
+                        placeholder="Key Label (e.g. Personal)"
+                        className="w-full px-4 py-1.5 rounded-lg bg-transparent border border-[var(--border-light)]/40 text-[10px] font-mono opacity-50 focus:opacity-100 outline-none transition-all"
+                      />
+                      {hint && (
+                        <p className={`text-[10px] ${hint.tone === 'error' ? 'text-red-500' : 'text-amber-500'} font-mono uppercase tracking-tight`}>
+                          [{hint.tone}] {hint.text}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* 3. Sovereign Storage */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <ShieldAlert size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Sovereign Storage (R2/S3)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Your files, your bucket. Total data sovereignty.</p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Provider</label>
+                <select
+                  value={storageConfig.provider}
+                  onChange={(e) => setStorageConfig({ ...storageConfig, provider: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all appearance-none"
+                >
+                  <option value="r2">Cloudflare R2</option>
+                  <option value="s3">AWS S3</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Bucket Name</label>
+                <input
+                  type="text"
+                  value={storageConfig.bucket}
+                  onChange={(e) => setStorageConfig({ ...storageConfig, bucket: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  placeholder="my-neolog-assets"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Access Key ID</label>
+              <input
+                type="text"
+                value={storageConfig.access_key_id}
+                onChange={(e) => setStorageConfig({ ...storageConfig, access_key_id: e.target.value })}
+                className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                placeholder="xxxxxx"
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Region</label>
+                <input
+                  type="text"
+                  value={storageConfig.region}
+                  onChange={(e) => setStorageConfig({ ...storageConfig, region: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  placeholder="auto"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Endpoint (Required for R2)</label>
+                <input
+                  type="text"
+                  value={storageConfig.endpoint}
+                  onChange={(e) => setStorageConfig({ ...storageConfig, endpoint: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Public Base URL (CDN)</label>
+              <input
+                type="text"
+                value={storageConfig.public_base_url}
+                onChange={(e) => setStorageConfig({ ...storageConfig, public_base_url: e.target.value })}
+                className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="flex justify-end pt-4">
               <button
-                onClick={saveUsageCaps}
-                disabled={usageCapsSaving}
-                className="btn btn-secondary btn-sm"
+                onClick={saveStorage}
+                disabled={storageSaving}
+                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 transition-all"
               >
-                {usageCapsSaving ? 'Saving...' : 'Save AI caps'}
+                {storageSaving ? 'Saving...' : 'Save Storage Configuration'}
               </button>
             </div>
           </div>
         </section>
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+
+        {/* 4. Automation API Keys */}
+        <section>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <User size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <SettingsIcon size={20} strokeWidth={1.5} />
             </div>
-            <h2 className="font-display text-lg">Profile</h2>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Automation API Keys</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Securely bridge Neolog with external platforms like n8n or Zapier.</p>
+            </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={apiKeyLabel}
+                onChange={(e) => setApiKeyLabel(e.target.value)}
+                placeholder="Key Description (e.g. n8n workflow)"
+                className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+              />
+              <button
+                onClick={createApiKey}
+                disabled={apiKeySaving || !apiKeyLabel.trim()}
+                className="px-5 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-30 transition-all"
+              >
+                {apiKeySaving ? '...' : 'Generate'}
+              </button>
+            </div>
+
+            {apiKeyCreated && (
+              <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/90 text-xs font-mono leading-relaxed">
+                <p className="font-bold uppercase tracking-widest mb-3 text-amber-500 flex items-center gap-2">
+                  <Shield size={14} /> Secret Key Generated
+                </p>
+                <p className="mb-4 text-[var(--text-tertiary)]">Copy this key now. It will not be visible again once you leave this page.</p>
+                <div className="relative group">
+                  <code className="block p-4 bg-black/40 rounded-xl border border-white/5 break-all select-all pr-12">
+                    {apiKeyCreated}
+                  </code>
+                  <button 
+                    onClick={() => copyToClipboard(apiKeyCreated, 'api_key')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white/5 rounded-lg transition-colors"
+                  >
+                    <Copy size={16} className="text-[var(--text-tertiary)]" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {apiKeys.length === 0 && !apiKeyCreated && (
+                <div className="text-center py-6 border border-dashed border-[var(--border-light)] rounded-xl">
+                  <p className="text-[10px] text-[var(--text-tertiary)] font-mono uppercase tracking-widest">No Active Automation Keys</p>
+                </div>
+              )}
+              {apiKeys.map((k) => (
+                <div key={k.id} className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)]/30 border border-[var(--border-light)]/40 hover:border-[var(--border-light)] transition-all">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold">{k.label || 'Unnamed Integration'}</span>
+                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-60">
+                      ID: {k.id.slice(0, 8)}... • Activity: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => revokeApiKey(k.id)}
+                    className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-[var(--text-tertiary)] transition-colors"
+                    title="Revoke Access"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 5. AI Usage Caps */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Shield size={20} strokeWidth={1.5} />
+            </div>
             <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-3">
-                Profile Picture
-              </label>
-              <div className="flex items-center gap-4">
-                <div className="relative">
+              <h2 className="text-lg font-medium tracking-tight">Intelligence Budgeting (Usage Caps)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Set hard limits on token usage to prevent billing surprises.</p>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
+            <div className="grid gap-6">
+              {([
+                { id: 'openai', label: 'OpenAI (GPT-4o/o1)' },
+                { id: 'anthropic', label: 'Anthropic (Claude 3.5/3.7)' },
+                { id: 'groq', label: 'Groq (Llama 3/Mistral)' },
+              ] as const).map((provider) => (
+                <div key={provider.id} className="p-5 rounded-xl bg-[var(--bg-primary)]/20 border border-[var(--border-light)]/40 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">{provider.label}</span>
+                    <div className="h-px flex-1 mx-4 bg-[var(--border-light)]/30" />
+                  </div>
+                  
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Daily Limit (Tokens)</label>
+                      <input
+                        type="number"
+                        value={(usageCaps as any)[provider.id].day}
+                        onChange={(event) =>
+                          setUsageCaps((prev) => ({
+                            ...prev,
+                            [provider.id]: {
+                              ...(prev as any)[provider.id],
+                              day: event.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Unlimited"
+                        className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Monthly Limit (Tokens)</label>
+                      <input
+                        type="number"
+                        value={(usageCaps as any)[provider.id].month}
+                        onChange={(event) =>
+                          setUsageCaps((prev) => ({
+                            ...prev,
+                            [provider.id]: {
+                              ...(prev as any)[provider.id],
+                              month: event.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="Unlimited"
+                        className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={saveUsageCaps}
+                disabled={usageCapsSaving}
+                className="px-6 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 transition-all shadow-xl shadow-black/20"
+              >
+                {usageCapsSaving ? 'Saving...' : 'Lock Budget Limits'}
+              </button>
+            </div>
+          </div>
+        </section>
+        {/* 6. Profile */}
+        <section>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <User size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Public Profile</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Manage how you appear to other neologgers and assistants.</p>
+            </div>
+          </div>
+
+          <div className="p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-10" style={{ background: 'rgba(13,13,22,0.2)' }}>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-4 block">Identity</label>
+              <div className="flex items-center gap-6">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-tr from-[var(--accent)] to-violet-500 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
                   {formData.avatar_url ? (
                     <img
                       src={formData.avatar_url}
                       alt="Avatar"
-                      className="w-20 h-20 rounded-full object-cover"
+                      className="relative w-24 h-24 rounded-full object-cover border-2 border-[var(--bg-primary)] shadow-2xl"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-[var(--accent)] flex items-center justify-center text-2xl text-white font-medium">
+                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-tr from-[var(--accent)] to-violet-600 flex items-center justify-center text-3xl text-white font-light tracking-tighter border-2 border-[var(--bg-primary)] shadow-2xl">
                       {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
                     </div>
                   )}
 
-                  <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center cursor-pointer hover:bg-[var(--bg-secondary)] transition-colors">
+                  <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-all shadow-lg">
                     {uploadingAvatar ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <Camera size={14} className="text-[var(--text-secondary)]" />
+                      <Camera size={14} />
                     )}
                     <input
                       type="file"
@@ -811,329 +1091,316 @@ export default function SettingsPage() {
                   </label>
                 </div>
 
-                <div className="text-sm text-[var(--text-tertiary)]">
-                  <p>Click the camera icon to upload</p>
-                  <p>JPG, PNG, or GIF. Max 2MB.</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold tracking-tight">{profile?.username || 'User'}</p>
+                  <p className="text-xs text-[var(--text-tertiary)] max-w-xs leading-relaxed">Recommended: 400x400px. JPG or PNG. Max 2MB.</p>
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                value={usernameDraft}
-                onChange={(e) => setUsernameDraft(e.target.value)}
-                className="input"
-              />
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <button
-                  onClick={handleUsernameSave}
-                  disabled={usernameSaving || !usernameDraft}
-                  className="btn btn-secondary btn-sm"
-                >
-                  {usernameSaving ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <Check size={16} />
-                      Update username
-                    </>
-                  )}
-                </button>
-                <p className="text-xs text-[var(--text-tertiary)]">
-                  3"30 chars. a-z, 0-9, underscore.
+            <div className="grid gap-8">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Username</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={usernameDraft}
+                      onChange={(e) => setUsernameDraft(e.target.value)}
+                      className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                    />
+                    <button
+                      onClick={handleUsernameSave}
+                      disabled={usernameSaving || !usernameDraft}
+                      className="px-4 py-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--bg-secondary)] transition-all"
+                    >
+                      {usernameSaving ? '...' : 'Update'}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Display Name</label>
+                  <input
+                    type="text"
+                    value={formData.display_name}
+                    onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                    placeholder="Your display name"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Bio</label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm min-h-[100px] transition-all resize-none"
+                  placeholder="Tell the world about your perspective..."
+                  maxLength={500}
+                />
+                <p className="text-[10px] text-right font-mono text-[var(--text-tertiary)] opacity-60">
+                  {formData.bio.length}/500
                 </p>
               </div>
-              <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                Your profile URL: {baseUrl}/{profile?.username}
-              </p>
-              <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                Changing your username can break old links.
-              </p>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Display Name
-              </label>
-              <input
-                type="text"
-                value={formData.display_name}
-                onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                className="input"
-                placeholder="Your display name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Bio
-              </label>
-              <textarea
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                className="input min-h-[100px] resize-y"
-                placeholder="Tell readers about yourself"
-                maxLength={500}
-              />
-              <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                {formData.bio.length}/500
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Website
-              </label>
-              <input
-                type="url"
-                value={formData.website_url}
-                onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                className="input"
-                placeholder="https://yoursite.com"
-              />
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  Twitter
-                </label>
-                <input
-                  type="url"
-                  value={formData.twitter_url}
-                  onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
-                  className="input"
-                  placeholder="https://twitter.com/..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  GitHub
-                </label>
-                <input
-                  type="url"
-                  value={formData.github_url}
-                  onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
-                  className="input"
-                  placeholder="https://github.com/..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                  LinkedIn
-                </label>
-                <input
-                  type="url"
-                  value={formData.linkedin_url}
-                  onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
-                  className="input"
-                  placeholder="https://linkedin.com/in/..."
-                />
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Website</label>
+                  <input
+                    type="url"
+                    value={formData.website_url}
+                    onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                    placeholder="https://yoursite.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Twitter/X (URL)</label>
+                  <input
+                    type="url"
+                    value={formData.twitter_url}
+                    onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                    placeholder="https://x.com/username"
+                  />
+                </div>
               </div>
             </div>
 
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn btn-primary"
-            >
-              {saving ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Check size={16} />
-                  Save Profile
-                </>
-              )}
-            </button>
-          </div>
-        </section>
-
-        {/* 5. Notifications */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Bell size={20} className="text-[var(--accent)]" />
-            </div>
-            <h2 className="font-display text-lg">Email Notifications</h2>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { key: 'email_new_follower', label: 'New subscribers', desc: 'When someone subscribes to you' },
-              { key: 'email_new_comment', label: 'New comments', desc: 'When someone comments on your posts' },
-              { key: 'email_comment_reply', label: 'Comment replies', desc: 'When someone replies to your comment' },
-            ].map(({ key, label, desc }) => (
-              <label
-                key={key}
-                className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--border-medium)] transition-colors"
+            <div className="flex justify-end pt-4">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-8 py-3 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-sm font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 transition-all shadow-2xl shadow-black/40"
               >
-                <div>
-                  <p className="font-medium text-sm">{label}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={(emailPrefs as any)[key]}
-                  onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
-                  className="w-4 h-4 rounded border-[var(--border-medium)] text-[var(--accent)] focus:ring-[var(--accent)]"
-                />
-              </label>
-            ))}
+                {saving ? 'Saving...' : 'Save Global Profile'}
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* 6. Feeds */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+        {/* 7. Notifications */}
+        <section>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Rss size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Bell size={20} strokeWidth={1.5} />
             </div>
-            <h2 className="font-display text-lg">Your Feeds</h2>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { label: 'RSS Feed', url: `${baseUrl}/${profile?.username}/feed` },
-              { label: 'JSON Feed', url: `${baseUrl}/${profile?.username}/feed?format=json` },
-            ].map(({ label, url }) => (
-              <div
-                key={label}
-                className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm">{label}</p>
-                  <p className="text-xs text-[var(--text-tertiary)] truncate">
-                    {url}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 ml-3">
-                  <button
-                    onClick={() => copyToClipboard(url, label)}
-                    className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-                  >
-                    {copied === label ? (
-                      <Check size={14} className="text-[var(--success)]" />
-                    ) : (
-                      <Copy size={14} className="text-[var(--text-tertiary)]" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 7. Export */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <Download size={20} className="text-[var(--accent)]" />
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Intelligence Briefs (Notifications)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Control how and when you are alerted of system activity.</p>
             </div>
-            <h2 className="font-display text-lg">Export Your Data</h2>
           </div>
 
           <div className="grid gap-3">
             {[
-              { format: 'json', label: 'Full Export (JSON)', desc: 'Complete data export' },
-              { format: 'markdown', label: 'Markdown Archive', desc: 'All posts as markdown files' },
+              { key: 'email_new_follower', label: 'New Subscribers', desc: 'Alert when a new user follows your log.' },
+              { key: 'email_new_comment', label: 'Interaction Updates', desc: 'Alert when someone comments on your sessions.' },
+              { key: 'email_comment_reply', label: 'Reply Notifications', desc: 'Alert when someone responds to your thread.' },
+            ].map(({ key, label, desc }) => (
+              <label
+                key={key}
+                className="group flex items-center justify-between p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--accent)]/30 transition-all"
+                style={{ background: 'rgba(13,13,22,0.2)' }}
+              >
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none">{label}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={(emailPrefs as any)[key]}
+                    onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-[var(--bg-primary)] rounded-full border border-[var(--border-light)] peer-checked:bg-[var(--accent)] peer-checked:border-[var(--accent)] transition-all duration-300"></div>
+                  <div className="absolute left-1 top-1 w-3 h-3 bg-[var(--text-tertiary)] rounded-full peer-checked:translate-x-5 peer-checked:bg-white transition-all duration-300"></div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </section>
+
+        {/* 8. Feeds */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Rss size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Protocol Feeds</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Syndicate your log via standard protocols for maximum distribution.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { label: 'RSS Protcol', url: `${baseUrl}/${profile?.username}/feed`, icon: <Globe size={18} /> },
+              { label: 'JSON protocol', url: `${baseUrl}/${profile?.username}/feed?format=json`, icon: <Link2 size={18} /> },
+            ].map(({ label, url, icon }) => (
+              <div
+                key={label}
+                className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-4 hover:border-[var(--border-medium)] transition-all"
+                style={{ background: 'rgba(13,13,22,0.1)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[var(--accent)]">
+                    {icon}
+                    <span className="text-xs font-bold uppercase tracking-widest">{label}</span>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(url, label)}
+                    className="p-2 rounded-lg bg-[var(--bg-primary)]/50 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    {copied === label ? (
+                      <Check size={14} className="text-emerald-500" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                </div>
+                <div className="px-3 py-2 rounded-lg bg-black/20 border border-white/5 font-mono text-[10px] text-[var(--text-tertiary)] truncate">
+                  {url}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 9. Export */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Download size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Data Portability (Export)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Export your entire neolog archive in open formats.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              { format: 'json', label: 'Archive (JSON)', desc: 'Complete system snapshot.' },
+              { format: 'markdown', label: 'Journal (MD)', desc: 'All logs as markdown files.' },
             ].map(({ format, label, desc }) => (
               <a
                 key={format}
                 href={`/api/export?format=${format}`}
-                className="flex items-center justify-between p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
+                className="group flex items-center justify-between p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all"
+                style={{ background: 'rgba(13,13,22,0.1)' }}
               >
-                <div>
-                  <p className="font-medium text-sm">{label}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium leading-none group-hover:text-[var(--accent)] transition-colors">{label}</p>
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-tight font-mono">{desc}</p>
                 </div>
-                <Download size={16} className="text-[var(--text-tertiary)]" />
+                <Download size={16} className="text-[var(--text-tertiary)] opacity-40 group-hover:opacity-100 transition-opacity" />
               </a>
             ))}
           </div>
         </section>
-        {/* 8. Account */}
-        <section className="rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-light)] p-5">
+
+        {/* 10. Account */}
+        <section>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center">
-              <KeyRound size={20} className="text-[var(--accent)]" />
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <KeyRound size={20} strokeWidth={1.5} />
             </div>
-            <h2 className="font-display text-lg">Account</h2>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Security & Auth</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Manage your core authentication and session security.</p>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={user?.email || ''}
-              disabled
-              className="input bg-[var(--bg-secondary)] text-[var(--text-tertiary)] opacity-60"
-            />
+          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]" style={{ background: 'rgba(13,13,22,0.2)' }}>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Primary Email</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={user?.email || ''}
+                  disabled
+                  className="w-full px-4 py-2 rounded-xl bg-black/40 border border-white/5 text-[var(--text-tertiary)] text-sm font-mono opacity-60 cursor-not-allowed"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/40"></div>
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-emerald-500/80">Verified</span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* 9. Danger Zone */}
-        <section className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error)]/5 p-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-[var(--error)]/10 flex items-center justify-center">
-              <Trash2 size={20} className="text-[var(--error)]" />
+        {/* 11. Danger Zone */}
+        <section className="pt-8">
+          <div className="p-8 rounded-3xl border border-red-500/20 bg-red-500/5 space-y-8 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
+              <Trash2 size={120} />
             </div>
-            <h2 className="font-display text-lg text-[var(--error)]">Danger Zone</h2>
-          </div>
-
-          {!showDeleteConfirm ? (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="btn bg-[var(--error)] text-white hover:opacity-90 btn-sm"
-            >
-              <Trash2 size={16} />
-              Delete Account
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">
-                Type <code className="px-1.5 py-0.5 bg-[var(--bg-tertiary)] rounded">{profile?.username}</code> to confirm:
-              </p>
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                className="input"
-                placeholder="Enter your username"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleteConfirmText !== profile?.username || deleting}
-                  className="btn bg-[var(--error)] text-white hover:opacity-90 disabled:opacity-50 btn-sm"
-                >
-                  {deleting ? 'Deleting...' : 'Permanently Delete'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirm(false)
-                    setDeleteConfirmText('')
-                  }}
-                  className="btn btn-secondary btn-sm"
-                >
-                  Cancel
-                </button>
+            
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 shadow-sm border border-red-500/20">
+                <Trash2 size={20} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h2 className="text-lg font-medium tracking-tight text-red-500">Danger Zone</h2>
+                <p className="text-xs text-red-500/60 mt-0.5 font-medium">Irreversible actions regarding your identity and data.</p>
               </div>
             </div>
-          )}
+
+            {!showDeleteConfirm ? (
+              <div className="flex items-center justify-between gap-6 p-6 rounded-2xl bg-black/20 border border-white/5">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">Delete Account</h3>
+                  <p className="text-xs text-[var(--text-tertiary)] leading-relaxed max-w-sm">
+                    This will permanently delete your profile, logs, and assets. This action is irreversible.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-6 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/5 active:scale-95 whitespace-nowrap"
+                >
+                  Initiate Deletion
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 p-6 rounded-2xl bg-black/40 border border-red-500/20 animate-in fade-in slide-in-from-bottom-2">
+                <p className="text-xs font-medium text-red-500/80 uppercase tracking-widest flex items-center gap-2 mb-2">
+                  <Shield size={14} /> Critical Confirmation Required
+                </p>
+                <p className="text-sm">
+                  Please type your username <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/5">{profile?.username}</span> to confirm.
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-black border border-red-500/30 focus:border-red-500 outline-none text-sm transition-all text-red-500 font-mono"
+                  placeholder="Enter your username"
+                  autoFocus
+                />
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleteConfirmText !== profile?.username || deleting}
+                    className="flex-1 px-6 py-3 rounded-xl bg-red-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-red-500/20 active:scale-95"
+                  >
+                    {deleting ? 'Processing...' : 'Permanently Delete Workspace'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false)
+                      setDeleteConfirmText('')
+                    }}
+                    className="px-6 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-xs font-bold uppercase tracking-widest hover:bg-[var(--bg-tertiary)] transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </main>
