@@ -77,7 +77,7 @@ export default function CapturesPage() {
 
       {captures.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-primary)]/70 p-10 text-center shadow">
-          <Archive size={36} className="mx-auto text-[var(--text-tertiary)] mb-4" />
+          <span className="text-4xl mx-auto mb-4 opacity-70 block text-center">📥</span>
           <h2 className="font-display text-xl text-[var(--text-primary)] mb-2 font-semibold">
             No captures yet
           </h2>
