@@ -21,6 +21,7 @@ export interface ChatResponse {
  * Uses the user's BYOK keys to power the dashboard chat
  */
 export async function chatWithManager(history: ChatMessage[]): Promise<ChatResponse> {
+    const keys: Record<string, string> = { openai: '', anthropic: '' }
     try {
         const supabase = await createClient()
 
@@ -44,10 +45,8 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
             getActiveIntegrationKey(user.id, 'anthropic')
         ])
 
-        const keys: Record<string, string> = {
-            openai: openaiKey || '',
-            anthropic: anthropicKey || ''
-        }
+        keys.openai = openaiKey || ''
+        keys.anthropic = anthropicKey || ''
 
         if (!keys.openai && !keys.anthropic) {
             return { success: false, error: 'NO_API_KEYS' }
@@ -108,6 +107,19 @@ FORMAT:
 
     } catch (error: any) {
         console.error('Chat error:', error)
+        try {
+            const fs = require('fs')
+            const debugInfo = {
+                timestamp: new Date().toISOString(),
+                error: error.message,
+                anthropicKeyPrefix: keys.anthropic ? keys.anthropic.substring(0, 10) : 'none',
+                openaiKeyPrefix: keys.openai ? keys.openai.substring(0, 10) : 'none',
+                providerAttempted: keys.openai ? 'openai' : 'anthropic'
+            }
+            fs.appendFileSync('c:/Users/suppo/Desktop/neolog/tmp/chat_debug.log', JSON.stringify(debugInfo, null, 2) + '\n---\n')
+        } catch (e) {
+            // ignore logging error
+        }
         return { success: false, error: error.message || 'Failed to generate response' }
     }
 }
