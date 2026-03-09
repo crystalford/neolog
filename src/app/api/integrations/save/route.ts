@@ -73,8 +73,12 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      finalErrorMessage = 'Failed to save integration.'
-      return NextResponse.json({ error: 'Failed to save integration.' }, { status: 500 })
+      if (error.code === '42P01') {
+        finalErrorMessage = 'Database table missing. Please run the SQL migration (fix_settings_tables.sql) in your Supabase dashboard.'
+      } else {
+        finalErrorMessage = `Failed to save integration: ${error.message}`
+      }
+      return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
     }
 
     if (saved?.id) {

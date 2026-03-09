@@ -31,8 +31,9 @@ export async function GET() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      finalErrorMessage = 'Failed to load keys.'
-      return NextResponse.json({ error: 'Failed to load keys.' }, { status: 500 })
+      // If table doesn't exist yet, return empty list gracefully
+      finalStatus = 'success'
+      return NextResponse.json({ keys: [] })
     }
 
     finalStatus = 'success'

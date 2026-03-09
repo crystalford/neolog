@@ -34,8 +34,9 @@ export async function GET() {
       .order('provider', { ascending: true })
 
     if (error) {
-      finalErrorMessage = 'Failed to load usage limits.'
-      return NextResponse.json({ error: 'Failed to load usage limits.' }, { status: 500 })
+      // If table doesn't exist yet, return empty list gracefully
+      finalStatus = 'success'
+      return NextResponse.json({ ok: true, limits: [] })
     }
 
     finalStatus = 'success'

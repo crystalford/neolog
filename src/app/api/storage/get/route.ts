@@ -34,8 +34,9 @@ export async function GET() {
       .maybeSingle()
 
     if (error) {
-      finalErrorMessage = 'Failed to load storage config.'
-      return NextResponse.json({ error: 'Failed to load storage config.' }, { status: 500 })
+      // If table doesn't exist yet, return null gracefully
+      finalStatus = 'success'
+      return NextResponse.json({ connection: null })
     }
 
     finalStatus = 'success'

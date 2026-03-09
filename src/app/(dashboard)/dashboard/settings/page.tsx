@@ -692,8 +692,7 @@ export default function SettingsPage() {
               value={formData.context_md}
               onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
               placeholder="e.g. My tone is concise, data-first, skeptical of hype. I am a software engineer focused on agentic coding."
-              className="relative w-full min-h-[180px] p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] outline-none font-mono text-sm leading-relaxed transition-all resize-y"
-              style={{ background: 'rgba(13,13,22,0.4)', backdropFilter: 'blur(12px)' }}
+              className="input min-h-[180px] font-mono leading-relaxed transition-all resize-y"
             />
           </div>
         </section>
@@ -766,22 +765,22 @@ export default function SettingsPage() {
                           value={draft}
                           onChange={(e) => setIntegrationDrafts({ ...integrationDrafts, [provider.id]: e.target.value })}
                           placeholder={`Enter ${provider.label} API Key...`}
-                          className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                          className="input flex-1"
                         />
                         <button
                           onClick={() => saveIntegration(provider.id)}
                           disabled={integrationSaving === provider.id || !draft}
-                          className="px-5 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-30 transition-all"
+                          className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
                         >
-                          {integrationSaving === provider.id ? '...' : 'Connect'}
+                          {integrationSaving === provider.id ? <Loader2 className="animate-spin" size={16} /> : 'Connect'}
                         </button>
                       </div>
                       <input
                         type="text"
                         value={label}
                         onChange={(e) => setIntegrationLabels({ ...integrationLabels, [provider.id]: e.target.value })}
-                        placeholder="Key Label (e.g. Personal)"
-                        className="w-full px-4 py-1.5 rounded-lg bg-transparent border border-[var(--border-light)]/40 text-[10px] font-mono opacity-50 focus:opacity-100 outline-none transition-all"
+                        placeholder="Key label (e.g. Personal)"
+                        className="input mt-2 py-1.5 text-[10px] opacity-70 focus:opacity-100"
                       />
                       {hint && (
                         <p className={`text-[10px] ${hint.tone === 'error' ? 'text-red-500' : 'text-amber-500'} font-mono uppercase tracking-tight`}>
@@ -815,7 +814,7 @@ export default function SettingsPage() {
                 <select
                   value={storageConfig.provider}
                   onChange={(e) => setStorageConfig({ ...storageConfig, provider: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all appearance-none"
+                  className="input appearance-none"
                 >
                   <option value="r2">Cloudflare R2</option>
                   <option value="s3">AWS S3</option>
@@ -827,7 +826,7 @@ export default function SettingsPage() {
                   type="text"
                   value={storageConfig.bucket}
                   onChange={(e) => setStorageConfig({ ...storageConfig, bucket: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  className="input"
                   placeholder="my-neolog-assets"
                 />
               </div>
@@ -839,7 +838,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storageConfig.access_key_id}
                 onChange={(e) => setStorageConfig({ ...storageConfig, access_key_id: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                className="input font-mono"
                 placeholder="xxxxxx"
               />
             </div>
@@ -851,7 +850,7 @@ export default function SettingsPage() {
                   type="text"
                   value={storageConfig.region}
                   onChange={(e) => setStorageConfig({ ...storageConfig, region: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  className="input"
                   placeholder="auto"
                 />
               </div>
@@ -861,7 +860,7 @@ export default function SettingsPage() {
                   type="text"
                   value={storageConfig.endpoint}
                   onChange={(e) => setStorageConfig({ ...storageConfig, endpoint: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                  className="input"
                   placeholder="https://..."
                 />
               </div>
@@ -873,7 +872,7 @@ export default function SettingsPage() {
                 type="text"
                 value={storageConfig.public_base_url}
                 onChange={(e) => setStorageConfig({ ...storageConfig, public_base_url: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                className="input"
                 placeholder="https://..."
               />
             </div>
@@ -882,9 +881,9 @@ export default function SettingsPage() {
               <button
                 onClick={saveStorage}
                 disabled={storageSaving}
-                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 shadow-lg shadow-[var(--accent)]/20 transition-all"
+                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
               >
-                {storageSaving ? 'Saving...' : 'Save Storage Configuration'}
+                {storageSaving ? <Loader2 size={16} className="animate-spin" /> : 'Save Storage Configuration'}
               </button>
             </div>
           </div>
@@ -909,14 +908,14 @@ export default function SettingsPage() {
                 value={apiKeyLabel}
                 onChange={(e) => setApiKeyLabel(e.target.value)}
                 placeholder="Key Description (e.g. n8n workflow)"
-                className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                className="input flex-1"
               />
               <button
                 onClick={createApiKey}
                 disabled={apiKeySaving || !apiKeyLabel.trim()}
-                className="px-5 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-30 transition-all"
+                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-40 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
               >
-                {apiKeySaving ? '...' : 'Generate'}
+                {apiKeySaving ? <Loader2 size={16} className="animate-spin" /> : 'Generate'}
               </button>
             </div>
 
@@ -1008,7 +1007,7 @@ export default function SettingsPage() {
                           }))
                         }
                         placeholder="Unlimited"
-                        className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                        className="input"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1026,7 +1025,7 @@ export default function SettingsPage() {
                           }))
                         }
                         placeholder="Unlimited"
-                        className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                        className="input"
                       />
                     </div>
                   </div>
@@ -1038,9 +1037,9 @@ export default function SettingsPage() {
               <button
                 onClick={saveUsageCaps}
                 disabled={usageCapsSaving}
-                className="px-6 py-2 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 transition-all shadow-xl shadow-black/20"
+                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
               >
-                {usageCapsSaving ? 'Saving...' : 'Lock Budget Limits'}
+                {usageCapsSaving ? <Loader2 size={16} className="animate-spin" /> : 'Lock Budget Limits'}
               </button>
             </div>
           </div>
@@ -1107,14 +1106,14 @@ export default function SettingsPage() {
                       type="text"
                       value={usernameDraft}
                       onChange={(e) => setUsernameDraft(e.target.value)}
-                      className="flex-1 px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm font-mono transition-all"
+                      className="input flex-1 font-mono"
                     />
                     <button
                       onClick={handleUsernameSave}
                       disabled={usernameSaving || !usernameDraft}
-                      className="px-4 py-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-light)] text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--bg-secondary)] transition-all"
+                      className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-all shadow-[0_0_15px_-5px_rgba(124,106,245,0.4)]"
                     >
-                      {usernameSaving ? '...' : 'Update'}
+                      {usernameSaving ? <Loader2 size={12} className="animate-spin" /> : 'Update'}
                     </button>
                   </div>
                 </div>
@@ -1124,7 +1123,7 @@ export default function SettingsPage() {
                     type="text"
                     value={formData.display_name}
                     onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                    className="input"
                     placeholder="Your display name"
                   />
                 </div>
@@ -1135,7 +1134,7 @@ export default function SettingsPage() {
                 <textarea
                   value={formData.bio}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm min-h-[100px] transition-all resize-none"
+                  className="input min-h-[100px] transition-all resize-none"
                   placeholder="Tell the world about your perspective..."
                   maxLength={500}
                 />
@@ -1151,8 +1150,8 @@ export default function SettingsPage() {
                     type="url"
                     value={formData.website_url}
                     onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
-                    placeholder="https://yoursite.com"
+                    className="input"
+                    placeholder="https://yourpage.com"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1161,7 +1160,7 @@ export default function SettingsPage() {
                     type="url"
                     value={formData.twitter_url}
                     onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
-                    className="w-full px-4 py-2 rounded-xl bg-[var(--bg-primary)]/40 border border-[var(--border-light)] focus:border-[var(--accent)] outline-none text-sm transition-all"
+                    className="input"
                     placeholder="https://x.com/username"
                   />
                 </div>
@@ -1172,9 +1171,9 @@ export default function SettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-8 py-3 rounded-xl bg-[var(--text-primary)] text-[var(--bg-primary)] text-sm font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50 transition-all shadow-2xl shadow-black/40"
+                className="px-8 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-[0.1em] hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
               >
-                {saving ? 'Saving...' : 'Save Global Profile'}
+                {saving ? <Loader2 size={16} className="animate-spin" /> : 'Save Profile Changes'}
               </button>
             </div>
           </div>
@@ -1321,7 +1320,7 @@ export default function SettingsPage() {
                   type="email"
                   value={user?.email || ''}
                   disabled
-                  className="w-full px-4 py-2 rounded-xl bg-black/40 border border-white/5 text-[var(--text-tertiary)] text-sm font-mono opacity-60 cursor-not-allowed"
+                  className="input cursor-not-allowed opacity-60 font-mono"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/40"></div>
@@ -1376,7 +1375,7 @@ export default function SettingsPage() {
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-black border border-red-500/30 focus:border-red-500 outline-none text-sm transition-all text-red-500 font-mono"
+                  className="input border-red-500/30 focus:border-red-500 text-red-500 font-mono"
                   placeholder="Enter your username"
                   autoFocus
                 />
