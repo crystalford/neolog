@@ -32,6 +32,24 @@ export default function DailyLogPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const [username, setUsername] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', session.user.id)
+          .single()
+        setUsername(data?.username || null)
+      }
+    }
+    loadProfile()
+  }, [])
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
@@ -184,13 +202,25 @@ export default function DailyLogPage() {
     <div className="flex flex-col h-[calc(100vh-64px)] max-w-4xl mx-auto px-6" style={{ fontFamily: 'var(--font-sans)' }}>
       
       {/* Header */}
-      <div className="pt-8 md:pt-12 mb-6 flex-shrink-0">
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
-          {dateStr} · SESSION 1
-        </p>
-        <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
-          Daily Log
-        </h1>
+      <div className="pt-8 md:pt-12 mb-6 flex-shrink-0 flex items-start justify-between">
+        <div>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
+            {dateStr} · SESSION 1
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+            Daily Log
+          </h1>
+        </div>
+        {username && (
+          <a
+            href={`/${username}/log`}
+            target="_blank"
+            className="btn btn-secondary btn-sm flex items-center gap-1 mt-4"
+          >
+            <ArrowUpRight size={13} />
+            Public Log
+          </a>
+        )}
       </div>
 
       {/* Message Area */}

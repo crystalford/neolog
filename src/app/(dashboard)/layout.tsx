@@ -399,10 +399,12 @@ export default function DashboardLayout({
         {/* User Section */}
         <div className="border-t border-[var(--border-light)] px-3 py-3 space-y-0.5">
           {profile && (
-            selectedPublicationSlug ? (
+            <div className="flex flex-col gap-0.5">
               <Link
-                href={`/${selectedPublicationSlug}`}
+                href={`/${profile.username}/log`}
+                target="_blank"
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors"
+                title="View your public log"
               >
                 {profile.avatar_url ? (
                   <img
@@ -411,31 +413,14 @@ export default function DashboardLayout({
                     className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-[var(--border-light)]"
                   />
                 ) : (
-                  <UserIcon size={18} className="flex-shrink-0" />
+                  <UserIcon size={14} className="flex-shrink-0" />
                 )}
-                <span className="truncate text-xs">
+                <span className="truncate flex-1">
                   {profile.display_name || profile.username}
                 </span>
+                <ArrowUpRight size={12} className="opacity-40" />
               </Link>
-            ) : (
-              <Link
-                href="/dashboard/settings"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors"
-              >
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.display_name || profile.username}
-                    className="w-5 h-5 rounded-full object-cover flex-shrink-0 border border-[var(--border-light)]"
-                  />
-                ) : (
-                  <UserIcon size={18} className="flex-shrink-0" />
-                )}
-                <span className="truncate text-xs">
-                  {profile.display_name || profile.username}
-                </span>
-              </Link>
-            )
+            </div>
           )}
 
           <button
@@ -502,37 +487,22 @@ export default function DashboardLayout({
 
               {/* User avatar */}
               {profile && (
-                selectedPublicationSlug ? (
-                  <Link
-                    href={`/${selectedPublicationSlug}`}
-                    className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] overflow-hidden flex items-center justify-center hover:border-[var(--border-heavy)] transition-colors"
-                  >
-                    {profile.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.display_name || profile.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon size={16} />
-                    )}
-                  </Link>
-                ) : (
-                  <Link
-                    href="/dashboard/settings"
-                    className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] overflow-hidden flex items-center justify-center hover:border-[var(--border-heavy)] transition-colors"
-                  >
-                    {profile.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.display_name || profile.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon size={16} />
-                    )}
-                  </Link>
-                )
+                <Link
+                  href={`/${profile.username}/log`}
+                  target="_blank"
+                  className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] overflow-hidden flex items-center justify-center hover:border-[var(--border-heavy)] transition-colors"
+                  title="View your public log"
+                >
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.display_name || profile.username}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <UserIcon size={16} />
+                  )}
+                </Link>
               )}
             </div>
           </div>
