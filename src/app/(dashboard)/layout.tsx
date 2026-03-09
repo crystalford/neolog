@@ -10,7 +10,7 @@ import {
   PenLine, Command, Search, Upload, BarChart3,
   DollarSign, Share2, Sparkles, Video, Boxes,
   Clock, List, CalendarDays, Inbox, BookUser,
-  Film, Briefcase
+  Film, Briefcase, ArrowUpRight
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
