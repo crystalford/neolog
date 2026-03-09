@@ -6,9 +6,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import {
-  Home, PenSquare, Send, Settings, LogOut, User as UserIcon,
-  PenLine, Command, Search, Upload, BarChart3, Layers, Tag,
-  BookOpen, DollarSign, Globe, Share2, Sparkles, Video, Brain
+  Home, Settings, LogOut, User as UserIcon,
+  PenLine, Command, Search, Upload, BarChart3,
+  DollarSign, Share2, Sparkles, Video, Boxes,
+  Clock, List, CalendarDays, Inbox, BookUser,
+  Film, Briefcase
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -222,58 +224,40 @@ export default function DashboardLayout({
   // User maturity for progressive disclosure
   const { capabilities, loading: maturityLoading } = useUserMaturity(user?.id ?? null)
 
-  // Enhanced Navigation with essential features
-  const primaryNav = useMemo(() => {
-    const items = [
-      { href: '/dashboard', icon: Home, label: 'Dashboard' },
-      { href: '/write', icon: PenLine, label: 'Write' },
-      { href: '/import', icon: Upload, label: 'Import' },
-      { href: '/dashboard/uploads', icon: Video, label: 'Uploads' },
-      { href: '/dashboard/brain', icon: Brain, label: 'Brain' },
-    ]
+  // INGEST section — primary actions
+  const primaryNav = useMemo(() => [
+    { href: '/dashboard/log',     icon: Inbox,     label: 'Daily Log',     section: 'INGEST' },
+    { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
+    { href: '/dashboard/captures',icon: List,      label: 'Captures',      section: 'INGEST' },
+  ], [])
 
-    // Always show Analytics
-    items.push({ href: '/analytics', icon: BarChart3, label: 'Analytics' })
+  // INTELLIGENCE section — what the system extracted
+  const secondaryNav = useMemo(() => [
+    { href: '/dashboard/entities',  icon: Boxes,       label: 'Entities',      section: 'INTELLIGENCE' },
+    { href: '/dashboard/timeline',  icon: CalendarDays,label: 'Timeline',      section: 'INTELLIGENCE' },
+    { href: '/dashboard/sessions',  icon: Film,        label: 'Clip Sessions', section: 'INTELLIGENCE' },
+  ], [])
 
-    items.push({ href: '/dashboard/settings', icon: Settings, label: 'Settings' })
-
-    return items
-  }, [capabilities])
-
-  // Secondary navigation for manage/organize features
-  const secondaryNav = useMemo(() => {
-    if (!capabilities.showPublishedTab) return [] // Only show after first publish
-
-    return [
-      { href: '/series', icon: Layers, label: 'Series' },
-      { href: '/topics', icon: Tag, label: 'Topics' },
-      { href: selectedPublicationSlug ? `/publications/${selectedPublicationSlug}/fediverse` : '/fediverse', icon: Globe, label: 'Fediverse' },
-    ]
-  }, [capabilities, selectedPublicationSlug])
-
-  // Grow section for monetization features
-  const growNav = useMemo(() => {
-    return [
-      { href: '/dashboard/agents', icon: Sparkles, label: 'Agents' },
-      { href: '/dashboard/domain', icon: Globe, label: 'Custom Domain' },
-      { href: '/dashboard/distribution', icon: Share2, label: 'Distribution' },
-      { href: '/dashboard/api', icon: Command, label: 'API' },
-      { href: '/dashboard/monetization', icon: DollarSign, label: 'Monetization' },
-    ]
-  }, [])
+  // PUBLISH section — output layer
+  const growNav = useMemo(() => [
+    { href: '/dashboard/queue',     icon: Share2,    label: 'Post Queue',    section: 'PUBLISH' },
+    { href: '/dashboard/portfolio', icon: Briefcase, label: 'Portfolio',     section: 'PUBLISH' },
+    { href: '/write',               icon: PenLine,   label: 'Write',         section: 'PUBLISH' },
+  ], [])
 
   const commandItems = useMemo(() => {
-    const items = primaryNav.map((item) => ({
+    const allNav = [...primaryNav, ...secondaryNav, ...growNav]
+    const items = allNav.map((item) => ({
       label: item.label,
       href: item.href,
-      description: 'Navigation',
+      description: item.section,
     }))
-    // Add common actions
     items.push(
-      { label: 'New Post', href: '/write', description: 'Action' },
+      { label: 'New Log Entry', href: '/dashboard/log', description: 'Action' },
+      { label: 'Upload Video', href: '/dashboard/uploads', description: 'Action' },
     )
     return items
-  }, [primaryNav])
+  }, [primaryNav, secondaryNav, growNav])
 
   if (loading) {
     return (
@@ -295,16 +279,17 @@ export default function DashboardLayout({
     )
   }
 
-  // Determine active label from new primary nav
+  // Determine active label across all nav sections
+  const allNavItems = [...primaryNav, ...secondaryNav, ...growNav]
   const activeLabel =
-    primaryNav.find(
+    allNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )?.label ||
-    (pathname === '/write' || pathname.startsWith('/write/') ? 'Write' : 'Dashboard')
+    (pathname === '/dashboard/settings' ? 'Settings' : 'Daily Log')
 
   return (
     <div className="dashboard-shell flex min-h-screen bg-[var(--bg-primary)]">
-      {/* Sidebar - 5 Primary Destinations */}
+      {/* Sidebar - 2.0 Control Room Nav */}
       <aside className="w-64 bg-[var(--bg-secondary)] border-r border-[var(--border-medium)] hidden lg:flex flex-col">
         <div className="px-5 pt-6 pb-4">
           <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
@@ -313,88 +298,102 @@ export default function DashboardLayout({
           </Link>
         </div>
 
-        {/* Primary Navigation */}
+        {/* Navigation — 3 sections */}
         <nav className="flex-1 overflow-y-auto px-4 py-2">
-          <div className="space-y-1.5">
-            {primaryNav.map((link) => {
-              const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-              const Icon = link.icon
-
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive
-                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+          {/* INGEST */}
+          <div className="mb-1">
+            <p className="px-3 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2 mt-3 font-semibold">Ingest</p>
+            <div className="space-y-0.5">
+              {primaryNav.map((link) => {
+                const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                const Icon = link.icon
+                return (
+                  <Link key={link.href} href={link.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isActive
+                        ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                     }`}
-                >
-                  <Icon size={18} className="flex-shrink-0" />
-                  <span>{link.label}</span>
-                </Link>
-              )
-            })}
+                  >
+                    <Icon size={17} className="flex-shrink-0" />
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
 
-          {/* Manage Section */}
-          {secondaryNav.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-[var(--border-medium)]">
-              <p className="px-3 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-3 font-semibold">
-                Manage
-              </p>
-              <div className="space-y-1.5">
-                {secondaryNav.map((link) => {
-                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-                  const Icon = link.icon
-
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive
+          {/* INTELLIGENCE */}
+          <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+            <p className="px-3 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2 font-semibold">Intelligence</p>
+            <div className="space-y-0.5">
+              {secondaryNav.map((link) => {
+                const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                const Icon = link.icon
+                return (
+                  <Link key={link.href} href={link.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isActive
                         ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-                        }`}
-                    >
-                      <Icon size={18} className="flex-shrink-0" />
-                      <span>{link.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
+                    }`}
+                  >
+                    <Icon size={17} className="flex-shrink-0" />
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
             </div>
-          )}
+          </div>
 
-          {/* Grow Section */}
-          {growNav.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-[var(--border-medium)]">
-              <p className="px-3 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-3 font-semibold">
-                Grow
-              </p>
-              <div className="space-y-1.5">
-                {growNav.map((link) => {
-                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
-                  const Icon = link.icon
-
-                  return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive
+          {/* PUBLISH */}
+          <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+            <p className="px-3 text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-2 font-semibold">Publish</p>
+            <div className="space-y-0.5">
+              {growNav.map((link) => {
+                const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+                const Icon = link.icon
+                return (
+                  <Link key={link.href} href={link.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isActive
                         ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-                        }`}
-                    >
-                      <Icon size={18} className="flex-shrink-0" />
-                      <span>{link.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
+                    }`}
+                  >
+                    <Icon size={17} className="flex-shrink-0" />
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
             </div>
-          )}
+          </div>
 
-
+          {/* Settings — bottom of nav */}
+          <div className="mt-4 pt-4 border-t border-[var(--border-light)]">
+            <div className="space-y-0.5">
+              <Link href="/analytics"
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  pathname.startsWith('/analytics')
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                <BarChart3 size={17} className="flex-shrink-0" />
+                <span>Analytics</span>
+              </Link>
+              <Link href="/dashboard/settings"
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  pathname === '/dashboard/settings'
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                <Settings size={17} className="flex-shrink-0" />
+                <span>Settings</span>
+              </Link>
+            </div>
+          </div>
         </nav>
 
         {/* User Section */}
@@ -493,12 +492,12 @@ export default function DashboardLayout({
                 <Search size={16} />
               </button>
 
-              {/* New Post button */}
+              {/* New Log Entry button */}
               <Link
-                href="/write"
+                href="/dashboard/log"
                 className="hidden sm:inline-flex btn btn-primary btn-sm"
               >
-                New Post
+                + New Log
               </Link>
 
               {/* User avatar */}
