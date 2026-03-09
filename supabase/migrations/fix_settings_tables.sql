@@ -98,3 +98,20 @@ do $$ begin
     using (auth.uid() = user_id)
     with check (auth.uid() = user_id);
 exception when others then null; end $$;
+
+
+-- 5. PERMISSIONS FIX
+-- Ensure the schema is accessible
+grant usage on schema public to postgres, anon, authenticated, service_role;
+
+-- Grant access to all settings tables
+grant all on table public.integration_keys to postgres, authenticated, service_role;
+grant all on table public.provider_usage_limits to postgres, authenticated, service_role;
+grant all on table public.storage_connections to postgres, authenticated, service_role;
+grant all on table public.api_keys to postgres, authenticated, service_role;
+
+-- Optional: Grant read to anon if any public viewing is needed (unlikely for these)
+grant select on table public.integration_keys to anon;
+grant select on table public.provider_usage_limits to anon;
+grant select on table public.storage_connections to anon;
+grant select on table public.api_keys to anon;

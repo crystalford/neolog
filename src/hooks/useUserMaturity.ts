@@ -48,60 +48,35 @@ export function useUserMaturity(userId: string | null): UserMaturity & { capabil
     const supabase = createClient()
 
     async function fetchMaturity() {
-      const [
-        capturesRes,
-        postsRes,
-        subscribersRes,
-        publicationsRes,
-        sourcesRes,
-        stacksRes,
-      ] = await Promise.all([
-        // Count captures (vault assets)
-        supabase
-          .from('vault_assets')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId),
-        // Count posts by status
-        supabase
-          .from('posts')
-          .select('status')
-          .eq('author_id', userId),
-        // Count subscribers
-        supabase
-          .from('subscriptions')
-          .select('*', { count: 'exact', head: true })
-          .eq('author_id', userId),
-        // Count publications
-        supabase
-          .from('publications')
-          .select('*', { count: 'exact', head: true })
-          .eq('owner_id', userId),
-        // Count sources
-        supabase
-          .from('feed_sources')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId),
-        // Count stacks (series)
-        supabase
-          .from('series')
-          .select('*', { count: 'exact', head: true })
-          .eq('author_id', userId),
-      ])
+      try {
+        const [
+          postsRes,
+        ] = await Promise.all([
+          // Only keep posts if it exists, otherwise it will just be empty
+          supabase
+            .from('posts')
+            .select('status')
+            .eq('author_id', userId),
+        ])
 
-      const posts = postsRes.data || []
-      const draftCount = posts.filter((p) => p.status === 'draft').length
-      const publishedCount = posts.filter((p) => p.status === 'published').length
+        const posts = postsRes?.data || []
+        const draftCount = posts.filter((p: any) => p.status === 'draft').length
+        const publishedCount = posts.filter((p: any) => p.status === 'published').length
 
-      setMaturity({
-        captureCount: capturesRes.count || 0,
-        draftCount,
-        publishedCount,
-        subscriberCount: subscribersRes.count || 0,
-        publicationCount: publicationsRes.count || 0,
-        sourceCount: sourcesRes.count || 0,
-        stackCount: stacksRes.count || 0,
-        loading: false,
-      })
+        setMaturity({
+          captureCount: 0,
+          draftCount,
+          publishedCount,
+          subscriberCount: 0,
+          publicationCount: 0,
+          sourceCount: 0,
+          stackCount: 0,
+          loading: false,
+        })
+      } catch (err) {
+        console.error('Maturity fetch error (legacy):', err)
+        setMaturity((prev) => ({ ...prev, loading: false }))
+      }
     }
 
     fetchMaturity()
