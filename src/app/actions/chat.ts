@@ -55,15 +55,15 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
             return { success: false, error: 'Not authenticated' }
         }
 
-        // 2. Get user's agents (to give context about available tools)
-        const { data: agents } = await supabase
-            .from('agents')
-            .select('name, description, model_provider')
+        // 2. Load user's entity graph for context
+        const { data: topEntities } = await supabase
+            .from('entities')
+            .select('type, name, summary, mention_count, last_mentioned_at')
             .eq('user_id', user.id)
+            .order('mention_count', { ascending: false })
+            .limit(30)
 
-        const agentList = agents?.map(a => `- ${a.name}: ${a.description} (${a.model_provider})`).join('\n') || 'No custom agents configured.'
-
-        // 3. Get API keys from modern integration system
+        // 3. Get API keys
         const [openaiKey, anthropicKey] = await Promise.all([
             getActiveIntegrationKey(user.id, 'openai'),
             getActiveIntegrationKey(user.id, 'anthropic')
@@ -76,17 +76,34 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
             return { success: false, error: 'NO_API_KEYS' }
         }
 
-        // 4. Construct System Prompt
+        // 4. Build entity context block from the user's actual graph
+        const entityContext = topEntities && topEntities.length > 0
+            ? topEntities
+                .reduce((acc: Record<string, string[]>, e) => {
+                    if (!acc[e.type]) acc[e.type] = []
+                    acc[e.type].push(e.name + (e.summary ? ` (${e.summary})` : ''))
+                    return acc
+                }, {})
+            : null
+
+        const entityBlock = entityContext
+            ? Object.entries(entityContext)
+                .map(([type, names]) => `${type.toUpperCase()}S: ${names.join(', ')}`)
+                .join('\n')
+            : 'No entities captured yet.'
+
+        // 5. Construct System Prompt with live entity context
         const systemPrompt = `You are Neolog — a personal intelligence system and life ingestion engine.
 
-CONTEXT:
- The user is building their own intelligence layer: capturing raw thought through video, voice, and chat, and synthesizing it into a permanent record of their life's work.
- You are their AI partner in this process — helping them think, clarify, plan, and capture.
+The user captures raw thought through video, voice, and chat. Your job is to help them think, synthesize, and build their permanent record.
+
+WHAT YOU KNOW ABOUT THIS USER (from their captured sessions):
+${entityBlock}
 
 YOUR ROLE:
- - Help the user articulate and develop their ideas across projects (Neolog, CANOPTICON, Supersample, Aldershot, The Crystal Ford, etc.)
+ - Use the above knowledge to give contextually aware responses — reference what you know about their projects and ideas when relevant.
  - When they mention something worth capturing, use the create_log_entry tool to add it to their timeline.
- - Notice patterns across what they're describing — connect things they've mentioned before.
+ - Notice patterns — connect things they've mentioned before.
  - Be direct, sharp, and intellectually honest. Don't flatter.
 
 FORMAT:
