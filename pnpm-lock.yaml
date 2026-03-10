@@ -62,6 +62,9 @@ importers:
       dompurify:
         specifier: ^3.1.6
         version: 3.3.1
+      ffprobe-client:
+        specifier: ^1.1.6
+        version: 1.1.6
       inngest:
         specifier: ^3.27.0
         version: 3.52.6(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(express@5.2.1)(hono@4.11.7)(next@14.2.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(typescript@5.9.3)(zod@4.3.6)
@@ -2691,6 +2694,9 @@ packages:
   fetch-blob@3.2.0:
     resolution: {integrity: sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==}
     engines: {node: ^12.20 || >= 14.13}
+
+  ffprobe-client@1.1.6:
+    resolution: {integrity: sha512-n+wNlD9QC0nHsBUJGYljYAB1gwtuNxXQh0V4Am6M2T3h8Is7qR2hwrrC5Pjc9YNE4MpIslaQUe7+c9wPCarVJQ==}
 
   file-entry-cache@6.0.1:
     resolution: {integrity: sha512-7Gps/XWymbLk2QLYK4NzpMOrYjMhdIxXuIvy2QBsLE6ljuodKvdkWs/cpyJJ3CVIVpH0Oi1Hvg1ovbMzLdFBBg==}
@@ -8067,6 +8073,8 @@ snapshots:
     dependencies:
       node-domexception: 1.0.0
       web-streams-polyfill: 3.3.3
+
+  ffprobe-client@1.1.6: {}
 
   file-entry-cache@6.0.1:
     dependencies:
