@@ -151,15 +151,21 @@ export default function UploadsPage() {
             const data = await res.json()
             setProcessingIds(prev => new Set(prev).add(data.id))
             await fetchUploads()
+            
+            // Remove from active uploads after a short delay ONLY if successful
+            setTimeout(() => {
+              setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
+            }, 2000)
+          } else {
+            // Display error and leave it in activeUploads so user can see it
+            const errData = await res.json().catch(() => ({ error: res.statusText }));
+            console.error('API Error:', res.status, errData);
+            updateUpload({ status: 'error', error: errData.error || `Failed with status ${res.status}` });
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to register upload:', err)
+          updateUpload({ status: 'error', error: err.message || 'Network error occurred' });
         }
-
-        // Remove from active uploads after a short delay
-        setTimeout(() => {
-          setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
-        }, 2000)
       },
     })
 
