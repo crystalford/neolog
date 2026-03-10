@@ -27,11 +27,43 @@ export default function DailyLogPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadSuccess, setUploadSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleEndSession = async () => {
+    if (messages.length < 2 || isArchiving) return
+    if (!confirm('End this session and archive it to your timeline? This will trigger a 3rd-person analysis.')) return
+
+    setIsArchiving(true)
+    try {
+      const res = await fetch('/api/chat/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
+      })
+
+      if (res.ok) {
+        setMessages([
+          { 
+            role: 'assistant', 
+            content: "Session archived! I'm performing a 3rd-person analysis of our discussion now. Check your timeline in a moment." 
+          }
+        ])
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to archive session')
+      }
+    } catch (err) {
+      console.error('Archive error:', err)
+      setError('Failed to archive session')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
 
   const [username, setUsername] = useState<string | null>(null)
 
@@ -218,9 +250,30 @@ export default function DailyLogPage() {
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.2rem' }}>
             {dateStr} · SESSION 1
           </p>
-          <h1 style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
-            Daily Log
-          </h1>
+          <div className="flex items-center gap-6">
+            <h1 style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+              Daily Log
+            </h1>
+            {messages.length > 2 && (
+              <button
+                onClick={handleEndSession}
+                disabled={isArchiving}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-semibold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all uppercase tracking-wider"
+              >
+                {isArchiving ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    Archiving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={12} />
+                    End Session & Archive
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
         {username && (
           <a

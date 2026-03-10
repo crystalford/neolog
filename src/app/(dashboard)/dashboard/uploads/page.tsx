@@ -485,10 +485,20 @@ export default function UploadsPage() {
                   <div className="px-5 pb-4 pt-0 flex items-center justify-end">
                     <button
                       onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
-                      className="text-xs px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center gap-2 font-medium"
+                      disabled={processingIds.has(upload.id)}
+                      className="text-xs px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium"
                     >
-                      <Zap size={14} />
-                      Process Now
+                      {processingIds.has(upload.id) ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Queuing...
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={14} />
+                          Process Now
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
