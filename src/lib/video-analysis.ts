@@ -112,7 +112,7 @@ export async function runAnalysis(
   if (anthropicKey) {
     const anthropic = new Anthropic({ apiKey: anthropicKey })
     const message = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-20250219',
+      model: 'claude-sonnet-4-5',
       max_tokens: 4096,
       system: ANALYSIS_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
@@ -122,7 +122,7 @@ export async function runAnalysis(
     if (textContent && textContent.type === 'text') {
       analysisText = textContent.text
     }
-    modelUsed = 'claude-3-5-sonnet'
+    modelUsed = 'claude-sonnet-4-5'
   } else if (openaiKey) {
     const openai = new OpenAI({ apiKey: openaiKey })
     const completion = await openai.chat.completions.create({

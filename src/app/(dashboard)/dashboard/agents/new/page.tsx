@@ -124,7 +124,7 @@ export default function NewAgentPage() {
                                 setFormData({
                                     ...formData,
                                     model_provider: e.target.value as 'openai' | 'anthropic',
-                                    model_name: e.target.value === 'openai' ? 'gpt-4o' : 'claude-3-7-sonnet-20250219',
+                                    model_name: e.target.value === 'openai' ? 'gpt-4o' : 'claude-sonnet-4-5',
                                 })
                             }
                             className="input"
@@ -149,8 +149,8 @@ export default function NewAgentPage() {
                                 </>
                             ) : (
                                 <>
-                                    <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
-                                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                                    <option value="claude-sonnet-4-5">Claude 4.5 Sonnet</option>
+                                    <option value="claude-opus-4-5">Claude 4.5 Opus</option>
                                 </>
                             )}
                         </select>

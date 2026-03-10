@@ -89,7 +89,7 @@ FORMAT:
         } else if (keys.anthropic) {
             const anthropic = new Anthropic({ apiKey: keys.anthropic })
             const message = await anthropic.messages.create({
-                model: 'claude-3-7-sonnet-20250219',
+                model: 'claude-sonnet-4-5',
                 max_tokens: 4096,
                 system: systemPrompt,
                 messages: history.map(h => ({ role: h.role, content: h.content })),
@@ -107,19 +107,6 @@ FORMAT:
 
     } catch (error: any) {
         console.error('Chat error:', error)
-        try {
-            const fs = require('fs')
-            const debugInfo = {
-                timestamp: new Date().toISOString(),
-                error: error.message,
-                anthropicKeyPrefix: keys.anthropic ? keys.anthropic.substring(0, 10) : 'none',
-                openaiKeyPrefix: keys.openai ? keys.openai.substring(0, 10) : 'none',
-                providerAttempted: keys.openai ? 'openai' : 'anthropic'
-            }
-            fs.appendFileSync('c:/Users/suppo/Desktop/neolog/tmp/chat_debug.log', JSON.stringify(debugInfo, null, 2) + '\n---\n')
-        } catch (e) {
-            // ignore logging error
-        }
         return { success: false, error: error.message || 'Failed to generate response' }
     }
 }

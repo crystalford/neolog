@@ -92,7 +92,7 @@ src/
 | Upload | TUS resumable (tus-js-client, direct browser → Supabase) |
 | Async jobs | Inngest (durable, step-based, retries) |
 | Transcription | OpenAI Whisper (whisper-1) |
-| AI analysis | Claude (claude-opus-4-6) or GPT-4o depending on user's keys |
+| AI analysis | Claude (claude-sonnet-4-5) or GPT-4o depending on user's keys |
 | Video processing | Replicate FFmpeg (audio extraction + clip assembly) |
 | Auth | Supabase Auth |
 | Styling | Tailwind CSS + CSS variables (theme tokens in globals.css) |
