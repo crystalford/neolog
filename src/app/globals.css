@@ -801,6 +801,21 @@ textarea:-webkit-autofill:focus {
   margin: 2em 0;
 }
 
+/* Chat Markdown Fixes */
+.rounded-2xl .prose p:first-child {
+  margin-top: 0;
+}
+.rounded-2xl .prose p:last-child {
+  margin-bottom: 0;
+}
+.rounded-2xl .prose ul:first-child, .rounded-2xl .prose ol:first-child {
+  margin-top: 0;
+}
+.rounded-2xl .prose ul:last-child, .rounded-2xl .prose ol:last-child {
+  margin-bottom: 0;
+}
+
+
 .prose ul,
 .prose ol {
   padding-left: 1.5em;

@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Upload, Send, ArrowUpRight, Loader2, CheckCircle2, User, Bot, Paperclip, MoreHorizontal } from 'lucide-react'
 import { chatWithManager, type ChatMessage } from '@/app/actions/chat'
 import { createClient } from '@/lib/supabase/client'
+import Markdown from '@/components/Markdown'
 import * as tus from 'tus-js-client'
 
 const mockExtractions = [
@@ -248,7 +249,7 @@ export default function DailyLogPage() {
                     ? 'bg-[var(--accent)] text-white ml-auto' 
                     : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}
                 `}>
-                  {m.content}
+                  <Markdown content={m.content} />
                 </div>
                 {m.role === 'assistant' && i === messages.length - 1 && isTyping && (
                    <div className="mt-2 flex gap-1 px-1">
