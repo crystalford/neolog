@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('DB insert error:', dbError)
-      finalErrorMessage = 'Failed to save upload record'
-      return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
+      finalErrorMessage = `Failed to save upload record: ${dbError.message}`
+      return NextResponse.json({ error: finalErrorMessage, details: dbError }, { status: 500 })
     }
 
     // Update session clip count if provided
@@ -154,7 +154,8 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to fetch uploads' }, { status: 500 })
+      console.error('Supabase query error in GET /api/video-upload:', error)
+      return NextResponse.json({ error: 'Failed to fetch uploads', details: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ uploads: data })
