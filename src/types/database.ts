@@ -725,6 +725,7 @@ export type VideoUpload = {
   source_deleted: boolean
   session_id: string | null
   processed_at: string | null
+  recorded_at: string | null
   created_at: string
   updated_at: string
 }

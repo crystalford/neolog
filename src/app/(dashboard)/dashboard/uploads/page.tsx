@@ -14,7 +14,7 @@ import type { VideoUpload } from '@/types/database'
 
 type UploadListItem = Pick<VideoUpload,
   'id' | 'file_name' | 'file_size_bytes' | 'mime_type' | 'duration_seconds' |
-  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'created_at' | 'updated_at'
+  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at'
 >
 
 type ActiveUpload = {
@@ -429,7 +429,7 @@ export default function UploadsPage() {
                         <span className="text-xs text-[var(--text-tertiary)]">{formatDuration(upload.duration_seconds)}</span>
                       )}
                       <span className="text-xs text-[var(--text-tertiary)]">
-                        {new Date(upload.created_at).toLocaleDateString()}
+                        {new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
