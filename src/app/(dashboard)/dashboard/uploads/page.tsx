@@ -481,6 +481,18 @@ export default function UploadsPage() {
                   </div>
                 )}
 
+                {upload.status === 'uploaded' && (
+                  <div className="px-5 pb-4 pt-0 flex items-center justify-end">
+                    <button
+                      onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
+                      className="text-xs px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center gap-2 font-medium"
+                    >
+                      <Zap size={14} />
+                      Process Now
+                    </button>
+                  </div>
+                )}
+
                 {isExpanded && (
                   <div className="border-t border-[var(--border-light)] px-5 py-5">
                     {!expandedData ? (

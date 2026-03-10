@@ -60,6 +60,7 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 1: Fetch upload record and resolve API keys ──
     const context = await step.run('fetch-context', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 1: Fetch context`);
       const { data: upload, error } = await admin
         .from('video_uploads')
         .select('*')
@@ -67,11 +68,19 @@ export const processUpload = inngest.createFunction(
         .eq('user_id', user_id)
         .single()
 
-      if (error || !upload) throw new Error('Upload not found')
-      if (upload.status === 'processed') return { skip: true as const, upload }
+      if (error || !upload) {
+        console.error(`[PROC-VIDEO:${video_upload_id}] Upload not found or error:`, error);
+        throw new Error('Upload not found');
+      }
+      if (upload.status === 'processed') {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Upload already processed. Skipping.`);
+        return { skip: true as const, upload };
+      }
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] Resolving provider keys...`);
       const openaiKey = await resolveProviderKeyWithClient(admin, user_id, 'openai')
       if (!openaiKey) {
+        console.error(`[PROC-VIDEO:${video_upload_id}] OpenAI key missing for user.`);
         await admin.from('video_uploads').update({
           status: 'error',
           error_message: 'OpenAI API key required for transcription. Add one in Settings > API Keys.',
@@ -82,6 +91,7 @@ export const processUpload = inngest.createFunction(
 
       const anthropicKey = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] Context ready for processing.`);
       return {
         skip: false as const,
         upload,
@@ -93,17 +103,17 @@ export const processUpload = inngest.createFunction(
     if (context.skip) return { status: 'already_processed', video_upload_id }
 
     // ── Step 2: Extract audio (video files only) ──
-    // For large video files, extract just the audio track via Replicate FFmpeg.
-    // This converts a 4GB video into a ~30-60MB audio file that fits in serverless memory.
-    // Audio files skip this step.
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = context
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 2: Extract audio. MIME: ${upload.mime_type}`);
 
       // Audio-only or text files don't need extraction
       if (!isVideoMimeType(upload.mime_type)) {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Not a video. Skipping extraction.`);
         return { path: upload.storage_path, extracted: false }
       }
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] Updating status to transcribing...`);
       await admin.from('video_uploads').update({
         status: 'transcribing',
         updated_at: new Date().toISOString(),
@@ -111,9 +121,7 @@ export const processUpload = inngest.createFunction(
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) {
-        // No Replicate token — fall back to downloading the raw video
-        // This will work for smaller videos but may OOM for 4GB+
-        console.warn('REPLICATE_API_TOKEN not set — falling back to direct download')
+        console.warn(`[PROC-VIDEO:${video_upload_id}] REPLICATE_API_TOKEN not set — falling back to direct download`);
         return { path: upload.storage_path, extracted: false }
       }
 
@@ -123,11 +131,12 @@ export const processUpload = inngest.createFunction(
         .createSignedUrl(upload.storage_path, 3600)
 
       if (signedError || !signedData?.signedUrl) {
-        console.error('Failed to generate signed URL:', signedError)
+        console.error(`[PROC-VIDEO:${video_upload_id}] Failed to generate signed URL for Replicate:`, signedError);
         return { path: upload.storage_path, extracted: false }
       }
 
       // Call Replicate FFmpeg to extract audio
+      console.log(`[PROC-VIDEO:${video_upload_id}] Calling Replicate for audio extraction...`);
       const replicate = new Replicate({ auth: replicateToken })
 
       const output = await replicate.run(
@@ -143,17 +152,19 @@ export const processUpload = inngest.createFunction(
       )
 
       if (!output || typeof output !== 'string') {
-        console.warn('Replicate audio extraction failed — falling back to direct download')
+        console.warn(`[PROC-VIDEO:${video_upload_id}] Replicate extraction failed (empty output) — falling back`);
         return { path: upload.storage_path, extracted: false }
       }
 
       // Download the extracted audio and re-upload to storage
+      console.log(`[PROC-VIDEO:${video_upload_id}] Replicate success. Downloading audio from ${output}`);
       const audioResponse = await fetch(output as string)
       const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
 
       const timestamp = Date.now()
       const audioStoragePath = `${user_id}/audio/${timestamp}_extracted.m4a`
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] Uploading extracted audio to ${audioStoragePath}`);
       const { error: audioUploadError } = await admin.storage
         .from('videos')
         .upload(audioStoragePath, audioBuffer, {
@@ -162,7 +173,7 @@ export const processUpload = inngest.createFunction(
         })
 
       if (audioUploadError) {
-        console.error('Failed to upload extracted audio:', audioUploadError)
+        console.error(`[PROC-VIDEO:${video_upload_id}] Failed to upload extracted audio:`, audioUploadError);
         return { path: upload.storage_path, extracted: false }
       }
 
@@ -172,35 +183,34 @@ export const processUpload = inngest.createFunction(
     // ── Step 2b: Extract Metadata (recorded_at) ──
     const metadata = await step.run('extract-metadata', async () => {
       const { upload } = context
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 2b: Metadata extraction`);
       
-      // If it's not a video/audio, we don't have good metadata usually
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
         return { recorded_at: upload.created_at }
       }
 
       try {
-        // Use ffprobe-client if available on the system
-        // We need a signed URL for ffprobe to read the file
         const { data: signedData } = await admin.storage
           .from('videos')
           .createSignedUrl(upload.storage_path, 600)
 
         if (signedData?.signedUrl) {
+          console.log(`[PROC-VIDEO:${video_upload_id}] Running ffprobe on file...`);
           const ffprobe = require('ffprobe-client')
           const info = await ffprobe(signedData.signedUrl)
           
-          // Look for creation_time in format, tags, or streams
           const creationDate = info.format?.tags?.creation_time || 
                                info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time
           
           if (creationDate) {
             const recordedAt = new Date(creationDate).toISOString()
+            console.log(`[PROC-VIDEO:${video_upload_id}] Extracted recorded_at: ${recordedAt}`);
             await admin.from('video_uploads').update({ recorded_at: recordedAt }).eq('id', video_upload_id)
             return { recorded_at: recordedAt }
           }
         }
       } catch (err) {
-        console.warn('Metadata extraction failed, falling back to upload date:', err)
+        console.warn(`[PROC-VIDEO:${video_upload_id}] Metadata extraction failed:`, err);
       }
 
       return { recorded_at: upload.created_at }
@@ -208,6 +218,7 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 3: Transcription`);
       if (context.upload.status !== 'transcribing') {
         await admin.from('video_uploads').update({
           status: 'transcribing',
@@ -215,29 +226,31 @@ export const processUpload = inngest.createFunction(
         }).eq('id', video_upload_id)
       }
 
-      // Download the audio file (extracted audio or original audio)
       const storagePath = audioPath.path
       const mimeType = audioPath.extracted ? 'audio/mp4' : context.upload.mime_type
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] Downloading file for transcription: ${storagePath}`);
       const { data: fileData, error: downloadError } = await admin.storage
         .from('videos')
         .download(storagePath)
 
-      if (downloadError || !fileData) throw new Error('Failed to download file from storage')
+      if (downloadError || !fileData) {
+        console.error(`[PROC-VIDEO:${video_upload_id}] Download failed for transcription:`, downloadError);
+        throw new Error('Failed to download file from storage');
+      }
 
       const arrayBuffer = await fileData.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
 
-      // If it's a text file, skip transcription and return its content
       if (context.upload.mime_type === 'text/plain') {
-        const textContent = buffer.toString('utf-8')
-        return { text: textContent, segments: [], language: null, duration: null }
+        return { text: buffer.toString('utf-8'), segments: [], language: null, duration: null }
       }
 
       const ext = getAudioExtension(mimeType)
       const openai = new OpenAI({ apiKey: context.openaiKey })
 
       if (!needsChunking(buffer.length)) {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Normal file (size: ${buffer.length}). Transcribing via Whisper-1...`);
         const file = new File([buffer.buffer as ArrayBuffer], `audio.${ext}`, { type: mimeType })
         const result = await openai.audio.transcriptions.create({
           file,
@@ -250,6 +263,7 @@ export const processUpload = inngest.createFunction(
           start: s.start, end: s.end, text: s.text,
         })) || []
 
+        console.log(`[PROC-VIDEO:${video_upload_id}] Transcription complete. Text length: ${result.text.length}`);
         return {
           text: result.text,
           segments,
@@ -259,6 +273,7 @@ export const processUpload = inngest.createFunction(
       }
 
       // Large file — chunk and transcribe each piece
+      console.log(`[PROC-VIDEO:${video_upload_id}] Large file (size: ${buffer.length}). Chunking and transcribing...`);
       const chunks = chunkBuffer(buffer)
       const results: Array<{
         text: string
@@ -267,6 +282,7 @@ export const processUpload = inngest.createFunction(
       }> = []
 
       for (let i = 0; i < chunks.length; i++) {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Transcribing chunk ${i+1}/${chunks.length}...`);
         const chunk = chunks[i]
         const file = new File([chunk.buffer as ArrayBuffer], `chunk_${i}.${ext}`, { type: mimeType })
         const result = await openai.audio.transcriptions.create({
@@ -285,11 +301,13 @@ export const processUpload = inngest.createFunction(
       }
 
       const merged = mergeTranscriptions(results)
+      console.log(`[PROC-VIDEO:${video_upload_id}] Chunks merged. Final text length: ${merged.text.length}`);
       return { text: merged.text, segments: merged.segments, language: null, duration: merged.totalDuration }
     })
 
     // ── Step 4: Save transcript ──
     await step.run('save-transcript', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 4: Saving transcript`);
       const updateData: Record<string, any> = {
         transcript: transcription.text,
         transcript_segments: transcription.segments,
@@ -301,14 +319,15 @@ export const processUpload = inngest.createFunction(
 
       await admin.from('video_uploads').update(updateData).eq('id', video_upload_id)
 
-      // Clean up extracted audio file to save storage space
       if (audioPath.extracted) {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Cleaning up extracted audio from storage...`);
         await admin.storage.from('videos').remove([audioPath.path])
       }
     })
 
     // ── Step 5: AI Analysis ──
     const analysisResult = await step.run('analyze', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 5: AI Analysis`);
       await admin.from('video_uploads').update({
         status: 'analyzing',
         updated_at: new Date().toISOString(),
@@ -320,11 +339,13 @@ export const processUpload = inngest.createFunction(
         context.anthropicKey,
       )
 
+      console.log(`[PROC-VIDEO:${video_upload_id}] AI analysis complete using model: ${modelUsed}`);
       return { analysis, modelUsed }
     })
 
     // ── Step 6: Post-process and save everything ──
     await step.run('save-analysis', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 6: Final save and post-processing`);
       const { analysis, modelUsed } = analysisResult
 
       const scrubbedTranscript = scrubPiiFromTranscript(transcription.text)
@@ -345,15 +366,19 @@ export const processUpload = inngest.createFunction(
       }
 
       if (scrubbedTranscript !== transcription.text) {
+        console.log(`[PROC-VIDEO:${video_upload_id}] Transcript scrubbed for PII.`);
         updateData.transcript = scrubbedTranscript
       }
 
       await admin.from('video_uploads').update(updateData).eq('id', video_upload_id)
+      console.log(`[PROC-VIDEO:${video_upload_id}] Database record updated to 'processed'`);
     })
 
     // ── Step 7: Extract and accumulate entities ──
     await step.run('upsert-entities', async () => {
+      console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 7: Upserting entities`);
       await upsertEntities(admin, user_id, video_upload_id, analysisResult.analysis)
+      console.log(`[PROC-VIDEO:${video_upload_id}] Pipeline complete.`);
     })
 
     return { status: 'processed', video_upload_id, model: analysisResult.modelUsed }
