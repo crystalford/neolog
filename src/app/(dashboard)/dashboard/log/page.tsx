@@ -84,9 +84,19 @@ export default function DailyLogPage() {
       return
     }
 
+    try {
+      // Ensure infrastructure (bucket) is ready
+      const prepRes = await fetch('/api/video-upload/prepare')
+      if (!prepRes.ok) {
+        console.warn('Infrastructure check failed, attempting upload anyway...')
+      }
+    } catch (err) {
+      console.error('Failed to prepare infrastructure:', err)
+    }
+
     const timestamp = Date.now()
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
+    const storagePath = `${session.user.id}/${timestamp}_${sanitizedName}`
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const projectId = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
