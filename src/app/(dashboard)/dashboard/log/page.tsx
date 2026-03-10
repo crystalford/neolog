@@ -31,8 +31,32 @@ export default function DailyLogPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadSuccess, setUploadSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  const [entries, setEntries] = useState<any[]>([])
+  const [loadingEntries, setLoadingEntries] = useState(true)
+  const [view, setView] = useState<'chat' | 'timeline' | 'detail'>('timeline')
+  const [selectedEntry, setSelectedEntry] = useState<any | null>(null)
+
   const fileRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const fetchEntries = useCallback(async () => {
+    try {
+      const res = await fetch('/api/log-entries')
+      if (res.ok) {
+        const data = await res.json()
+        setEntries(data.entries || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch entries:', err)
+    } finally {
+      setLoadingEntries(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchEntries()
+  }, [fetchEntries])
 
   const handleEndSession = async () => {
     if (messages.length < 2 || isArchiving) return
@@ -47,12 +71,9 @@ export default function DailyLogPage() {
       })
 
       if (res.ok) {
-        setMessages([
-          { 
-            role: 'assistant', 
-            content: "Session archived! I'm performing a 3rd-person analysis of our discussion now. Check your timeline in a moment." 
-          }
-        ])
+        await fetchEntries()
+        setView('timeline')
+        setMessages([]) // Clear chat for next session
       } else {
         const data = await res.json()
         setError(data.error || 'Failed to archive session')
@@ -242,19 +263,34 @@ export default function DailyLogPage() {
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
 
   return (
-    <div className="flex flex-col h-screen" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-primary)]" style={{ fontFamily: 'var(--font-sans)' }}>
       
       {/* Header */}
       <div className="pt-6 px-8 mb-4 flex-shrink-0 flex items-start justify-between border-b border-[var(--border-light)] pb-4 bg-[var(--bg-primary)]/80 backdrop-blur-md sticky top-0 z-20">
         <div>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.2rem' }}>
-            {dateStr} · SESSION 1
+            {dateStr} · {view === 'chat' ? 'ACTIVE SESSION' : view === 'detail' ? 'SESSION ARCHIVE' : 'CENTRAL LOG'}
           </p>
           <div className="flex items-center gap-6">
-            <h1 style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+            <h1 
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setView('timeline')}
+              style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}
+            >
               Daily Log
             </h1>
-            {messages.length > 2 && (
+            
+            {view === 'timeline' && (
+              <button
+                onClick={() => setView('chat')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent)] text-white text-[10px] font-semibold border border-[var(--accent)]/20 hover:opacity-90 transition-all uppercase tracking-wider"
+              >
+                <Bot size={12} />
+                Open Chat
+              </button>
+            )}
+
+            {view === 'chat' && messages.length > 2 && (
               <button
                 onClick={handleEndSession}
                 disabled={isArchiving}
@@ -273,6 +309,15 @@ export default function DailyLogPage() {
                 )}
               </button>
             )}
+
+            {view === 'detail' && (
+              <button
+                onClick={() => setView('timeline')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[10px] font-semibold border border-[var(--border-light)] hover:bg-[var(--bg-secondary)] transition-all uppercase tracking-wider"
+              >
+                Back to Timeline
+              </button>
+            )}
           </div>
         </div>
         {username && (
@@ -287,163 +332,267 @@ export default function DailyLogPage() {
         )}
       </div>
 
-      {/* Message Area */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto pt-8 pb-12 px-8 md:px-24 xl:px-48 space-y-10 no-scrollbar"
-      >
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-            <Bot size={48} strokeWidth={1} className="mb-4 text-[var(--accent)]" />
-            <p className="text-sm">Start a conversation or drop a recording.</p>
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+        {view === 'timeline' && (
+          <div className="max-w-3xl mx-auto px-6 py-12">
+            {loadingEntries ? (
+              <div className="flex flex-col items-center justify-center py-24 opacity-40">
+                <Loader2 size={32} className="animate-spin mb-4" />
+                <p className="text-sm font-mono uppercase tracking-widest text-[10px]">Synchronizing Log...</p>
+              </div>
+            ) : entries.length === 0 ? (
+              <div className="text-center py-24 border border-dashed border-[var(--border-light)] rounded-3xl bg-[var(--bg-card)]/30">
+                <p className="text-sm text-[var(--text-tertiary)] mb-6">Your timeline is quiet. Start a conversation to capture your first session.</p>
+                <button
+                  onClick={() => setView('chat')}
+                  className="px-6 py-2 rounded-full bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 transition-all"
+                >
+                  Initiate Brainstorming Session
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-16 relative">
+                {/* Visual Timeline Wire */}
+                <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-[var(--accent)]/40 via-[var(--border-light)] to-transparent" />
+                
+                {entries.map((entry, idx) => {
+                  const date = new Date(entry.logged_at)
+                  const meta = entry.meta || {}
+                  const analysis = meta.analysis || {}
+                  
+                  return (
+                    <div 
+                      key={entry.id} 
+                      className="pl-8 relative group cursor-pointer"
+                      onClick={() => { setSelectedEntry(entry); setView('detail') }}
+                    >
+                      {/* Timeline Dot */}
+                      <div className="absolute left-[-4px] top-1 w-2 h-2 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-primary)] group-hover:scale-125 transition-transform" />
+                      
+                      <div className="flex items-start justify-between gap-4 mb-2">
+                        <div>
+                          <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase mb-1">
+                            {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {entry.entry_type.replace('_', ' ')}
+                          </p>
+                          <h3 className="text-xl font-light tracking-tight text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                            {entry.title}
+                          </h3>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-mono text-[var(--text-tertiary)]">
+                            {date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }).toUpperCase()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-[var(--bg-card)]/50 backdrop-blur-sm border border-[var(--border-light)] p-5 rounded-2xl group-hover:border-[var(--accent)]/30 group-hover:bg-[var(--bg-card)]/80 transition-all">
+                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-3">
+                          {entry.body}
+                        </p>
+                        
+                        {(analysis.ideas?.length > 0 || analysis.projects?.length > 0) && (
+                          <div className="flex flex-wrap gap-2 mt-4">
+                            {analysis.projects?.slice(0, 2).map((p: string, i: number) => (
+                              <span key={i} className="px-2 py-0.5 rounded-md bg-blue-400/10 text-blue-400 text-[10px] font-medium border border-blue-400/20">
+                                🏗 {p}
+                              </span>
+                            ))}
+                            {analysis.ideas?.slice(0, 2).map((idea: string, i: number) => (
+                              <span key={i} className="px-2 py-0.5 rounded-md bg-yellow-400/10 text-yellow-400 text-[10px] font-medium border border-yellow-400/20">
+                                💡 {idea}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          messages.map((m, i) => (
-            <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : ''}`}>
-              {m.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
-                  <Bot size={16} className="text-[var(--accent)]" />
+        )}
+
+        {view === 'chat' && (
+          <div className="h-full flex flex-col">
+            <div 
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto pt-8 pb-12 px-8 md:px-24 xl:px-48 space-y-10 no-scrollbar"
+            >
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                  <Bot size={48} strokeWidth={1} className="mb-4 text-[var(--accent)]" />
+                  <p className="text-sm">Start a conversation or drop a recording.</p>
                 </div>
+              ) : (
+                messages.map((m, i) => (
+                  <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : ''}`}>
+                    {m.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
+                        <Bot size={16} className="text-[var(--accent)]" />
+                      </div>
+                    )}
+                    <div className={`max-w-[85%] group`}>
+                      <div className={`
+                        p-4 rounded-2xl text-sm leading-relaxed
+                        ${m.role === 'user' 
+                          ? 'bg-[var(--accent)] text-white ml-auto' 
+                          : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}
+                      `}>
+                        <Markdown content={m.content} />
+                      </div>
+                    </div>
+                    {m.role === 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 mt-1">
+                        <User size={16} className="text-[var(--text-secondary)]" />
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
-              <div className={`max-w-[85%] group`}>
-                <div className={`
-                  p-4 rounded-2xl text-sm leading-relaxed
-                  ${m.role === 'user' 
-                    ? 'bg-[var(--accent)] text-white ml-auto' 
-                    : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}
-                `}>
-                  <Markdown content={m.content} />
-                </div>
-                {m.role === 'assistant' && i === messages.length - 1 && isTyping && (
-                   <div className="mt-2 flex gap-1 px-1">
+              {isTyping && (
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
+                    <Bot size={16} className="text-[var(--accent)]" />
+                  </div>
+                  <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center gap-1">
                      <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" />
                      <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-75" />
                      <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-150" />
-                   </div>
-                )}
-              </div>
-              {m.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 mt-1">
-                  <User size={16} className="text-[var(--text-secondary)]" />
+                  </div>
                 </div>
               )}
+              {error && (
+                <p className="text-xs text-center text-red-500 bg-red-500/10 py-2 rounded-lg">{error}</p>
+              )}
             </div>
-          ))
-        )}
-        
-        {isTyping && !messages.find(m => m.role === 'assistant' && m === messages[messages.length-1]) && (
-          <div className="flex gap-4">
-            <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
-              <Bot size={16} className="text-[var(--accent)]" />
-            </div>
-            <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center gap-1">
-               <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" />
-               <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-75" />
-               <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-150" />
-            </div>
-          </div>
-        )}
 
-        {error && (
-          <p className="text-xs text-center text-red-500 bg-red-500/10 py-2 rounded-lg">
-            {error}
-          </p>
-        )}
-      </div>
-
-      {/* Input Zone */}
-      <div className="pb-6 px-8 md:px-24 xl:px-48 flex-shrink-0 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-12">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
-          style={{
-            position: 'relative',
-            background: dragging ? 'rgba(124,106,245,0.06)' : 'rgba(13,13,22,0.7)',
-            backdropFilter: 'blur(16px)',
-            border: `1px solid ${dragging ? 'var(--border-glow)' : 'var(--border-medium)'}`,
-            borderRadius: '12px',
-            padding: '1rem',
-            transition: 'all 0.2s',
-            boxShadow: dragging ? '0 0 24px -4px rgba(124,106,245,0.2)' : '0 4px 24px -4px rgba(0,0,0,0.2)',
-          }}
-        >
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Talk to your assistant or drop a file..."
-            rows={1}
-            className="no-scrollbar"
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              color: 'var(--text-primary)',
-              fontSize: '14px',
-              lineHeight: 1.6,
-              fontFamily: 'var(--font-sans)',
-              marginBottom: '0.5rem',
-              maxHeight: '120px'
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-all"
-                title="Attach file"
+            {/* Input Zone */}
+            <div className="pb-6 px-8 md:px-24 xl:px-48 flex-shrink-0">
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
+                style={{
+                  position: 'relative',
+                  background: dragging ? 'rgba(124,106,245,0.06)' : 'rgba(13,13,22,0.7)',
+                  backdropFilter: 'blur(16px)',
+                  border: `1px solid ${dragging ? 'var(--border-glow)' : 'var(--border-medium)'}`,
+                  borderRadius: '12px',
+                  padding: '1rem',
+                }}
               >
-                <Paperclip size={18} />
-              </button>
-              <input ref={fileRef} type="file" accept="video/*,audio/*,image/*,text/plain" onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }} style={{ display: 'none' }} />
-              
-              <div className="w-[1px] h-4 bg-[var(--border-light)] self-center mx-1" />
-              
-              <p className="text-[10px] text-[var(--text-tertiary)] self-center font-mono opacity-50 hidden sm:block">
-                TIPS: COMMAND + V TO PASTE
-              </p>
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Talk to your assistant..."
+                  rows={1}
+                  className="w-full bg-transparent border-none outline-none resize-none color-[var(--text-primary)] text-sm leading-relaxed no-scrollbar"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <button onClick={() => fileRef.current?.click()} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--accent)]">
+                    <Paperclip size={18} />
+                  </button>
+                  <input ref={fileRef} type="file" onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }} style={{ display: 'none' }} />
+                  <button
+                    onClick={handleTextSubmit}
+                    disabled={!input.trim() || isTyping}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      input.trim() ? 'bg-[var(--accent)] text-white' : 'bg-transparent border border-[var(--border-light)] text-[var(--text-tertiary)]'
+                    }`}
+                  >
+                    Send
+                  </button>
+                </div>
+              </div>
             </div>
-            
-            <button
-              onClick={handleTextSubmit}
-              disabled={!input.trim() || isTyping || isUploading}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0.4rem 1rem', borderRadius: '8px',
-                background: input.trim() && !isTyping && !isUploading ? 'var(--accent)' : 'transparent',
-                border: `1px solid ${input.trim() ? 'transparent' : 'var(--border-light)'}`,
-                color: input.trim() && !isTyping && !isUploading ? '#fff' : 'var(--text-tertiary)',
-                cursor: input.trim() && !isTyping && !isUploading ? 'pointer' : 'default',
-                transition: 'all 0.2s',
-                fontSize: '12px',
-                fontWeight: 500,
-              }}
-            >
-              {isUploading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>{uploadProgress}%</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span>Send</span>
-                  <Send size={13} />
-                </div>
-              )}
-            </button>
           </div>
-        </div>
+        )}
 
-        {uploadSuccess && (
-          <p className="text-[11px] text-green-500 mt-2 px-1 flex items-center gap-1.5 animation-fade-in">
-            <CheckCircle2 size={12} />
-            File successfully uploaded to your context.
-          </p>
+        {view === 'detail' && selectedEntry && (
+          <div className="max-w-4xl mx-auto px-8 py-12">
+            <div className="mb-12">
+              <p className="text-xs font-mono text-[var(--accent)] mb-2 uppercase tracking-widest">
+                SESSION REPORT · {new Date(selectedEntry.logged_at).toLocaleDateString()}
+              </p>
+              <h2 className="text-4xl font-light tracking-tight text-[var(--text-primary)] mb-6">
+                {selectedEntry.title}
+              </h2>
+              
+              <div className="aspect-video w-full rounded-3xl bg-[var(--bg-card)] border border-[var(--border-light)] overflow-hidden mb-12 flex items-center justify-center bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-secondary)] shadow-2xl relative">
+                <div className="absolute inset-0 bg-grid-white/[0.02]" />
+                <div className="text-center relative z-10">
+                  <Bot size={48} className="text-[var(--accent)]/40 mx-auto mb-4" />
+                  <p className="text-xs font-mono text-[var(--text-tertiary)] uppercase tracking-tighter">AI Analysis Protocol v1.4.2</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div className="md:col-span-2 space-y-10">
+                  <section>
+                    <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">The Narrative Report</h4>
+                    <div className="text-lg leading-relaxed text-[var(--text-secondary)] space-y-4">
+                      <Markdown content={selectedEntry.body} />
+                    </div>
+                  </section>
+                </div>
+
+                <div className="space-y-10">
+                  {selectedEntry.meta?.analysis?.projects?.length > 0 && (
+                    <section>
+                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Projects Tracked</h4>
+                      <div className="space-y-3">
+                        {selectedEntry.meta.analysis.projects.map((p: string, i: number) => (
+                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <span className="text-lg">🏗</span>
+                            <span className="text-xs font-medium text-[var(--text-primary)]">{p}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {selectedEntry.meta?.analysis?.ideas?.length > 0 && (
+                    <section>
+                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Extracted Ideas</h4>
+                      <div className="space-y-3">
+                        {selectedEntry.meta.analysis.ideas.map((idea: string, i: number) => (
+                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <span className="text-lg">💡</span>
+                            <span className="text-xs font-medium text-[var(--text-primary)]">{idea}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {selectedEntry.meta?.analysis?.decisions?.length > 0 && (
+                    <section>
+                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Core Decisions</h4>
+                      <div className="space-y-2">
+                        {selectedEntry.meta.analysis.decisions.map((d: string, i: number) => (
+                          <div key={i} className="text-xs text-[var(--text-secondary)] pl-4 border-l-2 border-[var(--accent)]">
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+
+      {uploadSuccess && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-green-500 text-white text-xs rounded-full shadow-lg flex items-center gap-2 z-50">
+          <CheckCircle2 size={14} />
+          File accepted for analysis
+        </div>
+      )}
     </div>
   )
 }
