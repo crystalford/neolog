@@ -6,8 +6,10 @@ import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
 export interface ChatMessage {
-    role: 'user' | 'assistant'
+    role: 'user' | 'assistant' | 'tool'
     content: string
+    tool_call_id?: string
+    name?: string
 }
 
 export interface ChatResponse {
@@ -15,6 +17,28 @@ export interface ChatResponse {
     message?: string
     error?: string
 }
+
+const TOOLS = [
+    {
+        name: 'create_log_entry',
+        description: 'Create a new entry in the users daily log / timeline.',
+        input_schema: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'The title of the log entry' },
+                body: { type: 'string', description: 'The detailed content of the log entry' },
+                entry_type: { 
+                    type: 'string', 
+                    enum: ['work', 'food', 'health', 'finance', 'asset_update', 'social', 'learn', 'build', 'session', 'capture'],
+                    description: 'The category of the event'
+                },
+                logged_at: { type: 'string', description: 'The ISO timestamp of when the event happened (optional)' },
+                is_public: { type: 'boolean', description: 'Whether the entry should be visible on the public log' }
+            },
+            required: ['title', 'entry_type']
+        }
+    }
+]
 
 /**
  * Chat with the "Manager Agent" (Neolog System)
@@ -82,22 +106,71 @@ FORMAT:
                 model: 'gpt-4o',
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    ...history
+                    ...history.map(m => ({ role: m.role as any, content: m.content }))
                 ],
+                tools: TOOLS.map(t => ({
+                    type: 'function',
+                    function: {
+                        name: t.name,
+                        description: t.description,
+                        parameters: t.input_schema
+                    }
+                })),
+                tool_choice: 'auto'
             })
-            aiResponseContent = completion.choices[0].message.content || ''
+
+            const responseMessage = completion.choices[0].message
+            aiResponseContent = responseMessage.content || ''
+
+            if (responseMessage.tool_calls) {
+                for (const toolCall of responseMessage.tool_calls) {
+                    const tc = toolCall as any
+                    if (tc.function?.name === 'create_log_entry') {
+                        const args = JSON.parse(tc.function.arguments)
+                        const { error: insertError } = await supabase.from('log_entries').insert({
+                            user_id: user.id,
+                            ...args,
+                            logged_at: args.logged_at || new Date().toISOString()
+                        })
+                        if (insertError) {
+                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
+                        } else {
+                            aiResponseContent += `\n\n✅ I've published that to your Daily Log.`
+                        }
+                    }
+                }
+            }
         } else if (keys.anthropic) {
             const anthropic = new Anthropic({ apiKey: keys.anthropic })
             const message = await anthropic.messages.create({
                 model: 'claude-sonnet-4-5',
                 max_tokens: 4096,
                 system: systemPrompt,
-                messages: history.map(h => ({ role: h.role, content: h.content })),
+                messages: history.map(h => ({ role: h.role as any, content: h.content })),
+                tools: TOOLS as any
             })
 
             const textContent = message.content.find(c => c.type === 'text')
             if (textContent && textContent.type === 'text') {
                 aiResponseContent = textContent.text
+            }
+
+            const toolCalls = message.content.filter(c => c.type === 'tool_use') as any[]
+            if (toolCalls.length > 0) {
+                for (const toolCall of toolCalls) {
+                    if (toolCall.name === 'create_log_entry') {
+                        const { error: insertError } = await supabase.from('log_entries').insert({
+                            user_id: user.id,
+                            ...toolCall.input,
+                            logged_at: toolCall.input.logged_at || new Date().toISOString()
+                        })
+                        if (insertError) {
+                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
+                        } else {
+                            aiResponseContent = (aiResponseContent ? aiResponseContent + '\n\n' : '') + `✅ I've published that to your Daily Log.`
+                        }
+                    }
+                }
             }
         } else {
             return { success: false, error: 'MISSING_PROVIDER_KEY' }

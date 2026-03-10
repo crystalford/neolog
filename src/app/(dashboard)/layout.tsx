@@ -228,7 +228,6 @@ export default function DashboardLayout({
   const primaryNav = useMemo(() => [
     { href: '/dashboard/log',     icon: Inbox,     label: 'Daily Log',     section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
-    { href: '/dashboard/captures',icon: List,      label: 'Captures',      section: 'INGEST' },
   ], [])
 
   // INTELLIGENCE section — what the system extracted

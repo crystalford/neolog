@@ -200,15 +200,15 @@ export default function DailyLogPage() {
   const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] max-w-4xl mx-auto px-6" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="flex flex-col h-screen" style={{ fontFamily: 'var(--font-sans)' }}>
       
       {/* Header */}
-      <div className="pt-8 md:pt-12 mb-6 flex-shrink-0 flex items-start justify-between">
+      <div className="pt-6 px-8 mb-4 flex-shrink-0 flex items-start justify-between border-b border-[var(--border-light)] pb-4 bg-[var(--bg-primary)]/80 backdrop-blur-md sticky top-0 z-20">
         <div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.2rem' }}>
             {dateStr} · SESSION 1
           </p>
-          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
             Daily Log
           </h1>
         </div>
@@ -227,7 +227,7 @@ export default function DailyLogPage() {
       {/* Message Area */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto mb-6 pr-2 -mr-2 space-y-8 no-scrollbar"
+        className="flex-1 overflow-y-auto pt-8 pb-12 px-8 md:px-24 xl:px-48 space-y-10 no-scrollbar"
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
@@ -289,7 +289,7 @@ export default function DailyLogPage() {
       </div>
 
       {/* Input Zone */}
-      <div className="pb-8 md:pb-12 flex-shrink-0">
+      <div className="pb-6 px-8 md:px-24 xl:px-48 flex-shrink-0 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent pt-12">
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}

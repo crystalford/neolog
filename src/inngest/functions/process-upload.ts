@@ -169,6 +169,43 @@ export const processUpload = inngest.createFunction(
       return { path: audioStoragePath, extracted: true }
     })
 
+    // ── Step 2b: Extract Metadata (recorded_at) ──
+    const metadata = await step.run('extract-metadata', async () => {
+      const { upload } = context
+      
+      // If it's not a video/audio, we don't have good metadata usually
+      if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
+        return { recorded_at: upload.created_at }
+      }
+
+      try {
+        // Use ffprobe-client if available on the system
+        // We need a signed URL for ffprobe to read the file
+        const { data: signedData } = await admin.storage
+          .from('videos')
+          .createSignedUrl(upload.storage_path, 600)
+
+        if (signedData?.signedUrl) {
+          const ffprobe = require('ffprobe-client')
+          const info = await ffprobe(signedData.signedUrl)
+          
+          // Look for creation_time in format, tags, or streams
+          const creationDate = info.format?.tags?.creation_time || 
+                               info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time
+          
+          if (creationDate) {
+            const recordedAt = new Date(creationDate).toISOString()
+            await admin.from('video_uploads').update({ recorded_at: recordedAt }).eq('id', video_upload_id)
+            return { recorded_at: recordedAt }
+          }
+        }
+      } catch (err) {
+        console.warn('Metadata extraction failed, falling back to upload date:', err)
+      }
+
+      return { recorded_at: upload.created_at }
+    })
+
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
       if (context.upload.status !== 'transcribing') {
@@ -293,7 +330,7 @@ export const processUpload = inngest.createFunction(
       const scrubbedTranscript = scrubPiiFromTranscript(transcription.text)
       const uniqueTags = extractTags(analysis)
       const generatedClips = generateClipSuggestions(transcription.segments || [], analysis.key_quotes || [])
-      const generatedPosts = generatePostSuggestions(analysis)
+      const generatedPosts = generatePostSuggestions(analysis, metadata?.recorded_at)
 
       const updateData: Record<string, any> = {
         analysis,
@@ -302,6 +339,7 @@ export const processUpload = inngest.createFunction(
         generated_clips: generatedClips,
         generated_posts: generatedPosts,
         status: 'processed',
+        recorded_at: metadata?.recorded_at || new Date().toISOString(),
         processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }

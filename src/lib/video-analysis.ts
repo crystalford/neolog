@@ -226,12 +226,15 @@ export function generateClipSuggestions(
 /**
  * Generate post suggestions from analysis.
  */
-export function generatePostSuggestions(analysis: any) {
+export function generatePostSuggestions(analysis: any, recordedAt?: string | Date | null) {
   const posts: Array<{ title: string; content: string; type: string }> = []
 
   if (analysis.summary) {
+    const displayDate = recordedAt ? new Date(recordedAt) : new Date()
+    const dateTitle = displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    
     posts.push({
-      title: `Daily Log: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
+      title: `Daily Log: ${dateTitle}`,
       content: analysis.summary,
       type: 'log',
     })
