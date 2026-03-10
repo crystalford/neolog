@@ -77,30 +77,58 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
         }
 
         // 4. Construct System Prompt
-        const systemPrompt = `You are Neolog, an intelligent editorial assistant and content strategist.
+        const systemPrompt = `You are Neolog — a personal intelligence system and life ingestion engine.
 
 CONTEXT:
- The user is a writer/publisher using the Neolog platform.
- You are their "Manager Agent" - helping them brainstorm, organize, and plan content.
- 
-AVAILABLE TOOLS (Worker Agents):
- The user has these specialized agents configured:
- ${agentList}
- 
-YOUR GOAL:
- - Help the user clarify their ideas.
- - Suggest which Agent might be best for a specific task.
- - Draft outlines or summaries if asked.
- - Be concise, helpful, and focused on high-quality publishing.
- 
+ The user is building their own intelligence layer: capturing raw thought through video, voice, and chat, and synthesizing it into a permanent record of their life's work.
+ You are their AI partner in this process — helping them think, clarify, plan, and capture.
+
+YOUR ROLE:
+ - Help the user articulate and develop their ideas across projects (Neolog, CANOPTICON, Supersample, Aldershot, The Crystal Ford, etc.)
+ - When they mention something worth capturing, use the create_log_entry tool to add it to their timeline.
+ - Notice patterns across what they're describing — connect things they've mentioned before.
+ - Be direct, sharp, and intellectually honest. Don't flatter.
+
 FORMAT:
  - Use Markdown for formatting.
- - Keep responses conversational but professional.`
+ - Keep responses concise and substantive.`
 
-        // 5. Call LLM (Prefer OpenAI, fallback to Anthropic)
+        // 5. Call LLM (Prefer Anthropic/Claude, fallback to OpenAI)
         let aiResponseContent = ''
 
-        if (keys.openai) {
+        if (keys.anthropic) {
+            const anthropic = new Anthropic({ apiKey: keys.anthropic })
+            const message = await anthropic.messages.create({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: history.map(h => ({ role: h.role as any, content: h.content })),
+                tools: TOOLS as any
+            })
+
+            const textContent = message.content.find(c => c.type === 'text')
+            if (textContent && textContent.type === 'text') {
+                aiResponseContent = textContent.text
+            }
+
+            const toolCalls = message.content.filter(c => c.type === 'tool_use') as any[]
+            if (toolCalls.length > 0) {
+                for (const toolCall of toolCalls) {
+                    if (toolCall.name === 'create_log_entry') {
+                        const { error: insertError } = await supabase.from('log_entries').insert({
+                            user_id: user.id,
+                            ...toolCall.input,
+                            logged_at: toolCall.input.logged_at || new Date().toISOString()
+                        })
+                        if (insertError) {
+                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
+                        } else {
+                            aiResponseContent = (aiResponseContent ? aiResponseContent + '\n\n' : '') + `✅ I've published that to your Daily Log.`
+                        }
+                    }
+                }
+            }
+        } else if (keys.openai) {
             const openai = new OpenAI({ apiKey: keys.openai })
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o',
@@ -136,38 +164,6 @@ FORMAT:
                             aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
                         } else {
                             aiResponseContent += `\n\n✅ I've published that to your Daily Log.`
-                        }
-                    }
-                }
-            }
-        } else if (keys.anthropic) {
-            const anthropic = new Anthropic({ apiKey: keys.anthropic })
-            const message = await anthropic.messages.create({
-                model: 'claude-sonnet-4-5',
-                max_tokens: 4096,
-                system: systemPrompt,
-                messages: history.map(h => ({ role: h.role as any, content: h.content })),
-                tools: TOOLS as any
-            })
-
-            const textContent = message.content.find(c => c.type === 'text')
-            if (textContent && textContent.type === 'text') {
-                aiResponseContent = textContent.text
-            }
-
-            const toolCalls = message.content.filter(c => c.type === 'tool_use') as any[]
-            if (toolCalls.length > 0) {
-                for (const toolCall of toolCalls) {
-                    if (toolCall.name === 'create_log_entry') {
-                        const { error: insertError } = await supabase.from('log_entries').insert({
-                            user_id: user.id,
-                            ...toolCall.input,
-                            logged_at: toolCall.input.logged_at || new Date().toISOString()
-                        })
-                        if (insertError) {
-                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
-                        } else {
-                            aiResponseContent = (aiResponseContent ? aiResponseContent + '\n\n' : '') + `✅ I've published that to your Daily Log.`
                         }
                     }
                 }
