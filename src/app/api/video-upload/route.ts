@@ -87,8 +87,7 @@ export async function POST(request: NextRequest) {
         .then(() => {}) // best-effort
     }
 
-    // Automatic Inngest trigger disabled - now triggered manually via UI
-    /*
+    // Trigger Inngest processing automatically on upload
     try {
       await inngest.send({
         name: 'video-upload/process',
@@ -96,8 +95,8 @@ export async function POST(request: NextRequest) {
       })
     } catch (inngestError) {
       console.error('Inngest event failed:', inngestError)
+      // Non-fatal: upload is registered, user can manually trigger from uploads page
     }
-    */
 
     finalStatus = 'success'
     finalMeta = { ...finalMeta, video_upload_id: record.id }
