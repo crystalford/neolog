@@ -55,15 +55,15 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
             return { success: false, error: 'Not authenticated' }
         }
 
-        // 2. Get user's agents (to give context about available tools)
-        const { data: agents } = await supabase
-            .from('agents')
-            .select('name, description, model_provider')
+        // 2. Load user's entity graph for context
+        const { data: topEntities } = await supabase
+            .from('entities')
+            .select('type, name, summary, mention_count, last_mentioned_at')
             .eq('user_id', user.id)
+            .order('mention_count', { ascending: false })
+            .limit(30)
 
-        const agentList = agents?.map(a => `- ${a.name}: ${a.description} (${a.model_provider})`).join('\n') || 'No custom agents configured.'
-
-        // 3. Get API keys from modern integration system
+        // 3. Get API keys
         const [openaiKey, anthropicKey] = await Promise.all([
             getActiveIntegrationKey(user.id, 'openai'),
             getActiveIntegrationKey(user.id, 'anthropic')
@@ -76,31 +76,76 @@ export async function chatWithManager(history: ChatMessage[]): Promise<ChatRespo
             return { success: false, error: 'NO_API_KEYS' }
         }
 
-        // 4. Construct System Prompt
-        const systemPrompt = `You are Neolog, an intelligent editorial assistant and content strategist.
+        // 4. Build entity context block from the user's actual graph
+        const entityContext = topEntities && topEntities.length > 0
+            ? topEntities
+                .reduce((acc: Record<string, string[]>, e) => {
+                    if (!acc[e.type]) acc[e.type] = []
+                    acc[e.type].push(e.name + (e.summary ? ` (${e.summary})` : ''))
+                    return acc
+                }, {})
+            : null
 
-CONTEXT:
- The user is a writer/publisher using the Neolog platform.
- You are their "Manager Agent" - helping them brainstorm, organize, and plan content.
- 
-AVAILABLE TOOLS (Worker Agents):
- The user has these specialized agents configured:
- ${agentList}
- 
-YOUR GOAL:
- - Help the user clarify their ideas.
- - Suggest which Agent might be best for a specific task.
- - Draft outlines or summaries if asked.
- - Be concise, helpful, and focused on high-quality publishing.
- 
+        const entityBlock = entityContext
+            ? Object.entries(entityContext)
+                .map(([type, names]) => `${type.toUpperCase()}S: ${names.join(', ')}`)
+                .join('\n')
+            : 'No entities captured yet.'
+
+        // 5. Construct System Prompt with live entity context
+        const systemPrompt = `You are Neolog — a personal intelligence system and life ingestion engine.
+
+The user captures raw thought through video, voice, and chat. Your job is to help them think, synthesize, and build their permanent record.
+
+WHAT YOU KNOW ABOUT THIS USER (from their captured sessions):
+${entityBlock}
+
+YOUR ROLE:
+ - Use the above knowledge to give contextually aware responses — reference what you know about their projects and ideas when relevant.
+ - When they mention something worth capturing, use the create_log_entry tool to add it to their timeline.
+ - Notice patterns — connect things they've mentioned before.
+ - Be direct, sharp, and intellectually honest. Don't flatter.
+
 FORMAT:
  - Use Markdown for formatting.
- - Keep responses conversational but professional.`
+ - Keep responses concise and substantive.`
 
-        // 5. Call LLM (Prefer OpenAI, fallback to Anthropic)
+        // 5. Call LLM (Prefer Anthropic/Claude, fallback to OpenAI)
         let aiResponseContent = ''
 
-        if (keys.openai) {
+        if (keys.anthropic) {
+            const anthropic = new Anthropic({ apiKey: keys.anthropic })
+            const message = await anthropic.messages.create({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: history.map(h => ({ role: h.role as any, content: h.content })),
+                tools: TOOLS as any
+            })
+
+            const textContent = message.content.find(c => c.type === 'text')
+            if (textContent && textContent.type === 'text') {
+                aiResponseContent = textContent.text
+            }
+
+            const toolCalls = message.content.filter(c => c.type === 'tool_use') as any[]
+            if (toolCalls.length > 0) {
+                for (const toolCall of toolCalls) {
+                    if (toolCall.name === 'create_log_entry') {
+                        const { error: insertError } = await supabase.from('log_entries').insert({
+                            user_id: user.id,
+                            ...toolCall.input,
+                            logged_at: toolCall.input.logged_at || new Date().toISOString()
+                        })
+                        if (insertError) {
+                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
+                        } else {
+                            aiResponseContent = (aiResponseContent ? aiResponseContent + '\n\n' : '') + `✅ I've published that to your Daily Log.`
+                        }
+                    }
+                }
+            }
+        } else if (keys.openai) {
             const openai = new OpenAI({ apiKey: keys.openai })
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o',
@@ -136,38 +181,6 @@ FORMAT:
                             aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
                         } else {
                             aiResponseContent += `\n\n✅ I've published that to your Daily Log.`
-                        }
-                    }
-                }
-            }
-        } else if (keys.anthropic) {
-            const anthropic = new Anthropic({ apiKey: keys.anthropic })
-            const message = await anthropic.messages.create({
-                model: 'claude-sonnet-4-5',
-                max_tokens: 4096,
-                system: systemPrompt,
-                messages: history.map(h => ({ role: h.role as any, content: h.content })),
-                tools: TOOLS as any
-            })
-
-            const textContent = message.content.find(c => c.type === 'text')
-            if (textContent && textContent.type === 'text') {
-                aiResponseContent = textContent.text
-            }
-
-            const toolCalls = message.content.filter(c => c.type === 'tool_use') as any[]
-            if (toolCalls.length > 0) {
-                for (const toolCall of toolCalls) {
-                    if (toolCall.name === 'create_log_entry') {
-                        const { error: insertError } = await supabase.from('log_entries').insert({
-                            user_id: user.id,
-                            ...toolCall.input,
-                            logged_at: toolCall.input.logged_at || new Date().toISOString()
-                        })
-                        if (insertError) {
-                            aiResponseContent += `\n\n(Error creating log entry: ${insertError.message})`
-                        } else {
-                            aiResponseContent = (aiResponseContent ? aiResponseContent + '\n\n' : '') + `✅ I've published that to your Daily Log.`
                         }
                     }
                 }

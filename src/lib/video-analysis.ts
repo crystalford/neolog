@@ -463,6 +463,7 @@ export async function upsertEntities(
         .insert({
           entity_id: entityId,
           video_upload_id: videoUploadId,
+          source_type: 'video',
           context: entity.context,
           sentiment: entity.sentiment || null,
         })

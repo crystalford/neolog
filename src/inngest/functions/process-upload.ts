@@ -27,13 +27,8 @@ import {
   upsertEntities,
 } from '@/lib/video-analysis'
 import {
-  needsChunking,
-  chunkBuffer,
-  getAudioExtension,
   isVideoMimeType,
-  mergeTranscriptions,
 } from '@/lib/audio-processing'
-import OpenAI from 'openai'
 import Replicate from 'replicate'
 
 type ProcessUploadEvent = {
@@ -79,23 +74,23 @@ export const processUpload = inngest.createFunction(
 
       console.log(`[PROC-VIDEO:${video_upload_id}] Resolving provider keys...`);
       const openaiKey = await resolveProviderKeyWithClient(admin, user_id, 'openai')
-      if (!openaiKey) {
-        console.error(`[PROC-VIDEO:${video_upload_id}] OpenAI key missing for user.`);
+      const anthropicKey = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
+
+      if (!openaiKey && !anthropicKey) {
+        console.error(`[PROC-VIDEO:${video_upload_id}] No AI key found for user.`);
         await admin.from('video_uploads').update({
           status: 'error',
-          error_message: 'OpenAI API key required for transcription. Add one in Settings > API Keys.',
+          error_message: 'An Anthropic or OpenAI API key is required for analysis. Add one in Settings > API Keys.',
           updated_at: new Date().toISOString(),
         }).eq('id', video_upload_id)
-        throw new Error('OpenAI API key required')
+        throw new Error('No AI API key available')
       }
-
-      const anthropicKey = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
 
       console.log(`[PROC-VIDEO:${video_upload_id}] Context ready for processing.`);
       return {
         skip: false as const,
         upload,
-        openaiKey: openaiKey.key,
+        openaiKey: openaiKey?.key || null,
         anthropicKey: anthropicKey?.key || null,
       }
     })
@@ -226,83 +221,57 @@ export const processUpload = inngest.createFunction(
         }).eq('id', video_upload_id)
       }
 
-      const storagePath = audioPath.path
-      const mimeType = audioPath.extracted ? 'audio/mp4' : context.upload.mime_type
-
-      console.log(`[PROC-VIDEO:${video_upload_id}] Downloading file for transcription: ${storagePath}`);
-      const { data: fileData, error: downloadError } = await admin.storage
-        .from('videos')
-        .download(storagePath)
-
-      if (downloadError || !fileData) {
-        console.error(`[PROC-VIDEO:${video_upload_id}] Download failed for transcription:`, downloadError);
-        throw new Error('Failed to download file from storage');
-      }
-
-      const arrayBuffer = await fileData.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-
       if (context.upload.mime_type === 'text/plain') {
+        const { data: fileData } = await admin.storage.from('videos').download(audioPath.path)
+        const buffer = fileData ? Buffer.from(await fileData.arrayBuffer()) : Buffer.alloc(0)
         return { text: buffer.toString('utf-8'), segments: [], language: null, duration: null }
       }
 
-      const ext = getAudioExtension(mimeType)
-      const openai = new OpenAI({ apiKey: context.openaiKey })
+      // Generate a signed URL for the audio file — Replicate fetches it directly
+      console.log(`[PROC-VIDEO:${video_upload_id}] Generating signed URL for Replicate Whisper...`);
+      const { data: signedData, error: signedError } = await admin.storage
+        .from('videos')
+        .createSignedUrl(audioPath.path, 3600)
 
-      if (!needsChunking(buffer.length)) {
-        console.log(`[PROC-VIDEO:${video_upload_id}] Normal file (size: ${buffer.length}). Transcribing via Whisper-1...`);
-        const file = new File([buffer.buffer as ArrayBuffer], `audio.${ext}`, { type: mimeType })
-        const result = await openai.audio.transcriptions.create({
-          file,
-          model: 'whisper-1',
-          response_format: 'verbose_json',
-          timestamp_granularities: ['segment'],
-        })
-
-        const segments = (result as any).segments?.map((s: any) => ({
-          start: s.start, end: s.end, text: s.text,
-        })) || []
-
-        console.log(`[PROC-VIDEO:${video_upload_id}] Transcription complete. Text length: ${result.text.length}`);
-        return {
-          text: result.text,
-          segments,
-          language: (result as any).language || null,
-          duration: (result as any).duration || null,
-        }
+      if (signedError || !signedData?.signedUrl) {
+        console.error(`[PROC-VIDEO:${video_upload_id}] Failed to generate signed URL:`, signedError);
+        throw new Error('Failed to generate signed URL for transcription');
       }
 
-      // Large file — chunk and transcribe each piece
-      console.log(`[PROC-VIDEO:${video_upload_id}] Large file (size: ${buffer.length}). Chunking and transcribing...`);
-      const chunks = chunkBuffer(buffer)
-      const results: Array<{
-        text: string
-        segments?: Array<{ start: number; end: number; text: string }>
-        duration?: number
-      }> = []
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) throw new Error('REPLICATE_API_TOKEN not set')
 
-      for (let i = 0; i < chunks.length; i++) {
-        console.log(`[PROC-VIDEO:${video_upload_id}] Transcribing chunk ${i+1}/${chunks.length}...`);
-        const chunk = chunks[i]
-        const file = new File([chunk.buffer as ArrayBuffer], `chunk_${i}.${ext}`, { type: mimeType })
-        const result = await openai.audio.transcriptions.create({
-          file,
-          model: 'whisper-1',
-          response_format: 'verbose_json',
-          timestamp_granularities: ['segment'],
-        })
-        results.push({
-          text: result.text,
-          segments: (result as any).segments?.map((s: any) => ({
-            start: s.start, end: s.end, text: s.text,
-          })) || [],
-          duration: (result as any).duration || 0,
-        })
+      const replicate = new Replicate({ auth: replicateToken })
+
+      console.log(`[PROC-VIDEO:${video_upload_id}] Calling Replicate Whisper (large-v3)...`);
+      const output = await replicate.run(
+        'openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d' as any,
+        {
+          input: {
+            audio: signedData.signedUrl,
+            model: 'large-v3',
+            transcription: 'plain text',
+            language: 'auto',
+            word_timestamps: false,
+          },
+        },
+      ) as any
+
+      const text = output?.transcription || ''
+      const segments = (output?.segments || []).map((s: any) => ({
+        start: s.start,
+        end: s.end,
+        text: s.text,
+      }))
+      const duration = segments.length > 0 ? segments[segments.length - 1].end : null
+
+      console.log(`[PROC-VIDEO:${video_upload_id}] Transcription complete. Text length: ${text.length}`);
+      return {
+        text,
+        segments,
+        language: output?.detected_language || null,
+        duration,
       }
-
-      const merged = mergeTranscriptions(results)
-      console.log(`[PROC-VIDEO:${video_upload_id}] Chunks merged. Final text length: ${merged.text.length}`);
-      return { text: merged.text, segments: merged.segments, language: null, duration: merged.totalDuration }
     })
 
     // ── Step 4: Save transcript ──
@@ -312,7 +281,7 @@ export const processUpload = inngest.createFunction(
         transcript: transcription.text,
         transcript_segments: transcription.segments,
         transcript_language: transcription.language,
-        transcript_model: 'whisper-1',
+        transcript_model: 'whisper-large-v3',
         updated_at: new Date().toISOString(),
       }
       if (transcription.duration) updateData.duration_seconds = transcription.duration
