@@ -7,9 +7,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited video/audio transcripts — stream-of-consciousness recordings about someone's life, work, ideas, and projects.
+export const ANALYSIS_PROMPT_VERSION = '1.1'
 
-Your job is to extract EVERYTHING meaningful. Think of yourself as building a living map of this person's mind, work, and life.
+export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited transcripts — stream-of-consciousness recordings, voice memos, chat sessions, or text notes about someone's life, work, ideas, and projects.
+
+Your job is to extract EVERYTHING meaningful. Think of yourself as building a living map of this person's mind, work, and life over time. Every session adds to an accumulating graph — entity framing you capture now will be compared against future sessions to detect how thinking evolves.
 
 CRITICAL — PRIVACY FIRST:
 Before anything else, scan for personally identifiable information (PII) and sensitive data:
@@ -26,6 +28,7 @@ Flag ALL PII in the "pii_detected" array. NEVER include actual PII values in any
 Analyze the transcript and return a JSON object with this EXACT structure:
 
 {
+  "analysis_version": "1.1",
   "summary": "2-3 sentence summary of what was discussed",
   "categories": [{"name": "category", "confidence": 0.0-1.0}],
   "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",
@@ -38,7 +41,12 @@ Analyze the transcript and return a JSON object with this EXACT structure:
   "recurring_themes": ["themes that come up multiple times in this recording"],
 
   "projects": [
-    {"name": "project name", "status": "active|idea|stalled|completed|mentioned", "updates": ["what was said about it"]}
+    {
+      "name": "project name — use the most specific/canonical name mentioned (not 'the app' when a real name was used)",
+      "status": "active|idea|stalled|completed|mentioned",
+      "updates": ["what was said about it"],
+      "framing": "1 sentence: how is the person currently relating to this project — their energy, attitude, or emotional position toward it"
+    }
   ],
   "action_items": ["concrete next steps mentioned"],
   "decisions": [
@@ -86,6 +94,9 @@ CATEGORIES: work, personal, ideas, health, relationships, projects, learning, go
 
 GUIDELINES:
 - Be thorough. Extract MORE than you think is needed. False negatives (missing something) are worse than false positives.
+- For projects: only mark as 'active' if the person is actively working on it NOW. Use 'mentioned' for passing references. Use the most specific, canonical name (if they say both 'the YouTube tool' and a specific product name, use the product name).
+- For entity deduplication: if the same concept appears under multiple names in this session, consolidate to the most specific/canonical name used.
+- For framing: capture the person's current emotional and strategic relationship to a project — not just what they said, but how they're sitting with it. "Excited and building fast" differs from "stuck and avoiding it."
 - For questions: capture "I wonder...", "what if...", "should I...", "how do I..." — these reveal what the person is actually thinking about.
 - For commitments: "I'm gonna...", "I should...", "I need to..." — these are accountability signals.
 - For values: what makes them angry, excited, passionate? What do they keep coming back to?
@@ -296,15 +307,24 @@ export function generatePostSuggestions(analysis: any, recordedAt?: string | Dat
   return posts
 }
 
+type EntitySource =
+  | { videoUploadId: string; logEntryId?: never }
+  | { logEntryId: string; videoUploadId?: never }
+
 /**
  * Upsert entities from analysis into the entities + entity_mentions tables.
+ * source: either { videoUploadId } for video pipeline or { logEntryId } for chat/capture/import.
  */
 export async function upsertEntities(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
-  videoUploadId: string,
+  source: EntitySource,
   analysis: any,
 ) {
+  const mentionSourceFields =
+    'videoUploadId' in source
+      ? { video_upload_id: source.videoUploadId, source_type: 'video' as const }
+      : { log_entry_id: source.logEntryId, source_type: 'capture' as const }
   const now = new Date().toISOString()
 
   const entitiesToUpsert: Array<{
@@ -462,8 +482,7 @@ export async function upsertEntities(
         .from('entity_mentions')
         .insert({
           entity_id: entityId,
-          video_upload_id: videoUploadId,
-          source_type: 'video',
+          ...mentionSourceFields,
           context: entity.context,
           sentiment: entity.sentiment || null,
         })

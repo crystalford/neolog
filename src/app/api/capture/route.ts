@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAutomationKey } from '@/lib/apiKeyAuth'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
+import { inngest } from '@/inngest/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -168,6 +169,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
     }
 
+    // Create log_entry and queue entity extraction
+    const { data: logEntry } = await admin
+      .from('log_entries')
+      .insert({
+        user_id: auth.userId,
+        entry_type: 'capture',
+        title: title || content.substring(0, 80),
+        body: content,
+        logged_at: new Date().toISOString(),
+        meta: { asset_id: data.id, source_platform: sourcePlatform, tags },
+      })
+      .select('id')
+      .single()
+
+    if (logEntry) {
+      await inngest.send({
+        name: 'capture/text.created',
+        data: { user_id: auth.userId, log_entry_id: logEntry.id, content },
+      })
+    }
+
     finalStatus = 'success'
     finalMeta = {
       ...finalMeta,
@@ -234,6 +256,30 @@ export async function POST(request: NextRequest) {
   if (error || !data) {
     finalErrorMessage = 'Failed to create asset.'
     return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
+  }
+
+  // Create log_entry and queue entity extraction
+  const adminForCapture = createAdminClient()
+  if (adminForCapture) {
+    const { data: logEntry } = await adminForCapture
+      .from('log_entries')
+      .insert({
+        user_id: session.user.id,
+        entry_type: 'capture',
+        title: title || content.substring(0, 80),
+        body: content,
+        logged_at: new Date().toISOString(),
+        meta: { asset_id: data.id, source_platform: sourcePlatform, tags },
+      })
+      .select('id')
+      .single()
+
+    if (logEntry) {
+      await inngest.send({
+        name: 'capture/text.created',
+        data: { user_id: session.user.id, log_entry_id: logEntry.id, content },
+      })
+    }
   }
 
   finalStatus = 'success'
