@@ -8,6 +8,7 @@ import {
 import { chatWithManager, type ChatMessage } from '@/app/actions/chat'
 import { createClient } from '@/lib/supabase/client'
 import Markdown from '@/components/Markdown'
+import { UploadPipelineStatus } from '@/components/UploadPipelineStatus'
 import * as tus from 'tus-js-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +41,8 @@ type FeedItem = {
   status?: string
   analysis?: any
   meta?: any
+  pipeline_log?: any[]
+  error_message?: string | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -158,6 +161,8 @@ export default function NeoLogPage() {
             timestamp: u.created_at,
             source_type: 'video',
             status: u.status,
+            pipeline_log: u.pipeline_log || [],
+            error_message: u.error_message || null,
           })
         }
       }
@@ -571,6 +576,16 @@ export default function NeoLogPage() {
 
                   {isExpanded && (
                     <div className="px-5 pb-5 border-t border-[var(--border-light)] pt-4 space-y-4">
+                      {/* Pipeline status for video uploads */}
+                      {item.kind === 'upload' && (
+                        <UploadPipelineStatus
+                          uploadId={item.id}
+                          initialStatus={item.status || 'uploaded'}
+                          initialPipelineLog={item.pipeline_log || []}
+                          errorMessage={item.error_message}
+                        />
+                      )}
+
                       {item.body && (
                         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                           <Markdown content={item.body} />
