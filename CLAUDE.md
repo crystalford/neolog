@@ -129,9 +129,9 @@ Users supply their own OpenAI/Anthropic keys via Settings → API Keys. The syst
 
 ---
 
-## Active branch
+## Git workflow
 
-`claude/video-upload-analysis-kARDH` — all video/upload/session work lives here.
+This is a solo personal project. **Push directly to `main`** — no feature branches, no PRs. Every push to main deploys to production automatically via Vercel.
 
 ---
 
