@@ -123,16 +123,16 @@ ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commi
         if (existing) {
           entityId = existing.id
           // Update mention count
-          await supabase
+          await admin
             .from('entities')
-            .update({ 
+            .update({
               mention_count: existing.mention_count + 1,
               last_mentioned_at: new Date().toISOString()
             })
             .eq('id', entityId)
         } else {
           // Create new entity
-          const { data: newEntity, error: insertError } = await supabase
+          const { data: newEntity, error: insertError } = await admin
             .from('entities')
             .insert({
               user_id,

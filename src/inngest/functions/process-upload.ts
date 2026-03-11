@@ -355,7 +355,7 @@ export const processUpload = inngest.createFunction(
     // ── Step 7: Extract and accumulate entities ──
     await step.run('upsert-entities', async () => {
       console.log(`[PROC-VIDEO:${video_upload_id}] Starting Step 7: Upserting entities`);
-      await upsertEntities(admin, user_id, video_upload_id, analysisResult.analysis)
+      await upsertEntities(admin, user_id, { videoUploadId: video_upload_id }, analysisResult.analysis)
       console.log(`[PROC-VIDEO:${video_upload_id}] Pipeline complete.`);
     })
 
