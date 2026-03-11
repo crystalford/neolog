@@ -254,18 +254,17 @@ export const processUpload = inngest.createFunction(
       const replicate = new Replicate({ auth: replicateToken })
 
       console.log(`[PROC-VIDEO:${video_upload_id}] Calling Replicate Whisper (large-v3)...`);
-      const output = await replicate.run(
-        'openai/whisper' as any,
-        {
-          input: {
-            audio: signedData.signedUrl,
-            model: 'large-v3',
-            transcription: 'plain text',
-            language: 'auto',
-            word_timestamps: false,
-          },
+      const prediction = await replicate.predictions.create({
+        model: 'openai/whisper',
+        input: {
+          audio: signedData.signedUrl,
+          model: 'large-v3',
+          transcription: 'plain text',
+          language: 'auto',
+          word_timestamps: false,
         },
-      ) as any
+      })
+      const output = await replicate.wait(prediction) as any
 
       const text = output?.transcription || ''
       const segments = (output?.segments || []).map((s: any) => ({
