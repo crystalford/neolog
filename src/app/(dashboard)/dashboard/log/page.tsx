@@ -457,7 +457,7 @@ export default function NeoLogPage() {
       {/* ── Entity Rail ── */}
       {entities.length > 0 && (
         <div className="flex-shrink-0 border-b border-[var(--border-light)]">
-          <div className="flex gap-2 px-6 py-3 overflow-x-auto no-scrollbar">
+          <div className="flex flex-wrap gap-2 px-6 py-3">
             {entities.map(e => {
               const isExpanded = expandedEntityId === e.id
               const colorClass = ENTITY_COLOR[e.type] || 'text-[var(--text-tertiary)] bg-[var(--bg-card)] border-[var(--border-light)]'

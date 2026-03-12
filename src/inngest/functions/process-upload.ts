@@ -240,7 +240,15 @@ export const processUpload = inngest.createFunction(
             await plog(admin, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
             return { recorded_at: foundDate }
           } else {
-            await plog(admin, video_upload_id, 'extract-metadata', 'warn', `No recording date found in metadata. Full tags logged for debug: ${JSON.stringify(allTags)}`)
+            // CRITICAL: Save raw tags to the database for manual inspection if all else fails
+            await admin.from('video_uploads').update({ 
+              meta: { 
+                ...(upload.meta || {}), 
+                raw_metadata_diagnostic: allTags 
+              } 
+            }).eq('id', video_upload_id)
+            
+            await plog(admin, video_upload_id, 'extract-metadata', 'warn', `No recording date found. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
           }
         }
       } catch (err: any) {

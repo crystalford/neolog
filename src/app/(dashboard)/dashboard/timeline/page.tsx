@@ -64,7 +64,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="max-w-5xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -129,13 +129,17 @@ export default function TimelinePage() {
               <div
                 style={{ 
                   position: 'sticky', 
-                  top: '64px', 
+                  top: '0', 
                   zIndex: 20, 
                   background: 'var(--bg-primary)',
-                  padding: '12px 0',
+                  padding: '16px 0',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
+                  borderBottom: '1px solid var(--border-light)',
+                  margin: '0 -16px 12px -16px',
+                  paddingLeft: '16px',
+                  paddingRight: '16px'
                 }}
               >
                 <span style={{
