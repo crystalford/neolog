@@ -336,26 +336,8 @@ export default function NeoLogPage() {
     setInput('')
     setError(null)
 
-    // 1. Log it automatically (save as capture)
-    try {
-      const res = await fetch('/api/capture', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'text', content: text }),
-      })
-      if (res.ok) {
-        // Refresh feed/entities to show the new log immediately
-        fetchFeed()
-        fetchEntities()
-      } else {
-        const data = await res.json().catch(() => ({}))
-        setError(data.error || 'Failed to save capture.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error saving capture.')
-    }
-
-    // 2. Start/Continue conversation
+    // 1. Start/Continue conversation (Transient Chat)
+    // No automatic capture here anymore. Interactions stay in the chat window until saved.
     const userMsg: ChatMessage = { role: 'user', content: text }
     const updated = [...chatMessages, userMsg]
     setChatMessages(updated)
@@ -366,7 +348,7 @@ export default function NeoLogPage() {
       if (res.success && res.message) {
         setChatMessages(prev => [...prev, { role: 'assistant', content: res.message! }])
       } else {
-        setError(res.error || 'Chat error')
+        setError(res.error || 'Assistant error')
       }
     } catch {
       setError('Chat failed.')
@@ -437,14 +419,22 @@ export default function NeoLogPage() {
         </div>
         <div className="flex items-center gap-2">
           {chatMessages.length > 0 && (
-            <button
-              onClick={archiveChat}
-              disabled={isArchiving}
-              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
-            >
-              {isArchiving ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
-              {isArchiving ? 'Saving...' : 'Save Session'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setChatMessages([]); setShowChat(false) }}
+                className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all"
+              >
+                Reset
+              </button>
+              <button
+                onClick={archiveChat}
+                disabled={isArchiving}
+                className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[var(--accent)] text-white hover:opacity-90 transition-all shadow-sm"
+              >
+                {isArchiving ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
+                {isArchiving ? 'Saving...' : 'Commit to Log'}
+              </button>
+            </div>
           )}
         </div>
       </div>
