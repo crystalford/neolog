@@ -96,7 +96,6 @@ export default function NeoLogPage() {
 
   // Input
   const [input, setInput] = useState('')
-  const [mode, setMode] = useState<'log' | 'chat'>('log')
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isThinking, setIsThinking] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -337,43 +336,42 @@ export default function NeoLogPage() {
     setInput('')
     setError(null)
 
-    if (mode === 'log') {
-      // Save as capture
-      try {
-        const res = await fetch('/api/capture', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'text', content: text }),
-        })
-        if (res.ok) {
-          fetchFeed()
-          fetchEntities()
-        } else {
-          const data = await res.json().catch(() => ({}))
-          setError(data.error || 'Failed to save capture.')
-        }
-      } catch (err: any) {
-        setError(err.message || 'Network error saving capture.')
+    // 1. Log it automatically (save as capture)
+    try {
+      const res = await fetch('/api/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'text', content: text }),
+      })
+      if (res.ok) {
+        // Refresh feed/entities to show the new log immediately
+        fetchFeed()
+        fetchEntities()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Failed to save capture.')
       }
-    } else {
-      // Chat mode
-      const userMsg: ChatMessage = { role: 'user', content: text }
-      const updated = [...chatMessages, userMsg]
-      setChatMessages(updated)
-      setShowChat(true)
-      setIsThinking(true)
-      try {
-        const res = await chatWithManager(updated)
-        if (res.success && res.message) {
-          setChatMessages(prev => [...prev, { role: 'assistant', content: res.message! }])
-        } else {
-          setError(res.error || 'Chat error')
-        }
-      } catch {
-        setError('Chat failed.')
-      } finally {
-        setIsThinking(false)
+    } catch (err: any) {
+      setError(err.message || 'Network error saving capture.')
+    }
+
+    // 2. Start/Continue conversation
+    const userMsg: ChatMessage = { role: 'user', content: text }
+    const updated = [...chatMessages, userMsg]
+    setChatMessages(updated)
+    setShowChat(true)
+    setIsThinking(true)
+    try {
+      const res = await chatWithManager(updated)
+      if (res.success && res.message) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: res.message! }])
+      } else {
+        setError(res.error || 'Chat error')
       }
+    } catch {
+      setError('Chat failed.')
+    } finally {
+      setIsThinking(false)
     }
   }
 
@@ -717,28 +715,11 @@ export default function NeoLogPage() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={mode === 'log' ? 'Log a thought...' : 'Talk to your assistant...'}
+                placeholder="Log a thought or chat with Assistant..."
                 rows={1}
                 className="w-full bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/60 resize-none overflow-hidden no-scrollbar leading-relaxed"
               />
             </div>
-
-            {/* Mode toggle */}
-            <button
-              onClick={() => {
-                const next = mode === 'log' ? 'chat' : 'log'
-                setMode(next)
-                if (next === 'chat') setShowChat(true)
-              }}
-              className="flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border transition-all"
-              style={{
-                color: mode === 'chat' ? 'var(--accent)' : 'var(--text-tertiary)',
-                borderColor: mode === 'chat' ? 'var(--accent)' : 'var(--border-light)',
-                background: mode === 'chat' ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
-              }}
-            >
-              {mode === 'log' ? 'log' : 'chat'}
-            </button>
 
             {/* Upload button */}
             <button
