@@ -313,13 +313,22 @@ export const processUpload = inngest.createFunction(
 
           // 4. Final Safety: Inferred from filename (e.g. PXL_20240128_...)
           if (!foundDate) {
-            const fileMatch = upload.file_name.match(/(\d{4})(\d{2})(\d{2})/);
-            if (fileMatch) {
-              const [_, y, m, d] = fileMatch;
-              const inferred = new Date(`${y}-${m}-${d}T12:00:00Z`);
-              if (!isNaN(inferred.getTime())) {
-                foundDate = inferred.toISOString();
-                foundKey = 'filename-inference';
+            const dateRegexes = [
+              /(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, // 20240128_123456
+              /(\d{4})-(\d{2})-(\d{2})/,                    // 2024-01-28
+              /(\d{4})(\d{2})(\d{2})/,                       // 20240128
+            ];
+            for (const regex of dateRegexes) {
+              const fileMatch = upload.file_name.match(regex);
+              if (fileMatch) {
+                const [_, y, m, d, hh, mm, ss] = fileMatch;
+                const dStr = hh ? `${y}-${m}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${m}-${d}T12:00:00Z`;
+                const inferred = new Date(dStr);
+                if (!isNaN(inferred.getTime())) {
+                  foundDate = inferred.toISOString();
+                  foundKey = 'filename-inference';
+                  break;
+                }
               }
             }
           }
@@ -327,13 +336,13 @@ export const processUpload = inngest.createFunction(
           if (foundDate) {
             await plog(admin!, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
           } else {
-            await plog(admin!, video_upload_id, 'extract-metadata', 'warn', `No recording date found in standard tags. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
+            await plog(admin!, video_upload_id, 'extract-metadata', 'warn', `No recording date found. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
           }
 
           return { 
             recorded_at: foundDate || (upload as any).recorded_at || (upload as any).created_at,
             raw_metadata_diagnostic: allTags,
-            found_key: foundKey
+            found_key: foundKey || 'not-found'
           }
         }
       } catch (err: any) {
