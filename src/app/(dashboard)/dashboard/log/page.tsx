@@ -1,598 +1,748 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Upload, Send, ArrowUpRight, Loader2, CheckCircle2, User, Bot, Paperclip, MoreHorizontal } from 'lucide-react'
+import {
+  Mic, MicOff, Send, Upload, Loader2, CheckCircle2,
+  User, Bot, X, ChevronDown, ChevronUp, Paperclip, Square,
+} from 'lucide-react'
 import { chatWithManager, type ChatMessage } from '@/app/actions/chat'
 import { createClient } from '@/lib/supabase/client'
 import Markdown from '@/components/Markdown'
+import { UploadPipelineStatus } from '@/components/UploadPipelineStatus'
 import * as tus from 'tus-js-client'
 
-const mockExtractions = [
-  { emoji: '💡', name: 'AI documentary idea', type: 'Idea', time: '12m ago' },
-  { emoji: '🏗', name: 'Neolog', type: 'Project', time: '12m ago' },
-  { emoji: '❓', name: 'How do I sell without selling?', type: 'Question', time: '12m ago' },
-  { emoji: '🎯', name: 'Ship uploads this week', type: 'Commitment', time: '12m ago' },
-  { emoji: '📖', name: 'The Crystal Ford', type: 'Creative', time: '12m ago' },
-]
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const days = [
-  { date: 'Sat, Mar 8', sessions: 1, entities: 17 },
-  { date: 'Thu, Mar 6', sessions: 2, entities: 31 },
-  { date: 'Tue, Mar 4', sessions: 1, entities: 11 },
-]
+type Entity = {
+  id: string
+  type: string
+  name: string
+  mention_count: number
+  last_mentioned_at: string
+  summary: string | null
+}
 
-export default function DailyLogPage() {
+type EntityMention = {
+  id: string
+  context: string
+  source_type: string
+  created_at: string
+  video_uploads?: { file_name: string; created_at: string } | null
+  log_entries?: { title: string; created_at: string } | null
+}
+
+type FeedItem = {
+  id: string
+  kind: 'log' | 'upload'
+  title: string
+  body: string | null
+  timestamp: string
+  source_type?: string
+  status?: string
+  analysis?: any
+  meta?: any
+  pipeline_log?: any[]
+  error_message?: string | null
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const ENTITY_EMOJI: Record<string, string> = {
+  project: '🏗', idea: '💡', person: '🤝', goal: '🚩',
+  question: '❓', habit: '🔁', commitment: '🎯', skill: '📖', blocker: '🚧', topic: '🔷',
+}
+
+const ENTITY_COLOR: Record<string, string> = {
+  project: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+  idea: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
+  person: 'text-green-400 bg-green-400/10 border-green-400/20',
+  goal: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+  question: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
+  habit: 'text-teal-400 bg-teal-400/10 border-teal-400/20',
+  commitment: 'text-pink-400 bg-pink-400/10 border-pink-400/20',
+  skill: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',
+  blocker: 'text-red-400 bg-red-400/10 border-red-400/20',
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  video: 'video', chat: 'chat', capture: 'capture', import: 'import',
+}
+
+function reltime(dateStr: string) {
+  const d = new Date(dateStr)
+  const diff = Date.now() - d.getTime()
+  const m = Math.floor(diff / 60000)
+  const h = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+  if (m < 60) return `${m}m ago`
+  if (h < 24) return `${h}h ago`
+  if (days < 7) return `${days}d ago`
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function NeoLogPage() {
+  // Feed
+  const [feed, setFeed] = useState<FeedItem[]>([])
+  const [feedLoading, setFeedLoading] = useState(true)
+  const [expandedFeedId, setExpandedFeedId] = useState<string | null>(null)
+
+  // Entities
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null)
+  const [entityMentions, setEntityMentions] = useState<EntityMention[]>([])
+  const [loadingMentions, setLoadingMentions] = useState(false)
+
+  // Input
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [isTyping, setIsTyping] = useState(false)
-  const [dragging, setDragging] = useState(false)
+  const [mode, setMode] = useState<'log' | 'chat'>('log')
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [isThinking, setIsThinking] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+
+  // Upload
   const [isUploading, setIsUploading] = useState(false)
-  const [isArchiving, setIsArchiving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [uploadDone, setUploadDone] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  // Recording
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Misc
   const [error, setError] = useState<string | null>(null)
-  
-  const [entries, setEntries] = useState<any[]>([])
-  const [loadingEntries, setLoadingEntries] = useState(true)
-  const [view, setView] = useState<'chat' | 'timeline' | 'detail'>('timeline')
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
-  const fetchEntries = useCallback(async () => {
+  // ── Data fetching ──────────────────────────────────────────────────────────
+
+  const fetchFeed = useCallback(async () => {
+    setFeedLoading(true)
     try {
-      const res = await fetch('/api/log-entries')
+      const [logRes, uploadRes] = await Promise.all([
+        fetch('/api/log-entries'),
+        fetch('/api/video-upload'),
+      ])
+
+      const items: FeedItem[] = []
+
+      if (logRes.ok) {
+        const { entries } = await logRes.json()
+        for (const e of (entries || [])) {
+          items.push({
+            id: e.id,
+            kind: 'log',
+            title: e.title,
+            body: e.body,
+            timestamp: e.logged_at,
+            source_type: e.entry_type,
+            analysis: e.meta?.analysis,
+            meta: e.meta,
+          })
+        }
+      }
+
+      if (uploadRes.ok) {
+        const { uploads } = await uploadRes.json()
+        for (const u of (uploads || [])) {
+          items.push({
+            id: u.id,
+            kind: 'upload',
+            title: u.file_name,
+            body: null,
+            timestamp: u.created_at,
+            source_type: 'video',
+            status: u.status,
+            pipeline_log: u.pipeline_log || [],
+            error_message: u.error_message || null,
+          })
+        }
+      }
+
+      items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      setFeed(items)
+    } catch (err) {
+      console.error('Feed fetch failed:', err)
+    } finally {
+      setFeedLoading(false)
+    }
+  }, [])
+
+  const fetchEntities = useCallback(async () => {
+    try {
+      const res = await fetch('/api/entities?sort=mentions&limit=16')
       if (res.ok) {
         const data = await res.json()
-        setEntries(data.entries || [])
+        setEntities(data.entities || [])
       }
     } catch (err) {
-      console.error('Failed to fetch entries:', err)
-    } finally {
-      setLoadingEntries(false)
+      console.error('Entities fetch failed:', err)
     }
   }, [])
 
   useEffect(() => {
-    fetchEntries()
-  }, [fetchEntries])
+    fetchFeed()
+    fetchEntities()
+  }, [fetchFeed, fetchEntities])
 
-  const handleEndSession = async () => {
-    if (messages.length < 2 || isArchiving) return
-    if (!confirm('End this session and archive it to your timeline? This will trigger a 3rd-person analysis.')) return
+  useEffect(() => {
+    if (showChat && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages, isThinking, showChat])
 
-    setIsArchiving(true)
+  // ── Entity expand ──────────────────────────────────────────────────────────
+
+  const toggleEntity = async (id: string) => {
+    if (expandedEntityId === id) {
+      setExpandedEntityId(null)
+      setEntityMentions([])
+      return
+    }
+    setExpandedEntityId(id)
+    setLoadingMentions(true)
     try {
-      const res = await fetch('/api/chat/archive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages }),
-      })
-
+      const res = await fetch(`/api/entities/${id}`)
       if (res.ok) {
-        await fetchEntries()
-        setView('timeline')
-        setMessages([]) // Clear chat for next session
-      } else {
         const data = await res.json()
-        setError(data.error || 'Failed to archive session')
+        setEntityMentions(data.mentions || [])
       }
     } catch (err) {
-      console.error('Archive error:', err)
-      setError('Failed to archive session')
+      console.error('Mentions fetch failed:', err)
     } finally {
-      setIsArchiving(false)
+      setLoadingMentions(false)
     }
   }
 
-  const [username, setUsername] = useState<string | null>(null)
+  // ── Upload (TUS) ───────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', session.user.id)
-          .single()
-        setUsername(data?.username || null)
-      }
-    }
-    loadProfile()
-  }, [])
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [messages, isTyping])
-
-  // Initialize with a welcome message if empty
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        { 
-          role: 'assistant', 
-          content: "Welcome to your Daily Log. I'm your Neolog assistant. You can brainstorm ideas, drop recordings, or ask me to draft something based on your context." 
-        }
-      ])
-    }
-  }, [])
-
-  const startTusUpload = useCallback(async (file: File) => {
+  const startUpload = useCallback(async (file: File) => {
     setIsUploading(true)
     setUploadProgress(0)
-    setUploadSuccess(false)
-    setError(null)
-    
+    setUploadDone(false)
+    setUploadError(null)
+
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      setIsUploading(false)
-      setError('You must be logged in to upload.')
-      return
-    }
+    if (!session) { setIsUploading(false); setUploadError('Not logged in'); return }
 
     try {
-      // Ensure infrastructure (bucket) is ready
-      const prepRes = await fetch('/api/video-upload/prepare')
-      if (!prepRes.ok) {
-        console.warn('Infrastructure check failed, attempting upload anyway...')
-      }
-    } catch (err) {
-      console.error('Failed to prepare infrastructure:', err)
-    }
+      await fetch('/api/video-upload/prepare').catch(() => {})
+    } catch {}
 
-    const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storagePath = `${session.user.id}/${timestamp}_${sanitizedName}`
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const projectId = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
+    const storagePath = `${session.user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace('https://', '').replace('.supabase.co', '')
 
     const tusUpload = new tus.Upload(file, {
       endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
       retryDelays: [0, 3000, 5000, 10000, 20000],
-      headers: {
-        authorization: `Bearer ${session.access_token}`,
-        'x-upsert': 'true',
-      },
+      headers: { authorization: `Bearer ${session.access_token}`, 'x-upsert': 'true' },
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       metadata: {
-        bucketName: 'videos',
-        objectName: storagePath,
-        contentType: file.type || 'text/plain',
-        cacheControl: '86400',
+        bucketName: 'videos', objectName: storagePath,
+        contentType: file.type || 'application/octet-stream', cacheControl: '86400',
       },
       chunkSize: 6 * 1024 * 1024,
-      onError: (error) => {
-        console.error('TUS upload error:', error)
-        setIsUploading(false)
-        setError('Upload failed. Please try again.')
-      },
-      onProgress: (bytesUploaded, bytesTotal) => {
-        const progress = Math.round((bytesUploaded / bytesTotal) * 100)
-        setUploadProgress(progress)
-      },
+      onError: () => { setIsUploading(false); setUploadError('Upload failed. Try again.') },
+      onProgress: (up, total) => setUploadProgress(Math.round((up / total) * 100)),
       onSuccess: async () => {
         try {
-          // Register with backend -> creates DB record + fires Inngest
           await fetch('/api/video-upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              storage_path: storagePath,
-              file_name: file.name,
-              file_size_bytes: file.size,
-              mime_type: file.type || 'text/plain',
+              storage_path: storagePath, file_name: file.name,
+              file_size_bytes: file.size, mime_type: file.type,
             }),
           })
-          setUploadSuccess(true)
-          
-          // Add notification to chat
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: `I've received **${file.name}**. I'm analyzing it now to add to your daily log context.` 
-          }])
-
-          setTimeout(() => setUploadSuccess(false), 3000)
-        } catch (err) {
-          console.error('Failed to register upload:', err)
-          setError('Failed to process upload.')
+          setUploadDone(true)
+          setTimeout(() => { setUploadDone(false); fetchFeed() }, 2000)
+        } catch {
+          setUploadError('Upload registered but failed to process.')
         } finally {
           setIsUploading(false)
         }
       },
     })
-
-    tusUpload.findPreviousUploads().then(previous => {
-      if (previous.length) tusUpload.resumeFromPreviousUpload(previous[0])
+    tusUpload.findPreviousUploads().then(prev => {
+      if (prev.length) tusUpload.resumeFromPreviousUpload(prev[0])
       tusUpload.start()
     })
-  }, [])
+  }, [fetchFeed])
 
   const handleFiles = useCallback((files: FileList | File[]) => {
-    const fileArray = Array.from(files)
-    if (fileArray.length > 0) {
-      startTusUpload(fileArray[0]) // Only take the first one for simplicity in the log page
+    const f = Array.from(files)[0]
+    if (f) startUpload(f)
+  }, [startUpload])
+
+  // ── Voice recording ────────────────────────────────────────────────────────
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      chunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' })
+        startUpload(file)
+        setIsRecording(false)
+        setRecordingSeconds(0)
+        if (timerRef.current) clearInterval(timerRef.current)
+      }
+      recorder.start()
+      recorderRef.current = recorder
+      setIsRecording(true)
+      timerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch (err) {
+      setError('Microphone access denied.')
     }
-  }, [startTusUpload])
+  }
 
-  const handleTextSubmit = async () => {
-    const trimmedInput = input.trim()
-    if (!trimmedInput || isTyping || isUploading) return
+  const stopRecording = () => {
+    recorderRef.current?.stop()
+  }
 
-    const userMessage: ChatMessage = { role: 'user', content: trimmedInput }
-    const newMessages = [...messages, userMessage]
-    
-    setMessages(newMessages)
+  // ── Submit ─────────────────────────────────────────────────────────────────
+
+  const handleSubmit = async () => {
+    const text = input.trim()
+    if (!text || isThinking) return
     setInput('')
-    setIsTyping(true)
     setError(null)
 
-    try {
-      const response = await chatWithManager(newMessages)
-      if (response.success && response.message) {
-        setMessages(prev => [...prev, { role: 'assistant', content: response.message! }])
-      } else if (response.error === 'NO_API_KEYS') {
-        setError('API keys missing. Please configure them in Settings.')
-      } else {
-        setError(response.error || 'Something went wrong.')
+    if (mode === 'log') {
+      // Save as capture
+      try {
+        await fetch('/api/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'text', content: text }),
+        })
+        fetchFeed()
+        fetchEntities()
+      } catch {
+        setError('Failed to save capture.')
       }
-    } catch (err) {
-      console.error('Chat error:', err)
-      setError('Failed to send message.')
-    } finally {
-      setIsTyping(false)
+    } else {
+      // Chat mode
+      const userMsg: ChatMessage = { role: 'user', content: text }
+      const updated = [...chatMessages, userMsg]
+      setChatMessages(updated)
+      setShowChat(true)
+      setIsThinking(true)
+      try {
+        const res = await chatWithManager(updated)
+        if (res.success && res.message) {
+          setChatMessages(prev => [...prev, { role: 'assistant', content: res.message! }])
+        } else {
+          setError(res.error || 'Chat error')
+        }
+      } catch {
+        setError('Chat failed.')
+      } finally {
+        setIsThinking(false)
+      }
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleTextSubmit()
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
+  }
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [input])
+
+  // ── Archive chat ───────────────────────────────────────────────────────────
+
+  const archiveChat = async () => {
+    if (chatMessages.length < 2 || isArchiving) return
+    setIsArchiving(true)
+    try {
+      const res = await fetch('/api/chat/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: chatMessages }),
+      })
+      if (res.ok) {
+        setChatMessages([])
+        setShowChat(false)
+        fetchFeed()
+        fetchEntities()
+      } else {
+        const d = await res.json()
+        setError(d.error || 'Archive failed')
+      }
+    } catch {
+      setError('Archive failed.')
+    } finally {
+      setIsArchiving(false)
     }
   }
 
-  const now = new Date()
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+  // ── Date label ─────────────────────────────────────────────────────────────
+
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  }).toUpperCase()
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-primary)]" style={{ fontFamily: 'var(--font-sans)' }}>
-      
-      {/* Header */}
-      <div className="pt-6 px-8 mb-4 flex-shrink-0 flex items-start justify-between border-b border-[var(--border-light)] pb-4 bg-[var(--bg-primary)]/80 backdrop-blur-md sticky top-0 z-20">
+    <div
+      className="flex flex-col h-screen overflow-hidden bg-[var(--bg-primary)]"
+      onDragOver={e => e.preventDefault()}
+      onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
+    >
+
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 px-6 pt-5 pb-3 flex items-center justify-between border-b border-[var(--border-light)]">
         <div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.2rem' }}>
-            {dateStr} · {view === 'chat' ? 'ACTIVE SESSION' : view === 'detail' ? 'SESSION ARCHIVE' : 'CENTRAL LOG'}
-          </p>
-          <div className="flex items-center gap-6">
-            <h1 
-              className="cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setView('timeline')}
-              style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}
-            >
-              Daily Log
-            </h1>
-            
-            {view === 'timeline' && (
-              <button
-                onClick={() => setView('chat')}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent)] text-white text-[10px] font-semibold border border-[var(--accent)]/20 hover:opacity-90 transition-all uppercase tracking-wider"
-              >
-                <Bot size={12} />
-                Open Chat
-              </button>
-            )}
-
-            {view === 'chat' && messages.length > 2 && (
-              <button
-                onClick={handleEndSession}
-                disabled={isArchiving}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-semibold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all uppercase tracking-wider"
-              >
-                {isArchiving ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" />
-                    Archiving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={12} />
-                    End Session & Archive
-                  </>
-                )}
-              </button>
-            )}
-
-            {view === 'detail' && (
-              <button
-                onClick={() => setView('timeline')}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[10px] font-semibold border border-[var(--border-light)] hover:bg-[var(--bg-secondary)] transition-all uppercase tracking-wider"
-              >
-                Back to Timeline
-              </button>
-            )}
-          </div>
+          <p className="font-mono text-[10px] tracking-widest text-[var(--text-tertiary)] mb-0.5">{dateStr}</p>
+          <h1 className="text-lg font-light tracking-tight text-[var(--text-primary)]">NeoLog</h1>
         </div>
-        {username && (
-          <a
-            href={`/${username}/log`}
-            target="_blank"
-            className="btn btn-secondary btn-sm flex items-center gap-1 mt-4"
-          >
-            <ArrowUpRight size={13} />
-            Public Log
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {chatMessages.length > 0 && (
+            <button
+              onClick={archiveChat}
+              disabled={isArchiving}
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
+            >
+              {isArchiving ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
+              {isArchiving ? 'Saving...' : 'Save Session'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {view === 'timeline' && (
-          <div className="max-w-3xl mx-auto px-6 py-12">
-            {loadingEntries ? (
-              <div className="flex flex-col items-center justify-center py-24 opacity-40">
-                <Loader2 size={32} className="animate-spin mb-4" />
-                <p className="text-sm font-mono uppercase tracking-widest text-[10px]">Synchronizing Log...</p>
-              </div>
-            ) : entries.length === 0 ? (
-              <div className="text-center py-24 border border-dashed border-[var(--border-light)] rounded-3xl bg-[var(--bg-card)]/30">
-                <p className="text-sm text-[var(--text-tertiary)] mb-6">Your timeline is quiet. Start a conversation to capture your first session.</p>
+      {/* ── Entity Rail ── */}
+      {entities.length > 0 && (
+        <div className="flex-shrink-0 border-b border-[var(--border-light)]">
+          <div className="flex gap-2 px-6 py-3 overflow-x-auto no-scrollbar">
+            {entities.map(e => {
+              const isExpanded = expandedEntityId === e.id
+              const colorClass = ENTITY_COLOR[e.type] || 'text-[var(--text-tertiary)] bg-[var(--bg-card)] border-[var(--border-light)]'
+              return (
                 <button
-                  onClick={() => setView('chat')}
-                  className="px-6 py-2 rounded-full bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 transition-all"
+                  key={e.id}
+                  onClick={() => toggleEntity(e.id)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${colorClass} ${isExpanded ? 'ring-1 ring-current ring-offset-1 ring-offset-[var(--bg-primary)]' : 'hover:opacity-80'}`}
                 >
-                  Initiate Brainstorming Session
+                  <span>{ENTITY_EMOJI[e.type] || '·'}</span>
+                  <span className="max-w-[140px] truncate">{e.name}</span>
+                  <span className="opacity-50 text-[10px]">×{e.mention_count}</span>
                 </button>
-              </div>
-            ) : (
-              <div className="space-y-16 relative">
-                {/* Visual Timeline Wire */}
-                <div className="absolute left-0 top-0 bottom-0 w-[1px] bg-gradient-to-b from-[var(--accent)]/40 via-[var(--border-light)] to-transparent" />
-                
-                {entries.map((entry, idx) => {
-                  const date = new Date(entry.logged_at)
-                  const meta = entry.meta || {}
-                  const analysis = meta.analysis || {}
-                  
-                  return (
-                    <div 
-                      key={entry.id} 
-                      className="pl-8 relative group cursor-pointer"
-                      onClick={() => { setSelectedEntry(entry); setView('detail') }}
-                    >
-                      {/* Timeline Dot */}
-                      <div className="absolute left-[-4px] top-1 w-2 h-2 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-primary)] group-hover:scale-125 transition-transform" />
-                      
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <div>
-                          <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase mb-1">
-                            {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {entry.entry_type.replace('_', ' ')}
-                          </p>
-                          <h3 className="text-xl font-light tracking-tight text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
-                            {entry.title}
-                          </h3>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-mono text-[var(--text-tertiary)]">
-                            {date.toLocaleDateString('en-US', { day: '2-digit', month: 'short' }).toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
+              )
+            })}
+          </div>
 
-                      <div className="bg-[var(--bg-card)]/50 backdrop-blur-sm border border-[var(--border-light)] p-5 rounded-2xl group-hover:border-[var(--accent)]/30 group-hover:bg-[var(--bg-card)]/80 transition-all">
-                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-3">
-                          {entry.body}
-                        </p>
-                        
-                        {(analysis.ideas?.length > 0 || analysis.projects?.length > 0) && (
-                          <div className="flex flex-wrap gap-2 mt-4">
-                            {analysis.projects?.slice(0, 2).map((p: string, i: number) => (
-                              <span key={i} className="px-2 py-0.5 rounded-md bg-blue-400/10 text-blue-400 text-[10px] font-medium border border-blue-400/20">
-                                🏗 {p}
-                              </span>
-                            ))}
-                            {analysis.ideas?.slice(0, 2).map((idea: string, i: number) => (
-                              <span key={i} className="px-2 py-0.5 rounded-md bg-yellow-400/10 text-yellow-400 text-[10px] font-medium border border-yellow-400/20">
-                                💡 {idea}
-                              </span>
-                            ))}
+          {/* Entity detail panel */}
+          {expandedEntityId && (
+            <div className="px-6 pb-4 border-t border-[var(--border-light)] bg-[var(--bg-card)]/40">
+              {(() => {
+                const entity = entities.find(e => e.id === expandedEntityId)
+                if (!entity) return null
+                return (
+                  <div className="pt-3">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-tertiary)]">{entity.type} · {entity.mention_count} mentions · last {reltime(entity.last_mentioned_at)}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)] mt-0.5">{entity.name}</p>
+                      </div>
+                      <button onClick={() => { setExpandedEntityId(null); setEntityMentions([]) }} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {entity.summary && (
+                      <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">{entity.summary}</p>
+                    )}
+                    {loadingMentions ? (
+                      <Loader2 size={14} className="animate-spin text-[var(--text-tertiary)]" />
+                    ) : (
+                      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                        {entityMentions.slice(0, 6).map(m => (
+                          <div key={m.id} className="flex-shrink-0 max-w-[240px] p-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                            <p className="font-mono text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-1">{SOURCE_LABEL[m.source_type] || m.source_type} · {reltime(m.created_at)}</p>
+                            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3">{m.context}</p>
                           </div>
+                        ))}
+                        {entityMentions.length === 0 && (
+                          <p className="text-xs text-[var(--text-tertiary)]">No mentions yet.</p>
                         )}
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {view === 'chat' && (
-          <div className="h-full flex flex-col">
-            <div 
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto pt-8 pb-12 px-8 md:px-24 xl:px-48 space-y-10 no-scrollbar"
-            >
-              {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                  <Bot size={48} strokeWidth={1} className="mb-4 text-[var(--accent)]" />
-                  <p className="text-sm">Start a conversation or drop a recording.</p>
-                </div>
-              ) : (
-                messages.map((m, i) => (
-                  <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : ''}`}>
-                    {m.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
-                        <Bot size={16} className="text-[var(--accent)]" />
-                      </div>
-                    )}
-                    <div className={`max-w-[85%] group`}>
-                      <div className={`
-                        p-4 rounded-2xl text-sm leading-relaxed
-                        ${m.role === 'user' 
-                          ? 'bg-[var(--accent)] text-white ml-auto' 
-                          : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}
-                      `}>
-                        <Markdown content={m.content} />
-                      </div>
-                    </div>
-                    {m.role === 'user' && (
-                      <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0 mt-1">
-                        <User size={16} className="text-[var(--text-secondary)]" />
-                      </div>
                     )}
                   </div>
-                ))
-              )}
-              {isTyping && (
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0 mt-1">
-                    <Bot size={16} className="text-[var(--accent)]" />
-                  </div>
-                  <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center gap-1">
-                     <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" />
-                     <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-75" />
-                     <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce delay-150" />
-                  </div>
-                </div>
-              )}
-              {error && (
-                <p className="text-xs text-center text-red-500 bg-red-500/10 py-2 rounded-lg">{error}</p>
-              )}
+                )
+              })()}
             </div>
-
-            {/* Input Zone */}
-            <div className="pb-6 px-8 md:px-24 xl:px-48 flex-shrink-0">
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
-                style={{
-                  position: 'relative',
-                  background: dragging ? 'rgba(124,106,245,0.06)' : 'rgba(13,13,22,0.7)',
-                  backdropFilter: 'blur(16px)',
-                  border: `1px solid ${dragging ? 'var(--border-glow)' : 'var(--border-medium)'}`,
-                  borderRadius: '12px',
-                  padding: '1rem',
-                }}
-              >
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Talk to your assistant..."
-                  rows={1}
-                  className="w-full bg-transparent border-none outline-none resize-none color-[var(--text-primary)] text-sm leading-relaxed no-scrollbar"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <button onClick={() => fileRef.current?.click()} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--accent)]">
-                    <Paperclip size={18} />
-                  </button>
-                  <input ref={fileRef} type="file" onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }} style={{ display: 'none' }} />
-                  <button
-                    onClick={handleTextSubmit}
-                    disabled={!input.trim() || isTyping}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                      input.trim() ? 'bg-[var(--accent)] text-white' : 'bg-transparent border border-[var(--border-light)] text-[var(--text-tertiary)]'
-                    }`}
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {view === 'detail' && selectedEntry && (
-          <div className="max-w-4xl mx-auto px-8 py-12">
-            <div className="mb-12">
-              <p className="text-xs font-mono text-[var(--accent)] mb-2 uppercase tracking-widest">
-                SESSION REPORT · {new Date(selectedEntry.logged_at).toLocaleDateString()}
-              </p>
-              <h2 className="text-4xl font-light tracking-tight text-[var(--text-primary)] mb-6">
-                {selectedEntry.title}
-              </h2>
-              
-              <div className="aspect-video w-full rounded-3xl bg-[var(--bg-card)] border border-[var(--border-light)] overflow-hidden mb-12 flex items-center justify-center bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-secondary)] shadow-2xl relative">
-                <div className="absolute inset-0 bg-grid-white/[0.02]" />
-                <div className="text-center relative z-10">
-                  <Bot size={48} className="text-[var(--accent)]/40 mx-auto mb-4" />
-                  <p className="text-xs font-mono text-[var(--text-tertiary)] uppercase tracking-tighter">AI Analysis Protocol v1.4.2</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                <div className="md:col-span-2 space-y-10">
-                  <section>
-                    <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">The Narrative Report</h4>
-                    <div className="text-lg leading-relaxed text-[var(--text-secondary)] space-y-4">
-                      <Markdown content={selectedEntry.body} />
-                    </div>
-                  </section>
-                </div>
-
-                <div className="space-y-10">
-                  {selectedEntry.meta?.analysis?.projects?.length > 0 && (
-                    <section>
-                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Projects Tracked</h4>
-                      <div className="space-y-3">
-                        {selectedEntry.meta.analysis.projects.map((p: string, i: number) => (
-                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <span className="text-lg">🏗</span>
-                            <span className="text-xs font-medium text-[var(--text-primary)]">{p}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {selectedEntry.meta?.analysis?.ideas?.length > 0 && (
-                    <section>
-                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Extracted Ideas</h4>
-                      <div className="space-y-3">
-                        {selectedEntry.meta.analysis.ideas.map((idea: string, i: number) => (
-                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <span className="text-lg">💡</span>
-                            <span className="text-xs font-medium text-[var(--text-primary)]">{idea}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {selectedEntry.meta?.analysis?.decisions?.length > 0 && (
-                    <section>
-                      <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[0.2em] mb-4">Core Decisions</h4>
-                      <div className="space-y-2">
-                        {selectedEntry.meta.analysis.decisions.map((d: string, i: number) => (
-                          <div key={i} className="text-xs text-[var(--text-secondary)] pl-4 border-l-2 border-[var(--accent)]">
-                            {d}
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {uploadSuccess && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-green-500 text-white text-xs rounded-full shadow-lg flex items-center gap-2 z-50">
-          <CheckCircle2 size={14} />
-          File accepted for analysis
+          )}
         </div>
       )}
+
+      {/* ── Feed ── */}
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+
+        {/* Chat panel (slides in above feed when chat mode active) */}
+        {showChat && chatMessages.length > 0 && (
+          <div className="border-b border-[var(--border-light)] bg-[var(--bg-card)]/30">
+            <div className="max-w-2xl mx-auto px-6 py-4 space-y-4">
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${m.role === 'assistant' ? 'bg-[var(--accent-soft)]' : 'bg-[var(--bg-tertiary)]'}`}>
+                    {m.role === 'assistant' ? <Bot size={12} className="text-[var(--accent)]" /> : <User size={12} className="text-[var(--text-secondary)]" />}
+                  </div>
+                  <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}`}>
+                    <Markdown content={m.content} />
+                  </div>
+                </div>
+              ))}
+              {isThinking && (
+                <div className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mt-0.5">
+                    <Bot size={12} className="text-[var(--accent)]" />
+                  </div>
+                  <div className="px-4 py-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex gap-1 items-center">
+                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Feed items */}
+        <div className="max-w-2xl mx-auto px-6 py-6 space-y-3">
+          {feedLoading ? (
+            <div className="flex items-center justify-center py-16 text-[var(--text-tertiary)]">
+              <Loader2 size={20} className="animate-spin" />
+            </div>
+          ) : feed.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-sm text-[var(--text-tertiary)] mb-2">Nothing logged yet.</p>
+              <p className="text-xs text-[var(--text-tertiary)]">Type a thought, record your voice, or drop a file.</p>
+            </div>
+          ) : (
+            feed.map(item => {
+              const isExpanded = expandedFeedId === item.id
+              const typeLabel = item.kind === 'upload' ? 'video' : (item.source_type || 'log')
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)]/60 overflow-hidden transition-all hover:border-[var(--border-medium)]"
+                >
+                  <button
+                    onClick={() => setExpandedFeedId(isExpanded ? null : item.id)}
+                    className="w-full text-left px-5 py-4 flex items-start justify-between gap-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)]">{typeLabel}</span>
+                        {item.status && item.status !== 'processed' && (
+                          <span className={`font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded ${item.status === 'error' ? 'text-red-400 bg-red-400/10' : 'text-yellow-400 bg-yellow-400/10'}`}>
+                            {item.status}
+                          </span>
+                        )}
+                        <span className="font-mono text-[9px] text-[var(--text-tertiary)]">{reltime(item.timestamp)}</span>
+                      </div>
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate pr-2">{item.title}</p>
+                      {item.body && !isExpanded && (
+                        <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{item.body}</p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 text-[var(--text-tertiary)]">
+                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-5 pb-5 border-t border-[var(--border-light)] pt-4 space-y-4">
+                      {/* Pipeline status for video uploads */}
+                      {item.kind === 'upload' && (
+                        <UploadPipelineStatus
+                          uploadId={item.id}
+                          initialStatus={item.status || 'uploaded'}
+                          initialPipelineLog={item.pipeline_log || []}
+                          errorMessage={item.error_message}
+                        />
+                      )}
+
+                      {item.body && (
+                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                          <Markdown content={item.body} />
+                        </p>
+                      )}
+
+                      {item.analysis && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {item.analysis.projects?.length > 0 && (
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Projects</p>
+                              <div className="space-y-1">
+                                {item.analysis.projects.slice(0, 4).map((p: any, i: number) => (
+                                  <p key={i} className="text-xs text-[var(--text-primary)]">🏗 {typeof p === 'object' ? p.name : p}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {item.analysis.ideas?.length > 0 && (
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Ideas</p>
+                              <div className="space-y-1">
+                                {item.analysis.ideas.slice(0, 4).map((idea: any, i: number) => (
+                                  <p key={i} className="text-xs text-[var(--text-primary)]">💡 {typeof idea === 'object' ? idea.text : idea}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {item.analysis.action_items?.length > 0 && (
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Actions</p>
+                              <div className="space-y-1">
+                                {item.analysis.action_items.slice(0, 3).map((a: string, i: number) => (
+                                  <p key={i} className="text-xs text-[var(--text-primary)]">→ {a}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {item.analysis.key_quotes?.length > 0 && (
+                            <div>
+                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Quotes</p>
+                              <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed line-clamp-3">&ldquo;{item.analysis.key_quotes[0]}&rdquo;</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ── Upload progress toast ── */}
+      {(isUploading || uploadDone || uploadError) && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+          <div className={`flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-medium shadow-lg backdrop-blur-md border ${uploadError ? 'bg-red-500/90 text-white border-red-400' : uploadDone ? 'bg-green-500/90 text-white border-green-400' : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-medium)]'}`}>
+            {uploadError ? (
+              <>{uploadError}</>
+            ) : uploadDone ? (
+              <><CheckCircle2 size={14} /> File received — processing</>
+            ) : (
+              <><Loader2 size={14} className="animate-spin" /> Uploading {uploadProgress}%</>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Error toast ── */}
+      {error && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full text-xs bg-red-500/90 text-white shadow-lg">
+            {error}
+            <button onClick={() => setError(null)}><X size={12} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Input Bar ── */}
+      <div className="flex-shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md px-4 py-3">
+        <div className="max-w-2xl mx-auto">
+          {/* Recording indicator */}
+          {isRecording && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              <span className="text-xs font-mono text-red-400">
+                {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+              </span>
+              <span className="text-xs text-[var(--text-tertiary)]">Recording — tap stop when done</span>
+            </div>
+          )}
+
+          <div className="flex items-end gap-2">
+            {/* Record / Stop button */}
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isUploading}
+              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'bg-[var(--bg-card)] border border-[var(--border-medium)] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40'}`}
+            >
+              {isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
+            </button>
+
+            {/* Text input */}
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={mode === 'log' ? 'Log a thought...' : 'Talk to your assistant...'}
+                rows={1}
+                className="w-full bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/60 resize-none overflow-hidden no-scrollbar leading-relaxed"
+              />
+            </div>
+
+            {/* Mode toggle */}
+            <button
+              onClick={() => {
+                const next = mode === 'log' ? 'chat' : 'log'
+                setMode(next)
+                if (next === 'chat') setShowChat(true)
+              }}
+              className="flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border transition-all"
+              style={{
+                color: mode === 'chat' ? 'var(--accent)' : 'var(--text-tertiary)',
+                borderColor: mode === 'chat' ? 'var(--accent)' : 'var(--border-light)',
+                background: mode === 'chat' ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : 'transparent',
+              }}
+            >
+              {mode === 'log' ? 'log' : 'chat'}
+            </button>
+
+            {/* Upload button */}
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={isUploading}
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-all"
+            >
+              <Paperclip size={15} />
+            </button>
+
+            {/* Send button */}
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim() || isThinking}
+              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${input.trim() ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-tertiary)]'}`}
+            >
+              <Send size={15} />
+            </button>
+          </div>
+
+          <input ref={fileRef} type="file" className="hidden" onChange={e => { if (e.target.files?.length) handleFiles(e.target.files) }} />
+        </div>
+      </div>
+
     </div>
   )
 }
