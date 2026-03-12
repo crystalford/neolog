@@ -59,6 +59,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Upload not found' }, { status: 404 })
     }
 
+    // Reset status and clear errors before starting
+    const { error: updateError } = await supabase
+      .from('video_uploads')
+      .update({
+        status: 'uploaded',
+        error_message: null,
+        pipeline_log: [] as any,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', video_upload_id)
+
+    if (updateError) {
+      console.warn('Failed to reset upload status:', updateError)
+    }
+
     // Send to Inngest for async processing
     await inngest.send({
       name: 'video-upload/process',

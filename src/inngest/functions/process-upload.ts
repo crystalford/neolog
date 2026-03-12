@@ -305,7 +305,7 @@ export const processUpload = inngest.createFunction(
 
       const replicate = new Replicate({ auth: replicateToken })
       const output = await replicate.run(
-        'openai/whisper:4d5079729c6195e7f31c88e23832dffadd88628ba8647423952e408a72532d1e',
+        'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
         {
           input: {
             audio: signedData.signedUrl,

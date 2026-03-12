@@ -474,9 +474,10 @@ export default function UploadsPage() {
                     </p>
                     <button
                       onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors flex-shrink-0"
+                      disabled={processingIds.has(upload.id)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Retry
+                      {processingIds.has(upload.id) ? 'Retrying...' : 'Retry'}
                     </button>
                   </div>
                 )}
