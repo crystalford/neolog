@@ -93,7 +93,12 @@ export default function UploadsPage() {
   const extractVideoDate = async (file: File): Promise<string | null> => {
     let mediainfo: any;
     try {
-      mediainfo = await (MediaInfoFactory as any)({ format: 'object' });
+      // Use CDN for WASM to avoid hosting/Next.js issues
+      mediainfo = await (MediaInfoFactory as any)({ 
+        format: 'object',
+        locateFile: (path: string, prefix: string) => `https://unpkg.com/mediainfo.js@0.2.2/dist/${path}`
+      });
+      
       const getSize = () => file.size;
       const readChunk = (chunkSize: number, offset: number) =>
         new Promise<Uint8Array>((resolve, reject) => {
@@ -104,34 +109,54 @@ export default function UploadsPage() {
         });
 
       const info = await mediainfo.analyzeData(getSize, readChunk);
-      const generalTrack = info.media.track.find((t: any) => t['@type'] === 'General');
-      
-      // Look for creation dates. Different cameras use different keys.
-      // We prioritize Encoded_Date then Tagged_Date
-      const rawDate = generalTrack?.Encoded_Date || generalTrack?.Tagged_Date;
-      
-      if (!rawDate) return null;
+      if (!info?.media?.track) return null;
 
-      console.log("Raw Extracted Date:", rawDate);
+      // 1. Gather ALL keys from ALL tracks that look like dates
+      const dateCandidates: { key: string; val: string; date: Date }[] = [];
+      const priorityKeys = ['Encoded_Date', 'Tagged_Date', 'Encoded_Date_Original', 'Creation_Date', 'Media_Create_Date'];
       
-      // Clean up the date string. It often looks like "UTC 2024-02-15 14:30:00"
-      // or "2024-02-15 14:30:00 UTC"
-      let cleanDate = rawDate.replace('UTC', '').trim();
-      
-      // Ensure it parses correctly
-      const parsed = new Date(cleanDate);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toISOString();
+      for (const track of info.media.track) {
+        for (const [key, val] of Object.entries(track)) {
+          if (typeof val !== 'string' || val.length < 8) continue;
+          
+          // Try to parse anything that looks remotely date-like
+          // MediaInfo dates often have UTC or look like YYYY-MM-DD HH:MM:SS
+          const cleanVal = val.replace('UTC', '').trim();
+          const d = new Date(cleanVal);
+          if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
+            dateCandidates.push({ key, val: cleanVal, date: d });
+          }
+        }
       }
-      
-      return null;
+
+      if (dateCandidates.length === 0) {
+        // Fallback to filename inference if no metadata found
+        // Matches PXL_20240128... or 20240128...
+        const fileMatch = file.name.match(/(\d{4})(\d{2})(\d{2})/);
+        if (fileMatch) {
+          const [_, y, m, d] = fileMatch;
+          const inferred = new Date(`${y}-${m}-${d}T12:00:00Z`);
+          if (!isNaN(inferred.getTime())) return inferred.toISOString();
+        }
+        return null;
+      }
+
+      // 2. Prioritize candidates
+      // Check priority keys first
+      for (const pk of priorityKeys) {
+        const match = dateCandidates.find(c => c.key === pk);
+        if (match) return match.date.toISOString();
+      }
+
+      // Or pick the earliest one that isn't Epoch
+      dateCandidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+      return dateCandidates[0].date.toISOString();
+
     } catch (error) {
       console.error("Failed to read metadata:", error);
       return null;
     } finally {
-      if (mediainfo) {
-        mediainfo.close();
-      }
+      if (mediainfo) mediainfo.close();
     }
   };
 

@@ -168,13 +168,21 @@ export const processUpload = inngest.createFunction(
 
       // Use pre-extracted date if available
       if (upload.recorded_at) {
-        await plog(admin, video_upload_id, 'extract-metadata', 'info', `Using pre-extracted recorded_at: ${upload.recorded_at}`)
-        return { recorded_at: upload.recorded_at }
+        await plog(admin!, video_upload_id, 'extract-metadata', 'info', `Using pre-extracted recorded_at: ${upload.recorded_at}`)
+        return { 
+          recorded_at: upload.recorded_at,
+          raw_metadata_diagnostic: (upload.meta as any)?.raw_metadata_diagnostic || null,
+          found_key: 'pre-extracted'
+        }
       }
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
-        await plog(admin, video_upload_id, 'extract-metadata', 'skipped', 'Not audio/video')
-        return { recorded_at: (upload as any).created_at }
+        await plog(admin!, video_upload_id, 'extract-metadata', 'skipped', 'Not audio/video')
+        return { 
+          recorded_at: (upload as any).created_at,
+          raw_metadata_diagnostic: null,
+          found_key: 'mime-mismatch'
+        }
       }
 
       try {
@@ -187,8 +195,12 @@ export const processUpload = inngest.createFunction(
 
           const replicateToken = process.env.REPLICATE_API_TOKEN
           if (!replicateToken) {
-            await plog(admin, video_upload_id, 'extract-metadata', 'error', 'REPLICATE_API_TOKEN missing for metadata extraction')
-            return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+            await plog(admin!, video_upload_id, 'extract-metadata', 'error', 'REPLICATE_API_TOKEN missing for metadata extraction')
+            return { 
+              recorded_at: (upload as any).recorded_at || (upload as any).created_at,
+              raw_metadata_diagnostic: null,
+              found_key: 'config-error'
+            }
           }
 
           const replicate = new Replicate({ auth: replicateToken })
@@ -212,16 +224,24 @@ export const processUpload = inngest.createFunction(
             try {
               info = JSON.parse(output)
             } catch (e) {
-              await plog(admin, video_upload_id, 'extract-metadata', 'error', `Failed to parse ffprobe output: ${output.substring(0, 100)}`)
-              return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+              await plog(admin!, video_upload_id, 'extract-metadata', 'error', `Failed to parse ffprobe output: ${output.substring(0, 100)}`)
+              return { 
+                recorded_at: (upload as any).recorded_at || (upload as any).created_at,
+                raw_metadata_diagnostic: null,
+                found_key: 'parse-error'
+              }
             }
           } else {
             info = output
           }
           
           if (!info) {
-            await plog(admin, video_upload_id, 'extract-metadata', 'error', 'ffprobe returned empty output')
-            return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+            await plog(admin!, video_upload_id, 'extract-metadata', 'error', 'ffprobe returned empty output')
+            return { 
+              recorded_at: (upload as any).recorded_at || (upload as any).created_at,
+              raw_metadata_diagnostic: null,
+              found_key: 'empty-output'
+            }
           }
 
           // 1. Gather all tags from format and streams
@@ -230,10 +250,14 @@ export const processUpload = inngest.createFunction(
             ...(info.streams?.reduce((acc: any, s: any) => ({ ...acc, ...(s.tags || {}) }), {}) || {})
           }
 
-          // 2. Priority check for known tags (mostly Apple/QuickTime/MP4)
+          // 2. Priority check for known tags (mostly Apple/QuickTime/MP4/Google)
           const priorityKeys = [
             'com.apple.quicktime.creationdate', // iPhone/Mac standard (highest precision)
             'com.apple.quicktime.creationdate-eng',
+            'Keys:CreationDate',                // Google Photos / iPhone standard
+            'Keys:CreationDate-eng',
+            'QuickTime:CreateDate',
+            'MediaCreateDate',
             'creation_time',                    // Common FFmpeg/Android tag
             'creation_time-eng',
             'CreateDate',                       // Windows/Standard MP4
@@ -267,7 +291,6 @@ export const processUpload = inngest.createFunction(
 
             for (const [key, value] of Object.entries(allTags)) {
               if (typeof value !== 'string' || value.length < 8) continue
-              // Filter out obvious non-date things that might accidentally parse
               if (/^\d+$/.test(value)) continue 
               
               const d = Date.parse(value)
@@ -276,7 +299,6 @@ export const processUpload = inngest.createFunction(
               }
             }
 
-            // Filter for dates before today if possible (most likely the real capture date)
             const backdatedCandidates = candidates.filter(c => c.date.split('T')[0] < todayStr)
             if (backdatedCandidates.length > 0) {
               backdatedCandidates.sort((a, b) => a.date.localeCompare(b.date))
@@ -289,27 +311,53 @@ export const processUpload = inngest.createFunction(
             }
           }
 
+          // 4. Final Safety: Inferred from filename (e.g. PXL_20240128_...)
+          if (!foundDate) {
+            const fileMatch = upload.file_name.match(/(\d{4})(\d{2})(\d{2})/);
+            if (fileMatch) {
+              const [_, y, m, d] = fileMatch;
+              const inferred = new Date(`${y}-${m}-${d}T12:00:00Z`);
+              if (!isNaN(inferred.getTime())) {
+                foundDate = inferred.toISOString();
+                foundKey = 'filename-inference';
+              }
+            }
+          }
+
           if (foundDate) {
-            await admin.from('video_uploads').update({ recorded_at: foundDate }).eq('id', video_upload_id)
-            await plog(admin, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
-            return { recorded_at: foundDate }
+            await plog(admin!, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
           } else {
-            // CRITICAL: Save raw tags to the database for manual inspection if all else fails
-            await admin.from('video_uploads').update({ 
-              meta: { 
-                ...(upload.meta || {}), 
-                raw_metadata_diagnostic: allTags 
-              } 
-            }).eq('id', video_upload_id)
-            
-            await plog(admin, video_upload_id, 'extract-metadata', 'warn', `No recording date found. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
+            await plog(admin!, video_upload_id, 'extract-metadata', 'warn', `No recording date found in standard tags. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
+          }
+
+          return { 
+            recorded_at: foundDate || (upload as any).recorded_at || (upload as any).created_at,
+            raw_metadata_diagnostic: allTags,
+            found_key: foundKey
           }
         }
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
+        await plog(admin!, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
 
-      return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+      return { 
+        recorded_at: (upload as any).recorded_at || (upload as any).created_at,
+        raw_metadata_diagnostic: (upload.meta as any)?.raw_metadata_diagnostic || null,
+        found_key: 'fallback'
+      }
+    })
+
+    // ── Step 2b-bis: Apply Metadata to DB ──
+    await step.run('apply-metadata', async () => {
+      const { upload } = activeContext
+      await admin!.from('video_uploads').update({
+        recorded_at: metadata.recorded_at,
+        meta: {
+          ...(upload.meta || {}),
+          raw_metadata_diagnostic: metadata.raw_metadata_diagnostic,
+          found_key: metadata.found_key
+        }
+      }).eq('id', video_upload_id)
     })
 
     // ── Step 2c: Extract Thumbnail (video files only) ──
