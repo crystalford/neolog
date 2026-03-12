@@ -108,6 +108,14 @@ export default function NeoLogPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isThinking, setIsThinking] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const feedEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll feed to bottom when it loads or updates
+  useEffect(() => {
+    if (!feedLoading && feed.length > 0) {
+      feedEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [feed, feedLoading])
 
   // Upload
   const [isUploading, setIsUploading] = useState(false)
@@ -184,7 +192,7 @@ export default function NeoLogPage() {
         if (!error) setError(errData.error || 'Failed to fetch uploads')
       }
 
-      items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      items.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       setFeed(items)
     } catch (err: any) {
       console.error('Feed fetch failed:', err)
@@ -508,11 +516,12 @@ export default function NeoLogPage() {
                         {entityMentions.length === 0 && (
                           <p className="text-xs text-[var(--text-tertiary)]">No mentions yet.</p>
                         )}
-                      </div>
+                       </div>
                     )}
                   </div>
                 )
               })()}
+              <div ref={feedEndRef} />
             </div>
           )}
         </div>

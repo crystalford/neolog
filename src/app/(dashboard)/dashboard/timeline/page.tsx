@@ -64,7 +64,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="max-w-7xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>

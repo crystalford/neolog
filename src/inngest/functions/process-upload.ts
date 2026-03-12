@@ -218,20 +218,40 @@ export const processUpload = inngest.createFunction(
             }
           }
 
-          // 3. Fuzzy fallback scanning if no priority key matched perfectly
-          if (!foundDate) {
-            for (const [key, value] of Object.entries(allTags)) {
-              if (typeof value !== 'string' || value.length < 8) continue
-              const k = key.toLowerCase()
-              // Look for keys containing date/time/creat/origin
-              if (k.includes('date') || k.includes('time') || k.includes('creat') || k.includes('origin')) {
-                const d = Date.parse(value)
-                if (!isNaN(d)) {
-                  foundDate = new Date(d).toISOString()
-                  foundKey = key
-                  break
-                }
+          // 3. Heuristic: Look for the *earliest* valid date that isn't Today (unless that's all we have)
+          const todayStr = new Date().toISOString().split('T')[0]
+          let candidates: { key: string, date: string }[] = []
+
+          for (const [key, value] of Object.entries(allTags)) {
+            if (typeof value !== 'string' || value.length < 8) continue
+            const d = Date.parse(value)
+            if (!isNaN(d)) {
+              candidates.push({ key, date: new Date(d).toISOString() })
+            }
+          }
+
+          // Filter for dates before today if possible
+          const backdatedCandidates = candidates.filter(c => c.date.split('T')[0] < todayStr)
+          if (backdatedCandidates.length > 0) {
+            // Pick the earliest one as it's most likely the original media creation date
+            backdatedCandidates.sort((a, b) => a.date.localeCompare(b.date))
+            foundDate = backdatedCandidates[0].date
+            foundKey = backdatedCandidates[0].key
+          } else if (candidates.length > 0) {
+            // If no backdated candidate, pick anything that matched a priority key first
+            for (const key of priorityKeys) {
+              const match = candidates.find(c => c.key === key)
+              if (match) {
+                foundDate = match.date
+                foundKey = match.key
+                break
               }
+            }
+            // Otherwise just pick the earliest overall
+            if (!foundDate) {
+              candidates.sort((a, b) => a.date.localeCompare(b.date))
+              foundDate = candidates[0].date
+              foundKey = candidates[0].key
             }
           }
 
