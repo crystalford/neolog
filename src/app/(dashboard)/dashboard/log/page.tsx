@@ -387,7 +387,13 @@ export default function NeoLogPage() {
       const res = await fetch('/api/chat/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: chatMessages }),
+        body: JSON.stringify({ 
+          messages: chatMessages,
+          meta: {
+            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            clientTime: new Date().toISOString()
+          }
+        }),
       })
       if (res.ok) {
         setChatMessages([])

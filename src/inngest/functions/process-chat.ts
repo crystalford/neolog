@@ -8,7 +8,7 @@ export const processChatSession = inngest.createFunction(
   { id: 'process-chat-session', name: 'Process Chat Session' },
   { event: 'chat/session.ended' },
   async ({ event, step }) => {
-    const { user_id, messages, ended_at } = event.data
+    const { user_id, messages, ended_at, client_metadata } = event.data
     const admin = createAdminClient()
     if (!admin) throw new Error('Admin client not available')
 
@@ -42,6 +42,7 @@ RESPONSE FORMAT (JSON only):
   "ideas": ["Idea 1"],
   "projects": ["Project 1"],
   "summary": "One sentence summary",
+  "intended_logged_at": "ISO-8601 date string (Use this if the user is describing a past event, e.g. 'yesterday' relative to Current Time. If they are talking about right now, use the Current Time provided.)",
   "entities": [
     { "name": "Entity Name", "type": "project", "context": "What was said about this entity." }
   ]
@@ -54,13 +55,20 @@ ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commi
         .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
         .join('\n\n')
 
+      const temporalContext = `
+Context Information:
+- Current Time: ${client_metadata?.clientTime || ended_at}
+- Timezone: ${client_metadata?.timezone || 'UTC'}
+- User Agent: ${client_metadata?.userAgent || 'unknown'}
+`
+
       if (keys.anthropicKey) {
         const anthropic = new Anthropic({ apiKey: keys.anthropicKey })
         const response = await anthropic.messages.create({
           model: 'claude-sonnet-4-6',
           max_tokens: 2048,
           messages: [
-            { role: 'user', content: `${systemPrompt}\n\nSession History:\n\n${historyText}\n\nRespond with JSON only.` }
+            { role: 'user', content: `${systemPrompt}\n\n${temporalContext}\n\nSession History:\n\n${historyText}\n\nRespond with JSON only.` }
           ]
         })
         const text = response.content.find(c => c.type === 'text')?.text || '{}'
@@ -71,7 +79,7 @@ ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commi
         const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: `${systemPrompt}\n\n${temporalContext}` },
             { role: 'user', content: `Session History:\n\n${historyText}` }
           ],
           response_format: { type: 'json_object' }
@@ -87,11 +95,12 @@ ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commi
         entry_type: 'session',
         title: analysis.title || 'Chat Session',
         body: analysis.narrative,
-        logged_at: ended_at,
+        logged_at: analysis.intended_logged_at || client_metadata?.clientTime || ended_at,
         meta: {
           analysis,
           messages_count: messages.length,
-          source: 'chat'
+          source: 'chat',
+          client_metadata
         }
       }).select().single()
 

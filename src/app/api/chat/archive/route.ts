@@ -13,7 +13,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { messages } = await request.json()
+    const { messages, meta: clientMeta } = await request.json()
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+    const timezone = clientMeta?.tz || 'UTC'
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: 'Messages are required' }, { status: 400 })
@@ -26,6 +28,12 @@ export async function POST(request: NextRequest) {
         user_id: session.user.id,
         messages,
         ended_at: new Date().toISOString(),
+        client_metadata: {
+          userAgent,
+          timezone,
+          clientTime: clientMeta?.clientTime || new Date().toISOString(),
+          ...clientMeta
+        }
       },
     })
 
