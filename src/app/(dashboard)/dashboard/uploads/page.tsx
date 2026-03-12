@@ -92,14 +92,9 @@ export default function UploadsPage() {
 
   const extractVideoDate = async (file: File): Promise<string | null> => {
     let mediainfo: any;
-    console.log(`[Metadata] Starting extraction for: ${file.name}`);
+    console.log(`[Metadata] Starting raw extraction for: ${file.name}`);
     
-    // 1. FAST PATH: Filename inference (extremely reliable for phone exports)
-    // Matches: 
-    // PXL_20240128_123456...
-    // 20240128_123456...
-    // 2024-01-28 12.34.56...
-    // WhatsApp Video 2024-01-28 at 12.34.56...
+    // 1. FAST PATH: Filename inference
     const name = file.name;
     const dateMatches = [
       /(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, // 20240128_123456
@@ -114,19 +109,29 @@ export default function UploadsPage() {
         const dateStr = hh ? `${y}-${m}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${m}-${d}T12:00:00Z`;
         const inferred = new Date(dateStr);
         if (!isNaN(inferred.getTime())) {
-          console.log(`[Metadata] Inferred from filename: ${inferred.toISOString()}`);
-          return inferred.toISOString();
+          const iso = inferred.toISOString();
+          console.log(`[Metadata] Filename extraction SUCCESS: ${iso}`);
+          window.alert(`✅ DATE DETECTED (via Filename): ${iso}\n\nNeolog will use this date for the timeline.`);
+          return iso;
         }
       }
     }
 
     // 2. SLOW PATH: Binary metadata extraction
     try {
+      // Use explicit version and ensure WASM is reachable
+      const wasmUrl = "https://unpkg.com/mediainfo.js@0.2.1/dist/MediaInfoModule.wasm";
+      console.log(`[Metadata] Fetching MediaInfo WASM from: ${wasmUrl}`);
+      
       mediainfo = await (MediaInfoFactory as any)({ 
         format: 'object',
-        locateFile: (path: string) => `https://unpkg.com/mediainfo.js@0.2.2/dist/${path}`
+        locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl : path
       });
       
+      if (!mediainfo) {
+        throw new Error("MediaInfoFactory returned null");
+      }
+
       const getSize = () => file.size;
       const readChunk = (chunkSize: number, offset: number) =>
         new Promise<Uint8Array>((resolve, reject) => {
@@ -136,9 +141,11 @@ export default function UploadsPage() {
           reader.readAsArrayBuffer(file.slice(offset, offset + chunkSize));
         });
 
+      console.log(`[Metadata] Analyzing binary header for ${file.name}...`);
       const info = await mediainfo.analyzeData(getSize, readChunk);
+      
       if (!info?.media?.track) {
-        console.warn("[Metadata] No tracks found in file");
+        console.warn("[Metadata] Binary analysis found zero tracks.");
         return null;
       }
 
@@ -156,9 +163,9 @@ export default function UploadsPage() {
         for (const [key, val] of Object.entries(track)) {
           if (typeof val !== 'string' || val.length < 8) continue;
           
-          // MediaInfo dates often have UTC prefix or specific formats
           const cleanVal = val.replace('UTC', '').trim();
           const d = new Date(cleanVal);
+          // Standard check: is it a valid date between 1990 and 2100?
           if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
             dateCandidates.push({ key, val: cleanVal, date: d });
           }
@@ -166,23 +173,36 @@ export default function UploadsPage() {
       }
 
       if (dateCandidates.length > 0) {
-        // Sort by priority keys first
+        let finalDate: string | null = null;
+        let finalKey: string | null = null;
+
+        // Priority find
         for (const pk of priorityKeys) {
           const match = dateCandidates.find(c => c.key === pk);
           if (match) {
-            console.log(`[Metadata] Found via ${pk}: ${match.date.toISOString()}`);
-            return match.date.toISOString();
+            finalDate = match.date.toISOString();
+            finalKey = pk;
+            break;
           }
         }
-        // Fallback to earliest valid date found
-        dateCandidates.sort((a, b) => a.date.getTime() - b.date.getTime());
-        console.log(`[Metadata] Using earliest candidate (${dateCandidates[0].key}): ${dateCandidates[0].date.toISOString()}`);
-        return dateCandidates[0].date.toISOString();
+        
+        if (!finalDate) {
+          dateCandidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+          finalDate = dateCandidates[0].date.toISOString();
+          finalKey = `earliest (${dateCandidates[0].key})`;
+        }
+
+        console.log(`[Metadata] Binary extraction SUCCESS: ${finalDate}`);
+        window.alert(`✅ DATE DETECTED (via Binary ${finalKey}): ${finalDate}\n\nNeolog will use this date for the timeline.`);
+        return finalDate;
       }
 
+      console.warn("[Metadata] Binary analysis found no valid date strings.");
+      window.alert(`❌ NO DATE DETECTED in ${file.name}.\n\nNeither filename nor binary metadata contained a valid date. Timeline will default to upload time.`);
       return null;
-    } catch (error) {
-      console.error("[Metadata] Binary extraction failed:", error);
+    } catch (error: any) {
+      console.error("[Metadata] Binary extraction FATAL ERROR:", error);
+      window.alert(`⚠️ EXTRACTION FAILED for ${file.name}.\n\nError: ${error.message}\n\nNeolog will retry on the server.`);
       return null;
     } finally {
       if (mediainfo) mediainfo.close();
