@@ -148,6 +148,10 @@ export default function NeoLogPage() {
             meta: e.meta,
           })
         }
+      } else {
+        const errData = await logRes.json().catch(() => ({}))
+        console.error('Log fetch error:', errData)
+        setError(errData.error || 'Failed to fetch logs')
       }
 
       if (uploadRes.ok) {
@@ -165,12 +169,18 @@ export default function NeoLogPage() {
             error_message: u.error_message || null,
           })
         }
+      } else {
+        const errData = await uploadRes.json().catch(() => ({}))
+        console.error('Upload fetch error:', errData)
+        // Don't overwrite error if already set by logs
+        if (!error) setError(errData.error || 'Failed to fetch uploads')
       }
 
       items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       setFeed(items)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Feed fetch failed:', err)
+      setError(err.message || 'Network error fetching feed')
     } finally {
       setFeedLoading(false)
     }
@@ -182,9 +192,14 @@ export default function NeoLogPage() {
       if (res.ok) {
         const data = await res.json()
         setEntities(data.entities || [])
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        console.error('Entities fetch error:', errData)
+        setError(errData.error || 'Failed to fetch entities')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Entities fetch failed:', err)
+      setError(err.message || 'Network error fetching entities')
     }
   }, [])
 
@@ -325,15 +340,20 @@ export default function NeoLogPage() {
     if (mode === 'log') {
       // Save as capture
       try {
-        await fetch('/api/capture', {
+        const res = await fetch('/api/capture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'text', content: text }),
         })
-        fetchFeed()
-        fetchEntities()
-      } catch {
-        setError('Failed to save capture.')
+        if (res.ok) {
+          fetchFeed()
+          fetchEntities()
+        } else {
+          const data = await res.json().catch(() => ({}))
+          setError(data.error || 'Failed to save capture.')
+        }
+      } catch (err: any) {
+        setError(err.message || 'Network error saving capture.')
       }
     } else {
       // Chat mode
@@ -406,7 +426,7 @@ export default function NeoLogPage() {
 
   return (
     <div
-      className="flex flex-col h-screen overflow-hidden bg-[var(--bg-primary)]"
+      className="flex flex-col h-full overflow-hidden bg-[var(--bg-primary)]"
       onDragOver={e => e.preventDefault()}
       onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
     >

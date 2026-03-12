@@ -29,19 +29,26 @@ export async function GET(
       return NextResponse.json({ error: 'Entity not found' }, { status: 404 })
     }
 
-    // Get all mentions with the recording they came from
+    // Get all mentions with the recording or log entry they came from
     const { data: mentions } = await supabase
       .from('entity_mentions')
       .select(`
         id,
         context,
         sentiment,
+        source_type,
         created_at,
         video_upload_id,
         video_uploads (
           id,
           file_name,
           created_at
+        ),
+        log_entry_id,
+        log_entries (
+          id,
+          title,
+          logged_at
         )
       `)
       .eq('entity_id', params.id)

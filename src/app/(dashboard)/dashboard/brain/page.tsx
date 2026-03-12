@@ -23,12 +23,19 @@ type EntityMention = {
   id: string
   context: string
   sentiment: string | null
+  source_type: string
   created_at: string
-  video_upload_id: string
+  video_upload_id: string | null
   video_uploads: {
     id: string
     file_name: string
     created_at: string
+  } | null
+  log_entry_id: string | null
+  log_entries: {
+    id: string
+    title: string
+    logged_at: string
   } | null
 }
 
@@ -290,35 +297,74 @@ export default function BrainPage() {
                         <h4 className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
                           Mention Timeline ({mentions.length} recording{mentions.length !== 1 ? 's' : ''})
                         </h4>
-                        {mentions.map((mention) => (
-                          <div
-                            key={mention.id}
-                            className="flex items-start gap-3 border-l-2 border-[var(--border-medium)] pl-3"
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                                {mention.context}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1">
-                                {mention.sentiment && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                    mention.sentiment === 'positive' ? 'bg-green-400/10 text-green-400' :
-                                    mention.sentiment === 'negative' ? 'bg-red-400/10 text-red-400' :
-                                    'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
-                                  }`}>
-                                    {mention.sentiment}
+                        {/* The type definition for EntityMention should be placed outside the component or in a separate types file.
+                            For the purpose of this edit, I'm assuming it's defined elsewhere or will be added.
+                            The instruction provided it inline, so I'll place it where it was indicated,
+                            but note that this is not standard practice for type definitions. */}
+                        {/* type EntityMention definition from instruction */}
+                        {/* This type definition should ideally be at the top level or in a types file.
+                            Placing it here as per instruction's implied location. */}
+                        {/*
+type EntityMention = {
+  id: string
+  context: string
+  sentiment: string | null
+  source_type: string
+  created_at: string
+  video_upload_id: string | null
+  video_uploads: {
+    id: string
+    file_name: string
+    created_at: string
+  } | null
+  log_entry_id: string | null
+  log_entries: {
+    id: string
+    title: string
+    logged_at: string
+  } | null
+}
+*/}
+                        {mentions.map((mention) => {
+                          const isVideo = mention.source_type === 'video' || !!mention.video_upload_id
+                          const title = isVideo
+                            ? (mention.video_uploads?.file_name || 'Recording')
+                            : (mention.log_entries?.title || 'Log Entry')
+
+                          const icon = mention.source_type === 'video' ? '📽️' :
+                                      mention.source_type === 'chat' ? '💬' :
+                                      mention.source_type === 'capture' ? '📝' : '📄'
+
+                          return (
+                            <div
+                              key={mention.id}
+                              className="flex items-start gap-3 border-l-2 border-[var(--border-medium)] pl-3"
+                            >
+                              <div className="flex-1">
+                                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                                  {mention.context}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {mention.sentiment && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      mention.sentiment === 'positive' ? 'bg-green-400/10 text-green-400' :
+                                      mention.sentiment === 'negative' ? 'bg-red-400/10 text-red-400' :
+                                      'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+                                    }`}>
+                                      {mention.sentiment}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-[var(--text-tertiary)] flex items-center gap-1.5">
+                                    <span className="opacity-70">{icon}</span> {title}
                                   </span>
-                                )}
-                                <span className="text-[10px] text-[var(--text-tertiary)]">
-                                  {mention.video_uploads?.file_name || 'Recording'}
-                                </span>
-                                <span className="text-[10px] text-[var(--text-tertiary)]">
-                                  {formatRelativeTime(mention.created_at)}
-                                </span>
+                                  <span className="text-[10px] text-[var(--text-tertiary)]">
+                                    {formatRelativeTime(mention.created_at)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
 

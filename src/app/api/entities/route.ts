@@ -65,8 +65,8 @@ export async function GET(request: NextRequest) {
       entities: data || [],
       type_counts: typeCounts || [],
     })
-  } catch (error) {
-    console.error('List entities error:', error)
-    return NextResponse.json({ error: 'Failed to fetch entities' }, { status: 500 })
+  } catch (err: any) {
+    console.error('Fetch logs error:', err)
+    return NextResponse.json({ error: err.message || 'Failed to fetch logs' }, { status: 500 })
   }
 }

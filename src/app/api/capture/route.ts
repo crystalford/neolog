@@ -288,6 +288,9 @@ export async function POST(request: NextRequest) {
     asset_id: data.id,
   }
   return NextResponse.json({ ok: true, id: data.id })
+  } catch (err: any) {
+    console.error('Capture API error:', err)
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   } finally {
     try {
       if (runId) {

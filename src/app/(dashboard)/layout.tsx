@@ -287,7 +287,7 @@ export default function DashboardLayout({
     (pathname === '/dashboard/settings' ? 'Settings' : 'Daily Log')
 
   return (
-    <div className="dashboard-shell flex min-h-screen bg-[var(--bg-primary)]">
+    <div className="dashboard-shell flex h-screen bg-[var(--bg-primary)]">
       {/* Sidebar - 2.0 Control Room Nav */}
       <aside className="w-[220px] bg-[var(--bg-secondary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-4 pt-4 pb-3">
