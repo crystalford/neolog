@@ -1,12 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
-import { isVideoMimeType } from '@/lib/utils'
+import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis } from '@/lib/video-analysis'
-import { resolveProviderKeyWithClient } from '@/lib/keys'
+import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import Replicate from 'replicate'
 
 // Helper for logging to processing_logs table
 async function plog(supabase: any, uploadId: string, step: string, status: string, message?: string) {
+  if (!supabase) return
   await supabase.from('processing_logs').insert({
     video_upload_id: uploadId,
     step,
@@ -22,6 +23,11 @@ export const processUpload = inngest.createFunction(
   async ({ event, step }) => {
     const { video_upload_id, user_id } = event.data
     const admin = createAdminClient()
+
+    if (!admin) {
+      console.error('Failed to create admin client')
+      return { status: 'error', error: 'admin_client_failed' }
+    }
 
     // Pre-flight
     await plog(admin, video_upload_id, 'preflight', 'running', 'Inngest function received event')
@@ -47,8 +53,8 @@ export const processUpload = inngest.createFunction(
         return { skip: true as const, upload }
       }
 
-      const openaiKey = await resolveProviderKeyWithClient(admin, user_id, 'openai')
-      const anthropicKey = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
+      const openaiKeyRes = await resolveProviderKeyWithClient(admin, user_id, 'openai')
+      const anthropicKeyRes = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
 
       // Fetch user profile for personalization
       const { data: profile } = await admin
@@ -59,7 +65,7 @@ export const processUpload = inngest.createFunction(
 
       const userName = profile?.display_name || profile?.username || 'the user'
 
-      if (!openaiKey && !anthropicKey) {
+      if (!openaiKeyRes && !anthropicKeyRes) {
         const msg = 'No AI API key found. Add an Anthropic or OpenAI key in Settings → API Keys.'
         await admin.from('video_uploads').update({
           status: 'error',
@@ -74,16 +80,19 @@ export const processUpload = inngest.createFunction(
         skip: false as const,
         upload,
         userName,
-        openaiKey: openaiKey?.key || null,
-        anthropicKey: anthropicKey?.key || null,
+        openaiKey: openaiKeyRes?.key || null,
+        anthropicKey: anthropicKeyRes?.key || null,
       }
     })
 
     if (context.skip) return { status: 'already_processed', video_upload_id }
 
+    // Use type narrowing or casting since we checked context.skip
+    const activeContext = context as Extract<typeof context, { skip: false }>
+
     // ── Step 2: Extract audio (video files only) ──
     const audioPath = await step.run('extract-audio', async () => {
-      const { upload } = context
+      const { upload } = activeContext
 
       if (!isVideoMimeType(upload.mime_type)) {
         await plog(admin, video_upload_id, 'extract-audio', 'skipped', `Not a video file (${upload.mime_type})`)
@@ -152,12 +161,12 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 2b: Extract Metadata (exhaustive backdating check) ──
     const metadata = await step.run('extract-metadata', async () => {
-      const { upload } = context
+      const { upload } = activeContext
       await plog(admin, video_upload_id, 'extract-metadata', 'running')
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', 'Not audio/video')
-        return { recorded_at: upload.created_at }
+        return { recorded_at: (upload as any).created_at }
       }
 
       try {
@@ -191,14 +200,14 @@ export const processUpload = inngest.createFunction(
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
 
-      return { recorded_at: upload.recorded_at || upload.created_at }
+      return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
     })
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
       await plog(admin, video_upload_id, 'transcribe', 'running')
 
-      if (context.upload.mime_type === 'text/plain') {
+      if (activeContext.upload.mime_type === 'text/plain') {
         const { data: fileData } = await admin.storage.from('videos').download(audioPath.path)
         const text = fileData ? Buffer.from(await fileData.arrayBuffer()).toString('utf-8') : ''
         return { text, language: 'en' }
@@ -231,12 +240,14 @@ export const processUpload = inngest.createFunction(
     // ── Step 4: Analyze ──
     const analysisResult = await step.run('analyze', async () => {
       await plog(admin, video_upload_id, 'analyze', 'running')
-      const result = await runAnalysis({
-        transcript: transcription.text,
-        userName: context.userName,
-        openaiKey: context.openaiKey,
-        anthropicKey: context.anthropicKey,
-      })
+      
+      // Fix: Position arguments for runAnalysis
+      const result = await runAnalysis(
+        transcription.text,
+        activeContext.openaiKey,
+        activeContext.anthropicKey,
+        activeContext.userName
+      )
 
       await admin.from('video_uploads').update({
         analysis: result.analysis,
@@ -275,7 +286,7 @@ export const processUpload = inngest.createFunction(
         logged_at: recordedAt,
         source_upload_id: video_upload_id,
         is_public: true, // Defaulting to public for consistency
-        thumbnail_url: context.upload.thumbnail_url,
+        thumbnail_url: (activeContext.upload as any).thumbnail_url,
         meta: {
           model: analysisResult.modelUsed,
           categories: analysis.categories,
