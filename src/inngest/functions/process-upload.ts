@@ -126,6 +126,15 @@ export const processUpload = inngest.createFunction(
       const openaiKey = await resolveProviderKeyWithClient(admin, user_id, 'openai')
       const anthropicKey = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
 
+      // Fetch user profile for personalization
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user_id)
+        .single()
+
+      const userName = profile?.display_name || profile?.username || 'the user'
+
       if (!openaiKey && !anthropicKey) {
         const msg = 'No AI API key found. Add an Anthropic or OpenAI key in Settings → API Keys.'
         await admin.from('video_uploads').update({
@@ -138,11 +147,12 @@ export const processUpload = inngest.createFunction(
       }
 
       const keyInfo = openaiKey ? 'openai' : 'anthropic'
-      await plog(admin, video_upload_id, 'fetch-context', 'done', `API key resolved: ${keyInfo}`)
+      await plog(admin, video_upload_id, 'fetch-context', 'done', `API key resolved: ${keyInfo}, user: ${userName}`)
 
       return {
         skip: false as const,
         upload,
+        userName,
         openaiKey: openaiKey?.key || null,
         anthropicKey: anthropicKey?.key || null,
       }
@@ -246,10 +256,15 @@ export const processUpload = inngest.createFunction(
         if (signedData?.signedUrl) {
           const ffprobe = require('ffprobe-client')
           const info = await ffprobe(signedData.signedUrl)
+          
+          console.log(`[DEBUG] ffprobe info for ${video_upload_id}:`, JSON.stringify(info.format?.tags || {}, null, 2))
 
+          // Try multiple tag locations for creation_time
           const creationDate =
             info.format?.tags?.creation_time ||
-            info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time
+            info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time ||
+            info.format?.tags?.['creation_time-eng'] ||
+            info.format?.tags?.['com.apple.quicktime.creationdate']
 
           if (creationDate) {
             const recordedAt = new Date(creationDate).toISOString()
@@ -263,7 +278,8 @@ export const processUpload = inngest.createFunction(
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
 
-      return { recorded_at: upload.created_at }
+      const defaultDate = upload.recorded_at || upload.created_at
+      return { recorded_at: defaultDate }
     })
 
     // ── Step 3: Transcribe ──
@@ -363,6 +379,7 @@ export const processUpload = inngest.createFunction(
         transcription.text,
         context.openaiKey,
         context.anthropicKey,
+        context.userName,
       )
 
       await plog(admin, video_upload_id, 'analyze', 'done', `Model: ${modelUsed}`)
@@ -403,7 +420,52 @@ export const processUpload = inngest.createFunction(
     await step.run('upsert-entities', async () => {
       await plog(admin, video_upload_id, 'upsert-entities', 'running')
       await upsertEntities(admin, user_id, { videoUploadId: video_upload_id }, analysisResult.analysis)
-      await plog(admin, video_upload_id, 'upsert-entities', 'done', 'Pipeline complete ✓')
+      await plog(admin, video_upload_id, 'upsert-entities', 'done')
+    })
+
+    // ── Step 8: Create timeline Log Entry ──
+    await step.run('create-log-entry', async () => {
+      await plog(admin, video_upload_id, 'create-log-entry', 'running')
+      const { analysis } = analysisResult
+      
+      const recordedAt = metadata?.recorded_at || context.upload.created_at
+
+      // Check if entry already exists to avoid duplicates
+      const { data: existing } = await admin
+        .from('log_entries')
+        .select('id')
+        .eq('source_upload_id', video_upload_id)
+        .maybeSingle()
+
+      if (existing) {
+        await plog(admin, video_upload_id, 'create-log-entry', 'skipped', 'Log entry already exists')
+        return
+      }
+
+      const { error: logError } = await admin
+        .from('log_entries')
+        .insert({
+          user_id,
+          entry_type: 'session',
+          title: analysis.summary ? (analysis.summary.length > 80 ? analysis.summary.substring(0, 77) + '...' : analysis.summary) : `Video Upload: ${context.upload.file_name}`,
+          body: analysis.summary || null,
+          logged_at: recordedAt,
+          source_upload_id: video_upload_id,
+          is_public: false,
+          meta: {
+            model: analysisResult.modelUsed,
+            categories: analysis.categories,
+            mood: analysis.mood,
+            reflections: analysis.reflections,
+          }
+        })
+
+      if (logError) {
+        await plog(admin, video_upload_id, 'create-log-entry', 'error', `Failed to create log entry: ${logError.message}`)
+        console.error('Failed to create log entry:', logError)
+      } else {
+        await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Timeline entry created ✓')
+      }
     })
 
     return { status: 'processed', video_upload_id, model: analysisResult.modelUsed }

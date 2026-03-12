@@ -8,7 +8,7 @@ import {
   Clock, Trash2, ChevronDown, ChevronUp, Play, Lightbulb,
   FolderOpen, Quote, Tag, Brain, Scissors, FileText, HelpCircle,
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
-  AlertTriangle, X, Pause, RotateCcw, Layers,
+  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles
 } from 'lucide-react'
 import type { VideoUpload } from '@/types/database'
 
@@ -180,7 +180,12 @@ export default function UploadsPage() {
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files)
+    const MAX_SIZE = 50 * 1024 * 1024 // 50MB
     for (const file of fileArray) {
+      if (file.size > MAX_SIZE) {
+        alert(`File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Supabase Standard projects have a 50MB limit. Please increase the limit in your project settings or upload a smaller file.`)
+        continue
+      }
       startTusUpload(file)
     }
   }, [startTusUpload])
@@ -312,7 +317,7 @@ export default function UploadsPage() {
           Drop video or audio files here
         </p>
         <p className="text-sm text-[var(--text-tertiary)] mb-4">
-          MP4, MOV, WebM, AVI, MP3, M4A, WAV — any size, uploads resume if interrupted
+          MP4, MOV, WebM, AVI, MP3, M4A, WAV — Max 50MB (Standard), uploads resume if interrupted
         </p>
         <label className="btn btn-primary btn-sm cursor-pointer inline-flex">
           Browse Files
@@ -491,8 +496,8 @@ export default function UploadsPage() {
                     >
                       {processingIds.has(upload.id) ? (
                         <>
-                          <Loader2 size={14} className="animate-spin" />
-                          Queuing...
+                           <Loader2 size={14} className="animate-spin" />
+                           Queuing...
                         </>
                       ) : (
                         <>
@@ -574,6 +579,20 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
 
       {activeTab === 'analysis' && a && (
         <div className="space-y-5">
+          {a.reflections && (
+            <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-xl p-4 mb-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-3 opacity-10">
+                <Brain size={40} />
+              </div>
+              <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--accent)] mb-2 flex items-center gap-2">
+                <Sparkles size={12} /> Neolog's Response
+              </h4>
+              <p className="text-sm text-[var(--text-primary)] leading-relaxed italic font-serif">
+                "{a.reflections}"
+              </p>
+            </div>
+          )}
+
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>

@@ -14,40 +14,41 @@ export const processChatSession = inngest.createFunction(
 
     // 1. Get API keys (prefer Anthropic, fallback to OpenAI)
     const keys = await step.run('get-api-keys', async () => {
-      const [anthropicKey, openaiKey] = await Promise.all([
+      const [anthropicKey, openaiKey, profile] = await Promise.all([
         getActiveIntegrationKeyWithClient(admin, user_id, 'anthropic'),
         getActiveIntegrationKeyWithClient(admin, user_id, 'openai'),
+        admin.from('profiles').select('display_name, username').eq('id', user_id).single().then(r => r.data)
       ])
-      return { anthropicKey, openaiKey }
+      return { anthropicKey, openaiKey, userName: profile?.display_name || profile?.username || 'User' }
     })
 
     if (!keys.anthropicKey && !keys.openaiKey) {
       throw new Error('No API key found for user — add an Anthropic or OpenAI key in Settings')
     }
 
-    const systemPrompt = `You are the Neolog Intelligence Layer — an AI that analyzes conversations and extracts structured knowledge.
-
-Analyze the following chat session and return a JSON object.
-
-YOUR TASKS:
-1. Write a 3rd-person narrative report. Start with "In this session, [User]..."
-2. Extract key Decisions, Ideas, and Projects as string arrays.
-3. Extract Entities: recurring concepts discussed (projects, ideas, people, goals, topics).
-
-RESPONSE FORMAT (JSON only):
-{
-  "title": "Short descriptive title",
-  "narrative": "3rd person analysis...",
-  "decisions": ["Decision 1"],
-  "ideas": ["Idea 1"],
-  "projects": ["Project 1"],
-  "summary": "One sentence summary",
-  "intended_logged_at": "ISO-8601 date string (Use this if the user is describing a past event, e.g. 'yesterday' relative to Current Time. If they are talking about right now, use the Current Time provided.)",
-  "entities": [
-    { "name": "Entity Name", "type": "project", "context": "What was said about this entity." }
-  ]
-}
-ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commitment, skill, blocker`
+    const systemPrompt = `You are the Neolog Intelligence Layer — an AI that analyzes conversations and extracts structured knowledge for ${keys.userName}.
+ 
+ Analyze the following chat session and return a JSON object.
+ 
+ YOUR TASKS:
+ 1. Write a 3rd-person narrative report. Start with "In this session, ${keys.userName}..."
+ 2. Extract key Decisions, Ideas, and Projects as string arrays.
+ 3. Extract Entities: recurring concepts discussed (projects, ideas, people, goals, topics).
+ 
+ RESPONSE FORMAT (JSON only):
+ {
+   "title": "Short descriptive title",
+   "narrative": "3rd person analysis...",
+   "decisions": ["Decision 1"],
+   "ideas": ["Idea 1"],
+   "projects": ["Project 1"],
+   "summary": "One sentence summary",
+   "intended_logged_at": "ISO-8601 date string (Use this if the user is describing a past event, e.g. 'yesterday' relative to Current Time. If they are talking about right now, use the Current Time provided.)",
+   "entities": [
+     { "name": "Entity Name", "type": "project", "context": "What was said about this entity." }
+   ]
+ }
+ ALLOWED ENTITY TYPES: project, idea, person, goal, question, habit, topic, commitment, skill, blocker`
 
     // 2. Perform analysis (Claude preferred, GPT-4o fallback)
     const analysis = await step.run('analyze-session', async () => {

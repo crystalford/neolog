@@ -183,7 +183,7 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
       {/* Thumbnail / Image if present */}
       {displayImage && (
         <div style={{ flexShrink: 0, width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}>
-          <img src={displayImage} alt="" style={{ width: '100%', height: '100%', objectCover: 'cover' }} />
+          <img src={displayImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
       )}
 
@@ -243,6 +243,23 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
             >
               {entry.body}
             </p>
+          )}
+
+          {/* Neolog's Reflection */}
+          {entry.meta?.reflections && (
+            <div style={{
+              marginTop: '10px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              background: 'rgba(124,106,245,0.05)',
+              borderLeft: '2px solid var(--accent)',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              color: 'var(--text-primary)',
+              fontStyle: 'italic',
+            }}>
+              {entry.meta.reflections as string}
+            </div>
           )}
 
           {/* Meta row: software tags, cost, asset */}
