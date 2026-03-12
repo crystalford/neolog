@@ -1,0 +1,409 @@
+'use client'
+
+import { useState } from 'react'
+import {
+  Brain, Target, FileText, Scissors, Shield, Sparkles, Zap, 
+  Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2, 
+  TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play
+} from 'lucide-react'
+import type { VideoUpload } from '@/types/database'
+
+interface SessionDetailProps {
+  upload: VideoUpload
+}
+
+export function SessionDetail({ upload }: SessionDetailProps) {
+  const [activeTab, setActiveTab] = useState<'analysis' | 'personal' | 'transcript' | 'clips' | 'posts'>('analysis')
+  const a = upload.analysis
+
+  const tabs = [
+    { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
+    { key: 'personal' as const,    label: 'Personal',     icon: Target },
+    { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
+    { key: 'clips' as const,       label: 'Clips',        icon: Scissors, count: upload.generated_clips?.length || 0 },
+    { key: 'posts' as const,       label: 'Posts',        icon: FileText, count: upload.generated_posts?.length || 0 },
+  ]
+
+  return (
+    <div className="session-detail">
+      {a?.contains_sensitive_content && (
+        <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-lg bg-red-400/10 border border-red-400/20">
+          <Shield size={14} className="text-red-400 flex-shrink-0" />
+          <p className="text-xs text-red-400">
+            Sensitive content detected and redacted. {a.pii_detected?.length || 0} item(s) flagged.
+          </p>
+        </div>
+      )}
+
+      {/* Tabs Header */}
+      <div className="flex gap-1 mb-5 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
+        {tabs.map(tab => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setActiveTab(tab.key)
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'text-[var(--accent)] border-b-2 border-[var(--accent)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              <Icon size={13} />
+              {tab.label}
+              {'count' in tab && (tab as any).count > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[10px]">
+                  {(tab as any).count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="tab-content transition-all duration-300">
+        {activeTab === 'analysis' && a && (
+          <div className="space-y-6">
+            {a.reflections && (
+              <div className="bg-[var(--accent)]/[0.03] border border-[var(--accent)]/10 rounded-xl p-5 mb-6 relative overflow-hidden backdrop-blur-sm">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.05]">
+                  <Sparkles size={48} />
+                </div>
+                <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
+                  <Sparkles size={12} /> Neolog's Response
+                </h4>
+                <p style={{ 
+                  fontSize: '14px', 
+                  lineHeight: '1.7', 
+                  color: 'var(--text-primary)',
+                  fontWeight: 400
+                }}>
+                  {a.reflections}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
+                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {a.mood && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[11px]">
+                      <span className="text-[var(--text-tertiary)]">Mood:</span>
+                      <span className="font-semibold text-[var(--text-primary)]">{a.mood}</span>
+                    </span>
+                  )}
+                  {a.energy_level && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[11px]">
+                      <Zap size={10} className="text-[var(--accent)]" />
+                      <span className="font-semibold text-[var(--text-primary)] capitalize">{a.energy_level} energy</span>
+                    </span>
+                  )}
+                </div>
+
+                {a.categories?.length > 0 && (
+                  <Section icon={TagIcon} title="Categories">
+                    <div className="flex flex-wrap gap-1.5">
+                      {a.categories.map((cat: any, i: number) => (
+                        <span key={i} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
+                          {cat.name}<span className="ml-1 text-[var(--text-tertiary)] opacity-60">{Math.round(cat.confidence * 100)}%</span>
+                        </span>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {a.ideas?.length > 0 && (
+                  <Section icon={Lightbulb} title="Ideas">
+                    <div className="space-y-2.5">
+                      {a.ideas.map((idea: any, i: number) => (
+                        <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)] group">
+                          <span className="text-[var(--accent)] mt-1 opacity-50 group-hover:opacity-100">•</span>
+                          <div>
+                            {typeof idea === 'object' ? idea.text : idea}
+                            {typeof idea === 'object' && idea.type && (
+                              <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase tracking-wider">{idea.type}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {a.questions?.length > 0 && (
+                  <Section icon={HelpCircle} title="Open Questions">
+                    <ul className="space-y-2">
+                      {a.questions.map((q: string, i: number) => (
+                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 italic">
+                          <HelpCircle size={14} className="text-purple-400 mt-1 flex-shrink-0" />
+                          {q}
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {a.projects?.length > 0 && (
+                  <Section icon={FolderOpen} title="Projects">
+                    <div className="space-y-3">
+                      {a.projects.map((p: any, i: number) => (
+                        <div key={i} className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-card)] shadow-sm">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{p.name}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">{p.status}</span>
+                          </div>
+                          {p.updates?.length > 0 && (
+                            <ul className="space-y-1.5 mt-2 border-t border-[var(--border-light)] pt-2">
+                              {p.updates.map((u: string, j: number) => (
+                                <li key={j} className="text-xs text-[var(--text-secondary)] flex items-start gap-2">
+                                  <span className="mt-1 opacity-50">•</span> {u}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {a.action_items?.length > 0 && (
+                  <Section icon={CheckCircle2} title="Action Items">
+                    <ul className="space-y-2">
+                      {a.action_items.map((item: string, i: number) => (
+                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3">
+                          <CheckCircle2 size={14} className="text-green-400 mt-1 flex-shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {a.decisions?.length > 0 && (
+                  <Section icon={TrendingUp} title="Decisions">
+                    <div className="space-y-3">
+                      {a.decisions.map((d: any, i: number) => (
+                        <div key={i} className="text-sm">
+                          <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+                            {d.decision}
+                          </div>
+                          {d.reasoning && <p className="text-xs text-[var(--text-tertiary)] mt-1 ml-3.5">Reasoning: {d.reasoning}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {a.blockers?.length > 0 && (
+                  <Section icon={AlertTriangle} title="Blockers">
+                    <ul className="space-y-2">
+                      {a.blockers.map((b: string, i: number) => (
+                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3">
+                          <AlertTriangle size={14} className="text-orange-400 mt-1 flex-shrink-0" />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'personal' && a && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              {a.goals?.length > 0 && (
+                <Section icon={Target} title="Goals">
+                  <div className="space-y-2.5">
+                    {a.goals.map((g: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
+                        <Target size={14} className="text-blue-400 mt-1 flex-shrink-0" />
+                        <div>
+                          {g.goal}
+                          <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase">{g.timeframe?.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {a.commitments?.length > 0 && (
+                <Section icon={CheckCircle2} title="Commitments">
+                  <ul className="space-y-2">
+                    {a.commitments.map((c: string, i: number) => (
+                      <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-2">
+                         <span className="text-blue-400 font-bold">•</span> {c}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {a.habits?.length > 0 && (
+                <Section icon={Zap} title="Habits">
+                  <div className="space-y-2.5">
+                    {a.habits.map((h: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2.5 text-sm text-[var(--text-secondary)] bg-[var(--bg-tertiary)]/30 p-2 rounded-lg">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          h.sentiment === 'positive' ? 'bg-green-400' : h.sentiment === 'negative' ? 'bg-red-400' : 'bg-[var(--text-tertiary)]'
+                        }`} />
+                        {h.habit}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {a.people_mentioned?.length > 0 && (
+                <Section icon={Users} title="People">
+                  <div className="space-y-4">
+                    {a.people_mentioned.map((p: any, i: number) => (
+                      <div key={i} className="flex items-start gap-3 text-sm">
+                        <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)] flex-shrink-0">
+                          <Users size={14} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-[var(--text-primary)]">{p.name}</span>
+                            {p.relationship && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase">{p.relationship}</span>}
+                          </div>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-1">{p.context}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {a.values_expressed?.length > 0 && (
+                <Section icon={Shield} title="Values Expressed">
+                  <div className="flex flex-wrap gap-1.5">
+                    {a.values_expressed.map((v: string, i: number) => (
+                      <span key={i} className="px-3 py-1 rounded-lg text-xs bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">{v}</span>
+                    ))}
+                  </div>
+                </Section>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'transcript' && (
+          <div className="transcript-view">
+            {upload.transcript ? (
+              <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {upload.transcript_segments && upload.transcript_segments.length > 0 ? (
+                  <div className="space-y-3">
+                    {upload.transcript_segments.map((seg, i) => (
+                      <div key={i} className="flex gap-4 group">
+                        <span className="text-[10px] text-[var(--text-tertiary)] font-mono pt-1 flex-shrink-0 w-14 text-right opacity-40 group-hover:opacity-100 transition-opacity">
+                          {formatTimestamp(seg.start)}
+                        </span>
+                        <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed group-hover:text-[var(--text-primary)] transition-colors">{seg.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                    {upload.transcript}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-[var(--text-tertiary)]">
+                <FileText size={24} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No transcript available</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'clips' && (
+          <div className="space-y-4">
+            {upload.generated_clips && upload.generated_clips.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {upload.generated_clips.map((clip, i) => (
+                  <div key={i} className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)] hover:border-[var(--accent)] transition-all cursor-pointer group shadow-sm">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <h5 className="text-[13px] font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{clip.title}</h5>
+                      <span className="text-[10px] text-[var(--text-tertiary)] font-mono flex-shrink-0 bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
+                        {formatTimestamp(clip.start)} – {formatTimestamp(clip.end)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 italic opacity-80">&ldquo;{clip.transcript}&rdquo;</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-[var(--text-tertiary)]">
+                <Scissors size={24} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No clip suggestions available yet</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'posts' && (
+          <div className="space-y-4">
+            {upload.generated_posts && upload.generated_posts.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4">
+                {upload.generated_posts.map((post, i) => (
+                  <div key={i} className="border border-[var(--border-light)] rounded-xl p-5 bg-[var(--bg-card)] hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)] opacity-20 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-0.5 rounded-[4px] text-[9px] font-mono uppercase tracking-widest bg-[var(--accent)]/10 text-[var(--accent)]">
+                        {post.type.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <h5 className="text-sm font-bold text-[var(--text-primary)] mb-2">{post.title}</h5>
+                    <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-[var(--text-tertiary)]">
+                <MessageCircle size={24} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No post suggestions available yet</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
+  return (
+    <div className="section-block">
+      <h4 className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-3 flex items-center gap-2 opacity-80">
+        <Icon size={11} className="text-[var(--accent)]" /> {title}
+      </h4>
+      {children}
+    </div>
+  )
+}
+
+function formatTimestamp(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}

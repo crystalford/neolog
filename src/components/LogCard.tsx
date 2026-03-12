@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { Sparkles, Video, Mic, FileText, ChevronRight } from 'lucide-react'
+import { Sparkles, Video, Mic, FileText, ChevronRight, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { SessionDetail } from './SessionDetail'
+import type { VideoUpload } from '@/types/database'
 
 // ──────────────────────────────────────────────────────────────
 // Types
@@ -107,6 +110,10 @@ interface LogCardProps {
 }
 
 export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [fullUploadData, setFullUploadData] = useState<VideoUpload | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
   const emoji = ENTRY_EMOJI[entry.entry_type] || '📌'
   const loggedDate = new Date(entry.logged_at)
   const timeStr = loggedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -137,10 +144,10 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
       {/* Visual Indicator / Thumbnail */}
       <div style={{ flexShrink: 0, width: '48px', height: '48px', position: 'relative' }}>
         {displayImage ? (
-          <div style={{ width: '100%', height: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+          <div style={{ width: '100%', height: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-light)', background: 'var(--bg-tertiary)' }}>
             <img src={displayImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             {entry.entry_type === 'session' && (
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', border: '2px solid var(--bg-primary)' }}>
                 <Video size={10} />
               </div>
             )}
@@ -194,12 +201,12 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
         )}
 
         {/* Body Preview */}
-        {hasBody && (
+        {hasBody && !isExpanded && (
           <p style={{
-            fontSize: '12px',
-            lineHeight: 1.5,
+            fontSize: '13px',
+            lineHeight: '1.6',
             color: 'var(--text-secondary)',
-            margin: '4px 0 8px 0',
+            margin: '6px 0 10px 0',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -207,6 +214,40 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
           }}>
             {entry.body}
           </p>
+        )}
+
+        {/* Reflections Snapshot (if not expanded) */}
+        {hasReflections && !isExpanded && (
+          <div style={{ 
+            background: 'var(--accent-soft)', 
+            padding: '10px 14px', 
+            borderRadius: '10px', 
+            border: '1px solid var(--accent-border)',
+            marginTop: '8px'
+          }}>
+            <p style={{ 
+              fontSize: '12px', 
+              color: 'var(--accent)', 
+              fontWeight: 600, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              marginBottom: '4px',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}>
+              <Sparkles size={12} /> Neolog's Response
+            </p>
+            <p style={{ 
+              fontSize: '13px', 
+              lineHeight: '1.5', 
+              color: 'var(--text-primary)',
+              margin: 0
+            }}>
+              {entry.meta?.reflections && entry.meta.reflections.length > 150 ? entry.meta.reflections.substring(0, 147) + '...' : entry.meta?.reflections}
+            </p>
+          </div>
         )}
 
 
@@ -224,23 +265,80 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
               </span>
             )}
             {entry.source_upload_id && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '10px', color: 'var(--accent)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                DETAILS <ChevronRight size={12} />
+              <span 
+                onClick={async (e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  
+                  if (isExpanded) {
+                    setIsExpanded(false)
+                    return
+                  }
+
+                  setIsExpanded(true)
+                  if (!fullUploadData) {
+                    setIsLoading(true)
+                    try {
+                      const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
+                      if (res.ok) {
+                        const data = await res.json()
+                        setFullUploadData(data.upload)
+                      }
+                    } catch (err) {
+                      console.error('Failed to fetch upload details:', err)
+                    } finally {
+                      setIsLoading(false)
+                    }
+                  }
+                }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px', 
+                  fontSize: '10px', 
+                  color: 'var(--accent)', 
+                  fontWeight: 700, 
+                  fontFamily: 'var(--font-mono)',
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  background: 'var(--accent-soft)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-soft-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-soft)'}
+              >
+                {isExpanded ? (
+                  <>COLLAPSE <ChevronUp size={12} /></>
+                ) : (
+                  <>DETAILS <ChevronRight size={12} /></>
+                )}
               </span>
             )}
           </div>
         </div>
+
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
+            {isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
+              </div>
+            ) : fullUploadData ? (
+              <SessionDetail upload={fullUploadData} />
+            ) : (
+              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', textAlign: 'center' }}>Failed to load details.</p>
+            )}
+          </div>
+        )}
       </div>
     </article>
   )
 
-  if (entry.source_upload_id) {
-    return (
-      <Link href={`/dashboard/uploads?id=${entry.source_upload_id}`} style={{ textDecoration: 'none', display: 'block' }}>
-        {content}
-      </Link>
-    )
-  }
-
-  return content
+  return (
+    <div style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
+      {content}
+    </div>
+  )
 }

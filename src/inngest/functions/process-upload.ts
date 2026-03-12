@@ -180,30 +180,127 @@ export const processUpload = inngest.createFunction(
           const ffprobe = require('ffprobe-client')
           const info = await ffprobe(signedData.signedUrl)
           
-          // Exhaustive check for creation dates (Media Created / Origin tags)
-          const creationDate =
-            info.format?.tags?.['com.apple.quicktime.creationdate'] || 
-            info.format?.tags?.creation_time ||                        
-            info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time ||
-            info.format?.tags?.['creation_time-eng'] ||
-            info.format?.tags?.['date'] ||
-            info.format?.tags?.['encoded_date'] ||
-            info.format?.tags?.['TAG:creation_time'] ||
-            info.format?.tags?.['com.apple.quicktime.creationdate']
+          await plog(admin, video_upload_id, 'extract-metadata', 'debug', `Scanning all tags for date info...`)
 
-          if (creationDate) {
-            const recordedAt = new Date(creationDate).toISOString()
-            await admin.from('video_uploads').update({ recorded_at: recordedAt }).eq('id', video_upload_id)
-            await plog(admin, video_upload_id, 'extract-metadata', 'done', `Found recorded_at: ${recordedAt} from tag`)
-            return { recorded_at: recordedAt }
+          // 1. Gather all tags from format and streams
+          const allTags: Record<string, string> = {
+            ...(info.format?.tags || {}),
+            ...(info.streams?.reduce((acc: any, s: any) => ({ ...acc, ...(s.tags || {}) }), {}) || {})
+          }
+
+          // 2. Priority check for known tags
+          const priorityKeys = [
+            'com.apple.quicktime.creationdate', // Apple standard
+            'creation_time',                    // Common FFmpeg tag
+            'creation_date',                    // Alternative
+            'date',                             // Generic date
+            'CreateDate',                       // Windows-friendly
+            'DateTimeOriginal',                 // Camera standard
+            'EncodingTime',                     // Windows-specific MP4
+            'ContentCreateDate',                // Windows Origin field mapping
+            'encoded_date',
+            'tagged_date',
+            'com.apple.quicktime.creationdate-eng',
+            'creation_time-eng'
+          ]
+
+          let foundDate: string | null = null
+          let foundKey: string | null = null
+
+          for (const key of priorityKeys) {
+            if (allTags[key]) {
+              const d = Date.parse(allTags[key])
+              if (!isNaN(d)) {
+                foundDate = new Date(d).toISOString()
+                foundKey = key
+                break
+              }
+            }
+          }
+
+          // 3. Fuzzy fallback scanning if no priority key matched perfectly
+          if (!foundDate) {
+            for (const [key, value] of Object.entries(allTags)) {
+              if (typeof value !== 'string' || value.length < 8) continue
+              const k = key.toLowerCase()
+              // Look for keys containing date/time/creat/origin
+              if (k.includes('date') || k.includes('time') || k.includes('creat') || k.includes('origin')) {
+                const d = Date.parse(value)
+                if (!isNaN(d)) {
+                  foundDate = new Date(d).toISOString()
+                  foundKey = key
+                  break
+                }
+              }
+            }
+          }
+
+          if (foundDate) {
+            await admin.from('video_uploads').update({ recorded_at: foundDate }).eq('id', video_upload_id)
+            await plog(admin, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
+            return { recorded_at: foundDate }
+          } else {
+            await plog(admin, video_upload_id, 'extract-metadata', 'warn', `No recording date found in metadata. Full tags logged for debug: ${JSON.stringify(allTags)}`)
           }
         }
-        await plog(admin, video_upload_id, 'extract-metadata', 'done', 'No creation_time tags found')
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
 
       return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+    })
+
+    // ── Step 2c: Extract Thumbnail (video files only) ──
+    const thumbnailUrl = await step.run('extract-thumbnail', async () => {
+      const { upload } = activeContext
+      if (!isVideoMimeType(upload.mime_type)) return null
+
+      await plog(admin, video_upload_id, 'extract-thumbnail', 'running')
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return null
+
+      const { data: signedData } = await admin.storage
+        .from('videos')
+        .createSignedUrl(upload.storage_path, 3600)
+
+      if (!signedData?.signedUrl) return null
+
+      try {
+        const replicate = new Replicate({ auth: replicateToken })
+        // Use fofr/ffmpeg to grab a frame at 1s
+        const output = await replicate.run(
+          "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+          {
+            input: {
+              input_file: signedData.signedUrl,
+              ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -f image2 pipe:1"
+            }
+          }
+        ) as any
+
+        if (!output || typeof output !== 'string') return null
+
+        // Fetch and upload to Supabase
+        const imgResponse = await fetch(output)
+        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
+        const thumbPath = `${user_id}/thumbnails/${video_upload_id}.jpg`
+
+        await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true
+        })
+
+        const { data: { publicUrl } } = admin.storage.from('videos').getPublicUrl(thumbPath)
+        
+        await admin.from('video_uploads').update({ thumbnail_url: publicUrl }).eq('id', video_upload_id)
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail created: ${publicUrl}`)
+        
+        return publicUrl
+      } catch (err: any) {
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', `Replicate error: ${err?.message}`)
+        return null
+      }
     })
 
     // ── Step 3: Transcribe ──
@@ -269,16 +366,25 @@ export const processUpload = inngest.createFunction(
         activeContext.userName
       )
 
+      // Generate additional suggestions
+      const { extractTags, generateClipSuggestions, generatePostSuggestions } = require('@/lib/video-analysis')
+      const tags = extractTags(result.analysis)
+      const clips = generateClipSuggestions(transcription.segments, result.analysis.key_quotes || [])
+      const posts = generatePostSuggestions(result.analysis, metadata.recorded_at)
+
       await admin.from('video_uploads').update({
         analysis: result.analysis,
         analysis_model: result.modelUsed,
+        tags,
+        generated_clips: clips,
+        generated_posts: posts,
         status: 'processed',
         processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
 
-      await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}`)
-      return result
+      await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}. Generated ${clips.length} clips and ${posts.length} posts.`)
+      return { ...result, tags, clips, posts }
     })
 
     // ── Step 5: Create rich Timeline Entry ──
@@ -311,10 +417,10 @@ export const processUpload = inngest.createFunction(
         logged_at: recordedAt,
         source_upload_id: video_upload_id,
         is_public: true,
-        thumbnail_url: uploadData?.thumbnail_url || (activeContext.upload as any).thumbnail_url,
+        thumbnail_url: thumbnailUrl || (activeContext.upload as any).thumbnail_url,
         meta: {
           model: analysisResult.modelUsed,
-          categories: analysis.categories,
+          categories: analysisResult.tags, // Using curated tags
           mood: analysis.mood,
           energy: analysis.energy_level,
           reflections: analysis.reflections,
