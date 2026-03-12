@@ -76,6 +76,8 @@ export const processUpload = inngest.createFunction(
         throw new Error(msg)
       }
 
+      await plog(admin, video_upload_id, 'fetch-context', 'done', `Context fetched for ${userName}`)
+
       return {
         skip: false as const,
         upload,
@@ -86,13 +88,17 @@ export const processUpload = inngest.createFunction(
     })
 
     if (context.skip) return { status: 'already_processed', video_upload_id }
-
-    // Use type narrowing or casting since we checked context.skip
     const activeContext = context as Extract<typeof context, { skip: false }>
 
     // ── Step 2: Extract audio (video files only) ──
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = activeContext
+      
+      // Ensure we are in a transcribing state
+      await admin.from('video_uploads').update({
+        status: 'transcribing',
+        updated_at: new Date().toISOString(),
+      }).eq('id', video_upload_id)
 
       if (!isVideoMimeType(upload.mime_type)) {
         await plog(admin, video_upload_id, 'extract-audio', 'skipped', `Not a video file (${upload.mime_type})`)
@@ -100,10 +106,6 @@ export const processUpload = inngest.createFunction(
       }
 
       await plog(admin, video_upload_id, 'extract-audio', 'running', 'Starting Replicate FFmpeg audio extraction')
-      await admin.from('video_uploads').update({
-        status: 'transcribing',
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) {
@@ -178,24 +180,22 @@ export const processUpload = inngest.createFunction(
           const ffprobe = require('ffprobe-client')
           const info = await ffprobe(signedData.signedUrl)
           
-          // Exhaustive check for creation dates
           const creationDate =
-            info.format?.tags?.['com.apple.quicktime.creationdate'] || // Primary for modern iPhone videos
-            info.format?.tags?.creation_time ||                        // Standard MP4 meta
+            info.format?.tags?.['com.apple.quicktime.creationdate'] || 
+            info.format?.tags?.creation_time ||                        
             info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time ||
             info.format?.tags?.['creation_time-eng'] ||
-            info.format?.tags?.['date'] ||                             // Common in older formats
+            info.format?.tags?.['date'] ||                             
             info.format?.tags?.['encoded_date']
 
           if (creationDate) {
-            // Clean up apple format (e.g. 2025-12-29T14:30:00-0500)
             const recordedAt = new Date(creationDate).toISOString()
             await admin.from('video_uploads').update({ recorded_at: recordedAt }).eq('id', video_upload_id)
             await plog(admin, video_upload_id, 'extract-metadata', 'done', `Found recorded_at: ${recordedAt}`)
             return { recorded_at: recordedAt }
           }
         }
-        await plog(admin, video_upload_id, 'extract-metadata', 'done', 'No creation_time tags found, defaulting to upload time')
+        await plog(admin, video_upload_id, 'extract-metadata', 'done', 'No creation_time tags found')
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
@@ -205,43 +205,60 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
-      await plog(admin, video_upload_id, 'transcribe', 'running')
+      await plog(admin, video_upload_id, 'transcribe', 'running', `Audio path: ${audioPath.path}`)
 
       if (activeContext.upload.mime_type === 'text/plain') {
         const { data: fileData } = await admin.storage.from('videos').download(audioPath.path)
         const text = fileData ? Buffer.from(await fileData.arrayBuffer()).toString('utf-8') : ''
-        return { text, language: 'en' }
+        return { text, language: 'en', segments: [] }
       }
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) throw new Error('REPLICATE_API_TOKEN missing for transcribing')
+      if (!replicateToken) throw new Error('REPLICATE_API_TOKEN missing')
 
       const { data: signedData } = await admin.storage
         .from('videos')
         .createSignedUrl(audioPath.path, 3600)
 
+      if (!signedData?.signedUrl) throw new Error('Failed to sign audio URL')
+
       const replicate = new Replicate({ auth: replicateToken })
-      const result = await replicate.run(
-        'openai/whisper:4d4b3d757d540203f19e487da847d8b51d6ed5dd2ac8f1076b66d4f6d49bc788' as any,
-        { input: { audio: signedData?.signedUrl, translate: false } }
+      // REVERTED: Using known-good model version and parameters
+      const output = await replicate.run(
+        'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+        {
+          input: {
+            audio: signedData.signedUrl,
+            model: 'large-v3',
+            transcription: 'plain text',
+            language: 'auto',
+            word_timestamps: false,
+          },
+        }
       ) as any
 
-      const text = result.transcription || result.text || ''
-      await admin.from('video_uploads').update({
-        transcript: text,
-        status: 'analyzing',
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
+      const text = output?.transcription || ''
+      const segments = (output?.segments || []).map((s: any) => ({
+        start: s.start,
+        end: s.end,
+        text: s.text,
+      }))
 
-      await plog(admin, video_upload_id, 'transcribe', 'done', `Transcription complete (${text.length} chars)`)
-      return { text, language: result.language || 'en' }
+      await plog(admin, video_upload_id, 'transcribe', 'done', `${text.length} chars transcribed`)
+      return { text, language: output?.detected_language || 'en', segments }
     })
 
     // ── Step 4: Analyze ──
     const analysisResult = await step.run('analyze', async () => {
       await plog(admin, video_upload_id, 'analyze', 'running')
       
-      // Fix: Position arguments for runAnalysis
+      await admin.from('video_uploads').update({
+        transcript: transcription.text,
+        transcript_segments: transcription.segments,
+        status: 'analyzing',
+        updated_at: new Date().toISOString(),
+      }).eq('id', video_upload_id)
+
       const result = await runAnalysis(
         transcription.text,
         activeContext.openaiKey,
@@ -257,7 +274,7 @@ export const processUpload = inngest.createFunction(
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
 
-      await plog(admin, video_upload_id, 'analyze', 'done', 'AI analysis shared and saved')
+      await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}`)
       return result
     })
 
@@ -267,9 +284,11 @@ export const processUpload = inngest.createFunction(
       const recordedAt = metadata.recorded_at
       
       const { data: existing } = await admin.from('log_entries').select('id').eq('source_upload_id', video_upload_id).maybeSingle()
-      if (existing) return
+      if (existing) {
+        await plog(admin, video_upload_id, 'create-log-entry', 'skipped', 'Already exists')
+        return
+      }
 
-      // Construct rich body with summary, mood, and questions
       let richBody = analysis.summary || ''
       if (analysis.mood || analysis.energy_level) {
         richBody += `\n\nMood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`
@@ -285,7 +304,7 @@ export const processUpload = inngest.createFunction(
         body: richBody,
         logged_at: recordedAt,
         source_upload_id: video_upload_id,
-        is_public: true, // Defaulting to public for consistency
+        is_public: true,
         thumbnail_url: (activeContext.upload as any).thumbnail_url,
         meta: {
           model: analysisResult.modelUsed,
@@ -297,7 +316,7 @@ export const processUpload = inngest.createFunction(
         }
       })
 
-      await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Rich timeline entry created (Public)')
+      await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Timeline entry created')
     })
 
     return { status: 'success', video_upload_id }
