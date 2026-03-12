@@ -4,9 +4,12 @@ import { useState } from 'react'
 import {
   Brain, Target, FileText, Scissors, Shield, Sparkles, Zap, 
   Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2, 
-  TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play
+  TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
+  CalendarDays
 } from 'lucide-react'
 import type { VideoUpload } from '@/types/database'
+
+import { format } from 'date-fns'
 
 interface SessionDetailProps {
   upload: VideoUpload
@@ -89,6 +92,44 @@ export function SessionDetail({ upload }: SessionDetailProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
+                <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
+                  <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
+                    <CalendarDays size={12} /> Timeline Placement
+                  </h4>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-lg font-light text-[var(--text-primary)] tracking-tight">
+                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'MMMM d, yyyy') : 'No date detected'}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'p') : ''}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
+                      {upload.recorded_at ? 'Metadata Synchronized' : 'Fallback to Upload Date'}
+                    </p>
+                  </div>
+                </div>
+
+                {upload.meta?.raw_metadata_diagnostic && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] flex items-center gap-2">
+                        <FileText size={11} /> Extraction Source
+                      </h4>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] font-mono">
+                        FFPROBE-JSON
+                      </span>
+                    </div>
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4 max-h-60 overflow-y-auto no-scrollbar shadow-inner">
+                      <pre className="text-[10px] text-[var(--text-tertiary)] font-mono leading-relaxed whitespace-pre-wrap">
+                        {JSON.stringify(upload.meta.raw_metadata_diagnostic, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
                   <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>

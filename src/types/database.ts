@@ -723,6 +723,7 @@ export type VideoUpload = {
   generated_clips: SuggestedClip[] | null
   thumbnail_url: string | null
   tags: string[]
+  meta?: any
   error_message: string | null
   source_deleted: boolean
   session_id: string | null

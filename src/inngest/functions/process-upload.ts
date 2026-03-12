@@ -177,10 +177,46 @@ export const processUpload = inngest.createFunction(
           .createSignedUrl(upload.storage_path, 600)
 
         if (signedData?.signedUrl) {
-          const ffprobe = require('ffprobe-client')
-          const info = await ffprobe(signedData.signedUrl)
+          await plog(admin, video_upload_id, 'extract-metadata', 'debug', `Scanning all tags via Replicate ffprobe...`)
+
+          const replicateToken = process.env.REPLICATE_API_TOKEN
+          if (!replicateToken) {
+            await plog(admin, video_upload_id, 'extract-metadata', 'error', 'REPLICATE_API_TOKEN missing for metadata extraction')
+            return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+          }
+
+          const replicate = new Replicate({ auth: replicateToken })
+          // Use fofr/ffmpeg to run ffprobe and get JSON
+          const output = await replicate.run(
+            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+            {
+              input: {
+                input_file: signedData.signedUrl,
+                ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
+              }
+            }
+          ) as any
+
+          // Replicate fofr/ffmpeg returns a URL to a file if output is large, or the content if small.
+          let info: any
+          if (typeof output === 'string' && output.startsWith('http')) {
+            const res = await fetch(output)
+            info = await res.json()
+          } else if (typeof output === 'string') {
+            try {
+              info = JSON.parse(output)
+            } catch (e) {
+              await plog(admin, video_upload_id, 'extract-metadata', 'error', `Failed to parse ffprobe output: ${output.substring(0, 100)}`)
+              return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+            }
+          } else {
+            info = output
+          }
           
-          await plog(admin, video_upload_id, 'extract-metadata', 'debug', `Scanning all tags for date info...`)
+          if (!info) {
+            await plog(admin, video_upload_id, 'extract-metadata', 'error', 'ffprobe returned empty output')
+            return { recorded_at: (upload as any).recorded_at || (upload as any).created_at }
+          }
 
           // 1. Gather all tags from format and streams
           const allTags: Record<string, string> = {
@@ -188,20 +224,20 @@ export const processUpload = inngest.createFunction(
             ...(info.streams?.reduce((acc: any, s: any) => ({ ...acc, ...(s.tags || {}) }), {}) || {})
           }
 
-          // 2. Priority check for known tags
+          // 2. Priority check for known tags (mostly Apple/QuickTime/MP4)
           const priorityKeys = [
-            'com.apple.quicktime.creationdate', // Apple standard
-            'creation_time',                    // Common FFmpeg tag
-            'creation_date',                    // Alternative
-            'date',                             // Generic date
-            'CreateDate',                       // Windows-friendly
-            'DateTimeOriginal',                 // Camera standard
-            'EncodingTime',                     // Windows-specific MP4
-            'ContentCreateDate',                // Windows Origin field mapping
-            'encoded_date',
-            'tagged_date',
+            'com.apple.quicktime.creationdate', // iPhone/Mac standard (highest precision)
             'com.apple.quicktime.creationdate-eng',
-            'creation_time-eng'
+            'creation_time',                    // Common FFmpeg/Android tag
+            'creation_time-eng',
+            'CreateDate',                       // Windows/Standard MP4
+            'creation_date',                    
+            'date',                             
+            'DateTimeOriginal',                 // Camera standard
+            'EncodingTime',                     
+            'ContentCreateDate',                
+            'encoded_date',
+            'tagged_date'
           ]
 
           let foundDate: string | null = null
@@ -218,37 +254,29 @@ export const processUpload = inngest.createFunction(
             }
           }
 
-          // 3. Heuristic: Look for the *earliest* valid date that isn't Today (unless that's all we have)
-          const todayStr = new Date().toISOString().split('T')[0]
-          let candidates: { key: string, date: string }[] = []
+          // 3. Fallback Heuristic: Scan ALL tags for anything that looks like a valid date
+          if (!foundDate) {
+            const todayStr = new Date().toISOString().split('T')[0]
+            let candidates: { key: string, date: string }[] = []
 
-          for (const [key, value] of Object.entries(allTags)) {
-            if (typeof value !== 'string' || value.length < 8) continue
-            const d = Date.parse(value)
-            if (!isNaN(d)) {
-              candidates.push({ key, date: new Date(d).toISOString() })
-            }
-          }
-
-          // Filter for dates before today if possible
-          const backdatedCandidates = candidates.filter(c => c.date.split('T')[0] < todayStr)
-          if (backdatedCandidates.length > 0) {
-            // Pick the earliest one as it's most likely the original media creation date
-            backdatedCandidates.sort((a, b) => a.date.localeCompare(b.date))
-            foundDate = backdatedCandidates[0].date
-            foundKey = backdatedCandidates[0].key
-          } else if (candidates.length > 0) {
-            // If no backdated candidate, pick anything that matched a priority key first
-            for (const key of priorityKeys) {
-              const match = candidates.find(c => c.key === key)
-              if (match) {
-                foundDate = match.date
-                foundKey = match.key
-                break
+            for (const [key, value] of Object.entries(allTags)) {
+              if (typeof value !== 'string' || value.length < 8) continue
+              // Filter out obvious non-date things that might accidentally parse
+              if (/^\d+$/.test(value)) continue 
+              
+              const d = Date.parse(value)
+              if (!isNaN(d)) {
+                candidates.push({ key, date: new Date(d).toISOString() })
               }
             }
-            // Otherwise just pick the earliest overall
-            if (!foundDate) {
+
+            // Filter for dates before today if possible (most likely the real capture date)
+            const backdatedCandidates = candidates.filter(c => c.date.split('T')[0] < todayStr)
+            if (backdatedCandidates.length > 0) {
+              backdatedCandidates.sort((a, b) => a.date.localeCompare(b.date))
+              foundDate = backdatedCandidates[0].date
+              foundKey = backdatedCandidates[0].key
+            } else if (candidates.length > 0) {
               candidates.sort((a, b) => a.date.localeCompare(b.date))
               foundDate = candidates[0].date
               foundKey = candidates[0].key

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Mic, MicOff, Send, Upload, Loader2, CheckCircle2,
-  User, Bot, X, ChevronDown, ChevronUp, Paperclip, Square,
+  User, Bot, X, ChevronDown, ChevronUp, Paperclip, Square, Sparkles
 } from 'lucide-react'
 import { chatWithManager, type ChatMessage } from '@/app/actions/chat'
 import { createClient } from '@/lib/supabase/client'
@@ -92,166 +92,59 @@ function abstime(dateStr: string) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function NeoLogPage() {
-  // Feed
-  const [feed, setFeed] = useState<FeedItem[]>([])
-  const [feedLoading, setFeedLoading] = useState(true)
-  const [expandedFeedId, setExpandedFeedId] = useState<string | null>(null)
-
-  // Entities
-  const [entities, setEntities] = useState<Entity[]>([])
-  const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null)
-  const [entityMentions, setEntityMentions] = useState<EntityMention[]>([])
-  const [loadingMentions, setLoadingMentions] = useState(false)
-
-  // Input
-  const [input, setInput] = useState('')
+  // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isThinking, setIsThinking] = useState(false)
   const [showChat, setShowChat] = useState(false)
-  const feedEndRef = useRef<HTMLDivElement>(null)
+  
+  // Feed & Entities (Stored but not shown in main UI to minimize clutter)
+  const [feed, setFeed] = useState<FeedItem[]>([])
+  const [feedLoading, setFeedLoading] = useState(true)
 
-  // Auto-scroll feed to bottom when it loads or updates
-  useEffect(() => {
-    if (!feedLoading && feed.length > 0) {
-      feedEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [feed, feedLoading])
-
-  // Upload
+  // Input & Refs
+  const [input, setInput] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadDone, setUploadDone] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-
-  // Recording
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [isArchiving, setIsArchiving] = useState(false)
+
+  const chatEndRef = useRef<HTMLDivElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Misc
-  const [error, setError] = useState<string | null>(null)
-  const [isArchiving, setIsArchiving] = useState(false)
-
-  const fileRef = useRef<HTMLInputElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const chatEndRef = useRef<HTMLDivElement>(null)
-
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  // ── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchFeed = useCallback(async () => {
     setFeedLoading(true)
     try {
-      const [logRes, uploadRes] = await Promise.all([
-        fetch('/api/log-entries'),
-        fetch('/api/video-upload'),
-      ])
-
-      const items: FeedItem[] = []
-
-      if (logRes.ok) {
-        const { entries } = await logRes.json()
-        for (const e of (entries || [])) {
-          items.push({
-            id: e.id,
-            kind: 'log',
-            title: e.title,
-            body: e.body,
-            timestamp: e.logged_at,
-            source_type: e.entry_type,
-            analysis: e.meta?.analysis,
-            meta: e.meta,
-          })
-        }
-      } else {
-        const errData = await logRes.json().catch(() => ({}))
-        console.error('Log fetch error:', errData)
-        setError(errData.error || 'Failed to fetch logs')
-      }
-
+      const uploadRes = await fetch('/api/video-upload')
       if (uploadRes.ok) {
         const { uploads } = await uploadRes.json()
-        for (const u of (uploads || [])) {
-          items.push({
-            id: u.id,
-            kind: 'upload',
-            title: u.file_name,
-            body: null,
-            timestamp: u.created_at,
-            source_type: 'video',
-            status: u.status,
-            pipeline_log: u.pipeline_log || [],
-            error_message: u.error_message || null,
-          })
-        }
-      } else {
-        const errData = await uploadRes.json().catch(() => ({}))
-        console.error('Upload fetch error:', errData)
-        // Don't overwrite error if already set by logs
-        if (!error) setError(errData.error || 'Failed to fetch uploads')
+        setFeed(uploads || [])
       }
-
-      items.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      setFeed(items)
     } catch (err: any) {
       console.error('Feed fetch failed:', err)
-      setError(err.message || 'Network error fetching feed')
     } finally {
       setFeedLoading(false)
     }
   }, [])
 
-  const fetchEntities = useCallback(async () => {
-    try {
-      const res = await fetch('/api/entities?sort=mentions&limit=16')
-      if (res.ok) {
-        const data = await res.json()
-        setEntities(data.entities || [])
-      } else {
-        const errData = await res.json().catch(() => ({}))
-        console.error('Entities fetch error:', errData)
-        setError(errData.error || 'Failed to fetch entities')
-      }
-    } catch (err: any) {
-      console.error('Entities fetch failed:', err)
-      setError(err.message || 'Network error fetching entities')
-    }
-  }, [])
-
   useEffect(() => {
     fetchFeed()
-    fetchEntities()
-  }, [fetchFeed, fetchEntities])
+  }, [fetchFeed])
 
   useEffect(() => {
-    if (showChat && chatEndRef.current) {
+    if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [chatMessages, isThinking, showChat])
-
-  // ── Entity expand ──────────────────────────────────────────────────────────
-
-  const toggleEntity = async (id: string) => {
-    if (expandedEntityId === id) {
-      setExpandedEntityId(null)
-      setEntityMentions([])
-      return
-    }
-    setExpandedEntityId(id)
-    setLoadingMentions(true)
-    try {
-      const res = await fetch(`/api/entities/${id}`)
-      if (res.ok) {
-        const data = await res.json()
-        setEntityMentions(data.mentions || [])
-      }
-    } catch (err) {
-      console.error('Mentions fetch failed:', err)
-    } finally {
-      setLoadingMentions(false)
-    }
-  }
+  }, [chatMessages, isThinking])
 
   // ── Upload (TUS) ───────────────────────────────────────────────────────────
 
@@ -265,10 +158,6 @@ export default function NeoLogPage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setIsUploading(false); setUploadError('Not logged in'); return }
 
-    try {
-      await fetch('/api/video-upload/prepare').catch(() => {})
-    } catch {}
-
     const storagePath = `${session.user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
     const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace('https://', '').replace('.supabase.co', '')
 
@@ -280,10 +169,14 @@ export default function NeoLogPage() {
       removeFingerprintOnSuccess: true,
       metadata: {
         bucketName: 'videos', objectName: storagePath,
-        contentType: file.type || 'application/octet-stream', cacheControl: '86400',
+        contentType: file.type || 'application/octet-stream',
       },
       chunkSize: 6 * 1024 * 1024,
-      onError: () => { setIsUploading(false); setUploadError('Upload failed. Try again.') },
+      onError: (err) => { 
+        console.error('Upload error:', err)
+        setIsUploading(false)
+        setUploadError('Upload failed. Try again.') 
+      },
       onProgress: (up, total) => setUploadProgress(Math.round((up / total) * 100)),
       onSuccess: async () => {
         try {
@@ -304,6 +197,7 @@ export default function NeoLogPage() {
         }
       },
     })
+    
     tusUpload.findPreviousUploads().then(prev => {
       if (prev.length) tusUpload.resumeFromPreviousUpload(prev[0])
       tusUpload.start()
@@ -315,7 +209,7 @@ export default function NeoLogPage() {
     if (f) startUpload(f)
   }, [startUpload])
 
-  // ── Voice recording ────────────────────────────────────────────────────────
+  // ── Voice Recording ────────────────────────────────────────────────────────
 
   const startRecording = async () => {
     try {
@@ -353,13 +247,12 @@ export default function NeoLogPage() {
     setInput('')
     setError(null)
 
-    // 1. Start/Continue conversation (Transient Chat)
-    // No automatic capture here anymore. Interactions stay in the chat window until saved.
     const userMsg: ChatMessage = { role: 'user', content: text }
     const updated = [...chatMessages, userMsg]
     setChatMessages(updated)
     setShowChat(true)
     setIsThinking(true)
+    
     try {
       const res = await chatWithManager(updated)
       if (res.success && res.message) {
@@ -378,15 +271,12 @@ export default function NeoLogPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
   }
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }, [input])
-
-  // ── Archive chat ───────────────────────────────────────────────────────────
 
   const archiveChat = async () => {
     if (chatMessages.length < 2 || isArchiving) return
@@ -407,7 +297,6 @@ export default function NeoLogPage() {
         setChatMessages([])
         setShowChat(false)
         fetchFeed()
-        fetchEntities()
       } else {
         const d = await res.json()
         setError(d.error || 'Archive failed')
@@ -419,13 +308,9 @@ export default function NeoLogPage() {
     }
   }
 
-  // ── Date label ─────────────────────────────────────────────────────────────
-
   const dateStr = new Date().toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   }).toUpperCase()
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -433,8 +318,7 @@ export default function NeoLogPage() {
       onDragOver={e => e.preventDefault()}
       onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files) }}
     >
-
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex-shrink-0 px-6 pt-5 pb-3 flex items-center justify-between border-b border-[var(--border-light)]">
         <div>
           <p className="font-mono text-[10px] tracking-widest text-[var(--text-tertiary)] mb-0.5">{dateStr}</p>
@@ -462,298 +346,98 @@ export default function NeoLogPage() {
         </div>
       </div>
 
-      {/* ── Entity Rail ── */}
-      {entities.length > 0 && (
-        <div className="flex-shrink-0 border-b border-[var(--border-light)]">
-          <div className="flex flex-wrap gap-2 px-6 py-3">
-            {entities.map(e => {
-              const isExpanded = expandedEntityId === e.id
-              const colorClass = ENTITY_COLOR[e.type] || 'text-[var(--text-tertiary)] bg-[var(--bg-card)] border-[var(--border-light)]'
-              return (
-                <button
-                  key={e.id}
-                  onClick={() => toggleEntity(e.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${colorClass} ${isExpanded ? 'ring-1 ring-current ring-offset-1 ring-offset-[var(--bg-primary)]' : 'hover:opacity-80'}`}
-                >
-                  <span>{ENTITY_EMOJI[e.type] || '·'}</span>
-                  <span className="max-w-[140px] truncate">{e.name}</span>
-                  <span className="opacity-50 text-[10px]">×{e.mention_count}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Entity detail panel */}
-          {expandedEntityId && (
-            <div className="px-6 pb-4 border-t border-[var(--border-light)] bg-[var(--bg-card)]/40">
-              {(() => {
-                const entity = entities.find(e => e.id === expandedEntityId)
-                if (!entity) return null
-                return (
-                  <div className="pt-3">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-tertiary)]">{entity.type} · {entity.mention_count} mentions · last {reltime(entity.last_mentioned_at)}</p>
-                        <p className="text-sm font-medium text-[var(--text-primary)] mt-0.5">{entity.name}</p>
-                      </div>
-                      <button onClick={() => { setExpandedEntityId(null); setEntityMentions([]) }} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
-                        <X size={14} />
-                      </button>
-                    </div>
-                    {entity.summary && (
-                      <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">{entity.summary}</p>
-                    )}
-                    {loadingMentions ? (
-                      <Loader2 size={14} className="animate-spin text-[var(--text-tertiary)]" />
-                    ) : (
-                      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                        {entityMentions.slice(0, 6).map(m => (
-                          <div key={m.id} className="flex-shrink-0 max-w-[240px] p-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-                            <p className="font-mono text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-1">{SOURCE_LABEL[m.source_type] || m.source_type} · {reltime(m.created_at)}</p>
-                            <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3">{m.context}</p>
-                          </div>
-                        ))}
-                        {entityMentions.length === 0 && (
-                          <p className="text-xs text-[var(--text-tertiary)]">No mentions yet.</p>
-                        )}
-                       </div>
-                    )}
+      {/* Main Chat Area */}
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-[var(--bg-primary)]">
+        <div className={`transition-all duration-300 min-h-full flex flex-col ${!showChat && chatMessages.length === 0 ? 'justify-center' : 'justify-end pb-12'}`}>
+          <div className="max-w-4xl mx-auto w-full px-6 py-8 space-y-6">
+            {!showChat && chatMessages.length === 0 ? (
+              <div className="text-center space-y-4 py-20 opacity-40">
+                <Sparkles size={48} className="mx-auto text-[var(--accent)]" />
+                <div>
+                  <h2 className="text-xl font-medium text-[var(--text-primary)] mb-1">How can I help you?</h2>
+                  <p className="text-sm text-[var(--text-tertiary)]">Recording, analysis, and memory synthesis active.</p>
+                </div>
+              </div>
+            ) : (
+              chatMessages.map((m, i) => (
+                <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border ${
+                    m.role === 'assistant' 
+                      ? 'bg-[var(--accent-soft)] border-[var(--accent)]/20 shadow-sm' 
+                      : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'
+                  }`}>
+                    {m.role === 'assistant' ? <Bot size={14} className="text-[var(--accent)]" /> : <User size={14} className="text-[var(--text-secondary)]" />}
                   </div>
-                )
-              })()}
-              <div ref={feedEndRef} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Feed ── */}
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-
-        {/* Chat panel (slides in above feed when chat mode active) */}
-        {showChat && chatMessages.length > 0 && (
-          <div className="border-b border-[var(--border-light)] bg-[var(--bg-card)]/30">
-            <div className="max-w-2xl mx-auto px-6 py-4 space-y-4">
-              {chatMessages.map((m, i) => (
-                <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${m.role === 'assistant' ? 'bg-[var(--accent-soft)]' : 'bg-[var(--bg-tertiary)]'}`}>
-                    {m.role === 'assistant' ? <Bot size={12} className="text-[var(--accent)]" /> : <User size={12} className="text-[var(--text-secondary)]" />}
-                  </div>
-                  <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-primary)]'}`}>
+                  <div className={`max-w-[85%] px-5 py-3.5 rounded-2xl text-[14px] leading-relaxed shadow-sm ${
+                    m.role === 'user' 
+                      ? 'bg-[var(--accent)] text-white font-medium' 
+                      : 'bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)]'
+                  }`}>
                     <Markdown content={m.content} />
                   </div>
                 </div>
-              ))}
-              {isThinking && (
-                <div className="flex gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mt-0.5">
-                    <Bot size={12} className="text-[var(--accent)]" />
-                  </div>
-                  <div className="px-4 py-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex gap-1 items-center">
-                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)] animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+              ))
+            )}
+            
+            {isThinking && (
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20 flex items-center justify-center mt-0.5 shadow-sm">
+                  <Bot size={14} className="text-[var(--accent)]" />
                 </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
+                <div className="px-5 py-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-light)] flex gap-1.5 items-center shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] opacity-40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] opacity-40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] opacity-40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
-        )}
-
-        {/* Feed items */}
-        <div className="max-w-2xl mx-auto px-6 py-6 space-y-3">
-          {feedLoading ? (
-            <div className="flex items-center justify-center py-16 text-[var(--text-tertiary)]">
-              <Loader2 size={20} className="animate-spin" />
-            </div>
-          ) : feed.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-sm text-[var(--text-tertiary)] mb-2">Nothing logged yet.</p>
-              <p className="text-xs text-[var(--text-tertiary)]">Type a thought, record your voice, or drop a file.</p>
-            </div>
-          ) : (
-            feed.map(item => {
-              const isExpanded = expandedFeedId === item.id
-              const typeLabel = item.kind === 'upload' ? 'video' : (item.source_type || 'log')
-
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)]/60 overflow-hidden transition-all hover:border-[var(--border-medium)]"
-                >
-                  <button
-                    onClick={() => setExpandedFeedId(isExpanded ? null : item.id)}
-                    className="w-full text-left px-5 py-4 flex items-start justify-between gap-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)]">{typeLabel}</span>
-                        {item.status && item.status !== 'processed' && (
-                          <span className={`font-mono text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded ${item.status === 'error' ? 'text-red-400 bg-red-400/10' : 'text-yellow-400 bg-yellow-400/10'}`}>
-                            {item.status}
-                          </span>
-                        )}
-                        <span className="font-mono text-[9px] text-[var(--text-tertiary)]" title={new Date(item.timestamp).toLocaleString()}>
-                          {abstime(item.timestamp)} · {reltime(item.timestamp)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-[var(--text-primary)] truncate pr-2">{item.title}</p>
-                        {item.meta?.analysis?.model && (
-                          <span className="text-[10px] text-[var(--text-tertiary)] border border-[var(--border-light)] px-1.5 rounded-full">
-                            {item.meta.analysis.model}
-                          </span>
-                        )}
-                      </div>
-                      {item.body && !isExpanded && (
-                        <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{item.body}</p>
-                      )}
-                      {item.meta?.tags?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {item.meta.tags.map((t: string, i: number) => (
-                            <span key={i} className="text-[9px] text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded">
-                              #{t}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 text-[var(--text-tertiary)]">
-                      {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-5 pb-5 border-t border-[var(--border-light)] pt-4 space-y-4">
-                      {/* Pipeline status for video uploads */}
-                      {item.kind === 'upload' && (
-                        <UploadPipelineStatus
-                          uploadId={item.id}
-                          initialStatus={item.status || 'uploaded'}
-                          initialPipelineLog={item.pipeline_log || []}
-                          errorMessage={item.error_message}
-                        />
-                      )}
-
-                      {item.body && (
-                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                          <Markdown content={item.body} />
-                        </p>
-                      )}
-
-                      {item.analysis && (
-                        <div className="grid grid-cols-2 gap-3">
-                          {item.analysis.projects?.length > 0 && (
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Projects</p>
-                              <div className="space-y-1">
-                                {item.analysis.projects.slice(0, 4).map((p: any, i: number) => (
-                                  <p key={i} className="text-xs text-[var(--text-primary)]">🏗 {typeof p === 'object' ? p.name : p}</p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {item.analysis.ideas?.length > 0 && (
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Ideas</p>
-                              <div className="space-y-1">
-                                {item.analysis.ideas.slice(0, 4).map((idea: any, i: number) => (
-                                  <p key={i} className="text-xs text-[var(--text-primary)]">💡 {typeof idea === 'object' ? idea.text : idea}</p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {item.analysis.action_items?.length > 0 && (
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Actions</p>
-                              <div className="space-y-1">
-                                {item.analysis.action_items.slice(0, 3).map((a: string, i: number) => (
-                                  <p key={i} className="text-xs text-[var(--text-primary)]">→ {a}</p>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {item.analysis.key_quotes?.length > 0 && (
-                            <div>
-                              <p className="font-mono text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">Quotes</p>
-                              <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed line-clamp-3">&ldquo;{item.analysis.key_quotes[0]}&rdquo;</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
         </div>
       </div>
 
-      {/* ── Upload progress toast ── */}
+      {/* Upload/Status Toasts */}
       {(isUploading || uploadDone || uploadError) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
           <div className={`flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-medium shadow-lg backdrop-blur-md border ${uploadError ? 'bg-red-500/90 text-white border-red-400' : uploadDone ? 'bg-green-500/90 text-white border-green-400' : 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-medium)]'}`}>
-            {uploadError ? (
-              <>{uploadError}</>
-            ) : uploadDone ? (
-              <><CheckCircle2 size={14} /> File received — processing</>
-            ) : (
-              <><Loader2 size={14} className="animate-spin" /> Uploading {uploadProgress}%</>
-            )}
+            {uploadError ? uploadError : uploadDone ? <><CheckCircle2 size={14} /> File received</> : <><Loader2 size={14} className="animate-spin" /> Uploading {uploadProgress}%</>}
           </div>
         </div>
       )}
 
-      {/* ── Error toast ── */}
-      {error && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full text-xs bg-red-500/90 text-white shadow-lg">
-            {error}
-            <button onClick={() => setError(null)}><X size={12} /></button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Input Bar ── */}
-      <div className="flex-shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md px-4 py-3">
-        <div className="max-w-2xl mx-auto">
-          {/* Recording indicator */}
+      {/* Input Bar */}
+      <div className="flex-shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md px-4 py-6">
+        <div className="max-w-4xl mx-auto">
           {isRecording && (
             <div className="flex items-center gap-2 mb-2 px-1">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
               <span className="text-xs font-mono text-red-400">
                 {Math.floor(recordingSeconds / 60).toString().padStart(2, '0')}:{(recordingSeconds % 60).toString().padStart(2, '0')}
               </span>
-              <span className="text-xs text-[var(--text-tertiary)]">Recording — tap stop when done</span>
             </div>
           )}
 
           <div className="flex items-end gap-2">
-            {/* Record / Stop button */}
             <button
               onClick={isRecording ? stopRecording : startRecording}
               disabled={isUploading}
-              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white' : 'bg-[var(--bg-card)] border border-[var(--border-medium)] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40'}`}
+              className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white shadow-lg' : 'bg-[var(--bg-card)] border border-[var(--border-medium)] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40'}`}
             >
               {isRecording ? <Square size={14} fill="currentColor" /> : <Mic size={16} />}
             </button>
 
-            {/* Text input */}
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Log a thought or chat with Assistant..."
+                placeholder="Log a thought or chat..."
                 rows={1}
                 className="w-full bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/60 resize-none overflow-hidden no-scrollbar leading-relaxed"
               />
             </div>
 
-            {/* Upload button */}
             <button
               onClick={() => fileRef.current?.click()}
               disabled={isUploading}
