@@ -74,10 +74,19 @@ function reltime(dateStr: string) {
   const m = Math.floor(diff / 60000)
   const h = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
+  if (m < 1) return 'just now'
   if (m < 60) return `${m}m ago`
   if (h < 24) return `${h}h ago`
   if (days < 7) return `${days}d ago`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function abstime(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  })
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -570,11 +579,29 @@ export default function NeoLogPage() {
                             {item.status}
                           </span>
                         )}
-                        <span className="font-mono text-[9px] text-[var(--text-tertiary)]">{reltime(item.timestamp)}</span>
+                        <span className="font-mono text-[9px] text-[var(--text-tertiary)]" title={new Date(item.timestamp).toLocaleString()}>
+                          {abstime(item.timestamp)} · {reltime(item.timestamp)}
+                        </span>
                       </div>
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate pr-2">{item.title}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate pr-2">{item.title}</p>
+                        {item.meta?.analysis?.model && (
+                          <span className="text-[10px] text-[var(--text-tertiary)] border border-[var(--border-light)] px-1.5 rounded-full">
+                            {item.meta.analysis.model}
+                          </span>
+                        )}
+                      </div>
                       {item.body && !isExpanded && (
                         <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 leading-relaxed">{item.body}</p>
+                      )}
+                      {item.meta?.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {item.meta.tags.map((t: string, i: number) => (
+                            <span key={i} className="text-[9px] text-[var(--text-tertiary)] bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <div className="flex-shrink-0 text-[var(--text-tertiary)]">
