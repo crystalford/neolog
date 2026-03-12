@@ -166,6 +166,12 @@ export const processUpload = inngest.createFunction(
       const { upload } = activeContext
       await plog(admin, video_upload_id, 'extract-metadata', 'running')
 
+      // Use pre-extracted date if available
+      if (upload.recorded_at) {
+        await plog(admin, video_upload_id, 'extract-metadata', 'info', `Using pre-extracted recorded_at: ${upload.recorded_at}`)
+        return { recorded_at: upload.recorded_at }
+      }
+
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
         await plog(admin, video_upload_id, 'extract-metadata', 'skipped', 'Not audio/video')
         return { recorded_at: (upload as any).created_at }

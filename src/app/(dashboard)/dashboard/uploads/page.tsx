@@ -10,6 +10,7 @@ import {
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
   AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles
 } from 'lucide-react'
+import MediaInfoFactory from 'mediainfo.js'
 import type { VideoUpload } from '@/types/database'
 import { SessionDetail } from '@/components/SessionDetail'
 
@@ -28,6 +29,7 @@ type ActiveUpload = {
   status: 'uploading' | 'paused' | 'complete' | 'error'
   error: string | null
   tusUpload: tus.Upload | null
+  recordedAt: string | null
 }
 
 export default function UploadsPage() {
@@ -88,7 +90,52 @@ export default function UploadsPage() {
     return () => clearInterval(interval)
   }, [processingIds, uploads, fetchUploads])
 
-  const startTusUpload = useCallback(async (file: File, sessionId?: string) => {
+  const extractVideoDate = async (file: File): Promise<string | null> => {
+    let mediainfo: any;
+    try {
+      mediainfo = await (MediaInfoFactory as any)({ format: 'object' });
+      const getSize = () => file.size;
+      const readChunk = (chunkSize: number, offset: number) =>
+        new Promise<Uint8Array>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(new Uint8Array(e.target?.result as ArrayBuffer));
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(file.slice(offset, offset + chunkSize));
+        });
+
+      const info = await mediainfo.analyzeData(getSize, readChunk);
+      const generalTrack = info.media.track.find((t: any) => t['@type'] === 'General');
+      
+      // Look for creation dates. Different cameras use different keys.
+      // We prioritize Encoded_Date then Tagged_Date
+      const rawDate = generalTrack?.Encoded_Date || generalTrack?.Tagged_Date;
+      
+      if (!rawDate) return null;
+
+      console.log("Raw Extracted Date:", rawDate);
+      
+      // Clean up the date string. It often looks like "UTC 2024-02-15 14:30:00"
+      // or "2024-02-15 14:30:00 UTC"
+      let cleanDate = rawDate.replace('UTC', '').trim();
+      
+      // Ensure it parses correctly
+      const parsed = new Date(cleanDate);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Failed to read metadata:", error);
+      return null;
+    } finally {
+      if (mediainfo) {
+        mediainfo.close();
+      }
+    }
+  };
+
+  const startTusUpload = useCallback(async (file: File, sessionId?: string, preextractedDate?: string | null) => {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
@@ -111,6 +158,7 @@ export default function UploadsPage() {
       status: 'uploading',
       error: null,
       tusUpload: null,
+      recordedAt: preextractedDate || null,
     }
 
     setActiveUploads(prev => [...prev, activeUpload])
@@ -156,6 +204,7 @@ export default function UploadsPage() {
               file_name: file.name,
               file_size_bytes: file.size,
               mime_type: file.type,
+              recorded_at: preextractedDate || null,
               ...(sessionId ? { session_id: sessionId } : {}),
             }),
           })
@@ -191,7 +240,7 @@ export default function UploadsPage() {
     })
   }, [fetchUploads])
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const MAX_SIZE = 50 * 1024 * 1024 // 50MB
     for (const file of fileArray) {
@@ -199,7 +248,12 @@ export default function UploadsPage() {
         alert(`File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Supabase Standard projects have a 50MB limit. Please increase the limit in your project settings or upload a smaller file.`)
         continue
       }
-      startTusUpload(file)
+      
+      // NEW: Extract metadata in browser first
+      const recordedAt = await extractVideoDate(file);
+      console.log(`Detected date for ${file.name}:`, recordedAt);
+      
+      startTusUpload(file, undefined, recordedAt)
     }
   }, [startTusUpload])
 

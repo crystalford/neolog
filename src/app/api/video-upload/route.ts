@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { storage_path, file_name, file_size_bytes, mime_type, session_id } = body
+    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at } = body
 
     if (!storage_path || !file_name || !file_size_bytes || !mime_type) {
       finalErrorMessage = 'Missing required fields: storage_path, file_name, file_size_bytes, mime_type'
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         storage_path,
         storage_provider: 'supabase',
         status: 'uploaded',
+        recorded_at: recorded_at || null,
         ...(session_id ? { session_id } : {}),
       })
       .select()
