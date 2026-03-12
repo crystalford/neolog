@@ -577,6 +577,7 @@ export type VideoAnalysis = {
   }>
   mood: string | null
   energy_level: 'high' | 'medium' | 'low' | null
+  reflections: string | null
 
   // Ideas & Creativity
   ideas: Array<{
@@ -720,6 +721,7 @@ export type VideoUpload = {
   analysis_model: string | null
   generated_posts: GeneratedPost[] | null
   generated_clips: SuggestedClip[] | null
+  thumbnail_url: string | null
   tags: string[]
   error_message: string | null
   source_deleted: boolean

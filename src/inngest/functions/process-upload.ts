@@ -180,18 +180,21 @@ export const processUpload = inngest.createFunction(
           const ffprobe = require('ffprobe-client')
           const info = await ffprobe(signedData.signedUrl)
           
+          // Exhaustive check for creation dates (Media Created / Origin tags)
           const creationDate =
             info.format?.tags?.['com.apple.quicktime.creationdate'] || 
             info.format?.tags?.creation_time ||                        
             info.streams?.find((s: any) => s.tags?.creation_time)?.tags?.creation_time ||
             info.format?.tags?.['creation_time-eng'] ||
-            info.format?.tags?.['date'] ||                             
-            info.format?.tags?.['encoded_date']
+            info.format?.tags?.['date'] ||
+            info.format?.tags?.['encoded_date'] ||
+            info.format?.tags?.['TAG:creation_time'] ||
+            info.format?.tags?.['com.apple.quicktime.creationdate']
 
           if (creationDate) {
             const recordedAt = new Date(creationDate).toISOString()
             await admin.from('video_uploads').update({ recorded_at: recordedAt }).eq('id', video_upload_id)
-            await plog(admin, video_upload_id, 'extract-metadata', 'done', `Found recorded_at: ${recordedAt}`)
+            await plog(admin, video_upload_id, 'extract-metadata', 'done', `Found recorded_at: ${recordedAt} from tag`)
             return { recorded_at: recordedAt }
           }
         }
@@ -289,6 +292,7 @@ export const processUpload = inngest.createFunction(
         return
       }
 
+      // Construct rich body with summary, mood, and questions (3rd person)
       let richBody = analysis.summary || ''
       if (analysis.mood || analysis.energy_level) {
         richBody += `\n\nMood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`
@@ -297,15 +301,17 @@ export const processUpload = inngest.createFunction(
         richBody += `\n\n**Open Questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n')
       }
 
+      const { data: uploadData } = await admin.from('video_uploads').select('thumbnail_url').eq('id', video_upload_id).single()
+
       await admin.from('log_entries').insert({
         user_id,
         entry_type: 'session',
-        title: analysis.summary ? (analysis.summary.length > 80 ? analysis.summary.substring(0, 77) + '...' : analysis.summary) : `Video Session`,
+        title: analysis.summary ? (analysis.summary.length > 80 ? analysis.summary.substring(0, 77) + '...' : analysis.summary) : `${activeContext.userName}'s Video Session`,
         body: richBody,
         logged_at: recordedAt,
         source_upload_id: video_upload_id,
         is_public: true,
-        thumbnail_url: (activeContext.upload as any).thumbnail_url,
+        thumbnail_url: uploadData?.thumbnail_url || (activeContext.upload as any).thumbnail_url,
         meta: {
           model: analysisResult.modelUsed,
           categories: analysis.categories,

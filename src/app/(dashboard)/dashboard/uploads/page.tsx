@@ -56,6 +56,18 @@ export default function UploadsPage() {
 
   useEffect(() => { fetchUploads() }, [fetchUploads])
 
+  // Auto-expand based on ?id=... URL parameter
+  useEffect(() => {
+    if (loading || uploads.length === 0) return
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('id')
+    if (id && uploads.some(u => u.id === id)) {
+      setExpandedId(id)
+      // Clear the param after expansion to prevent multiple triggers if desired, 
+      // but keeping it is fine for bookmarkability.
+    }
+  }, [loading, uploads])
+
   // Poll for processing status
   useEffect(() => {
     if (processingIds.size === 0) return
@@ -587,8 +599,15 @@ function UploadDetail({ upload }: { upload: VideoUpload }) {
               <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--accent)] mb-2 flex items-center gap-2">
                 <Sparkles size={12} /> Neolog's Response
               </h4>
-              <p className="text-sm text-[var(--text-primary)] leading-relaxed italic font-serif">
-                "{a.reflections}"
+              <p style={{ 
+                fontFamily: 'var(--font-mono)', 
+                fontSize: '13px', 
+                lineHeight: '1.6', 
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.01em',
+                fontWeight: 400
+              }}>
+                {a.reflections}
               </p>
             </div>
           )}

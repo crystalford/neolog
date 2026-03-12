@@ -11,12 +11,6 @@ const VALID_TYPES = [
 
 /**
  * POST /api/video-upload
- *
- * Registers a video/audio file that has already been uploaded directly to Supabase
- * Storage via TUS resumable upload from the browser. Creates the DB record and fires
- * the Inngest processing event.
- *
- * Body: { storage_path, file_name, file_size_bytes, mime_type, session_id? }
  */
 export async function POST(request: NextRequest) {
   const startedAt = Date.now()
@@ -60,40 +54,6 @@ export async function POST(request: NextRequest) {
 
     finalMeta = { user_id: session.user.id, file_name, file_size_bytes, mime_type }
 
-    // --- Automated Session Grouping ---
-    let effectiveSessionId = session_id
-    if (!effectiveSessionId) {
-      // Look for a session created by the user in the last 1 hour
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-      const { data: activeSession } = await supabase
-        .from('clip_sessions')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .gte('created_at', oneHourAgo)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (activeSession) {
-        effectiveSessionId = activeSession.id
-      } else {
-        // Create a new automatic session
-        const { data: newSession, error: sessionError } = await supabase
-          .from('clip_sessions')
-          .insert({
-            user_id: session.user.id,
-            title: `Session — ${new Date().toLocaleDateString()}`,
-            status: 'collecting'
-          })
-          .select()
-          .single()
-        
-        if (!sessionError && newSession) {
-          effectiveSessionId = newSession.id
-        }
-      }
-    }
-
     const { data: record, error: dbError } = await supabase
       .from('video_uploads')
       .insert({
@@ -104,7 +64,7 @@ export async function POST(request: NextRequest) {
         storage_path,
         storage_provider: 'supabase',
         status: 'uploaded',
-        ...(effectiveSessionId ? { session_id: effectiveSessionId } : {}),
+        ...(session_id ? { session_id } : {}),
       })
       .select()
       .single()
@@ -115,12 +75,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: finalErrorMessage, details: dbError }, { status: 500 })
     }
 
-    // Update session clip count if provided
-    if (effectiveSessionId) {
-      await supabase.rpc('increment_session_clip_count', { session_id: effectiveSessionId })
-        .then(() => {}) // best-effort
-    }
-
     // Trigger Inngest processing automatically on upload
     try {
       await inngest.send({
@@ -129,7 +83,6 @@ export async function POST(request: NextRequest) {
       })
     } catch (inngestError) {
       console.error('Inngest event failed:', inngestError)
-      // Non-fatal: upload is registered, user can manually trigger from uploads page
     }
 
     finalStatus = 'success'

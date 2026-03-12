@@ -124,11 +124,19 @@ export default function TimelinePage() {
       ) : (
         <div>
           {dayGroups.map((group) => (
-            <div key={group.label}>
-              {/* Day header */}
+            <div key={group.label} style={{ marginBottom: '2rem' }}>
+              {/* Day header - Fixed Sticky Glitch */}
               <div
-                className="flex items-center gap-3 py-3 sticky top-16 z-10"
-                style={{ background: 'var(--bg-primary)' }}
+                style={{ 
+                  position: 'sticky', 
+                  top: '64px', 
+                  zIndex: 20, 
+                  background: 'var(--bg-primary)',
+                  padding: '12px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
               >
                 <span style={{
                   fontFamily: 'var(--font-mono)',
@@ -157,7 +165,9 @@ export default function TimelinePage() {
                 border: '1px solid var(--border-light)',
                 borderRadius: '10px',
                 overflow: 'hidden',
-                marginBottom: '8px',
+                background: 'var(--bg-primary)',
+                position: 'relative',
+                zIndex: 1,
               }}>
                 {group.entries.map((entry) => (
                   <LogCard

@@ -45,7 +45,7 @@ const ENTRY_EMOJI: Record<string, string> = {
   social:       '👥',
   learn:        '📚',
   build:        '⚡',
-  session:      '🎙️',
+  session:      '🎬',
   capture:      '📝',
 }
 
@@ -140,7 +140,7 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
           <div style={{ width: '100%', height: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
             <img src={displayImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             {entry.entry_type === 'session' && (
-              <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', itemsCenter: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                 <Video size={10} />
               </div>
             )}
@@ -209,24 +209,6 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
           </p>
         )}
 
-        {/* Neolog's Reflection */}
-        {hasReflections && (
-          <div style={{
-            marginTop: '10px',
-            padding: '12px 14px',
-            borderRadius: '12px',
-            background: 'rgba(124,106,245,0.05)',
-            borderLeft: '3px solid var(--accent)',
-            fontSize: '12px',
-            lineHeight: 1.6,
-            color: 'var(--text-primary)',
-            fontStyle: 'italic',
-            position: 'relative',
-          }}>
-            <Sparkles size={12} style={{ position: 'absolute', top: '8px', right: '8px', opacity: 0.3, color: 'var(--accent)' }} />
-            {entry.meta.reflections}
-          </div>
-        )}
 
         {/* Footer Meta */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px' }}>
@@ -254,7 +236,7 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
 
   if (entry.source_upload_id) {
     return (
-      <Link href={`/dashboard/uploads/${entry.source_upload_id}`} style={{ textDecoration: 'none', display: 'block' }}>
+      <Link href={`/dashboard/uploads?id=${entry.source_upload_id}`} style={{ textDecoration: 'none', display: 'block' }}>
         {content}
       </Link>
     )
