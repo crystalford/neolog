@@ -304,17 +304,18 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'transcribe', 'running', 'Calling Replicate Whisper large-v3')
 
       const replicate = new Replicate({ auth: replicateToken })
-      const prediction = await replicate.predictions.create({
-        model: 'openai/whisper',
-        input: {
-          audio: signedData.signedUrl,
-          model: 'large-v3',
-          transcription: 'plain text',
-          language: 'auto',
-          word_timestamps: false,
-        },
-      })
-      const output = await replicate.wait(prediction) as any
+      const output = await replicate.run(
+        'openai/whisper:4d5079729c6195e7f31c88e23832dffadd88628ba8647423952e408a72532d1e',
+        {
+          input: {
+            audio: signedData.signedUrl,
+            model: 'large-v3',
+            transcription: 'plain text',
+            language: 'auto',
+            word_timestamps: false,
+          },
+        }
+      ) as any
 
       const text = output?.transcription || ''
       const segments = (output?.segments || []).map((s: any) => ({
