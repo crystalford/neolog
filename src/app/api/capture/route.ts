@@ -254,8 +254,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error || !data) {
-    finalErrorMessage = 'Failed to create asset.'
-    return NextResponse.json({ error: 'Failed to create asset.' }, { status: 500 })
+    finalErrorMessage = error?.message || 'Failed to create asset.'
+    return NextResponse.json({ error: finalErrorMessage }, { status: 500 })
   }
 
   // Create log_entry and queue entity extraction

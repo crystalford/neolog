@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
       .eq('user_id', session.user.id)
       .order('logged_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ entries })
   } catch (error: any) {
@@ -24,3 +26,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to fetch logs' }, { status: 500 })
   }
 }
+```
