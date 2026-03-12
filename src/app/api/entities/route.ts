@@ -53,20 +53,24 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: 'Failed to fetch entities' }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     // Also get counts by type for the filter tabs
-    const { data: typeCounts } = await supabase
+    const { data: typeCounts, error: rpcError } = await supabase
       .rpc('get_entity_type_counts', { p_user_id: session.user.id })
-      .select('*')
+
+    if (rpcError) {
+      console.error('RPC error:', rpcError)
+      // We don't necessarily want to fail the whole request if counts fail
+    }
 
     return NextResponse.json({
       entities: data || [],
       type_counts: typeCounts || [],
     })
   } catch (err: any) {
-    console.error('Fetch logs error:', err)
-    return NextResponse.json({ error: err.message || 'Failed to fetch logs' }, { status: 500 })
+    console.error('List entities error:', err)
+    return NextResponse.json({ error: err.message || 'Failed to fetch entities' }, { status: 500 })
   }
 }
