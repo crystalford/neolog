@@ -33,7 +33,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-20 pb-32 px-6">
+      <section className="relative z-10 pt-16 pb-20 px-6">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20">
@@ -121,7 +121,7 @@ export default function HomePage() {
       </section>
 
       {/* Sovereignty Pillars */}
-      <section className="relative z-10 py-32 border-t border-white/5 bg-black/20">
+      <section className="relative z-10 py-20 border-t border-white/5 bg-black/20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-20 space-y-4">
              <h2 className="text-xs font-mono font-black uppercase tracking-[0.5em] text-[var(--accent)]">Sovereignty Pillar</h2>
@@ -161,7 +161,7 @@ export default function HomePage() {
       </section>
 
       {/* Integrated RPG Layer */}
-      <section className="relative z-10 py-32">
+      <section className="relative z-10 py-20">
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-20 items-center">
           <div className="space-y-12">
             <div className="space-y-4">
@@ -232,7 +232,7 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="relative z-10 py-48 text-center px-6">
+      <section className="relative z-10 py-32 text-center px-6">
         <div className="max-w-3xl mx-auto space-y-10">
           <h2 className="text-4xl md:text-7xl font-black italic uppercase leading-none">
             Stop losing your <br /> best thinking.
