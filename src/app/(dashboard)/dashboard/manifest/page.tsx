@@ -110,9 +110,9 @@ export default function ManifestPage() {
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Cpu size={18} className="text-[var(--accent)]" />
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)]">Neural Manifest</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)]">AI Model</p>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Character Pipeline</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Training Pipeline</h1>
         <p className="text-sm text-[var(--text-tertiary)] mt-2 max-w-2xl">
           Every upload you make passively builds your AI twin. Voice samples, face frames, and entity intelligence accumulate automatically — you never need to do anything extra.
         </p>

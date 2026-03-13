@@ -236,15 +236,15 @@ export default function DashboardLayout({
 
   // INTELLIGENCE section — what the system extracted
   const secondaryNav = useMemo(() => [
-    { href: '/dashboard/entities',   icon: Boxes,       label: 'Brain',      section: 'INTELLIGENCE' },
+    { href: '/dashboard/entities',   icon: Boxes,       label: 'Entities',   section: 'INTELLIGENCE' },
     { href: '/dashboard/timeline',   icon: CalendarDays,label: 'Timeline',   section: 'INTELLIGENCE' },
-    { href: '/dashboard/synthesis',  icon: Sparkles,    label: 'Synthesis',  section: 'INTELLIGENCE' },
+    { href: '/dashboard/synthesis',  icon: Sparkles,    label: 'Analysis',   section: 'INTELLIGENCE' },
   ], [])
 
-  // MANIFEST section — the character being built
+  // AI MODEL section — the character being built
   const characterNav = useMemo(() => [
-    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest', section: 'MANIFEST' },
-    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',       section: 'MANIFEST' },
+    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Training Pipeline', section: 'AI MODEL' },
+    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'AI MODEL' },
   ], [])
 
   const commandItems = useMemo(() => {
@@ -347,9 +347,9 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          {/* MANIFEST */}
+          {/* AI MODEL */}
           <div className="mt-4">
-            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">Manifest</p>
+            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">AI Model</p>
             <div className="space-y-0.5">
               {characterNav.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + '/')

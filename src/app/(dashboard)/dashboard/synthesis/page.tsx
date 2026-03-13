@@ -85,7 +85,7 @@ export default function SynthesisPage() {
             <Sparkles size={16} className="text-[var(--accent)]" />
             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)]">Intelligence</p>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Synthesis</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Analysis</h1>
           <p className="text-sm text-[var(--text-tertiary)] mt-1">
             Cross-corpus analysis across all {uploadCount} processed uploads — narratives, contradictions, momentum.
           </p>
