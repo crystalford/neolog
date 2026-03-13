@@ -106,11 +106,19 @@ export default function UploadsPage() {
       const match = name.match(regex);
       if (match) {
         const [_, y, m, d, hh, mm, ss] = match;
-        const dateStr = hh ? `${y}-${m}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${m}-${d}T12:00:00Z`;
-        const inferred = new Date(dateStr);
+        // CRITICAL: Construct as a LOCAL date object by using number arguments
+        const inferred = new Date(
+          parseInt(y),
+          parseInt(m) - 1,
+          parseInt(d),
+          parseInt(hh || "12"),
+          parseInt(mm || "0"),
+          parseInt(ss || "0")
+        );
+        
         if (!isNaN(inferred.getTime())) {
           const iso = inferred.toISOString();
-          console.log(`[Metadata] Filename extraction SUCCESS for ${name}: ${iso}`);
+          console.log(`[Metadata] Filename extraction SUCCESS for ${name}: ${iso} (interpreted as Local)`);
           return iso;
         }
       }
@@ -162,11 +170,12 @@ export default function UploadsPage() {
         for (const [key, val] of Object.entries(track)) {
           if (typeof val !== 'string' || val.length < 8) continue;
           
-          const cleanVal = val.replace('UTC', '').trim();
-          const d = new Date(cleanVal);
-          // Standard check: is it a valid date between 1990 and 2100?
+          // MediaInfo often gives "UTC 2026-03-01 21:16:00"
+          // If we pass this directly to new Date(), it usually handles it correctly as UTC.
+          // If it lacks UTC, we check if it's a priority key (usually UTC in MP4).
+          const d = new Date(val);
           if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
-            dateCandidates.push({ key, val: cleanVal, date: d });
+            dateCandidates.push({ key, val, date: d });
           }
         }
       }

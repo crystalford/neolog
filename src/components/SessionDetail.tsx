@@ -85,11 +85,18 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                       {upload.recorded_at ? format(new Date(upload.recorded_at), 'p') : ''}
                     </p>
                   </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-red-400'}`} />
-                    <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
-                      {upload.recorded_at ? 'Metadata Synchronized' : 'Fallback to Upload Date'}
-                    </p>
+                  <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--border-light)]/30 pt-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-red-400'}`} />
+                      <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
+                        {upload.recorded_at ? 'Metadata Synchronized' : 'Fallback to Upload Date'}
+                      </p>
+                    </div>
+                    {upload.recorded_at && (
+                      <p className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-50 overflow-hidden text-ellipsis whitespace-nowrap">
+                        Trace: {upload.recorded_at}
+                      </p>
+                    )}
                   </div>
                 </div>
 
