@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { Logo } from '@/components/Logo'
 import { Activity, Shield, Cpu, Database, Fingerprint, Zap, Brain, Target, Flame, Box, ChevronRight, Share2, Unlock } from 'lucide-react'
 
 export default function HomePage() {
@@ -19,10 +20,9 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="relative z-50 border-b border-white/5 bg-black/40 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center text-white font-black shadow-[0_0_20px_rgba(124,106,245,0.4)]">N</div>
-             <span className="font-bold tracking-tighter text-xl">NEOLOG</span>
-          </div>
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Logo />
+          </Link>
           <div className="flex items-center gap-4">
              <Link href="/login" className="text-sm font-medium text-[var(--text-tertiary)] hover:text-white transition-colors">Sign In</Link>
              <Link href="/login" className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)]">

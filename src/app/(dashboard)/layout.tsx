@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
+import { Logo } from '@/components/Logo'
 import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
 import { useUserMaturity } from '@/hooks/useUserMaturity'
 
@@ -293,9 +294,8 @@ export default function DashboardLayout({
       {/* Sidebar - 2.0 Control Room Nav */}
       <aside className="w-[220px] bg-[var(--bg-secondary)] border-r border-[var(--border-light)] hidden lg:flex flex-col">
         <div className="px-4 pt-4 pb-3">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <span className="logo-mark" style={{width:'1.5rem',height:'1.5rem',fontSize:'0.75rem'}}>N</span>
-            <span className="font-display text-base font-semibold tracking-tight">Neolog</span>
+          <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Logo size="default" />
           </Link>
         </div>
 

@@ -3,7 +3,6 @@ interface LogoProps {
     className?: string
     size?: "default" | "lg" | "xl"
     showText?: boolean
-    theme?: "light" | "dark"
 }
 
 export function Logo({ className = "", size = "default", showText = true }: LogoProps) {
@@ -20,7 +19,7 @@ export function Logo({ className = "", size = "default", showText = true }: Logo
     }
 
     return (
-        <div className={`flex items-center gap-2.5 font-display font-bold tracking-tight text-[var(--text-primary)] ${sizeClasses[size]} ${className}`}>
+        <div className={`flex items-center gap-2.5 font-bold tracking-tighter text-[var(--text-primary)] ${sizeClasses[size]} ${className}`} style={{ fontFamily: 'var(--font-sans)' }}>
             <div className="relative flex items-center justify-center">
                 <svg
                     width={iconSizes[size]}
@@ -28,40 +27,27 @@ export function Logo({ className = "", size = "default", showText = true }: Logo
                     viewBox="0 0 32 32"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
+                    className="drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]"
                 >
-                    {/* Modern geometric N shape */}
-                    <path
-                        d="M6 4C6 2.89543 6.89543 2 8 2H10C11.1046 2 12 2.89543 12 4V28C12 29.1046 11.1046 30 10 30H8C6.89543 30 6 29.1046 6 28V4Z"
-                        fill="url(#accent-gradient)"
-                    />
+                    {/* Neural Node Mark */}
+                    <circle cx="16" cy="16" r="3" fill="currentColor" />
+                    <circle cx="16" cy="6" r="2" fill="currentColor" fillOpacity="0.4" />
+                    <circle cx="16" cy="26" r="2" fill="currentColor" fillOpacity="0.4" />
+                    <circle cx="6" cy="11" r="2" fill="currentColor" fillOpacity="0.4" />
+                    <circle cx="26" cy="11" r="2" fill="currentColor" fillOpacity="0.4" />
+                    <circle cx="6" cy="21" r="2" fill="currentColor" fillOpacity="0.4" />
+                    <circle cx="26" cy="21" r="2" fill="currentColor" fillOpacity="0.4" />
                     
-                    <path
-                        d="M20 4C20 2.89543 20.8954 2 22 2H24C25.1046 2 26 2.89543 26 4V28C26 29.1046 25.1046 30 24 30H22C20.8954 30 20 29.1046 20 28V4Z"
-                        fill="url(#accent-gradient-2)"
-                    />
-                    
-                    <path
-                        d="M12 6L20 26H14L7 6H12Z"
-                        fill="url(#accent-gradient-3)"
-                    />
-
-                    <defs>
-                        <linearGradient id="accent-gradient" x1="9" y1="2" x2="9" y2="30" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#3b82f6" />
-                            <stop offset="1" stopColor="#2563eb" />
-                        </linearGradient>
-                        <linearGradient id="accent-gradient-2" x1="23" y1="2" x2="23" y2="30" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#06b6d4" />
-                            <stop offset="1" stopColor="#0891b2" />
-                        </linearGradient>
-                        <linearGradient id="accent-gradient-3" x1="13.5" y1="6" x2="13.5" y2="26" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#a855f7" />
-                            <stop offset="1" stopColor="#7c3aed" />
-                        </linearGradient>
-                    </defs>
+                    {/* Connections */}
+                    <path d="M16 9V13" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
+                    <path d="M16 19V23" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
+                    <path d="M8 12L13.5 14.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
+                    <path d="M24 12L18.5 14.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
+                    <path d="M8 20L13.5 17.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
+                    <path d="M24 20L18.5 17.5" stroke="currentColor" strokeWidth="1" strokeOpacity="0.2" />
                 </svg>
             </div>
-            {showText && <span>Neolog</span>}
+            {showText && <span className="uppercase italic">Neolog</span>}
         </div>
     )
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Logo } from '@/components/Logo'
 
 export default function AuthLayout({
   children,
@@ -24,14 +25,8 @@ export default function AuthLayout({
       />
 
       <div className="w-full max-w-sm relative z-10 flex flex-col items-center">
-        <Link href="/" className="flex items-center gap-2 mb-10 hover:opacity-80 transition-opacity">
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '28px', height: '28px', borderRadius: '5px',
-            background: 'var(--text-primary)', color: 'var(--text-inverse)',
-            fontWeight: 700, fontSize: '14px', letterSpacing: '-0.02em',
-          }}>N</span>
-          <span className="font-sans text-xl font-semibold tracking-tight text-[var(--text-primary)]">Neolog</span>
+        <Link href="/" className="mb-10 hover:opacity-80 transition-opacity">
+          <Logo size="lg" />
         </Link>
         
         <div className="w-full">
