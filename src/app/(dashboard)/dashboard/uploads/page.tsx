@@ -457,15 +457,6 @@ export default function UploadsPage() {
             A comprehensive record of all raw intelligence ingested. Videos, voice notes, and captures are processed into actionable insights.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <a
-            href="/dashboard/sessions"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-all shadow-sm"
-          >
-            <Layers size={14} />
-            <span>Manage Sessions</span>
-          </a>
-        </div>
       </div>
 
       {/* Control Bar */}

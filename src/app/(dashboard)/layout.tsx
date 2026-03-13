@@ -237,7 +237,6 @@ export default function DashboardLayout({
   const secondaryNav = useMemo(() => [
     { href: '/dashboard/entities',  icon: Boxes,       label: 'Entities',      section: 'INTELLIGENCE' },
     { href: '/dashboard/timeline',  icon: CalendarDays,label: 'Timeline',      section: 'INTELLIGENCE' },
-    { href: '/dashboard/sessions',  icon: Film,        label: 'Clip Sessions', section: 'INTELLIGENCE' },
   ], [])
 
   // CHARACTER section — the RPG layer
