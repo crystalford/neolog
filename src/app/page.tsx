@@ -1,290 +1,265 @@
 import Link from 'next/link'
-
-const entityCards = [
-  { emoji: '💡', label: 'AI documentary idea', type: 'Idea', session: '2h ago' },
-  { emoji: '🏗', label: 'Neolog', type: 'Project', session: '23 sessions' },
-  { emoji: '❓', label: 'How do I sell without selling?', type: 'Question', session: '5d ago' },
-  { emoji: '🎯', label: 'Ship uploads this week', type: 'Commitment', session: '1d ago' },
-  { emoji: '📖', label: 'The Crystal Ford', type: 'Creative', session: '3 sessions' },
-]
+import { Activity, Shield, Cpu, Database, Fingerprint, Zap, Brain, Target, Flame, Box, ChevronRight, Share2, Unlock } from 'lucide-react'
 
 export default function HomePage() {
   return (
     <div
-      className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-x-hidden"
-      style={{ fontFamily: 'var(--font-sans)' }}
+      className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-x-hidden selection:bg-[var(--accent)] selection:text-white"
+      style={{ fontFamily: 'var(--font-sans)', background: '#050508' }}
     >
-      {/* Ambient bloom */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          top: '-15%',
-          right: '-5%',
-          width: '55vw',
-          height: '55vh',
-          background: 'radial-gradient(ellipse, rgba(124,106,245,0.09) 0%, transparent 70%)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          bottom: '-10%',
-          left: '-5%',
-          width: '40vw',
-          height: '40vh',
-          background: 'radial-gradient(ellipse, rgba(124,106,245,0.05) 0%, transparent 70%)',
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
+      {/* Ambient Cyber Bloom */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] right-[-10%] w-[70vw] h-[70vh] rounded-full bg-[radial-gradient(circle,rgba(124,106,245,0.08)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] w-[50vw] h-[50vh] rounded-full bg-[radial-gradient(circle,rgba(6,182,212,0.05)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] contrast-150 brightness-100" />
+      </div>
 
       {/* Nav */}
-      <header
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          borderBottom: '1px solid var(--border-light)',
-          background: 'rgba(9,9,16,0.8)',
-          backdropFilter: 'blur(16px)',
-        }}
-      >
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: '26px', height: '26px', borderRadius: '5px',
-              background: 'var(--text-primary)', color: 'var(--text-inverse)',
-              fontWeight: 700, fontSize: '13px', letterSpacing: '-0.02em',
-              flexShrink: 0,
-            }}>N</span>
-            <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.02em' }}>Neolog</span>
+      <nav className="relative z-50 border-b border-white/5 bg-black/40 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center text-white font-black shadow-[0_0_20px_rgba(124,106,245,0.4)]">N</div>
+             <span className="font-bold tracking-tighter text-xl">NEOLOG</span>
           </div>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <Link href="/login" style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '0.4rem 0.75rem', borderRadius: '6px', textDecoration: 'none', transition: 'color 0.15s' }}>
-              Sign in
-            </Link>
-            <Link href="/login" style={{
-              fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)',
-              padding: '0.4rem 0.9rem', borderRadius: '6px',
-              border: '1px solid var(--border-medium)',
-              background: 'rgba(255,255,255,0.04)',
-              textDecoration: 'none', transition: 'all 0.15s',
-            }}>
-              Get started →
-            </Link>
-          </nav>
+          <div className="flex items-center gap-4">
+             <Link href="/login" className="text-sm font-medium text-[var(--text-tertiary)] hover:text-white transition-colors">Sign In</Link>
+             <Link href="/login" className="px-5 py-2 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+               Initialize Session
+             </Link>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Master Hero Section */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '5rem 2rem 4rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '6rem' }}>
+      {/* Hero Section */}
+      <section className="relative z-10 pt-20 pb-32 px-6">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div className="space-y-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-soft)] border border-[var(--accent)]/20">
+               <Activity size={12} className="text-[var(--accent)]" />
+               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--accent)]">Intelligence Sovereignty Protocol v2.0</span>
+            </div>
+            
+            <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] italic uppercase">
+              Architect Your <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] via-purple-400 to-cyan-400">
+                Neural Manifest.
+              </span>
+            </h1>
+            
+            <p className="text-xl text-[var(--text-secondary)] leading-relaxed max-w-xl">
+              The sovereign system that transcribes your existence, extracts your intelligence, and trains your digital twin. From raw signal to permanent structure.
+            </p>
 
-          {/* Top of Hero: Text + Floating Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '3rem', alignItems: 'center' }}>
-            {/* Left — Editorial text */}
-            <div>
-              <p style={{
-                fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase',
-                color: 'var(--text-tertiary)', marginBottom: '1.75rem', fontWeight: 600,
-              }}>
-                Personal Intelligence System
-              </p>
-
-              <h1 style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(3rem, 5vw, 5.5rem)',
-                fontWeight: 400,
-                lineHeight: 1.08,
-                letterSpacing: '-0.02em',
-                marginBottom: '1.5rem',
-                color: 'var(--text-primary)',
-              }}>
-                Your thinking,<br />
-                <span style={{
-                  background: 'linear-gradient(135deg, #a78bfa 0%, #7c6af5 50%, #c4b5fd 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}>
-                  made permanent.
-                </span>
-              </h1>
-
-              <p style={{ fontSize: '17px', color: 'var(--text-secondary)', lineHeight: 1.65, maxWidth: '480px', marginBottom: '2.5rem' }}>
-                Talk. Record. Neolog listens to everything you create and builds a living map of your thinking — ideas, projects, questions, patterns.
-              </p>
-
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <Link href="/dashboard" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                  padding: '0.7rem 1.4rem', borderRadius: '8px',
-                  background: 'var(--accent)', color: '#fff',
-                  fontWeight: 500, fontSize: '14px', textDecoration: 'none',
-                  boxShadow: '0 0 24px -4px rgba(124,106,245,0.5)',
-                  transition: 'all 0.2s',
-                }}>
-                  Start logging →
-                </Link>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center',
-                  padding: '0.7rem 1.4rem', borderRadius: '8px',
-                  border: '1px solid var(--border-medium)',
-                  color: 'var(--text-secondary)', fontSize: '14px',
-                  background: 'rgba(255,255,255,0.03)',
-                }}>
-                  Built for builders.
-                </div>
+            <div className="flex flex-wrap gap-4 pt-4">
+              <Link href="/dashboard" className="px-8 py-4 rounded-2xl bg-[var(--accent)] text-white font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_40px_-10px_rgba(124,106,245,0.6)] flex items-center gap-3">
+                Start Logging <ChevronRight size={20} />
+              </Link>
+              <div className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-lg backdrop-blur-md flex items-center gap-3">
+                <Box size={20} className="text-cyan-400" /> BYOK Enabled
               </div>
             </div>
 
-            {/* Right — Floating entity cards */}
-            <div style={{ position: 'relative', height: '400px' }}>
-              {entityCards.map((card, i) => (
-                <div
-                  key={i}
-                  style={{
-                    position: 'absolute',
-                    background: 'rgba(13,13,22,0.8)',
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid var(--border-light)',
-                    borderRadius: '10px',
-                    padding: '0.75rem 1rem',
-                    width: '260px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                    // Staggered positions
-                    top: `${[12, 80, 148, 220, 292][i]}px`,
-                    left: `${[20, 60, 10, 50, 25][i]}px`,
-                    transform: `rotate(${[-1.5, 1, -0.5, 1.2, -1][i]}deg)`,
-                    zIndex: entityCards.length - i,
-                    transition: 'transform 0.3s',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                    <span style={{ fontSize: '14px' }}>{card.emoji}</span>
-                    <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, letterSpacing: '-0.01em' }}>{card.label}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '10px', padding: '0.1rem 0.4rem', borderRadius: '4px',
-                      background: 'rgba(124,106,245,0.12)', color: 'var(--accent)',
-                      fontWeight: 500,
-                    }}>{card.type}</span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{card.session}</span>
+            <div className="flex items-center gap-8 pt-8 border-t border-white/5">
+               <div className="space-y-1">
+                 <p className="text-2xl font-black italic">100%</p>
+                 <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Data Sovereignty</p>
+               </div>
+               <div className="space-y-1">
+                 <p className="text-2xl font-black italic text-cyan-400">0ms</p>
+                 <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Signal Latency</p>
+               </div>
+               <div className="space-y-1">
+                 <p className="text-2xl font-black italic text-purple-400">BYOK</p>
+                 <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Bring Your Own Key</p>
+               </div>
+            </div>
+          </div>
+
+          {/* Visual: The Manifest Preview */}
+          <div className="relative aspect-square">
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--accent)_0%,_transparent_70%)] opacity-20 blur-3xl" />
+             <div className="relative h-full w-full rounded-[4rem] border border-white/10 bg-black/40 backdrop-blur-3xl overflow-hidden shadow-2xl group">
+                <img 
+                  src="/neural_manifest_hyper_realistic_avatar_1773404786973.png" 
+                  alt="Neural Manifest"
+                  className="w-full h-full object-cover grayscale brightness-110 opacity-60 group-hover:opacity-100 transition-opacity duration-1000"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                
+                {/* HUD Telemetry Overlays */}
+                <div className="absolute top-10 left-10 space-y-2">
+                   <div className="flex items-center gap-2 px-3 py-1 bg-black/60 border border-white/10 rounded-lg backdrop-blur-md">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+                      <span className="text-[10px] font-mono uppercase tracking-widest">Signal Syncing...</span>
+                   </div>
+                </div>
+
+                <div className="absolute bottom-10 left-10 right-10 p-6 bg-black/60 border border-white/10 rounded-[2rem] backdrop-blur-md">
+                   <div className="flex justify-between items-center mb-4">
+                      <span className="text-xs font-mono font-bold uppercase tracking-widest text-[var(--accent)]">Manifest LVL 14</span>
+                      <span className="text-[10px] font-mono text-white/40">INTELLIGENCE QUOTIENT: NOMINAL</span>
+                   </div>
+                   <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-[var(--accent)] to-cyan-400" style={{ width: '75%' }} />
+                   </div>
+                </div>
+
+                {/* Scanning line animation */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-[var(--accent)]/50 shadow-[0_0_20px_var(--accent)] animate-[scan_8s_linear_infinite]" />
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Sovereignty Pillars */}
+      <section className="relative z-10 py-32 border-t border-white/5 bg-black/20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="mb-20 space-y-4">
+             <h2 className="text-xs font-mono font-black uppercase tracking-[0.5em] text-[var(--accent)]">Sovereignty Pillar</h2>
+             <h3 className="text-5xl font-black italic uppercase leading-none">Your Thinking. <br /> Your Infrastructure.</h3>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { 
+                icon: <Unlock size={32} className="text-[var(--accent)]" />, 
+                title: 'BYOK Architecture', 
+                desc: 'Bring your own OpenAI, Anthropic, or Groq keys. No middleman markup. Total sovereign control over your intelligence costs and model choices.' 
+              },
+              { 
+                icon: <Database size={32} className="text-cyan-400" />, 
+                title: 'Sovereign Storage', 
+                desc: 'Direct R2/S3 integration. Your files never touch our servers. Your bucket, your data, permanent and portable by default.' 
+              },
+              { 
+                icon: <Share2 size={32} className="text-purple-400" />, 
+                title: 'Open Manifolds', 
+                desc: 'Your knowledge graph belongs to you. Export your entire neural vault in JSON or Markdown anytime. No vendor lock-in, ever.' 
+              },
+            ].map(pillar => (
+              <div key={pillar.title} className="p-10 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-[var(--accent)]/30 transition-all group">
+                <div className="mb-8 p-4 rounded-2xl bg-white/[0.03] inline-block group-hover:scale-110 transition-transform">
+                  {pillar.icon}
+                </div>
+                <h4 className="text-2xl font-bold mb-4 italic uppercase">{pillar.title}</h4>
+                <p className="text-[var(--text-secondary)] leading-relaxed">
+                  {pillar.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Integrated RPG Layer */}
+      <section className="relative z-10 py-32">
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-20 items-center">
+          <div className="space-y-12">
+            <div className="space-y-4">
+              <h2 className="text-xs font-mono font-black uppercase tracking-[0.5em] text-cyan-400">System Mechanics</h2>
+              <h3 className="text-6xl font-black italic uppercase leading-none">The Progressive <br /> Intelligence Loop.</h3>
+            </div>
+
+            <div className="space-y-8">
+              {[
+                { num: '01', title: 'Multimodal Ingestion', desc: 'Drop raw video, audio, or text. Neolog extracts ideas, projects, and commitments across every session automatically.' },
+                { num: '02', title: 'Momentum & XP', desc: 'Every signal stabilized gains you XP. Watch your skills unlock as your knowledge graph matures.' },
+                { num: '03', title: 'Automated Synthesis', desc: 'The system narrates your progress, updating your character profile, socials, and portfolio in real-time.' },
+              ].map(step => (
+                <div key={step.num} className="flex gap-6 group">
+                  <span className="text-2xl font-black italic text-white/20 group-hover:text-cyan-400 transition-colors">{step.num}</span>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-bold uppercase italic">{step.title}</h4>
+                    <p className="text-[var(--text-secondary)] leading-relaxed">{step.desc}</p>
                   </div>
                 </div>
               ))}
-
-              {/* Subtle glow behind cards */}
-              <div aria-hidden style={{
-                position: 'absolute', top: '50%', left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '300px', height: '300px',
-                background: 'radial-gradient(circle, rgba(124,106,245,0.08) 0%, transparent 70%)',
-                pointerEvents: 'none',
-              }} />
             </div>
           </div>
 
-          {/* Bottom of Hero: How it works (integrated) */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3rem',
-            paddingTop: '4rem', borderTop: '1px solid var(--border-light)'
-          }}>
-            {[
-              { num: '01', title: 'Record', desc: 'Drop a raw video, voice note, or type a brain dump. No editing, no formatting required.' },
-              { num: '02', title: 'Extract', desc: 'Neolog transcribes, then pulls out ideas, projects, questions, goals, and patterns across every session.' },
-              { num: '03', title: 'Publish', desc: 'Social posts, portfolio entries, and a bio update themselves. The system narrates you.' },
-            ].map((step) => (
-              <div key={step.num}>
-                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>{step.num}</p>
-                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '-0.01em' }}>{step.title}</h3>
-                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>{step.desc}</p>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* Structured Graph Section (2 columns) */}
-      <section style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-light)', background: 'rgba(13,13,22,0.6)' }}>
-        <div style={{
-          maxWidth: '1200px', margin: '0 auto', padding: '6rem 2rem',
-          display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 1.5fr', gap: '4rem', alignItems: 'center'
-        }}>
-          <div>
-            <p style={{ fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--accent)', marginBottom: '1rem', fontWeight: 600 }}>What gets extracted</p>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.5rem, 3vw, 3rem)', fontWeight: 400, marginBottom: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              Everything you say, permanently structured.
-            </h2>
-            <p style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-              Instead of unstructured notes drifting into the void, Neolog detects what matters and catalogs it into your personal graph. 
-              Searchable, actionable, and forever accumulating.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-            {[
-              { emoji: '💡', label: 'Ideas', desc: 'Raw sparks, captured.' },
-              { emoji: '🏗', label: 'Projects', desc: 'What you\'re building.' },
-              { emoji: '❓', label: 'Questions', desc: 'What you\'re wrestling with.' },
-              { emoji: '🤝', label: 'People', desc: 'Who matters in your work.' },
-              { emoji: '🎯', label: 'Commitments', desc: 'What you said you\'d do.' },
-              { emoji: '📖', label: 'Creative Works', desc: 'Books, scripts, essays building.' },
-            ].map((item) => (
-              <div key={item.label} style={{
-                padding: '1.25rem 1.5rem',
-                border: '1px solid var(--border-light)',
-                borderRadius: '8px',
-                background: 'rgba(13,13,22,0.4)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)',
-              }}>
-                <span style={{ fontSize: '20px', display: 'block', marginBottom: '0.5rem' }}>{item.emoji}</span>
-                <p style={{ fontWeight: 600, fontSize: '14px', marginBottom: '0.25rem' }}>{item.label}</p>
-                <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>{item.desc}</p>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 space-y-6">
+               <Brain size={48} className="text-purple-400" />
+               <h5 className="font-black italic uppercase">Cognitive Graph</h5>
+               <div className="space-y-2">
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-400" style={{ width: '88%' }} />
+                  </div>
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest">Stability: Optimal</p>
+               </div>
+            </div>
+            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 mt-12 space-y-6 text-right">
+               <div className="flex justify-end"><Target size={48} className="text-amber-400 " /></div>
+               <h5 className="font-black italic uppercase">Active Directives</h5>
+               <div className="space-y-2">
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-400 ml-auto" style={{ width: '62%' }} />
+                  </div>
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest">Momentum: High</p>
+               </div>
+            </div>
+            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 space-y-6">
+               <Fingerprint size={48} className="text-[var(--accent)]" />
+               <h5 className="font-black italic uppercase">Manifest Sync</h5>
+               <div className="space-y-2">
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-[var(--accent)]" style={{ width: '99%' }} />
+                  </div>
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest">Profile: Sovereign</p>
+               </div>
+            </div>
+            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 mt-12 space-y-6 text-right">
+               <div className="flex justify-end"><Flame size={48} className="text-rose-500" /></div>
+               <h5 className="font-black italic uppercase">Metabolic Surge</h5>
+               <div className="space-y-2">
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-rose-500 ml-auto" style={{ width: '45%' }} />
+                  </div>
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-widest">Focus: Critical</p>
+               </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border-light)', textAlign: 'center', background: 'radial-gradient(100% 100% at 50% 0%, rgba(124,106,245,0.06) 0%, transparent 100%)' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '6rem 2rem' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3.5rem)', fontWeight: 400, lineHeight: 1.1, marginBottom: '1.5rem', letterSpacing: '-0.02em' }}>
-            Stop losing your best thinking.
+      {/* Final CTA */}
+      <section className="relative z-10 py-48 text-center px-6">
+        <div className="max-w-3xl mx-auto space-y-10">
+          <h2 className="text-4xl md:text-7xl font-black italic uppercase leading-none">
+            Stop losing your <br /> best thinking.
           </h2>
-          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.65 }}>
-            Every recording, note, and idea — organised, searchable, and working for you.
+          <p className="text-xl text-[var(--text-secondary)] leading-relaxed">
+            Every recording, note, and spark — captured, stabilized, and evolved into a permanent manifest of your existence.
           </p>
-          <Link href="/dashboard" style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '0.8rem 2rem', borderRadius: '8px',
-            background: 'var(--accent)', color: '#fff',
-            fontWeight: 500, fontSize: '15px', textDecoration: 'none',
-            boxShadow: '0 0 32px -6px rgba(124,106,245,0.5)',
-          }}>
-            Start logging — it's free
-          </Link>
+          <div className="flex justify-center gap-6">
+            <Link href="/dashboard" className="px-12 py-5 rounded-2xl bg-white text-black font-black text-xl hover:scale-[1.05] active:scale-95 transition-all shadow-2xl">
+              Initialize neolog v1.0
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer style={{ borderTop: '1px solid var(--border-light)', position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Neolog 2026</span>
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
-            {['Privacy', 'Terms'].map(l => (
-              <Link key={l} href="#" style={{ fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>{l}</Link>
-            ))}
+      <footer className="relative z-10 py-12 border-t border-white/5 bg-black/40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-3 grayscale opacity-50">
+             <div className="w-6 h-6 rounded bg-white text-black flex items-center justify-center text-[10px] font-black">N</div>
+             <span className="font-bold tracking-tighter text-sm">NEOLOG © 2026</span>
+          </div>
+          <div className="flex gap-12 font-mono text-[10px] uppercase tracking-widest text-white/30">
+            <Link href="#" className="hover:text-[var(--accent)] transition-colors">Neural Sovereignty Pact</Link>
+            <Link href="#" className="hover:text-[var(--accent)] transition-colors">Terms of Manifold</Link>
+            <Link href="#" className="hover:text-[var(--accent)] transition-colors">BYOK Documentation</Link>
           </div>
         </div>
       </footer>
+
+      <style jsx global>{`
+        @keyframes scan {
+          from { transform: translateY(-100%); }
+          to { transform: translateY(800px); }
+        }
+      `}</style>
     </div>
   )
 }
