@@ -76,7 +76,8 @@ export const processUpload = inngest.createFunction(
         throw new Error(msg)
       }
 
-      await plog(admin, video_upload_id, 'fetch-context', 'done', `Context fetched for ${userName}`)
+      await plog(admin, video_upload_id, 'fetch-context', 'done', `Context fetched for ${userName}. recorded_at in DB: ${upload.recorded_at}`)
+      console.log(`[Inngest] Starting process for ${video_upload_id}. recorded_at in DB: ${upload.recorded_at}`);
 
       return {
         skip: false as const,
@@ -166,7 +167,7 @@ export const processUpload = inngest.createFunction(
       const { upload } = activeContext
       await plog(admin, video_upload_id, 'extract-metadata', 'running')
 
-      // Use pre-extracted date if available
+      // CRITICAL: Always prioritize what was sent from the browser/frontend
       if (upload.recorded_at) {
         await plog(admin!, video_upload_id, 'extract-metadata', 'info', `Using pre-extracted recorded_at: ${upload.recorded_at}`)
         return { 
@@ -359,14 +360,20 @@ export const processUpload = inngest.createFunction(
     // ── Step 2b-bis: Apply Metadata to DB ──
     await step.run('apply-metadata', async () => {
       const { upload } = activeContext
-      await admin!.from('video_uploads').update({
-        recorded_at: metadata.recorded_at,
+      const updateData: any = {
         meta: {
           ...(upload.meta || {}),
           raw_metadata_diagnostic: metadata.raw_metadata_diagnostic,
           found_key: metadata.found_key
         }
-      }).eq('id', video_upload_id)
+      }
+      
+      // Only update recorded_at if we have a valid, non-null date to apply
+      if (metadata.recorded_at) {
+        updateData.recorded_at = metadata.recorded_at
+      }
+
+      await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
     })
 
     // ── Step 2c: Extract Thumbnail (video files only) ──
@@ -533,7 +540,7 @@ export const processUpload = inngest.createFunction(
         entry_type: 'session',
         title: analysis.summary ? (analysis.summary.length > 80 ? analysis.summary.substring(0, 77) + '...' : analysis.summary) : `${activeContext.userName}'s Video Session`,
         body: richBody,
-        logged_at: recordedAt,
+        logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,
         is_public: true,
         thumbnail_url: thumbnailUrl || (activeContext.upload as any).thumbnail_url,

@@ -110,8 +110,7 @@ export default function UploadsPage() {
         const inferred = new Date(dateStr);
         if (!isNaN(inferred.getTime())) {
           const iso = inferred.toISOString();
-          console.log(`[Metadata] Filename extraction SUCCESS: ${iso}`);
-          window.alert(`✅ DATE DETECTED (via Filename): ${iso}\n\nNeolog will use this date for the timeline.`);
+          console.log(`[Metadata] Filename extraction SUCCESS for ${name}: ${iso}`);
           return iso;
         }
       }
@@ -192,17 +191,14 @@ export default function UploadsPage() {
           finalKey = `earliest (${dateCandidates[0].key})`;
         }
 
-        console.log(`[Metadata] Binary extraction SUCCESS: ${finalDate}`);
-        window.alert(`✅ DATE DETECTED (via Binary ${finalKey}): ${finalDate}\n\nNeolog will use this date for the timeline.`);
+        console.log(`[Metadata] Binary extraction SUCCESS for ${file.name}: ${finalDate} (via ${finalKey})`);
         return finalDate;
       }
 
-      console.warn("[Metadata] Binary analysis found no valid date strings.");
-      window.alert(`❌ NO DATE DETECTED in ${file.name}.\n\nNeither filename nor binary metadata contained a valid date. Timeline will default to upload time.`);
+      console.warn(`[Metadata] NO DATE FOUND in ${file.name}. Falling back to upload date.`);
       return null;
     } catch (error: any) {
-      console.error("[Metadata] Binary extraction FATAL ERROR:", error);
-      window.alert(`⚠️ EXTRACTION FAILED for ${file.name}.\n\nError: ${error.message}\n\nNeolog will retry on the server.`);
+      console.error(`[Metadata] EXTRACTION ERROR for ${file.name}:`, error);
       return null;
     } finally {
       if (mediainfo) mediainfo.close();
@@ -270,17 +266,20 @@ export default function UploadsPage() {
 
         // Register with backend → creates DB record + fires Inngest
         try {
+          const payload = {
+            storage_path: storagePath,
+            file_name: file.name,
+            file_size_bytes: file.size,
+            mime_type: file.type,
+            recorded_at: preextractedDate || null,
+            ...(sessionId ? { session_id: sessionId } : {}),
+          };
+          console.log('[Upload] Registering with payload:', payload);
+
           const res = await fetch('/api/video-upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              storage_path: storagePath,
-              file_name: file.name,
-              file_size_bytes: file.size,
-              mime_type: file.type,
-              recorded_at: preextractedDate || null,
-              ...(sessionId ? { session_id: sessionId } : {}),
-            }),
+            body: JSON.stringify(payload),
           })
 
           if (res.ok) {
