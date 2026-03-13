@@ -686,7 +686,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-sm text-[var(--text-secondary)] max-w-xl leading-relaxed">
-          Configure your intelligence layer, manage your global persona, and control your sovereign data.
+          Configure your intelligence layer and manage your sovereign data. (Persona management moved to <a href="/dashboard/profile" className="text-[var(--accent)] hover:underline">Character</a>).
         </p>
       </div>
 
@@ -1074,140 +1074,7 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
-        {/* 6. Profile */}
-        <section>
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <User size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Public Profile</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Manage how you appear to other neologgers and assistants.</p>
-            </div>
-          </div>
-
-          <div className="p-8 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-10" style={{ background: 'rgba(13,13,22,0.2)' }}>
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] mb-4 block">Identity</label>
-              <div className="flex items-center gap-6">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-tr from-[var(--accent)] to-violet-500 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-                  {formData.avatar_url ? (
-                    <img
-                      src={formData.avatar_url}
-                      alt="Avatar"
-                      className="relative w-24 h-24 rounded-full object-cover border-2 border-[var(--bg-primary)] shadow-2xl"
-                    />
-                  ) : (
-                    <div className="relative w-24 h-24 rounded-full bg-gradient-to-tr from-[var(--accent)] to-violet-600 flex items-center justify-center text-3xl text-white font-light tracking-tighter border-2 border-[var(--bg-primary)] shadow-2xl">
-                      {(formData.display_name || profile?.username || 'U')[0].toUpperCase()}
-                    </div>
-                  )}
-
-                  <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--text-primary)] text-[var(--bg-primary)] flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95 transition-all shadow-lg">
-                    {uploadingAvatar ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Camera size={14} />
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      className="hidden"
-                      disabled={uploadingAvatar}
-                    />
-                  </label>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold tracking-tight">{profile?.username || 'User'}</p>
-                  <p className="text-xs text-[var(--text-tertiary)] max-w-xs leading-relaxed">Recommended: 400x400px. JPG or PNG. Max 2MB.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-8">
-              <div className="grid sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Username</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={usernameDraft}
-                      onChange={(e) => setUsernameDraft(e.target.value)}
-                      className="input flex-1 font-mono"
-                    />
-                    <button
-                      onClick={handleUsernameSave}
-                      disabled={usernameSaving || !usernameDraft}
-                      className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-all shadow-[0_0_15px_-5px_rgba(124,106,245,0.4)]"
-                    >
-                      {usernameSaving ? <Loader2 size={12} className="animate-spin" /> : 'Update'}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Display Name</label>
-                  <input
-                    type="text"
-                    value={formData.display_name}
-                    onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                    className="input"
-                    placeholder="Your display name"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Bio</label>
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="input min-h-[100px] transition-all resize-none"
-                  placeholder="Tell the world about your perspective..."
-                  maxLength={500}
-                />
-                <p className="text-[10px] text-right font-mono text-[var(--text-tertiary)] opacity-60">
-                  {formData.bio.length}/500
-                </p>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Website</label>
-                  <input
-                    type="url"
-                    value={formData.website_url}
-                    onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                    className="input"
-                    placeholder="https://yourpage.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Twitter/X (URL)</label>
-                  <input
-                    type="url"
-                    value={formData.twitter_url}
-                    onChange={(e) => setFormData({ ...formData, twitter_url: e.target.value })}
-                    className="input"
-                    placeholder="https://x.com/username"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-8 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-[0.1em] hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : 'Save Profile Changes'}
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* Profile management moved to Character page */}
 
         {/* 7. Notifications */}
         <section>

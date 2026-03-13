@@ -8,30 +8,16 @@ import {
   Layers, Database, Compass, Radio, 
   Map as MapIcon, Box, ChevronRight, Fingerprint
 } from 'lucide-react'
+import { ManifestAvatar } from '@/components/dashboard/ManifestAvatar'
 
-// Mock Data for the HUD
-const COGNITIVE_STATE = {
-  focus: 82,
-  energy: 65,
-  stress: 40,
-  clarity: 88,
-}
-
-const ACTIVE_DIRECTIVES = [
-  { id: 1, type: 'health', title: 'Rehabilitate Ankle', progress: 62, priority: 'HIGH' },
-  { id: 2, type: 'project', title: 'Neolog V2 Architecture', progress: 45, priority: 'CRITICAL' },
-  { id: 3, type: 'skill', title: 'Cybernetic Design Study', progress: 80, priority: 'NORMAL' },
-]
-
-const MOCK_INSIGHTS = [
-  { id: 1, text: 'You generate ideas 40% faster when recording late at night.', type: 'PATTERN' },
-  { id: 2, text: 'Focus correlates strongly with high energy payload days.', type: 'OBSERVATION' },
-  { id: 3, text: 'Mentioned "Supply Chain" 14 times this month. Evolving into a core interest?', type: 'QUESTION' },
-]
+// Data-driven HUD
 
 export default function LiveMindDashboard() {
   const [recentEntities, setRecentEntities] = useState<any[]>([])
   const [recentTransmissions, setRecentTransmissions] = useState<any[]>([])
+  const [activeDirectives, setActiveDirectives] = useState<any[]>([])
+  const [cognitiveState, setCognitiveState] = useState({ focus: 50, energy: 50, stress: 20, clarity: 50 })
+  const [insights, setInsights] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -40,24 +26,60 @@ export default function LiveMindDashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Fetch recent active entities across sessions
-      // We use a mock query logic since we don't have an exact API for "momentum" yet
-      const { data: entities } = await supabase
-        .from('entities')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('last_mentioned_at', { ascending: false, nullsFirst: false })
-        .limit(4)
-
-      const { data: uploads } = await supabase
-        .from('video_uploads')
-        .select('id, title, created_at, status')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(3)
+      // Parallel fetch for speed
+      const [
+        { data: entities },
+        { data: uploads },
+        { data: goals },
+        { data: recentLogs }
+      ] = await Promise.all([
+        supabase.from('entities').select('*').eq('user_id', session.user.id).order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(4),
+        supabase.from('video_uploads').select('id, title, created_at, status').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(3),
+        supabase.from('entities').select('*').eq('user_id', session.user.id).eq('type', 'goal').order('mention_count', { ascending: false }).limit(3),
+        supabase.from('log_entries').select('meta').eq('user_id', session.user.id).order('logged_at', { ascending: false }).limit(10)
+      ])
 
       setRecentEntities(entities || [])
       setRecentTransmissions(uploads || [])
+      
+      // Process Goals into Directives
+      setActiveDirectives(goals?.map(g => ({
+        id: g.id,
+        title: g.name,
+        progress: Math.min(100, (g.mention_count || 0) * 5), // Heuristic progress
+        priority: g.metadata?.priority || 'NORMAL'
+      })) || [])
+
+      // Process Cognitive State from last 10 logs
+      if (recentLogs && recentLogs.length > 0) {
+        let f = 0, e = 0, s = 0, c = 0, count = 0
+        const extractedInsights: any[] = []
+
+        recentLogs.forEach(log => {
+          const m = log.meta as any
+          if (m?.analysis) {
+            f += m.analysis.focus_score || 50
+            e += m.analysis.energy_score || 50
+            s += m.analysis.stress_score || 20
+            c += m.analysis.clarity_score || 50
+            count++
+          }
+          if (m?.insights) {
+            extractedInsights.push(...m.insights)
+          }
+        })
+
+        if (count > 0) {
+          setCognitiveState({ 
+            focus: Math.round(f / count), 
+            energy: Math.round(e / count), 
+            stress: Math.round(s / count), 
+            clarity: Math.round(c / count) 
+          })
+        }
+        setInsights(extractedInsights.slice(0, 3).map((text, id) => ({ id, text, type: 'SIGNAL' })))
+      }
+
       setLoading(false)
     }
 
@@ -156,8 +178,10 @@ export default function LiveMindDashboard() {
         {/* MIDDLE ROW: The Core Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* LEFT COL: Cognitive State (Vitals) */}
+          {/* LEFT COL: Neural Manifest & Vitals */}
           <div className="lg:col-span-4 flex flex-col gap-6">
+            <ManifestAvatar />
+
             <div className="hud-panel p-5 rounded-sm">
               <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
@@ -168,10 +192,10 @@ export default function LiveMindDashboard() {
               
               <div className="space-y-4">
                 {[
-                  { label: 'Focus', val: COGNITIVE_STATE.focus, color: 'bg-indigo-500' },
-                  { label: 'Energy Payload', val: COGNITIVE_STATE.energy, color: 'bg-amber-500' },
-                  { label: 'System Stress', val: COGNITIVE_STATE.stress, color: 'bg-rose-500' },
-                  { label: 'Signal Clarity', val: COGNITIVE_STATE.clarity, color: 'bg-cyan-500' },
+                  { label: 'Focus', val: cognitiveState.focus, color: 'bg-indigo-500' },
+                  { label: 'Energy Payload', val: cognitiveState.energy, color: 'bg-amber-500' },
+                  { label: 'System Stress', val: cognitiveState.stress, color: 'bg-rose-500' },
+                  { label: 'Signal Clarity', val: cognitiveState.clarity, color: 'bg-cyan-500' },
                 ].map(stat => (
                   <div key={stat.label}>
                     <div className="flex justify-between text-[10px] font-mono font-bold uppercase mb-1.5 text-[var(--text-tertiary)]">
@@ -208,35 +232,41 @@ export default function LiveMindDashboard() {
                 <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
                   <Crosshair size={14} className="text-rose-400" /> Active Directives
                 </span>
-                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">[ 3 Targets ]</span>
+                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">[ {activeDirectives.length} Targets ]</span>
               </div>
               
               <div className="space-y-3">
-                {ACTIVE_DIRECTIVES.map((directive, i) => (
-                  <div key={directive.id} className="relative group p-3 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] rounded-sm hover:border-[var(--accent)]/50 transition-colors">
-                     <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[var(--bg-primary)] border border-[var(--border-medium)] uppercase text-[var(--text-tertiary)] group-hover:text-[var(--accent)] transition-colors">
-                            FWD-{i+1}
+                {activeDirectives.length > 0 ? (
+                  activeDirectives.map((directive, i) => (
+                    <div key={directive.id} className="relative group p-3 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] rounded-sm hover:border-[var(--accent)]/50 transition-colors">
+                       <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[var(--bg-primary)] border border-[var(--border-medium)] uppercase text-[var(--text-tertiary)] group-hover:text-[var(--accent)] transition-colors">
+                              FWD-{i+1}
+                            </span>
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{directive.title}</span>
+                          </div>
+                          <span className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm
+                            ${directive.priority === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 
+                              directive.priority === 'HIGH' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 
+                              'bg-[var(--border-medium)] text-[var(--text-tertiary)]'}`
+                          }>
+                            {directive.priority}
                           </span>
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{directive.title}</span>
-                        </div>
-                        <span className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm
-                          ${directive.priority === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 
-                            directive.priority === 'HIGH' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 
-                            'bg-[var(--border-medium)] text-[var(--text-tertiary)]'}`
-                        }>
-                          {directive.priority}
-                        </span>
-                     </div>
-                     <div className="flex items-center gap-3">
-                        <div className="flex-1 h-1 bg-[var(--bg-primary)] rounded-full overflow-hidden">
-                           <div className="h-full bg-[var(--text-secondary)] group-hover:bg-[var(--accent)] transition-all" style={{ width: `${directive.progress}%` }} />
-                        </div>
-                        <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{directive.progress}%</span>
-                     </div>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1 bg-[var(--bg-primary)] rounded-full overflow-hidden">
+                             <div className="h-full bg-[var(--text-secondary)] group-hover:bg-[var(--accent)] transition-all" style={{ width: `${directive.progress}%` }} />
+                          </div>
+                          <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{directive.progress}%</span>
+                       </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest border border-dashed border-[var(--border-light)]">
+                    No active directives found. Mark entities as 'goal' to track.
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -256,8 +286,8 @@ export default function LiveMindDashboard() {
                   recentEntities.map((entity, i) => (
                     <div key={entity.id} className="p-4 border border-[var(--border-light)] bg-gradient-to-br from-transparent to-[var(--bg-tertiary)]/20 flex gap-4 hover:border-[var(--accent)]/40 transition-colors">
                       <div className="w-8 h-8 rounded-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center flex-shrink-0">
-                        {entity.entity_type === 'project' ? <Box size={14} className="text-blue-400" /> : 
-                         entity.entity_type === 'idea' ? <Zap size={14} className="text-amber-400" /> : 
+                        {entity.type === 'project' ? <Box size={14} className="text-blue-400" /> : 
+                         entity.type === 'idea' ? <Zap size={14} className="text-amber-400" /> : 
                          <Layers size={14} className="text-emerald-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -290,12 +320,16 @@ export default function LiveMindDashboard() {
                   </span>
                 </div>
                 <div className="space-y-4">
-                  {MOCK_INSIGHTS.map((insight) => (
-                    <div key={insight.id} className="text-sm text-[var(--text-secondary)] border-l-2 border-purple-500/50 pl-3 py-1">
-                      <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest block mb-1">[{insight.type}]</span>
-                      "{insight.text}"
-                    </div>
-                  ))}
+                  {insights.length > 0 ? (
+                    insights.map((insight) => (
+                      <div key={insight.id} className="text-sm text-[var(--text-secondary)] border-l-2 border-purple-500/50 pl-3 py-1">
+                        <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest block mb-1">[{insight.type}]</span>
+                        "{insight.text}"
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-[10px] font-mono text-[var(--text-tertiary)] italic">No insights extracted from recent signals.</div>
+                  )}
                 </div>
               </div>
 

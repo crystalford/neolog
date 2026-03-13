@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Terminal, Send, History, Layers, Zap, Brain, Globe, MessageSquare, Code } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Terminal, Send, History, Layers, Zap, Brain, Globe, MessageSquare, Code, Camera, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function QuickIngestPage() {
@@ -9,6 +9,8 @@ export default function QuickIngestPage() {
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const supabase = createClient()
 
@@ -36,6 +38,51 @@ export default function QuickIngestPage() {
       setError(err.message)
     } finally {
       setProcessing(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingImage(true)
+    setError(null)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${session.user.id}/${Date.now()}.${fileExt}`
+      const filePath = `images/${fileName}`
+
+      // 1. Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from('neural-signals')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('neural-signals')
+        .getPublicUrl(filePath)
+
+      // 2. Register Signal via API
+      const res = await fetch('/api/ingest/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: publicUrl, fileName: file.name })
+      })
+
+      if (!res.ok) throw new Error('Failed to register neural signal')
+
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setUploadingImage(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -73,15 +120,33 @@ export default function QuickIngestPage() {
                 <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--text-tertiary)]">
                   <span>CHAR_COUNT: {input.length}</span>
                   {processing && <span className="text-[var(--accent)] animate-pulse">EXTRACTING_ENTITIES...</span>}
+                  {uploadingImage && <span className="text-cyan-400 animate-pulse">UPLOADING_NEURAL_MANIFEST...</span>}
                   {success && <span className="text-emerald-500 animate-bounce">SIGNAL_RECEIVED</span>}
                 </div>
-                <button
-                  onClick={handleIngest}
-                  disabled={!input.trim() || processing}
-                  className="btn btn-primary btn-sm flex items-center gap-2 px-6"
-                >
-                  <Send size={14} /> Ingest Signal
-                </button>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage || processing}
+                    className="p-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-cyan-400 transition-colors"
+                    title="Upload Neural Image"
+                  >
+                    {uploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                  </button>
+                  <button
+                    onClick={handleIngest}
+                    disabled={!input.trim() || processing}
+                    className="btn btn-primary btn-sm flex items-center gap-2 px-6"
+                  >
+                    <Send size={14} /> Ingest Signal
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -105,12 +170,28 @@ export default function QuickIngestPage() {
                 { icon: Code, label: 'GitHub Commits', color: 'text-purple-400' },
                 { icon: Brain, label: 'Meeting Notes', color: 'text-amber-400' },
                 { icon: Globe, label: 'Article Text', color: 'text-emerald-400' },
+                { icon: Camera, label: 'Neural Headshots', color: 'text-cyan-400' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                   <item.icon size={14} className={item.color} />
                   <span>{item.label}</span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="bg-cyan-500/5 rounded-2xl border border-cyan-500/20 p-6 space-y-4">
+            <h3 className="text-xs font-mono uppercase tracking-widest text-cyan-400 flex items-center gap-2">
+              <ImageIcon size={14} /> Neural Manifest
+            </h3>
+            <p className="text-[10px] text-[var(--text-tertiary)] leading-relaxed">
+              Upload clear headshots to fine-tune your virtual character. Use high-contrast, well-lit photos for the best results.
+            </p>
+            <div className="pt-2">
+               <div className="h-1 w-full bg-cyan-500/10 rounded-full overflow-hidden">
+                 <div className="h-full bg-cyan-500 w-1/4 animate-pulse" />
+               </div>
+               <p className="text-[8px] font-mono uppercase text-cyan-500/60 mt-2">Training Data: 20% Required</p>
             </div>
           </div>
 

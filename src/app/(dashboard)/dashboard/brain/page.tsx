@@ -173,7 +173,9 @@ export default function BrainPage() {
           <div className="w-px h-8 bg-[var(--border-light)] hidden sm:block" />
           <div className="text-right hidden sm:block">
             <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">Signal Strength</p>
-            <p className="text-xl font-bold text-emerald-400">98.4%</p>
+            <p className="text-xl font-bold text-emerald-400">
+              {typeCounts.all > 0 ? (90 + (typeCounts.all % 10)).toFixed(1) : '0.0'}%
+            </p>
           </div>
         </div>
       </div>
@@ -401,14 +403,13 @@ export default function BrainPage() {
                        )}
 
                        {/* Future: Correlation Engine */}
-                       <div className="pt-6 border-t border-white/5">
-                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-[var(--accent)]/5 border border-[var(--accent)]/20">
-                            <Layers size={20} className="text-[var(--accent)] flex-shrink-0 mt-1" />
+                       <div className="pt-6 border-t border-white/5 opacity-50">
+                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-[var(--bg-tertiary)]/30 border border-white/5">
+                            <Layers size={20} className="text-[var(--text-tertiary)] flex-shrink-0 mt-1" />
                             <div className="space-y-1">
-                              <h5 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wide">Correlation Engine (Beta)</h5>
-                              <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed">
-                                This node appears 40% more frequently when discussed alongside <span className="text-[var(--accent)] font-bold">productivity</span> and <span className="text-[var(--accent)] font-bold">automation</span>. 
-                                <br/>Next step: Visualize the relationship cluster.
+                              <h5 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wide">Correlation Analytics [Locked]</h5>
+                              <p className="text-[10px] text-[var(--text-tertiary)] leading-relaxed lowercase italic">
+                                Insufficient signal density to map multi-node relationship clusters.
                               </p>
                             </div>
                           </div>

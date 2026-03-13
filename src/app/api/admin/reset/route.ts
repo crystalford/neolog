@@ -42,6 +42,12 @@ export async function POST() {
     // 6. Clear clip sessions
     await supabase.from('clip_sessions').delete().eq('user_id', userId)
 
+    // 7. Clear neural signals
+    await supabase.from('neural_signals').delete().eq('user_id', userId)
+
+    // 8. Clear assets (inventory)
+    await supabase.from('assets').delete().eq('user_id', userId)
+
     return NextResponse.json({ message: 'Memory wiped successfully' })
   } catch (error: any) {
     console.error('[RESET] Wipe failed:', error)

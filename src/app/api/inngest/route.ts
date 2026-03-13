@@ -6,6 +6,7 @@ import { assembleClip } from '@/inngest/functions/assemble-clip'
 import { processChatSession } from '@/inngest/functions/process-chat'
 import { processCapture } from '@/inngest/functions/process-capture'
 import { processText } from '@/inngest/functions/process-text'
+import { refineSignal } from '@/inngest/functions/refine-signals'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -15,6 +16,7 @@ export const { GET, POST, PUT } = serve({
     assembleClip, 
     processChatSession, 
     processCapture,
-    processText
+    processText,
+    refineSignal
   ],
 })
