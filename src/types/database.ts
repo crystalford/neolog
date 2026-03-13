@@ -796,3 +796,71 @@ export type ClipSession = {
   created_at: string
   updated_at: string
 }
+
+// --- Cross-corpus synthesis ---
+
+export type SynthesisNarrative = {
+  title: string
+  description: string
+  upload_ids?: string[]
+  arc_type?: string   // 'progress' | 'struggle' | 'exploration' | 'transformation'
+  strength: number    // 1–10
+}
+
+export type SynthesisTheme = {
+  theme: string
+  strength: number    // 1–10
+  first_seen?: string // ISO date string
+  last_seen?: string
+  upload_count?: number
+}
+
+export type SynthesisContradiction = {
+  topic: string
+  position_a: string
+  position_b: string
+  upload_ids?: string[]
+  dates?: string[]
+}
+
+export type SynthesisCommitment = {
+  commitment: string
+  date?: string
+  context?: string
+}
+
+export type SynthesisMomentum = {
+  accelerating: string[]
+  stalling: string[]
+  dormant?: string[]
+}
+
+export type UserSynthesis = {
+  id: string
+  user_id: string
+  synthesized_at: string
+  upload_count: number | null
+  date_range_start: string | null
+  date_range_end: string | null
+  spine: string | null
+  narratives: SynthesisNarrative[] | null
+  themes: SynthesisTheme[] | null
+  contradictions: SynthesisContradiction[] | null
+  commitments_open: SynthesisCommitment[] | null
+  momentum: SynthesisMomentum | null
+  synthesis_model: string | null
+}
+
+// --- Word-level transcript ---
+
+export type TranscriptWord = {
+  id: string
+  video_upload_id: string
+  user_id: string
+  word: string
+  start_time: number   // seconds
+  end_time: number     // seconds
+  confidence: number | null
+  is_cut: boolean
+  word_index: number
+}

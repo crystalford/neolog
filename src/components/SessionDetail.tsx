@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
-  Brain, Target, FileText, Scissors, Shield, Sparkles, Zap, 
-  Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2, 
+  Brain, Target, FileText, Scissors, Shield, Sparkles, Zap,
+  Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2,
   TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
-  CalendarDays, ChevronRight
+  CalendarDays, ChevronRight, Edit2
 } from 'lucide-react'
-import type { VideoUpload } from '@/types/database'
+import type { VideoUpload, TranscriptWord } from '@/types/database'
+import { TranscriptEditor } from '@/components/TranscriptEditor'
 
 import { format } from 'date-fns'
 
@@ -16,13 +17,26 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({ upload }: SessionDetailProps) {
-  const [activeTab, setActiveTab] = useState<'analysis' | 'personal' | 'transcript' | 'clips' | 'posts'>('analysis')
+  const [activeTab, setActiveTab] = useState<'analysis' | 'personal' | 'transcript' | 'edit' | 'clips' | 'posts'>('analysis')
+  const [transcriptWords, setTranscriptWords] = useState<TranscriptWord[] | null>(null)
+  const [loadingWords, setLoadingWords] = useState(false)
   const a = upload.analysis
+
+  // Load word-level transcript when Edit tab is opened
+  useEffect(() => {
+    if (activeTab !== 'edit' || transcriptWords !== null || !upload.id) return
+    setLoadingWords(true)
+    fetch(`/api/transcript-words?upload_id=${upload.id}`)
+      .then(r => r.json())
+      .then(d => setTranscriptWords(d.words ?? []))
+      .finally(() => setLoadingWords(false))
+  }, [activeTab, upload.id, transcriptWords])
 
   const tabs = [
     { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
     { key: 'personal' as const,    label: 'Personal',     icon: Target },
     { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
+    { key: 'edit' as const,        label: 'Edit',         icon: Edit2 },
     { key: 'clips' as const,       label: 'Clips',        icon: Scissors, count: upload.generated_clips?.length || 0 },
     { key: 'posts' as const,       label: 'Posts',        icon: FileText, count: upload.generated_posts?.length || 0 },
   ]
@@ -384,6 +398,28 @@ export function SessionDetail({ upload }: SessionDetailProps) {
               <div className="py-12 text-center text-[var(--text-tertiary)]">
                 <FileText size={24} className="mx-auto mb-2 opacity-20" />
                 <p className="text-sm">No transcript available</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'edit' && (
+          <div className="min-h-[300px]">
+            {loadingWords ? (
+              <div className="py-12 text-center text-[var(--text-tertiary)]">
+                <p className="text-sm animate-pulse">Loading word-level transcript...</p>
+              </div>
+            ) : transcriptWords && transcriptWords.length > 0 ? (
+              <TranscriptEditor
+                uploadId={upload.id!}
+                words={transcriptWords}
+                onWordsUpdate={setTranscriptWords}
+              />
+            ) : (
+              <div className="py-12 text-center text-[var(--text-tertiary)]">
+                <Edit2 size={24} className="mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No word-level data for this upload</p>
+                <p className="text-xs mt-1 opacity-60">Word timestamps are captured on new uploads going forward</p>
               </div>
             )}
           </div>

@@ -145,14 +145,34 @@ export const processUpload = inngest.createFunction(
             cacheControl: '31536000',
           })
 
+        // Extract real duration from WAV header
+        let durationSeconds: number | null = null
+        try {
+          if (audioBuffer.length >= 44) {
+            const sampleRate = audioBuffer.readUInt32LE(24)
+            const numChannels = audioBuffer.readUInt16LE(22)
+            const bitsPerSample = audioBuffer.readUInt16LE(34)
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+            // Find 'data' chunk size — it starts at byte 40 in standard WAV
+            const dataChunkSize = audioBuffer.readUInt32LE(40)
+            if (byteRate > 0 && dataChunkSize > 0) {
+              durationSeconds = dataChunkSize / byteRate
+            }
+          }
+        } catch { /* ignore — fall back to null */ }
+
         // Archive in Neural Corpus
         await admin.from('neural_corpus').insert({
           user_id,
           source_upload_id: video_upload_id,
           type: 'voice',
           storage_path: audioStoragePath,
-          fidelity_score: 0.8, // Initial score, will be refined by analysis
-          meta: { sample_rate: 44100, format: 'wav' }
+          fidelity_score: 0.8,
+          meta: {
+            sample_rate: 44100,
+            format: 'wav',
+            ...(durationSeconds !== null ? { duration_seconds: Math.round(durationSeconds) } : {}),
+          },
         })
 
         await plog(admin, video_upload_id, 'extract-audio', 'done', `Signal archived to corpus: ${audioStoragePath}`)
@@ -430,14 +450,18 @@ export const processUpload = inngest.createFunction(
           
           if (idx === 0) primaryThumb = publicUrl
 
+          // Score fidelity from JPEG image dimensions (proxy for quality)
+          const fidelityScore = scoreFrameFidelity(imgBuffer)
+
           // Archive in Neural Corpus
           await admin.from('neural_corpus').insert({
             user_id,
             source_upload_id: video_upload_id,
             type: 'face',
             storage_path: thumbPath,
-            fidelity_score: 0.7, 
-            meta: { point, is_primary: idx === 0 }
+            fidelity_score: fidelityScore,
+            fidelity_rank: fidelityScore >= 0.85 ? 'S' : fidelityScore >= 0.7 ? 'A' : fidelityScore >= 0.5 ? 'B' : 'C',
+            meta: { point, is_primary: idx === 0 },
           })
         }
 
@@ -482,7 +506,7 @@ export const processUpload = inngest.createFunction(
             model: 'large-v3',
             transcription: 'plain text',
             language: 'auto',
-            word_timestamps: false,
+            word_timestamps: true,
           },
         }
       ) as any
@@ -494,14 +518,57 @@ export const processUpload = inngest.createFunction(
         text: s.text,
       }))
 
-      await plog(admin, video_upload_id, 'transcribe', 'done', `${text.length} chars transcribed`)
-      return { text, language: output?.detected_language || 'en', segments }
+      // Extract word-level data if available
+      const words: Array<{ word: string; start: number; end: number; probability: number }> = []
+      for (const seg of (output?.segments || [])) {
+        if (Array.isArray(seg.words)) {
+          for (const w of seg.words) {
+            if (w.word && typeof w.start === 'number' && typeof w.end === 'number') {
+              words.push({
+                word: w.word.trim(),
+                start: w.start,
+                end: w.end,
+                probability: w.probability ?? 1,
+              })
+            }
+          }
+        }
+      }
+
+      await plog(admin, video_upload_id, 'transcribe', 'done', `${text.length} chars, ${words.length} words transcribed`)
+      return { text, language: output?.detected_language || 'en', segments, words }
     })
+
+    // ── Step 3b: Store word-level transcript ──
+    if (transcription.words && transcription.words.length > 0) {
+      await step.run('store-transcript-words', async () => {
+        // Delete any existing words for this upload (idempotent)
+        await admin.from('transcript_words').delete().eq('video_upload_id', video_upload_id)
+
+        // Insert in batches of 500
+        const rows = transcription.words!.map((w, i) => ({
+          video_upload_id,
+          user_id,
+          word: w.word,
+          start_time: w.start,
+          end_time: w.end,
+          confidence: w.probability,
+          is_cut: false,
+          word_index: i,
+        }))
+
+        for (let i = 0; i < rows.length; i += 500) {
+          await admin.from('transcript_words').insert(rows.slice(i, i + 500))
+        }
+
+        await plog(admin, video_upload_id, 'store-transcript-words', 'done', `Stored ${rows.length} words`)
+      })
+    }
 
     // ── Step 4: Analyze ──
     const analysisResult = await step.run('analyze', async () => {
       await plog(admin, video_upload_id, 'analyze', 'running')
-      
+
       await admin.from('video_uploads').update({
         transcript: transcription.text,
         transcript_segments: transcription.segments,
@@ -536,6 +603,38 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}. Generated ${clips.length} clips and ${posts.length} posts.`)
       return { ...result, tags, clips, posts }
     })
+
+    // ── Step 4b: Pre-populate word cuts from clip suggestions ──
+    // Words OUTSIDE any generated clip window are marked is_cut=true by default
+    if (transcription.words && transcription.words.length > 0 && analysisResult.clips?.length > 0) {
+      await step.run('apply-clip-cuts', async () => {
+        const clips = analysisResult.clips as Array<{ start: number; end: number }>
+
+        // Words inside at least one clip window = keep (is_cut=false)
+        // Words outside all clip windows = cut (is_cut=true)
+        const cutWordIndices: number[] = transcription.words!
+          .map((w, i) => {
+            const inWindow = clips.some(c => w.start >= c.start && w.end <= c.end)
+            return inWindow ? -1 : i
+          })
+          .filter(i => i >= 0)
+
+        if (cutWordIndices.length > 0) {
+          // Batch update in chunks
+          for (let i = 0; i < cutWordIndices.length; i += 200) {
+            const batch = cutWordIndices.slice(i, i + 200)
+            await admin
+              .from('transcript_words')
+              .update({ is_cut: true })
+              .eq('video_upload_id', video_upload_id)
+              .in('word_index', batch)
+          }
+        }
+
+        await plog(admin, video_upload_id, 'apply-clip-cuts', 'done',
+          `Marked ${cutWordIndices.length} of ${transcription.words!.length} words as cut`)
+      })
+    }
 
     // ── Step 5: Create rich Timeline Entry ──
     await step.run('create-log-entry', async () => {
@@ -581,6 +680,84 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Timeline entry created')
     })
 
+    // ── Step 6: Check manifest training thresholds ──
+    const manifestTriggers = await step.run('check-manifest-thresholds', async () => {
+      const { checkManifestThresholds } = await import('@/lib/manifest-thresholds')
+      return checkManifestThresholds(user_id, admin)
+    })
+
+    if (manifestTriggers.triggerVoiceClone) {
+      await step.sendEvent('trigger-voice-clone', {
+        name: 'manifest/voice-threshold-met',
+        data: { user_id },
+      })
+    }
+    if (manifestTriggers.triggerLoraTraining) {
+      await step.sendEvent('trigger-lora-training', {
+        name: 'manifest/face-threshold-met',
+        data: { user_id },
+      })
+    }
+
+    // ── Step 7: Auto-trigger cross-corpus synthesis every 10th upload ──
+    const shouldTriggerSynthesis = await step.run('check-synthesis-milestone', async () => {
+      const { count } = await admin
+        .from('video_uploads')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user_id)
+        .eq('status', 'processed')
+
+      return !!(count && count >= 3 && count % 10 === 0)
+    })
+
+    if (shouldTriggerSynthesis) {
+      await step.sendEvent('trigger-synthesis', {
+        name: 'neolog/synthesize-graph',
+        data: { user_id },
+      })
+    }
+
     return { status: 'success', video_upload_id }
   }
 )
+
+/**
+ * Score face frame fidelity from JPEG buffer dimensions.
+ * Higher resolution = higher potential quality.
+ * Returns a 0–1 score based on resolution percentile.
+ */
+function scoreFrameFidelity(buffer: Buffer): number {
+  try {
+    // Parse JPEG dimensions from SOF0/SOF2 marker (0xFF 0xC0 or 0xFF 0xC2)
+    let offset = 2 // skip SOI marker
+    while (offset < buffer.length - 9) {
+      if (buffer[offset] !== 0xFF) break
+      const marker = buffer[offset + 1]
+      const length = buffer.readUInt16BE(offset + 2)
+
+      // SOF markers contain image dimensions
+      if (marker === 0xC0 || marker === 0xC1 || marker === 0xC2) {
+        const height = buffer.readUInt16BE(offset + 5)
+        const width = buffer.readUInt16BE(offset + 7)
+        const pixels = width * height
+
+        // Score based on resolution:
+        // >= 3840×2160 (4K)   → 1.0
+        // >= 1920×1080 (1080p) → 0.85
+        // >= 1280×720 (720p)  → 0.7
+        // >= 854×480 (480p)   → 0.5
+        // below 480p          → 0.3
+        if (pixels >= 3840 * 2160) return 1.0
+        if (pixels >= 1920 * 1080) return 0.85
+        if (pixels >= 1280 * 720) return 0.7
+        if (pixels >= 854 * 480) return 0.5
+        return 0.3
+      }
+
+      offset += 2 + length
+    }
+  } catch { /* fall through */ }
+
+  // Default if we can't parse dimensions
+  return 0.6
+}
