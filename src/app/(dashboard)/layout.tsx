@@ -10,7 +10,8 @@ import {
   PenLine, Command, Search, Upload, BarChart3,
   DollarSign, Share2, Sparkles, Video, Boxes,
   Clock, List, CalendarDays, Inbox, BookUser,
-  Film, Briefcase, ArrowUpRight, Trophy, Zap
+  Film, Briefcase, ArrowUpRight, Trophy, Zap,
+  Brain, Cpu, Network
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -235,15 +236,15 @@ export default function DashboardLayout({
 
   // INTELLIGENCE section — what the system extracted
   const secondaryNav = useMemo(() => [
-    { href: '/dashboard/entities',  icon: Boxes,       label: 'Entities',      section: 'INTELLIGENCE' },
-    { href: '/dashboard/timeline',  icon: CalendarDays,label: 'Timeline',      section: 'INTELLIGENCE' },
+    { href: '/dashboard/entities',   icon: Boxes,       label: 'Brain',      section: 'INTELLIGENCE' },
+    { href: '/dashboard/timeline',   icon: CalendarDays,label: 'Timeline',   section: 'INTELLIGENCE' },
+    { href: '/dashboard/synthesis',  icon: Sparkles,    label: 'Synthesis',  section: 'INTELLIGENCE' },
   ], [])
 
-  // CHARACTER section — the RPG layer
+  // MANIFEST section — the character being built
   const characterNav = useMemo(() => [
-    { href: '/dashboard/profile',   icon: UserIcon,  label: 'Character',     section: 'CHARACTER' },
-    { href: '/dashboard/inventory', icon: Boxes,     label: 'Inventory',     section: 'CHARACTER' },
-    { href: '/dashboard/portfolio', icon: Briefcase, label: 'Portfolio',     section: 'CHARACTER' },
+    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest', section: 'MANIFEST' },
+    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',       section: 'MANIFEST' },
   ], [])
 
   const commandItems = useMemo(() => {
@@ -286,7 +287,7 @@ export default function DashboardLayout({
     allNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )?.label ||
-    (pathname === '/dashboard/settings' ? 'Settings' : 'Daily Log')
+    (pathname === '/dashboard/settings' ? 'Settings' : pathname === '/dashboard/character' ? 'Character' : 'Daily Log')
 
   return (
     <div className="dashboard-shell flex h-screen bg-[var(--bg-primary)]">
@@ -346,9 +347,9 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          {/* CHARACTER */}
+          {/* MANIFEST */}
           <div className="mt-4">
-            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">Character</p>
+            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">Manifest</p>
             <div className="space-y-0.5">
               {characterNav.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
@@ -372,16 +373,6 @@ export default function DashboardLayout({
           {/* Settings — bottom of nav */}
           <div className="mt-4">
             <div className="space-y-0.5">
-              <Link href="/analytics"
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  pathname.startsWith('/analytics')
-                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
-                }`}
-              >
-                <BarChart3 size={14} className="flex-shrink-0" />
-                <span>Analytics</span>
-              </Link>
               <Link href="/dashboard/settings"
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                   pathname === '/dashboard/settings'
