@@ -91,37 +91,32 @@ export const processUpload = inngest.createFunction(
     if (context.skip) return { status: 'already_processed', video_upload_id }
     const activeContext = context as Extract<typeof context, { skip: false }>
 
-    // ── Step 2: Extract audio (video files only) ──
+    // ── Step 2: Extract audio & Archive Voice Signal ──
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = activeContext
       
-      // Ensure we are in a transcribing state
       await admin.from('video_uploads').update({
         status: 'transcribing',
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
 
-      if (!isVideoMimeType(upload.mime_type)) {
-        await plog(admin, video_upload_id, 'extract-audio', 'skipped', `Not a video file (${upload.mime_type})`)
+      if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
+        await plog(admin, video_upload_id, 'extract-audio', 'skipped', `Not a media file`)
         return { path: upload.storage_path, extracted: false }
       }
 
-      await plog(admin, video_upload_id, 'extract-audio', 'running', 'Starting Replicate FFmpeg audio extraction')
+      await plog(admin, video_upload_id, 'extract-audio', 'running', 'Starting signal extraction')
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) {
-        await plog(admin, video_upload_id, 'extract-audio', 'skipped', 'REPLICATE_API_TOKEN not set — using source file directly')
         return { path: upload.storage_path, extracted: false }
       }
 
-      const { data: signedData, error: signedError } = await admin.storage
+      const { data: signedData } = await admin.storage
         .from('videos')
         .createSignedUrl(upload.storage_path, 3600)
 
-      if (signedError || !signedData?.signedUrl) {
-        await plog(admin, video_upload_id, 'extract-audio', 'error', `Signed URL failed: ${signedError?.message}`)
-        return { path: upload.storage_path, extracted: false }
-      }
+      if (!signedData?.signedUrl) return { path: upload.storage_path, extracted: false }
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
@@ -130,34 +125,40 @@ export const processUpload = inngest.createFunction(
           {
             input: {
               video_url: signedData.signedUrl,
-              sample_rate: 16000,
+              sample_rate: 44100, // Higher fidelity for corpus
               channels: 1,
-              format: 'm4a',
+              format: 'wav', // Uncompressed/WAV preferred for training
             },
           },
         )
 
-        if (!output || typeof output !== 'string') {
-          await plog(admin, video_upload_id, 'extract-audio', 'skipped', 'Replicate returned empty output — using source file')
-          return { path: upload.storage_path, extracted: false }
-        }
+        if (!output || typeof output !== 'string') return { path: upload.storage_path, extracted: false }
 
         const audioResponse = await fetch(output as string)
         const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
-        const timestamp = Date.now()
-        const audioStoragePath = `${user_id}/audio/${timestamp}_extracted.m4a`
+        const audioStoragePath = `${user_id}/neural-corpus/audio/${Date.now()}.wav`
 
         await admin.storage
           .from('videos')
           .upload(audioStoragePath, audioBuffer, {
-            contentType: 'audio/mp4',
-            cacheControl: '86400',
+            contentType: 'audio/wav',
+            cacheControl: '31536000',
           })
 
-        await plog(admin, video_upload_id, 'extract-audio', 'done', `Extracted audio saved: ${audioStoragePath}`)
+        // Archive in Neural Corpus
+        await admin.from('neural_corpus').insert({
+          user_id,
+          source_upload_id: video_upload_id,
+          type: 'voice',
+          storage_path: audioStoragePath,
+          fidelity_score: 0.8, // Initial score, will be refined by analysis
+          meta: { sample_rate: 44100, format: 'wav' }
+        })
+
+        await plog(admin, video_upload_id, 'extract-audio', 'done', `Signal archived to corpus: ${audioStoragePath}`)
         return { path: audioStoragePath, extracted: true }
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-audio', 'error', `Replicate error: ${err?.message || String(err)}`)
+        await plog(admin, video_upload_id, 'extract-audio', 'error', err?.message)
         return { path: upload.storage_path, extracted: false }
       }
     })
@@ -376,12 +377,12 @@ export const processUpload = inngest.createFunction(
       await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
     })
 
-    // ── Step 2c: Extract Thumbnail (video files only) ──
-    const thumbnailUrl = await step.run('extract-thumbnail', async () => {
+    // ── Step 2c: Extract Neural Signal (Multi-frame Face Sampling) ──
+    const thumbnailUrl = await step.run('extract-visual-corpus', async () => {
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
 
-      await plog(admin, video_upload_id, 'extract-thumbnail', 'running')
+      await plog(admin, video_upload_id, 'extract-visual-corpus', 'running', 'Harvesting face samples for Neural Corpus')
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
@@ -394,37 +395,60 @@ export const processUpload = inngest.createFunction(
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
-        // Use fofr/ffmpeg to grab a frame at 1s
-        const output = await replicate.run(
-          "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
-          {
-            input: {
-              input_file: signedData.signedUrl,
-              ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -f image2 pipe:1"
+        
+        // Define key points for extraction (1s, 25%, 50%, 75%, end-1s)
+        const samplePoints = ['00:00:01', '25%', '50%', '75%', '95%']
+        let primaryThumb = null
+
+        for (const [idx, point] of samplePoints.entries()) {
+          const ffmpegCmd = point.endsWith('%') 
+            ? `-ss ${point} -i {input_file} -vframes 1 -f image2 pipe:1`
+            : `-ss ${point} -i {input_file} -vframes 1 -f image2 pipe:1`
+
+          const output = await replicate.run(
+            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+            {
+              input: {
+                input_file: signedData.signedUrl,
+                ffmpeg_command: ffmpegCmd
+              }
             }
-          }
-        ) as any
+          ) as any
 
-        if (!output || typeof output !== 'string') return null
+          if (!output || typeof output !== 'string') continue
 
-        // Fetch and upload to Supabase
-        const imgResponse = await fetch(output)
-        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
-        const thumbPath = `${user_id}/thumbnails/${video_upload_id}.jpg`
+          const imgResponse = await fetch(output)
+          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
+          const thumbPath = `${user_id}/neural-corpus/visual/${video_upload_id}_sample_${idx}.jpg`
 
-        await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
-          contentType: 'image/jpeg',
-          upsert: true
-        })
+          await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
+            contentType: 'image/jpeg',
+            upsert: true
+          })
 
-        const { data: { publicUrl } } = admin.storage.from('videos').getPublicUrl(thumbPath)
-        
-        await admin.from('video_uploads').update({ thumbnail_url: publicUrl }).eq('id', video_upload_id)
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail created: ${publicUrl}`)
-        
-        return publicUrl
+          const { data: { publicUrl } } = admin.storage.from('videos').getPublicUrl(thumbPath)
+          
+          if (idx === 0) primaryThumb = publicUrl
+
+          // Archive in Neural Corpus
+          await admin.from('neural_corpus').insert({
+            user_id,
+            source_upload_id: video_upload_id,
+            type: 'face',
+            storage_path: thumbPath,
+            fidelity_score: 0.7, 
+            meta: { point, is_primary: idx === 0 }
+          })
+        }
+
+        if (primaryThumb) {
+          await admin.from('video_uploads').update({ thumbnail_url: primaryThumb }).eq('id', video_upload_id)
+        }
+
+        await plog(admin, video_upload_id, 'extract-visual-corpus', 'done', `Harvested face samples for corpus`)
+        return primaryThumb
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', `Replicate error: ${err?.message}`)
+        await plog(admin, video_upload_id, 'extract-visual-corpus', 'error', err?.message)
         return null
       }
     })

@@ -17,6 +17,7 @@ export default function LiveMindDashboard() {
   const [recentTransmissions, setRecentTransmissions] = useState<any[]>([])
   const [activeDirectives, setActiveDirectives] = useState<any[]>([])
   const [cognitiveState, setCognitiveState] = useState({ focus: 50, energy: 50, stress: 20, clarity: 50 })
+  const [corpusStats, setCorpusStats] = useState({ voice: 0, face: 0 })
   const [insights, setInsights] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -31,17 +32,27 @@ export default function LiveMindDashboard() {
         { data: entities },
         { data: uploads },
         { data: goals },
-        { data: recentLogs }
+        { data: recentLogs },
+        { data: corpus }
       ] = await Promise.all([
         supabase.from('entities').select('*').eq('user_id', session.user.id).order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(4),
         supabase.from('video_uploads').select('id, title, created_at, status').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(3),
         supabase.from('entities').select('*').eq('user_id', session.user.id).eq('type', 'goal').order('mention_count', { ascending: false }).limit(3),
-        supabase.from('log_entries').select('meta').eq('user_id', session.user.id).order('logged_at', { ascending: false }).limit(10)
+        supabase.from('log_entries').select('meta').eq('user_id', session.user.id).order('logged_at', { ascending: false }).limit(10),
+        supabase.from('neural_corpus').select('type').eq('user_id', session.user.id)
       ])
 
       setRecentEntities(entities || [])
       setRecentTransmissions(uploads || [])
       
+      // Process Corpus Stats
+      const stats = { voice: 0, face: 0 }
+      corpus?.forEach(item => {
+        if (item.type === 'voice') stats.voice++
+        if (item.type === 'face') stats.face++
+      })
+      setCorpusStats(stats)
+
       // Process Goals into Directives
       setActiveDirectives(goals?.map(g => ({
         id: g.id,
@@ -161,16 +172,16 @@ export default function LiveMindDashboard() {
           </div>
           <div className="flex items-center gap-6 font-mono text-xs">
              <div className="flex flex-col items-end">
-               <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Uptime</span>
-               <span className="text-[var(--text-secondary)]">ACTIVE</span>
+                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Uptime</span>
+                <span className="text-[var(--text-secondary)]">ACTIVE</span>
              </div>
              <div className="flex flex-col items-end">
-               <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Sync Status</span>
-               <span className="text-emerald-400">99.9%</span>
+                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Sync Status</span>
+                <span className="text-emerald-400">99.9%</span>
              </div>
              <div className="flex flex-col items-end">
-               <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Threat Level</span>
-               <span className="text-[var(--text-secondary)]">NOMINAL</span>
+                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Threat Level</span>
+                <span className="text-[var(--text-secondary)]">NOMINAL</span>
              </div>
           </div>
         </div>
@@ -181,6 +192,34 @@ export default function LiveMindDashboard() {
           {/* LEFT COL: Neural Manifest & Vitals */}
           <div className="lg:col-span-4 flex flex-col gap-6">
             <ManifestAvatar />
+
+            {/* Neural Manifest Thresholds */}
+            <div className="hud-panel p-5 rounded-sm">
+               <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Fingerprint size={14} className="text-emerald-400" /> Manifest Thresholds
+                </span>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: 'Voice Archive', val: Math.min(100, (corpusStats.voice * 10)), total: '180m', color: 'bg-emerald-500' },
+                  { label: 'Visual Samples', val: Math.min(100, (corpusStats.face * 2.5)), total: '40', color: 'bg-indigo-500' },
+                ].map(stat => (
+                  <div key={stat.label}>
+                    <div className="flex justify-between text-[10px] font-mono font-bold uppercase mb-1.5 text-[var(--text-tertiary)]">
+                      <span>{stat.label}</span>
+                      <span className="text-[var(--text-primary)]">{stat.val}%</span>
+                    </div>
+                    <div className="h-1 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                       <div className={`h-full ${stat.color} transition-all duration-1000`} style={{ width: `${stat.val}%` }} />
+                    </div>
+                  </div>
+                ))}
+                <p className="text-[9px] font-mono text-[var(--text-tertiary)] leading-tight mt-2 opacity-50 uppercase italic">
+                  Signals are harvested automatically from every upload.
+                </p>
+              </div>
+            </div>
 
             <div className="hud-panel p-5 rounded-sm">
               <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
