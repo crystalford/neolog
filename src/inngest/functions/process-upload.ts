@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
-import { runAnalysis } from '@/lib/video-analysis'
+import { runAnalysis, upsertEntities } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import Replicate from 'replicate'
 
@@ -602,6 +602,12 @@ export const processUpload = inngest.createFunction(
 
       await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}. Generated ${clips.length} clips and ${posts.length} posts.`)
       return { ...result, tags, clips, posts }
+    })
+
+    // ── Step 4a: Upsert entities into knowledge graph ──
+    await step.run('upsert-entities', async () => {
+      await upsertEntities(admin, user_id, { videoUploadId: video_upload_id }, analysisResult.analysis)
+      await plog(admin, video_upload_id, 'upsert-entities', 'done', 'Entities written to knowledge graph')
     })
 
     // ── Step 4b: Pre-populate word cuts from clip suggestions ──

@@ -51,7 +51,7 @@ export default async function PublicLogPage({ params }: Props) {
     .from('log_entries')
     .select(`
       id, entry_type, title, body, logged_at, software_tags,
-      cost_delta, is_public, source_upload_id, meta,
+      cost_delta, is_public, source_upload_id, thumbnail_url, meta,
       asset:assets(id, name, category)
     `)
     .eq('user_id', profile.id)
@@ -163,17 +163,11 @@ export default async function PublicLogPage({ params }: Props) {
                   </div>
 
                   {/* Entries for this day */}
-                  <div
-                    style={{
-                      border: '1px solid var(--border-light)',
-                      borderRadius: '10px',
-                      overflow: 'hidden',
-                      marginBottom: '8px',
-                    }}
-                  >
+                  <div className="rounded-xl border border-[var(--border-light)] overflow-hidden mb-2">
                     {group.entries.map((entry) => (
                       <LogCard
                         key={entry.id}
+                        isPublicView
                         entry={{
                           ...entry,
                           software_tags: entry.software_tags ?? [],

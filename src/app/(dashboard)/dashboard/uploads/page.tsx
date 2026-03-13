@@ -299,11 +299,37 @@ export default function UploadsPage() {
             const data = await res.json()
             setProcessingIds(prev => new Set(prev).add(data.id))
             await fetchUploads()
-            
+
             // Remove from active uploads after a short delay ONLY if successful
             setTimeout(() => {
               setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
             }, 2000)
+          } else if (res.status === 409) {
+            // Duplicate file
+            const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))
+            const proceed = confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
+            if (proceed) {
+              // Re-POST with force flag to bypass duplicate check
+              const res2 = await fetch('/api/video-upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...payload, force: true }),
+              })
+              if (res2.ok) {
+                const data = await res2.json()
+                setProcessingIds(prev => new Set(prev).add(data.id))
+                await fetchUploads()
+                setTimeout(() => {
+                  setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
+                }, 2000)
+              } else {
+                const e2 = await res2.json().catch(() => ({ error: res2.statusText }))
+                updateUpload({ status: 'error', error: e2.error || 'Failed' })
+              }
+            } else {
+              // User chose to skip — remove from active uploads cleanly
+              setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
+            }
           } else {
             // Display error and leave it in activeUploads so user can see it
             const errData = await res.json().catch(() => ({ error: res.statusText }));

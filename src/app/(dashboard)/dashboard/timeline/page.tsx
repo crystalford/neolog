@@ -41,7 +41,7 @@ export default function TimelinePage() {
       .from('log_entries')
       .select(`
         id, entry_type, title, body, logged_at, software_tags,
-        cost_delta, is_public, source_upload_id, meta,
+        cost_delta, is_public, source_upload_id, thumbnail_url, meta,
         asset:assets(id, name, category)
       `)
       .eq('user_id', session.user.id)
@@ -64,7 +64,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="max-w-2xl mx-auto px-4 py-8" style={{ fontFamily: 'var(--font-sans)' }}>
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -165,14 +165,7 @@ export default function TimelinePage() {
               </div>
 
               {/* Cards */}
-              <div style={{
-                border: '1px solid var(--border-light)',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                background: 'var(--bg-primary)',
-                position: 'relative',
-                zIndex: 1,
-              }}>
+              <div className="rounded-xl border border-[var(--border-light)] overflow-hidden bg-[var(--bg-primary)]">
                 {group.entries.map((entry) => (
                   <LogCard
                     key={entry.id}
