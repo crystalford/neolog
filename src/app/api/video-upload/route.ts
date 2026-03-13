@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at } = body
+    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at, force } = body
     console.log(`[API] Received upload registration for ${file_name}. recorded_at: ${recorded_at}`);
 
     if (!storage_path || !file_name || !file_size_bytes || !mime_type) {
@@ -51,6 +51,28 @@ export async function POST(request: NextRequest) {
     // Verify the storage path belongs to this user
     if (!storage_path.startsWith(`${session.user.id}/`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Duplicate detection: check if a file with the same name and size already exists
+    // Skip if force=true (user confirmed they want to re-upload)
+    if (!force) {
+      const { data: existing } = await supabase
+        .from('video_uploads')
+        .select('id, status, created_at')
+        .eq('user_id', session.user.id)
+        .eq('file_name', file_name)
+        .eq('file_size_bytes', file_size_bytes)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existing) {
+        return NextResponse.json({
+          duplicate: true,
+          existing_id: existing.id,
+          message: `"${file_name}" was already uploaded (status: ${existing.status}). Upload it again?`,
+        }, { status: 409 })
+      }
     }
 
     finalMeta = { user_id: session.user.id, file_name, file_size_bytes, mime_type }

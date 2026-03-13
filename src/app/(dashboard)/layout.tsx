@@ -229,8 +229,7 @@ export default function DashboardLayout({
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
     { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
-    { href: '/dashboard/ingest',  icon: Zap,       label: 'Quick Ingest',  section: 'INGEST' },
-    { href: '/dashboard/log',     icon: Inbox,     label: 'Daily Log',     section: 'INGEST' },
+    { href: '/dashboard/log',     icon: Inbox,     label: 'Log',           section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
   ], [])
 
@@ -287,7 +286,7 @@ export default function DashboardLayout({
     allNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )?.label ||
-    (pathname === '/dashboard/settings' ? 'Settings' : pathname === '/dashboard/character' ? 'Character' : 'Daily Log')
+    (pathname === '/dashboard/settings' ? 'Settings' : pathname === '/dashboard/character' ? 'Character' : 'Log')
 
   return (
     <div className="dashboard-shell flex h-screen bg-[var(--bg-primary)]">

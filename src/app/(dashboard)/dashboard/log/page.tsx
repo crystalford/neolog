@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Mic, MicOff, Send, Upload, Loader2, CheckCircle2,
-  User, Bot, X, ChevronDown, ChevronUp, Paperclip, Square, Sparkles
+  User, Bot, X, ChevronDown, ChevronUp, Paperclip, Square, Sparkles,
+  ClipboardPaste, MessageSquare
 } from 'lucide-react'
 import { chatWithManager, type ChatMessage } from '@/app/actions/chat'
 import { createClient } from '@/lib/supabase/client'
@@ -100,6 +101,12 @@ export default function NeoLogPage() {
   // Feed & Entities (Stored but not shown in main UI to minimize clutter)
   const [feed, setFeed] = useState<FeedItem[]>([])
   const [feedLoading, setFeedLoading] = useState(true)
+
+  // Input mode: 'chat' = AI chat, 'paste' = direct log ingest
+  const [inputMode, setInputMode] = useState<'chat' | 'paste'>('chat')
+  const [pasteText, setPasteText] = useState('')
+  const [isPasting, setIsPasting] = useState(false)
+  const [pasteSuccess, setPasteSuccess] = useState(false)
 
   // Input & Refs
   const [input, setInput] = useState('')
@@ -278,6 +285,26 @@ export default function NeoLogPage() {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }, [input])
 
+  const handlePasteIngest = async () => {
+    if (!pasteText.trim() || isPasting) return
+    setIsPasting(true)
+    try {
+      const res = await fetch('/api/ingest/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: pasteText.trim() }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || 'Ingest failed')
+      setPasteSuccess(true)
+      setPasteText('')
+      setTimeout(() => setPasteSuccess(false), 3000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsPasting(false)
+    }
+  }
+
   const archiveChat = async () => {
     if (chatMessages.length < 2 || isArchiving) return
     setIsArchiving(true)
@@ -406,8 +433,52 @@ export default function NeoLogPage() {
       )}
 
       {/* Input Bar */}
-      <div className="flex-shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md px-4 py-6">
+      <div className="flex-shrink-0 border-t border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md px-4 py-4">
         <div className="max-w-4xl mx-auto">
+
+          {/* Mode toggle */}
+          <div className="flex items-center gap-1 mb-3">
+            <button
+              onClick={() => setInputMode('chat')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all ${inputMode === 'chat' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+            >
+              <MessageSquare size={11} /> Chat
+            </button>
+            <button
+              onClick={() => setInputMode('paste')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all ${inputMode === 'paste' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+            >
+              <ClipboardPaste size={11} /> Paste text
+            </button>
+          </div>
+
+          {/* Paste mode panel */}
+          {inputMode === 'paste' && (
+            <div className="mb-3 space-y-2">
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                placeholder="Paste a chat log, meeting notes, article, code snippet..."
+                rows={6}
+                className="w-full bg-[var(--bg-card)] border border-[var(--border-medium)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/60 resize-none font-mono leading-relaxed"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">
+                  {pasteText.length} chars
+                  {pasteSuccess && <span className="ml-2 text-emerald-400">✓ Ingested</span>}
+                </span>
+                <button
+                  onClick={handlePasteIngest}
+                  disabled={!pasteText.trim() || isPasting}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium disabled:opacity-40 transition-opacity"
+                >
+                  {isPasting ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                  {isPasting ? 'Ingesting...' : 'Ingest'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {isRecording && (
             <div className="flex items-center gap-2 mb-2 px-1">
               <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />

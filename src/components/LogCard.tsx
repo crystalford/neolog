@@ -1,15 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { formatDistanceToNow } from 'date-fns'
-import { Trash2, Sparkles, Video, Mic, FileText, ChevronRight, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
-import { SessionDetail } from './SessionDetail'
-import type { VideoUpload } from '@/types/database'
+import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
+import { Video, Mic, FileText, Loader2, Trash2, ExternalLink, Sparkles } from 'lucide-react'
 
-// ──────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export type LogEntry = {
   id: string
   entry_type: string
@@ -25,399 +22,177 @@ export type LogEntry = {
   meta?: Record<string, any>
 }
 
-// ──────────────────────────────────────────────────────────────
-// Software chip config
-// ──────────────────────────────────────────────────────────────
-const TOOL_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  claude:       { label: 'Claude',       color: '#C97A3A', icon: '◆' },
-  'claude-sonnet': { label: 'Claude Sonnet', color: '#C97A3A', icon: '◆' },
-  gpt:          { label: 'GPT-4o',       color: '#10A37F', icon: '◎' },
-  'gpt-4o':     { label: 'GPT-4o',       color: '#10A37F', icon: '◎' },
-  antigravity:  { label: 'Antigravity',  color: '#7C6AF5', icon: '◇' },
-  cursor:       { label: 'Cursor',       color: '#3B82F6', icon: '▷' },
-  gemini:       { label: 'Gemini',       color: '#4285F4', icon: '✦' },
-  copilot:      { label: 'Copilot',      color: '#6366F1', icon: '⬡' },
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function reltime(dateStr: string) {
+  const d = new Date(dateStr)
+  if (isToday(d)) return format(d, 'h:mm a')
+  if (isYesterday(d)) return 'Yesterday'
+  return format(d, 'MMM d')
 }
 
-const ENTRY_EMOJI: Record<string, string> = {
-  work:         '🧠',
-  food:         '🍽️',
-  health:       '💪',
-  finance:      '💰',
-  asset_update: '🔧',
-  social:       '👥',
-  learn:        '📚',
-  build:        '⚡',
-  session:      '🎬',
-  capture:      '📝',
+function fulltime(dateStr: string) {
+  return format(new Date(dateStr), 'MMM d, yyyy · h:mm a')
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  work:         '#3B82F6', // Blue
-  food:         '#F59E0B', // Amber
-  health:       '#EF4444', // Rose
-  finance:      '#10B981', // Emerald
-  asset_update: '#7C6AF5', // Violet
-  social:       '#EC4899', // Pink
-  learn:        '#8B5CF6', // Purple
-  build:        '#06B6D4', // Cyan
-  session:      '#F43F5E', // Rose
-  capture:      '#A855F7', // Purple
+const TYPE_ICON: Record<string, typeof Video> = {
+  session: Video,
+  capture: Mic,
 }
 
-// ──────────────────────────────────────────────────────────────
-// Sub-components
-// ──────────────────────────────────────────────────────────────
-function SoftwareChip({ tag }: { tag: string }) {
-  const key = tag.toLowerCase().replace(/\s+/g, '-')
-  const config = TOOL_CONFIG[key] || { label: tag, color: '#6B7280', icon: '·' }
+const MOOD_COLORS: Record<string, string> = {
+  frustrated: 'bg-red-500/10 text-red-400 border-red-500/20',
+  anxious: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  excited: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  calm: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  motivated: 'bg-green-500/10 text-green-400 border-green-500/20',
+  scattered: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  focused: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+}
+
+function MoodChip({ mood }: { mood: string }) {
+  const words = mood.toLowerCase().split(/[,\s]+/).filter(Boolean).slice(0, 2)
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '4px',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      border: `1px solid ${config.color}40`,
-      background: `${config.color}10`,
-      color: config.color,
-      fontSize: '10px',
-      fontWeight: 600,
-      fontFamily: 'var(--font-mono)',
-      letterSpacing: '0.05em',
-      whiteSpace: 'nowrap',
-    }}>
-      <span>{config.icon}</span>
-      <span>{config.label}</span>
-    </span>
+    <>
+      {words.map(w => {
+        const cls = MOOD_COLORS[w] || 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] border-[var(--border-light)]'
+        return (
+          <span key={w} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${cls}`}>
+            {w}
+          </span>
+        )
+      })}
+    </>
   )
 }
 
-function EntryTypeBadge({ type }: { type: string }) {
-  const Icon = type === 'session' ? Video : type === 'capture' ? Mic : FileText
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '4px',
-      fontSize: '9px',
-      fontFamily: 'var(--font-mono)',
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase',
-      color: 'var(--text-tertiary)',
-      opacity: 0.6,
-    }}>
-      <Icon size={10} />
-      {type.replace('_', ' ')}
-    </span>
-  )
-}
+// ─── Main Card ───────────────────────────────────────────────────────────────
 
-// ──────────────────────────────────────────────────────────────
-// Main component
-// ──────────────────────────────────────────────────────────────
 interface LogCardProps {
   entry: LogEntry
   username?: string
   showPrivacyBadge?: boolean
+  isPublicView?: boolean
 }
 
-export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [fullUploadData, setFullUploadData] = useState<VideoUpload | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: LogCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const emoji = ENTRY_EMOJI[entry.entry_type] || '📌'
-  const loggedDate = new Date(entry.logged_at)
-  const timeStr = loggedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-  const dateStr = loggedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const thumbnail = entry.thumbnail_url || entry.asset?.image_url
+  const TypeIcon = TYPE_ICON[entry.entry_type] || FileText
+  const hasOpenDetail = !!entry.source_upload_id
 
-  const displayImage = entry.thumbnail_url || entry.asset?.image_url
-  const hasBody = entry.body && entry.body.trim().length > 0
-  const hasReflections = entry.meta?.reflections
+  // Link to full detail view in uploads (auto-expands that upload)
+  const detailHref = hasOpenDetail
+    ? `/dashboard/uploads?id=${entry.source_upload_id}`
+    : null
 
-  const content = (
-    <article style={{
-      position: 'relative',
-      padding: '1.25rem',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      cursor: entry.source_upload_id ? 'pointer' : 'default',
-      display: 'flex',
-      gap: '16px',
-      background: 'transparent',
-      borderLeft: `3px solid ${TYPE_COLORS[entry.entry_type] || 'transparent'}`,
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.background = 'rgba(124,106,245,0.03)'
-      e.currentTarget.style.transform = entry.source_upload_id ? 'translateX(4px)' : 'none'
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = 'transparent'
-      e.currentTarget.style.transform = 'none'
-    }}>
-      {/* Visual Indicator / Thumbnail */}
-      <div style={{ flexShrink: 0, width: '48px', height: '48px', position: 'relative' }}>
-        {displayImage ? (
-          <div style={{ width: '100%', height: '100%', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-light)', background: 'var(--bg-tertiary)' }}>
-            <img src={displayImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            {entry.entry_type === 'session' && (
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', border: '2px solid var(--bg-primary)' }}>
-                <Video size={10} />
-              </div>
-            )}
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm('Delete this log entry?')) return
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/log-entries/${entry.id}`, { method: 'DELETE' })
+      if (res.ok) window.location.reload()
+    } catch {}
+    finally { setIsDeleting(false) }
+  }
+
+  return (
+    <article className="group relative px-4 py-4 hover:bg-[var(--bg-secondary)]/40 transition-colors border-b border-[var(--border-light)] last:border-b-0">
+      <div className="flex gap-3">
+
+        {/* Type icon indicator */}
+        <div className="flex-shrink-0 mt-0.5">
+          <div className="w-8 h-8 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center">
+            <TypeIcon size={13} className="text-[var(--text-tertiary)]" />
           </div>
-        ) : (
-          <div style={{ width: '100%', height: '100%', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', position: 'relative' }}>
-            {emoji}
-            {entry.entry_type === 'session' && (
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', border: '2px solid var(--bg-primary)' }}>
-                <Video size={10} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Header: Title + Time */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
-          <h3 style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '13px',
-            fontWeight: 600,
-            lineHeight: 1.4,
-            color: 'var(--text-primary)',
-            margin: 0,
-          }}>
-            {entry.title}
-          </h3>
-          <time style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '10px',
-            color: 'var(--text-tertiary)',
-            opacity: 0.6,
-            whiteSpace: 'nowrap',
-            marginTop: '2px',
-          }}>
-            {dateStr} · {timeStr}
-          </time>
         </div>
 
-        {/* Intelligence Context (Energy, Mood) */}
-        {(entry.meta?.mood || entry.meta?.energy) && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-            {entry.meta.mood && (
-              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                {entry.meta.mood}
-              </span>
-            )}
-            {entry.meta.energy && (
-              <span style={{ fontSize: '10px', color: 'var(--accent)', background: 'var(--accent-soft)', padding: '1px 6px', borderRadius: '4px' }}>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+
+          {/* Header: title + timestamp */}
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
+              {entry.title}
+            </p>
+            <time
+              title={fulltime(entry.logged_at)}
+              className="flex-shrink-0 text-[11px] text-[var(--text-tertiary)] mt-0.5 font-mono"
+            >
+              {reltime(entry.logged_at)}
+            </time>
+          </div>
+
+          {/* Body summary — 2 lines max */}
+          {entry.body && (
+            <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed line-clamp-2 mb-2">
+              {entry.body.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').replace(/\nMood:.*$/m, '').trim()}
+            </p>
+          )}
+
+          {/* Thumbnail — 16:9, full-width below text */}
+          {thumbnail && (
+            <div className="mt-2 mb-3 rounded-xl overflow-hidden border border-[var(--border-light)] bg-[var(--bg-secondary)] aspect-video max-h-52">
+              <img
+                src={thumbnail}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Reflection snippet if interesting */}
+          {entry.meta?.reflections && (
+            <div className="mt-2 mb-3 px-3 py-2 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 text-[12px] text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+              <Sparkles size={10} className="inline mr-1.5 text-[var(--accent)] mb-0.5" />
+              {entry.meta.reflections}
+            </div>
+          )}
+
+          {/* Footer: chips + actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Mood chips */}
+            {entry.meta?.mood && <MoodChip mood={entry.meta.mood} />}
+            {entry.meta?.energy && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
                 {entry.meta.energy} energy
               </span>
             )}
-          </div>
-        )}
 
-        {/* Body Preview */}
-        {hasBody && !isExpanded && (
-          <p style={{
-            fontSize: '13px',
-            lineHeight: '1.6',
-            color: 'var(--text-secondary)',
-            margin: '6px 0 10px 0',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>
-            {entry.body}
-          </p>
-        )}
-
-        {/* Reflections Snapshot (if not expanded) */}
-        {hasReflections && !isExpanded && (
-          <div style={{ 
-            background: 'linear-gradient(135deg, var(--accent-soft) 0%, rgba(124,106,245,0.05) 100%)', 
-            padding: '12px 16px', 
-            borderRadius: '12px', 
-            border: '1px solid var(--accent-border)',
-            marginTop: '12px',
-            boxShadow: '0 4px 12px rgba(124,106,245,0.05)',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}>
-              <Sparkles size={40} className="text-[var(--accent)]" />
-            </div>
-            <p style={{ 
-              fontSize: '11px', 
-              color: 'var(--accent)', 
-              fontWeight: 700, 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              marginBottom: '6px',
-              fontFamily: 'var(--font-mono)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em'
-            }}>
-              <Sparkles size={12} /> Neolog's Perspective
-            </p>
-            <p style={{ 
-              fontSize: '13px', 
-              lineHeight: '1.6', 
-              color: 'var(--text-primary)',
-              margin: 0,
-              fontWeight: 450
-            }}>
-              {entry.meta?.reflections && entry.meta.reflections.length > 150 ? entry.meta.reflections.substring(0, 147) + '...' : entry.meta?.reflections}
-            </p>
-          </div>
-        )}
-
-
-        {/* Footer Meta */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <EntryTypeBadge type={entry.entry_type} />
-            {entry.software_tags?.map(tag => <SoftwareChip key={tag} tag={tag} />)}
-          </div>
-          
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Privacy badge */}
             {showPrivacyBadge && !entry.is_public && (
-              <span style={{ fontSize: '9px', color: '#F87171', fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.05em' }}>
-                PRIVATE
-              </span>
+              <span className="text-[9px] font-mono text-red-400/70 uppercase tracking-wider">private</span>
             )}
-            <button
-               disabled={isDeleting}
-               onClick={async (e) => {
-                 e.preventDefault()
-                 e.stopPropagation()
-                 if (!confirm('Delete this log entry?')) return
-                 setIsDeleting(true)
-                 try {
-                   const res = await fetch(`/api/log-entries/${entry.id}`, { method: 'DELETE' })
-                   if (res.ok) {
-                     window.location.reload() // Simple for now
-                   }
-                 } catch (err) {
-                   console.error('Delete error:', err)
-                 } finally {
-                   setIsDeleting(false)
-                 }
-               }}
-               style={{ 
-                 padding: '4px', 
-                 opacity: 0.3, 
-                 cursor: 'pointer', 
-                 color: 'var(--text-tertiary)',
-                 border: 'none',
-                 background: 'none',
-                 transition: 'opacity 0.2s'
-               }}
-               onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-               onMouseLeave={e => e.currentTarget.style.opacity = '0.3'}
-            >
-              {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} className="hover:text-red-400" />}
-            </button>
-            {(entry.source_upload_id || entry.meta) && (
-              <span 
-                onClick={async (e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  
-                  if (isExpanded) {
-                    setIsExpanded(false)
-                    return
-                  }
 
-                  setIsExpanded(true)
-                  if (!fullUploadData && entry.source_upload_id) {
-                    setIsLoading(true)
-                    try {
-                      const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
-                      if (res.ok) {
-                        const data = await res.json()
-                        setFullUploadData(data.upload)
-                      } else if (res.status === 404) {
-                        // Source deleted, but we have meta
-                        console.warn('Source upload not found, using meta from entry.')
-                      }
-                    } catch (err) {
-                      console.error('Failed to fetch upload details:', err)
-                    } finally {
-                      setIsLoading(false)
-                    }
-                  }
-                }}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '4px', 
-                  fontSize: '10px', 
-                  color: 'var(--accent)', 
-                  fontWeight: 700, 
-                  fontFamily: 'var(--font-mono)',
-                  cursor: 'pointer',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  background: 'var(--accent-soft)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-soft-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-soft)'}
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Delete (private view only) */}
+            {!isPublicView && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)] hover:text-red-400"
               >
-                {isExpanded ? (
-                  <>COLLAPSE <ChevronUp size={12} /></>
-                ) : (
-                  <>DETAILS <ChevronRight size={12} /></>
-                )}
-              </span>
+                {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              </button>
+            )}
+
+            {/* Open full detail */}
+            {detailHref && (
+              <Link
+                href={detailHref}
+                className="flex items-center gap-1 text-[11px] font-mono text-[var(--accent)] hover:text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity"
+              >
+                view <ExternalLink size={10} />
+              </Link>
             )}
           </div>
         </div>
-
-        {/* Expanded Content */}
-        {isExpanded && (
-          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '20px' }}>
-            {isLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
-              </div>
-            ) : (fullUploadData || entry.meta) ? (
-              <div>
-                {!fullUploadData && entry.source_upload_id && (
-                  <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-orange-400/10 border border-orange-400/20 text-[10px] text-orange-400 uppercase tracking-widest font-mono">
-                    <AlertCircle size={12} /> Source video file has been removed · Analysis Snapshot
-                  </div>
-                )}
-                <SessionDetail 
-                  upload={fullUploadData || ({ 
-                     id: entry.source_upload_id || entry.id,
-                     file_name: entry.title,
-                     recorded_at: entry.logged_at,
-                     analysis: entry.meta,
-                     mime_type: 'video/mp4',
-                     thumbnail_url: entry.thumbnail_url
-                  } as any)} 
-                />
-              </div>
-            ) : (
-              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', textAlign: 'center' }}>Failed to load details.</p>
-            )}
-          </div>
-        )}
       </div>
     </article>
-  )
-
-  return (
-    <div style={{ textDecoration: 'none', display: 'block', marginBottom: '8px' }}>
-      {content}
-    </div>
   )
 }
