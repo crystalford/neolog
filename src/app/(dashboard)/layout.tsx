@@ -10,7 +10,7 @@ import {
   PenLine, Command, Search, Upload, BarChart3,
   DollarSign, Share2, Sparkles, Video, Boxes,
   Clock, List, CalendarDays, Inbox, BookUser,
-  Film, Briefcase, ArrowUpRight, Trophy
+  Film, Briefcase, ArrowUpRight, Trophy, Zap
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -227,6 +227,7 @@ export default function DashboardLayout({
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
     { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
+    { href: '/dashboard/ingest',  icon: Zap,       label: 'Quick Ingest',  section: 'INGEST' },
     { href: '/dashboard/log',     icon: Inbox,     label: 'Daily Log',     section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
   ], [])

@@ -5,8 +5,16 @@ import { synthesizeSession } from '@/inngest/functions/synthesize-session'
 import { assembleClip } from '@/inngest/functions/assemble-clip'
 import { processChatSession } from '@/inngest/functions/process-chat'
 import { processCapture } from '@/inngest/functions/process-capture'
+import { processText } from '@/inngest/functions/process-text'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [processUpload, synthesizeSession, assembleClip, processChatSession, processCapture],
+  functions: [
+    processUpload, 
+    synthesizeSession, 
+    assembleClip, 
+    processChatSession, 
+    processCapture,
+    processText
+  ],
 })

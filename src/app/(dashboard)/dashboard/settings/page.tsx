@@ -54,6 +54,9 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [integrationKeys, setIntegrationKeys] = useState<{
@@ -627,6 +630,33 @@ export default function SettingsPage() {
       setError(err.message || 'Failed to delete account.')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleReset = async () => {
+    if (!profile) return
+    if (resetConfirmText !== 'RESET') return
+
+    setResetting(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/admin/reset', { method: 'POST' })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to wipe memory.')
+      }
+
+      setSuccess('All intelligence data has been wiped. Your system is fresh.')
+      setShowResetConfirm(false)
+      setResetConfirmText('')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Failed to wipe memory.')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -1348,49 +1378,50 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {!showDeleteConfirm ? (
-              <div className="flex items-center justify-between gap-6 p-6 rounded-2xl bg-black/20 border border-white/5">
+            {/* Memory Wipe */}
+            {!showResetConfirm ? (
+              <div className="flex items-center justify-between gap-6 p-6 rounded-2xl bg-black/20 border border-white/5 mt-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold">Delete Account</h3>
+                  <h3 className="text-sm font-semibold">Nuclear Reset (Wipe Memory)</h3>
                   <p className="text-xs text-[var(--text-tertiary)] leading-relaxed max-w-sm">
-                    This will permanently delete your profile, logs, and assets. This action is irreversible.
+                    This will wipe all log entries, entities, and video uploads. Your profile and settings will remain.
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="px-6 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/30 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/5 active:scale-95 whitespace-nowrap"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="px-6 py-2.5 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-xl shadow-amber-500/5 active:scale-95 whitespace-nowrap"
                 >
-                  Initiate Deletion
+                  Initiate Reset
                 </button>
               </div>
             ) : (
-              <div className="space-y-4 p-6 rounded-2xl bg-black/40 border border-red-500/20 animate-in fade-in slide-in-from-bottom-2">
-                <p className="text-xs font-medium text-red-500/80 uppercase tracking-widest flex items-center gap-2 mb-2">
-                  <Shield size={14} /> Critical Confirmation Required
+              <div className="space-y-4 p-6 rounded-2xl bg-black/40 border border-amber-500/20 animate-in fade-in slide-in-from-bottom-2 mt-4">
+                <p className="text-xs font-medium text-amber-500/80 uppercase tracking-widest flex items-center gap-2 mb-2">
+                  <AlertTriangle size={14} /> Critical Confirmation Required
                 </p>
                 <p className="text-sm">
-                  Please type your username <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/5">{profile?.username}</span> to confirm.
+                  Please type <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/5">RESET</span> to confirm total memory wipe.
                 </p>
                 <input
                   type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  className="input border-red-500/30 focus:border-red-500 text-red-500 font-mono"
-                  placeholder="Enter your username"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  className="input border-amber-500/30 focus:border-amber-500 text-amber-500 font-mono"
+                  placeholder="Type RESET"
                   autoFocus
                 />
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={handleDeleteAccount}
-                    disabled={deleteConfirmText !== profile?.username || deleting}
-                    className="flex-1 px-6 py-3 rounded-xl bg-red-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-red-500/20 active:scale-95"
+                    onClick={handleReset}
+                    disabled={resetConfirmText !== 'RESET' || resetting}
+                    className="flex-1 px-6 py-3 rounded-xl bg-amber-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-amber-500/20 active:scale-95"
                   >
-                    {deleting ? 'Processing...' : 'Permanently Delete Workspace'}
+                    {resetting ? 'Wiping Intelligence...' : 'Confirm System Reset'}
                   </button>
                   <button
                     onClick={() => {
-                      setShowDeleteConfirm(false)
-                      setDeleteConfirmText('')
+                      setShowResetConfirm(false)
+                      setResetConfirmText('')
                     }}
                     className="px-6 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-xs font-bold uppercase tracking-widest hover:bg-[var(--bg-tertiary)] transition-all"
                   >
@@ -1399,6 +1430,8 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* Delete Account */}
           </div>
         </section>
       </div>

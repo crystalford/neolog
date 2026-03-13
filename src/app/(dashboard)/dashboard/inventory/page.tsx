@@ -47,10 +47,11 @@ export default function InventoryPage() {
     loadAssets()
   }, [])
 
-  const filteredAssets = assets.filter(a => 
-    a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.category.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredAssets = assets.filter(a => {
+    const nameMatch = (a.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const catMatch = (a.category || '').toLowerCase().includes(searchQuery.toLowerCase())
+    return nameMatch || catMatch
+  })
 
   if (loading) return <div className="p-8 animate-pulse text-[var(--text-tertiary)] font-mono uppercase tracking-widest text-xs">Loading Inventory...</div>
 
@@ -93,8 +94,9 @@ export default function InventoryPage() {
       {filteredAssets.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredAssets.map(asset => {
-            const Icon = CATEGORY_ICONS[asset.category] || Boxes
-            const colorClass = CATEGORY_COLORS[asset.category] || CATEGORY_COLORS.other
+            const cat = asset.category || 'other'
+            const Icon = CATEGORY_ICONS[cat] || Boxes
+            const colorClass = CATEGORY_COLORS[cat] || CATEGORY_COLORS.other
             
             return (
               <div key={asset.id} className="group relative flex flex-col bg-[var(--bg-card)] border border-[var(--border-light)] rounded-2xl overflow-hidden hover:border-[var(--accent)] hover:shadow-xl transition-all duration-300">
@@ -108,7 +110,7 @@ export default function InventoryPage() {
                     </div>
                   )}
                   <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg border text-[9px] font-mono font-bold uppercase tracking-wider backdrop-blur-md ${colorClass}`}>
-                    {asset.category}
+                    {cat}
                   </div>
                 </div>
 
