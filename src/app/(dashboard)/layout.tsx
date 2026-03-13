@@ -10,7 +10,7 @@ import {
   PenLine, Command, Search, Upload, BarChart3,
   DollarSign, Share2, Sparkles, Video, Boxes,
   Clock, List, CalendarDays, Inbox, BookUser,
-  Film, Briefcase, ArrowUpRight
+  Film, Briefcase, ArrowUpRight, Trophy
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -226,6 +226,7 @@ export default function DashboardLayout({
 
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
+    { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
     { href: '/dashboard/log',     icon: Inbox,     label: 'Daily Log',     section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
   ], [])
@@ -237,15 +238,15 @@ export default function DashboardLayout({
     { href: '/dashboard/sessions',  icon: Film,        label: 'Clip Sessions', section: 'INTELLIGENCE' },
   ], [])
 
-  // PUBLISH section — output layer
-  const growNav = useMemo(() => [
-    { href: '/dashboard/queue',     icon: Share2,    label: 'Post Queue',    section: 'PUBLISH' },
-    { href: '/dashboard/portfolio', icon: Briefcase, label: 'Portfolio',     section: 'PUBLISH' },
-    { href: '/write',               icon: PenLine,   label: 'Write',         section: 'PUBLISH' },
+  // CHARACTER section — the RPG layer
+  const characterNav = useMemo(() => [
+    { href: '/dashboard/profile',   icon: UserIcon,  label: 'Character',     section: 'CHARACTER' },
+    { href: '/dashboard/inventory', icon: Boxes,     label: 'Inventory',     section: 'CHARACTER' },
+    { href: '/dashboard/portfolio', icon: Briefcase, label: 'Portfolio',     section: 'CHARACTER' },
   ], [])
 
   const commandItems = useMemo(() => {
-    const allNav = [...primaryNav, ...secondaryNav, ...growNav]
+    const allNav = [...primaryNav, ...secondaryNav, ...characterNav]
     const items = allNav.map((item) => ({
       label: item.label,
       href: item.href,
@@ -256,7 +257,7 @@ export default function DashboardLayout({
       { label: 'Upload Video', href: '/dashboard/uploads', description: 'Action' },
     )
     return items
-  }, [primaryNav, secondaryNav, growNav])
+  }, [primaryNav, secondaryNav, characterNav])
 
   if (loading) {
     return (
@@ -279,7 +280,7 @@ export default function DashboardLayout({
   }
 
   // Determine active label across all nav sections
-  const allNavItems = [...primaryNav, ...secondaryNav, ...growNav]
+  const allNavItems = [...primaryNav, ...secondaryNav, ...characterNav]
   const activeLabel =
     allNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
@@ -345,18 +346,18 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          {/* PUBLISH */}
+          {/* CHARACTER */}
           <div className="mt-4">
-            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--text-tertiary)] mb-1 font-semibold opacity-60">Publish</p>
+            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">Character</p>
             <div className="space-y-0.5">
-              {growNav.map((link) => {
+              {characterNav.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
                 const Icon = link.icon
                 return (
                   <Link key={link.href} href={link.href}
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                       isActive
-                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
+                        ? 'bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
                     }`}
                   >

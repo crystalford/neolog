@@ -5,14 +5,14 @@ import {
   Brain, Target, FileText, Scissors, Shield, Sparkles, Zap, 
   Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2, 
   TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
-  CalendarDays
+  CalendarDays, ChevronRight
 } from 'lucide-react'
 import type { VideoUpload } from '@/types/database'
 
 import { format } from 'date-fns'
 
 interface SessionDetailProps {
-  upload: VideoUpload
+  upload: Partial<VideoUpload> & { analysis: any }
 }
 
 export function SessionDetail({ upload }: SessionDetailProps) {
@@ -151,15 +151,15 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 )}
 
                 {a.ideas?.length > 0 && (
-                  <Section icon={Lightbulb} title="Ideas">
+                  <Section icon={Lightbulb} title="Ideas" variant="amber">
                     <div className="space-y-2.5">
                       {a.ideas.map((idea: any, i: number) => (
-                        <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)] group">
-                          <span className="text-[var(--accent)] mt-1 opacity-50 group-hover:opacity-100">•</span>
+                        <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)] group p-3 rounded-xl bg-amber-400/5 border border-amber-400/10 hover:border-amber-400/30 transition-colors shadow-sm">
+                          <Lightbulb size={14} className="text-amber-400 mt-1 flex-shrink-0" />
                           <div>
                             {typeof idea === 'object' ? idea.text : idea}
                             {typeof idea === 'object' && idea.type && (
-                              <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase tracking-wider">{idea.type}</span>
+                              <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-500 border border-amber-400/20 uppercase tracking-wider font-mono">{idea.type}</span>
                             )}
                           </div>
                         </div>
@@ -169,34 +169,35 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 )}
 
                 {a.questions?.length > 0 && (
-                  <Section icon={HelpCircle} title="Open Questions">
-                    <ul className="space-y-2">
+                  <Section icon={HelpCircle} title="Open Questions" variant="purple">
+                    <div className="space-y-3">
                       {a.questions.map((q: string, i: number) => (
-                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 italic">
+                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-4 rounded-xl bg-purple-400/5 border border-purple-400/10 shadow-sm italic">
                           <HelpCircle size={14} className="text-purple-400 mt-1 flex-shrink-0" />
                           {q}
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </Section>
                 )}
               </div>
 
               <div className="space-y-6">
                 {a.projects?.length > 0 && (
-                  <Section icon={FolderOpen} title="Projects">
+                  <Section icon={FolderOpen} title="Projects" variant="blue">
                     <div className="space-y-3">
                       {a.projects.map((p: any, i: number) => (
-                        <div key={i} className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-card)] shadow-sm">
+                        <div key={i} className="border border-blue-400/20 rounded-xl p-4 bg-blue-400/5 shadow-sm hover:border-blue-400/40 transition-colors">
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm font-semibold text-[var(--text-primary)]">{p.name}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">{p.status}</span>
+                            <span className="text-sm font-bold text-[var(--text-primary)]">{p.name}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-blue-400/10 text-blue-400 border border-blue-400/20">{p.status}</span>
                           </div>
                           {p.updates?.length > 0 && (
-                            <ul className="space-y-1.5 mt-2 border-t border-[var(--border-light)] pt-2">
+                            <ul className="space-y-2 mt-2 border-t border-blue-400/10 pt-2 text-[13px]">
                               {p.updates.map((u: string, j: number) => (
-                                <li key={j} className="text-xs text-[var(--text-secondary)] flex items-start gap-2">
-                                  <span className="mt-1 opacity-50">•</span> {u}
+                                <li key={j} className="text-[var(--text-secondary)] flex items-start gap-2">
+                                  <ChevronRight size={12} className="mt-1 text-blue-400/50 flex-shrink-0" /> 
+                                  <span>{u}</span>
                                 </li>
                               ))}
                             </ul>
@@ -208,28 +209,32 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 )}
 
                 {a.action_items?.length > 0 && (
-                  <Section icon={CheckCircle2} title="Action Items">
-                    <ul className="space-y-2">
+                  <Section icon={CheckCircle2} title="Action Items" variant="emerald">
+                    <div className="space-y-2">
                       {a.action_items.map((item: string, i: number) => (
-                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3">
-                          <CheckCircle2 size={14} className="text-green-400 mt-1 flex-shrink-0" />
+                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10 shadow-sm group">
+                          <CheckCircle2 size={14} className="text-emerald-400 mt-1 flex-shrink-0 group-hover:scale-110 transition-transform" />
                           {item}
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </Section>
                 )}
 
                 {a.decisions?.length > 0 && (
-                  <Section icon={TrendingUp} title="Decisions">
+                  <Section icon={TrendingUp} title="Decisions" variant="indigo">
                     <div className="space-y-3">
                       {a.decisions.map((d: any, i: number) => (
-                        <div key={i} className="text-sm">
-                          <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+                        <div key={i} className="p-4 rounded-xl bg-indigo-400/5 border border-indigo-400/10 shadow-sm">
+                          <div className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
                             {d.decision}
                           </div>
-                          {d.reasoning && <p className="text-xs text-[var(--text-tertiary)] mt-1 ml-3.5">Reasoning: {d.reasoning}</p>}
+                          {d.reasoning && (
+                            <div className="mt-2 pl-3.5 border-l border-indigo-400/20">
+                              <p className="text-xs text-[var(--text-tertiary)] italic leading-relaxed">{d.reasoning}</p>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -237,15 +242,15 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 )}
 
                 {a.blockers?.length > 0 && (
-                  <Section icon={AlertTriangle} title="Blockers">
-                    <ul className="space-y-2">
+                  <Section icon={AlertTriangle} title="Blockers" variant="rose">
+                    <div className="space-y-2">
                       {a.blockers.map((b: string, i: number) => (
-                        <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3">
-                          <AlertTriangle size={14} className="text-orange-400 mt-1 flex-shrink-0" />
+                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-3 rounded-xl bg-rose-400/5 border border-rose-400/10 shadow-sm">
+                          <AlertTriangle size={14} className="text-rose-400 mt-1 flex-shrink-0 animate-pulse" />
                           {b}
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </Section>
                 )}
               </div>
@@ -439,11 +444,21 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   )
 }
 
-function Section({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, children, variant = 'accent' }: { icon: any; title: string; children: React.ReactNode; variant?: string }) {
+  const colors: Record<string, string> = {
+    accent:   'text-[var(--accent)]',
+    blue:     'text-blue-400',
+    emerald:  'text-emerald-400',
+    purple:   'text-purple-400',
+    amber:    'text-amber-400',
+    rose:     'text-rose-400',
+    indigo:   'text-indigo-400',
+  }
+
   return (
     <div className="section-block">
-      <h4 className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-3 flex items-center gap-2 opacity-80">
-        <Icon size={11} className="text-[var(--accent)]" /> {title}
+      <h4 className={`text-[10px] font-mono uppercase tracking-widest mb-3 flex items-center gap-2 opacity-80 ${colors[variant] || colors.accent}`}>
+        <Icon size={11} /> {title}
       </h4>
       {children}
     </div>

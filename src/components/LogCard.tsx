@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { Sparkles, Video, Mic, FileText, ChevronRight, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { Trash2, Sparkles, Video, Mic, FileText, ChevronRight, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
 import { SessionDetail } from './SessionDetail'
 import type { VideoUpload } from '@/types/database'
 
@@ -50,6 +50,19 @@ const ENTRY_EMOJI: Record<string, string> = {
   build:        '⚡',
   session:      '🎬',
   capture:      '📝',
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  work:         '#3B82F6', // Blue
+  food:         '#F59E0B', // Amber
+  health:       '#EF4444', // Rose
+  finance:      '#10B981', // Emerald
+  asset_update: '#7C6AF5', // Violet
+  social:       '#EC4899', // Pink
+  learn:        '#8B5CF6', // Purple
+  build:        '#06B6D4', // Cyan
+  session:      '#F43F5E', // Rose
+  capture:      '#A855F7', // Purple
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -113,6 +126,8 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [fullUploadData, setFullUploadData] = useState<VideoUpload | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const emoji = ENTRY_EMOJI[entry.entry_type] || '📌'
   const loggedDate = new Date(entry.logged_at)
@@ -132,6 +147,7 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
       display: 'flex',
       gap: '16px',
       background: 'transparent',
+      borderLeft: `3px solid ${TYPE_COLORS[entry.entry_type] || 'transparent'}`,
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.background = 'rgba(124,106,245,0.03)'
@@ -153,8 +169,13 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
             )}
           </div>
         ) : (
-          <div style={{ width: '100%', height: '100%', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+          <div style={{ width: '100%', height: '100%', borderRadius: '10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', position: 'relative' }}>
             {emoji}
+            {entry.entry_type === 'session' && (
+                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--accent)', color: 'white', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', border: '2px solid var(--bg-primary)' }}>
+                <Video size={10} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -219,31 +240,38 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
         {/* Reflections Snapshot (if not expanded) */}
         {hasReflections && !isExpanded && (
           <div style={{ 
-            background: 'var(--accent-soft)', 
-            padding: '10px 14px', 
-            borderRadius: '10px', 
+            background: 'linear-gradient(135deg, var(--accent-soft) 0%, rgba(124,106,245,0.05) 100%)', 
+            padding: '12px 16px', 
+            borderRadius: '12px', 
             border: '1px solid var(--accent-border)',
-            marginTop: '8px'
+            marginTop: '12px',
+            boxShadow: '0 4px 12px rgba(124,106,245,0.05)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}>
+              <Sparkles size={40} className="text-[var(--accent)]" />
+            </div>
             <p style={{ 
-              fontSize: '12px', 
+              fontSize: '11px', 
               color: 'var(--accent)', 
-              fontWeight: 600, 
+              fontWeight: 700, 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px', 
-              marginBottom: '4px',
+              marginBottom: '6px',
               fontFamily: 'var(--font-mono)',
               textTransform: 'uppercase',
-              letterSpacing: '0.05em'
+              letterSpacing: '0.1em'
             }}>
-              <Sparkles size={12} /> Neolog's Response
+              <Sparkles size={12} /> Neolog's Perspective
             </p>
             <p style={{ 
               fontSize: '13px', 
-              lineHeight: '1.5', 
+              lineHeight: '1.6', 
               color: 'var(--text-primary)',
-              margin: 0
+              margin: 0,
+              fontWeight: 450
             }}>
               {entry.meta?.reflections && entry.meta.reflections.length > 150 ? entry.meta.reflections.substring(0, 147) + '...' : entry.meta?.reflections}
             </p>
@@ -264,7 +292,39 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
                 PRIVATE
               </span>
             )}
-            {entry.source_upload_id && (
+            <button
+               disabled={isDeleting}
+               onClick={async (e) => {
+                 e.preventDefault()
+                 e.stopPropagation()
+                 if (!confirm('Delete this log entry?')) return
+                 setIsDeleting(true)
+                 try {
+                   const res = await fetch(`/api/log-entries/${entry.id}`, { method: 'DELETE' })
+                   if (res.ok) {
+                     window.location.reload() // Simple for now
+                   }
+                 } catch (err) {
+                   console.error('Delete error:', err)
+                 } finally {
+                   setIsDeleting(false)
+                 }
+               }}
+               style={{ 
+                 padding: '4px', 
+                 opacity: 0.3, 
+                 cursor: 'pointer', 
+                 color: 'var(--text-tertiary)',
+                 border: 'none',
+                 background: 'none',
+                 transition: 'opacity 0.2s'
+               }}
+               onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+               onMouseLeave={e => e.currentTarget.style.opacity = '0.3'}
+            >
+              {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} className="hover:text-red-400" />}
+            </button>
+            {(entry.source_upload_id || entry.meta) && (
               <span 
                 onClick={async (e) => {
                   e.preventDefault()
@@ -276,13 +336,16 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
                   }
 
                   setIsExpanded(true)
-                  if (!fullUploadData) {
+                  if (!fullUploadData && entry.source_upload_id) {
                     setIsLoading(true)
                     try {
                       const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
                       if (res.ok) {
                         const data = await res.json()
                         setFullUploadData(data.upload)
+                      } else if (res.status === 404) {
+                        // Source deleted, but we have meta
+                        console.warn('Source upload not found, using meta from entry.')
                       }
                     } catch (err) {
                       console.error('Failed to fetch upload details:', err)
@@ -325,8 +388,24 @@ export function LogCard({ entry, username, showPrivacyBadge }: LogCardProps) {
               <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
                 <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
               </div>
-            ) : fullUploadData ? (
-              <SessionDetail upload={fullUploadData} />
+            ) : (fullUploadData || entry.meta) ? (
+              <div>
+                {!fullUploadData && entry.source_upload_id && (
+                  <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-orange-400/10 border border-orange-400/20 text-[10px] text-orange-400 uppercase tracking-widest font-mono">
+                    <AlertCircle size={12} /> Source video file has been removed · Analysis Snapshot
+                  </div>
+                )}
+                <SessionDetail 
+                  upload={fullUploadData || ({ 
+                     id: entry.source_upload_id || entry.id,
+                     file_name: entry.title,
+                     recorded_at: entry.logged_at,
+                     analysis: entry.meta,
+                     mime_type: 'video/mp4',
+                     thumbnail_url: entry.thumbnail_url
+                  } as any)} 
+                />
+              </div>
             ) : (
               <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', textAlign: 'center' }}>Failed to load details.</p>
             )}

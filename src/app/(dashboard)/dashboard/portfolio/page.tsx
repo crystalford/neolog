@@ -80,37 +80,40 @@ export default async function PortfolioPage() {
 
       {/* Projects */}
       <section>
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-4">Projects</h2>
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-6 flex items-center gap-2">
+           <Briefcase size={16} className="text-blue-400" /> Projects & Creations
+        </h2>
         {!projectEntities || projectEntities.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-[var(--border-light)] rounded-xl text-[var(--text-tertiary)]">
-            <Briefcase size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium mb-1">No projects detected yet</p>
-            <p className="text-sm">Projects are extracted automatically from your video logs.</p>
+          <div className="text-center py-12 border border-dashed border-[var(--border-light)] rounded-2xl bg-[var(--bg-secondary)]/30 text-[var(--text-tertiary)]">
+            <Briefcase size={32} className="mx-auto mb-3 opacity-20" />
+            <p className="font-medium mb-1">No artifacts detected in your graph</p>
+            <p className="text-sm">Your creations and projects will appear here as you log them.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {projectEntities.map((entity) => (
-              <div key={entity.id} className="group p-5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-[var(--text-primary)]">{entity.name}</h3>
-                      <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-1">
-                        <Clock size={11} />
-                        {entity.mention_count} mentions
-                      </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {projectEntities.map((entity, i) => (
+              <div key={entity.id} className="group p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-light)] hover:border-blue-400/30 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
+                <div className={`absolute top-0 left-0 w-1 h-full bg-blue-400 opacity-20 group-hover:opacity-100 transition-opacity`} />
+                <div className="flex flex-col h-full">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <h3 className="font-bold text-[var(--text-primary)] group-hover:text-blue-400 transition-colors">{entity.name}</h3>
+                    <div className="px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-wider bg-blue-400/10 text-blue-400 border border-blue-400/20">
+                      Project
                     </div>
-                    {entity.summary && (
-                      <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{entity.summary}</p>
-                    )}
-                    {entity.first_seen_at && (
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                        First mentioned: {new Date(entity.first_seen_at).toLocaleDateString()}
-                        {entity.last_seen_at && ` · Last: ${new Date(entity.last_seen_at).toLocaleDateString()}`}
-                      </p>
-                    )}
                   </div>
-                  <ChevronRight size={16} className="text-[var(--text-tertiary)] flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  {entity.summary && (
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2 mb-4">
+                      {entity.summary}
+                    </p>
+                  )}
+
+                  <div className="mt-auto pt-4 border-t border-[var(--border-light)] flex items-center justify-between">
+                    <span className="text-[10px] text-[var(--text-tertiary)] flex items-center gap-1 font-mono">
+                      <Clock size={11} /> {entity.mention_count} Mentions
+                    </span>
+                    <ChevronRight size={14} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
+                  </div>
                 </div>
               </div>
             ))}

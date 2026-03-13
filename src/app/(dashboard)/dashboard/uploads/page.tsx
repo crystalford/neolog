@@ -40,6 +40,10 @@ export default function UploadsPage() {
   const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [dragActive, setDragActive] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'date' | 'size' | 'name'>('date')
   const activeUploadsRef = useRef<ActiveUpload[]>([])
   activeUploadsRef.current = activeUploads
 
@@ -425,51 +429,129 @@ export default function UploadsPage() {
 
   const hasActiveUploads = activeUploads.length > 0
 
+  const filteredUploads = uploads
+    .filter(u => {
+      if (filterType === 'video') return u.mime_type.startsWith('video/')
+      if (filterType === 'audio') return u.mime_type.startsWith('audio/')
+      return true
+    })
+    .filter(u => u.file_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'date') return new Date(b.recorded_at || b.created_at).getTime() - new Date(a.recorded_at || a.created_at).getTime()
+      if (sortBy === 'size') return b.file_size_bytes - a.file_size_bytes
+      return a.file_name.localeCompare(b.file_name)
+    })
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+    <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-            MANAGE MEDIA
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--accent)] mb-3">
+             Storage & Assets
           </p>
-          <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            Uploads
+          <h1 className="text-3xl font-light tracking-tight text-[var(--text-primary)] mb-2">
+            Media Database
           </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Upload raw video or audio recordings. Neolog transcribes, analyzes, and extracts ideas, projects, and content.
+          <p className="text-[14px] text-[var(--text-secondary)] max-w-lg leading-relaxed">
+            A comprehensive record of all raw intelligence ingested. Videos, voice notes, and captures are processed into actionable insights.
           </p>
         </div>
-        <a
-          href="/dashboard/sessions"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-medium)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-heavy)] transition-colors flex-shrink-0"
-        >
-          <Layers size={15} />
-          Sessions
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href="/dashboard/sessions"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-all shadow-sm"
+          >
+            <Layers size={14} />
+            <span>Manage Sessions</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Control Bar */}
+      <div className="flex flex-col md:flex-row gap-4 mb-8 bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border-light)] shadow-sm">
+        <div className="flex-1 flex gap-2">
+          <div className="relative flex-1">
+             <input 
+               type="text" 
+               placeholder="Search files..."
+               value={searchQuery}
+               onChange={e => setSearchQuery(e.target.value)}
+               className="w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+             />
+             <Layers size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          </div>
+          <select 
+            value={sortBy} 
+            onChange={e => setSortBy(e.target.value as any)}
+            className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+          >
+            <option value="date">Sort: Date</option>
+            <option value="size">Sort: Size</option>
+            <option value="name">Sort: Name</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)]">
+           <button 
+             onClick={() => setFilterType('all')}
+             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'all' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+           >
+             All
+           </button>
+           <button 
+             onClick={() => setFilterType('video')}
+             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'video' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+           >
+             Video
+           </button>
+           <button 
+             onClick={() => setFilterType('audio')}
+             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'audio' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+           >
+             Audio
+           </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)]">
+           <button 
+             onClick={() => setViewMode('grid')}
+             className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)]'}`}
+           >
+             <Layers size={14} />
+           </button>
+           <button 
+             onClick={() => setViewMode('list')}
+             className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)]'}`}
+           >
+             <X size={14} className="rotate-45" />
+           </button>
+        </div>
       </div>
 
       {/* Upload Zone */}
       <div
-        className={`relative border-2 border-dashed rounded-xl p-10 text-center transition-all mb-6 ${
+        className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all mb-10 ${
           dragActive
-            ? 'border-[var(--accent)] bg-[var(--accent)]/5'
-            : 'border-[var(--border-medium)] hover:border-[var(--border-heavy)] bg-[var(--bg-card)]'
+            ? 'border-[var(--accent)] bg-[var(--accent)]/5 shadow-inner'
+            : 'border-[var(--border-light)] hover:border-[var(--accent)]/50 bg-[var(--bg-card)]'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <span className="text-4xl mx-auto mb-3 opacity-70 block text-center">📤</span>
-        <p className="text-[var(--text-primary)] font-medium mb-1">
-          Drop video or audio files here
+        <div className="w-16 h-16 bg-[var(--accent)]/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[var(--accent)]/10">
+          <Upload size={32} className="text-[var(--accent)]" />
+        </div>
+        <p className="text-[var(--text-primary)] text-lg font-light tracking-tight mb-1">
+          Drop files to ingest
         </p>
-        <p className="text-sm text-[var(--text-tertiary)] mb-4">
-          MP4, MOV, WebM, AVI, MP3, M4A, WAV — Max 50MB (Standard), uploads resume if interrupted
+        <p className="text-sm text-[var(--text-tertiary)] mb-6 opacity-60">
+          MP4, MOV, MP3, M4A — Max 50MB (Standard)
         </p>
-        <label className="btn btn-primary btn-sm cursor-pointer inline-flex">
-          Browse Files
+        <label className="btn btn-primary px-8 rounded-xl cursor-pointer inline-flex shadow-lg shadow-[var(--accent)]/20">
+          Select Files
           <input
             type="file"
             className="hidden"
@@ -512,7 +594,6 @@ export default function UploadsPage() {
                 </button>
               </div>
 
-              {/* Progress bar */}
               <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-300 ${
@@ -543,72 +624,158 @@ export default function UploadsPage() {
         </div>
       )}
 
-      {/* Uploads List */}
+      {/* Main List/Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-[var(--text-tertiary)]" />
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
+          <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Synchronizing Database...</p>
         </div>
-      ) : uploads.length === 0 && !hasActiveUploads ? (
-        <div className="text-center py-16 text-[var(--text-tertiary)]">
-          <span className="text-4xl mx-auto mb-3 opacity-50 block text-center">🎬</span>
-          <p className="font-medium">No uploads yet</p>
-          <p className="text-sm mt-1">Upload a video to get started</p>
+      ) : filteredUploads.length === 0 && !hasActiveUploads ? (
+        <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-light)] border-dashed">
+          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
+             <Video size={32} className="text-[var(--text-tertiary)]" />
+          </div>
+          <p className="text-[var(--text-primary)] font-medium">Database is empty</p>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">No files match your current filters.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {uploads.map(upload => {
+        <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
+          {filteredUploads.map(upload => {
             const status = statusConfig[upload.status] || statusConfig.uploaded
             const StatusIcon = status.icon
             const isExpanded = expandedId === upload.id
             const isAnimating = upload.status === 'transcribing' || upload.status === 'analyzing'
             const isVideo = upload.mime_type.startsWith('video/')
 
+            if (viewMode === 'grid') {
+              return (
+                <div 
+                  key={upload.id}
+                  className={`group relative bg-[var(--bg-card)] border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-[var(--accent)]/5 ${isExpanded ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/20 shadow-md' : 'border-[var(--border-light)]'}`}
+                >
+                  <div className="aspect-video relative bg-[var(--bg-secondary)] overflow-hidden cursor-pointer" onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}>
+                    {(upload as any).thumbnail_url ? (
+                      <img src={(upload as any).thumbnail_url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-30 group-hover:opacity-50 transition-opacity">
+                         {isVideo ? <Video size={32} /> : <FileAudio size={32} />}
+                         <span className="text-[10px] font-mono tracking-widest uppercase">{isVideo ? 'Video' : 'Audio'}</span>
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white text-[10px] font-medium transition-all">
+                      <StatusIcon size={11} className={isAnimating ? 'animate-spin' : ''} />
+                      {status.label}
+                    </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-between text-white">
+                       <span className="text-[10px] font-mono shadow-sm">{formatBytes(upload.file_size_bytes)}</span>
+                       {upload.duration_seconds && (
+                         <span className="text-[10px] font-mono shadow-sm">{formatDuration(upload.duration_seconds)}</span>
+                       )}
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                     <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate mb-2 group-hover:text-[var(--accent)] transition-colors" title={upload.file_name}>
+                        {upload.file_name}
+                     </h3>
+                     
+                     <div className="flex items-center justify-between text-[11px] text-[var(--text-tertiary)] mb-4">
+                        <span className="flex items-center gap-1">
+                           <Clock size={10} />
+                           {new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}
+                        </span>
+                        {upload.tags && upload.tags.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-medium">
+                            {upload.tags[0]}
+                          </span>
+                        )}
+                     </div>
+
+                     <div className="flex items-center gap-2">
+                        {upload.status === 'processed' ? (
+                          <button 
+                            onClick={() => toggleExpand(upload.id)}
+                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
+                          >
+                             {isExpanded ? 'Collapse' : 'Details'}
+                          </button>
+                        ) : upload.status === 'error' ? (
+                           <button 
+                              onClick={() => handleReprocess(upload.id)}
+                              disabled={processingIds.has(upload.id)}
+                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase bg-red-400/10 text-red-500 hover:bg-red-400/20 transition-all border border-red-400/20"
+                           >
+                              {processingIds.has(upload.id) ? 'Retrying...' : 'Retry'}
+                           </button>
+                        ) : (
+                          <div className="flex-1 py-1.5 text-center text-[10px] font-mono text-[var(--text-tertiary)] italic">
+                            Processing...
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => handleDelete(upload.id)}
+                          className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-red-400/10 hover:text-red-400 transition-all border border-transparent hover:border-red-400/20"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                     </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/60 backdrop-blur-sm shadow-2xl" onClick={() => setExpandedId(null)}>
+                       <div className="bg-[var(--bg-primary)] w-full max-w-4xl max-h-full rounded-3xl overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-between p-6 border-b border-[var(--border-light)] bg-[var(--bg-secondary)]">
+                             <div>
+                               <h2 className="text-xl font-medium text-[var(--text-primary)]">{upload.file_name}</h2>
+                               <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest mt-1">Ingested Asset · {upload.id.substring(0, 8)}</p>
+                             </div>
+                             <button onClick={() => setExpandedId(null)} className="p-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-all">
+                               <X size={20} className="text-[var(--text-secondary)]" />
+                             </button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                             {!expandedData ? (
+                               <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                 <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
+                                 <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Analyzing Intelligence...</p>
+                               </div>
+                             ) : (
+                               <SessionDetail upload={expandedData} />
+                             )}
+                          </div>
+                       </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
             return (
               <div
                 key={upload.id}
-                className="border border-[var(--border-medium)] rounded-xl bg-[var(--bg-card)] overflow-hidden"
+                className={`border rounded-xl bg-[var(--bg-card)] overflow-hidden transition-all ${isExpanded ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/10' : 'border-[var(--border-light)]'}`}
               >
                 <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors"
+                  className="flex items-center gap-4 px-5 py-3 cursor-pointer hover:bg-[var(--bg-tertiary)]/50 transition-colors"
                   onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}
                 >
-                  <div className="flex-shrink-0">
-                    {isVideo
-                      ? <Video size={20} className="text-[var(--text-tertiary)]" />
-                      : <FileAudio size={20} className="text-[var(--text-tertiary)]" />}
+                  <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0 border border-[var(--border-light)]">
+                    {isVideo ? <Video size={18} className="text-[var(--text-tertiary)]" /> : <FileAudio size={18} className="text-[var(--text-tertiary)]" />}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                      {upload.file_name}
-                    </p>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-xs text-[var(--text-tertiary)]">{formatBytes(upload.file_size_bytes)}</span>
-                      {upload.duration_seconds && (
-                        <span className="text-xs text-[var(--text-tertiary)]">{formatDuration(upload.duration_seconds)}</span>
-                      )}
-                      <span className="text-xs text-[var(--text-tertiary)]">
-                        {new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}
-                      </span>
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{upload.file_name}</p>
+                    <div className="flex items-center gap-3 mt-0.5 opacity-60">
+                      <span className="text-[10px] font-mono">{formatBytes(upload.file_size_bytes)}</span>
+                      <span className="text-[10px] font-mono">{new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
 
-                  {upload.tags && upload.tags.length > 0 && (
-                    <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-                      {upload.tags.slice(0, 3).map(tag => (
-                        <span key={tag} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
-                          {tag}
-                        </span>
-                      ))}
-                      {upload.tags.length > 3 && (
-                        <span className="text-[10px] text-[var(--text-tertiary)]">+{upload.tags.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className={`flex items-center gap-1.5 flex-shrink-0 ${status.color}`}>
-                    <StatusIcon size={14} className={isAnimating ? 'animate-spin' : ''} />
-                    <span className="text-xs font-medium">{status.label}</span>
+                  <div className={`hidden sm:flex items-center gap-1.5 flex-shrink-0 ${status.color}`}>
+                    <StatusIcon size={12} className={isAnimating ? 'animate-spin' : ''} />
+                    <span className="text-[10px] font-mono uppercase tracking-[0.1em]">{status.label}</span>
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -626,48 +793,11 @@ export default function UploadsPage() {
                   </div>
                 </div>
 
-                {upload.status === 'error' && (
-                  <div className="px-5 pb-4 pt-0 flex items-center gap-3">
-                    <p className="text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2 flex-1">
-                      {upload.error_message || 'Processing failed'}
-                    </p>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
-                      disabled={processingIds.has(upload.id)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {processingIds.has(upload.id) ? 'Retrying...' : 'Retry'}
-                    </button>
-                  </div>
-                )}
-
-                {upload.status === 'uploaded' && (
-                  <div className="px-5 pb-4 pt-0 flex items-center justify-end">
-                    <button
-                      onClick={e => { e.stopPropagation(); handleReprocess(upload.id) }}
-                      disabled={processingIds.has(upload.id)}
-                      className="text-xs px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium"
-                    >
-                      {processingIds.has(upload.id) ? (
-                        <>
-                           <Loader2 size={14} className="animate-spin" />
-                           Queuing...
-                        </>
-                      ) : (
-                        <>
-                          <Zap size={14} />
-                          Process Now
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-
                 {isExpanded && (
-                  <div className="border-t border-[var(--border-light)] px-5 py-5">
+                  <div className="border-t border-[var(--border-light)] p-8 bg-[var(--bg-primary)]">
                     {!expandedData ? (
                       <div className="flex items-center justify-center py-6">
-                        <Loader2 size={18} className="animate-spin text-[var(--text-tertiary)]" />
+                        <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
                       </div>
                     ) : (
                       <SessionDetail upload={expandedData} />
