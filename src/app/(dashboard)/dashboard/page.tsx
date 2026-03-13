@@ -3,22 +3,22 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { 
-  Activity, Brain, Zap, Battery, Crosshair, 
-  Layers, Database, Compass, Radio, 
-  Map as MapIcon, Box, ChevronRight, Fingerprint
+import {
+  Activity, Brain, Zap, Crosshair,
+  Database, Radio, Box, ChevronRight, Fingerprint,
+  Mic, ImageIcon, Sparkles, AlertCircle, TrendingUp
 } from 'lucide-react'
 import { ManifestAvatar } from '@/components/dashboard/ManifestAvatar'
 
-// Data-driven HUD
-
 export default function LiveMindDashboard() {
   const [recentEntities, setRecentEntities] = useState<any[]>([])
-  const [recentTransmissions, setRecentTransmissions] = useState<any[]>([])
+  const [recentUploads, setRecentUploads] = useState<any[]>([])
   const [activeDirectives, setActiveDirectives] = useState<any[]>([])
-  const [cognitiveState, setCognitiveState] = useState({ focus: 50, energy: 50, stress: 20, clarity: 50 })
-  const [corpusStats, setCorpusStats] = useState({ voice: 0, face: 0 })
-  const [insights, setInsights] = useState<any[]>([])
+  const [openQuestions, setOpenQuestions] = useState<any[]>([])
+  const [corpusStats, setCorpusStats] = useState({ voice: 0, face: 0, voiceMinutes: 0, qualifiedFaces: 0 })
+  const [lastUploadContrib, setLastUploadContrib] = useState<{ voiceSecs: number; frames: number } | null>(null)
+  const [synthesis, setSynthesis] = useState<{ spine: string; synthesized_at: string; commitments_open: any[] } | null>(null)
+  const [uploadsSinceSynthesis, setUploadsSinceSynthesis] = useState(0)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -27,68 +27,66 @@ export default function LiveMindDashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Parallel fetch for speed
       const [
         { data: entities },
         { data: uploads },
         { data: goals },
-        { data: recentLogs },
-        { data: corpus }
+        { data: questions },
+        { data: corpus },
+        { data: synthData },
       ] = await Promise.all([
-        supabase.from('entities').select('*').eq('user_id', session.user.id).order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(4),
-        supabase.from('video_uploads').select('id, title, created_at, status').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(3),
-        supabase.from('entities').select('*').eq('user_id', session.user.id).eq('type', 'goal').order('mention_count', { ascending: false }).limit(3),
-        supabase.from('log_entries').select('meta').eq('user_id', session.user.id).order('logged_at', { ascending: false }).limit(10),
-        supabase.from('neural_corpus').select('type').eq('user_id', session.user.id)
+        supabase.from('entities').select('*').eq('user_id', session.user.id).order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(5),
+        supabase.from('video_uploads').select('id, file_name, created_at, status, analysis, duration_seconds').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('entities').select('*').eq('user_id', session.user.id).eq('type', 'goal').order('mention_count', { ascending: false }).limit(4),
+        supabase.from('entities').select('id, name').eq('user_id', session.user.id).eq('type', 'question').order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(4),
+        supabase.from('neural_corpus').select('type, fidelity_score, meta, source_upload_id, created_at').eq('user_id', session.user.id),
+        supabase.from('user_synthesis').select('spine, synthesized_at, commitments_open').eq('user_id', session.user.id).order('synthesized_at', { ascending: false }).limit(1).maybeSingle(),
       ])
 
       setRecentEntities(entities || [])
-      setRecentTransmissions(uploads || [])
-      
-      // Process Corpus Stats
-      const stats = { voice: 0, face: 0 }
-      corpus?.forEach(item => {
-        if (item.type === 'voice') stats.voice++
-        if (item.type === 'face') stats.face++
-      })
-      setCorpusStats(stats)
-
-      // Process Goals into Directives
+      setRecentUploads(uploads || [])
+      setOpenQuestions(questions || [])
       setActiveDirectives(goals?.map(g => ({
         id: g.id,
         title: g.name,
-        progress: Math.min(100, (g.mention_count || 0) * 5), // Heuristic progress
-        priority: g.metadata?.priority || 'NORMAL'
+        progress: Math.min(100, (g.mention_count || 0) * 5),
+        priority: g.metadata?.priority || 'NORMAL',
       })) || [])
 
-      // Process Cognitive State from last 10 logs
-      if (recentLogs && recentLogs.length > 0) {
-        let f = 0, e = 0, s = 0, c = 0, count = 0
-        const extractedInsights: any[] = []
+      if (corpus) {
+        const voiceEntries = corpus.filter((c: any) => c.type === 'voice')
+        const faceEntries = corpus.filter((c: any) => c.type === 'face')
+        const voiceMinutes = voiceEntries.reduce((acc: number, v: any) => {
+          const secs = v.meta?.duration_seconds
+          return acc + (typeof secs === 'number' ? secs / 60 : 5)
+        }, 0)
+        const qualifiedFaces = faceEntries.filter((f: any) => (f.fidelity_score ?? 0.7) >= 0.6).length
+        setCorpusStats({ voice: voiceEntries.length, face: faceEntries.length, voiceMinutes: Math.round(voiceMinutes), qualifiedFaces })
 
-        recentLogs.forEach(log => {
-          const m = log.meta as any
-          if (m?.analysis) {
-            f += m.analysis.focus_score || 50
-            e += m.analysis.energy_score || 50
-            s += m.analysis.stress_score || 20
-            c += m.analysis.clarity_score || 50
-            count++
+        // Last upload contribution — corpus entries from most recent upload
+        if (uploads && uploads.length > 0) {
+          const latestUploadId = uploads[0].id
+          const latestVoice = corpus.filter((c: any) => c.type === 'voice' && c.source_upload_id === latestUploadId)
+          const latestFaces = corpus.filter((c: any) => c.type === 'face' && c.source_upload_id === latestUploadId)
+          const voiceSecs = latestVoice.reduce((acc: number, v: any) => {
+            const s = v.meta?.duration_seconds
+            return acc + (typeof s === 'number' ? s : 0)
+          }, 0)
+          if (latestVoice.length > 0 || latestFaces.length > 0) {
+            setLastUploadContrib({ voiceSecs: Math.round(voiceSecs), frames: latestFaces.length })
           }
-          if (m?.insights) {
-            extractedInsights.push(...m.insights)
-          }
-        })
-
-        if (count > 0) {
-          setCognitiveState({ 
-            focus: Math.round(f / count), 
-            energy: Math.round(e / count), 
-            stress: Math.round(s / count), 
-            clarity: Math.round(c / count) 
-          })
         }
-        setInsights(extractedInsights.slice(0, 3).map((text, id) => ({ id, text, type: 'SIGNAL' })))
+      }
+
+      if (synthData) {
+        setSynthesis(synthData as any)
+        // Count uploads since last synthesis
+        if (synthData.synthesized_at && uploads) {
+          const sinceCount = uploads.filter(u => new Date(u.created_at) > new Date(synthData.synthesized_at)).length
+          setUploadsSinceSynthesis(sinceCount)
+        }
+      } else if (uploads) {
+        setUploadsSinceSynthesis(uploads.length)
       }
 
       setLoading(false)
@@ -106,13 +104,11 @@ export default function LiveMindDashboard() {
     )
   }
 
+  const voicePct = Math.min(100, Math.round((corpusStats.voiceMinutes / 180) * 100))
+  const facePct = Math.min(100, Math.round((corpusStats.qualifiedFaces / 25) * 100))
+
   return (
-    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 md:p-8 font-sans selection:bg-[var(--accent)] selection:text-white">
-      
-      {/* 
-        HUD AESTHETIC STYLING
-        Deus Ex / Cyberpunk vibes: Monospace accents, structural grid borders, glowing elements, dense telemetry.
-      */}
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 md:p-8 font-sans">
       <style dangerouslySetInnerHTML={{__html: `
         .hud-panel {
           background: rgba(10, 10, 12, 0.4);
@@ -142,266 +138,263 @@ export default function LiveMindDashboard() {
           position: absolute;
           top: 0; left: 0; right: 0; height: 2px;
           background: var(--accent);
-          opacity: 0.1;
-          animation: scan 4s linear infinite;
+          opacity: 0.07;
+          animation: scan 5s linear infinite;
         }
         @keyframes scan {
           0% { transform: translateY(0); }
-          100% { transform: translateY(1000px); }
-        }
-        .glitch-hover:hover {
-          text-shadow: 2px 0 var(--accent), -2px 0 #06B6D4;
+          100% { transform: translateY(1200px); }
         }
       `}} />
 
-      {/* Background Scanline */}
       <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
-         <div className="scan-line" />
+        <div className="scan-line" />
       </div>
 
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* TOP ROW: Identity & Global Status */}
-        <div className="flex flex-col md:flex-row gap-6 items-end justify-between border-b border-[var(--border-light)] pb-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row gap-4 items-end justify-between border-b border-[var(--border-light)] pb-4">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Activity size={16} className="text-[var(--accent)]" />
-              <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)]">System Diagnostics [Online]</h2>
+            <div className="flex items-center gap-2 mb-1">
+              <Activity size={14} className="text-[var(--accent)]" />
+              <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)]">Control Room</h2>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] glitch-hover">NEURAL TELEMETRY</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Neural Telemetry</h1>
           </div>
-          <div className="flex items-center gap-6 font-mono text-xs">
-             <div className="flex flex-col items-end">
-                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Uptime</span>
-                <span className="text-[var(--text-secondary)]">ACTIVE</span>
-             </div>
-             <div className="flex flex-col items-end">
-                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Sync Status</span>
-                <span className="text-emerald-400">99.9%</span>
-             </div>
-             <div className="flex flex-col items-end">
-                <span className="text-[var(--text-tertiary)] uppercase text-[9px]">Threat Level</span>
-                <span className="text-[var(--text-secondary)]">NOMINAL</span>
-             </div>
+          <div className="flex items-center gap-6 font-mono text-xs text-[var(--text-tertiary)]">
+            <div className="text-right">
+              <p className="uppercase text-[9px] mb-0.5">Corpus</p>
+              <p className="text-[var(--text-secondary)]">{corpusStats.voice}v / {corpusStats.face}f signals</p>
+            </div>
+            <div className="text-right">
+              <p className="uppercase text-[9px] mb-0.5">Entities</p>
+              <p className="text-[var(--text-secondary)]">{recentEntities.length > 0 ? 'active' : 'empty'}</p>
+            </div>
           </div>
         </div>
 
-        {/* MIDDLE ROW: The Core Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* LEFT COL: Neural Manifest & Vitals */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
-            <ManifestAvatar />
 
-            {/* Neural Manifest Thresholds */}
+          {/* ── LEFT: Manifest + Corpus ── */}
+          <div className="lg:col-span-4 flex flex-col gap-5">
+
+            {/* ManifestAvatar — links to full manifest page */}
+            <Link href="/dashboard/manifest" className="block hover:opacity-90 transition-opacity">
+              <ManifestAvatar />
+            </Link>
+
+            {/* Manifest Thresholds — real data */}
             <div className="hud-panel p-5 rounded-sm">
-               <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
+              <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Fingerprint size={14} className="text-emerald-400" /> Manifest Thresholds
+                  <Fingerprint size={13} className="text-emerald-400" /> Manifest Progress
                 </span>
+                <Link href="/dashboard/manifest" className="text-[9px] font-mono text-[var(--accent)] hover:underline">Details →</Link>
               </div>
               <div className="space-y-4">
-                {[
-                  { label: 'Voice Archive', val: Math.min(100, (corpusStats.voice * 10)), total: '180m', color: 'bg-emerald-500' },
-                  { label: 'Visual Samples', val: Math.min(100, (corpusStats.face * 2.5)), total: '40', color: 'bg-indigo-500' },
-                ].map(stat => (
-                  <div key={stat.label}>
-                    <div className="flex justify-between text-[10px] font-mono font-bold uppercase mb-1.5 text-[var(--text-tertiary)]">
-                      <span>{stat.label}</span>
-                      <span className="text-[var(--text-primary)]">{stat.val}%</span>
-                    </div>
-                    <div className="h-1 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                       <div className={`h-full ${stat.color} transition-all duration-1000`} style={{ width: `${stat.val}%` }} />
-                    </div>
+                <div>
+                  <div className="flex justify-between text-[10px] font-mono uppercase mb-1.5 text-[var(--text-tertiary)]">
+                    <span className="flex items-center gap-1"><Mic size={10} className="text-emerald-400" /> Voice</span>
+                    <span className="text-[var(--text-primary)]">{corpusStats.voiceMinutes}m / 180m</span>
                   </div>
-                ))}
-                <p className="text-[9px] font-mono text-[var(--text-tertiary)] leading-tight mt-2 opacity-50 uppercase italic">
-                  Signals are harvested automatically from every upload.
+                  <div className="h-1 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${voicePct}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] font-mono uppercase mb-1.5 text-[var(--text-tertiary)]">
+                    <span className="flex items-center gap-1"><ImageIcon size={10} className="text-indigo-400" /> Visual</span>
+                    <span className="text-[var(--text-primary)]">{corpusStats.qualifiedFaces} / 25 frames</span>
+                  </div>
+                  <div className="h-1 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${facePct}%` }} />
+                  </div>
+                </div>
+                {lastUploadContrib && (
+                  <div className="mt-1 p-2.5 rounded bg-[var(--bg-tertiary)]/40 border border-[var(--border-light)]">
+                    <p className="text-[9px] font-mono uppercase text-[var(--text-tertiary)] mb-1">Last upload contributed</p>
+                    <p className="text-[10px] font-mono text-[var(--text-secondary)]">
+                      {lastUploadContrib.voiceSecs > 0 ? `${lastUploadContrib.voiceSecs}s voice` : ''}
+                      {lastUploadContrib.voiceSecs > 0 && lastUploadContrib.frames > 0 ? ' · ' : ''}
+                      {lastUploadContrib.frames > 0 ? `${lastUploadContrib.frames} face frames` : ''}
+                    </p>
+                  </div>
+                )}
+                <p className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-50 uppercase italic leading-tight">
+                  Signals harvested automatically from every upload.
                 </p>
               </div>
             </div>
 
-            <div className="hud-panel p-5 rounded-sm">
-              <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Brain size={14} className="text-cyan-400" /> Cognitive State
-                </span>
-                <span className="animate-pulse w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-              </div>
-              
-              <div className="space-y-4">
-                {[
-                  { label: 'Focus', val: cognitiveState.focus, color: 'bg-indigo-500' },
-                  { label: 'Energy Payload', val: cognitiveState.energy, color: 'bg-amber-500' },
-                  { label: 'System Stress', val: cognitiveState.stress, color: 'bg-rose-500' },
-                  { label: 'Signal Clarity', val: cognitiveState.clarity, color: 'bg-cyan-500' },
-                ].map(stat => (
-                  <div key={stat.label}>
-                    <div className="flex justify-between text-[10px] font-mono font-bold uppercase mb-1.5 text-[var(--text-tertiary)]">
-                      <span>{stat.label}</span>
-                      <span className="text-[var(--text-primary)]">{stat.val}%</span>
+            {/* Open Questions from entity graph */}
+            {openQuestions.length > 0 && (
+              <div className="hud-panel p-5 rounded-sm">
+                <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-4 flex items-center justify-between">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
+                    <Brain size={13} className="text-purple-400" /> Open Questions
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {openQuestions.map(q => (
+                    <div key={q.id} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+                      <span className="text-purple-400 mt-0.5 flex-shrink-0">?</span>
+                      <span className="leading-relaxed">{q.name}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                       <div className={`h-full ${stat.color} transition-all duration-1000 ease-out`} style={{ width: `${stat.val}%` }} />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-
-            {/* Hub Links to the RPG Core */}
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/dashboard/profile" className="hud-panel p-4 flex flex-col items-center justify-center gap-2 hover:bg-[var(--accent-soft)] transition-colors group cursor-pointer">
-                 <Fingerprint size={20} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent)] transition-colors" />
-                 <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">Profile</span>
-              </Link>
-              <Link href="/dashboard/inventory" className="hud-panel p-4 flex flex-col items-center justify-center gap-2 hover:bg-[var(--accent-soft)] transition-colors group cursor-pointer">
-                 <Box size={20} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent)] transition-colors" />
-                 <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)]">Inventory</span>
-              </Link>
-            </div>
+            )}
           </div>
 
-          {/* CENTER COL: Neural Stream (Active Elements & Tasks) */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
-            
-            {/* Active Directives (Quests) */}
+          {/* ── RIGHT: Intelligence Pulse ── */}
+          <div className="lg:col-span-8 flex flex-col gap-5">
+
+            {/* Synthesis — spine + CTA */}
             <div className="hud-panel p-5 rounded-sm">
               <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Crosshair size={14} className="text-rose-400" /> Active Directives
+                  <Sparkles size={13} className="text-[var(--accent)]" /> Synthesis
                 </span>
-                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">[ {activeDirectives.length} Targets ]</span>
-              </div>
-              
-              <div className="space-y-3">
-                {activeDirectives.length > 0 ? (
-                  activeDirectives.map((directive, i) => (
-                    <div key={directive.id} className="relative group p-3 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] rounded-sm hover:border-[var(--accent)]/50 transition-colors">
-                       <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[var(--bg-primary)] border border-[var(--border-medium)] uppercase text-[var(--text-tertiary)] group-hover:text-[var(--accent)] transition-colors">
-                              FWD-{i+1}
-                            </span>
-                            <span className="text-sm font-semibold text-[var(--text-primary)]">{directive.title}</span>
-                          </div>
-                          <span className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm
-                            ${directive.priority === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 
-                              directive.priority === 'HIGH' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 
-                              'bg-[var(--border-medium)] text-[var(--text-tertiary)]'}`
-                          }>
-                            {directive.priority}
-                          </span>
-                       </div>
-                       <div className="flex items-center gap-3">
-                          <div className="flex-1 h-1 bg-[var(--bg-primary)] rounded-full overflow-hidden">
-                             <div className="h-full bg-[var(--text-secondary)] group-hover:bg-[var(--accent)] transition-all" style={{ width: `${directive.progress}%` }} />
-                          </div>
-                          <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{directive.progress}%</span>
-                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest border border-dashed border-[var(--border-light)]">
-                    No active directives found. Mark entities as 'goal' to track.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Neural Momentum (Recent Entities) */}
-            <div className="hud-panel p-5 rounded-sm flex-1">
-              <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                  <Radio size={14} className="text-[var(--accent)]" /> Neural Momentum
-                </span>
-                <Link href="/dashboard/entities" className="text-[10px] font-mono text-[var(--accent)] hover:underline flex items-center gap-1">
-                  View Core DB <ChevronRight size={10} />
+                <Link href="/dashboard/synthesis" className="text-[10px] font-mono text-[var(--accent)] hover:underline flex items-center gap-1">
+                  View All <ChevronRight size={10} />
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {recentEntities.length > 0 ? (
-                  recentEntities.map((entity, i) => (
-                    <div key={entity.id} className="p-4 border border-[var(--border-light)] bg-gradient-to-br from-transparent to-[var(--bg-tertiary)]/20 flex gap-4 hover:border-[var(--accent)]/40 transition-colors">
-                      <div className="w-8 h-8 rounded-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center flex-shrink-0">
-                        {entity.type === 'project' ? <Box size={14} className="text-blue-400" /> : 
-                         entity.type === 'idea' ? <Zap size={14} className="text-amber-400" /> : 
-                         <Layers size={14} className="text-emerald-400" />}
+              {synthesis?.spine ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-[var(--text-primary)] leading-relaxed italic border-l-2 border-[var(--accent)]/50 pl-3">
+                    "{synthesis.spine}"
+                  </p>
+                  {synthesis.commitments_open && synthesis.commitments_open.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-mono uppercase text-[var(--text-tertiary)] mb-2">Open Commitments</p>
+                      <div className="space-y-1.5">
+                        {synthesis.commitments_open.slice(0, 3).map((c: any, i: number) => (
+                          <div key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+                            <span className="text-amber-400 mt-0.5 flex-shrink-0">·</span>
+                            <span>{typeof c === 'string' ? c : c.commitment}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-1">
-                           <h3 className="text-xs font-bold truncate text-[var(--text-secondary)]">{entity.name}</h3>
-                           <span className="text-[9px] font-mono text-[var(--text-tertiary)]">LVL {Math.floor((entity.mention_count || 1) * 1.5)}</span>
-                        </div>
+                    </div>
+                  )}
+                  {uploadsSinceSynthesis >= 10 && (
+                    <Link href="/dashboard/synthesis" className="flex items-center gap-2 text-xs text-[var(--accent)] hover:underline">
+                      <AlertCircle size={12} /> {uploadsSinceSynthesis} new uploads since last synthesis — re-run?
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between py-2">
+                  <p className="text-xs text-[var(--text-tertiary)]">No synthesis yet. Run your first cross-corpus analysis.</p>
+                  <Link href="/dashboard/synthesis" className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent)] hover:underline">
+                    <Sparkles size={12} /> Run Synthesis
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Active Directives */}
+            <div className="hud-panel p-5 rounded-sm">
+              <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
+                  <Crosshair size={13} className="text-rose-400" /> Active Directives
+                </span>
+                <span className="text-[10px] font-mono text-[var(--text-tertiary)]">[ {activeDirectives.length} ]</span>
+              </div>
+              <div className="space-y-3">
+                {activeDirectives.length > 0 ? (
+                  activeDirectives.map((d, i) => (
+                    <div key={d.id} className="group p-3 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] hover:border-[var(--accent)]/50 transition-colors rounded-sm">
+                      <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-2">
-                           <div className="flex-1 h-0.5 bg-[var(--border-medium)] opacity-50 relative">
-                             <div className="absolute top-0 left-0 h-full bg-[var(--accent)]" style={{ width: `${Math.min((entity.mention_count || 1) * 10, 100)}%` }} />
-                           </div>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 bg-[var(--bg-primary)] border border-[var(--border-medium)] text-[var(--text-tertiary)]">FWD-{i+1}</span>
+                          <span className="text-xs font-semibold">{d.title}</span>
                         </div>
+                        <span className={`text-[9px] font-mono uppercase px-2 py-0.5 rounded-sm ${d.priority === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500' : d.priority === 'HIGH' ? 'bg-amber-500/10 text-amber-500' : 'bg-[var(--border-medium)] text-[var(--text-tertiary)]'}`}>{d.priority}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-1 bg-[var(--bg-primary)] rounded-full overflow-hidden">
+                          <div className="h-full bg-[var(--text-secondary)] group-hover:bg-[var(--accent)] transition-all" style={{ width: `${d.progress}%` }} />
+                        </div>
+                        <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{d.progress}%</span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-2 text-center py-6 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest border border-dashed border-[var(--border-light)]">
-                    Awaiting Signal Ingestion...
-                  </div>
+                  <p className="text-[10px] font-mono text-[var(--text-tertiary)] italic">No directives. Entities typed as 'goal' will appear here.</p>
                 )}
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Emergent Insights */}
+
+            {/* Neural Momentum + Recent Transmissions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
               <div className="hud-panel p-5 rounded-sm">
-                <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
+                <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-4 flex items-center justify-between">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                    <Brain size={14} className="text-purple-400" /> Emergent Insights
+                    <Radio size={13} className="text-[var(--accent)]" /> Neural Momentum
                   </span>
+                  <Link href="/dashboard/entities" className="text-[9px] font-mono text-[var(--accent)] hover:underline">Brain →</Link>
                 </div>
-                <div className="space-y-4">
-                  {insights.length > 0 ? (
-                    insights.map((insight) => (
-                      <div key={insight.id} className="text-sm text-[var(--text-secondary)] border-l-2 border-purple-500/50 pl-3 py-1">
-                        <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest block mb-1">[{insight.type}]</span>
-                        "{insight.text}"
+                <div className="space-y-3">
+                  {recentEntities.length > 0 ? (
+                    recentEntities.slice(0, 4).map(entity => (
+                      <div key={entity.id} className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-sm bg-[var(--bg-primary)] border border-[var(--border-medium)] flex items-center justify-center flex-shrink-0">
+                          {entity.type === 'project' ? <Box size={12} className="text-blue-400" /> :
+                           entity.type === 'idea' ? <Zap size={12} className="text-amber-400" /> :
+                           <TrendingUp size={12} className="text-emerald-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate text-[var(--text-secondary)]">{entity.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex-1 h-0.5 bg-[var(--border-medium)] overflow-hidden">
+                              <div className="h-full bg-[var(--accent)]" style={{ width: `${Math.min((entity.mention_count || 1) * 10, 100)}%` }} />
+                            </div>
+                            <span className="text-[9px] font-mono text-[var(--text-tertiary)]">{entity.mention_count}</span>
+                          </div>
+                        </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-[10px] font-mono text-[var(--text-tertiary)] italic">No insights extracted from recent signals.</div>
+                    <p className="text-[10px] font-mono text-[var(--text-tertiary)] italic">Awaiting signal ingestion...</p>
                   )}
                 </div>
               </div>
 
-              {/* Recent Transmissions */}
               <div className="hud-panel p-5 rounded-sm">
-                <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-5 flex items-center justify-between">
+                <div className="hud-header -mx-5 -mt-5 px-5 py-3 mb-4 flex items-center justify-between">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-widest flex items-center gap-2 text-[var(--text-secondary)]">
-                    <Database size={14} className="text-emerald-400" /> Recent Transmissions
+                    <Database size={13} className="text-emerald-400" /> Recent Transmissions
                   </span>
+                  <Link href="/dashboard/uploads" className="text-[9px] font-mono text-[var(--accent)] hover:underline">All →</Link>
                 </div>
-                <div className="space-y-3">
-                  {recentTransmissions.length > 0 ? (
-                    recentTransmissions.map((log) => (
-                      <Link key={log.id} href={`/dashboard/uploads/${log.id}`} className="flex items-center justify-between p-2 hover:bg-[var(--bg-tertiary)]/50 transition-colors border border-transparent hover:border-[var(--border-light)] rounded-sm group">
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">{log.title || 'Encrypted Transmission'}</span>
-                          <span className="text-[9px] font-mono text-[var(--text-tertiary)]">{new Date(log.created_at).toLocaleString()}</span>
+                <div className="space-y-2">
+                  {recentUploads.length > 0 ? (
+                    recentUploads.slice(0, 4).map(upload => (
+                      <Link key={upload.id} href={`/dashboard/uploads?id=${upload.id}`} className="flex items-center justify-between p-2 hover:bg-[var(--bg-tertiary)]/50 border border-transparent hover:border-[var(--border-light)] rounded-sm group transition-colors">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate group-hover:text-[var(--accent)] transition-colors">
+                            {upload.analysis?.summary?.slice(0, 45) || upload.file_name?.replace(/\.[^.]+$/, '') || 'Transmission'}
+                            {(upload.analysis?.summary?.length > 45) ? '…' : ''}
+                          </p>
+                          <p className="text-[9px] font-mono text-[var(--text-tertiary)]">{new Date(upload.created_at).toLocaleDateString()}</p>
                         </div>
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-sm uppercase ${log.status === 'processed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                          {log.status}
+                        <span className={`ml-2 flex-shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded-sm uppercase ${upload.status === 'processed' ? 'bg-emerald-500/10 text-emerald-500' : upload.status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-500'}`}>
+                          {upload.status}
                         </span>
                       </Link>
                     ))
                   ) : (
-                    <div className="text-[10px] font-mono text-[var(--text-tertiary)]">No recent logs.</div>
+                    <p className="text-[10px] font-mono text-[var(--text-tertiary)]">No uploads yet.</p>
                   )}
                 </div>
               </div>
             </div>
-
           </div>
         </div>
-
       </div>
     </div>
   )
