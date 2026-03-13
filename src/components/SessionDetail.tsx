@@ -71,25 +71,6 @@ export function SessionDetail({ upload }: SessionDetailProps) {
       <div className="tab-content transition-all duration-300">
         {activeTab === 'analysis' && a && (
           <div className="space-y-6">
-            {a.reflections && (
-              <div className="bg-[var(--accent)]/[0.03] border border-[var(--accent)]/10 rounded-xl p-5 mb-6 relative overflow-hidden backdrop-blur-sm">
-                <div className="absolute top-0 right-0 p-4 opacity-[0.05]">
-                  <Sparkles size={48} />
-                </div>
-                <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
-                  <Sparkles size={12} /> Neolog's Response
-                </h4>
-                <p style={{ 
-                  fontSize: '14px', 
-                  lineHeight: '1.7', 
-                  color: 'var(--text-primary)',
-                  fontWeight: 400
-                }}>
-                  {a.reflections}
-                </p>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
@@ -262,6 +243,25 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 )}
               </div>
             </div>
+
+            {a.reflections && (
+              <div className="bg-[var(--accent)]/[0.03] border border-[var(--accent)]/10 rounded-xl p-5 mt-8 relative overflow-hidden backdrop-blur-sm">
+                <div className="absolute top-0 right-0 p-4 opacity-[0.05]">
+                  <Sparkles size={48} />
+                </div>
+                <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
+                  <Sparkles size={12} /> Neolog's Response
+                </h4>
+                <p style={{ 
+                  fontSize: '14px', 
+                  lineHeight: '1.7', 
+                  color: 'var(--text-primary)',
+                  fontWeight: 400
+                }}>
+                  {a.reflections}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
