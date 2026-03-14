@@ -3,22 +3,11 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Trophy, Star, Zap, Activity, Brain, Target, Flame,
-  Edit3, Save, X, Globe, Sparkles, Briefcase, Loader2,
+  Brain, Edit3, Save, X, Sparkles,
   Plus, Search, Filter, ShieldCheck, Clock, ArrowUpRight,
-  Wrench, Car, Laptop, Home, Smartphone, Boxes, TrendingUp,
+  Car, Laptop, Home, Smartphone, Boxes,
   CheckCircle, ArrowRight, BookOpen, Download, Copy
 } from 'lucide-react'
-
-const BODY_MAP_COORDS: Record<string, { cx: string; cy: string; r: string }> = {
-  ankle: { cx: '55', cy: '85', r: '4' },
-  head: { cx: '50', cy: '15', r: '3' },
-  sleep: { cx: '50', cy: '15', r: '3' },
-  knee: { cx: '45', cy: '75', r: '3' },
-  shoulder: { cx: '42', cy: '30', r: '3' },
-  back: { cx: '50', cy: '45', r: '5' },
-  wrist: { cx: '38', cy: '45', r: '2' },
-}
 
 const CATEGORY_ICONS: Record<string, any> = {
   vehicle: Car, hardware: Laptop, property: Home, gear: Smartphone, other: Boxes, instrument: Wrench,
@@ -80,20 +69,14 @@ export default function CharacterPage() {
       }
 
       if (entitiesData) {
-        const skills = entitiesData.filter((e: any) => e.type === 'skill')
+        const topics = entitiesData.filter((e: any) => !['project', 'goal'].includes(e.type))
         const prjs = entitiesData.filter((e: any) => e.type === 'project')
-        const blockers = entitiesData.filter((e: any) => e.type === 'blocker' || e.type === 'habit')
         const totalMentions = entitiesData.reduce((acc: number, curr: any) => acc + (curr.mention_count || 0), 0)
-        const level = Math.floor(Math.sqrt(totalMentions / 10)) + 1
-        const xp = totalMentions * 10
-        const nextLevelXp = Math.pow(level, 2) * 100
         setStats({
-          level, xp, nextLevelXp, totalMentions,
-          skillCount: skills.length,
+          totalMentions,
+          topicCount: topics.length,
           projectCount: prjs.length,
-          skills: skills.sort((a: any, b: any) => b.mention_count - a.mention_count).slice(0, 5),
-          healthEntities: blockers,
-          activeProjects: prjs.sort((a: any, b: any) => b.mention_count - a.mention_count).slice(0, 3),
+          topics: topics.sort((a: any, b: any) => b.mention_count - a.mention_count),
         })
         setProjects(prjs.sort((a: any, b: any) => b.mention_count - a.mention_count).slice(0, 20))
       }
@@ -134,11 +117,6 @@ export default function CharacterPage() {
 
   if (loading) return <div className="p-8 text-[var(--text-tertiary)] font-mono text-xs uppercase tracking-widest animate-pulse">Loading character data...</div>
 
-  const hotspots = stats?.healthEntities?.map((e: any) => {
-    const key = Object.keys(BODY_MAP_COORDS).find(k => e.name.toLowerCase().includes(k))
-    return key ? { ...BODY_MAP_COORDS[key], id: e.id, name: e.name } : null
-  }).filter(Boolean)
-
   const filteredAssets = assets.filter(a =>
     (a.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (a.category || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -160,7 +138,7 @@ export default function CharacterPage() {
           <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
             {profile?.display_name || profile?.username || 'Intelligence Pilot'}
           </h1>
-          <p className="text-xs text-[var(--text-tertiary)] font-mono mt-1">@{profile?.username} · Level {stats?.level || 1}</p>
+          <p className="text-xs text-[var(--text-tertiary)] font-mono mt-1">@{profile?.username}</p>
         </div>
         <div className="flex items-center gap-2">
           {tabs.map(t => (
@@ -194,9 +172,6 @@ export default function CharacterPage() {
                       {profile?.username?.[0].toUpperCase()}
                     </div>
                   )}
-                </div>
-                <div className="absolute -bottom-2 -right-2 bg-[var(--accent)] text-white px-3 py-0.5 rounded-full text-xs font-bold">
-                  LVL {stats?.level || 1}
                 </div>
               </div>
 
@@ -235,25 +210,15 @@ export default function CharacterPage() {
                 ) : (
                   <>
                     {profile?.bio && <p className="text-sm text-[var(--text-secondary)] italic max-w-xl">"{profile.bio}"</p>}
-                    <div>
-                      <div className="flex justify-between text-[10px] font-mono text-[var(--text-tertiary)] mb-1">
-                        <span>XP to Level {(stats?.level || 1) + 1}</span>
-                        <span>{Math.round(((stats?.xp || 0) / (stats?.nextLevelXp || 100)) * 100)}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-[var(--accent)] to-purple-500 rounded-full transition-all duration-1000" style={{ width: `${((stats?.xp || 0) / (stats?.nextLevelXp || 100)) * 100}%` }} />
-                      </div>
-                    </div>
                   </>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 {[
-                  { val: stats?.totalMentions || 0, label: 'Signals' },
-                  { val: stats?.skillCount || 0, label: 'Skills' },
+                  { val: stats?.totalMentions || 0, label: 'Mentions' },
+                  { val: stats?.topicCount || 0, label: 'Topics' },
                   { val: stats?.projectCount || 0, label: 'Projects' },
-                  { val: stats?.level || 1, label: 'Level' },
                 ].map(s => (
                   <div key={s.label} className="bg-[var(--bg-tertiary)]/50 p-3 rounded-xl border border-[var(--border-light)]">
                     <p className="text-xl font-bold">{s.val}</p>
@@ -264,69 +229,38 @@ export default function CharacterPage() {
             </div>
           </div>
 
-          {/* Skills + Bio-map */}
+          {/* Topics + Personality */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] p-6">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-5 flex items-center gap-2"><Brain size={13} className="text-blue-400" /> Skills</h3>
-              <div className="space-y-4">
-                {stats?.skills?.map((skill: any) => (
-                  <div key={skill.id} className="space-y-1.5">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium">{skill.name}</span>
-                      <span className="text-[9px] font-mono text-[var(--accent)]">RANK {Math.floor(skill.mention_count / 5) + 1}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-400/70 rounded-full" style={{ width: `${Math.min(skill.mention_count * 2, 100)}%` }} />
-                    </div>
+              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-5 flex items-center gap-2"><Brain size={13} className="text-blue-400" /> Topics & Interests</h3>
+              <div className="space-y-2">
+                {stats?.topics?.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {stats.topics.slice(0, 15).map((topic: any) => (
+                      <div key={topic.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                        <span className="text-xs font-medium">{topic.name}</span>
+                        <span className="text-[9px] text-[var(--text-tertiary)]">{topic.mention_count}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {(!stats?.skills?.length) && <p className="text-xs text-[var(--text-tertiary)] italic">Skills accumulate as you upload sessions.</p>}
+                ) : (
+                  <p className="text-xs text-[var(--text-tertiary)] italic">Topics accumulate as you record and upload sessions.</p>
+                )}
               </div>
             </div>
 
             <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] p-6">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-5 flex items-center gap-2"><Activity size={13} className="text-rose-400" /> Bio-metric Map</h3>
-              <div className="flex gap-6 items-center">
-                <div className="relative w-32 h-32 flex-shrink-0">
-                  <svg viewBox="0 0 100 100" className="w-full h-full text-[var(--text-tertiary)] fill-current opacity-30">
-                    <path d="M50,10c3,0,5,2,5,5s-2,5-5,5s-5-2-5-5S47,10,50,10z M45,22h10c4,0,7,3,7,7v15h-4v25h-5v20h-6v-20h-5v-25h-4V29C38,25,41,22,45,22z" />
-                    {hotspots?.map((h: any) => (
-                      <circle key={h.id} cx={h.cx} cy={h.cy} r={h.r} className="fill-rose-500 animate-pulse" />
-                    ))}
-                  </svg>
-                </div>
-                <div className="flex-1 space-y-2">
-                  {stats?.healthEntities?.length > 0 ? stats.healthEntities.slice(0, 4).map((h: any) => (
-                    <div key={h.id} className="flex items-center gap-2 text-xs">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${h.type === 'blocker' ? 'bg-rose-500' : 'bg-blue-400'}`} />
-                      <span className="text-[var(--text-secondary)]">{h.name}</span>
-                    </div>
-                  )) : <p className="text-xs text-[var(--text-tertiary)] italic">No blockers detected.</p>}
+              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-5 flex items-center gap-2"><Sparkles size={13} className="text-purple-400" /> Personality & Patterns</h3>
+              <div className="space-y-3 text-sm">
+                <p className="text-[var(--text-secondary)] italic">Personality traits inferred from your patterns:</p>
+                <div className="space-y-2 text-xs text-[var(--text-tertiary)]">
+                  <p>• Your most discussed topics reveal what captures your attention</p>
+                  <p>• The frequency of mentions shows your focus areas and passions</p>
+                  <p>• Connect the dots across your recordings to understand your patterns</p>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Active Projects */}
-          {stats?.activeProjects?.length > 0 && (
-            <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] p-6">
-              <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-5 flex items-center gap-2"><Target size={13} className="text-amber-400" /> Active Directives</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {stats.activeProjects.map((p: any) => (
-                  <div key={p.id} className="p-4 rounded-xl bg-amber-400/5 border border-amber-400/10">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Flame size={14} className="text-amber-500" />
-                      <span className="text-xs font-bold text-amber-500 uppercase truncate">{p.name}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-400" style={{ width: `${(p.mention_count % 10) * 10}%` }} />
-                    </div>
-                    <p className="text-[9px] font-mono text-amber-500/60 mt-1.5">{p.mention_count} signals</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
