@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { LogCard, type LogEntry } from '@/components/LogCard'
 import { format, isToday, isYesterday, isSameDay } from 'date-fns'
-import { Plus, ExternalLink } from 'lucide-react'
+import { Plus, Video, Lightbulb, AlignLeft } from 'lucide-react'
 
 function formatDateHeader(date: Date): string {
   if (isToday(date)) return 'Today'
@@ -14,16 +14,23 @@ function formatDateHeader(date: Date): string {
   return format(date, 'EEEE, MMMM d · yyyy')
 }
 
+type View = 'all' | 'videos' | 'ideas'
+
+const VIEWS: { id: View; label: string; icon: typeof Video }[] = [
+  { id: 'all',    label: 'All',    icon: AlignLeft  },
+  { id: 'videos', label: 'Videos', icon: Video      },
+  { id: 'ideas',  label: 'Ideas',  icon: Lightbulb  },
+]
+
 export default function TimelinePage() {
-  const [entries, setEntries] = useState<LogEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [entries, setEntries]   = useState<LogEntry[]>([])
+  const [loading, setLoading]   = useState(true)
   const [username, setUsername] = useState<string | null>(null)
+  const [view, setView]         = useState<View>('all')
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    loadEntries()
-  }, [])
+  useEffect(() => { loadEntries() }, [])
 
   async function loadEntries() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -46,15 +53,22 @@ export default function TimelinePage() {
       `)
       .eq('user_id', session.user.id)
       .order('logged_at', { ascending: false })
-      .limit(200)
+      .limit(500)
 
     setEntries((data || []) as unknown as LogEntry[])
     setLoading(false)
   }
 
+  // Filter by view
+  const filtered = entries.filter(e => {
+    if (view === 'videos') return e.entry_type === 'session' || e.entry_type === 'video'
+    if (view === 'ideas')  return e.entry_type === 'capture' || e.entry_type === 'idea' || e.entry_type === 'note'
+    return true
+  })
+
   type DayGroup = { label: string; date: Date; entries: LogEntry[] }
   const dayGroups: DayGroup[] = []
-  for (const entry of entries) {
+  for (const entry of filtered) {
     const d = new Date(entry.logged_at)
     const last = dayGroups[dayGroups.length - 1]
     if (!last || !isSameDay(last.date, d)) {
@@ -64,28 +78,27 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8" style={{ fontFamily: 'var(--font-sans)' }}>
+    <div className="px-6 py-8 max-w-5xl mx-auto" style={{ fontFamily: 'var(--font-sans)' }}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-            ALL TIME · CHRONOLOGICAL
+            Chronological · All Time
           </p>
           <h1 style={{ fontSize: '26px', fontWeight: 300, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            The Log
+            Timeline
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            Your complete life record — auto-generated and manually added.
+            Everything captured — videos, notes, ideas — in order.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 mt-1">
           {username && (
             <Link
               href={`/${username}/log`}
               target="_blank"
-              className="btn btn-secondary btn-sm flex items-center gap-1"
+              className="btn btn-secondary btn-sm"
             >
-              <ExternalLink size={13} />
               Public
             </Link>
           )}
@@ -94,6 +107,27 @@ export default function TimelinePage() {
             New Entry
           </Link>
         </div>
+      </div>
+
+      {/* View tabs */}
+      <div className="flex items-center gap-1 mb-6 p-1 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl w-fit">
+        {VIEWS.map(v => {
+          const Icon = v.icon
+          return (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                view === v.id
+                  ? 'bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-light)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              <Icon size={13} />
+              {v.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Feed */}
@@ -107,17 +141,17 @@ export default function TimelinePage() {
         <div className="text-center py-24 opacity-40">
           <span className="text-5xl block mb-4">📋</span>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            The log is empty
+            {view === 'all' ? 'Nothing yet' : `No ${view} entries yet`}
           </p>
           <p className="text-xs mt-2 text-[var(--text-tertiary)]">
-            Upload a session or add a manual entry to begin.
+            Upload a video or add a manual entry to begin.
           </p>
           <div className="flex gap-3 items-center justify-center mt-6">
             <Link href="/dashboard/log/new" className="btn btn-primary btn-sm">
               <Plus size={13} /> New Entry
             </Link>
             <Link href="/dashboard/uploads" className="btn btn-secondary btn-sm">
-              Upload Session
+              Upload Video
             </Link>
           </div>
         </div>
@@ -125,21 +159,19 @@ export default function TimelinePage() {
         <div>
           {dayGroups.map((group) => (
             <div key={group.label} style={{ marginBottom: '2rem' }}>
-              {/* Day header - Fixed Sticky Glitch */}
+              {/* Day header */}
               <div
-                style={{ 
-                  position: 'sticky', 
-                  top: '0', 
-                  zIndex: 20, 
+                style={{
+                  position: 'sticky',
+                  top: '0',
+                  zIndex: 20,
                   background: 'var(--bg-primary)',
-                  padding: '16px 0',
+                  padding: '14px 0',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
                   borderBottom: '1px solid var(--border-light)',
-                  margin: '0 -16px 12px -16px',
-                  paddingLeft: '16px',
-                  paddingRight: '16px'
+                  marginBottom: '12px',
                 }}
               >
                 <span style={{
@@ -187,7 +219,7 @@ export default function TimelinePage() {
               color: 'var(--text-tertiary)',
               opacity: 0.4,
             }}>
-              End of log
+              End of timeline
             </p>
           </div>
         </div>

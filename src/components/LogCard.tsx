@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
-import { Video, Mic, FileText, Loader2, Trash2, ExternalLink, Sparkles } from 'lucide-react'
+import { format, isToday, isYesterday } from 'date-fns'
+import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -77,15 +77,11 @@ interface LogCardProps {
 
 export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: LogCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const thumbnail = entry.thumbnail_url || entry.asset?.image_url
   const TypeIcon = TYPE_ICON[entry.entry_type] || FileText
-  const hasOpenDetail = !!entry.source_upload_id
-
-  // Link to full detail view in uploads (auto-expands that upload)
-  const detailHref = hasOpenDetail
-    ? `/dashboard/uploads?id=${entry.source_upload_id}`
-    : null
+  const hasBody = !!entry.body && entry.body.trim().length > 0
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -100,7 +96,10 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
   }
 
   return (
-    <article className="group relative px-4 py-4 hover:bg-[var(--bg-secondary)]/40 transition-colors border-b border-[var(--border-light)] last:border-b-0">
+    <article
+      className={`group relative px-4 py-4 transition-colors border-b border-[var(--border-light)] last:border-b-0 ${hasBody ? 'cursor-pointer hover:bg-[var(--bg-secondary)]/40' : 'hover:bg-[var(--bg-secondary)]/20'}`}
+      onClick={() => hasBody && setExpanded(e => !e)}
+    >
       <div className="flex gap-3">
 
         {/* Type icon indicator */}
@@ -126,9 +125,9 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
             </time>
           </div>
 
-          {/* Body summary — 2 lines max */}
+          {/* Body — collapsed shows 2 lines, expanded shows full */}
           {entry.body && (
-            <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed line-clamp-2 mb-2">
+            <p className={`text-[13px] text-[var(--text-secondary)] leading-relaxed mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
               {entry.body.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').replace(/\nMood:.*$/m, '').trim()}
             </p>
           )}
@@ -144,9 +143,9 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
             </div>
           )}
 
-          {/* Reflection snippet if interesting */}
-          {entry.meta?.reflections && (
-            <div className="mt-2 mb-3 px-3 py-2 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 text-[12px] text-[var(--text-secondary)] leading-relaxed line-clamp-2">
+          {/* Reflection snippet — always show when expanded */}
+          {entry.meta?.reflections && expanded && (
+            <div className="mt-2 mb-3 px-3 py-2 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 text-[12px] text-[var(--text-secondary)] leading-relaxed">
               <Sparkles size={10} className="inline mr-1.5 text-[var(--accent)] mb-0.5" />
               {entry.meta.reflections}
             </div>
@@ -173,7 +172,7 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
             {/* Delete (private view only) */}
             {!isPublicView && (
               <button
-                onClick={handleDelete}
+                onClick={e => { e.stopPropagation(); handleDelete(e) }}
                 disabled={isDeleting}
                 className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)] hover:text-red-400"
               >
@@ -181,14 +180,14 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
               </button>
             )}
 
-            {/* Open full detail */}
-            {detailHref && (
-              <Link
-                href={detailHref}
-                className="flex items-center gap-1 text-[11px] font-mono text-[var(--accent)] hover:text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity"
+            {/* Expand toggle */}
+            {hasBody && (
+              <button
+                onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)]"
               >
-                view <ExternalLink size={10} />
-              </Link>
+                <ChevronDown size={13} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              </button>
             )}
           </div>
         </div>

@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Brain, Edit3, Save, X, Sparkles,
-  Plus, Search, Filter, ShieldCheck, Clock, ArrowUpRight,
-  Car, Laptop, Home, Smartphone, Boxes,
-  CheckCircle, ArrowRight, BookOpen, Download, Copy
+  Plus, Search, ShieldCheck, Clock, ArrowUpRight,
+  Car, Laptop, Home, Smartphone, Boxes, Wrench,
+  ArrowRight, BookOpen, Download, Briefcase, Loader2,
+  TrendingUp, Globe
 } from 'lucide-react'
 
 const CATEGORY_ICONS: Record<string, any> = {
@@ -136,7 +137,7 @@ export default function CharacterPage() {
         <div>
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1">Character Profile</p>
           <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-            {profile?.display_name || profile?.username || 'Intelligence Pilot'}
+            {profile?.display_name || profile?.username || 'Anonymous'}
           </h1>
           <p className="text-xs text-[var(--text-tertiary)] font-mono mt-1">@{profile?.username}</p>
         </div>
@@ -269,7 +270,7 @@ export default function CharacterPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Inventory Loadout</h2>
+              <h2 className="text-lg font-semibold">Assets</h2>
               <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Physical and digital assets — linked to your entity graph.</p>
             </div>
             <button className="btn btn-primary btn-sm flex items-center gap-2"><Plus size={14} /> Add Asset</button>
@@ -323,7 +324,7 @@ export default function CharacterPage() {
               <Boxes size={36} className="text-[var(--text-tertiary)] opacity-20 mb-4" />
               <h3 className="text-sm font-medium text-[var(--text-secondary)]">Inventory empty</h3>
               <p className="text-xs text-[var(--text-tertiary)] mt-1">Add assets to track your gear, vehicles, equipment.</p>
-              <button className="btn btn-primary btn-sm mt-5">Initialize Loadout</button>
+              <button className="btn btn-primary btn-sm mt-5">Add Asset</button>
             </div>
           )}
         </div>
