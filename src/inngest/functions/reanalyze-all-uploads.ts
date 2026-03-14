@@ -1,8 +1,6 @@
 import { inngest } from '@/inngest/client'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
 import { runAnalysis, upsertEntities, extractTags, generatePostSuggestions } from '@/lib/video-analysis'
-import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 
 /**
  * Bulk retroactive re-analysis of all processed uploads for a user.
