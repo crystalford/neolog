@@ -56,18 +56,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Also get counts by type for the filter tabs
-    const { data: typeCounts, error: rpcError } = await supabase
-      .rpc('get_entity_type_counts', { p_user_id: session.user.id })
+    // Get counts by type for the filter tabs (direct query, no RPC needed)
+    const { data: allTypes } = await supabase
+      .from('entities')
+      .select('type')
+      .eq('user_id', session.user.id)
 
-    if (rpcError) {
-      console.error('RPC error:', rpcError)
-      // We don't necessarily want to fail the whole request if counts fail
+    const typeCountMap: Record<string, number> = {}
+    for (const row of (allTypes || [])) {
+      typeCountMap[row.type] = (typeCountMap[row.type] || 0) + 1
     }
+    const typeCounts = Object.entries(typeCountMap).map(([type, count]) => ({ type, count }))
 
     return NextResponse.json({
       entities: data || [],
-      type_counts: typeCounts || [],
+      type_counts: typeCounts,
     })
   } catch (err: any) {
     console.error('List entities error:', err)

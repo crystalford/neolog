@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('video_uploads')
-      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url')
+      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at')
       .eq('user_id', session.user.id)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })

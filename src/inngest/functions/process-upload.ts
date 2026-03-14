@@ -635,12 +635,14 @@ export const processUpload = inngest.createFunction(
         richBody += `\n\n**Open Questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n')
       }
 
-      const { data: uploadData } = await admin.from('video_uploads').select('thumbnail_url').eq('id', video_upload_id).single()
-
       await admin.from('log_entries').insert({
         user_id,
         entry_type: 'session',
-        title: analysis.summary ? (analysis.summary.length > 80 ? analysis.summary.substring(0, 77) + '...' : analysis.summary) : `${activeContext.userName}'s Video Session`,
+        title: (() => {
+          const raw = (activeContext.upload as any).file_name || ''
+          const clean = raw.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim()
+          return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        })(),
         body: richBody,
         logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,

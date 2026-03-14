@@ -8,7 +8,6 @@ import {
   Database, Box, ChevronRight,
   Mic, ImageIcon, Sparkles, AlertCircle, TrendingUp
 } from 'lucide-react'
-import { ManifestAvatar } from '@/components/dashboard/ManifestAvatar'
 
 export default function LiveMindDashboard() {
   const [recentEntities, setRecentEntities] = useState<any[]>([])
@@ -19,6 +18,8 @@ export default function LiveMindDashboard() {
   const [lastUploadContrib, setLastUploadContrib] = useState<{ voiceSecs: number; frames: number } | null>(null)
   const [synthesis, setSynthesis] = useState<{ spine: string; synthesized_at: string; commitments_open: any[] } | null>(null)
   const [uploadsSinceSynthesis, setUploadsSinceSynthesis] = useState(0)
+  const [totalEntityCount, setTotalEntityCount] = useState(0)
+  const [totalUploadCount, setTotalUploadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -34,17 +35,23 @@ export default function LiveMindDashboard() {
         { data: questions },
         { data: corpus },
         { data: synthData },
+        { count: entityCount },
+        { count: uploadCount },
       ] = await Promise.all([
         supabase.from('entities').select('*').eq('user_id', session.user.id).order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(5),
-        supabase.from('video_uploads').select('id, file_name, created_at, status, analysis, duration_seconds').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('video_uploads').select('id, file_name, created_at, status, duration_seconds').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('entities').select('*').eq('user_id', session.user.id).eq('type', 'goal').order('mention_count', { ascending: false }).limit(4),
         supabase.from('entities').select('id, name').eq('user_id', session.user.id).eq('type', 'question').order('last_mentioned_at', { ascending: false, nullsFirst: false }).limit(4),
         supabase.from('neural_corpus').select('type, fidelity_score, meta, source_upload_id, created_at').eq('user_id', session.user.id),
         supabase.from('user_synthesis').select('spine, synthesized_at, commitments_open').eq('user_id', session.user.id).order('synthesized_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('entities').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
+        supabase.from('video_uploads').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('status', 'processed'),
       ])
 
       setRecentEntities(entities || [])
       setRecentUploads(uploads || [])
+      setTotalEntityCount(entityCount || 0)
+      setTotalUploadCount(uploadCount || 0)
       setOpenQuestions(questions || [])
       setActiveDirectives(goals?.map(g => ({
         id: g.id,
@@ -117,8 +124,11 @@ export default function LiveMindDashboard() {
             <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           </div>
           <div className="flex items-center gap-4 font-mono text-xs text-[var(--text-tertiary)]">
-            <span>{corpusStats.voice} voice · {corpusStats.face} visual samples</span>
-            <span>{recentEntities.length} active topics</span>
+            <span>{totalEntityCount} entities</span>
+            <span>·</span>
+            <span>{totalUploadCount} processed</span>
+            <span>·</span>
+            <span>{corpusStats.voiceMinutes}m voice</span>
           </div>
         </div>
 
@@ -126,10 +136,6 @@ export default function LiveMindDashboard() {
 
           {/* ── LEFT: AI Model progress ── */}
           <div className="lg:col-span-4 flex flex-col gap-5">
-
-            <Link href="/dashboard/manifest" className="block hover:opacity-90 transition-opacity">
-              <ManifestAvatar />
-            </Link>
 
             {/* AI Model corpus progress */}
             <div className="p-5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-light)]">
@@ -307,8 +313,7 @@ export default function LiveMindDashboard() {
                       <Link key={upload.id} href={`/dashboard/uploads?id=${upload.id}`} className="flex items-center justify-between p-2 hover:bg-[var(--bg-tertiary)]/50 border border-transparent hover:border-[var(--border-light)] rounded-lg group transition-colors">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium truncate group-hover:text-[var(--accent)] transition-colors">
-                            {upload.analysis?.summary?.slice(0, 45) || upload.file_name?.replace(/\.[^.]+$/, '') || 'Untitled'}
-                            {(upload.analysis?.summary?.length > 45) ? '…' : ''}
+                            {upload.file_name?.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ') || 'Untitled'}
                           </p>
                           <p className="text-[9px] font-mono text-[var(--text-tertiary)]">{new Date(upload.created_at).toLocaleDateString()}</p>
                         </div>
