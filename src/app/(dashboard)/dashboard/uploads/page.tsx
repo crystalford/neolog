@@ -354,13 +354,7 @@ export default function UploadsPage() {
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
-    const MAX_SIZE = 50 * 1024 * 1024 // 50MB
     for (const file of fileArray) {
-      if (file.size > MAX_SIZE) {
-        alert(`File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Supabase Standard projects have a 50MB limit. Please increase the limit in your project settings or upload a smaller file.`)
-        continue
-      }
-      
       // NEW: Extract metadata in browser first
       const recordedAt = await extractVideoDate(file);
       console.log(`Detected date for ${file.name}:`, recordedAt);
@@ -565,7 +559,7 @@ export default function UploadsPage() {
           Drop files to ingest
         </p>
         <p className="text-sm text-[var(--text-tertiary)] mb-6 opacity-60">
-          MP4, MOV, MP3, M4A — Max 50MB (Standard)
+          MP4, MOV, MP3, M4A — up to 5GB
         </p>
         <label className="btn btn-primary px-8 rounded-xl cursor-pointer inline-flex shadow-lg shadow-[var(--accent)]/20">
           Select Files

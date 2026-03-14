@@ -160,6 +160,19 @@ export default function ManifestPage() {
         })}
       </div>
 
+      {/* Empty state hint — shown when no corpus data yet */}
+      {corpus.voice === 0 && corpus.face === 0 && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-400/5 border border-amber-400/20 text-xs text-amber-300/80">
+          <AlertCircle size={14} className="flex-shrink-0 mt-0.5 text-amber-400" />
+          <div>
+            <p className="font-medium mb-0.5">No corpus data yet</p>
+            <p className="text-amber-300/60 leading-relaxed">
+              Upload a video to start building. Voice and face data are extracted automatically during processing and accumulate here over time.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Corpus Health */}
       <div className="space-y-5">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Corpus Health</h2>
