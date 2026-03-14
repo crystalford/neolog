@@ -167,7 +167,7 @@ export default function ManifestPage() {
           <div>
             <p className="font-medium mb-0.5">No corpus data yet</p>
             <p className="text-amber-300/60 leading-relaxed">
-              Upload a video to start building. Voice archival and face extraction require <span className="font-mono">REPLICATE_API_TOKEN</span> to be configured in your Vercel environment — without it, uploads process but don't contribute to the AI model corpus.
+              Upload a video to start building. Voice and face data are extracted automatically during processing and accumulate here over time.
             </p>
           </div>
         </div>
