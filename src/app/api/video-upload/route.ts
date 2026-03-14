@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('video_uploads')
-      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at')
+      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url')
       .eq('user_id', session.user.id)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
@@ -172,7 +172,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch uploads', details: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ uploads: data })
+    // Generate signed URLs for thumbnails stored as storage paths (not http URLs)
+    const thumbPaths = (data || [])
+      .filter((u: any) => u.thumbnail_url && !u.thumbnail_url.startsWith('http'))
+      .map((u: any) => u.thumbnail_url)
+
+    let signedMap: Record<string, string> = {}
+    if (thumbPaths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from('videos')
+        .createSignedUrls(thumbPaths, 3600)
+      if (signed) {
+        for (const s of signed) {
+          if (s.signedUrl) signedMap[s.path] = s.signedUrl
+        }
+      }
+    }
+
+    const uploads = (data || []).map((u: any) => ({
+      ...u,
+      thumbnail_url: u.thumbnail_url && !u.thumbnail_url.startsWith('http')
+        ? (signedMap[u.thumbnail_url] || null)
+        : u.thumbnail_url,
+    }))
+
+    return NextResponse.json({ uploads })
   } catch (error) {
     console.error('List video uploads error:', error)
     return NextResponse.json({ error: 'Failed to fetch uploads' }, { status: 500 })

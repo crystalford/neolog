@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  Brain, Loader2, TrendingUp, ChevronDown, ChevronUp, Search, 
-  ArrowUpDown, Zap, Calendar, Link as LinkIcon, Users, 
-  Target, Lightbulb, Package, HelpCircle, Activity, 
+  Network, Loader2, ChevronDown, ChevronUp, Search,
+  ArrowUpDown, Zap, Calendar, Link as LinkIcon, Users,
+  Target, Lightbulb, Package, HelpCircle, Activity,
   Clock, ArrowRight, Layers, Inbox, Film
 } from 'lucide-react'
 import Link from 'next/link'
@@ -43,13 +43,13 @@ type EntityMention = {
 }
 
 const ENTITY_TYPES = [
-  { key: 'all', label: 'Nodes', icon: Brain, color: 'text-white' },
+  { key: 'all', label: 'All', icon: Network, color: 'text-white' },
   { key: 'project', label: 'Projects', icon: Package, color: 'text-blue-400' },
   { key: 'idea', label: 'Ideas', icon: Lightbulb, color: 'text-yellow-400' },
-  { key: 'person', label: 'Contacts', icon: Users, color: 'text-green-400' },
-  { key: 'goal', label: 'Objectives', icon: Target, color: 'text-purple-400' },
-  { key: 'question', label: 'Inquiries', icon: HelpCircle, color: 'text-orange-400' },
-  { key: 'skill', label: 'Aptitudes', icon: Zap, color: 'text-cyan-400' },
+  { key: 'person', label: 'People', icon: Users, color: 'text-green-400' },
+  { key: 'goal', label: 'Goals', icon: Target, color: 'text-purple-400' },
+  { key: 'question', label: 'Questions', icon: HelpCircle, color: 'text-orange-400' },
+  { key: 'skill', label: 'Skills', icon: Zap, color: 'text-cyan-400' },
 ]
 
 export default function BrainPage() {
@@ -120,7 +120,7 @@ export default function BrainPage() {
   }
 
   const getEntityConfig = (type: string) => {
-    return ENTITY_TYPES.find(t => t.key === type) || { icon: Brain, color: 'text-white' }
+    return ENTITY_TYPES.find(t => t.key === type) || { icon: Network, color: 'text-white' }
   }
 
   const formatRelativeTime = (dateStr: string) => {
@@ -138,45 +138,23 @@ export default function BrainPage() {
     return date.toLocaleDateString()
   }
 
-  // Calculate "Trend" for an entity based on mentions
-  const renderTrend = (entity: Entity) => {
-    return (
-      <div className="flex items-end gap-0.5 h-3 opacity-40 group-hover:opacity-100 transition-opacity">
-        {[0.4, 0.7, 0.2, 0.5, 0.9, 0.3, 0.6, 0.8].map((h, i) => (
-          <div 
-            key={i} 
-            className="w-1 bg-[var(--accent)] rounded-t-[0.5px]" 
-            style={{ height: `${h * 100}%`, opacity: 0.3 + (i * 0.1) }} 
-          />
-        ))}
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 md:py-12 space-y-8">
-      {/* HUD Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-[var(--border-light)] pb-6">
         <div>
-          <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)] mb-2 flex items-center gap-2">
-             <Activity size={12} className="animate-pulse" /> Neural Network Overview
+          <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)] mb-2">
+            Knowledge Graph
           </h2>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Knowledge Map</h1>
-          <p className="text-sm text-[var(--text-tertiary)] mt-2">The synthesis of every thought, project, and encounter. A living map of your evolution.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">Entities</h1>
+          <p className="text-sm text-[var(--text-tertiary)] mt-2">
+            Everything extracted from your uploads — people, projects, ideas, goals, and more.
+          </p>
         </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">Active Nodes</p>
-            <p className="text-xl font-bold text-[var(--text-primary)]">{typeCounts.all || 0}</p>
-          </div>
-          <div className="w-px h-8 bg-[var(--border-light)] hidden sm:block" />
-          <div className="text-right hidden sm:block">
-            <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">Signal Strength</p>
-            <p className="text-xl font-bold text-emerald-400">
-              {typeCounts.all > 0 ? (90 + (typeCounts.all % 10)).toFixed(1) : '0.0'}%
-            </p>
-          </div>
+
+        <div className="text-right hidden sm:block">
+          <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">Total</p>
+          <p className="text-xl font-bold text-[var(--text-primary)]">{typeCounts.all || 0}</p>
         </div>
       </div>
 
@@ -186,13 +164,13 @@ export default function BrainPage() {
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-focus-within:text-[var(--accent)] transition-colors" />
           <input
             type="text"
-            placeholder="Query brain graph..."
+            placeholder="Search entities..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 text-sm bg-transparent border-none focus:ring-0 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]/50 font-mono"
+            className="w-full pl-11 pr-4 py-2.5 text-sm bg-transparent border-none focus:ring-0 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]/50"
           />
         </div>
-        
+
         <div className="flex items-center gap-2 px-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
           {ENTITY_TYPES.map((type) => {
             const isActive = activeType === type.key
@@ -208,6 +186,11 @@ export default function BrainPage() {
               >
                 <type.icon size={10} className={isActive ? 'text-white' : type.color} />
                 {type.label}
+                {typeCounts[type.key] !== undefined && (
+                  <span className={`text-[9px] ${isActive ? 'opacity-70' : 'opacity-40'}`}>
+                    {typeCounts[type.key]}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -216,7 +199,7 @@ export default function BrainPage() {
         <button
           onClick={() => setSort(s => s === 'mentions' ? 'recent' : s === 'recent' ? 'oldest' : 'mentions')}
           className="p-2.5 rounded-xl bg-black/20 border border-white/5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all flex items-center justify-center"
-          title="Sort Graph"
+          title={`Sort: ${sort}`}
         >
           <ArrowUpDown size={16} />
         </button>
@@ -229,9 +212,11 @@ export default function BrainPage() {
         </div>
       ) : entities.length === 0 ? (
         <div className="text-center py-32 border border-dashed border-[var(--border-light)] rounded-3xl bg-black/5">
-          <Brain size={48} className="mx-auto mb-4 opacity-20 text-[var(--accent)]" />
-          <p className="text-lg font-medium text-[var(--text-secondary)]">The Graph is Silent</p>
-          <p className="text-sm text-[var(--text-tertiary)] mt-2">Upload audio, video, or raw text signals to wake the memory engine.</p>
+          <Network size={48} className="mx-auto mb-4 opacity-20 text-[var(--accent)]" />
+          <p className="text-lg font-medium text-[var(--text-secondary)]">Nothing here yet</p>
+          <p className="text-sm text-[var(--text-tertiary)] mt-2">
+            Upload videos and entities will be extracted automatically.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -243,13 +228,13 @@ export default function BrainPage() {
               <div
                 key={entity.id}
                 className={`group relative flex flex-col transition-all duration-300 rounded-2xl border ${
-                  isExpanded 
-                  ? 'col-span-1 md:col-span-2 lg:col-span-3 bg-[var(--bg-secondary)] border-[var(--accent)]/40 shadow-2xl z-10' 
+                  isExpanded
+                  ? 'col-span-1 md:col-span-2 lg:col-span-3 bg-[var(--bg-secondary)] border-[var(--accent)]/40 shadow-2xl z-10'
                   : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--border-medium)] hover:shadow-lg'
                 }`}
               >
                 {/* Entity Card Header */}
-                <div 
+                <div
                   className={`flex items-center gap-4 p-5 cursor-pointer ${isExpanded ? 'border-b border-[var(--border-light)]' : ''}`}
                   onClick={() => toggleExpand(entity.id)}
                 >
@@ -258,62 +243,49 @@ export default function BrainPage() {
                   }`}>
                     <config.icon size={18} strokeWidth={1.5} />
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">
                       {entity.name}
                     </h3>
                     <div className="flex items-center gap-3 mt-1 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-tight">
                       <span className={isExpanded ? 'text-[var(--accent)] font-bold' : config.color}>{entity.type}</span>
-                      <span>{entity.mention_count} Mentions</span>
+                      <span>{entity.mention_count} mention{entity.mention_count !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
 
-                  {!isExpanded && renderTrend(entity)}
-                  
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                 </div>
 
-                {/* Expanded Details Implementation */}
+                {/* Expanded Details */}
                 {isExpanded && (
                   <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-top-2">
-                    {/* Left Column: Connections & Metrics */}
+                    {/* Left Column */}
                     <div className="space-y-6">
                       <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
-                        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)] flex items-center gap-2">
-                          <Activity size={12} className="text-[var(--accent)]" /> Node Strength
+                        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">
+                          Mentions
                         </h4>
                         <div className="flex items-end justify-between">
                           <span className="text-3xl font-bold">{entity.mention_count}</span>
                           <div className="text-right">
-                            <p className="text-[9px] text-[var(--text-tertiary)] uppercase font-bold">Signal Period</p>
-                            <p className="text-xs font-medium truncate">{formatRelativeTime(entity.first_mentioned_at)} — Present</p>
+                            <p className="text-[9px] text-[var(--text-tertiary)] uppercase font-bold">First seen</p>
+                            <p className="text-xs font-medium">{formatRelativeTime(entity.first_mentioned_at)}</p>
                           </div>
                         </div>
                         <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" style={{ width: `${Math.min(100, (entity.mention_count / 20) * 100)}%` }} />
+                          <div
+                            className="h-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"
+                            style={{ width: `${Math.min(100, (entity.mention_count / 20) * 100)}%` }}
+                          />
                         </div>
-                      </div>
-
-                      <div className="space-y-3">
-                         <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">Signal Evolution</h4>
-                         <div className="h-32 bg-black/20 rounded-2xl border border-white/5 flex items-end justify-around p-4">
-                            {[0.2, 0.4, 0.3, 0.8, 0.5, 0.6, 0.9, 0.4, 0.7, 0.3, 0.5, 0.8].map((h, i) => (
-                              <div 
-                                key={i} 
-                                className="w-2 bg-[var(--accent)] rounded-t-[1px] transition-all hover:scale-y-110 cursor-pointer" 
-                                style={{ height: `${h * 100}%`, opacity: 0.1 + (i * 0.08) }} 
-                                title={`Activity spike observed during cycle ${i + 1}`}
-                              />
-                            ))}
-                         </div>
                       </div>
 
                       {entity.metadata && Object.keys(entity.metadata).length > 0 && (
                         <div className="space-y-3">
-                          <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">Node Properties</h4>
+                          <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">Details</h4>
                           <div className="flex flex-wrap gap-2">
                             {Object.entries(entity.metadata).map(([key, value]) => (
                               <div key={key} className="px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/5 flex flex-col">
@@ -326,94 +298,83 @@ export default function BrainPage() {
                       )}
                     </div>
 
-                    {/* Middle Column: Mention Timeline (Backlinks) */}
-                    <div className="lg:col-span-2 space-y-6">
-                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">Neural Backlinks</h4>
-                        <span className="text-[10px] font-mono text-[var(--accent)]/60">{mentions.length} OCCURRENCES DETECTED</span>
-                       </div>
+                    {/* Right Column: Appearances */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">Appearances</h4>
+                        <span className="text-[10px] font-mono text-[var(--accent)]/60">{mentions.length} total</span>
+                      </div>
 
-                       {loadingMentions ? (
-                         <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-50">
-                            <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
-                            <span className="text-[10px] font-mono uppercase tracking-[0.2em]">Traversing graph layers...</span>
-                         </div>
-                       ) : mentions.length === 0 ? (
-                         <div className="p-12 text-center border border-dashed border-white/5 rounded-3xl">
-                            <Clock size={32} className="mx-auto mb-3 opacity-20" />
-                            <p className="text-sm text-[var(--text-tertiary)] italic">No historical data preserved for this node.</p>
-                         </div>
-                       ) : (
-                         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
-                           {mentions.map((mention) => {
-                             const isVideo = mention.source_type === 'video' || !!mention.video_upload_id
-                             const title = isVideo
-                               ? (mention.video_uploads?.file_name || 'Processing Archive')
-                               : (mention.log_entries?.title || 'Signal Capture')
-                             
-                             return (
-                               <div 
-                                 key={mention.id} 
-                                 className="group/item flex gap-5 bg-black/20 p-5 rounded-2xl border border-white/[0.03] hover:border-[var(--accent)]/30 transition-all cursor-default"
-                               >
-                                  <div className="flex flex-col items-center gap-2 pt-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
-                                    <div className="w-0.5 flex-1 bg-white/5" />
-                                  </div>
-                                  
-                                  <div className="flex-1 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">
-                                        <Calendar size={12} className="text-[var(--accent)]" />
-                                        <span>{new Date(mention.created_at).toLocaleDateString()}</span>
-                                        <span className="opacity-20">•</span>
-                                        <span>{new Date(mention.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                      </div>
+                      {loadingMentions ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-50">
+                          <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
+                          <span className="text-[10px] font-mono uppercase tracking-[0.2em]">Loading...</span>
+                        </div>
+                      ) : mentions.length === 0 ? (
+                        <div className="p-12 text-center border border-dashed border-white/5 rounded-3xl">
+                          <Clock size={32} className="mx-auto mb-3 opacity-20" />
+                          <p className="text-sm text-[var(--text-tertiary)]">No appearances yet.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
+                          {mentions.map((mention) => {
+                            const isVideo = mention.source_type === 'video' || !!mention.video_upload_id
+                            const title = isVideo
+                              ? (mention.video_uploads?.file_name || 'Unknown file')
+                              : (mention.log_entries?.title || 'Log entry')
+
+                            return (
+                              <div
+                                key={mention.id}
+                                className="group/item flex gap-5 bg-black/20 p-5 rounded-2xl border border-white/[0.03] hover:border-[var(--accent)]/30 transition-all cursor-default"
+                              >
+                                <div className="flex flex-col items-center gap-2 pt-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+                                  <div className="w-0.5 flex-1 bg-white/5" />
+                                </div>
+
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">
+                                      <Calendar size={12} className="text-[var(--accent)]" />
+                                      <span>{new Date(mention.created_at).toLocaleDateString()}</span>
+                                      <span className="opacity-20">·</span>
+                                      <span>{new Date(mention.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                    {mention.sentiment && (
                                       <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tighter ${
                                         mention.sentiment === 'positive' ? 'bg-emerald-500/10 text-emerald-400' :
                                         mention.sentiment === 'negative' ? 'bg-red-500/10 text-red-500' :
                                         'bg-white/5 text-[var(--text-tertiary)]'
                                       }`}>
-                                        {mention.sentiment || 'NEUTRAL'}
+                                        {mention.sentiment}
                                       </div>
-                                    </div>
-                                    
-                                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
-                                      "{mention.context}"
-                                    </p>
-                                    
-                                    <div className="flex items-center justify-between pt-2">
-                                      <div className="flex items-center gap-2 text-[10px] text-[var(--text-tertiary)] font-bold uppercase tracking-tight">
-                                        {isVideo ? <Film size={12} /> : <Inbox size={12} />}
-                                        {title}
-                                      </div>
-                                      
-                                      <Link 
-                                        href={isVideo ? `/dashboard/uploads` : `/dashboard/log`}
-                                        className="text-[10px] font-mono text-[var(--accent)] uppercase font-bold tracking-widest flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity"
-                                      >
-                                        Jump to Signal <ArrowRight size={12} />
-                                      </Link>
-                                    </div>
+                                    )}
                                   </div>
-                               </div>
-                             )
-                           })}
-                         </div>
-                       )}
 
-                       {/* Future: Correlation Engine */}
-                       <div className="pt-6 border-t border-white/5 opacity-50">
-                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-[var(--bg-tertiary)]/30 border border-white/5">
-                            <Layers size={20} className="text-[var(--text-tertiary)] flex-shrink-0 mt-1" />
-                            <div className="space-y-1">
-                              <h5 className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wide">Correlation Analytics [Locked]</h5>
-                              <p className="text-[10px] text-[var(--text-tertiary)] leading-relaxed lowercase italic">
-                                Insufficient signal density to map multi-node relationship clusters.
-                              </p>
-                            </div>
-                          </div>
-                       </div>
+                                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
+                                    "{mention.context}"
+                                  </p>
+
+                                  <div className="flex items-center justify-between pt-2">
+                                    <div className="flex items-center gap-2 text-[10px] text-[var(--text-tertiary)] font-bold uppercase tracking-tight">
+                                      {isVideo ? <Film size={12} /> : <Inbox size={12} />}
+                                      {title}
+                                    </div>
+
+                                    <Link
+                                      href={isVideo ? `/dashboard/uploads` : `/dashboard/log`}
+                                      className="text-[10px] font-mono text-[var(--accent)] uppercase font-bold tracking-widest flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                    >
+                                      View source <ArrowRight size={12} />
+                                    </Link>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

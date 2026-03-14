@@ -397,12 +397,12 @@ export const processUpload = inngest.createFunction(
       await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
     })
 
-    // ── Step 2c: Extract Neural Signal (Multi-frame Face Sampling) ──
-    const thumbnailUrl = await step.run('extract-visual-corpus', async () => {
+    // ── Step 2c: Extract thumbnail frame ──
+    const thumbnailPath = await step.run('extract-thumbnail', async () => {
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
 
-      await plog(admin, video_upload_id, 'extract-visual-corpus', 'running', 'Harvesting face samples for Neural Corpus')
+      await plog(admin, video_upload_id, 'extract-thumbnail', 'running', 'Extracting thumbnail frame')
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
@@ -415,64 +415,37 @@ export const processUpload = inngest.createFunction(
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
-        
-        // Define key points for extraction (1s, 25%, 50%, 75%, end-1s)
-        const samplePoints = ['00:00:01', '25%', '50%', '75%', '95%']
-        let primaryThumb = null
 
-        for (const [idx, point] of samplePoints.entries()) {
-          const ffmpegCmd = point.endsWith('%') 
-            ? `-ss ${point} -i {input_file} -vframes 1 -f image2 pipe:1`
-            : `-ss ${point} -i {input_file} -vframes 1 -f image2 pipe:1`
-
-          const output = await replicate.run(
-            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
-            {
-              input: {
-                input_file: signedData.signedUrl,
-                ffmpeg_command: ffmpegCmd
-              }
+        // Extract a single frame at 3 seconds (falls back gracefully for short clips)
+        const output = await replicate.run(
+          "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+          {
+            input: {
+              input_file: signedData.signedUrl,
+              ffmpeg_command: "-ss 00:00:03 -i {input_file} -vframes 1 -vf scale=640:-1 -f image2 pipe:1"
             }
-          ) as any
+          }
+        ) as any
 
-          if (!output || typeof output !== 'string') continue
+        if (!output || typeof output !== 'string') return null
 
-          const imgResponse = await fetch(output)
-          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
-          const thumbPath = `${user_id}/neural-corpus/visual/${video_upload_id}_sample_${idx}.jpg`
+        const imgResponse = await fetch(output)
+        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
+        const thumbPath = `${user_id}/thumbnails/${video_upload_id}.jpg`
 
-          await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
-            contentType: 'image/jpeg',
-            upsert: true
-          })
+        await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+          cacheControl: '31536000',
+        })
 
-          const { data: { publicUrl } } = admin.storage.from('videos').getPublicUrl(thumbPath)
-          
-          if (idx === 0) primaryThumb = publicUrl
+        // Store the storage path — the listing API generates signed URLs at read time
+        await admin.from('video_uploads').update({ thumbnail_url: thumbPath }).eq('id', video_upload_id)
 
-          // Score fidelity from JPEG image dimensions (proxy for quality)
-          const fidelityScore = scoreFrameFidelity(imgBuffer)
-
-          // Archive in Neural Corpus
-          await admin.from('neural_corpus').insert({
-            user_id,
-            source_upload_id: video_upload_id,
-            type: 'face',
-            storage_path: thumbPath,
-            fidelity_score: fidelityScore,
-            fidelity_rank: fidelityScore >= 0.85 ? 'S' : fidelityScore >= 0.7 ? 'A' : fidelityScore >= 0.5 ? 'B' : 'C',
-            meta: { point, is_primary: idx === 0 },
-          })
-        }
-
-        if (primaryThumb) {
-          await admin.from('video_uploads').update({ thumbnail_url: primaryThumb }).eq('id', video_upload_id)
-        }
-
-        await plog(admin, video_upload_id, 'extract-visual-corpus', 'done', `Harvested face samples for corpus`)
-        return primaryThumb
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored at ${thumbPath}`)
+        return thumbPath
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-visual-corpus', 'error', err?.message)
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
         return null
       }
     })
@@ -672,7 +645,7 @@ export const processUpload = inngest.createFunction(
         logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,
         is_public: true,
-        thumbnail_url: thumbnailUrl || (activeContext.upload as any).thumbnail_url,
+        thumbnail_url: thumbnailPath || (activeContext.upload as any).thumbnail_url,
         meta: {
           model: analysisResult.modelUsed,
           categories: analysisResult.tags, // Using curated tags

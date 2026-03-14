@@ -16,7 +16,7 @@ import { SessionDetail } from '@/components/SessionDetail'
 
 type UploadListItem = Pick<VideoUpload,
   'id' | 'file_name' | 'file_size_bytes' | 'mime_type' | 'duration_seconds' |
-  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at'
+  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at' | 'thumbnail_url'
 >
 
 type ActiveUpload = {
@@ -470,14 +470,11 @@ export default function UploadsPage() {
       {/* Header */}
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--accent)] mb-3">
-             Storage & Assets
-          </p>
           <h1 className="text-3xl font-light tracking-tight text-[var(--text-primary)] mb-2">
-            Media Database
+            Uploads
           </h1>
           <p className="text-[14px] text-[var(--text-secondary)] max-w-lg leading-relaxed">
-            A comprehensive record of all raw intelligence ingested. Videos, voice notes, and captures are processed into actionable insights.
+            All your videos and audio — drop files to upload, then view what was extracted.
           </p>
         </div>
       </div>
@@ -642,7 +639,7 @@ export default function UploadsPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
-          <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Synchronizing Database...</p>
+          <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
         </div>
       ) : filteredUploads.length === 0 && !hasActiveUploads ? (
         <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-light)] border-dashed">
@@ -668,8 +665,8 @@ export default function UploadsPage() {
                   className={`group relative bg-[var(--bg-card)] border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-[var(--accent)]/5 ${isExpanded ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/20 shadow-md' : 'border-[var(--border-light)]'}`}
                 >
                   <div className="aspect-video relative bg-[var(--bg-secondary)] overflow-hidden cursor-pointer" onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}>
-                    {(upload as any).thumbnail_url ? (
-                      <img src={(upload as any).thumbnail_url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    {upload.thumbnail_url ? (
+                      <img src={upload.thumbnail_url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-30 group-hover:opacity-50 transition-opacity">
                          {isVideo ? <Video size={32} /> : <FileAudio size={32} />}
@@ -743,7 +740,7 @@ export default function UploadsPage() {
                           <div className="flex items-center justify-between p-6 border-b border-[var(--border-light)] bg-[var(--bg-secondary)]">
                              <div>
                                <h2 className="text-xl font-medium text-[var(--text-primary)]">{upload.file_name}</h2>
-                               <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest mt-1">Ingested Asset · {upload.id.substring(0, 8)}</p>
+                               <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest mt-1">{new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}</p>
                              </div>
                              <button onClick={() => setExpandedId(null)} className="p-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-all">
                                <X size={20} className="text-[var(--text-secondary)]" />
@@ -753,7 +750,7 @@ export default function UploadsPage() {
                              {!expandedData ? (
                                <div className="flex flex-col items-center justify-center py-20 gap-4">
                                  <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
-                                 <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Analyzing Intelligence...</p>
+                                 <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
                                </div>
                              ) : (
                                <SessionDetail upload={expandedData} />

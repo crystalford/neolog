@@ -55,7 +55,30 @@ export default function TimelinePage() {
       .order('logged_at', { ascending: false })
       .limit(500)
 
-    setEntries((data || []) as unknown as LogEntry[])
+    // Generate signed URLs for thumbnails stored as storage paths
+    const entries = (data || []) as unknown as LogEntry[]
+    const thumbPaths = entries
+      .filter(e => e.thumbnail_url && !e.thumbnail_url.startsWith('http'))
+      .map(e => e.thumbnail_url!)
+
+    if (thumbPaths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from('videos')
+        .createSignedUrls(thumbPaths, 3600)
+      if (signed) {
+        const signedMap: Record<string, string> = {}
+        for (const s of signed) {
+          if (s.signedUrl) signedMap[s.path] = s.signedUrl
+        }
+        for (const e of entries) {
+          if (e.thumbnail_url && signedMap[e.thumbnail_url]) {
+            e.thumbnail_url = signedMap[e.thumbnail_url]
+          }
+        }
+      }
+    }
+
+    setEntries(entries)
     setLoading(false)
   }
 
