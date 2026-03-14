@@ -26,20 +26,27 @@ export async function GET() {
 
     const videoBucketExists = buckets.some(b => b.name === 'videos')
 
+    const bucketConfig = {
+      public: false,
+      allowedMimeTypes: ['video/*', 'audio/*', 'text/plain'],
+      fileSizeLimit: 5368709120 // 5GB (Supabase Pro max)
+    }
+
     if (!videoBucketExists) {
       console.log('Videos bucket missing. Creating it now...')
-      const { error: createError } = await admin.storage.createBucket('videos', {
-        public: false,
-        allowedMimeTypes: ['video/*', 'audio/*', 'text/plain'],
-        fileSizeLimit: 524288000 // 500MB (adjust as needed)
-      })
-
+      const { error: createError } = await admin.storage.createBucket('videos', bucketConfig)
       if (createError) {
         console.error('Error creating bucket:', createError)
         return NextResponse.json({ error: createError.message }, { status: 500 })
       }
-      
       return NextResponse.json({ message: 'Videos bucket created successfully', status: 'created' })
+    }
+
+    // Always sync bucket config to pick up limit increases
+    const { error: updateError } = await admin.storage.updateBucket('videos', bucketConfig)
+    if (updateError) {
+      console.error('Error updating bucket config:', updateError)
+      // Non-fatal — bucket still works, just may have old limit
     }
 
     return NextResponse.json({ message: 'Videos bucket ready', status: 'ready' })
