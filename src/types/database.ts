@@ -12,8 +12,44 @@ export type Profile = {
   github_url: string | null
   linkedin_url: string | null
   is_pro?: boolean | null
+  // Health / physical profile
+  date_of_birth: string | null          // stored as DATE string 'YYYY-MM-DD'
+  height_cm: number | null
+  weight_kg: number | null
+  biological_sex: 'male' | 'female' | 'other' | null
+  unit_preference: 'imperial' | 'metric' | null
   created_at: string
   updated_at: string
+}
+
+export type HealthLog = {
+  id: string
+  user_id: string
+  logged_at: string
+  weight_kg: number | null
+  energy_level: number | null           // 1–10
+  sleep_hours: number | null
+  mood: string | null
+  workout_done: boolean
+  workout_notes: string | null
+  notes: string | null
+  source: 'manual' | 'video_analysis'
+  source_upload_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CreateHealthLogInput = {
+  logged_at?: string
+  weight_kg?: number | null
+  energy_level?: number | null
+  sleep_hours?: number | null
+  mood?: string | null
+  workout_done?: boolean
+  workout_notes?: string | null
+  notes?: string | null
+  source?: 'manual' | 'video_analysis'
+  source_upload_id?: string | null
 }
 
 export type Post = {

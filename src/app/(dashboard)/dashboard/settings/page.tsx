@@ -7,8 +7,8 @@ import { ensureProfile } from '@/lib/profile'
 import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
-  KeyRound, Brain, Sparkles,
-  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert
+  KeyRound, Brain, Sparkles, Heart,
+  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert, Ruler
 } from 'lucide-react'
 
 // ─── Re-analyze all uploads widget ───────────────────────────────────────────
@@ -92,6 +92,12 @@ export default function SettingsPage() {
     github_url: '',
     linkedin_url: '',
     context_md: '',
+    // Health / physical profile
+    date_of_birth: '',
+    height_cm: '',
+    weight_kg: '',
+    biological_sex: '',
+    unit_preference: 'imperial' as 'imperial' | 'metric',
   })
 
   const [emailPrefs, setEmailPrefs] = useState({
@@ -449,6 +455,11 @@ export default function SettingsPage() {
           github_url: data.github_url || '',
           linkedin_url: data.linkedin_url || '',
           context_md: data.context_md || '',
+          date_of_birth: data.date_of_birth || '',
+          height_cm: data.height_cm ? String(data.height_cm) : '',
+          weight_kg: data.weight_kg ? String(data.weight_kg) : '',
+          biological_sex: data.biological_sex || '',
+          unit_preference: data.unit_preference || 'imperial',
         })
         setError(null)
       } else {
@@ -480,6 +491,11 @@ export default function SettingsPage() {
           github_url: formData.github_url || null,
           linkedin_url: formData.linkedin_url || null,
           context_md: formData.context_md || null,
+          date_of_birth: formData.date_of_birth || null,
+          height_cm: formData.height_cm ? parseInt(formData.height_cm) : null,
+          weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : null,
+          biological_sex: formData.biological_sex || null,
+          unit_preference: formData.unit_preference || 'imperial',
         })
         .eq('id', profile.id)
 
@@ -1216,7 +1232,152 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 9. Intelligence */}
+        {/* 9. Physical Profile */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Heart size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Physical Profile</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Used for health tracking and your AI context. Passive health data is captured from your videos.</p>
+            </div>
+          </div>
+
+          <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-5" style={{ background: 'rgba(13,13,22,0.2)' }}>
+
+            {/* Units toggle */}
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">Units</p>
+              <div className="flex items-center gap-2">
+                {(['imperial', 'metric'] as const).map(u => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, unit_preference: u })}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      formData.unit_preference === u
+                        ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
+                        : 'bg-[var(--bg-primary)]/50 border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {u === 'imperial' ? 'ft / lbs' : 'cm / kg'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {/* Date of birth */}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={formData.date_of_birth}
+                  onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
+                  className="input w-full"
+                />
+              </div>
+
+              {/* Biological sex */}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
+                  Biological Sex
+                </label>
+                <select
+                  value={formData.biological_sex}
+                  onChange={e => setFormData({ ...formData, biological_sex: e.target.value })}
+                  className="input w-full"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Height */}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
+                  Height ({formData.unit_preference === 'imperial' ? 'in' : 'cm'})
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={50}
+                    max={300}
+                    value={formData.height_cm
+                      ? (formData.unit_preference === 'imperial'
+                          ? Math.round(parseInt(formData.height_cm) / 2.54)
+                          : formData.height_cm)
+                      : ''}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v)) {
+                        const cm = formData.unit_preference === 'imperial' ? Math.round(v * 2.54) : v
+                        setFormData({ ...formData, height_cm: String(cm) })
+                      } else {
+                        setFormData({ ...formData, height_cm: '' })
+                      }
+                    }}
+                    placeholder={formData.unit_preference === 'imperial' ? 'e.g. 71' : 'e.g. 180'}
+                    className="input w-full pr-12"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[var(--text-tertiary)]">
+                    {formData.unit_preference === 'imperial' ? 'in' : 'cm'}
+                  </span>
+                </div>
+                {formData.height_cm && formData.unit_preference === 'imperial' && (
+                  <p className="text-[10px] text-[var(--text-tertiary)] mt-1 font-mono">
+                    {Math.floor(parseInt(formData.height_cm) / 30.48)}′ {Math.round((parseInt(formData.height_cm) % 30.48) / 2.54)}″
+                  </p>
+                )}
+              </div>
+
+              {/* Weight */}
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
+                  Weight ({formData.unit_preference === 'imperial' ? 'lbs' : 'kg'})
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={20}
+                    max={500}
+                    step={0.1}
+                    value={formData.weight_kg
+                      ? (formData.unit_preference === 'imperial'
+                          ? Math.round(parseFloat(formData.weight_kg) * 2.20462 * 10) / 10
+                          : formData.weight_kg)
+                      : ''}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value)
+                      if (!isNaN(v)) {
+                        const kg = formData.unit_preference === 'imperial'
+                          ? Math.round(v / 2.20462 * 10) / 10
+                          : v
+                        setFormData({ ...formData, weight_kg: String(kg) })
+                      } else {
+                        setFormData({ ...formData, weight_kg: '' })
+                      }
+                    }}
+                    placeholder={formData.unit_preference === 'imperial' ? 'e.g. 175' : 'e.g. 79.5'}
+                    className="input w-full pr-12"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[var(--text-tertiary)]">
+                    {formData.unit_preference === 'imperial' ? 'lbs' : 'kg'}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* 10. Intelligence */}
         <section>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">

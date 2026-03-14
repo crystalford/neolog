@@ -242,6 +242,7 @@ export default function DashboardLayout({
   const characterNav = useMemo(() => [
     { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'MANIFEST' },
     { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest',   section: 'MANIFEST' },
+    { href: '/dashboard/health',     icon: Brain,     label: 'Health',            section: 'MANIFEST' },
   ], [])
 
   const commandItems = useMemo(() => {
