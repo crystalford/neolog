@@ -35,6 +35,7 @@ type ActiveUpload = {
 export default function UploadsPage() {
   const [uploads, setUploads] = useState<UploadListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
@@ -53,9 +54,16 @@ export default function UploadsPage() {
       if (res.ok) {
         const data = await res.json()
         setUploads(data.uploads || [])
+        setFetchError(null)
+      } else {
+        const errData = await res.json().catch(() => ({ error: res.statusText }))
+        const msg = errData.details || errData.error || `HTTP ${res.status}`
+        console.error('Uploads fetch failed:', msg)
+        setFetchError(msg)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch uploads:', err)
+      setFetchError(err.message || 'Network error')
     } finally {
       setLoading(false)
     }
@@ -641,13 +649,27 @@ export default function UploadsPage() {
           <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
           <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
         </div>
+      ) : fetchError ? (
+        <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-red-400/20 border-dashed">
+          <div className="w-16 h-16 bg-red-400/5 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-red-400/60" />
+          </div>
+          <p className="text-[var(--text-primary)] font-medium">Could not load uploads</p>
+          <p className="text-xs font-mono text-red-400/70 mt-2 max-w-md mx-auto px-4">{fetchError}</p>
+          <button
+            onClick={() => { setLoading(true); fetchUploads() }}
+            className="mt-6 px-4 py-2 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
+          >
+            Retry
+          </button>
+        </div>
       ) : filteredUploads.length === 0 && !hasActiveUploads ? (
         <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-light)] border-dashed">
           <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
              <Video size={32} className="text-[var(--text-tertiary)]" />
           </div>
-          <p className="text-[var(--text-primary)] font-medium">Database is empty</p>
-          <p className="text-sm text-[var(--text-tertiary)] mt-1">No files match your current filters.</p>
+          <p className="text-[var(--text-primary)] font-medium">No uploads yet</p>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">Drop files above to get started.</p>
         </div>
       ) : (
         <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
