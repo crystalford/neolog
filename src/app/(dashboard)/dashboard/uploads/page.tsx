@@ -219,6 +219,9 @@ export default function UploadsPage() {
   };
 
   const startTusUpload = useCallback(async (file: File, sessionId?: string, preextractedDate?: string | null) => {
+    // Ensure bucket exists and has correct fileSizeLimit (updates on every call)
+    await fetch('/api/video-upload/prepare').catch(() => {/* non-fatal */})
+
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
