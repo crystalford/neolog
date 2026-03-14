@@ -229,21 +229,19 @@ export default function DashboardLayout({
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
     { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
-    { href: '/dashboard/log',     icon: Inbox,     label: 'Log',           section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Video,     label: 'Uploads',       section: 'INGEST' },
   ], [])
 
   // INTELLIGENCE section — what the system extracted
   const secondaryNav = useMemo(() => [
-    { href: '/dashboard/entities',   icon: Boxes,       label: 'Entities',   section: 'INTELLIGENCE' },
-    { href: '/dashboard/timeline',   icon: CalendarDays,label: 'Timeline',   section: 'INTELLIGENCE' },
-    { href: '/dashboard/synthesis',  icon: Sparkles,    label: 'Analysis',   section: 'INTELLIGENCE' },
+    { href: '/dashboard/timeline',   icon: CalendarDays, label: 'Timeline',         section: 'INTELLIGENCE' },
+    { href: '/dashboard/entities',   icon: Network,      label: 'Knowledge Graph',  section: 'INTELLIGENCE' },
   ], [])
 
-  // AI MODEL section — the character being built
+  // MANIFEST section — the character being built
   const characterNav = useMemo(() => [
-    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Training Pipeline', section: 'AI MODEL' },
-    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'AI MODEL' },
+    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'MANIFEST' },
+    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest',   section: 'MANIFEST' },
   ], [])
 
   const commandItems = useMemo(() => {
@@ -286,7 +284,7 @@ export default function DashboardLayout({
     allNavItems.find(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )?.label ||
-    (pathname === '/dashboard/settings' ? 'Settings' : pathname === '/dashboard/character' ? 'Character' : 'Log')
+    (pathname === '/dashboard/settings' ? 'Settings' : 'Control Room')
 
   return (
     <div className="dashboard-shell flex h-screen bg-[var(--bg-primary)]">
@@ -346,9 +344,9 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          {/* AI MODEL */}
+          {/* MANIFEST */}
           <div className="mt-4">
-            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">AI Model</p>
+            <p className="px-2.5 text-[9px] uppercase tracking-widest text-[var(--accent)] mb-1 font-semibold opacity-60">Manifest</p>
             <div className="space-y-0.5">
               {characterNav.map((link) => {
                 const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
