@@ -40,6 +40,8 @@ export default function UploadsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const [reanalyzingIds, setReanalyzingIds] = useState<Set<string>>(new Set())
+  const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -402,6 +404,37 @@ export default function UploadsPage() {
     }
   }
 
+  const handleReanalyze = async (id: string) => {
+    setReanalyzingIds(prev => new Set(prev).add(id))
+    try {
+      const res = await fetch(`/api/video-upload/${id}/reanalyze`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Re-analysis failed')
+      }
+    } catch {}
+    finally {
+      setReanalyzingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+    }
+  }
+
+  const handleReanalyzeAll = async () => {
+    if (!confirm('Re-analyze all processed uploads with the updated AI prompt? This will extract new entity types (decisions, values, tools, principles, etc.) from your existing transcripts. May take a few minutes.')) return
+    setReanalyzeAllState('running')
+    try {
+      const res = await fetch('/api/video-upload/reanalyze-all', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setReanalyzeAllState('done')
+      } else {
+        alert(data.error || 'Failed to trigger re-analysis')
+        setReanalyzeAllState('idle')
+      }
+    } catch {
+      setReanalyzeAllState('idle')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this upload and all its data?')) return
     const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
@@ -485,6 +518,19 @@ export default function UploadsPage() {
             All your videos and audio — drop files to upload, then view what was extracted.
           </p>
         </div>
+        <button
+          onClick={handleReanalyzeAll}
+          disabled={reanalyzeAllState === 'running'}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
+        >
+          {reanalyzeAllState === 'running' ? (
+            <><Loader2 size={13} className="animate-spin" /> Re-analyzing...</>
+          ) : reanalyzeAllState === 'done' ? (
+            <><Sparkles size={13} className="text-green-400" /> Queued</>
+          ) : (
+            <><Brain size={13} /> Re-analyze all</>
+          )}
+        </button>
       </div>
 
       {/* Control Bar */}
@@ -728,12 +774,24 @@ export default function UploadsPage() {
 
                      <div className="flex items-center gap-2">
                         {upload.status === 'processed' ? (
-                          <button 
-                            onClick={() => toggleExpand(upload.id)}
-                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
-                          >
-                             {isExpanded ? 'Collapse' : 'Details'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => toggleExpand(upload.id)}
+                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
+                            >
+                              {isExpanded ? 'Collapse' : 'Details'}
+                            </button>
+                            <button
+                              onClick={() => handleReanalyze(upload.id)}
+                              disabled={reanalyzingIds.has(upload.id)}
+                              title="Re-run AI analysis to extract new entity types"
+                              className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] transition-all border border-transparent hover:border-[var(--accent)]/20 disabled:opacity-40"
+                            >
+                              {reanalyzingIds.has(upload.id)
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Brain size={13} />}
+                            </button>
+                          </>
                         ) : upload.status === 'error' ? (
                            <button 
                               onClick={() => handleReprocess(upload.id)}
