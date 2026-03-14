@@ -33,7 +33,7 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   }, [activeTab, upload.id, transcriptWords])
 
   const tabs = [
-    { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
+    { key: 'analysis' as const,    label: 'Analysis', icon: Brain },
     { key: 'personal' as const,    label: 'Personal',     icon: Target },
     { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
     { key: 'edit' as const,        label: 'Edit',         icon: Edit2 },
@@ -89,7 +89,7 @@ export function SessionDetail({ upload }: SessionDetailProps) {
               <div className="space-y-6">
                 <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
                   <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
-                    <CalendarDays size={12} /> Timeline Placement
+                    <CalendarDays size={12} /> Recorded
                   </h4>
                   <div className="flex items-baseline gap-2">
                     <p className="text-lg font-light text-[var(--text-primary)] tracking-tight">
@@ -99,38 +99,13 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                       {upload.recorded_at ? format(new Date(upload.recorded_at), 'p') : ''}
                     </p>
                   </div>
-                  <div className="mt-3 flex flex-col gap-1.5 border-t border-[var(--border-light)]/30 pt-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-red-400'}`} />
-                      <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
-                        {upload.recorded_at ? 'Metadata Synchronized' : 'Fallback to Upload Date'}
-                      </p>
-                    </div>
-                    {upload.recorded_at && (
-                      <p className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-50 overflow-hidden text-ellipsis whitespace-nowrap">
-                        Trace: {upload.recorded_at}
-                      </p>
-                    )}
+                  <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-light)]/30 pt-3">
+                    <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-amber-400'}`} />
+                    <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
+                      {upload.recorded_at ? 'Date from file' : 'Upload date (no metadata)'}
+                    </p>
                   </div>
                 </div>
-
-                {upload.meta?.raw_metadata_diagnostic && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] flex items-center gap-2">
-                        <FileText size={11} /> Extraction Source
-                      </h4>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] font-mono">
-                        FFPROBE-JSON
-                      </span>
-                    </div>
-                    <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl p-4 max-h-60 overflow-y-auto no-scrollbar shadow-inner">
-                      <pre className="text-[10px] text-[var(--text-tertiary)] font-mono leading-relaxed whitespace-pre-wrap">
-                        {JSON.stringify(upload.meta.raw_metadata_diagnostic, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
 
                 <div>
                   <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
@@ -276,7 +251,7 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                   <Sparkles size={48} />
                 </div>
                 <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
-                  <Sparkles size={12} /> Neolog's Response
+                  <Sparkles size={12} /> Reflection
                 </h4>
                 <p style={{ 
                   fontSize: '14px', 

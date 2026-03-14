@@ -711,8 +711,8 @@ export default function SettingsPage() {
               <Globe size={20} strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-lg font-medium tracking-tight">Assistant Persona & Memory</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Prime your intelligence layer with your style and preferences.</p>
+              <h2 className="text-lg font-medium tracking-tight">AI Context</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Give the AI context about who you are and how you work.</p>
             </div>
           </div>
           
@@ -735,8 +735,8 @@ export default function SettingsPage() {
               <Link2 size={20} strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-lg font-medium tracking-tight">Intelligence Integrations (BYOK)</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Plug in your own model keys for maximum control and lower costs.</p>
+              <h2 className="text-lg font-medium tracking-tight">AI Providers (BYOK)</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Plug in your own API keys for OpenAI, Anthropic, or Groq.</p>
             </div>
           </div>
 
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
               <Shield size={20} strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-lg font-medium tracking-tight">Intelligence Budgeting (Usage Caps)</h2>
+              <h2 className="text-lg font-medium tracking-tight">Usage Caps</h2>
               <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Set hard limits on token usage to prevent billing surprises.</p>
             </div>
           </div>
@@ -1083,8 +1083,8 @@ export default function SettingsPage() {
               <Bell size={20} strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-lg font-medium tracking-tight">Intelligence Briefs (Notifications)</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Control how and when you are alerted of system activity.</p>
+              <h2 className="text-lg font-medium tracking-tight">Notifications</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Control when you receive email alerts.</p>
             </div>
           </div>
 
@@ -1125,8 +1125,8 @@ export default function SettingsPage() {
               <Rss size={20} strokeWidth={1.5} />
             </div>
             <div>
-              <h2 className="text-lg font-medium tracking-tight">Protocol Feeds</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Syndicate your log via standard protocols for maximum distribution.</p>
+              <h2 className="text-lg font-medium tracking-tight">Feeds</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">RSS and Atom feeds for your public content.</p>
             </div>
           </div>
 
@@ -1249,7 +1249,7 @@ export default function SettingsPage() {
             {!showResetConfirm ? (
               <div className="flex items-center justify-between gap-6 p-6 rounded-2xl bg-black/20 border border-white/5 mt-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold">Nuclear Reset (Wipe Memory)</h3>
+                  <h3 className="text-sm font-semibold">Reset All Data</h3>
                   <p className="text-xs text-[var(--text-tertiary)] leading-relaxed max-w-sm">
                     This will wipe all log entries, entities, and video uploads. Your profile and settings will remain.
                   </p>
