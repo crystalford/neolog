@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const ANALYSIS_PROMPT_VERSION = '1.1'
+export const ANALYSIS_PROMPT_VERSION = '1.2'
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited transcripts from {userName} — stream-of-consciousness recordings, voice memos, chat sessions, or text notes about {userName}'s life, work, ideas, and projects.
  
@@ -83,6 +83,11 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
    "stories_told": ["narratives or anecdotes shared — these are the best content candidates"],
    "strong_opinions": ["convictions stated forcefully enough to be essays or posts"],
  
+   "tools_mentioned": [
+     {"name": "tool or software name", "context": "how or why they are using it"}
+   ],
+   "principles": ["articulated rules or frameworks stated explicitly — 'I never X', 'My approach is always Y', 'The rule I follow is Z'"],
+
    "topics": ["all topics discussed"],
    "key_quotes": ["up to 7 verbatim quotes that are insightful, memorable, or shareable"],
  
@@ -434,6 +439,104 @@ export async function upsertEntities(
         type: 'blocker',
         name: b.length > 100 ? b.substring(0, 97) + '...' : b,
         context: b,
+      })
+    }
+  }
+
+  // ── New entity types (v1.2) ──────────────────────────────────────────────
+
+  if (analysis.decisions) {
+    for (const d of analysis.decisions) {
+      const name = typeof d === 'object' ? d.decision : d
+      const reasoning = typeof d === 'object' ? d.reasoning : null
+      if (!name) continue
+      entitiesToUpsert.push({
+        type: 'decision',
+        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
+        context: reasoning ? `${name} — ${reasoning}` : name,
+        metadata: reasoning ? { reasoning } : {},
+      })
+    }
+  }
+
+  if (analysis.values_expressed) {
+    for (const v of analysis.values_expressed) {
+      if (!v) continue
+      entitiesToUpsert.push({
+        type: 'value',
+        name: v.length > 100 ? v.substring(0, 97) + '...' : v,
+        context: v,
+      })
+    }
+  }
+
+  if (analysis.references) {
+    for (const r of analysis.references) {
+      const name = typeof r === 'object' ? r.title : r
+      const refType = typeof r === 'object' ? r.type : null
+      if (!name) continue
+      entitiesToUpsert.push({
+        type: 'reference',
+        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
+        context: refType ? `${refType}: ${name}` : name,
+        metadata: refType ? { ref_type: refType } : {},
+      })
+    }
+  }
+
+  if (analysis.stories_told) {
+    for (const s of analysis.stories_told) {
+      if (!s) continue
+      entitiesToUpsert.push({
+        type: 'story',
+        name: s.length > 100 ? s.substring(0, 97) + '...' : s,
+        context: s,
+      })
+    }
+  }
+
+  if (analysis.strong_opinions) {
+    for (const o of analysis.strong_opinions) {
+      if (!o) continue
+      entitiesToUpsert.push({
+        type: 'opinion',
+        name: o.length > 100 ? o.substring(0, 97) + '...' : o,
+        context: o,
+      })
+    }
+  }
+
+  if (analysis.lessons_learned) {
+    for (const l of analysis.lessons_learned) {
+      if (!l) continue
+      entitiesToUpsert.push({
+        type: 'lesson',
+        name: l.length > 100 ? l.substring(0, 97) + '...' : l,
+        context: l,
+      })
+    }
+  }
+
+  if (analysis.tools_mentioned) {
+    for (const t of analysis.tools_mentioned) {
+      const name = typeof t === 'object' ? t.name : t
+      const ctx = typeof t === 'object' ? t.context : null
+      if (!name) continue
+      entitiesToUpsert.push({
+        type: 'tool',
+        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
+        context: ctx || `Tool mentioned: ${name}`,
+      })
+    }
+  }
+
+  if (analysis.principles) {
+    for (const p of analysis.principles) {
+      if (!p) continue
+      entitiesToUpsert.push({
+        type: 'principle',
+        name: p.length > 100 ? p.substring(0, 97) + '...' : p,
+        context: p,
       })
     }
   }

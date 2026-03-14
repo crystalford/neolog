@@ -7,9 +7,61 @@ import { ensureProfile } from '@/lib/profile'
 import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
-  KeyRound,
+  KeyRound, Brain, Sparkles,
   AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert
 } from 'lucide-react'
+
+// ─── Re-analyze all uploads widget ───────────────────────────────────────────
+
+function ReanalyzeAllButton() {
+  const [state, setState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
+  const [message, setMessage] = useState('')
+
+  const trigger = async () => {
+    if (!confirm('Re-analyze all processed uploads with the updated AI prompt?\n\nThis extracts new entity types (decisions, values, tools, principles, stories, opinions, lessons, references) from your existing transcripts — no re-upload needed. May take a few minutes.')) return
+    setState('running')
+    try {
+      const res = await fetch('/api/video-upload/reanalyze-all', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setState('done')
+        setMessage(data.message || `Queued ${data.queued} uploads`)
+      } else {
+        setState('error')
+        setMessage(data.error || 'Failed')
+      }
+    } catch (e: any) {
+      setState('error')
+      setMessage(e.message || 'Network error')
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/30 p-5">
+      <p className="text-sm text-[var(--text-secondary)] mb-1">
+        Retroactive entity extraction
+      </p>
+      <p className="text-xs text-[var(--text-tertiary)] mb-4 leading-relaxed">
+        New entity types have been added: <span className="font-mono text-[var(--accent)]">decision</span>, <span className="font-mono text-[var(--accent)]">value</span>, <span className="font-mono text-[var(--accent)]">tool</span>, <span className="font-mono text-[var(--accent)]">principle</span>, <span className="font-mono text-[var(--accent)]">story</span>, <span className="font-mono text-[var(--accent)]">opinion</span>, <span className="font-mono text-[var(--accent)]">lesson</span>, <span className="font-mono text-[var(--accent)]">reference</span>.
+        Re-analyzing your existing uploads will extract these from already-stored transcripts — no re-uploading needed.
+      </p>
+      {message && (
+        <p className={`text-xs font-mono mb-3 ${state === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+          {message}
+        </p>
+      )}
+      <button
+        onClick={trigger}
+        disabled={state === 'running' || state === 'done'}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50"
+      >
+        {state === 'running' ? <><Loader2 size={14} className="animate-spin" /> Running...</>
+          : state === 'done' ? <><Sparkles size={14} className="text-green-400" /> Queued — check Inngest dashboard</>
+          : <><Brain size={14} /> Re-analyze all uploads</>}
+      </button>
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -1164,7 +1216,22 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 9. Export */}
+        {/* 9. Intelligence */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Brain size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Intelligence</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Re-run AI analysis on existing uploads to extract new entity types.</p>
+            </div>
+          </div>
+
+          <ReanalyzeAllButton />
+        </section>
+
+        {/* 10. Export */}
         <section>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">

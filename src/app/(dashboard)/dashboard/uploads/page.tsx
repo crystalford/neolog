@@ -35,10 +35,13 @@ type ActiveUpload = {
 export default function UploadsPage() {
   const [uploads, setUploads] = useState<UploadListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  const [reanalyzingIds, setReanalyzingIds] = useState<Set<string>>(new Set())
+  const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -53,9 +56,16 @@ export default function UploadsPage() {
       if (res.ok) {
         const data = await res.json()
         setUploads(data.uploads || [])
+        setFetchError(null)
+      } else {
+        const errData = await res.json().catch(() => ({ error: res.statusText }))
+        const msg = errData.details || errData.error || `HTTP ${res.status}`
+        console.error('Uploads fetch failed:', msg)
+        setFetchError(msg)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch uploads:', err)
+      setFetchError(err.message || 'Network error')
     } finally {
       setLoading(false)
     }
@@ -394,6 +404,37 @@ export default function UploadsPage() {
     }
   }
 
+  const handleReanalyze = async (id: string) => {
+    setReanalyzingIds(prev => new Set(prev).add(id))
+    try {
+      const res = await fetch(`/api/video-upload/${id}/reanalyze`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Re-analysis failed')
+      }
+    } catch {}
+    finally {
+      setReanalyzingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+    }
+  }
+
+  const handleReanalyzeAll = async () => {
+    if (!confirm('Re-analyze all processed uploads with the updated AI prompt? This will extract new entity types (decisions, values, tools, principles, etc.) from your existing transcripts. May take a few minutes.')) return
+    setReanalyzeAllState('running')
+    try {
+      const res = await fetch('/api/video-upload/reanalyze-all', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setReanalyzeAllState('done')
+      } else {
+        alert(data.error || 'Failed to trigger re-analysis')
+        setReanalyzeAllState('idle')
+      }
+    } catch {
+      setReanalyzeAllState('idle')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this upload and all its data?')) return
     const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
@@ -477,6 +518,19 @@ export default function UploadsPage() {
             All your videos and audio — drop files to upload, then view what was extracted.
           </p>
         </div>
+        <button
+          onClick={handleReanalyzeAll}
+          disabled={reanalyzeAllState === 'running'}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
+        >
+          {reanalyzeAllState === 'running' ? (
+            <><Loader2 size={13} className="animate-spin" /> Re-analyzing...</>
+          ) : reanalyzeAllState === 'done' ? (
+            <><Sparkles size={13} className="text-green-400" /> Queued</>
+          ) : (
+            <><Brain size={13} /> Re-analyze all</>
+          )}
+        </button>
       </div>
 
       {/* Control Bar */}
@@ -641,13 +695,27 @@ export default function UploadsPage() {
           <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
           <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
         </div>
+      ) : fetchError ? (
+        <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-red-400/20 border-dashed">
+          <div className="w-16 h-16 bg-red-400/5 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-red-400/60" />
+          </div>
+          <p className="text-[var(--text-primary)] font-medium">Could not load uploads</p>
+          <p className="text-xs font-mono text-red-400/70 mt-2 max-w-md mx-auto px-4">{fetchError}</p>
+          <button
+            onClick={() => { setLoading(true); fetchUploads() }}
+            className="mt-6 px-4 py-2 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
+          >
+            Retry
+          </button>
+        </div>
       ) : filteredUploads.length === 0 && !hasActiveUploads ? (
         <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-light)] border-dashed">
           <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
              <Video size={32} className="text-[var(--text-tertiary)]" />
           </div>
-          <p className="text-[var(--text-primary)] font-medium">Database is empty</p>
-          <p className="text-sm text-[var(--text-tertiary)] mt-1">No files match your current filters.</p>
+          <p className="text-[var(--text-primary)] font-medium">No uploads yet</p>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">Drop files above to get started.</p>
         </div>
       ) : (
         <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
@@ -706,12 +774,24 @@ export default function UploadsPage() {
 
                      <div className="flex items-center gap-2">
                         {upload.status === 'processed' ? (
-                          <button 
-                            onClick={() => toggleExpand(upload.id)}
-                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
-                          >
-                             {isExpanded ? 'Collapse' : 'Details'}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => toggleExpand(upload.id)}
+                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
+                            >
+                              {isExpanded ? 'Collapse' : 'Details'}
+                            </button>
+                            <button
+                              onClick={() => handleReanalyze(upload.id)}
+                              disabled={reanalyzingIds.has(upload.id)}
+                              title="Re-run AI analysis to extract new entity types"
+                              className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] transition-all border border-transparent hover:border-[var(--accent)]/20 disabled:opacity-40"
+                            >
+                              {reanalyzingIds.has(upload.id)
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Brain size={13} />}
+                            </button>
+                          </>
                         ) : upload.status === 'error' ? (
                            <button 
                               onClick={() => handleReprocess(upload.id)}

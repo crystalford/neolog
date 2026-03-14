@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { format, isToday, isYesterday } from 'date-fns'
 import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown } from 'lucide-react'
 
@@ -27,8 +26,8 @@ export type LogEntry = {
 function reltime(dateStr: string) {
   const d = new Date(dateStr)
   if (isToday(d)) return format(d, 'h:mm a')
-  if (isYesterday(d)) return 'Yesterday'
-  return format(d, 'MMM d')
+  if (isYesterday(d)) return 'Yesterday · ' + format(d, 'h:mm a')
+  return format(d, 'h:mm a')
 }
 
 function fulltime(dateStr: string) {
@@ -38,6 +37,11 @@ function fulltime(dateStr: string) {
 const TYPE_ICON: Record<string, typeof Video> = {
   session: Video,
   capture: Mic,
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  session: 'Video',
+  capture: 'Note',
 }
 
 const MOOD_COLORS: Record<string, string> = {
@@ -81,7 +85,12 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
 
   const thumbnail = entry.thumbnail_url || entry.asset?.image_url
   const TypeIcon = TYPE_ICON[entry.entry_type] || FileText
-  const hasBody = !!entry.body && entry.body.trim().length > 0
+  const typeLabel = TYPE_LABEL[entry.entry_type] || 'Entry'
+  const hasDetails = !!(entry.body && entry.body.trim().length > 0)
+  const cleanBody = entry.body
+    ?.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '')
+    .replace(/\nMood:.*$/m, '')
+    .trim()
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -96,102 +105,113 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
   }
 
   return (
-    <article
-      className={`group relative px-4 py-4 transition-colors border-b border-[var(--border-light)] last:border-b-0 ${hasBody ? 'cursor-pointer hover:bg-[var(--bg-secondary)]/40' : 'hover:bg-[var(--bg-secondary)]/20'}`}
-      onClick={() => hasBody && setExpanded(e => !e)}
-    >
-      <div className="flex gap-3">
+    <article className="group relative border-b border-[var(--border-light)] last:border-b-0">
 
-        {/* Type icon indicator */}
-        <div className="flex-shrink-0 mt-0.5">
-          <div className="w-8 h-8 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center">
-            <TypeIcon size={13} className="text-[var(--text-tertiary)]" />
+      {/* Main card row */}
+      <div
+        className={`flex items-stretch transition-colors ${hasDetails ? 'cursor-pointer hover:bg-[var(--bg-secondary)]/30' : 'hover:bg-[var(--bg-secondary)]/10'}`}
+        onClick={() => hasDetails && setExpanded(e => !e)}
+      >
+        {/* Thumbnail - flush left, portrait crop */}
+        {thumbnail && (
+          <div className="flex-shrink-0 w-[88px] overflow-hidden border-r border-[var(--border-light)] bg-[var(--bg-secondary)]">
+            <img
+              src={thumbnail}
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ minHeight: '68px' }}
+            />
           </div>
-        </div>
+        )}
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
 
-          {/* Header: title + timestamp */}
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <p className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
-              {entry.title}
-            </p>
-            <time
-              title={fulltime(entry.logged_at)}
-              className="flex-shrink-0 text-[11px] text-[var(--text-tertiary)] mt-0.5 font-mono"
-            >
-              {reltime(entry.logged_at)}
-            </time>
-          </div>
+              {/* Type + timestamp row */}
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <TypeIcon size={9} className="text-[var(--text-tertiary)] flex-shrink-0" />
+                <span className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-wider">
+                  {typeLabel}
+                </span>
+                <span className="text-[var(--border-medium)] text-[10px]">·</span>
+                <time
+                  className="text-[10px] font-mono text-[var(--text-tertiary)]"
+                  title={fulltime(entry.logged_at)}
+                >
+                  {reltime(entry.logged_at)}
+                </time>
+                {showPrivacyBadge && !entry.is_public && (
+                  <>
+                    <span className="text-[var(--border-medium)] text-[10px]">·</span>
+                    <span className="text-[9px] font-mono text-red-400/60 uppercase tracking-wider">private</span>
+                  </>
+                )}
+              </div>
 
-          {/* Body — collapsed shows 2 lines, expanded shows full */}
-          {entry.body && (
-            <p className={`text-[13px] text-[var(--text-secondary)] leading-relaxed mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
-              {entry.body.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').replace(/\nMood:.*$/m, '').trim()}
-            </p>
-          )}
+              {/* Title — the main thing */}
+              <p className="text-[13px] font-semibold text-[var(--text-primary)] leading-snug">
+                {entry.title}
+              </p>
 
-          {/* Thumbnail — 16:9, full-width below text */}
-          {thumbnail && (
-            <div className="mt-2 mb-3 rounded-xl overflow-hidden border border-[var(--border-light)] bg-[var(--bg-secondary)] aspect-video max-h-52">
-              <img
-                src={thumbnail}
-                alt=""
-                className="w-full h-full object-cover"
-              />
             </div>
+
+            {/* Controls — appear on hover */}
+            <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+              {!isPublicView && (
+                <button
+                  onClick={e => { e.stopPropagation(); handleDelete(e) }}
+                  disabled={isDeleting}
+                  className="opacity-0 group-hover:opacity-30 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)] hover:text-red-400 p-1.5 rounded"
+                >
+                  {isDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                </button>
+              )}
+              {hasDetails && (
+                <button
+                  onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+                  className="opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)] p-1.5 rounded"
+                >
+                  <ChevronDown size={13} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded details — AI analysis, mood, energy, reflections */}
+      {expanded && (
+        <div
+          className="border-t border-[var(--border-light)] bg-[var(--bg-secondary)]/20 px-4 py-4"
+          style={{ paddingLeft: thumbnail ? 'calc(88px + 1rem)' : '1rem' }}
+        >
+          {cleanBody && (
+            <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed mb-3">
+              {cleanBody}
+            </p>
           )}
 
-          {/* Reflection snippet — always show when expanded */}
-          {entry.meta?.reflections && expanded && (
-            <div className="mt-2 mb-3 px-3 py-2 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 text-[12px] text-[var(--text-secondary)] leading-relaxed">
+          {entry.meta?.reflections && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-[var(--accent-soft)] border border-[var(--accent)]/15 text-[12px] text-[var(--text-secondary)] leading-relaxed">
               <Sparkles size={10} className="inline mr-1.5 text-[var(--accent)] mb-0.5" />
               {entry.meta.reflections}
             </div>
           )}
 
-          {/* Footer: chips + actions */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Mood chips */}
-            {entry.meta?.mood && <MoodChip mood={entry.meta.mood} />}
-            {entry.meta?.energy && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
-                {entry.meta.energy} energy
-              </span>
-            )}
-
-            {/* Privacy badge */}
-            {showPrivacyBadge && !entry.is_public && (
-              <span className="text-[9px] font-mono text-red-400/70 uppercase tracking-wider">private</span>
-            )}
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Delete (private view only) */}
-            {!isPublicView && (
-              <button
-                onClick={e => { e.stopPropagation(); handleDelete(e) }}
-                disabled={isDeleting}
-                className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)] hover:text-red-400"
-              >
-                {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-              </button>
-            )}
-
-            {/* Expand toggle */}
-            {hasBody && (
-              <button
-                onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
-                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-[var(--text-tertiary)]"
-              >
-                <ChevronDown size={13} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-              </button>
-            )}
-          </div>
+          {(entry.meta?.mood || entry.meta?.energy) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {entry.meta?.mood && <MoodChip mood={entry.meta.mood} />}
+              {entry.meta?.energy && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
+                  {entry.meta.energy} energy
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </article>
   )
 }
