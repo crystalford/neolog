@@ -758,6 +758,7 @@ export type VideoUpload = {
   generated_posts: GeneratedPost[] | null
   generated_clips: SuggestedClip[] | null
   thumbnail_url: string | null
+  playback_path: string | null
   tags: string[]
   meta?: any
   error_message: string | null

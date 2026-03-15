@@ -24,6 +24,7 @@ type UploadItem = {
   analysis: VideoAnalysis | null
   thumbnail_url: string | null
   storage_path: string | null
+  playback_path?: string | null
   video_url?: string | null
   recorded_at: string | null
   created_at: string
@@ -304,7 +305,7 @@ export default function TimelinePage() {
         .from('video_uploads')
         .select(`
           id, file_name, file_size_bytes, mime_type, duration_seconds,
-          status, tags, analysis, thumbnail_url, storage_path,
+          status, tags, analysis, thumbnail_url, storage_path, playback_path,
           recorded_at, created_at, generated_clips, generated_posts
         `)
         .eq('user_id', session.user.id)
@@ -348,23 +349,24 @@ export default function TimelinePage() {
       }
     }
 
-    // Generate signed video URLs for uploads missing thumbnails (for client-side frame capture)
-    const videoPaths = uploads
-      .filter(u => !u.thumbnail_url && u.storage_path && u.mime_type?.startsWith('video/'))
-      .map(u => u.storage_path!)
+    // Generate signed video URLs for uploads missing thumbnails (prefer H.264 playback_path)
+    const videoPathEntries = uploads
+      .filter(u => !u.thumbnail_url && u.mime_type?.startsWith('video/') && (u.playback_path || u.storage_path))
+      .map(u => ({ id: u.id, path: (u.playback_path || u.storage_path)! }))
 
-    if (videoPaths.length > 0) {
+    if (videoPathEntries.length > 0) {
       const { data: signedVideos } = await supabase.storage
         .from('videos')
-        .createSignedUrls(videoPaths, 3600)
+        .createSignedUrls(videoPathEntries.map(e => e.path), 3600)
       if (signedVideos) {
         const videoMap: Record<string, string> = {}
         for (const s of signedVideos) {
           if (s.signedUrl) videoMap[s.path] = s.signedUrl
         }
         for (const u of uploads) {
-          if (!u.thumbnail_url && u.storage_path && videoMap[u.storage_path]) {
-            u.video_url = videoMap[u.storage_path]
+          const path = (u.playback_path || u.storage_path)!
+          if (!u.thumbnail_url && path && videoMap[path]) {
+            u.video_url = videoMap[path]
           }
         }
       }
