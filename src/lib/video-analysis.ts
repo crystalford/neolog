@@ -88,6 +88,13 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
    ],
    "principles": ["articulated rules or frameworks stated explicitly — 'I never X', 'My approach is always Y', 'The rule I follow is Z'"],
 
+   "health_mentions": {
+     "sleep": "any sleep mention, e.g. '6 hours', 'slept great', 'insomnia' — null if none",
+     "energy": "1-10 numeric estimate based on what they say about energy/fatigue — null if not mentioned",
+     "workout": "any exercise or physical activity mentioned — null if none",
+     "body_notes": "any mention of weight changes, physical health, diet, illness — null if none"
+   },
+
    "topics": ["all topics discussed"],
    "key_quotes": ["up to 7 verbatim quotes that are insightful, memorable, or shareable"],
  

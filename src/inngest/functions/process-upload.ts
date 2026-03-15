@@ -661,6 +661,48 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Timeline entry created')
     })
 
+    // ── Step 5b: Passive health log from video analysis ──
+    await step.run('health-log-from-analysis', async () => {
+      const analysis = analysisResult.analysis
+      const health = analysis.health_mentions
+      if (!health) return
+
+      const hasData = health.sleep || health.energy || health.workout || health.body_notes
+      if (!hasData) return
+
+      // Parse sleep hours from text (e.g. "6 hours", "7.5", "slept great" → null)
+      let sleep_hours: number | null = null
+      if (health.sleep) {
+        const match = String(health.sleep).match(/(\d+(?:\.\d+)?)/)
+        if (match) sleep_hours = parseFloat(match[1])
+      }
+
+      // Parse energy level (should be 1-10 or null)
+      let energy_level: number | null = null
+      if (health.energy) {
+        const parsed = parseInt(String(health.energy))
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) energy_level = parsed
+      }
+
+      const hasUsefulData = sleep_hours !== null || energy_level !== null || health.workout || health.body_notes
+      if (!hasUsefulData) return
+
+      await admin.from('health_logs').insert({
+        user_id,
+        logged_at: metadata?.recorded_at || new Date().toISOString(),
+        sleep_hours,
+        energy_level,
+        workout_done: !!health.workout,
+        workout_notes: health.workout || null,
+        notes: health.body_notes || null,
+        mood: analysis.mood || null,
+        source: 'video_analysis',
+        source_upload_id: video_upload_id,
+      })
+
+      await plog(admin, video_upload_id, 'health-log', 'done', 'Health data captured from analysis')
+    })
+
     // ── Step 6: Check manifest training thresholds ──
     const manifestTriggers = await step.run('check-manifest-thresholds', async () => {
       const { checkManifestThresholds } = await import('@/lib/manifest-thresholds')
