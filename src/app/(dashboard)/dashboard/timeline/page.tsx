@@ -23,6 +23,8 @@ type UploadItem = {
   tags: string[]
   analysis: VideoAnalysis | null
   thumbnail_url: string | null
+  storage_path: string | null
+  video_url?: string | null
   recorded_at: string | null
   created_at: string
   generated_clips: any[] | null
@@ -54,6 +56,7 @@ type Session = {
   clipCount: number
   postCount: number
   thumbnailUrl: string | null
+  videoUrl: string | null
   isProcessing: boolean
   isError: boolean
 }
@@ -132,6 +135,7 @@ function buildSessionFromGroup(uploads: UploadItem[]): Session {
   const energy = firstProcessed?.analysis?.energy_level ?? null
   const keyQuote = firstProcessed?.analysis?.key_quotes?.[0] ?? null
   const thumbnailUrl = sorted.find(u => u.thumbnail_url)?.thumbnail_url ?? null
+  const videoUrl = thumbnailUrl ? null : (sorted.find(u => u.video_url)?.video_url ?? null)
 
   const topics = extractTopics(sorted)
 
@@ -154,6 +158,7 @@ function buildSessionFromGroup(uploads: UploadItem[]): Session {
     clipCount,
     postCount,
     thumbnailUrl,
+    videoUrl,
     isProcessing,
     isError,
   }
@@ -210,6 +215,54 @@ function buildDayGroups(sessions: Session[], notes: NoteItem[], view: View): Day
     .map(([, v]) => v)
 }
 
+// ─── VideoThumb ───────────────────────────────────────────────────────────────
+
+function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.crossOrigin = 'anonymous'
+    video.src = videoUrl
+
+    const onSeeked = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth || 160
+        canvas.height = video.videoHeight || 90
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(video, 0, 0)
+          setThumbUrl(canvas.toDataURL('image/jpeg', 0.7))
+        }
+      } catch {
+        // CORS or canvas taint — leave null
+      }
+      video.src = ''
+    }
+
+    const onMeta = () => {
+      video.currentTime = Math.min(3, video.duration * 0.05 || 0)
+    }
+
+    video.addEventListener('loadedmetadata', onMeta)
+    video.addEventListener('seeked', onSeeked)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', onMeta)
+      video.removeEventListener('seeked', onSeeked)
+      video.src = ''
+    }
+  }, [videoUrl])
+
+  if (thumbUrl) {
+    return <img src={thumbUrl} alt="" className={className ?? 'w-full h-full object-cover'} />
+  }
+  return <div className="w-full h-full bg-[var(--bg-tertiary)] animate-pulse opacity-20" />
+}
+
 // ─── SessionCard ──────────────────────────────────────────────────────────────
 
 function SessionCard({ session }: { session: Session }) {
@@ -233,6 +286,10 @@ function SessionCard({ session }: { session: Session }) {
               className="w-full h-full object-cover"
               style={{ minHeight: '72px' }}
             />
+          </div>
+        ) : session.videoUrl ? (
+          <div className="flex-shrink-0 w-[80px] overflow-hidden border-r border-[var(--border-light)] bg-[var(--bg-secondary)]" style={{ minHeight: '72px' }}>
+            <VideoThumb videoUrl={session.videoUrl} />
           </div>
         ) : (
           <div
@@ -408,7 +465,7 @@ export default function TimelinePage() {
         .from('video_uploads')
         .select(`
           id, file_name, file_size_bytes, mime_type, duration_seconds,
-          status, tags, analysis, thumbnail_url,
+          status, tags, analysis, thumbnail_url, storage_path,
           recorded_at, created_at, generated_clips, generated_posts
         `)
         .eq('user_id', session.user.id)
@@ -447,6 +504,28 @@ export default function TimelinePage() {
         for (const u of uploads) {
           if (u.thumbnail_url && map[u.thumbnail_url]) {
             u.thumbnail_url = map[u.thumbnail_url]
+          }
+        }
+      }
+    }
+
+    // Generate signed video URLs for uploads missing thumbnails (for client-side frame capture)
+    const videoPaths = uploads
+      .filter(u => !u.thumbnail_url && u.storage_path && u.mime_type?.startsWith('video/'))
+      .map(u => u.storage_path!)
+
+    if (videoPaths.length > 0) {
+      const { data: signedVideos } = await supabase.storage
+        .from('videos')
+        .createSignedUrls(videoPaths, 3600)
+      if (signedVideos) {
+        const videoMap: Record<string, string> = {}
+        for (const s of signedVideos) {
+          if (s.signedUrl) videoMap[s.path] = s.signedUrl
+        }
+        for (const u of uploads) {
+          if (!u.thumbnail_url && u.storage_path && videoMap[u.storage_path]) {
+            u.video_url = videoMap[u.storage_path]
           }
         }
       }
