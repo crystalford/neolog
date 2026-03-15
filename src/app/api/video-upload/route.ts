@@ -172,9 +172,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch uploads', details: error.message }, { status: 500 })
     }
 
-    // Generate signed URLs for thumbnails stored as storage paths (not http URLs)
+    // Generate signed URLs for thumbnails stored as storage paths (skip http and data: URLs)
     const thumbPaths = (data || [])
-      .filter((u: any) => u.thumbnail_url && !u.thumbnail_url.startsWith('http'))
+      .filter((u: any) => u.thumbnail_url && !u.thumbnail_url.startsWith('http') && !u.thumbnail_url.startsWith('data:'))
       .map((u: any) => u.thumbnail_url)
 
     let signedMap: Record<string, string> = {}
@@ -210,9 +210,11 @@ export async function GET(request: NextRequest) {
       const videoPath = u.playback_path || u.storage_path
       return {
         ...u,
-        thumbnail_url: u.thumbnail_url && !u.thumbnail_url.startsWith('http')
-          ? (signedMap[u.thumbnail_url] || null)
-          : u.thumbnail_url,
+        thumbnail_url: (u.thumbnail_url?.startsWith('data:') || u.thumbnail_url?.startsWith('http'))
+          ? u.thumbnail_url
+          : u.thumbnail_url
+            ? (signedMap[u.thumbnail_url] || null)
+            : null,
         video_url: (!u.thumbnail_url && videoPath)
           ? (videoSignedMap[videoPath] || null)
           : null,

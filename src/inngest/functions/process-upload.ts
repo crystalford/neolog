@@ -5,6 +5,15 @@ import { runAnalysis, upsertEntities } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import Replicate from 'replicate'
 
+// Replicate SDK v1.4 returns FileOutput objects (not strings) and sometimes arrays.
+// This helper safely extracts the URL from any output shape.
+function extractReplicateUrl(output: unknown): string | null {
+  const value = Array.isArray(output) ? output[0] : output
+  if (!value) return null
+  const url = typeof value === 'string' ? value : String(value)
+  return url.startsWith('http') ? url : null
+}
+
 // Helper for logging to processing_logs table
 async function plog(supabase: any, uploadId: string, step: string, status: string, message?: string) {
   if (!supabase) return
@@ -130,8 +139,8 @@ export const processUpload = inngest.createFunction(
           },
         )
 
-        const audioUrl = output ? String(output) : null
-        if (!audioUrl || !audioUrl.startsWith('http')) return { path: upload.storage_path, extracted: false }
+        const audioUrl = extractReplicateUrl(output)
+        if (!audioUrl) return { path: upload.storage_path, extracted: false }
 
         const audioResponse = await fetch(audioUrl)
         const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
@@ -427,8 +436,8 @@ export const processUpload = inngest.createFunction(
           }
         ) as any
 
-        const thumbUrl = output ? String(output) : null
-        if (!thumbUrl || !thumbUrl.startsWith('http')) return null
+        const thumbUrl = extractReplicateUrl(output)
+        if (!thumbUrl) return null
 
         const imgResponse = await fetch(thumbUrl)
         const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
@@ -440,8 +449,9 @@ export const processUpload = inngest.createFunction(
           cacheControl: '31536000',
         })
 
-        // Store the storage path — the listing API generates signed URLs at read time
-        await admin.from('video_uploads').update({ thumbnail_url: thumbPath }).eq('id', video_upload_id)
+        // Store base64 data URL directly — renders in <img> with zero signed URL chain
+        const base64DataUrl = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+        await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
 
         // Also archive this frame as a face corpus entry
         const fidelityScore = scoreFrameFidelity(imgBuffer)
@@ -493,8 +503,8 @@ export const processUpload = inngest.createFunction(
           },
         ) as any
 
-        const outputUrl = output ? String(output) : null
-        if (!outputUrl || !outputUrl.startsWith('http')) return null
+        const outputUrl = extractReplicateUrl(output)
+        if (!outputUrl) return null
 
         const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
         const playbackStoragePath = `${user_id}/playback/${video_upload_id}.mp4`
@@ -548,8 +558,8 @@ export const processUpload = inngest.createFunction(
             }
           ) as any
 
-          const faceUrl = output ? String(output) : null
-          if (!faceUrl || !faceUrl.startsWith('http')) continue
+          const faceUrl = extractReplicateUrl(output)
+          if (!faceUrl) continue
 
           const imgResponse = await fetch(faceUrl)
           const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
