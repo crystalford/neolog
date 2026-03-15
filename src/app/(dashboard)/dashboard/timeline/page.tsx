@@ -327,9 +327,9 @@ export default function TimelinePage() {
     if (uploadsRes.error) console.error('[Timeline] video_uploads query error:', uploadsRes.error)
     const uploads = (uploadsRes.data ?? []) as UploadItem[]
 
-    // Resolve thumbnail signed URLs (only non-http paths)
+    // Resolve thumbnail signed URLs (only legacy storage paths — skip http and data: URLs)
     const thumbPaths = uploads
-      .filter(u => u.thumbnail_url && !u.thumbnail_url.startsWith('http'))
+      .filter(u => u.thumbnail_url && !u.thumbnail_url.startsWith('http') && !u.thumbnail_url.startsWith('data:'))
       .map(u => u.thumbnail_url!)
 
     if (thumbPaths.length > 0) {
