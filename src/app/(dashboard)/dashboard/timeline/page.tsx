@@ -412,7 +412,8 @@ export default function TimelinePage() {
           recorded_at, created_at, generated_clips, generated_posts
         `)
         .eq('user_id', session.user.id)
-        .not('status', 'in', '("deleting","deleted")')
+        .neq('status', 'deleted')
+        .neq('status', 'deleting')
         .order('recorded_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(200),
@@ -426,6 +427,7 @@ export default function TimelinePage() {
         .limit(100),
     ])
 
+    if (uploadsRes.error) console.error('[Timeline] video_uploads query error:', uploadsRes.error)
     const uploads = (uploadsRes.data ?? []) as UploadItem[]
 
     // Resolve thumbnail signed URLs (only non-http paths)
