@@ -129,66 +129,26 @@ export const processUpload = inngest.createFunction(
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
+        // fofr/toolkit correct API: task + input_file (no ffmpeg_command parameter)
         const output = await replicate.run(
           'fofr/toolkit',
           {
             input: {
+              task: 'extract_video_audio_as_mp3',
               input_file: signedData.signedUrl,
-              ffmpeg_command: '-i {input_file} -vn -acodec pcm_s16le -ar 16000 -ac 1 output.wav',
             },
           },
         )
 
         const audioUrl = extractReplicateUrl(output)
-        if (!audioUrl) return { path: upload.storage_path, extracted: false }
+        if (!audioUrl) return { path: upload.storage_path, extracted: false, isDirectUrl: false }
 
-        const audioResponse = await fetch(audioUrl)
-        const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
-        const audioStoragePath = `${user_id}/neural-corpus/audio/${Date.now()}.wav`
-
-        await admin.storage
-          .from('videos')
-          .upload(audioStoragePath, audioBuffer, {
-            contentType: 'audio/wav',
-            cacheControl: '31536000',
-          })
-
-        // Extract real duration from WAV header
-        let durationSeconds: number | null = null
-        try {
-          if (audioBuffer.length >= 44) {
-            const sampleRate = audioBuffer.readUInt32LE(24)
-            const numChannels = audioBuffer.readUInt16LE(22)
-            const bitsPerSample = audioBuffer.readUInt16LE(34)
-            const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
-            // Find 'data' chunk size — it starts at byte 40 in standard WAV
-            const dataChunkSize = audioBuffer.readUInt32LE(40)
-            if (byteRate > 0 && dataChunkSize > 0) {
-              durationSeconds = dataChunkSize / byteRate
-            }
-          }
-        } catch { /* ignore — fall back to null */ }
-
-        // Archive in Neural Corpus
-        await admin.from('neural_corpus').insert({
-          user_id,
-          source_upload_id: video_upload_id,
-          type: 'voice',
-          storage_path: audioStoragePath,
-          fidelity_score: 0.8,
-          fidelity_rank: 'A',
-          meta: {
-            sample_rate: 44100,
-            format: 'wav',
-            ...(durationSeconds !== null ? { duration_seconds: Math.round(durationSeconds) } : {}),
-          },
-        })
-
-        await plog(admin, video_upload_id, 'extract-audio', 'done', `Signal archived to corpus: ${audioStoragePath}`)
-        return { path: audioStoragePath, extracted: true }
+        await plog(admin, video_upload_id, 'extract-audio', 'done', `Audio extracted: ${audioUrl}`)
+        // Return the direct Replicate MP3 URL — transcribe step uses it without re-signing
+        return { path: audioUrl, extracted: true, isDirectUrl: true }
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-audio', 'error', err?.message)
-        return { path: upload.storage_path, extracted: false }
+        return { path: upload.storage_path, extracted: false, isDirectUrl: false }
       }
     })
 
@@ -425,49 +385,39 @@ export const processUpload = inngest.createFunction(
       try {
         const replicate = new Replicate({ auth: replicateToken })
 
-        // Extract a single frame at 3 seconds (falls back gracefully for short clips)
+        // fofr/toolkit correct API: extract_frames_from_input returns a ZIP of PNGs at given fps
         const output = await replicate.run(
           "fofr/toolkit",
           {
             input: {
+              task: 'extract_frames_from_input',
               input_file: signedData.signedUrl,
-              ffmpeg_command: "-ss 00:00:03 -i {input_file} -vframes 1 -vf scale=640:-1 output.jpg"
+              fps: 1,
             }
           }
         ) as any
 
-        const thumbUrl = extractReplicateUrl(output)
-        if (!thumbUrl) return null
+        const zipUrl = extractReplicateUrl(output)
+        if (!zipUrl) return null
 
-        const imgResponse = await fetch(thumbUrl)
-        const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
-        const thumbPath = `${user_id}/thumbnails/${video_upload_id}.jpg`
+        // Download and unzip — jszip is already in package.json
+        const JSZip = (await import('jszip')).default
+        const zipResponse = await fetch(zipUrl)
+        const zipBuffer = await zipResponse.arrayBuffer()
+        const zip = await JSZip.loadAsync(zipBuffer)
 
-        await admin.storage.from('videos').upload(thumbPath, imgBuffer, {
-          contentType: 'image/jpeg',
-          upsert: true,
-          cacheControl: '31536000',
-        })
+        // Frames named out001.png, out002.png, ... at 1fps
+        // Try ~3s frame first, fall back to earlier frames for short clips
+        const frameFile = zip.file('out004.png') ?? zip.file('out003.png') ?? zip.file('out002.png') ?? zip.file('out001.png')
+        if (!frameFile) return null
+        const imgBuffer = Buffer.from(await frameFile.async('arraybuffer'))
 
         // Store base64 data URL directly — renders in <img> with zero signed URL chain
-        const base64DataUrl = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+        const base64DataUrl = `data:image/png;base64,${imgBuffer.toString('base64')}`
         await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
 
-        // Also archive this frame as a face corpus entry
-        const fidelityScore = scoreFrameFidelity(imgBuffer)
-        const fidelityRank = fidelityScore >= 0.95 ? 'S' : fidelityScore >= 0.85 ? 'A' : fidelityScore >= 0.7 ? 'B' : 'C'
-        await admin.from('neural_corpus').insert({
-          user_id,
-          source_upload_id: video_upload_id,
-          type: 'face',
-          storage_path: thumbPath,
-          fidelity_score: fidelityScore,
-          fidelity_rank: fidelityRank,
-          meta: { timestamp: '00:00:03', format: 'jpg', width: 640 },
-        })
-
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored at ${thumbPath} (fidelity: ${fidelityScore})`)
-        return thumbPath
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', 'Thumbnail stored as base64 data URL')
+        return true
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
         return null
@@ -493,12 +443,13 @@ export const processUpload = inngest.createFunction(
       try {
         const replicate = new Replicate({ auth: replicateToken })
 
+        // fofr/toolkit correct API: convert_input_to_mp4 re-encodes to H.264/AAC
         const output = await replicate.run(
           'fofr/toolkit',
           {
             input: {
+              task: 'convert_input_to_mp4',
               input_file: signedData.signedUrl,
-              ffmpeg_command: "-i {input_file} -c:v libx264 -preset fast -crf 28 -movflags +faststart -vf \"scale='min(1280,iw)':-2\" -c:a aac -b:a 128k output.mp4",
             },
           },
         ) as any
@@ -605,19 +556,24 @@ export const processUpload = inngest.createFunction(
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) throw new Error('REPLICATE_API_TOKEN missing')
 
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(audioPath.path, 3600)
-
-      if (!signedData?.signedUrl) throw new Error('Failed to sign audio URL')
+      // If audio extraction succeeded, audioPath.path is a direct URL; otherwise sign the storage path
+      let whisperAudioUrl: string
+      if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) {
+        whisperAudioUrl = audioPath.path
+      } else {
+        const { data: signedData } = await admin.storage
+          .from('videos')
+          .createSignedUrl(audioPath.path, 3600)
+        if (!signedData?.signedUrl) throw new Error('Failed to sign audio URL')
+        whisperAudioUrl = signedData.signedUrl
+      }
 
       const replicate = new Replicate({ auth: replicateToken })
-      // REVERTED: Using known-good model version and parameters
       const output = await replicate.run(
         'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
         {
           input: {
-            audio: signedData.signedUrl,
+            audio: whisperAudioUrl,
             model: 'large-v3',
             transcription: 'plain text',
             language: 'auto',
