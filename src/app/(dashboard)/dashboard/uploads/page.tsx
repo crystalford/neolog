@@ -33,49 +33,19 @@ type ActiveUpload = {
 }
 
 function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.preload = 'metadata'
-    video.crossOrigin = 'anonymous'
-    video.src = videoUrl
-
-    const onSeeked = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth || 320
-        canvas.height = video.videoHeight || 180
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.drawImage(video, 0, 0)
-          setThumbUrl(canvas.toDataURL('image/jpeg', 0.7))
-        }
-      } catch {
-        // CORS or canvas taint — leave thumbUrl null
-      }
-      video.src = ''
-    }
-
-    const onMeta = () => {
-      video.currentTime = Math.min(3, video.duration * 0.05 || 0)
-    }
-
-    video.addEventListener('loadedmetadata', onMeta)
-    video.addEventListener('seeked', onSeeked)
-
-    return () => {
-      video.removeEventListener('loadedmetadata', onMeta)
-      video.removeEventListener('seeked', onSeeked)
-      video.src = ''
-    }
-  }, [videoUrl])
-
-  if (thumbUrl) {
-    return <img src={thumbUrl} alt="" className={className ?? 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-105'} />
-  }
-  return <div className="w-full h-full bg-[var(--bg-tertiary)] animate-pulse opacity-30" />
+  const ref = useRef<HTMLVideoElement>(null)
+  return (
+    <video
+      ref={ref}
+      src={videoUrl}
+      muted
+      playsInline
+      preload="auto"
+      className={className ?? 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-105'}
+      style={{ pointerEvents: 'none' }}
+      onLoadedMetadata={() => { if (ref.current) ref.current.currentTime = 3 }}
+    />
+  )
 }
 
 export default function UploadsPage() {

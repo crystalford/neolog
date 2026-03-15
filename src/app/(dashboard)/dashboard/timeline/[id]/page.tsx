@@ -48,6 +48,7 @@ export default function TimelineDetailPage() {
   const [upload, setUpload] = useState<VideoUpload | null>(null)
   const [mentions, setMentions] = useState<EntityMentionRow[]>([])
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoError, setVideoError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
@@ -204,8 +205,25 @@ export default function TimelineDetailPage() {
               controls
               src={videoUrl}
               className="w-full max-h-[420px] object-contain"
+              onError={(e) => {
+                const code = (e.target as HTMLVideoElement).error?.code
+                const msgs: Record<number, string> = {
+                  2: 'Network error loading video.',
+                  3: 'Could not decode video. If this is a MOV/HEVC file, install HEVC Video Extensions on Windows.',
+                  4: 'Video format not supported in this browser. MOV/HEVC files require HEVC Video Extensions on Windows.',
+                }
+                setVideoError(msgs[code ?? 0] ?? 'Video could not be loaded.')
+              }}
             />
           )}
+        </div>
+      )}
+
+      {/* Video error */}
+      {videoError && (
+        <div className="mb-6 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[12px]">
+          <span className="mt-0.5 flex-shrink-0">⚠</span>
+          <span>{videoError}</span>
         </div>
       )}
 

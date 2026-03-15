@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { format, isToday, isYesterday } from 'date-fns'
 import {
-  Video, FileText, Loader2, Heart, Dumbbell,
-  ChevronRight, Film, FileEdit
+  Video, FileText, Loader2, Heart,
+  ChevronRight
 } from 'lucide-react'
 import type { VideoAnalysis } from '@/types/database'
 
@@ -42,29 +42,10 @@ type NoteItem = {
   thumbnail_url: string | null
 }
 
-type Session = {
-  id: string
-  uploads: UploadItem[]
-  startTime: Date
-  endTime: Date
-  totalDuration: number
-  topics: string[]
-  mood: string | null
-  energy: string | null
-  summary: string | null
-  keyQuote: string | null
-  clipCount: number
-  postCount: number
-  thumbnailUrl: string | null
-  videoUrl: string | null
-  isProcessing: boolean
-  isError: boolean
-}
-
 type DayGroup = {
   label: string
   date: Date
-  sessions: Session[]
+  uploads: UploadItem[]
   notes: NoteItem[]
 }
 
@@ -76,7 +57,7 @@ function getUploadTime(u: UploadItem): number {
   return new Date(u.recorded_at ?? u.created_at).getTime()
 }
 
-function formatTotalDuration(seconds: number): string {
+function formatDuration(seconds: number): string {
   if (seconds <= 0) return ''
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -85,117 +66,23 @@ function formatTotalDuration(seconds: number): string {
   return `${Math.floor(seconds)}s`
 }
 
-function formatTimeRange(start: Date, end: Date): string {
-  const startStr = format(start, 'h:mm a')
-  if (start.getTime() === end.getTime()) return startStr
-  const endStr = format(end, 'h:mm a')
-  return `${startStr} – ${endStr}`
-}
-
 function formatDayHeader(date: Date): string {
   if (isToday(date)) return 'Today'
   if (isYesterday(date)) return 'Yesterday'
   return format(date, 'EEEE, MMMM d · yyyy').toUpperCase()
 }
 
-function extractTopics(uploads: UploadItem[]): string[] {
-  const seen = new Set<string>()
-  const topics: string[] = []
-  for (const u of uploads) {
-    if (!u.analysis) continue
-    const a = u.analysis
-    const candidates = [
-      ...(a.recurring_themes ?? []),
-      ...(a.topics ?? []),
-      ...(a.categories ?? []).map((c: any) => typeof c === 'string' ? c : (c.name ?? '')),
-    ]
-    for (const t of candidates) {
-      const key = t.toLowerCase().trim()
-      if (key && !seen.has(key) && topics.length < 8) {
-        seen.add(key)
-        topics.push(t)
-      }
-    }
-  }
-  return topics.slice(0, 6)
-}
-
-function buildSessionFromGroup(uploads: UploadItem[]): Session {
-  const sorted = [...uploads].sort((a, b) => getUploadTime(a) - getUploadTime(b))
-  const startTime = new Date(getUploadTime(sorted[0]))
-  const endTime = new Date(getUploadTime(sorted[sorted.length - 1]))
-
-  const totalDuration = sorted.reduce((sum, u) => sum + (u.duration_seconds ?? 0), 0)
-  const clipCount = sorted.reduce((sum, u) => sum + (u.generated_clips?.length ?? 0), 0)
-  const postCount = sorted.reduce((sum, u) => sum + (u.generated_posts?.length ?? 0), 0)
-
-  const firstProcessed = sorted.find(u => u.status === 'processed' && u.analysis)
-  const summary = firstProcessed?.analysis?.summary ?? null
-  const mood = firstProcessed?.analysis?.mood ?? null
-  const energy = firstProcessed?.analysis?.energy_level ?? null
-  const keyQuote = firstProcessed?.analysis?.key_quotes?.[0] ?? null
-  const thumbnailUrl = sorted.find(u => u.thumbnail_url)?.thumbnail_url ?? null
-  const videoUrl = thumbnailUrl ? null : (sorted.find(u => u.video_url)?.video_url ?? null)
-
-  const topics = extractTopics(sorted)
-
-  const isProcessing = sorted.some(
-    u => u.status === 'transcribing' || u.status === 'analyzing' || u.status === 'uploaded'
-  )
-  const isError = !isProcessing && sorted.every(u => u.status === 'error')
-
-  return {
-    id: sorted[0].id,
-    uploads: sorted,
-    startTime,
-    endTime,
-    totalDuration,
-    topics,
-    mood,
-    energy,
-    summary,
-    keyQuote,
-    clipCount,
-    postCount,
-    thumbnailUrl,
-    videoUrl,
-    isProcessing,
-    isError,
-  }
-}
-
-function buildSessions(uploads: UploadItem[], windowMinutes = 90): Session[] {
-  if (uploads.length === 0) return []
-
-  const sorted = [...uploads].sort((a, b) => getUploadTime(a) - getUploadTime(b))
-  const groups: UploadItem[][] = []
-  let current: UploadItem[] = [sorted[0]]
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = current[current.length - 1]
-    const gap = (getUploadTime(sorted[i]) - getUploadTime(prev)) / 60000
-    if (gap <= windowMinutes) {
-      current.push(sorted[i])
-    } else {
-      groups.push(current)
-      current = [sorted[i]]
-    }
-  }
-  groups.push(current)
-
-  return groups.map(buildSessionFromGroup).reverse()
-}
-
-function buildDayGroups(sessions: Session[], notes: NoteItem[], view: View): DayGroup[] {
+function buildDayGroups(uploads: UploadItem[], notes: NoteItem[], view: View): DayGroup[] {
   const dayMap = new Map<string, DayGroup>()
 
   if (view !== 'notes') {
-    for (const s of sessions) {
-      const key = format(s.startTime, 'yyyy-MM-dd')
+    for (const u of uploads) {
+      const date = new Date(u.recorded_at ?? u.created_at)
+      const key = format(date, 'yyyy-MM-dd')
       if (!dayMap.has(key)) {
-        dayMap.set(key, { label: formatDayHeader(s.startTime), date: s.startTime, sessions: [], notes: [] })
+        dayMap.set(key, { label: formatDayHeader(date), date, uploads: [], notes: [] })
       }
-      dayMap.get(key)!.sessions.push(s)
+      dayMap.get(key)!.uploads.push(u)
     }
   }
 
@@ -204,7 +91,7 @@ function buildDayGroups(sessions: Session[], notes: NoteItem[], view: View): Day
       const date = new Date(n.logged_at)
       const key = format(date, 'yyyy-MM-dd')
       if (!dayMap.has(key)) {
-        dayMap.set(key, { label: formatDayHeader(date), date, sessions: [], notes: [] })
+        dayMap.set(key, { label: formatDayHeader(date), date, uploads: [], notes: [] })
       }
       dayMap.get(key)!.notes.push(n)
     }
@@ -218,84 +105,59 @@ function buildDayGroups(sessions: Session[], notes: NoteItem[], view: View): Day
 // ─── VideoThumb ───────────────────────────────────────────────────────────────
 
 function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.preload = 'metadata'
-    video.crossOrigin = 'anonymous'
-    video.src = videoUrl
-
-    const onSeeked = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth || 160
-        canvas.height = video.videoHeight || 90
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.drawImage(video, 0, 0)
-          setThumbUrl(canvas.toDataURL('image/jpeg', 0.7))
-        }
-      } catch {
-        // CORS or canvas taint — leave null
-      }
-      video.src = ''
-    }
-
-    const onMeta = () => {
-      video.currentTime = Math.min(3, video.duration * 0.05 || 0)
-    }
-
-    video.addEventListener('loadedmetadata', onMeta)
-    video.addEventListener('seeked', onSeeked)
-
-    return () => {
-      video.removeEventListener('loadedmetadata', onMeta)
-      video.removeEventListener('seeked', onSeeked)
-      video.src = ''
-    }
-  }, [videoUrl])
-
-  if (thumbUrl) {
-    return <img src={thumbUrl} alt="" className={className ?? 'w-full h-full object-cover'} />
-  }
-  return <div className="w-full h-full bg-[var(--bg-tertiary)] animate-pulse opacity-20" />
+  const ref = useRef<HTMLVideoElement>(null)
+  return (
+    <video
+      ref={ref}
+      src={videoUrl}
+      muted
+      playsInline
+      preload="auto"
+      className={className ?? 'w-full h-full object-cover'}
+      style={{ pointerEvents: 'none' }}
+      onLoadedMetadata={() => { if (ref.current) ref.current.currentTime = 3 }}
+    />
+  )
 }
 
-// ─── SessionCard ──────────────────────────────────────────────────────────────
+// ─── UploadCard ───────────────────────────────────────────────────────────────
 
-function SessionCard({ session }: { session: Session }) {
-  const count = session.uploads.length
-  const isMulti = count > 1
-  const timeLabel = formatTimeRange(session.startTime, session.endTime)
-  const durationLabel = formatTotalDuration(session.totalDuration)
+function UploadCard({ upload }: { upload: UploadItem }) {
+  const a = upload.analysis
+  const isAudio = upload.mime_type?.startsWith('audio/')
+  const isProcessing = upload.status === 'transcribing' || upload.status === 'analyzing' || upload.status === 'uploaded'
+  const isError = upload.status === 'error'
+  const time = format(new Date(upload.recorded_at ?? upload.created_at), 'h:mm a')
+  const durationLabel = upload.duration_seconds ? formatDuration(upload.duration_seconds) : ''
+
+  const topics = a ? [
+    ...(a.recurring_themes ?? []),
+    ...(a.topics ?? []),
+    ...(a.categories ?? []).map((c: any) => typeof c === 'string' ? c : (c.name ?? '')),
+  ].filter((v, i, arr) => arr.findIndex(x => x.toLowerCase() === v.toLowerCase()) === i).slice(0, 5) : []
+
+  const summary = a?.summary ?? null
+  const keyQuote = a?.key_quotes?.[0] ?? null
+  const mood = a?.mood ?? null
+  const energy = a?.energy_level ?? null
 
   return (
     <Link
-      href={`/dashboard/timeline/${session.id}`}
+      href={`/dashboard/timeline/${upload.id}`}
       className="block group hover:bg-white/[0.018] transition-colors"
     >
       <div className="flex items-stretch gap-0">
-        {/* Thumbnail or icon */}
-        {session.thumbnailUrl ? (
+        {/* Thumbnail */}
+        {upload.thumbnail_url ? (
           <div className="flex-shrink-0 w-[80px] overflow-hidden border-r border-[var(--border-light)] bg-[var(--bg-secondary)]">
-            <img
-              src={session.thumbnailUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{ minHeight: '72px' }}
-            />
+            <img src={upload.thumbnail_url} alt="" className="w-full h-full object-cover" style={{ minHeight: '72px' }} />
           </div>
-        ) : session.videoUrl ? (
+        ) : upload.video_url ? (
           <div className="flex-shrink-0 w-[80px] overflow-hidden border-r border-[var(--border-light)] bg-[var(--bg-secondary)]" style={{ minHeight: '72px' }}>
-            <VideoThumb videoUrl={session.videoUrl} />
+            <VideoThumb videoUrl={upload.video_url} />
           </div>
         ) : (
-          <div
-            className="flex-shrink-0 w-[80px] border-r border-[var(--border-light)] bg-[var(--bg-secondary)]/40 flex items-center justify-center"
-            style={{ minHeight: '72px' }}
-          >
+          <div className="flex-shrink-0 w-[80px] border-r border-[var(--border-light)] bg-[var(--bg-secondary)]/40 flex items-center justify-center" style={{ minHeight: '72px' }}>
             <Video size={18} className="text-[var(--text-tertiary)]/30" />
           </div>
         )}
@@ -307,7 +169,7 @@ function SessionCard({ session }: { session: Session }) {
           <div className="flex items-center gap-2 mb-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0" />
             <span className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">
-              {isMulti ? `Recording Session · ${count} clips` : 'Recording'}
+              {isAudio ? 'Voice Recording' : 'Recording'}
             </span>
             {durationLabel && (
               <>
@@ -315,33 +177,30 @@ function SessionCard({ session }: { session: Session }) {
                 <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{durationLabel}</span>
               </>
             )}
-            <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] opacity-60">{timeLabel}</span>
+            <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] opacity-60">{time}</span>
           </div>
 
           {/* Summary / processing state */}
-          {session.isError ? (
+          {isError ? (
             <p className="text-[13px] text-[var(--text-tertiary)] italic">Processing failed.</p>
-          ) : session.isProcessing && !session.summary ? (
+          ) : isProcessing && !summary ? (
             <div className="flex items-center gap-2 text-[13px] text-[var(--text-tertiary)]">
               <Loader2 size={12} className="animate-spin" />
               <span>Transcribing and analyzing…</span>
             </div>
-          ) : session.summary ? (
+          ) : summary ? (
             <p className="text-[13.5px] leading-relaxed text-[var(--text-secondary)] mb-2">
-              {session.summary.length > 280 ? session.summary.slice(0, 280) + '…' : session.summary}
+              {summary.length > 280 ? summary.slice(0, 280) + '…' : summary}
             </p>
           ) : (
             <p className="text-[13px] text-[var(--text-tertiary)] italic">No analysis yet.</p>
           )}
 
           {/* Topics */}
-          {session.topics.length > 0 && (
+          {topics.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {session.topics.map(t => (
-                <span
-                  key={t}
-                  className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15"
-                >
+              {topics.map(t => (
+                <span key={t} className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15">
                   {t}
                 </span>
               ))}
@@ -349,43 +208,23 @@ function SessionCard({ session }: { session: Session }) {
           )}
 
           {/* Signals */}
-          {(session.mood || session.energy) && (
+          {(mood || energy) && (
             <p className="text-[11px] font-mono text-[var(--text-tertiary)] mb-2">
-              {[session.mood, session.energy ? `${session.energy} energy` : null]
-                .filter(Boolean)
-                .join('  ·  ')}
+              {[mood, energy ? `${energy} energy` : null].filter(Boolean).join('  ·  ')}
             </p>
           )}
 
           {/* Key quote */}
-          {session.keyQuote && (
+          {keyQuote && (
             <blockquote className="border-l-2 border-[var(--accent)]/30 pl-3 mb-2">
               <p className="text-[12px] italic text-[var(--text-tertiary)] leading-relaxed">
-                "{session.keyQuote.length > 160 ? session.keyQuote.slice(0, 160) + '…' : session.keyQuote}"
+                "{keyQuote.length > 160 ? keyQuote.slice(0, 160) + '…' : keyQuote}"
               </p>
             </blockquote>
           )}
 
-          {/* Artifact counts + chevron */}
-          <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center gap-3">
-              {session.clipCount > 0 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-tertiary)]">
-                  <Film size={10} />
-                  {session.clipCount} clip{session.clipCount !== 1 ? 's' : ''}
-                </span>
-              )}
-              {session.postCount > 0 && (
-                <span className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-tertiary)]">
-                  <FileEdit size={10} />
-                  {session.postCount} post{session.postCount !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-            <ChevronRight
-              size={13}
-              className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0"
-            />
+          <div className="flex justify-end mt-1">
+            <ChevronRight size={13} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
           </div>
         </div>
       </div>
@@ -448,7 +287,7 @@ const VIEWS: { id: View; label: string }[] = [
 ]
 
 export default function TimelinePage() {
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [uploads, setUploads] = useState<UploadItem[]>([])
   const [notes, setNotes] = useState<NoteItem[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>('all')
@@ -531,15 +370,15 @@ export default function TimelinePage() {
       }
     }
 
-    setSessions(buildSessions(uploads))
+    setUploads(uploads)
     setNotes((notesRes.data ?? []) as NoteItem[])
     setLoading(false)
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  const dayGroups = buildDayGroups(sessions, notes, view)
-  const totalEvents = sessions.length + notes.length
+  const dayGroups = buildDayGroups(uploads, notes, view)
+  const totalEvents = uploads.length + notes.length
 
   return (
     <div className="px-6 py-8 max-w-3xl mx-auto">
@@ -554,7 +393,7 @@ export default function TimelinePage() {
         </h1>
         {!loading && (
           <p className="text-[11px] font-mono text-[var(--text-tertiary)]">
-            {sessions.length} recording{sessions.length !== 1 ? 's' : ''}
+            {uploads.length} recording{uploads.length !== 1 ? 's' : ''}
             {notes.length > 0 ? ` · ${notes.length} note${notes.length !== 1 ? 's' : ''}` : ''}
           </p>
         )}
@@ -609,14 +448,14 @@ export default function TimelinePage() {
                 </span>
                 <div className="flex-1 h-px bg-[var(--border-light)]" />
                 <span className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-40">
-                  {day.sessions.length + day.notes.length} {day.sessions.length + day.notes.length === 1 ? 'entry' : 'entries'}
+                  {day.uploads.length + day.notes.length} {day.uploads.length + day.notes.length === 1 ? 'entry' : 'entries'}
                 </span>
               </div>
 
               {/* Cards */}
               <div className="rounded-xl border border-[var(--border-light)] overflow-hidden bg-[var(--bg-card)] divide-y divide-[var(--border-light)]">
-                {day.sessions.map(s => (
-                  <SessionCard key={s.id} session={s} />
+                {day.uploads.map(u => (
+                  <UploadCard key={u.id} upload={u} />
                 ))}
                 {day.notes.map(n => (
                   <NoteCard key={n.id} note={n} />
