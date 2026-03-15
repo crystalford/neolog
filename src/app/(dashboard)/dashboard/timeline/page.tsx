@@ -29,6 +29,7 @@ type TimelineEntry = {
     file_name: string | null
     duration_seconds: number | null
     status: string | null
+    thumbnail_url: string | null
   } | null
 }
 
@@ -353,7 +354,8 @@ export default function TimelinePage() {
       .from('log_entries')
       .select(`
         id, entry_type, title, body, logged_at, software_tags,
-        is_public, source_upload_id, thumbnail_url, meta
+        is_public, source_upload_id, thumbnail_url, meta,
+        video_upload:video_uploads!source_upload_id(file_name, duration_seconds, status, thumbnail_url)
       `)
       .eq('user_id', session.user.id)
       .order('logged_at', { ascending: false })
@@ -361,7 +363,14 @@ export default function TimelinePage() {
 
     const all = (data || []) as unknown as TimelineEntry[]
 
-    // Generate signed URLs for thumbnails stored as storage paths
+    // Resolve thumbnail: prefer log_entries.thumbnail_url, fall back to video_uploads.thumbnail_url
+    for (const e of all) {
+      if (!e.thumbnail_url && e.video_upload?.thumbnail_url) {
+        e.thumbnail_url = e.video_upload.thumbnail_url
+      }
+    }
+
+    // Generate signed URLs for thumbnails stored as storage paths (not already http URLs)
     const thumbPaths = all
       .filter(e => e.thumbnail_url && !e.thumbnail_url.startsWith('http'))
       .map(e => e.thumbnail_url!)

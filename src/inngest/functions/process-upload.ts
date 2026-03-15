@@ -168,6 +168,7 @@ export const processUpload = inngest.createFunction(
           type: 'voice',
           storage_path: audioStoragePath,
           fidelity_score: 0.8,
+          fidelity_rank: 'A',
           meta: {
             sample_rate: 44100,
             format: 'wav',
@@ -422,7 +423,7 @@ export const processUpload = inngest.createFunction(
           {
             input: {
               input_file: signedData.signedUrl,
-              ffmpeg_command: "-ss 00:00:03 -i {input_file} -vframes 1 -vf scale=640:-1 -f image2 pipe:1"
+              ffmpeg_command: "-ss 00:00:03 -i {input_file} -vframes 1 -vf scale=640:-1 output.jpg"
             }
           }
         ) as any
@@ -442,12 +443,89 @@ export const processUpload = inngest.createFunction(
         // Store the storage path — the listing API generates signed URLs at read time
         await admin.from('video_uploads').update({ thumbnail_url: thumbPath }).eq('id', video_upload_id)
 
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored at ${thumbPath}`)
+        // Also archive this frame as a face corpus entry
+        const fidelityScore = scoreFrameFidelity(imgBuffer)
+        const fidelityRank = fidelityScore >= 0.95 ? 'S' : fidelityScore >= 0.85 ? 'A' : fidelityScore >= 0.7 ? 'B' : 'C'
+        await admin.from('neural_corpus').insert({
+          user_id,
+          source_upload_id: video_upload_id,
+          type: 'face',
+          storage_path: thumbPath,
+          fidelity_score: fidelityScore,
+          fidelity_rank: fidelityRank,
+          meta: { timestamp: '00:00:03', format: 'jpg', width: 640 },
+        })
+
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored at ${thumbPath} (fidelity: ${fidelityScore})`)
         return thumbPath
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
         return null
       }
+    })
+
+    // ── Step 2d: Extract additional face frames for neural corpus ──
+    await step.run('extract-face-frames', async () => {
+      const { upload } = activeContext
+      if (!isVideoMimeType(upload.mime_type)) return
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return
+
+      // Sample frames at 30s and 60s in addition to the 3s thumbnail already archived
+      const timestamps = ['00:00:30', '00:01:00']
+      let inserted = 0
+
+      for (const ts of timestamps) {
+        try {
+          const { data: signedData } = await admin.storage
+            .from('videos')
+            .createSignedUrl(upload.storage_path, 3600)
+
+          if (!signedData?.signedUrl) continue
+
+          const replicate = new Replicate({ auth: replicateToken })
+          const output = await replicate.run(
+            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+            {
+              input: {
+                input_file: signedData.signedUrl,
+                ffmpeg_command: `-ss ${ts} -i {input_file} -vframes 1 -vf scale=640:-1 output.jpg`
+              }
+            }
+          ) as any
+
+          if (!output || typeof output !== 'string') continue
+
+          const imgResponse = await fetch(output)
+          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
+          if (imgBuffer.length < 1000) continue // skip empty/corrupt frames
+
+          const fidelityScore = scoreFrameFidelity(imgBuffer)
+          const fidelityRank = fidelityScore >= 0.95 ? 'S' : fidelityScore >= 0.85 ? 'A' : fidelityScore >= 0.7 ? 'B' : 'C'
+          const facePath = `${user_id}/neural-corpus/faces/${video_upload_id}_${ts.replace(/:/g, '')}.jpg`
+
+          await admin.storage.from('videos').upload(facePath, imgBuffer, {
+            contentType: 'image/jpeg',
+            upsert: true,
+            cacheControl: '31536000',
+          })
+
+          await admin.from('neural_corpus').insert({
+            user_id,
+            source_upload_id: video_upload_id,
+            type: 'face',
+            storage_path: facePath,
+            fidelity_score: fidelityScore,
+            fidelity_rank: fidelityRank,
+            meta: { timestamp: ts, format: 'jpg', width: 640 },
+          })
+
+          inserted++
+        } catch { /* skip this timestamp if video is shorter */ }
+      }
+
+      await plog(admin, video_upload_id, 'extract-face-frames', 'done', `${inserted} additional face frames archived`)
     })
 
     // ── Step 3: Transcribe ──
