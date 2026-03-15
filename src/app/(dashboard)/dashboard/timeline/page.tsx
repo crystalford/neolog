@@ -342,7 +342,6 @@ export default function TimelinePage() {
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>('all')
-  const [username, setUsername] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -350,20 +349,11 @@ export default function TimelinePage() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', session.user.id)
-      .single()
-
-    setUsername(profile?.username || null)
-
     const { data } = await supabase
       .from('log_entries')
       .select(`
         id, entry_type, title, body, logged_at, software_tags,
-        is_public, source_upload_id, thumbnail_url, meta,
-        video_upload:video_uploads!log_entries_source_upload_id_fkey(file_name, duration_seconds, status)
+        is_public, source_upload_id, thumbnail_url, meta
       `)
       .eq('user_id', session.user.id)
       .order('logged_at', { ascending: false })
@@ -421,11 +411,6 @@ export default function TimelinePage() {
         </div>
 
         <div className="flex items-center gap-2 mt-1">
-          {username && (
-            <Link href={`/${username}/log`} target="_blank" className="btn btn-secondary btn-sm">
-              Public
-            </Link>
-          )}
           <Link href="/dashboard/log/new" className="btn btn-primary btn-sm flex items-center gap-1.5">
             <Plus size={13} />
             New
