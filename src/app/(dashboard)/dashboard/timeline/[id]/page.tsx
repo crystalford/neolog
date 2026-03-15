@@ -219,11 +219,11 @@ export default function TimelineDetailPage() {
         </div>
       )}
 
-      {/* Video error */}
+      {/* Video error + download fallback */}
       {videoError && (
         <div className="mb-6 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[12px]">
           <span className="mt-0.5 flex-shrink-0">⚠</span>
-          <span>{videoError}</span>
+          <span>{videoError} <a href={videoUrl ?? ''} download className="underline hover:no-underline ml-1">Download video</a> to play in VLC or QuickTime.</span>
         </div>
       )}
 

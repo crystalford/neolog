@@ -130,9 +130,10 @@ export const processUpload = inngest.createFunction(
           },
         )
 
-        if (!output || typeof output !== 'string') return { path: upload.storage_path, extracted: false }
+        const audioUrl = output ? String(output) : null
+        if (!audioUrl || !audioUrl.startsWith('http')) return { path: upload.storage_path, extracted: false }
 
-        const audioResponse = await fetch(output as string)
+        const audioResponse = await fetch(audioUrl)
         const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
         const audioStoragePath = `${user_id}/neural-corpus/audio/${Date.now()}.wav`
 
@@ -426,9 +427,10 @@ export const processUpload = inngest.createFunction(
           }
         ) as any
 
-        if (!output || typeof output !== 'string') return null
+        const thumbUrl = output ? String(output) : null
+        if (!thumbUrl || !thumbUrl.startsWith('http')) return null
 
-        const imgResponse = await fetch(output)
+        const imgResponse = await fetch(thumbUrl)
         const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
         const thumbPath = `${user_id}/thumbnails/${video_upload_id}.jpg`
 
@@ -462,7 +464,60 @@ export const processUpload = inngest.createFunction(
       }
     })
 
-    // ── Step 2d: Extract additional face frames for neural corpus ──
+    // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
+    await step.run('transcode-playback', async () => {
+      const { upload } = activeContext
+      if (!isVideoMimeType(upload.mime_type)) return null
+
+      await plog(admin, video_upload_id, 'transcode-playback', 'running', 'Transcoding to H.264 for web playback')
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return null
+
+      const { data: signedData } = await admin.storage
+        .from('videos')
+        .createSignedUrl(upload.storage_path, 7200)
+
+      if (!signedData?.signedUrl) return null
+
+      try {
+        const replicate = new Replicate({ auth: replicateToken })
+
+        const output = await replicate.run(
+          'fofr/toolkit',
+          {
+            input: {
+              input_file: signedData.signedUrl,
+              ffmpeg_command: "-i {input_file} -c:v libx264 -preset fast -crf 28 -movflags +faststart -vf \"scale='min(1280,iw)':-2\" -c:a aac -b:a 128k output.mp4",
+            },
+          },
+        ) as any
+
+        const outputUrl = output ? String(output) : null
+        if (!outputUrl || !outputUrl.startsWith('http')) return null
+
+        const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+        const playbackStoragePath = `${user_id}/playback/${video_upload_id}.mp4`
+
+        await admin.storage.from('videos').upload(playbackStoragePath, mp4Buf, {
+          contentType: 'video/mp4',
+          upsert: true,
+          cacheControl: '31536000',
+        })
+
+        await admin.from('video_uploads')
+          .update({ playback_path: playbackStoragePath })
+          .eq('id', video_upload_id)
+
+        await plog(admin, video_upload_id, 'transcode-playback', 'done', `H.264 stored at ${playbackStoragePath}`)
+        return playbackStoragePath
+      } catch (err: any) {
+        await plog(admin, video_upload_id, 'transcode-playback', 'error', err?.message)
+        return null
+      }
+    })
+
+    // ── Step 2e: Extract additional face frames for neural corpus ──
     await step.run('extract-face-frames', async () => {
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return
@@ -493,9 +548,10 @@ export const processUpload = inngest.createFunction(
             }
           ) as any
 
-          if (!output || typeof output !== 'string') continue
+          const faceUrl = output ? String(output) : null
+          if (!faceUrl || !faceUrl.startsWith('http')) continue
 
-          const imgResponse = await fetch(output)
+          const imgResponse = await fetch(faceUrl)
           const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
           if (imgBuffer.length < 1000) continue // skip empty/corrupt frames
 
