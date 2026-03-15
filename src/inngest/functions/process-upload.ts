@@ -121,13 +121,11 @@ export const processUpload = inngest.createFunction(
       try {
         const replicate = new Replicate({ auth: replicateToken })
         const output = await replicate.run(
-          'fofr/video-to-audio:bf8b48a8f1c2e3a7f9d7e4b6c5a0d3e2f1b4c7a6e9d2f5c8b1e4a7d0f3c6b9e2' as any,
+          'fofr/toolkit',
           {
             input: {
-              video_url: signedData.signedUrl,
-              sample_rate: 44100, // Higher fidelity for corpus
-              channels: 1,
-              format: 'wav', // Uncompressed/WAV preferred for training
+              input_file: signedData.signedUrl,
+              ffmpeg_command: '-i {input_file} -vn -acodec pcm_s16le -ar 16000 -ac 1 output.wav',
             },
           },
         )
@@ -227,9 +225,9 @@ export const processUpload = inngest.createFunction(
           }
 
           const replicate = new Replicate({ auth: replicateToken })
-          // Use fofr/ffmpeg to run ffprobe and get JSON
+          // Use fofr/toolkit to run ffprobe and get JSON
           const output = await replicate.run(
-            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+            "fofr/toolkit",
             {
               input: {
                 input_file: signedData.signedUrl,
@@ -419,7 +417,7 @@ export const processUpload = inngest.createFunction(
 
         // Extract a single frame at 3 seconds (falls back gracefully for short clips)
         const output = await replicate.run(
-          "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+          "fofr/toolkit",
           {
             input: {
               input_file: signedData.signedUrl,
@@ -486,7 +484,7 @@ export const processUpload = inngest.createFunction(
 
           const replicate = new Replicate({ auth: replicateToken })
           const output = await replicate.run(
-            "fofr/ffmpeg:83b6a56e7561f2f0b435ff29402e1c08d66938dc814275001ad253818e959ec2",
+            "fofr/toolkit",
             {
               input: {
                 input_file: signedData.signedUrl,
