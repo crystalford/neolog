@@ -81,12 +81,16 @@ export default function TimelineDetailPage() {
     setUpload(u)
     setMentions((mentionsRes.data ?? []) as unknown as EntityMentionRow[])
 
-    // Get signed URL for video
+    // Get signed URL for video via server-side API (uses admin client, bypasses RLS)
     if (u.storage_path) {
-      const { data: signed } = await supabase.storage
-        .from('videos')
-        .createSignedUrl(u.storage_path, 3600)
-      if (signed?.signedUrl) setVideoUrl(signed.signedUrl)
+      const res = await fetch(`/api/video-upload/${id}/signed-url`)
+      if (res.ok) {
+        const { signedUrl } = await res.json()
+        if (signedUrl) setVideoUrl(signedUrl)
+      } else {
+        const { error } = await res.json().catch(() => ({ error: 'Failed to load video' }))
+        console.error('[video player] signed URL error:', error)
+      }
     }
 
     setLoading(false)
@@ -200,7 +204,6 @@ export default function TimelineDetailPage() {
               controls
               src={videoUrl}
               className="w-full max-h-[420px] object-contain"
-              preload="metadata"
             />
           )}
         </div>

@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('video_uploads')
-      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url')
+      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path')
       .eq('user_id', session.user.id)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
@@ -189,11 +189,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Generate signed video URLs for uploads missing thumbnails (for client-side frame capture)
+    const videoPaths = (data || [])
+      .filter((u: any) => !u.thumbnail_url && u.storage_path && u.mime_type?.startsWith('video/'))
+      .map((u: any) => u.storage_path)
+
+    let videoSignedMap: Record<string, string> = {}
+    if (videoPaths.length > 0) {
+      const { data: signedVideos } = await supabase.storage
+        .from('videos')
+        .createSignedUrls(videoPaths, 3600)
+      if (signedVideos) {
+        for (const s of signedVideos) {
+          if (s.signedUrl) videoSignedMap[s.path] = s.signedUrl
+        }
+      }
+    }
+
     const uploads = (data || []).map((u: any) => ({
       ...u,
       thumbnail_url: u.thumbnail_url && !u.thumbnail_url.startsWith('http')
         ? (signedMap[u.thumbnail_url] || null)
         : u.thumbnail_url,
+      video_url: (!u.thumbnail_url && u.storage_path)
+        ? (videoSignedMap[u.storage_path] || null)
+        : null,
     }))
 
     return NextResponse.json({ uploads })

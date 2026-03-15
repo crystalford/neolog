@@ -17,7 +17,7 @@ import { SessionDetail } from '@/components/SessionDetail'
 type UploadListItem = Pick<VideoUpload,
   'id' | 'file_name' | 'file_size_bytes' | 'mime_type' | 'duration_seconds' |
   'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at' | 'thumbnail_url'
->
+> & { video_url?: string | null }
 
 type ActiveUpload = {
   id: string
@@ -30,6 +30,52 @@ type ActiveUpload = {
   error: string | null
   tusUpload: tus.Upload | null
   recordedAt: string | null
+}
+
+function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.crossOrigin = 'anonymous'
+    video.src = videoUrl
+
+    const onSeeked = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth || 320
+        canvas.height = video.videoHeight || 180
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(video, 0, 0)
+          setThumbUrl(canvas.toDataURL('image/jpeg', 0.7))
+        }
+      } catch {
+        // CORS or canvas taint — leave thumbUrl null
+      }
+      video.src = ''
+    }
+
+    const onMeta = () => {
+      video.currentTime = Math.min(3, video.duration * 0.05 || 0)
+    }
+
+    video.addEventListener('loadedmetadata', onMeta)
+    video.addEventListener('seeked', onSeeked)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', onMeta)
+      video.removeEventListener('seeked', onSeeked)
+      video.src = ''
+    }
+  }, [videoUrl])
+
+  if (thumbUrl) {
+    return <img src={thumbUrl} alt="" className={className ?? 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-105'} />
+  }
+  return <div className="w-full h-full bg-[var(--bg-tertiary)] animate-pulse opacity-30" />
 }
 
 export default function UploadsPage() {
@@ -735,6 +781,8 @@ export default function UploadsPage() {
                   <div className="aspect-video relative bg-[var(--bg-secondary)] overflow-hidden cursor-pointer" onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}>
                     {upload.thumbnail_url ? (
                       <img src={upload.thumbnail_url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : upload.video_url ? (
+                      <VideoThumb videoUrl={upload.video_url} />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-30 group-hover:opacity-50 transition-opacity">
                          {isVideo ? <Video size={32} /> : <FileAudio size={32} />}
