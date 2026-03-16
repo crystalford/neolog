@@ -385,7 +385,8 @@ export const processUpload = inngest.createFunction(
       try {
         const replicate = new Replicate({ auth: replicateToken })
 
-        // fofr/toolkit correct API: extract_frames_from_input returns a ZIP of PNGs at given fps
+        // fofr/toolkit extract_frames_from_input returns List[Path] — an ARRAY of frame URLs at given fps
+        // NOT a ZIP file. output[0]=0s, output[1]=1s, output[2]=2s, output[3]=3s (at fps=1)
         const output = await replicate.run(
           "fofr/toolkit",
           {
@@ -397,26 +398,35 @@ export const processUpload = inngest.createFunction(
           }
         ) as any
 
-        const zipUrl = extractReplicateUrl(output)
-        if (!zipUrl) return null
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'info',
+          `Replicate output type: ${typeof output}, isArray: ${Array.isArray(output)}, value: ${JSON.stringify(output)?.slice(0, 200)}`)
 
-        // Download and unzip — jszip is already in package.json
-        const JSZip = (await import('jszip')).default
-        const zipResponse = await fetch(zipUrl)
-        const zipBuffer = await zipResponse.arrayBuffer()
-        const zip = await JSZip.loadAsync(zipBuffer)
+        // Handle array of frame URLs OR single URL
+        const frames = Array.isArray(output) ? output : [output]
+        if (frames.length === 0) {
+          await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'No frames returned from Replicate')
+          return null
+        }
 
-        // Frames named out001.png, out002.png, ... at 1fps
-        // Try ~3s frame first, fall back to earlier frames for short clips
-        const frameFile = zip.file('out004.png') ?? zip.file('out003.png') ?? zip.file('out002.png') ?? zip.file('out001.png')
-        if (!frameFile) return null
-        const imgBuffer = Buffer.from(await frameFile.async('arraybuffer'))
+        // Take frame at ~3s (index 3), fall back to last available frame for short clips
+        const targetIdx = Math.min(3, frames.length - 1)
+        const frameOutput = frames[targetIdx]
+        const frameUrl = typeof frameOutput === 'string' ? frameOutput : String(frameOutput)
+
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'info', `Using frame[${targetIdx}] URL: ${frameUrl.slice(0, 100)}`)
+
+        if (!frameUrl.startsWith('http')) {
+          await plog(admin, video_upload_id, 'extract-thumbnail', 'error', `Invalid frame URL: ${frameUrl.slice(0, 100)}`)
+          return null
+        }
+
+        const imgBuffer = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
 
         // Store base64 data URL directly — renders in <img> with zero signed URL chain
         const base64DataUrl = `data:image/png;base64,${imgBuffer.toString('base64')}`
         await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
 
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', 'Thumbnail stored as base64 data URL')
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored (${imgBuffer.length} bytes)`)
         return true
       } catch (err: any) {
         await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
