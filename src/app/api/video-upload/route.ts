@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at, force } = body
+    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at, force, thumbnail_url } = body
     console.log(`[API] Received upload registration for ${file_name}. recorded_at: ${recorded_at}`);
 
     if (!storage_path || !file_name || !file_size_bytes || !mime_type) {
@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
         status: 'uploaded',
         recorded_at: recorded_at || null,
         ...(session_id ? { session_id } : {}),
+        ...(thumbnail_url ? { thumbnail_url } : {}),
       })
       .select()
       .single()

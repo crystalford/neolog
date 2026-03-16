@@ -33,6 +33,55 @@ type ActiveUpload = {
 }
 
 function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
+
+// Capture a thumbnail from a video file in the browser.
+// Works for H.264/WebM/etc. For HEVC on Chrome Windows it fails and returns a placeholder.
+async function captureVideoThumbnail(file: File): Promise<string> {
+  const canvasThumb = await new Promise<string | null>((resolve) => {
+    const video = document.createElement('video')
+    const url = URL.createObjectURL(file)
+    let resolved = false
+    const done = (val: string | null) => {
+      if (resolved) return
+      resolved = true
+      URL.revokeObjectURL(url)
+      resolve(val)
+    }
+    const timeout = setTimeout(() => done(null), 8000)
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'metadata'
+    video.onerror = () => { clearTimeout(timeout); done(null) }
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(3, (video.duration || 10) * 0.1)
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const w = Math.min(video.videoWidth || 640, 640)
+        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return done(null)
+        ctx.drawImage(video, 0, 0, w, h)
+        const data = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50))
+        // Check if frame is all black (HEVC decode failed silently)
+        const allBlack = data.data.every((v, i) => i % 4 === 3 || v < 10)
+        done(allBlack ? null : canvas.toDataURL('image/jpeg', 0.85))
+      } catch { done(null) }
+    }
+    video.src = url
+  })
+
+  if (canvasThumb) return canvasThumb
+
+  // Fallback: deterministic colored placeholder with filename initial
+  const initial = (file.name[0] ?? 'V').toUpperCase()
+  const hue = file.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`
+  return `data:image/svg+xml;base64,${btoa(svg)}`
+}
   const ref = useRef<HTMLVideoElement>(null)
   return (
     <video
@@ -244,7 +293,7 @@ export default function UploadsPage() {
     }
   };
 
-  const startTusUpload = useCallback(async (file: File, sessionId?: string, preextractedDate?: string | null) => {
+  const startTusUpload = useCallback(async (file: File, sessionId?: string, preextractedDate?: string | null, thumbnailPromise?: Promise<string>) => {
     // Ensure bucket exists and has correct fileSizeLimit (updates on every call)
     await fetch('/api/video-upload/prepare').catch(() => {/* non-fatal */})
 
@@ -308,6 +357,8 @@ export default function UploadsPage() {
 
         // Register with backend → creates DB record + fires Inngest
         try {
+          // By the time TUS upload finishes, the thumbnail capture has had plenty of time
+          const thumbnail = thumbnailPromise ? await thumbnailPromise : null
           const payload = {
             storage_path: storagePath,
             file_name: file.name,
@@ -315,6 +366,7 @@ export default function UploadsPage() {
             mime_type: file.type,
             recorded_at: preextractedDate || null,
             ...(sessionId ? { session_id: sessionId } : {}),
+            ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
           };
           console.log('[Upload] Registering with payload:', payload);
 
@@ -384,11 +436,10 @@ export default function UploadsPage() {
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
     for (const file of fileArray) {
-      // NEW: Extract metadata in browser first
-      const recordedAt = await extractVideoDate(file);
-      console.log(`Detected date for ${file.name}:`, recordedAt);
-      
-      startTusUpload(file, undefined, recordedAt)
+      const recordedAt = await extractVideoDate(file)
+      // Start thumbnail capture immediately — runs in parallel with TUS upload
+      const thumbnailPromise = captureVideoThumbnail(file)
+      startTusUpload(file, undefined, recordedAt, thumbnailPromise)
     }
   }, [startTusUpload])
 
