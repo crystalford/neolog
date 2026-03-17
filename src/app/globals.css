@@ -11,77 +11,46 @@
  */
 
 :root {
-  /* Backgrounds — deep charcoal, not pure black */
-  --bg-primary: #090910;
-  --bg-secondary: #0d0d14;
-  --bg-tertiary: #121219;
-  --bg-card: #0f0f18;
-  --bg-glass: rgba(12, 12, 20, 0.7);
-  --bg-inverse: #f0f0ff;
+  /* Backgrounds — Deep Obsidian */
+  --bg-primary: #050505;
+  --bg-secondary: #0a0a0f;
+  --bg-tertiary: #0e0e14;
+  --bg-card: #08080c;
+  --bg-glass: rgba(5, 5, 8, 0.85);
 
-  /* Text hierarchy */
-  --text-primary: #eeeef5;
-  --text-secondary: #a0a0c4;
-  --text-tertiary: #7c7c9c;
-  --text-inverse: #090910;
+  /* Text hierarchy — High contrast for headers, muted for meta */
+  --text-primary: #ffffff;
+  --text-secondary: #c0c0d8;
+  --text-tertiary: #80809a;
+  --text-inverse: #050505;
 
-  /* Accent — Indigo/Violet (no more blue, no yellow) */
-  --accent: #7c6af5;
-  --accent-hover: #6b58e8;
-  --accent-soft: rgba(124, 106, 245, 0.15);
-  --accent-softer: rgba(124, 106, 245, 0.07);
-  --accent-glow: rgba(124, 106, 245, 0.25);
+  /* Accent — Strategic Indigo */
+  --accent: #818cf8;
+  --accent-soft: rgba(129, 140, 248, 0.08);
+  --accent-softer: rgba(129, 140, 248, 0.04);
+  --accent-glow: rgba(129, 140, 248, 0.2);
 
-  /* Semantic */
-  --success: #34d399;
-  --warning: #fbbf24;
-  --error: #f87171;
+  /* Borders — Ultra thin (0.5px equivalent) */
+  --border-light: rgba(255, 255, 255, 0.04);
+  --border-medium: rgba(255, 255, 255, 0.06);
+  --border-heavy: rgba(255, 255, 255, 0.12);
+  --border-glow: rgba(129, 140, 248, 0.15);
 
-  /* Borders — cool-tinted whites */
-  --border-light: rgba(200, 200, 255, 0.06);
-  --border-medium: rgba(200, 200, 255, 0.1);
-  --border-heavy: rgba(200, 200, 255, 0.18);
-  --border-glow: rgba(124, 106, 245, 0.3);
-
-  /* Surfaces */
-  --surface-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.5);
-  --surface-shadow-hover: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --surface-shadow-xl: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
-  --surface-glow: 0 0 40px -10px rgba(124, 106, 245, 0.2);
+  /* Surface System */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 8px 30px rgba(0,0,0,0.6);
+  --shadow-lg: 0 20px 50px rgba(0,0,0,0.8);
+  --surface-glow: 0 0 40px rgba(129, 140, 248, 0.05);
 
   /* Typography */
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+  --font-display: 'Playfair Display', serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 
-  /* Spacing */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2.5rem;
-  --space-2xl: 4rem;
-  --space-3xl: 6rem;
-  --space-4xl: 8rem;
-
-  /* Transitions */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --transition-fast: 120ms var(--ease-out-expo);
-  --transition-medium: 200ms var(--ease-out-expo);
-  --transition-slow: 350ms var(--ease-out-expo);
-
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-
-  /* Timeline specific */
-  --timeline-thread: rgba(124, 106, 245, 0.12);
-  --timeline-node-bg: #090910;
-  --timeline-node-border: rgba(124, 106, 245, 0.4);
+  /* Timeline Dossier Constants */
+  --timeline-thread: rgba(129, 140, 248, 0.08);
+  --timeline-node-bg: #050505;
+  --timeline-node-border: rgba(129, 140, 248, 0.3);
 }
 
 /* Glass utility classes */

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format, isToday, isYesterday } from 'date-fns'
-import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown, ChevronUp, ChevronRight, AlertCircle } from 'lucide-react'
+import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown, ChevronUp, ChevronRight, AlertCircle, Bookmark } from 'lucide-react'
 import { SessionDetail } from './SessionDetail'
 import type { VideoUpload } from '@/types/database'
 
@@ -29,69 +29,26 @@ function reltime(dateStr: string) {
   const d = new Date(dateStr)
   if (isToday(d)) return format(d, 'h:mm a')
   if (isYesterday(d)) return 'Yesterday · ' + format(d, 'h:mm a')
-  return format(d, 'MMMM d · h:mm a')
+  return format(d, 'MMM d · h:mm a')
 }
 
 function getActionLabel(type: string): string {
   const map: Record<string, string> = {
-    session: 'Recorded a video',
-    capture: 'Captured a thought',
-    note: 'Wrote a note',
-    idea: 'Mapped an idea',
-    health: 'Logged health',
+    session: 'Recorded Session',
+    capture: 'Thought Captured',
+    note: 'Note Written',
+    idea: 'Idea Mapped',
+    health: 'Health Logged',
   }
-  return map[type] || 'Logged activity'
+  return map[type] || 'Activity Logged'
 }
 
 function cleanTitle(entry: LogEntry): string {
-  // Priority 1: AI-generated title from meta
-  if (entry.meta?.title && entry.meta.title.length > 0) {
-    return entry.meta.title
-  }
-
-  // Priority 2: Use summary if it's very short, or fallback to date
+  if (entry.meta?.title && entry.meta.title.length > 0) return entry.meta.title
   const title = entry.title || ''
   const isFilename = title.includes('.') && (title.endsWith('.mp4') || title.endsWith('.mov') || title.endsWith('.wav'))
-  
-  if (isFilename) {
-    return format(new Date(entry.logged_at), 'MMMM d, yyyy · h:mm a')
-  }
-
+  if (isFilename) return format(new Date(entry.logged_at), 'MMMM d, yyyy')
   return title
-}
-
-const MOOD_COLORS: Record<string, string> = {
-  frustrated: 'bg-red-500/10 text-red-400 border-red-500/20',
-  anxious: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  excited: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  calm: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  motivated: 'bg-green-500/10 text-green-400 border-green-500/20',
-  scattered: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  focused: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-}
-
-function MoodChip({ mood }: { mood: string }) {
-  const words = mood.toLowerCase().split(/[,\s]+/).filter(Boolean).slice(0, 2)
-  return (
-    <>
-      {words.map(w => {
-        const cls = MOOD_COLORS[w] || 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] border-[var(--border-light)] font-mono uppercase tracking-widest text-[9px]'
-        return (
-          <span key={w} className={`inline-flex items-center px-2 py-0.5 rounded-md border ${cls}`}>
-            {w}
-          </span>
-        )
-      })}
-    </>
-  )
-}
-
-function SoftwareChip({ tag }: { tag: string }) {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md border border-[var(--accent)]/10 bg-[var(--accent-soft)] text-[var(--accent)] text-[9px] font-mono font-bold uppercase tracking-wider">
-      {tag}
-    </span>
-  )
 }
 
 // ─── Main Card ───────────────────────────────────────────────────────────────
@@ -111,158 +68,170 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
 
   const thumbnail = entry.thumbnail_url || entry.asset?.image_url
   const hasBody = entry.body && entry.body.trim().length > 0
-  
   const actionLabel = getActionLabel(entry.entry_type)
   const displayTitle = cleanTitle(entry)
 
   return (
-    <div className="group relative flex gap-8 px-6 py-10 transition-all duration-700 hover:bg-[var(--accent-softer)]/20 border-b border-[var(--border-light)] last:border-0 overflow-hidden">
-      {/* Timeline Thread & Node */}
-      <div className="relative flex flex-col items-center flex-shrink-0 w-8">
-        <div className="absolute top-0 bottom-0 w-px bg-[var(--timeline-thread)] group-first:top-12 group-last:bottom-12 opacity-40" />
-        <div className="relative z-10 w-3.5 h-3.5 mt-2 bg-[var(--bg-primary)] border-2 border-[var(--timeline-node-border)] rounded-full transition-all duration-700 group-hover:scale-125 group-hover:border-[var(--accent)] group-hover:shadow-[0_0_20px_rgba(124,106,245,0.4)]" />
+    <div className="group relative flex gap-10 px-8 py-14 transition-all duration-700 hover:bg-[#0a0a10]/40 border-b border-[var(--border-light)] last:border-0 overflow-hidden">
+      {/* Dossier Sidebar Meta */}
+      <div className="flex flex-col items-end flex-shrink-0 w-24 pt-1">
+        <span className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--accent)] mb-2">
+          {actionLabel}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-tertiary)] opacity-60">
+          {reltime(entry.logged_at)}
+        </span>
+        
+        {/* Dossier Thread Line */}
+        <div className="mt-8 mr-[3px] w-[0.5px] h-full bg-gradient-to-b from-[var(--timeline-thread)] via-[var(--timeline-thread)] to-transparent opacity-40 relative">
+           <div className="absolute top-0 right-[-2.5px] w-[6px] h-[0.5px] bg-[var(--accent)] opacity-50" />
+        </div>
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-6 mb-4">
-          <div className="flex flex-col gap-2">
-             <div className="flex items-center gap-4">
-               <span className="font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--accent)] opacity-80">
-                 {actionLabel}
-               </span>
-               <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] opacity-50">
-                 {reltime(entry.logged_at)}
-               </span>
-             </div>
-             <h3 className="font-serif text-[22px] font-medium tracking-tight text-[var(--text-primary)] leading-tight group-hover:text-[var(--accent)] transition-colors duration-500">
+        <div className="flex items-start justify-between gap-8 mb-6">
+          <div className="flex-1 max-w-3xl">
+             <h3 className="font-serif text-[26px] font-medium tracking-tight text-[var(--text-primary)] leading-[1.2] mb-4 group-hover:text-[var(--accent)] transition-colors duration-700">
                {displayTitle}
              </h3>
-          </div>
-
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-             {!isPublicView && (
-               <button
-                  disabled={isDeleting}
-                  onClick={async (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (!confirm('Delete this log entry?')) return
-                    setIsDeleting(true)
-                    try {
-                      const res = await fetch(`/api/log-entries/${entry.id}`, { method: 'DELETE' })
-                      if (res.ok) window.location.reload()
-                    } catch {
-                    } finally {
-                      setIsDeleting(false)
-                    }
-                  }}
-                  className="p-2 text-[var(--text-tertiary)] hover:text-red-400 transition-colors bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-light)]"
-                  title="Delete entry"
-               >
-                 {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-               </button>
-             )}
-          </div>
-        </div>
-
-        {/* Visual Content + Body */}
-        <div className="flex gap-8 items-start">
-           {thumbnail && (
-             <div className="flex-shrink-0 w-28 h-28 rounded-2xl overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)] shadow-2xl relative group-second:scale-105 transition-transform duration-700">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
-                <img src={thumbnail} alt="" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-             </div>
-           )}
-
-           <div className="flex-1">
+             
              {hasBody && !isExpanded && (
-               <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] line-clamp-3 mb-6 max-w-2xl font-light opacity-80 tracking-wide underline-offset-4 decoration-[var(--accent-softer)]">
-                 {entry.body}
+               <p className="text-[16px] leading-relaxed text-[var(--text-secondary)] line-clamp-2 font-light opacity-70 tracking-wide max-w-2xl">
+                 {entry.body?.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').trim()}
                </p>
              )}
-             
-             {/* Note: Reflections (Synthetic Perspective) removed from card view as requested */}
-           </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-4">
+             {thumbnail && (
+               <div className="relative group/thumb">
+                 <div className="absolute inset-0 bg-[var(--accent)] mix-blend-overlay opacity-0 group-hover/thumb:opacity-20 transition-opacity z-10" />
+                 <div className="w-32 h-32 rounded-sm overflow-hidden border border-[var(--border-medium)] bg-[var(--bg-tertiary)] shadow-2xl transition-transform duration-700 group-hover:scale-[1.02]">
+                    <img src={thumbnail} alt="" className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-1000" />
+                 </div>
+                 <div className="absolute -top-1 -right-1 p-1 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-full">
+                    <Bookmark size={10} className="text-[var(--text-tertiary)]" />
+                 </div>
+               </div>
+             )}
+
+             <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0">
+                {!isPublicView && (
+                  <button
+                     disabled={isDeleting}
+                     onClick={async (e) => {
+                       e.preventDefault(); e.stopPropagation()
+                       if (!confirm('Destroy this log entry?')) return
+                       setIsDeleting(true)
+                       try {
+                         const res = await fetch(`/api/log-entries/${entry.id}`, { method: 'DELETE' })
+                         if (res.ok) window.location.reload()
+                       } finally {
+                         setIsDeleting(false)
+                       }
+                     }}
+                     className="p-2.5 text-[var(--text-tertiary)] hover:text-red-400 transition-all bg-[var(--bg-secondary)] rounded-sm border border-[var(--border-light)] hover:border-red-900/30"
+                  >
+                    {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  </button>
+                )}
+             </div>
+          </div>
         </div>
 
-        {/* Footer Meta */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex flex-wrap gap-2.5 items-center">
-            {entry.software_tags?.map(tag => <SoftwareChip key={tag} tag={tag} />)}
-            {(entry.meta?.mood || entry.meta?.energy) && !isExpanded && (
-              <div className="flex gap-3 items-center ml-2 border-l border-[var(--border-light)] pl-4">
-                {entry.meta?.mood && <MoodChip mood={entry.meta.mood} />}
+        {/* Action Tray */}
+        <div className="flex items-center justify-between pt-4 border-t border-[var(--border-light)]/50">
+          <div className="flex items-center gap-6">
+            {entry.software_tags && entry.software_tags.length > 0 && (
+              <div className="flex gap-2">
+                {entry.software_tags.map(tag => (
+                  <span key={tag} className="text-[9px] font-mono tracking-[0.1em] text-[var(--text-tertiary)] uppercase opacity-60 flex items-center gap-1.5 before:content-[''] before:w-1 before:h-1 before:bg-[var(--accent)]/30 before:rounded-full">
+                    {tag}
+                  </span>
+                ))}
               </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-5">
-            {showPrivacyBadge && !entry.is_public && (
-              <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-red-400/60 uppercase">
-                Private
-              </span>
             )}
             
-            {(entry.source_upload_id || entry.meta) && (
-              <button
-                onClick={async (e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (isExpanded) { setIsExpanded(false); return }
-                  setIsExpanded(true)
-                  if (!fullUploadData && entry.source_upload_id) {
-                    setIsLoading(true)
-                    try {
-                      const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
-                      if (res.ok) {
-                        const data = await res.json()
-                        setFullUploadData(data.upload)
-                      }
-                    } catch {
-                    } finally {
-                      setIsLoading(false)
-                    }
-                  }
-                }}
-                className="flex items-center gap-3 font-mono text-[10px] font-bold tracking-[0.25em] uppercase text-[var(--accent)] hover:text-white transition-all group/btn"
-              >
-                <span className="border-b border-transparent group-hover/btn:border-[var(--accent)] pb-0.5">
-                  {isExpanded ? 'Collapse' : 'Detailed Analysis'}
-                </span>
-                {isExpanded ? <ChevronUp size={14} /> : <ChevronRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />}
-              </button>
+            {entry.meta?.mood && !isExpanded && (
+               <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border-light)] bg-[var(--bg-tertiary)]/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">{entry.meta.mood}</span>
+               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-6">
+            {showPrivacyBadge && !entry.is_public && (
+              <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-red-400/40 uppercase">
+                Restricted Access
+              </span>
+            )}
+
+            <button
+              onClick={async (e) => {
+                e.preventDefault(); e.stopPropagation()
+                if (isExpanded) { setIsExpanded(false); return }
+                setIsExpanded(true)
+                if (!fullUploadData && entry.source_upload_id) {
+                  setIsLoading(true)
+                  try {
+                    const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
+                    if (res.ok) {
+                      const data = await res.json()
+                      setFullUploadData(data.upload)
+                    }
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }
+              }}
+              className="group/btn flex items-center gap-4 text-[11px] font-mono uppercase tracking-[0.4em] text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all duration-300"
+            >
+              <span className="relative pb-1 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1px] after:bg-[var(--accent)] after:transition-all group-hover/btn:after:w-full">
+                {isExpanded ? 'Minimize' : 'Detail'}
+              </span>
+              <div className={`transition-transform duration-500 ${isExpanded ? 'rotate-180' : 'group-hover/btn:translate-x-1'}`}>
+                <ChevronDown size={14} />
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Expanded Details */}
+        {/* Expanded Intelligence Dossier */}
         {isExpanded && (
-          <div className="mt-10 pt-10 border-t border-[var(--border-light)] animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="mt-12 animate-in fade-in slide-in-from-top-6 duration-700">
             {isLoading ? (
-              <div className="flex justify-center py-20">
-                <Loader2 size={24} className="animate-spin text-[var(--accent)] opacity-40" />
+              <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-40">
+                <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.3em]">Decrypting Session...</span>
               </div>
             ) : (fullUploadData || entry.meta) ? (
-              <div className="bg-[#0c0c0d]/60 rounded-[2.5rem] p-8 border border-[var(--border-light)] shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent" />
+              <div className="relative border border-[var(--border-medium)] bg-[var(--bg-secondary)] shadow-2xl rounded-sm overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent" />
+                
                 {!fullUploadData && entry.source_upload_id && (
-                  <div className="flex items-center gap-3 px-5 py-3 mb-6 rounded-2xl bg-orange-400/5 border border-orange-400/10 text-[10px] text-orange-400 uppercase tracking-widest font-mono">
-                    <AlertCircle size={14} /> Source removed · Analysis Snapshot
+                  <div className="flex items-center gap-3 px-8 py-4 bg-orange-500/5 border-b border-orange-500/10 text-[10px] text-orange-400 uppercase tracking-[0.2em] font-mono">
+                    <AlertCircle size={14} /> Intelligence Snapshot · Primary Source Unavailable
                   </div>
                 )}
-                <SessionDetail 
-                  upload={fullUploadData || ({ 
-                     id: entry.source_upload_id || entry.id,
-                     file_name: entry.title,
-                     recorded_at: entry.logged_at,
-                     analysis: entry.meta,
-                     mime_type: 'video/mp4',
-                     thumbnail_url: entry.thumbnail_url
-                  } as any)} 
-                />
+                
+                <div className="p-10">
+                  <SessionDetail 
+                    upload={fullUploadData || ({ 
+                       id: entry.source_upload_id || entry.id,
+                       file_name: entry.title,
+                       recorded_at: entry.logged_at,
+                       analysis: entry.meta,
+                       mime_type: 'video/mp4',
+                       thumbnail_url: entry.thumbnail_url
+                    } as any)} 
+                  />
+                </div>
               </div>
             ) : (
-              <p className="text-xs text-[var(--text-tertiary)] text-center py-12 opacity-40 italic">Session metadata unavailable.</p>
+              <div className="text-center py-20 border border-dashed border-[var(--border-light)] opacity-30 italic font-light text-sm">
+                Primary Intelligence Data Missing for this Node.
+              </div>
             )}
           </div>
         )}

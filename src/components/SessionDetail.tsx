@@ -5,7 +5,8 @@ import {
   Brain, Target, FileText, Scissors, Shield, Sparkles, Zap,
   Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2,
   TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
-  CalendarDays, ChevronRight, Edit2, Quote, Activity, Compass, Fingerprint
+  CalendarDays, ChevronRight, Edit2, Quote, Activity, Compass, Fingerprint,
+  Layers, Map, Terminal, Cpu
 } from 'lucide-react'
 import type { VideoUpload, TranscriptWord } from '@/types/database'
 import { TranscriptEditor } from '@/components/TranscriptEditor'
@@ -31,51 +32,31 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   }, [activeTab, upload.id, transcriptWords])
 
   const tabs = [
-    { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
-    { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
-    { key: 'edit' as const,        label: 'Edit',         icon: Edit2 },
-    { key: 'clips' as const,       label: 'Clips',        icon: Scissors, count: upload.generated_clips?.length || 0 },
-    { key: 'posts' as const,       label: 'Posts',        icon: FileText, count: upload.generated_posts?.length || 0 },
+    { key: 'analysis' as const,    label: 'Primary Intel', icon: Terminal },
+    { key: 'transcript' as const,  label: 'Log Files',    icon: FileText },
+    { key: 'edit' as const,        label: 'Source Edit',  icon: Edit2 },
+    { key: 'clips' as const,       label: 'Fragments',    icon: Scissors, count: upload.generated_clips?.length || 0 },
+    { key: 'posts' as const,       label: 'Drafts',       icon: MessageCircle, count: upload.generated_posts?.length || 0 },
   ]
 
   return (
-    <div className="session-detail animate-in fade-in duration-700">
-      {a?.contains_sensitive_content && (
-        <div className="flex items-center gap-3 px-6 py-4 mb-8 rounded-2xl bg-red-500/5 border border-red-500/10 backdrop-blur-md">
-          <Shield size={16} className="text-red-400 flex-shrink-0" />
-          <p className="text-[11px] font-mono uppercase tracking-widest text-red-400">
-            Sensitive content detected and redacted. {a.pii_detected?.length || 0} items flagged.
-          </p>
-        </div>
-      )}
-
-      {/* Tabs Header - Premium Minimal */}
-      <div className="flex gap-8 mb-10 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
+    <div className="session-detail dossier-view">
+      {/* Tab Navigation — Ultra Minimal */}
+      <div className="flex gap-10 mb-12 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
         {tabs.map(tab => {
           const Icon = tab.icon
           return (
             <button
               key={tab.key}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setActiveTab(tab.key)
-              }}
-              className={`flex items-center gap-2.5 px-1 py-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'text-[var(--accent)]'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] opacity-60 hover:opacity-100'
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab(tab.key) }}
+              className={`flex items-center gap-3 py-4 text-[10px] font-mono font-bold uppercase tracking-[0.3em] transition-all relative ${
+                activeTab === tab.key ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] opacity-50 hover:opacity-100'
               }`}
             >
-              <Icon size={14} className={activeTab === tab.key ? 'animate-pulse' : ''} />
+              <Icon size={14} strokeWidth={1.5} />
               {tab.label}
-              {'count' in tab && (tab as any).count > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-[9px]">
-                  {(tab as any).count}
-                </span>
-              )}
               {activeTab === tab.key && (
-                <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[var(--accent)] shadow-[0_0_10px_rgba(124,106,245,0.5)]" />
+                <div className="absolute bottom-[-1px] left-0 right-0 h-[1.5px] bg-[var(--accent)]" />
               )}
             </button>
           )
@@ -84,284 +65,184 @@ export function SessionDetail({ upload }: SessionDetailProps) {
 
       <div className="tab-content">
         {activeTab === 'analysis' && a && (
-          <div className="space-y-12">
-            {/* Top Grid: Recap & Core Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-              {/* Narrative Summary */}
-              <div className="lg:col-span-7 space-y-8">
-                <div>
-                   <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--accent)] mb-6 opacity-70">
-                     <Quote size={12} /> Narrative Core
-                   </h4>
-                   <p className="font-serif text-2xl leading-relaxed text-[var(--text-primary)] font-medium tracking-tight">
-                     {a.summary}
-                   </p>
-                </div>
-
-                {/* Categories & Topics */}
-                <div className="flex flex-wrap gap-2 pt-4">
-                  {a.categories?.map((cat: any, i: number) => (
-                    <span key={i} className="px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[var(--accent)]/30 transition-colors cursor-default">
-                      {cat.name}
-                    </span>
-                  ))}
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* COLUMN 1: Narrative & Context (Bento Main) */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Central Summary — Editorial Inset */}
+              <div className="p-10 bg-[var(--bg-tertiary)]/20 border border-[var(--border-medium)] rounded-sm relative group overflow-hidden">
+                 <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)] opacity-20" />
+                 <h4 className="flex items-center gap-3 text-[9px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--accent)] mb-8 opacity-60">
+                   <Quote size={12} /> Narrative Synthesis
+                 </h4>
+                 <p className="font-serif text-[24px] leading-[1.6] text-[var(--text-primary)] font-light tracking-tight max-w-2xl">
+                   {a.summary}
+                 </p>
               </div>
 
-              {/* State Metadata */}
-              <div className="lg:col-span-5 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-5 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] backdrop-blur-sm">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
-                       <Activity size={12} /> Mood
-                    </p>
-                    <p className="text-lg font-medium text-[var(--text-primary)] capitalize tracking-tight">
-                      {a.mood || 'Reflective'}
-                    </p>
-                  </div>
-                  <div className="p-5 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] backdrop-blur-sm">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
-                       <Zap size={12} /> Energy
-                    </p>
-                    <p className="text-lg font-medium text-[var(--text-primary)] capitalize tracking-tight">
-                      {a.energy_level || 'Medium'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-6 rounded-3xl bg-gradient-to-br from-[var(--bg-tertiary)] to-[var(--bg-secondary)] border border-[var(--border-light)]">
-                  <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
-                    <CalendarDays size={12} /> Temporal Marker
-                  </h4>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <p className="text-xl font-light text-[var(--text-primary)]">
-                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'MMMM d, yyyy') : 'Live Ingestion'}
-                    </p>
-                    <p className="text-[11px] font-mono text-[var(--text-tertiary)]">
-                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'HH:mm') : ''}
-                    </p>
-                  </div>
-                  <p className="text-[9px] font-mono uppercase tracking-widest text-[var(--accent)] opacity-60">
-                    Source: {upload.recorded_at ? 'Device Metadata' : 'System Timestamp'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Reflections Section - High Impact */}
-            {a.reflections && (
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/10 via-transparent to-transparent rounded-3xl blur-2xl opacity-20" />
-                <div className="relative p-10 rounded-[2.5rem] bg-[#0d0d15]/80 border border-[var(--accent)]/10 backdrop-blur-xl group-hover:border-[var(--accent)]/30 transition-all duration-700">
-                  <div className="absolute top-8 right-10 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Sparkles size={64} className="text-[var(--accent)]" />
-                  </div>
-                  <h4 className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--accent)] mb-8">
-                     <Fingerprint size={16} /> Synthetic Perspective
-                  </h4>
-                  <p className="text-xl leading-relaxed text-[var(--text-primary)] font-light italic tracking-tight opacity-90">
-                    &ldquo;{a.reflections}&rdquo;
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Combined Strategic Intelligence */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-8 border-t border-[var(--border-light)]">
-              {/* Strategic Entities (Projects, Decisions, Action Items) */}
-              <div className="space-y-10">
-                {a.projects?.length > 0 && (
-                  <InsightSection icon={FolderOpen} title="Domain: Projects">
-                    <div className="space-y-4">
+              {/* Bento Grid: Projects & Decisions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <BentoCard icon={FolderOpen} title="Domain Manifest" variant="blue">
+                  {a.projects?.length > 0 ? (
+                    <div className="space-y-6">
                       {a.projects.map((p: any, i: number) => (
-                        <div key={i} className="group/item">
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm font-semibold text-[var(--text-primary)]">{p.name}</span>
-                            <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-tertiary)]">{p.status}</span>
+                        <div key={i} className="group/project">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-[var(--text-primary)] tracking-wide">{p.name}</span>
+                            <span className="text-[8px] font-mono px-1.5 py-0.5 border border-[var(--border-light)] text-[var(--text-tertiary)] uppercase">{p.status}</span>
                           </div>
                           {p.updates?.length > 0 && (
-                            <p className="text-xs text-[var(--text-tertiary)] leading-relaxed line-clamp-2 italic">{p.updates[0]}</p>
+                            <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed italic opacity-80">{p.updates[0]}</p>
                           )}
                         </div>
                       ))}
                     </div>
-                  </InsightSection>
-                )}
+                  ) : <EmptyState text="No active project links detected." />}
+                </BentoCard>
 
-                {a.decisions?.length > 0 && (
-                  <InsightSection icon={TrendingUp} title="Strategic: Decisions">
-                    <div className="space-y-4">
+                <BentoCard icon={TrendingUp} title="Strategic Vector" variant="purple">
+                  {a.decisions?.length > 0 ? (
+                    <div className="space-y-5">
                       {a.decisions.map((d: any, i: number) => (
-                        <div key={i} className="pl-3 border-l-2 border-[var(--accent)]/30">
-                          <p className="text-sm text-[var(--text-secondary)] font-medium mb-1">{d.decision}</p>
-                          {d.reasoning && <p className="text-[11px] text-[var(--text-tertiary)] italic">{d.reasoning}</p>}
+                        <div key={i} className="pl-3 border-l-[1px] border-[var(--border-heavy)]">
+                          <p className="text-[12px] text-[var(--text-secondary)] font-medium mb-1 tracking-tight">{d.decision}</p>
+                          {d.reasoning && <p className="text-[10px] text-[var(--text-tertiary)] opacity-60 leading-relaxed font-light">{d.reasoning}</p>}
                         </div>
                       ))}
                     </div>
-                  </InsightSection>
-                )}
+                  ) : <EmptyState text="No significant decisions archived." />}
+                </BentoCard>
               </div>
 
-              {/* Creative & Ideational */}
-              <div className="space-y-10">
-                {a.ideas?.length > 0 && (
-                   <InsightSection icon={Lightbulb} title="Conceptual: Ideas">
-                     <div className="space-y-4">
-                       {a.ideas.map((idea: any, i: number) => (
-                         <div key={i} className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/20 border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]/40 transition-all">
-                           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                             {typeof idea === 'object' ? idea.text : idea}
-                           </p>
-                         </div>
-                       ))}
-                     </div>
-                   </InsightSection>
-                )}
-                
-                {a.questions?.length > 0 && (
-                  <InsightSection icon={HelpCircle} title="Inquiry: Open Questions">
-                    <div className="space-y-4 opacity-70">
-                      {a.questions.map((q: string, i: number) => (
-                        <p key={i} className="text-sm text-[var(--text-secondary)] italic border-b border-[var(--border-light)] pb-2 last:border-0">
-                          {q}
-                        </p>
-                      ))}
-                    </div>
-                  </InsightSection>
-                )}
+              {/* Reflections — The 'High Intel' highlight */}
+              {a.reflections && (
+                <div className="p-10 border border-[var(--border-medium)] bg-gradient-to-br from-[#0a0a14] to-[var(--bg-primary)] rounded-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-[-20%] w-[40%] h-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
+                  <div className="absolute top-10 right-10 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Sparkles size={48} className="text-[var(--accent)]" />
+                  </div>
+                  <h4 className="flex items-center gap-3 text-[9px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--accent)] mb-8">
+                     <Fingerprint size={14} /> Synthetic Perspective
+                  </h4>
+                  <p className="text-[19px] leading-[1.8] text-[var(--text-secondary)] font-light italic tracking-tight opacity-90 relative z-10">
+                    &ldquo;{a.reflections}&rdquo;
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* COLUMN 2: Metadata & Accountability (Bento Sidebar) */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Quick Status Bento */}
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="p-6 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm">
+                    <p className="text-[8px] font-mono font-bold uppercase tracking-[0.3em] text-[var(--text-tertiary)] mb-4">State</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)] tracking-wide">{a.mood || 'Calm'}</p>
+                 </div>
+                 <div className="p-6 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm">
+                    <p className="text-[8px] font-mono font-bold uppercase tracking-[0.3em] text-[var(--text-tertiary)] mb-4">Current</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)] tracking-wide">{a.energy_level || 'Normal'}</p>
+                 </div>
               </div>
 
-              {/* Action & Accountability */}
-              <div className="space-y-10">
-                {a.action_items?.length > 0 && (
-                  <InsightSection icon={CheckCircle2} title="Tactical: Action Items">
-                    <div className="space-y-3">
-                      {a.action_items.map((item: string, i: number) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-[var(--accent-softer)] border border-[var(--accent)]/5 group/ai">
-                          <CheckCircle2 size={14} className="text-[var(--accent)] mt-0.5 flex-shrink-0 opacity-40 group-hover/ai:opacity-100 transition-opacity" />
-                          <span className="text-sm text-[var(--text-secondary)]">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </InsightSection>
-                )}
+              <BentoCard icon={CheckCircle2} title="Tactical Intake" variant="emerald">
+                {a.action_items?.length > 0 ? (
+                  <div className="space-y-4">
+                    {a.action_items.map((item: string, i: number) => (
+                      <div key={i} className="flex items-start gap-4 p-3 bg-[var(--bg-primary)] border border-[var(--border-light)] hover:border-[var(--accent)]/20 transition-all rounded-sm group/item">
+                        <div className="mt-1 w-1 h-1 rounded-full bg-[var(--accent)] opacity-40 group-hover/item:opacity-100" />
+                        <span className="text-[12px] text-[var(--text-secondary)] font-light leading-relaxed">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <EmptyState text="Zero tactical items captured." />}
+              </BentoCard>
 
-                {a.goals?.length > 0 && (
-                  <InsightSection icon={Target} title="Vision: Goals">
-                    <div className="space-y-3">
-                       {a.goals.map((g: any, i: number) => (
-                         <div key={i} className="text-sm text-[var(--text-secondary)]">
-                            <span className="font-semibold text-[var(--text-primary)]">• {g.goal}</span>
-                            <span className="ml-2 text-[9px] font-mono text-[var(--text-tertiary)] opacity-60 uppercase">{g.timeframe}</span>
-                         </div>
-                       ))}
-                    </div>
-                  </InsightSection>
-                )}
-              </div>
+              <BentoCard icon={Lightbulb} title="Conceptual Mapping" variant="amber">
+                {a.ideas?.length > 0 ? (
+                  <div className="space-y-4">
+                    {a.ideas.map((idea: any, i: number) => (
+                      <div key={i} className="text-[12px] text-[var(--text-tertiary)] font-light leading-relaxed pb-4 border-b border-[var(--border-light)] last:border-0">
+                        {typeof idea === 'object' ? idea.text : idea}
+                      </div>
+                    ))}
+                  </div>
+                ) : <EmptyState text="Conceptual slate empty." />}
+              </BentoCard>
+
+              <BentoCard icon={Compass} title="Vision & Trajectory" variant="indigo">
+                {a.goals?.length > 0 ? (
+                  <div className="space-y-4">
+                    {a.goals.map((g: any, i: number) => (
+                      <div key={i} className="flex flex-col gap-1">
+                        <span className="text-[12px] text-[var(--text-secondary)] font-medium">• {g.goal}</span>
+                        <span className="text-[8px] font-mono text-[var(--text-tertiary)] opacity-50 uppercase tracking-widest pl-3">{g.timeframe}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <EmptyState text="No trajectory markers found." />}
+              </BentoCard>
             </div>
           </div>
         )}
 
-        {/* Other tabs with minimal styles */}
+        {/* Other tabs — Simplified Dossier Styling */}
         {activeTab === 'transcript' && (
-          <div className="py-10">
+          <div className="py-10 max-w-4xl mx-auto">
             {upload.transcript ? (
-              <div className="max-h-[600px] overflow-y-auto pr-6 custom-scrollbar space-y-8">
-                {upload.transcript_segments && upload.transcript_segments.length > 0 ? (
-                  upload.transcript_segments.map((seg, i) => (
-                    <div key={i} className="flex gap-10 group">
-                      <span className="text-[10px] text-[var(--text-tertiary)] font-mono pt-1.5 flex-shrink-0 w-16 text-right opacity-30 group-hover:opacity-100 transition-opacity">
-                        {formatTimestamp(seg.start)}
-                      </span>
-                      <p className="text-base text-[var(--text-secondary)] leading-loose group-hover:text-[var(--text-primary)] transition-colors duration-500 font-light max-w-2xl">{seg.text}</p>
+               <div className="space-y-12">
+                  {upload.transcript_segments?.map((seg, i) => (
+                    <div key={i} className="flex gap-12 group">
+                       <span className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 group-hover:opacity-100 transition-opacity w-16 text-right pt-1.5">{formatTimestamp(seg.start)}</span>
+                       <p className="text-[16px] leading-[1.8] text-[var(--text-secondary)] font-light tracking-wide group-hover:text-[var(--text-primary)] transition-all duration-700">{seg.text}</p>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-base text-[var(--text-secondary)] leading-loose font-light max-w-2xl whitespace-pre-wrap px-10">
-                    {upload.transcript}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="py-24 text-center opacity-30">
-                <FileText size={32} className="mx-auto mb-4" />
-                <p className="text-sm uppercase tracking-widest font-mono">End of line</p>
-              </div>
-            )}
+                  ))}
+               </div>
+            ) : <EmptyState text="No transcript record found." />}
           </div>
         )}
 
         {activeTab === 'edit' && (
-          <div className="min-h-[400px] py-8">
-            {loadingWords ? (
-              <div className="py-24 text-center">
-                <p className="text-sm animate-pulse font-mono uppercase tracking-widest opacity-40">Synthesizing word-level data...</p>
-              </div>
-            ) : transcriptWords && transcriptWords.length > 0 ? (
-              <TranscriptEditor
-                uploadId={upload.id!}
-                words={transcriptWords}
-                onWordsUpdate={setTranscriptWords}
-              />
-            ) : (
-              <div className="py-24 text-center opacity-30">
-                <Edit2 size={32} className="mx-auto mb-4" />
-                <p className="text-sm uppercase tracking-widest font-mono">No granular metadata available</p>
-              </div>
-            )}
+          <div className="py-10">
+            {loadingWords ? <div className="py-24 text-center animate-pulse text-[10px] font-mono uppercase tracking-[0.4em]">Resyncing Word Stream...</div> : 
+             transcriptWords && transcriptWords.length > 0 ? (
+               <TranscriptEditor uploadId={upload.id!} words={transcriptWords} onWordsUpdate={setTranscriptWords} />
+             ) : <EmptyState text="Word-level metadata unavailable for this node." />}
           </div>
         )}
 
         {activeTab === 'clips' && (
-          <div className="py-10 pb-20">
-            {upload.generated_clips && upload.generated_clips.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {upload.generated_clips.map((clip, i) => (
-                  <div key={i} className="group/clip p-6 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] hover:border-[var(--accent)] transition-all duration-500 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/5 to-transparent opacity-0 group-hover/clip:opacity-100 transition-opacity" />
-                    <div className="flex items-start justify-between mb-4 relative z-10">
-                      <h5 className="text-sm font-bold text-[var(--text-primary)] group-hover/clip:text-[var(--accent)] transition-colors">{clip.title}</h5>
-                      <span className="text-[9px] text-[var(--text-tertiary)] font-mono bg-[#000]/40 px-2 py-0.5 rounded-full">
-                        {formatTimestamp(clip.start)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed italic opacity-70 group-hover/clip:opacity-100 transition-opacity">&ldquo;{clip.transcript}&rdquo;</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-24 text-center opacity-30">
-                <Scissors size={32} className="mx-auto mb-4" />
-                <p className="text-sm uppercase tracking-widest font-mono">No fragments available</p>
-              </div>
-            )}
+          <div className="py-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upload.generated_clips?.map((clip, i) => (
+                <div key={i} className="group/clip p-8 border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)]/40 transition-all duration-700 rounded-sm">
+                   <div className="flex justify-between items-start mb-6">
+                      <h5 className="text-xs font-bold text-[var(--text-primary)] tracking-wide">{clip.title}</h5>
+                      <span className="text-[9px] font-mono opacity-40">{formatTimestamp(clip.start)}</span>
+                   </div>
+                   <p className="text-[11px] text-[var(--text-tertiary)] italic leading-relaxed opacity-60 group-hover/clip:opacity-100 transition-opacity">
+                     &ldquo;{clip.transcript}&rdquo;
+                   </p>
+                </div>
+              ))}
+              {!upload.generated_clips?.length && <div className="col-span-full"><EmptyState text="No high-value fragments identified." /></div>}
+            </div>
           </div>
         )}
 
         {activeTab === 'posts' && (
-          <div className="py-10 pb-20">
-            {upload.generated_posts && upload.generated_posts.length > 0 ? (
-              <div className="grid grid-cols-1 gap-8 max-w-3xl">
-                {upload.generated_posts.map((post, i) => (
-                  <div key={i} className="relative group/post">
-                    <div className="absolute -left-4 top-0 bottom-0 w-0.5 bg-[var(--accent)] opacity-20 group-hover/post:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase tracking-widest bg-[var(--accent-soft)] text-[var(--accent)]">
-                        {post.type}
-                      </span>
-                    </div>
-                    <h5 className="text-lg font-bold text-[var(--text-primary)] mb-4">{post.title}</h5>
-                    <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed font-light">{post.content}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-24 text-center opacity-30">
-                <MessageCircle size={32} className="mx-auto mb-4" />
-                <p className="text-sm uppercase tracking-widest font-mono">No drafts generated</p>
-              </div>
-            )}
+          <div className="py-10 max-w-2xl">
+             <div className="space-y-12">
+               {upload.generated_posts?.map((post, i) => (
+                 <div key={i} className="relative pl-10 border-l border-[var(--border-light)] group/post">
+                    <div className="absolute top-0 left-[-1px] w-[1px] h-full bg-[var(--accent)] opacity-0 group-hover/post:opacity-100 transition-all duration-700" />
+                    <span className="text-[8px] font-mono font-bold uppercase tracking-[0.3em] text-[var(--accent)] mb-4 block opacity-50">{post.type}</span>
+                    <h5 className="text-[18px] font-bold text-[var(--text-primary)] mb-4 tracking-tight">{post.title}</h5>
+                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed font-light opacity-80">{post.content}</p>
+                 </div>
+               ))}
+               {!upload.generated_posts?.length && <EmptyState text="Zero derivative drafts generated." />}
+             </div>
           </div>
         )}
       </div>
@@ -369,15 +250,23 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   )
 }
 
-function InsightSection({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
+function BentoCard({ icon: Icon, title, children, variant }: { icon: any; title: string, children: React.ReactNode, variant: string }) {
   return (
-    <div className="space-y-6">
-      <h4 className="flex items-center gap-2.5 text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--text-secondary)] opacity-50">
-        <Icon size={12} className="text-[var(--accent)] opacity-80" /> {title}
+    <div className="p-8 border border-[var(--border-light)] bg-[#08080c] rounded-sm relative group hover:border-[var(--border-medium)] transition-all duration-500">
+      <h4 className="flex items-center gap-3 text-[9px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--text-tertiary)] mb-8 opacity-40 group-hover:opacity-80 transition-opacity">
+        <Icon size={12} strokeWidth={2} /> {title}
       </h4>
-      <div className="pl-1">
+      <div className="relative z-10">
         {children}
       </div>
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="py-12 flex flex-col items-center justify-center opacity-20 border border-dashed border-[var(--border-light)] rounded-sm">
+      <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-center px-4">{text}</p>
     </div>
   )
 }
