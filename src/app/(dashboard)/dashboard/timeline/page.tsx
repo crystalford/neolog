@@ -51,72 +51,67 @@ export default function TimelinePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-40">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
-        <span className="text-[10px] font-mono uppercase tracking-[0.4em]">Initializing Dossier Stream...</span>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-20">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        <span className="text-[9px] font-mono uppercase tracking-[0.4em]">Resyncing Data...</span>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-32">
-      {/* Narrative Header — Fixed Dossier Status */}
-      <header className="sticky top-0 z-50 w-full border-b border-[var(--border-light)] bg-[var(--bg-primary)]/80 backdrop-blur-xl">
-        <div className="max-w-[1000px] mx-auto px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="font-serif text-xl font-medium tracking-tight text-[var(--text-primary)]">The Log</h1>
-            <div className="h-4 w-[1px] bg-[var(--border-light)]" />
-            <div className="flex items-center gap-2">
-               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-               <span className="text-[9px] font-mono font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] opacity-60">System Online</span>
+      {/* Analyst Header — Compact */}
+      <header className="sticky top-0 z-50 w-full border-b border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
+        <div className="max-w-[800px] mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="font-serif text-lg font-medium tracking-tight text-[var(--text-primary)]">Log</h1>
+            <div className="flex items-center gap-2 px-2 py-0.5 rounded-sm bg-green-500/5 border border-green-500/10">
+               <span className="text-[8px] font-mono font-bold uppercase tracking-widest text-green-500/60">Stream Live</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <div className="relative group">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] opacity-40 group-focus-within:opacity-100 transition-opacity" />
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] opacity-30 group-focus-within:opacity-100" />
               <input 
                 type="text"
-                placeholder="Search Narrative..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm pl-10 pr-4 py-2 text-xs w-64 focus:w-80 transition-all focus:border-[var(--accent)] outline-none font-light"
+                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm pl-9 pr-3 py-1.5 text-[11px] w-48 focus:w-64 transition-all focus:border-[var(--text-tertiary)] outline-none font-light"
               />
             </div>
-            <button className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-all">
-               <SlidersHorizontal size={14} /> Filter
+            <button className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+               <SlidersHorizontal size={12} /> Filter
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Narrative Feed */}
-      <main className="max-w-[1000px] mx-auto mt-12">
+      {/* Narrative Feed — Optimized Flow */}
+      <main className="max-w-[800px] mx-auto mt-8">
         {dates.length > 0 ? (
-          <div className="space-y-24">
+          <div className="space-y-6">
             {dates.map((dateStr) => {
               const dateObj = parseISO(dateStr)
               const entriesForDate = groupedEntries[dateStr]
               
               return (
                 <section key={dateStr} className="relative">
-                  {/* Sticky Date Waypoint */}
-                  <div className="sticky top-20 z-40 flex items-center gap-8 py-8 bg-[var(--bg-primary)] mb-6 overflow-hidden">
-                    <div className="flex flex-col items-end flex-shrink-0 w-24">
-                       <span className="text-[10px] font-mono font-bold text-[var(--accent)] tracking-[0.2em] mb-1">
-                          {isToday(dateObj) ? 'TODAY' : isYesterday(dateObj) ? 'YESTERDAY' : format(dateObj, 'yyyy')}
-                       </span>
-                       <span className="text-[12px] font-serif text-[var(--text-tertiary)] opacity-40 uppercase tracking-widest">
-                          {format(dateObj, 'MMM dd')}
+                  {/* waypoint - extremely low profile */}
+                  <div className="sticky top-14 z-40 flex items-center gap-4 py-4 bg-[var(--bg-primary)]/95">
+                    <div className="flex flex-col items-end flex-shrink-0 w-20">
+                       <span className="text-[9px] font-mono font-bold text-[var(--text-primary)] tracking-widest leading-none">
+                          {isToday(dateObj) ? 'TODAY' : isYesterday(dateObj) ? 'YESTERDAY' : format(dateObj, 'MMM dd')}
                        </span>
                     </div>
-                    <div className="flex-1 h-[1px] bg-gradient-to-r from-[var(--border-light)] to-transparent" />
-                    <div className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 uppercase tracking-[0.4em]">
-                       {entriesForDate.length} EVENT{entriesForDate.length !== 1 ? 'S' : ''} ARCHIVED
-                    </div>
+                    <div className="flex-1 h-[1px] bg-[var(--border-light)]" />
+                    <span className="text-[8px] font-mono text-[var(--text-tertiary)] opacity-20 uppercase tracking-[0.3em]">
+                       {entriesForDate.length} EVENT{entriesForDate.length !== 1 ? 'S' : ''}
+                    </span>
                   </div>
 
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                  <div className="border border-[var(--border-light)] bg-[var(--bg-secondary)]/20 rounded-sm">
                     {entriesForDate.map((entry) => (
                       <LogCard key={entry.id} entry={entry} />
                     ))}
@@ -126,12 +121,9 @@ export default function TimelinePage() {
             })}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-48 gap-6 border border-dashed border-[var(--border-light)] rounded-sm opacity-30">
-            <Sparkles size={32} className="text-[var(--accent)]" />
-            <div className="text-center space-y-2">
-              <p className="text-[11px] font-mono uppercase tracking-[0.5em]">Narrative Stream Empty</p>
-              <p className="text-sm font-light italic">No events have been captured in this temporal window.</p>
-            </div>
+          <div className="flex flex-col items-center justify-center py-32 gap-4 border border-dashed border-[var(--border-light)] rounded-sm opacity-20">
+            <Sparkles size={20} />
+            <p className="text-[9px] font-mono uppercase tracking-[0.4em]">Zero Captured Signals</p>
           </div>
         )}
       </main>
