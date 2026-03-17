@@ -45,6 +45,7 @@ const nextConfig = {
               "font-src 'self' data: https:",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+              "media-src 'self' blob:",
               "connect-src 'self' https: wss:",
               "frame-src https://js.stripe.com",
               "form-action 'self'",
