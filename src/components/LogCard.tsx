@@ -21,6 +21,10 @@ export type LogEntry = {
   source_upload_id?: string | null
   is_public: boolean
   meta?: Record<string, any>
+  video_uploads?: {
+    transcript_segments: any[]
+    analysis: any
+  } | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -118,6 +122,19 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
     e.preventDefault(); e.stopPropagation()
     if (isExpanded) { setIsExpanded(false); return }
     setIsExpanded(true)
+
+    // If we already have the data (from a join), don't fetch
+    if (entry.video_uploads && !fullUploadData) {
+      setFullUploadData({
+        ...entry.video_uploads,
+        id: entry.source_upload_id || entry.id,
+        file_name: entry.title,
+        recorded_at: entry.logged_at,
+        logged_at: entry.logged_at,
+      } as any)
+      return
+    }
+
     if (!fullUploadData && entry.source_upload_id) {
       setIsLoading(true)
       try {

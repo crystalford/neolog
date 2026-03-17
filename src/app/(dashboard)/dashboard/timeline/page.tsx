@@ -18,13 +18,14 @@ export default function TimelinePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
+      // Join video_uploads to get the actual transcript segments for Script mode
       const { data, error } = await supabase
         .from('log_entries')
-        .select('*')
+        .select('*, video_uploads!source_upload_id(transcript_segments, analysis)')
         .eq('user_id', session.user.id)
         .order('logged_at', { ascending: false })
 
-      if (data) setEntries(data)
+      if (data) setEntries(data as any)
       setIsLoading(false)
     }
     load()
@@ -137,8 +138,10 @@ export default function TimelinePage() {
         ) : (
           /* Infinite Script View */
           <div className="space-y-24 pb-64">
-             {filteredEntries.map((entry, idx) => {
-                const segments = entry.meta?.transcript_segments || []
+             {filteredEntries.map((entry: any, idx) => {
+                // Use segments from video_uploads if log_entry's meta is empty
+                const segments = entry.video_uploads?.transcript_segments || entry.meta?.transcript_segments || []
+                
                 return (
                   <article key={entry.id} className="relative animate-in fade-in duration-1000 slide-in-from-bottom-4">
                      <div className="flex items-center gap-6 mb-12 opacity-20 hover:opacity-100 transition-opacity duration-500">
@@ -163,12 +166,9 @@ export default function TimelinePage() {
                            ))}
                         </div>
                      ) : (
-                        <div className="pl-28 border-l-2 border-[var(--border-light)] py-4">
-                           <p className="text-[18px] leading-[1.8] text-[var(--text-tertiary)] font-light italic opacity-40">
-                              [ NO TRANSCRIPT DATA RECOVERED FOR THIS SIGNAL ]
-                           </p>
-                           <p className="text-[14px] mt-4 text-[var(--text-secondary)] font-light">
-                              {entry.meta?.summary || entry.body}
+                        <div className="pl-28 border-l-2 border-[var(--border-light)] py-4 opacity-40">
+                           <p className="text-[14px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)]">
+                              [ NO LOG RECOVERED FOR THIS SIGNAL ]
                            </p>
                         </div>
                      )}
