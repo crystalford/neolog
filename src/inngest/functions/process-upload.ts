@@ -366,104 +366,11 @@ export const processUpload = inngest.createFunction(
       await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
     })
 
-    // ── Step 2c: Extract thumbnail frame ──
-    // Strategy: try direct frame extraction first (fast). If no frames returned
-    // (HEVC files can fail on some hosts), transcode to H.264 first then extract.
-    const thumbnailPath = await step.run('extract-thumbnail', async () => {
-      const { upload } = activeContext
-      if (!isVideoMimeType(upload.mime_type)) return null
-
-      await plog(admin, video_upload_id, 'extract-thumbnail', 'running', 'Extracting thumbnail frame')
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return null
-
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(upload.storage_path, 7200)
-
-      if (!signedData?.signedUrl) return null
-
-      const replicate = new Replicate({ auth: replicateToken })
-
-      // Helper: extract frame from a given URL, returns frame URL or null
-      const extractFrame = async (inputUrl: string): Promise<string | null> => {
-        try {
-          const output = await replicate.run('fofr/toolkit', {
-            input: { task: 'extract_frames_from_input', input_file: inputUrl, fps: 1 },
-          }) as any
-
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'info',
-            `extract_frames output: isArray=${Array.isArray(output)}, sample=${JSON.stringify(output)?.slice(0, 150)}`)
-
-          const frames = Array.isArray(output) ? output : (output ? [output] : [])
-          if (frames.length === 0) return null
-
-          const idx = Math.min(3, frames.length - 1)
-          const frameOutput = frames[idx]
-          const url = typeof frameOutput === 'string' ? frameOutput : String(frameOutput)
-          return url.startsWith('http') ? url : null
-        } catch (err: any) {
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'warn', `Direct extract failed: ${err?.message}`)
-          return null
-        }
-      }
-
-      // Attempt 1: direct extraction (fast, works for H.264)
-      let frameUrl = await extractFrame(signedData.signedUrl)
-
-      // Attempt 2: transcode to H.264 first (handles HEVC/MOV files)
-      if (!frameUrl) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'info', 'Direct extract returned no frames — transcoding to H.264 first')
-        try {
-          const { data: freshSign } = await admin.storage
-            .from('videos')
-            .createSignedUrl(upload.storage_path, 7200)
-
-          if (freshSign?.signedUrl) {
-            const transOutput = await replicate.run('fofr/toolkit', {
-              input: { task: 'convert_input_to_mp4', input_file: freshSign.signedUrl },
-            }) as any
-
-            const mp4Url = extractReplicateUrl(transOutput)
-            await plog(admin, video_upload_id, 'extract-thumbnail', 'info', `Transcoded to H.264: ${mp4Url?.slice(0, 80)}`)
-
-            if (mp4Url) {
-              frameUrl = await extractFrame(mp4Url)
-            }
-          }
-        } catch (err: any) {
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'warn', `Transcode fallback failed: ${err?.message}`)
-        }
-      }
-
-      if (!frameUrl) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'All thumbnail extraction attempts failed')
-        return null
-      }
-
-      try {
-        const imgBuffer = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
-        if (imgBuffer.length < 500) {
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'Frame too small — likely corrupt')
-          return null
-        }
-
-        const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50
-        const mime = isPng ? 'image/png' : 'image/jpeg'
-        const base64DataUrl = `data:${mime};base64,${imgBuffer.toString('base64')}`
-        await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
-
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Thumbnail stored (${imgBuffer.length} bytes, ${mime})`)
-        return base64DataUrl
-      } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
-        return null
-      }
-    })
-
-    // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
-    await step.run('transcode-playback', async () => {
+    // ── Step 2c: Transcode to H.264 for browser-compatible playback ──
+    // NOTE: This now runs BEFORE thumbnail extraction so we can use the H.264
+    // output for frame extraction — critical for vertical DJI HEVC videos which
+    // have rotation metadata that causes fofr/toolkit to fail on the original file.
+    const playbackStoragePath = await step.run('transcode-playback', async () => {
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
 
@@ -480,38 +387,109 @@ export const processUpload = inngest.createFunction(
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
-
-        // fofr/toolkit correct API: convert_input_to_mp4 re-encodes to H.264/AAC
-        const output = await replicate.run(
-          'fofr/toolkit',
-          {
-            input: {
-              task: 'convert_input_to_mp4',
-              input_file: signedData.signedUrl,
-            },
-          },
-        ) as any
+        const output = await replicate.run('fofr/toolkit', {
+          input: { task: 'convert_input_to_mp4', input_file: signedData.signedUrl },
+        }) as any
 
         const outputUrl = extractReplicateUrl(output)
         if (!outputUrl) return null
 
         const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-        const playbackStoragePath = `${user_id}/playback/${video_upload_id}.mp4`
+        const path = `${user_id}/playback/${video_upload_id}.mp4`
 
-        await admin.storage.from('videos').upload(playbackStoragePath, mp4Buf, {
+        await admin.storage.from('videos').upload(path, mp4Buf, {
           contentType: 'video/mp4',
           upsert: true,
           cacheControl: '31536000',
         })
 
-        await admin.from('video_uploads')
-          .update({ playback_path: playbackStoragePath })
-          .eq('id', video_upload_id)
-
-        await plog(admin, video_upload_id, 'transcode-playback', 'done', `H.264 stored at ${playbackStoragePath}`)
-        return playbackStoragePath
+        await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
+        await plog(admin, video_upload_id, 'transcode-playback', 'done', `H.264 stored at ${path}`)
+        return path
       } catch (err: any) {
         await plog(admin, video_upload_id, 'transcode-playback', 'error', err?.message)
+        return null
+      }
+    })
+
+    // ── Step 2d: Extract thumbnail frame ──
+    // Use the H.264 playback version when available — avoids HEVC rotation issues
+    // that cause fofr/toolkit to silently return 0 frames for vertical DJI videos.
+    const thumbnailPath = await step.run('extract-thumbnail', async () => {
+      const { upload } = activeContext
+      if (!isVideoMimeType(upload.mime_type)) return null
+
+      await plog(admin, video_upload_id, 'extract-thumbnail', 'running', 'Extracting thumbnail frame')
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return null
+
+      const replicate = new Replicate({ auth: replicateToken })
+
+      const extractFrameFromUrl = async (inputUrl: string, label: string): Promise<string | null> => {
+        try {
+          const output = await replicate.run('fofr/toolkit', {
+            input: { task: 'extract_frames_from_input', input_file: inputUrl, fps: 0.5 },
+          }) as any
+
+          await plog(admin, video_upload_id, 'extract-thumbnail', 'info',
+            `[${label}] isArray=${Array.isArray(output)} frames=${Array.isArray(output) ? output.length : 1} sample=${JSON.stringify(output)?.slice(0, 150)}`)
+
+          const frames = Array.isArray(output) ? output : (output ? [output] : [])
+          if (frames.length === 0) return null
+
+          const idx = Math.min(2, frames.length - 1)
+          const frameOutput = frames[idx]
+          const url = typeof frameOutput === 'string' ? frameOutput : String(frameOutput)
+          return url.startsWith('http') ? url : null
+        } catch (err: any) {
+          await plog(admin, video_upload_id, 'extract-thumbnail', 'warn', `[${label}] failed: ${err?.message}`)
+          return null
+        }
+      }
+
+      // Prefer H.264 playback path (handles vertical HEVC rotation issues)
+      let frameUrl: string | null = null
+      if (playbackStoragePath) {
+        const { data: playbackSign } = await admin.storage
+          .from('videos')
+          .createSignedUrl(playbackStoragePath, 3600)
+        if (playbackSign?.signedUrl) {
+          frameUrl = await extractFrameFromUrl(playbackSign.signedUrl, 'h264_playback')
+        }
+      }
+
+      // Fallback: try original file directly
+      if (!frameUrl) {
+        const { data: signedData } = await admin.storage
+          .from('videos')
+          .createSignedUrl(upload.storage_path, 7200)
+        if (signedData?.signedUrl) {
+          frameUrl = await extractFrameFromUrl(signedData.signedUrl, 'original')
+        }
+      }
+
+      if (!frameUrl) {
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'All extraction attempts failed')
+        return null
+      }
+
+      try {
+        const imgBuffer = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
+        if (imgBuffer.length < 500) {
+          await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'Frame too small — corrupt')
+          return null
+        }
+
+        const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50
+        const mime = isPng ? 'image/png' : 'image/jpeg'
+        const base64DataUrl = `data:${mime};base64,${imgBuffer.toString('base64')}`
+        await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
+
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Stored ${imgBuffer.length} bytes as ${mime}`)
+        return base64DataUrl
+      } catch (err: any) {
+        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
         return null
       }
     })
