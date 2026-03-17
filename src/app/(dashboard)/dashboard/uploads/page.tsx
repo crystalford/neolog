@@ -8,7 +8,7 @@ import {
   Clock, Trash2, ChevronDown, ChevronUp, Play, Lightbulb,
   FolderOpen, Quote, Tag, Brain, Scissors, FileText, HelpCircle,
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
-  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles
+  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles, ImageOff
 } from 'lucide-react'
 import MediaInfoFactory from 'mediainfo.js'
 import type { VideoUpload } from '@/types/database'
@@ -107,6 +107,7 @@ export default function UploadsPage() {
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
   const [reanalyzingIds, setReanalyzingIds] = useState<Set<string>>(new Set())
   const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
+  const [thumbnailGenIds, setThumbnailGenIds] = useState<Set<string>>(new Set())
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -485,6 +486,23 @@ export default function UploadsPage() {
     }
   }
 
+  const handleGenerateThumbnail = async (id: string) => {
+    setThumbnailGenIds(prev => new Set(prev).add(id))
+    try {
+      await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
+      // Poll for thumbnail update
+      for (let i = 0; i < 24; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        await fetchUploads()
+        const updated = uploads.find(u => u.id === id)
+        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) break
+      }
+    } catch {}
+    finally {
+      setThumbnailGenIds(prev => { const next = new Set(prev); next.delete(id); return next })
+    }
+  }
+
   const handleReanalyzeAll = async () => {
     if (!confirm('Re-analyze all processed uploads with the updated AI prompt? This will extract new entity types (decisions, values, tools, principles, etc.) from your existing transcripts. May take a few minutes.')) return
     setReanalyzeAllState('running')
@@ -850,6 +868,18 @@ export default function UploadsPage() {
                             >
                               {isExpanded ? 'Collapse' : 'Details'}
                             </button>
+                            {isVideo && (
+                              <button
+                                onClick={() => handleGenerateThumbnail(upload.id)}
+                                disabled={thumbnailGenIds.has(upload.id)}
+                                title="Generate thumbnail from video"
+                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] transition-all border border-transparent hover:border-[var(--accent)]/20 disabled:opacity-40"
+                              >
+                                {thumbnailGenIds.has(upload.id)
+                                  ? <Loader2 size={13} className="animate-spin" />
+                                  : <ImageOff size={13} />}
+                              </button>
+                            )}
                             <button
                               onClick={() => handleReanalyze(upload.id)}
                               disabled={reanalyzingIds.has(upload.id)}
