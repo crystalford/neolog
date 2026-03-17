@@ -32,8 +32,6 @@ type ActiveUpload = {
   recordedAt: string | null
 }
 
-function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
-
 // Capture a thumbnail from a video file in the browser.
 // Works for H.264/WebM/etc. For HEVC on Chrome Windows it fails and returns a placeholder.
 async function captureVideoThumbnail(file: File): Promise<string> {
@@ -82,6 +80,8 @@ async function captureVideoThumbnail(file: File): Promise<string> {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`
   return `data:image/svg+xml;base64,${btoa(svg)}`
 }
+
+function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null)
   return (
     <video
