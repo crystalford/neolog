@@ -43,8 +43,8 @@
   --surface-glow: 0 0 60px rgba(34, 211, 238, 0.08);
   --surface-glow: 0 0 40px rgba(129, 140, 248, 0.05);
 
-  /* Typography */
-  --font-display: 'Playfair Display', serif;
+  /* Typography — Clean Sans Stack */
+  --font-display: 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 
@@ -95,9 +95,9 @@
   z-index: 0;
 }
 
-/* Font utility */
+/* Font utility — Clean */
 .font-serif {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
 }
 
 /* ================================
@@ -767,13 +767,14 @@ textarea:-webkit-autofill:focus {
 }
 
 .prose blockquote {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-style: italic;
+  font-family: var(--font-sans);
+  font-size: 1.1rem;
+  font-style: normal;
   color: var(--text-secondary);
-  border-left: 3px solid var(--accent);
+  border-left: 2px solid var(--accent);
   padding-left: 1.5rem;
   margin: 2em 0;
+  opacity: 0.8;
 }
 
 /* Chat Markdown Fixes */

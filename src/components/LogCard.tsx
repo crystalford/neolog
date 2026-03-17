@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format, isToday, isYesterday } from 'date-fns'
-import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown, ChevronUp, ChevronRight, AlertCircle, Bookmark, BarChart3, Radio } from 'lucide-react'
+import { Video, Mic, FileText, Loader2, Trash2, Sparkles, ChevronDown, ChevronUp, ChevronRight, AlertCircle, Bookmark, BarChart3, Radio, Plus } from 'lucide-react'
 import { SessionDetail } from './SessionDetail'
 import type { VideoUpload } from '@/types/database'
 
@@ -34,59 +34,64 @@ function reltime(dateStr: string) {
 
 function getActionLabel(type: string): string {
   const map: Record<string, string> = {
-    session: 'Recorded Session',
-    capture: 'Thought Captured',
-    note: 'Narrative Log',
-    idea: 'Cognitive Map',
-    health: 'Bio Metric',
+    session: 'Recorded',
+    capture: 'Thought',
+    note: 'Log',
+    idea: 'Mapping',
+    health: 'Bio',
   }
   return map[type] || 'Archived'
 }
 
 /**
- * Aggressive check to see if a string looks like a technical filename or timestamp.
+ * Normalizes titles by removing narrative boilerplate.
  */
+function normalizeTitle(title: string): string {
+  if (!title) return ''
+  return title
+    .replace(/^the user expressed (a|an|the|some|intense)?/i, '')
+    .replace(/^the user attempted to/i, '')
+    .replace(/^the user is/i, '')
+    .replace(/^the user/i, '')
+    .replace(/^this feels like/i, '')
+    .replace(/^recorded a video:/i, '')
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase()) // Re-capitalize
+}
+
 function isTechnicalString(s: string): boolean {
   if (!s) return true
   const lower = s.toLowerCase()
-  
-  // 1. Extension check
   if (/\.(mp4|mov|wav|avi|mkv|jpg|png|heic)$/i.test(s)) return true
-  
-  // 2. Digit density check (e.g. "20260216 112018")
   const digits = s.replace(/\D/g, '').length
   if (digits > 8 && (digits / s.length) > 0.35) return true
-  
-  // 3. Common hardware/technical prefixes
   const techKeywords = ['dji', 'mimo', 'gopro', 'pixel', 'iphone', 'img_', 'vid_', 'whatsapp', 'screen recording', 'recording', 'export'];
   if (techKeywords.some(p => lower.includes(p))) return true
-  
-  // 4. UUID or high-entropy hex strings
   if (/[a-f0-9]{8,}/i.test(s) && (s.match(/[a-f]/ig) || []).length > 2) return true
-
   return false
 }
 
 function cleanTitle(entry: LogEntry): string {
-  // 1. If AI generated a high-quality title in meta, use it.
+  let finalTitle = ''
+
   if (entry.meta?.title && entry.meta.title.length > 5 && !isTechnicalString(entry.meta.title)) {
-    return entry.meta.title
+    finalTitle = entry.meta.title
+  } else {
+    const rawTitle = entry.title || ''
+    if (isTechnicalString(rawTitle) || !rawTitle) {
+       const summary = entry.meta?.summary || entry.body || ''
+       if (summary.length > 10) {
+          const sentence = summary.split('.')[0]
+          finalTitle = sentence.length > 100 ? sentence.slice(0, 100) + '...' : sentence
+       } else {
+          finalTitle = format(new Date(entry.logged_at), 'MMMM d, yyyy · H:mm')
+       }
+    } else {
+      finalTitle = rawTitle
+    }
   }
 
-  const rawTitle = entry.title || ''
-  
-  // 2. If the current title looks technical, fallback to summary or date
-  if (isTechnicalString(rawTitle) || !rawTitle) {
-     const summary = entry.meta?.summary || entry.body || ''
-     if (summary.length > 10) {
-        // Extract a narrative title from the summary (first 80 chars)
-        const sentence = summary.split('.')[0]
-        return sentence.length > 100 ? sentence.slice(0, 100) + '...' : sentence
-     }
-     return format(new Date(entry.logged_at), 'MMMM d, yyyy · H:mm')
-  }
-
-  return rawTitle
+  return normalizeTitle(finalTitle)
 }
 
 // ─── Main Card ───────────────────────────────────────────────────────────────
@@ -109,48 +114,63 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
   const actionLabel = getActionLabel(entry.entry_type)
   const displayTitle = cleanTitle(entry)
 
+  const toggleExpansion = async (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    if (isExpanded) { setIsExpanded(false); return }
+    setIsExpanded(true)
+    if (!fullUploadData && entry.source_upload_id) {
+      setIsLoading(true)
+      try {
+        const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setFullUploadData(data.upload)
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+
   return (
-    <div className={`group relative flex gap-8 px-8 py-10 transition-all duration-500 border-b border-[var(--border-light)] hover:bg-[var(--bg-secondary)] last:border-0 overflow-hidden ${isExpanded ? 'bg-[var(--bg-secondary)]' : ''}`}>
-      {/* Narrative Sidecard */}
-      <div className="flex flex-col items-end flex-shrink-0 w-24 pt-1">
-        <div className="flex items-center gap-2 mb-2 text-[var(--accent)]">
-           <Radio size={10} className="animate-pulse" />
-           <span className="font-mono text-[9px] font-black uppercase tracking-[0.25em]">
-             {actionLabel}
-           </span>
-        </div>
-        <span className="font-mono text-[10px] uppercase font-bold text-[var(--text-tertiary)] opacity-80">
-          {reltime(entry.logged_at)}
+    <div className={`group relative flex gap-8 px-8 py-12 transition-all duration-700 border-b border-[var(--border-light)] hover:bg-[var(--bg-secondary)] last:border-0 ${isExpanded ? 'bg-[var(--bg-secondary)] py-16' : ''}`}>
+      {/* Dynamic Sidebar */}
+      <div className="flex flex-col items-end flex-shrink-0 w-24 pt-2">
+        <span className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-[var(--text-tertiary)] opacity-60 mb-1">
+          {actionLabel}
+        </span>
+        <span className="font-mono text-[10px] font-bold text-[var(--text-tertiary)] opacity-40">
+          {format(new Date(entry.logged_at), 'H:mm')}
         </span>
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-8">
+        <div className="flex items-start justify-between gap-10">
           <div className="flex-1 min-w-0">
-             <div className="flex items-start gap-4 mb-3">
-                <h3 className="font-serif text-[24px] font-medium tracking-tight text-[var(--text-primary)] leading-snug group-hover:text-[var(--accent)] transition-colors duration-500">
+             <button 
+                onClick={toggleExpansion}
+                className="text-left group/title focus:outline-none block w-full"
+             >
+                <h3 className="font-sans text-[26px] font-semibold tracking-tight text-[var(--text-primary)] leading-[1.2] mb-4 transition-all group-hover/title:translate-x-1 duration-500">
                   {displayTitle}
                 </h3>
-             </div>
-             
-             {hasBody && !isExpanded && (
-               <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] line-clamp-2 font-light opacity-90 max-w-3xl tracking-wide">
-                 {entry.body?.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').trim()}
-               </p>
-             )}
+                
+                {hasBody && !isExpanded && (
+                  <p className="text-[16px] leading-[1.6] text-[var(--text-secondary)] line-clamp-2 font-light opacity-60 max-w-2xl">
+                    {entry.body?.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').trim()}
+                  </p>
+                )}
+             </button>
           </div>
 
-          <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="flex items-center gap-6 flex-shrink-0 pt-2">
              {thumbnail && !isExpanded && (
-                <div className="relative group/thumb">
-                   <div className="w-24 h-24 rotate-1 rounded-sm overflow-hidden border border-[var(--border-medium)] bg-[var(--bg-tertiary)] shadow-xl group-hover:rotate-0 transition-all duration-700">
-                      <img src={thumbnail} alt="" className="w-full h-full object-cover" />
-                   </div>
-                   <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-primary)]/40 to-transparent pointer-events-none" />
+                <div className="w-20 h-20 rounded-sm overflow-hidden border border-[var(--border-light)] bg-[var(--bg-tertiary)] transition-all duration-700 hover:scale-105 active:scale-95 shadow-2xl">
+                   <img src={thumbnail} alt="" className="w-full h-full object-cover" />
                 </div>
              )}
 
-             <div className="flex flex-col items-end gap-2">
+             <div className="flex flex-col items-end gap-3">
                 {!isPublicView && (
                   <button
                      disabled={isDeleting}
@@ -165,81 +185,60 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
                          setIsDeleting(false)
                        }
                      }}
-                     className="p-2 text-[var(--text-tertiary)] hover:text-red-400 opacity-20 group-hover:opacity-100 transition-all bg-[var(--bg-tertiary)]/50 rounded-sm border border-[var(--border-light)]"
+                     className="p-2 text-[var(--text-tertiary)] hover:text-red-500 opacity-20 group-hover:opacity-100 transition-all rounded-full hover:bg-red-500/10"
                   >
-                    {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={14} />}
                   </button>
                 )}
 
                 <button
-                  onClick={async (e) => {
-                    e.preventDefault(); e.stopPropagation()
-                    if (isExpanded) { setIsExpanded(false); return }
-                    setIsExpanded(true)
-                    if (!fullUploadData && entry.source_upload_id) {
-                      setIsLoading(true)
-                      try {
-                        const res = await fetch(`/api/video-upload/${entry.source_upload_id}`)
-                        if (res.ok) {
-                          const data = await res.json()
-                          setFullUploadData(data.upload)
-                        }
-                      } finally {
-                        setIsLoading(false)
-                      }
-                    }
-                  }}
-                  className={`flex items-center gap-3 px-4 py-2 border rounded-sm font-mono text-[10px] uppercase tracking-widest transition-all ${
+                  onClick={toggleExpansion}
+                  className={`flex items-center gap-3 px-5 py-2.5 rounded-full font-mono text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${
                     isExpanded 
-                    ? 'bg-[var(--accent)] text-[var(--bg-primary)] border-[var(--accent)]' 
-                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
+                    ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] scale-110 shadow-glow' 
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--border-medium)]'
                   }`}
                 >
-                  {isExpanded ? 'Collapse' : 'Examine'}
-                  <div className={`transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
-                    <ChevronDown size={14} />
+                  {isExpanded ? 'Shrink' : 'Explore'}
+                  <div className={`transition-transform duration-700 ${isExpanded ? 'rotate-180' : ''}`}>
+                    <ChevronDown size={14} strokeWidth={3} />
                   </div>
                 </button>
              </div>
           </div>
         </div>
 
-        {/* Tactical Indicators */}
+        {/* Minimal Context Taps */}
         {!isExpanded && (
-          <div className="flex items-center gap-6 mt-6 pt-4 border-t border-[var(--border-light)]/40">
+          <div className="flex items-center gap-6 mt-8">
              {entry.software_tags && entry.software_tags.length > 0 && (
-               <div className="flex gap-3">
+               <div className="flex gap-4">
                  {entry.software_tags.map(tag => (
-                   <span key={tag} className="text-[9px] font-mono font-bold tracking-widest text-[var(--accent)] uppercase opacity-70">
-                     #{tag}
+                   <span key={tag} className="text-[10px] font-mono font-black tracking-[0.2em] text-[var(--text-tertiary)] uppercase opacity-30 hover:opacity-100 transition-opacity">
+                     {tag}
                    </span>
                  ))}
                </div>
              )}
              {entry.meta?.mood && (
-               <div className="flex items-center gap-2 px-3 py-1 bg-[var(--accent-softer)] border border-[var(--accent-glow)] rounded-full">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--accent)]">{entry.meta.mood}</span>
+               <div className="flex items-center gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">{entry.meta.mood}</span>
                </div>
-             )}
-             {showPrivacyBadge && !entry.is_public && (
-                <div className="text-[9px] font-mono text-red-500/60 uppercase tracking-[0.3em] font-black">Restricted</div>
              )}
           </div>
         )}
 
-        {/* Intelligence Workspace */}
+        {/* Intelligence Stream */}
         {isExpanded && (
-          <div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="mt-16 animate-in fade-in slide-in-from-top-6 duration-1000">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-40">
-                <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
-                <span className="text-[10px] font-mono uppercase tracking-[0.5em]">Syncing Intelligence...</span>
+              <div className="flex flex-col items-center justify-center py-32 gap-6 opacity-30">
+                <Loader2 size={32} className="animate-spin" />
+                <span className="text-[11px] font-mono uppercase tracking-[0.6em]">Tuning Feed...</span>
               </div>
             ) : (fullUploadData || entry.meta) ? (
-              <div className="relative border border-[var(--border-medium)] bg-[var(--bg-primary)] shadow-2xl rounded-sm overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/60 to-transparent" />
-                <div className="p-10">
+              <div className="bg-transparent">
                   <SessionDetail 
                     upload={fullUploadData || ({ 
                        id: entry.source_upload_id || entry.id,
@@ -250,11 +249,10 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
                        thumbnail_url: entry.thumbnail_url
                     } as any)} 
                   />
-                </div>
               </div>
             ) : (
-              <div className="py-20 text-center border border-dashed border-[var(--border-light)] opacity-20 italic">
-                No archived intelligence for this node.
+              <div className="py-24 text-center border border-dashed border-[var(--border-light)] rounded-lg opacity-20 text-[10px] uppercase font-mono tracking-widest">
+                No signal data found
               </div>
             )}
           </div>
