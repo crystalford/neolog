@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const ANALYSIS_PROMPT_VERSION = '1.2'
+export const ANALYSIS_PROMPT_VERSION = '1.3'
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited transcripts from {userName} — stream-of-consciousness recordings, voice memos, chat sessions, or text notes about {userName}'s life, work, ideas, and projects.
  
@@ -30,14 +30,15 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
  Analyze the transcript and return a JSON object with this EXACT structure:
  
  {
-   "analysis_version": "1.1",
+   "analysis_version": "1.3",
    "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles.",
    "summary": "2-3 sentence summary of what was discussed",
    "categories": [{"name": "category", "confidence": 0.0-1.0}],
    "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",
    "energy_level": "high" | "medium" | "low",
    "reflections": "A personalized, insightful response to {userName}. If the session is personal/emotional, provide a 'therapeutic' touch — validating, questioning, or encouraging. If it is business/productivity focused, provide a 'mentor' touch — strategic, challenging, or organizing. Speak directly to {userName}.",
- 
+   "rewrite": "A polished, first-person rewrite of everything {userName} said. Write exactly as if {userName} is speaking — same ideas, same sequence, authentic voice — but coherent, well-articulated prose with no rambling. This is what they meant to say. Write in first person ('I think...', 'I've been...', 'My plan is...'). Match the length of the original — don't summarize, rewrite.",
+
    "ideas": [
      {"text": "the idea", "type": "business|creative|product|content|philosophical|other", "confidence": 0.0-1.0}
    ],
@@ -241,7 +242,7 @@ export function generateClipSuggestions(
         clips.push({
           start: clipSegments[0].start,
           end: clipSegments[clipSegments.length - 1].end,
-          title: quote.length > 60 ? quote.substring(0, 57) + '...' : quote,
+          title: quote,
           transcript: clipTranscript,
           platform: 'general',
         })
@@ -259,67 +260,19 @@ export function generateClipSuggestions(
 export function generatePostSuggestions(analysis: any, recordedAt?: string | Date | null) {
   const posts: Array<{ title: string; content: string; type: string }> = []
 
-  if (analysis.summary) {
-    const displayDate = recordedAt ? new Date(recordedAt) : new Date()
-    const dateTitle = displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    
-    posts.push({
-      title: `Daily Log: ${dateTitle}`,
-      content: analysis.summary,
-      type: 'log',
-    })
-  }
-
-  if (analysis.ideas?.length > 0) {
-    for (const idea of analysis.ideas.slice(0, 3)) {
-      const text = typeof idea === 'object' ? idea.text : idea
-      posts.push({
-        title: text.length > 80 ? text.substring(0, 77) + '...' : text,
-        content: text,
-        type: 'idea',
-      })
-    }
-  }
-
+  // Strong opinions — forceful takes that stand alone as X posts
   if (analysis.strong_opinions?.length > 0) {
-    for (const opinion of analysis.strong_opinions.slice(0, 2)) {
-      posts.push({
-        title: opinion.length > 80 ? opinion.substring(0, 77) + '...' : opinion,
-        content: opinion,
-        type: 'opinion',
-      })
+    for (const opinion of analysis.strong_opinions.slice(0, 3)) {
+      if (!opinion) continue
+      posts.push({ title: opinion, content: opinion, type: 'opinion' })
     }
   }
 
-  if (analysis.questions?.length > 0) {
-    for (const q of analysis.questions.slice(0, 2)) {
-      posts.push({
-        title: q.length > 80 ? q.substring(0, 77) + '...' : q,
-        content: q,
-        type: 'question',
-      })
-    }
-  }
-
-  if (analysis.lessons_learned?.length > 0) {
-    for (const lesson of analysis.lessons_learned.slice(0, 2)) {
-      posts.push({
-        title: lesson.length > 80 ? lesson.substring(0, 77) + '...' : lesson,
-        content: lesson,
-        type: 'lesson',
-      })
-    }
-  }
-
-  if (analysis.projects?.length > 0) {
-    for (const project of analysis.projects.slice(0, 2)) {
-      if (project.updates?.length > 0) {
-        posts.push({
-          title: `Project Update: ${project.name}`,
-          content: project.updates.join('\n'),
-          type: 'project_update',
-        })
-      }
+  // Key quotes — verbatim memorable lines from the transcript
+  if (analysis.key_quotes?.length > 0) {
+    for (const quote of analysis.key_quotes.slice(0, 4)) {
+      if (!quote) continue
+      posts.push({ title: quote, content: quote, type: 'quote' })
     }
   }
 
@@ -365,12 +318,13 @@ export async function upsertEntities(
     }
   }
 
+  // Ideas — high-confidence only (≥0.7), full text stored
   if (analysis.ideas) {
     for (const idea of analysis.ideas) {
-      if (typeof idea === 'object' && idea.confidence >= 0.6) {
+      if (typeof idea === 'object' && idea.confidence >= 0.7) {
         entitiesToUpsert.push({
           type: 'idea',
-          name: idea.text.length > 100 ? idea.text.substring(0, 97) + '...' : idea.text,
+          name: idea.text,
           context: idea.text,
           metadata: { idea_type: idea.type, confidence: idea.confidence },
         })
@@ -380,6 +334,7 @@ export async function upsertEntities(
 
   if (analysis.people_mentioned) {
     for (const person of analysis.people_mentioned) {
+      if (!person.name) continue
       entitiesToUpsert.push({
         type: 'person',
         name: person.name,
@@ -391,67 +346,17 @@ export async function upsertEntities(
 
   if (analysis.goals) {
     for (const g of analysis.goals) {
+      if (!g.goal) continue
       entitiesToUpsert.push({
         type: 'goal',
-        name: g.goal.length > 100 ? g.goal.substring(0, 97) + '...' : g.goal,
+        name: g.goal,
         context: g.goal,
         metadata: { timeframe: g.timeframe },
       })
     }
   }
 
-  if (analysis.questions) {
-    for (const q of analysis.questions) {
-      entitiesToUpsert.push({
-        type: 'question',
-        name: q.length > 100 ? q.substring(0, 97) + '...' : q,
-        context: q,
-      })
-    }
-  }
-
-  if (analysis.habits) {
-    for (const h of analysis.habits) {
-      entitiesToUpsert.push({
-        type: 'habit',
-        name: h.habit,
-        context: h.habit,
-        sentiment: h.sentiment,
-      })
-    }
-  }
-
-  if (analysis.commitments) {
-    for (const c of analysis.commitments) {
-      entitiesToUpsert.push({
-        type: 'commitment',
-        name: c.length > 100 ? c.substring(0, 97) + '...' : c,
-        context: c,
-      })
-    }
-  }
-
-  if (analysis.skills_mentioned) {
-    for (const s of analysis.skills_mentioned) {
-      entitiesToUpsert.push({
-        type: 'skill',
-        name: s,
-        context: `Mentioned skill: ${s}`,
-      })
-    }
-  }
-
-  if (analysis.blockers) {
-    for (const b of analysis.blockers) {
-      entitiesToUpsert.push({
-        type: 'blocker',
-        name: b.length > 100 ? b.substring(0, 97) + '...' : b,
-        context: b,
-      })
-    }
-  }
-
-  // ── New entity types (v1.2) ──────────────────────────────────────────────
+  // ── Core entity types (v1.3) ─────────────────────────────────────────────
 
   if (analysis.decisions) {
     for (const d of analysis.decisions) {
@@ -460,7 +365,7 @@ export async function upsertEntities(
       if (!name) continue
       entitiesToUpsert.push({
         type: 'decision',
-        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
+        name,
         context: reasoning ? `${name} — ${reasoning}` : name,
         metadata: reasoning ? { reasoning } : {},
       })
@@ -472,79 +377,8 @@ export async function upsertEntities(
       if (!v) continue
       entitiesToUpsert.push({
         type: 'value',
-        name: v.length > 100 ? v.substring(0, 97) + '...' : v,
+        name: v,
         context: v,
-      })
-    }
-  }
-
-  if (analysis.references) {
-    for (const r of analysis.references) {
-      const name = typeof r === 'object' ? r.title : r
-      const refType = typeof r === 'object' ? r.type : null
-      if (!name) continue
-      entitiesToUpsert.push({
-        type: 'reference',
-        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
-        context: refType ? `${refType}: ${name}` : name,
-        metadata: refType ? { ref_type: refType } : {},
-      })
-    }
-  }
-
-  if (analysis.stories_told) {
-    for (const s of analysis.stories_told) {
-      if (!s) continue
-      entitiesToUpsert.push({
-        type: 'story',
-        name: s.length > 100 ? s.substring(0, 97) + '...' : s,
-        context: s,
-      })
-    }
-  }
-
-  if (analysis.strong_opinions) {
-    for (const o of analysis.strong_opinions) {
-      if (!o) continue
-      entitiesToUpsert.push({
-        type: 'opinion',
-        name: o.length > 100 ? o.substring(0, 97) + '...' : o,
-        context: o,
-      })
-    }
-  }
-
-  if (analysis.lessons_learned) {
-    for (const l of analysis.lessons_learned) {
-      if (!l) continue
-      entitiesToUpsert.push({
-        type: 'lesson',
-        name: l.length > 100 ? l.substring(0, 97) + '...' : l,
-        context: l,
-      })
-    }
-  }
-
-  if (analysis.tools_mentioned) {
-    for (const t of analysis.tools_mentioned) {
-      const name = typeof t === 'object' ? t.name : t
-      const ctx = typeof t === 'object' ? t.context : null
-      if (!name) continue
-      entitiesToUpsert.push({
-        type: 'tool',
-        name: name.length > 100 ? name.substring(0, 97) + '...' : name,
-        context: ctx || `Tool mentioned: ${name}`,
-      })
-    }
-  }
-
-  if (analysis.principles) {
-    for (const p of analysis.principles) {
-      if (!p) continue
-      entitiesToUpsert.push({
-        type: 'principle',
-        name: p.length > 100 ? p.substring(0, 97) + '...' : p,
-        context: p,
       })
     }
   }
