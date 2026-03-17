@@ -18,33 +18,44 @@ export default function TimelinePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Join video_uploads to get the actual transcript segments for Script mode
-      // We use a query that handles potential join errors by falling back
-      let { data, error } = await supabase
+      // Fetch log entries first
+      const { data: logs, error: logsError } = await supabase
         .from('log_entries')
-        .select(`
-          *,
-          video_uploads!source_upload_id (
-            transcript_segments,
-            transcript,
-            analysis
-          )
-        `)
+        .select('*')
         .eq('user_id', session.user.id)
         .order('logged_at', { ascending: false })
 
-      if (error) {
-        console.error('TIMELINE_QUERY_ERROR:', error)
-        // Fallback: fetch without join if the join fails
-        const { data: fallbackData } = await supabase
-          .from('log_entries')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('logged_at', { ascending: false })
+      if (logsError) {
+        console.error('LOGS_FETCH_ERROR:', logsError)
+        setIsLoading(false)
+        return
+      }
+
+      if (logs) {
+        // Collect all unique upload IDs to fetch transcript data manually
+        const uploadIds = Array.from(new Set(logs.map(l => l.source_upload_id).filter(id => !!id))) as string[]
         
-        if (fallbackData) setEntries(fallbackData as any)
-      } else if (data) {
-        setEntries(data as any)
+        if (uploadIds.length > 0) {
+          const { data: uploads, error: uploadsError } = await supabase
+            .from('video_uploads')
+            .select('id, transcript_segments, transcript, analysis')
+            .in('id', uploadIds)
+
+          if (!uploadsError && uploads) {
+            // Merge uploads into logs manually
+            const uploadMap = new Map(uploads.map(u => [u.id, u]))
+            const mergedEntries = logs.map(log => ({
+              ...log,
+              video_uploads: log.source_upload_id ? uploadMap.get(log.source_upload_id) : null
+            }))
+            setEntries(mergedEntries as any)
+          } else {
+            console.error('UPLOADS_FETCH_ERROR:', uploadsError)
+            setEntries(logs as any)
+          }
+        } else {
+          setEntries(logs as any)
+        }
       }
       
       setIsLoading(false)
