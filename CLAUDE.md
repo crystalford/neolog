@@ -135,6 +135,12 @@ This is a solo personal project. **Push directly to `main`** — no feature bran
 
 ---
 
+## Roadmap (not started)
+
+- **Image uploads for Character/Avatar** — upload photos of the user to `/dashboard/character` or similar. Goal: accumulate a corpus of portrait photos that eventually feeds a LoRA training pipeline to generate hyper-realistic AI portraits of the user. Would need: `image/*` added to upload accept, client-side thumbnail = the image itself (no canvas needed, just read as data URL), Inngest skip audio/transcription steps, store in a separate `character_images` table or tag in `video_uploads`. The `trigger-lora-training` Inngest function already exists as a stub.
+
+---
+
 ## What matters most right now
 
 1. **Video upload pipeline** — must work for 4GB+ iPhone videos. TUS upload is implemented. Needs `REPLICATE_API_TOKEN` in env to activate audio extraction.
