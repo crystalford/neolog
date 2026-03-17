@@ -5,11 +5,10 @@ import {
   Brain, Target, FileText, Scissors, Shield, Sparkles, Zap,
   Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2,
   TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
-  CalendarDays, ChevronRight, Edit2
+  CalendarDays, ChevronRight, Edit2, Quote, Activity, Compass, Fingerprint
 } from 'lucide-react'
 import type { VideoUpload, TranscriptWord } from '@/types/database'
 import { TranscriptEditor } from '@/components/TranscriptEditor'
-
 import { format } from 'date-fns'
 
 interface SessionDetailProps {
@@ -17,12 +16,11 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({ upload }: SessionDetailProps) {
-  const [activeTab, setActiveTab] = useState<'analysis' | 'personal' | 'transcript' | 'edit' | 'clips' | 'posts'>('analysis')
+  const [activeTab, setActiveTab] = useState<'analysis' | 'transcript' | 'edit' | 'clips' | 'posts'>('analysis')
   const [transcriptWords, setTranscriptWords] = useState<TranscriptWord[] | null>(null)
   const [loadingWords, setLoadingWords] = useState(false)
   const a = upload.analysis
 
-  // Load word-level transcript when Edit tab is opened
   useEffect(() => {
     if (activeTab !== 'edit' || transcriptWords !== null || !upload.id) return
     setLoadingWords(true)
@@ -33,8 +31,7 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   }, [activeTab, upload.id, transcriptWords])
 
   const tabs = [
-    { key: 'analysis' as const,    label: 'Analysis', icon: Brain },
-    { key: 'personal' as const,    label: 'Personal',     icon: Target },
+    { key: 'analysis' as const,    label: 'Intelligence', icon: Brain },
     { key: 'transcript' as const,  label: 'Transcript',   icon: FileText },
     { key: 'edit' as const,        label: 'Edit',         icon: Edit2 },
     { key: 'clips' as const,       label: 'Clips',        icon: Scissors, count: upload.generated_clips?.length || 0 },
@@ -42,18 +39,18 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   ]
 
   return (
-    <div className="session-detail">
+    <div className="session-detail animate-in fade-in duration-700">
       {a?.contains_sensitive_content && (
-        <div className="flex items-center gap-2 px-4 py-3 mb-4 rounded-lg bg-red-400/10 border border-red-400/20">
-          <Shield size={14} className="text-red-400 flex-shrink-0" />
-          <p className="text-xs text-red-400">
-            Sensitive content detected and redacted. {a.pii_detected?.length || 0} item(s) flagged.
+        <div className="flex items-center gap-3 px-6 py-4 mb-8 rounded-2xl bg-red-500/5 border border-red-500/10 backdrop-blur-md">
+          <Shield size={16} className="text-red-400 flex-shrink-0" />
+          <p className="text-[11px] font-mono uppercase tracking-widest text-red-400">
+            Sensitive content detected and redacted. {a.pii_detected?.length || 0} items flagged.
           </p>
         </div>
       )}
 
-      {/* Tabs Header */}
-      <div className="flex gap-1 mb-5 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
+      {/* Tabs Header - Premium Minimal */}
+      <div className="flex gap-8 mb-10 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
         {tabs.map(tab => {
           const Icon = tab.icon
           return (
@@ -64,325 +61,242 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 e.stopPropagation()
                 setActiveTab(tab.key)
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-2.5 px-1 py-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'text-[var(--accent)] border-b-2 border-[var(--accent)]'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] opacity-60 hover:opacity-100'
               }`}
             >
-              <Icon size={13} />
+              <Icon size={14} className={activeTab === tab.key ? 'animate-pulse' : ''} />
               {tab.label}
               {'count' in tab && (tab as any).count > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[10px]">
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] text-[9px]">
                   {(tab as any).count}
                 </span>
+              )}
+              {activeTab === tab.key && (
+                <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[var(--accent)] shadow-[0_0_10px_rgba(124,106,245,0.5)]" />
               )}
             </button>
           )
         })}
       </div>
 
-      <div className="tab-content transition-all duration-300">
+      <div className="tab-content">
         {activeTab === 'analysis' && a && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
-                  <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
-                    <CalendarDays size={12} /> Recorded
-                  </h4>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-lg font-light text-[var(--text-primary)] tracking-tight">
-                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'MMMM d, yyyy') : 'No date detected'}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-tertiary)] font-mono">
-                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'p') : ''}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 border-t border-[var(--border-light)]/30 pt-3">
-                    <span className={`w-1.5 h-1.5 rounded-full ${upload.recorded_at ? 'bg-green-400' : 'bg-amber-400'}`} />
-                    <p className="text-[10px] text-[var(--text-tertiary)] opacity-80 uppercase tracking-wider font-medium">
-                      {upload.recorded_at ? 'Date from file' : 'Upload date (no metadata)'}
-                    </p>
-                  </div>
-                </div>
-
+          <div className="space-y-12">
+            {/* Top Grid: Recap & Core Stats */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              {/* Narrative Summary */}
+              <div className="lg:col-span-7 space-y-8">
                 <div>
-                  <h4 className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)] mb-2">Summary</h4>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{a.summary}</p>
+                   <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--accent)] mb-6 opacity-70">
+                     <Quote size={12} /> Narrative Core
+                   </h4>
+                   <p className="font-serif text-2xl leading-relaxed text-[var(--text-primary)] font-medium tracking-tight">
+                     {a.summary}
+                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {a.mood && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[11px]">
-                      <span className="text-[var(--text-tertiary)]">Mood:</span>
-                      <span className="font-semibold text-[var(--text-primary)]">{a.mood}</span>
+                {/* Categories & Topics */}
+                <div className="flex flex-wrap gap-2 pt-4">
+                  {a.categories?.map((cat: any, i: number) => (
+                    <span key={i} className="px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[var(--accent)]/30 transition-colors cursor-default">
+                      {cat.name}
                     </span>
-                  )}
-                  {a.energy_level && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[11px]">
-                      <Zap size={10} className="text-[var(--accent)]" />
-                      <span className="font-semibold text-[var(--text-primary)] capitalize">{a.energy_level} energy</span>
-                    </span>
-                  )}
+                  ))}
                 </div>
-
-                {a.categories?.length > 0 && (
-                  <Section icon={TagIcon} title="Categories">
-                    <div className="flex flex-wrap gap-1.5">
-                      {a.categories.map((cat: any, i: number) => (
-                        <span key={i} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
-                          {cat.name}<span className="ml-1 text-[var(--text-tertiary)] opacity-60">{Math.round(cat.confidence * 100)}%</span>
-                        </span>
-                      ))}
-                    </div>
-                  </Section>
-                )}
-
-                {a.ideas?.length > 0 && (
-                  <Section icon={Lightbulb} title="Ideas" variant="amber">
-                    <div className="space-y-2.5">
-                      {a.ideas.map((idea: any, i: number) => (
-                        <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)] group p-3 rounded-xl bg-amber-400/5 border border-amber-400/10 hover:border-amber-400/30 transition-colors shadow-sm">
-                          <Lightbulb size={14} className="text-amber-400 mt-1 flex-shrink-0" />
-                          <div>
-                            {typeof idea === 'object' ? idea.text : idea}
-                            {typeof idea === 'object' && idea.type && (
-                              <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-500 border border-amber-400/20 uppercase tracking-wider font-mono">{idea.type}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                )}
-
-                {a.questions?.length > 0 && (
-                  <Section icon={HelpCircle} title="Open Questions" variant="purple">
-                    <div className="space-y-3">
-                      {a.questions.map((q: string, i: number) => (
-                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-4 rounded-xl bg-purple-400/5 border border-purple-400/10 shadow-sm italic">
-                          <HelpCircle size={14} className="text-purple-400 mt-1 flex-shrink-0" />
-                          {q}
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
-                )}
               </div>
 
-              <div className="space-y-6">
+              {/* State Metadata */}
+              <div className="lg:col-span-5 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-5 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] backdrop-blur-sm">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
+                       <Activity size={12} /> Mood
+                    </p>
+                    <p className="text-lg font-medium text-[var(--text-primary)] capitalize tracking-tight">
+                      {a.mood || 'Reflective'}
+                    </p>
+                  </div>
+                  <div className="p-5 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] backdrop-blur-sm">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
+                       <Zap size={12} /> Energy
+                    </p>
+                    <p className="text-lg font-medium text-[var(--text-primary)] capitalize tracking-tight">
+                      {a.energy_level || 'Medium'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-3xl bg-gradient-to-br from-[var(--bg-tertiary)] to-[var(--bg-secondary)] border border-[var(--border-light)]">
+                  <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-4 flex items-center gap-2">
+                    <CalendarDays size={12} /> Temporal Marker
+                  </h4>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <p className="text-xl font-light text-[var(--text-primary)]">
+                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'MMMM d, yyyy') : 'Live Ingestion'}
+                    </p>
+                    <p className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                      {upload.recorded_at ? format(new Date(upload.recorded_at), 'HH:mm') : ''}
+                    </p>
+                  </div>
+                  <p className="text-[9px] font-mono uppercase tracking-widest text-[var(--accent)] opacity-60">
+                    Source: {upload.recorded_at ? 'Device Metadata' : 'System Timestamp'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Reflections Section - High Impact */}
+            {a.reflections && (
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/10 via-transparent to-transparent rounded-3xl blur-2xl opacity-20" />
+                <div className="relative p-10 rounded-[2.5rem] bg-[#0d0d15]/80 border border-[var(--accent)]/10 backdrop-blur-xl group-hover:border-[var(--accent)]/30 transition-all duration-700">
+                  <div className="absolute top-8 right-10 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Sparkles size={64} className="text-[var(--accent)]" />
+                  </div>
+                  <h4 className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--accent)] mb-8">
+                     <Fingerprint size={16} /> Synthetic Perspective
+                  </h4>
+                  <p className="text-xl leading-relaxed text-[var(--text-primary)] font-light italic tracking-tight opacity-90">
+                    &ldquo;{a.reflections}&rdquo;
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Combined Strategic Intelligence */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-8 border-t border-[var(--border-light)]">
+              {/* Strategic Entities (Projects, Decisions, Action Items) */}
+              <div className="space-y-10">
                 {a.projects?.length > 0 && (
-                  <Section icon={FolderOpen} title="Projects" variant="blue">
-                    <div className="space-y-3">
+                  <InsightSection icon={FolderOpen} title="Domain: Projects">
+                    <div className="space-y-4">
                       {a.projects.map((p: any, i: number) => (
-                        <div key={i} className="border border-blue-400/20 rounded-xl p-4 bg-blue-400/5 shadow-sm hover:border-blue-400/40 transition-colors">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-sm font-bold text-[var(--text-primary)]">{p.name}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider bg-blue-400/10 text-blue-400 border border-blue-400/20">{p.status}</span>
+                        <div key={i} className="group/item">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-semibold text-[var(--text-primary)]">{p.name}</span>
+                            <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-tertiary)]">{p.status}</span>
                           </div>
                           {p.updates?.length > 0 && (
-                            <ul className="space-y-2 mt-2 border-t border-blue-400/10 pt-2 text-[13px]">
-                              {p.updates.map((u: string, j: number) => (
-                                <li key={j} className="text-[var(--text-secondary)] flex items-start gap-2">
-                                  <ChevronRight size={12} className="mt-1 text-blue-400/50 flex-shrink-0" /> 
-                                  <span>{u}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <p className="text-xs text-[var(--text-tertiary)] leading-relaxed line-clamp-2 italic">{p.updates[0]}</p>
                           )}
                         </div>
                       ))}
                     </div>
-                  </Section>
-                )}
-
-                {a.action_items?.length > 0 && (
-                  <Section icon={CheckCircle2} title="Action Items" variant="emerald">
-                    <div className="space-y-2">
-                      {a.action_items.map((item: string, i: number) => (
-                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/10 shadow-sm group">
-                          <CheckCircle2 size={14} className="text-emerald-400 mt-1 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </Section>
+                  </InsightSection>
                 )}
 
                 {a.decisions?.length > 0 && (
-                  <Section icon={TrendingUp} title="Decisions" variant="indigo">
-                    <div className="space-y-3">
+                  <InsightSection icon={TrendingUp} title="Strategic: Decisions">
+                    <div className="space-y-4">
                       {a.decisions.map((d: any, i: number) => (
-                        <div key={i} className="p-4 rounded-xl bg-indigo-400/5 border border-indigo-400/10 shadow-sm">
-                          <div className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                            {d.decision}
-                          </div>
-                          {d.reasoning && (
-                            <div className="mt-2 pl-3.5 border-l border-indigo-400/20">
-                              <p className="text-xs text-[var(--text-tertiary)] italic leading-relaxed">{d.reasoning}</p>
-                            </div>
-                          )}
+                        <div key={i} className="pl-3 border-l-2 border-[var(--accent)]/30">
+                          <p className="text-sm text-[var(--text-secondary)] font-medium mb-1">{d.decision}</p>
+                          {d.reasoning && <p className="text-[11px] text-[var(--text-tertiary)] italic">{d.reasoning}</p>}
                         </div>
                       ))}
                     </div>
-                  </Section>
+                  </InsightSection>
                 )}
+              </div>
 
-                {a.blockers?.length > 0 && (
-                  <Section icon={AlertTriangle} title="Blockers" variant="rose">
-                    <div className="space-y-2">
-                      {a.blockers.map((b: string, i: number) => (
-                        <div key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-3 p-3 rounded-xl bg-rose-400/5 border border-rose-400/10 shadow-sm">
-                          <AlertTriangle size={14} className="text-rose-400 mt-1 flex-shrink-0 animate-pulse" />
-                          {b}
+              {/* Creative & Ideational */}
+              <div className="space-y-10">
+                {a.ideas?.length > 0 && (
+                   <InsightSection icon={Lightbulb} title="Conceptual: Ideas">
+                     <div className="space-y-4">
+                       {a.ideas.map((idea: any, i: number) => (
+                         <div key={i} className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/20 border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]/40 transition-all">
+                           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                             {typeof idea === 'object' ? idea.text : idea}
+                           </p>
+                         </div>
+                       ))}
+                     </div>
+                   </InsightSection>
+                )}
+                
+                {a.questions?.length > 0 && (
+                  <InsightSection icon={HelpCircle} title="Inquiry: Open Questions">
+                    <div className="space-y-4 opacity-70">
+                      {a.questions.map((q: string, i: number) => (
+                        <p key={i} className="text-sm text-[var(--text-secondary)] italic border-b border-[var(--border-light)] pb-2 last:border-0">
+                          {q}
+                        </p>
+                      ))}
+                    </div>
+                  </InsightSection>
+                )}
+              </div>
+
+              {/* Action & Accountability */}
+              <div className="space-y-10">
+                {a.action_items?.length > 0 && (
+                  <InsightSection icon={CheckCircle2} title="Tactical: Action Items">
+                    <div className="space-y-3">
+                      {a.action_items.map((item: string, i: number) => (
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-2xl bg-[var(--accent-softer)] border border-[var(--accent)]/5 group/ai">
+                          <CheckCircle2 size={14} className="text-[var(--accent)] mt-0.5 flex-shrink-0 opacity-40 group-hover/ai:opacity-100 transition-opacity" />
+                          <span className="text-sm text-[var(--text-secondary)]">{item}</span>
                         </div>
                       ))}
                     </div>
-                  </Section>
+                  </InsightSection>
+                )}
+
+                {a.goals?.length > 0 && (
+                  <InsightSection icon={Target} title="Vision: Goals">
+                    <div className="space-y-3">
+                       {a.goals.map((g: any, i: number) => (
+                         <div key={i} className="text-sm text-[var(--text-secondary)]">
+                            <span className="font-semibold text-[var(--text-primary)]">• {g.goal}</span>
+                            <span className="ml-2 text-[9px] font-mono text-[var(--text-tertiary)] opacity-60 uppercase">{g.timeframe}</span>
+                         </div>
+                       ))}
+                    </div>
+                  </InsightSection>
                 )}
               </div>
-            </div>
-
-            {a.reflections && (
-              <div className="bg-[var(--accent)]/[0.03] border border-[var(--accent)]/10 rounded-xl p-5 mt-8 relative overflow-hidden backdrop-blur-sm">
-                <div className="absolute top-0 right-0 p-4 opacity-[0.05]">
-                  <Sparkles size={48} />
-                </div>
-                <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-3 flex items-center gap-2">
-                  <Sparkles size={12} /> Reflection
-                </h4>
-                <p style={{ 
-                  fontSize: '14px', 
-                  lineHeight: '1.7', 
-                  color: 'var(--text-primary)',
-                  fontWeight: 400
-                }}>
-                  {a.reflections}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'personal' && a && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              {a.goals?.length > 0 && (
-                <Section icon={Target} title="Goals">
-                  <div className="space-y-2.5">
-                    {a.goals.map((g: any, i: number) => (
-                      <div key={i} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
-                        <Target size={14} className="text-blue-400 mt-1 flex-shrink-0" />
-                        <div>
-                          {g.goal}
-                          <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase">{g.timeframe?.replace('_', ' ')}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-              )}
-
-              {a.commitments?.length > 0 && (
-                <Section icon={CheckCircle2} title="Commitments">
-                  <ul className="space-y-2">
-                    {a.commitments.map((c: string, i: number) => (
-                      <li key={i} className="text-sm text-[var(--text-secondary)] flex items-start gap-2">
-                         <span className="text-blue-400 font-bold">•</span> {c}
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-              )}
-
-              {a.habits?.length > 0 && (
-                <Section icon={Zap} title="Habits">
-                  <div className="space-y-2.5">
-                    {a.habits.map((h: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2.5 text-sm text-[var(--text-secondary)] bg-[var(--bg-tertiary)]/30 p-2 rounded-lg">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          h.sentiment === 'positive' ? 'bg-green-400' : h.sentiment === 'negative' ? 'bg-red-400' : 'bg-[var(--text-tertiary)]'
-                        }`} />
-                        {h.habit}
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              {a.people_mentioned?.length > 0 && (
-                <Section icon={Users} title="People">
-                  <div className="space-y-4">
-                    {a.people_mentioned.map((p: any, i: number) => (
-                      <div key={i} className="flex items-start gap-3 text-sm">
-                        <div className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)] flex-shrink-0">
-                          <Users size={14} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[var(--text-primary)]">{p.name}</span>
-                            {p.relationship && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] uppercase">{p.relationship}</span>}
-                          </div>
-                          <p className="text-xs text-[var(--text-tertiary)] mt-1">{p.context}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-              )}
-
-              {a.values_expressed?.length > 0 && (
-                <Section icon={Shield} title="Values Expressed">
-                  <div className="flex flex-wrap gap-1.5">
-                    {a.values_expressed.map((v: string, i: number) => (
-                      <span key={i} className="px-3 py-1 rounded-lg text-xs bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">{v}</span>
-                    ))}
-                  </div>
-                </Section>
-              )}
             </div>
           </div>
         )}
 
+        {/* Other tabs with minimal styles */}
         {activeTab === 'transcript' && (
-          <div className="transcript-view">
+          <div className="py-10">
             {upload.transcript ? (
-              <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="max-h-[600px] overflow-y-auto pr-6 custom-scrollbar space-y-8">
                 {upload.transcript_segments && upload.transcript_segments.length > 0 ? (
-                  <div className="space-y-3">
-                    {upload.transcript_segments.map((seg, i) => (
-                      <div key={i} className="flex gap-4 group">
-                        <span className="text-[10px] text-[var(--text-tertiary)] font-mono pt-1 flex-shrink-0 w-14 text-right opacity-40 group-hover:opacity-100 transition-opacity">
-                          {formatTimestamp(seg.start)}
-                        </span>
-                        <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed group-hover:text-[var(--text-primary)] transition-colors">{seg.text}</p>
-                      </div>
-                    ))}
-                  </div>
+                  upload.transcript_segments.map((seg, i) => (
+                    <div key={i} className="flex gap-10 group">
+                      <span className="text-[10px] text-[var(--text-tertiary)] font-mono pt-1.5 flex-shrink-0 w-16 text-right opacity-30 group-hover:opacity-100 transition-opacity">
+                        {formatTimestamp(seg.start)}
+                      </span>
+                      <p className="text-base text-[var(--text-secondary)] leading-loose group-hover:text-[var(--text-primary)] transition-colors duration-500 font-light max-w-2xl">{seg.text}</p>
+                    </div>
+                  ))
                 ) : (
-                  <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                  <p className="text-base text-[var(--text-secondary)] leading-loose font-light max-w-2xl whitespace-pre-wrap px-10">
                     {upload.transcript}
                   </p>
                 )}
               </div>
             ) : (
-              <div className="py-12 text-center text-[var(--text-tertiary)]">
-                <FileText size={24} className="mx-auto mb-2 opacity-20" />
-                <p className="text-sm">No transcript available</p>
+              <div className="py-24 text-center opacity-30">
+                <FileText size={32} className="mx-auto mb-4" />
+                <p className="text-sm uppercase tracking-widest font-mono">End of line</p>
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'edit' && (
-          <div className="min-h-[300px]">
+          <div className="min-h-[400px] py-8">
             {loadingWords ? (
-              <div className="py-12 text-center text-[var(--text-tertiary)]">
-                <p className="text-sm animate-pulse">Loading word-level transcript...</p>
+              <div className="py-24 text-center">
+                <p className="text-sm animate-pulse font-mono uppercase tracking-widest opacity-40">Synthesizing word-level data...</p>
               </div>
             ) : transcriptWords && transcriptWords.length > 0 ? (
               <TranscriptEditor
@@ -391,61 +305,61 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                 onWordsUpdate={setTranscriptWords}
               />
             ) : (
-              <div className="py-12 text-center text-[var(--text-tertiary)]">
-                <Edit2 size={24} className="mx-auto mb-2 opacity-20" />
-                <p className="text-sm">No word-level data for this upload</p>
-                <p className="text-xs mt-1 opacity-60">Word timestamps are captured on new uploads going forward</p>
+              <div className="py-24 text-center opacity-30">
+                <Edit2 size={32} className="mx-auto mb-4" />
+                <p className="text-sm uppercase tracking-widest font-mono">No granular metadata available</p>
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'clips' && (
-          <div className="space-y-4">
+          <div className="py-10 pb-20">
             {upload.generated_clips && upload.generated_clips.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {upload.generated_clips.map((clip, i) => (
-                  <div key={i} className="border border-[var(--border-light)] rounded-xl p-4 bg-[var(--bg-primary)] hover:border-[var(--accent)] transition-all cursor-pointer group shadow-sm">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <h5 className="text-[13px] font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{clip.title}</h5>
-                      <span className="text-[10px] text-[var(--text-tertiary)] font-mono flex-shrink-0 bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
-                        {formatTimestamp(clip.start)} – {formatTimestamp(clip.end)}
+                  <div key={i} className="group/clip p-6 rounded-3xl bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] hover:border-[var(--accent)] transition-all duration-500 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/5 to-transparent opacity-0 group-hover/clip:opacity-100 transition-opacity" />
+                    <div className="flex items-start justify-between mb-4 relative z-10">
+                      <h5 className="text-sm font-bold text-[var(--text-primary)] group-hover/clip:text-[var(--accent)] transition-colors">{clip.title}</h5>
+                      <span className="text-[9px] text-[var(--text-tertiary)] font-mono bg-[#000]/40 px-2 py-0.5 rounded-full">
+                        {formatTimestamp(clip.start)}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 italic opacity-80">&ldquo;{clip.transcript}&rdquo;</p>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed italic opacity-70 group-hover/clip:opacity-100 transition-opacity">&ldquo;{clip.transcript}&rdquo;</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center text-[var(--text-tertiary)]">
-                <Scissors size={24} className="mx-auto mb-2 opacity-20" />
-                <p className="text-sm">No clip suggestions available yet</p>
+              <div className="py-24 text-center opacity-30">
+                <Scissors size={32} className="mx-auto mb-4" />
+                <p className="text-sm uppercase tracking-widest font-mono">No fragments available</p>
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'posts' && (
-          <div className="space-y-4">
+          <div className="py-10 pb-20">
             {upload.generated_posts && upload.generated_posts.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-8 max-w-3xl">
                 {upload.generated_posts.map((post, i) => (
-                  <div key={i} className="border border-[var(--border-light)] rounded-xl p-5 bg-[var(--bg-card)] hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)] opacity-20 group-hover:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="px-2 py-0.5 rounded-[4px] text-[9px] font-mono uppercase tracking-widest bg-[var(--accent)]/10 text-[var(--accent)]">
-                        {post.type.replace('_', ' ')}
+                  <div key={i} className="relative group/post">
+                    <div className="absolute -left-4 top-0 bottom-0 w-0.5 bg-[var(--accent)] opacity-20 group-hover/post:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase tracking-widest bg-[var(--accent-soft)] text-[var(--accent)]">
+                        {post.type}
                       </span>
                     </div>
-                    <h5 className="text-sm font-bold text-[var(--text-primary)] mb-2">{post.title}</h5>
-                    <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                    <h5 className="text-lg font-bold text-[var(--text-primary)] mb-4">{post.title}</h5>
+                    <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed font-light">{post.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center text-[var(--text-tertiary)]">
-                <MessageCircle size={24} className="mx-auto mb-2 opacity-20" />
-                <p className="text-sm">No post suggestions available yet</p>
+              <div className="py-24 text-center opacity-30">
+                <MessageCircle size={32} className="mx-auto mb-4" />
+                <p className="text-sm uppercase tracking-widest font-mono">No drafts generated</p>
               </div>
             )}
           </div>
@@ -455,23 +369,15 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   )
 }
 
-function Section({ icon: Icon, title, children, variant = 'accent' }: { icon: any; title: string; children: React.ReactNode; variant?: string }) {
-  const colors: Record<string, string> = {
-    accent:   'text-[var(--accent)]',
-    blue:     'text-blue-400',
-    emerald:  'text-emerald-400',
-    purple:   'text-purple-400',
-    amber:    'text-amber-400',
-    rose:     'text-rose-400',
-    indigo:   'text-indigo-400',
-  }
-
+function InsightSection({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) {
   return (
-    <div className="section-block">
-      <h4 className={`text-[10px] font-mono uppercase tracking-widest mb-3 flex items-center gap-2 opacity-80 ${colors[variant] || colors.accent}`}>
-        <Icon size={11} /> {title}
+    <div className="space-y-6">
+      <h4 className="flex items-center gap-2.5 text-[9px] font-bold uppercase tracking-[0.3em] text-[var(--text-secondary)] opacity-50">
+        <Icon size={12} className="text-[var(--accent)] opacity-80" /> {title}
       </h4>
-      {children}
+      <div className="pl-1">
+        {children}
+      </div>
     </div>
   )
 }

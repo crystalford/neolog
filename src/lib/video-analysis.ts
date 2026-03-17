@@ -31,6 +31,7 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
  
  {
    "analysis_version": "1.1",
+   "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles.",
    "summary": "2-3 sentence summary of what was discussed",
    "categories": [{"name": "category", "confidence": 0.0-1.0}],
    "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",
