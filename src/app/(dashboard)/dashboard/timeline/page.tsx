@@ -63,7 +63,7 @@ export default function TimelinePage() {
     <div className="min-h-screen bg-[var(--bg-primary)] pb-32">
       {/* High-Contrast Header */}
       <header className="sticky top-0 z-50 w-full border-b border-[var(--border-medium)] bg-[var(--bg-primary)]/80 backdrop-blur-xl">
-        <div className="max-w-[1000px] mx-auto px-8 h-20 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-10">
             <h1 className="font-sans text-2xl font-black tracking-tighter text-[var(--text-primary)]">Log Archive</h1>
             
@@ -95,14 +95,14 @@ export default function TimelinePage() {
                 placeholder="Search Narrative..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg pl-12 pr-6 py-2.5 text-[13px] w-64 focus:w-96 transition-all focus:border-[var(--text-primary)] outline-none font-light text-[var(--text-primary)]"
+                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg pl-12 pr-6 py-2.5 text-[13px] w-64 focus:w-[500px] transition-all focus:border-[var(--text-primary)] outline-none font-light text-[var(--text-primary)]"
               />
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-[800px] mx-auto mt-16 px-6">
+      <main className="max-w-[1400px] mx-auto mt-16 px-8">
         {viewMode === 'archive' ? (
           /* Standard Record View */
           dates.length > 0 ? (
@@ -150,7 +150,7 @@ export default function TimelinePage() {
                      </div>
 
                      {segments.length > 0 ? (
-                        <div className="space-y-10 max-w-2xl mx-auto">
+                        <div className="space-y-10">
                            {segments.map((seg: any, sIdx: number) => (
                               <div key={sIdx} className="flex gap-12 group/seg">
                                  <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-20 w-16 pt-1 font-bold tracking-tighter group-hover/seg:opacity-100 transition-opacity">
@@ -163,7 +163,7 @@ export default function TimelinePage() {
                            ))}
                         </div>
                      ) : (
-                        <div className="max-w-2xl mx-auto pl-28 border-l-2 border-[var(--border-light)] py-4">
+                        <div className="pl-28 border-l-2 border-[var(--border-light)] py-4">
                            <p className="text-[18px] leading-[1.8] text-[var(--text-tertiary)] font-light italic opacity-40">
                               [ NO TRANSCRIPT DATA RECOVERED FOR THIS SIGNAL ]
                            </p>

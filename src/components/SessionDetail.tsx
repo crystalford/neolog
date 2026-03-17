@@ -72,7 +72,7 @@ export function SessionDetail({ upload }: SessionDetailProps) {
                   <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
                     <Target size={12} /> Narrative Core
                   </h4>
-                  <p className="text-[17px] leading-relaxed text-[var(--text-primary)] font-light tracking-wide max-w-2xl">
+                  <p className="text-[17px] leading-relaxed text-[var(--text-primary)] font-light tracking-wide">
                     {a.summary}
                   </p>
                </div>
@@ -133,18 +133,18 @@ export function SessionDetail({ upload }: SessionDetailProps) {
         )}
 
         {activeTab === 'synthesis' && (
-           <div className="max-w-3xl mx-auto py-20 px-10 border border-[var(--border-light)] rounded-xl">
+           <div className="py-20 px-10 border border-[var(--border-light)] rounded-xl">
               <h4 className="flex items-center gap-3 text-[10px] font-mono font-black uppercase tracking-[0.4em] text-[var(--text-tertiary)] mb-10 opacity-30">
                 <Fingerprint size={14} /> Synthetic Perspective
               </h4>
-              <p className="text-[18px] leading-[1.8] text-[var(--text-secondary)] font-normal max-w-2xl">
+              <p className="text-[18px] leading-[1.8] text-[var(--text-secondary)] font-normal">
                 {a?.reflections || "Synthesis currently offline for this node."}
               </p>
            </div>
         )}
 
         {activeTab === 'log' && (
-          <div className="max-w-4xl mx-auto">
+          <div className="px-10">
             {upload.transcript ? (
                <div className="space-y-8">
                   {upload.transcript_segments?.map((seg, i) => (

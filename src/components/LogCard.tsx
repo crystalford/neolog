@@ -156,7 +156,7 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
                 </h3>
                 
                 {hasBody && !isExpanded && (
-                  <p className="text-[16px] leading-[1.6] text-[var(--text-secondary)] line-clamp-2 font-light opacity-60 max-w-2xl">
+                  <p className="text-[16px] leading-[1.6] text-[var(--text-secondary)] line-clamp-2 font-light opacity-60">
                     {entry.body?.replace(/\*\*Open Questions:\*\*[\s\S]*/m, '').trim()}
                   </p>
                 )}
