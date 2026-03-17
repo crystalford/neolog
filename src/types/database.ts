@@ -607,6 +607,7 @@ export type TranscriptSegment = {
 export type VideoAnalysis = {
   // Core summary
   summary: string
+  rewrite: string | null
   categories: Array<{
     name: string
     confidence: number
@@ -690,7 +691,7 @@ export type VideoAnalysis = {
 export type GeneratedPost = {
   title: string
   content: string
-  type: 'log' | 'idea' | 'project_update' | 'reflection' | 'social_clip' | 'opinion' | 'question' | 'lesson'
+  type: 'log' | 'idea' | 'project_update' | 'reflection' | 'social_clip' | 'opinion' | 'question' | 'lesson' | 'quote'
 }
 
 export type SuggestedClip = {

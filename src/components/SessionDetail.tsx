@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
   Sparkles, Scissors, MessageCircle, Terminal,
   Lightbulb, FolderOpen, Activity, Target, Edit2, Share2,
-  Fingerprint, Braces
+  Fingerprint, Braces, Quote
 } from 'lucide-react'
 import type { VideoUpload, TranscriptWord } from '@/types/database'
 
@@ -92,7 +92,23 @@ export function SessionDetail({ upload }: SessionDetailProps) {
               </div>
             )}
 
-            {/* 3. Projects — only if any */}
+            {/* 3. Key Quotes / Signal — only if any */}
+            {a.key_quotes?.length > 0 && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
+                  <Quote size={12} /> Signal
+                </h4>
+                <div className="space-y-5">
+                  {a.key_quotes.map((q: string, i: number) => (
+                    <p key={i} className="text-[15px] text-[var(--text-secondary)] leading-relaxed border-l-2 border-[var(--border-light)] pl-6 italic">
+                      {q}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Projects — only if any */}
             {a.projects?.length > 0 && (
               <div className="p-10 border border-[var(--border-light)] rounded-lg">
                 <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-blue-400 mb-6 opacity-60">
