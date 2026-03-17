@@ -21,13 +21,14 @@ async function plog(admin: any, uploadId: string, step: string, status: string, 
 
 /**
  * Standalone thumbnail generator — fired by POST /api/video-upload/[id]/thumbnail
- * or called after the main pipeline for uploads that still need a thumbnail.
  *
  * Strategy (most reliable first):
  *   1. Use playback_path (H.264 version) if it exists — avoids all HEVC/rotation issues.
- *   2. Try extract_frames_from_input directly on the original file.
+ *      Vertical DJI Mimo HEVC videos have rotation metadata that causes fofr/toolkit
+ *      extract_frames_from_input to return 0 frames on the original file. The H.264
+ *      playback version has no such issue.
+ *   2. Try extract_frames_from_input directly on the original file (fast, works for H.264).
  *   3. Transcode original → H.264 via convert_input_to_mp4, then extract frames.
- *      (handles vertical DJI HEVC which has rotation metadata that confuses fofr/toolkit)
  */
 export const generateThumbnail = inngest.createFunction(
   { id: 'generate-thumbnail' },
@@ -101,7 +102,6 @@ export const generateThumbnail = inngest.createFunction(
           return null
         }
 
-        // At fps=0.5 frame[1] ≈ 2s, [2] ≈ 4s — pick frame ~2s in
         const idx = Math.min(2, frames.length - 1)
         const url = typeof frames[idx] === 'string' ? frames[idx] : String(frames[idx])
         return url.startsWith('http') ? url : null
@@ -114,7 +114,7 @@ export const generateThumbnail = inngest.createFunction(
     // ── Step 4: If direct extraction failed AND we used original, transcode first ──
     const frameUrl = directFrameUrl ?? await step.run('transcode-then-extract', async () => {
       if (inputSource.source === 'h264_playback') {
-        // Already used H.264 — if that failed, nothing more we can do here
+        // Already used H.264 — if that failed, nothing more we can do
         await plog(admin, video_upload_id, 'transcode-then-extract', 'skipped', 'Already tried H.264 source')
         return null
       }
