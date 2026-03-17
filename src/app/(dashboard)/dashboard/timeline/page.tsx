@@ -19,13 +19,33 @@ export default function TimelinePage() {
       if (!session) return
 
       // Join video_uploads to get the actual transcript segments for Script mode
-      const { data, error } = await supabase
+      // We use a query that handles potential join errors by falling back
+      let { data, error } = await supabase
         .from('log_entries')
-        .select('*, video_uploads!source_upload_id(transcript_segments, analysis)')
+        .select(`
+          *,
+          video_uploads:source_upload_id (
+            transcript_segments,
+            analysis
+          )
+        `)
         .eq('user_id', session.user.id)
         .order('logged_at', { ascending: false })
 
-      if (data) setEntries(data as any)
+      if (error) {
+        console.error('TIMELINE_QUERY_ERROR:', error)
+        // Fallback: fetch without join if the join fails
+        const { data: fallbackData } = await supabase
+          .from('log_entries')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('logged_at', { ascending: false })
+        
+        if (fallbackData) setEntries(fallbackData as any)
+      } else if (data) {
+        setEntries(data as any)
+      }
+      
       setIsLoading(false)
     }
     load()
