@@ -61,52 +61,56 @@ export default function TimelinePage() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] pb-32">
       {/* Analyst Header — Compact */}
-      <header className="sticky top-0 z-50 w-full border-b border-[var(--border-light)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
-        <div className="max-w-[800px] mx-auto px-6 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-50 w-full border-b border-[var(--border-medium)] bg-[var(--bg-primary)]/90 backdrop-blur-md">
+        <div className="max-w-[800px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="font-serif text-lg font-medium tracking-tight text-[var(--text-primary)]">Log</h1>
-            <div className="flex items-center gap-2 px-2 py-0.5 rounded-sm bg-green-500/5 border border-green-500/10">
-               <span className="text-[8px] font-mono font-bold uppercase tracking-widest text-green-500/60">Stream Live</span>
+            <h1 className="font-serif text-2xl font-medium tracking-tight text-[var(--text-primary)]">The Log</h1>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-sm bg-[var(--accent-softer)] border border-[var(--accent-glow)]">
+               <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+               <span className="text-[9px] font-mono font-black uppercase tracking-widest text-[var(--accent)]">Stream Active</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div className="relative group">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] opacity-30 group-focus-within:opacity-100" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--accent)] opacity-40 group-focus-within:opacity-100 transition-opacity" />
               <input 
                 type="text"
-                placeholder="Search..."
+                placeholder="Search Archive..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm pl-9 pr-3 py-1.5 text-[11px] w-48 focus:w-64 transition-all focus:border-[var(--text-tertiary)] outline-none font-light"
+                className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-sm pl-10 pr-4 py-2 text-[12px] w-48 focus:w-72 transition-all focus:border-[var(--accent)] outline-none font-light text-[var(--text-primary)]"
               />
             </div>
-            <button className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
-               <SlidersHorizontal size={12} /> Filter
+            <button className="flex items-center gap-2 text-[10px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all">
+               <SlidersHorizontal size={14} /> Filter
             </button>
           </div>
         </div>
       </header>
 
       {/* Narrative Feed — Optimized Flow */}
-      <main className="max-w-[800px] mx-auto mt-8">
+      <main className="max-w-[800px] mx-auto mt-10">
         {dates.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-12">
             {dates.map((dateStr) => {
               const dateObj = parseISO(dateStr)
               const entriesForDate = groupedEntries[dateStr]
               
               return (
                 <section key={dateStr} className="relative">
-                  {/* waypoint - extremely low profile */}
-                  <div className="sticky top-14 z-40 flex items-center gap-4 py-4 bg-[var(--bg-primary)]/95">
+                  {/* waypoint - extremely sharp */}
+                  <div className="sticky top-16 z-40 flex items-center gap-6 py-6 bg-[var(--bg-primary)]/95">
                     <div className="flex flex-col items-end flex-shrink-0 w-20">
-                       <span className="text-[9px] font-mono font-bold text-[var(--text-primary)] tracking-widest leading-none">
-                          {isToday(dateObj) ? 'TODAY' : isYesterday(dateObj) ? 'YESTERDAY' : format(dateObj, 'MMM dd')}
+                       <span className="text-[10px] font-mono font-black text-[var(--accent)] tracking-[0.2em] leading-none mb-1">
+                          {isToday(dateObj) ? 'TODAY' : isYesterday(dateObj) ? 'YESTERDAY' : format(dateObj, 'yyyy')}
+                       </span>
+                       <span className="text-[11px] font-serif text-[var(--text-tertiary)] uppercase font-bold tracking-widest opacity-60">
+                          {format(dateObj, 'MMM dd')}
                        </span>
                     </div>
-                    <div className="flex-1 h-[1px] bg-[var(--border-light)]" />
-                    <span className="text-[8px] font-mono text-[var(--text-tertiary)] opacity-20 uppercase tracking-[0.3em]">
+                    <div className="flex-1 h-[1px] bg-gradient-to-r from-[var(--border-light)] via-[var(--border-medium)] to-transparent" />
+                    <span className="text-[9px] font-mono text-[var(--text-tertiary)] font-bold uppercase tracking-[0.3em] opacity-40">
                        {entriesForDate.length} EVENT{entriesForDate.length !== 1 ? 'S' : ''}
                     </span>
                   </div>

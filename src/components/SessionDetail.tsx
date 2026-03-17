@@ -42,21 +42,21 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   return (
     <div className="session-detail-analyst">
       {/* Analyst Tab Nav — High Density */}
-      <div className="flex gap-6 mb-8 border-b border-[var(--border-light)] overflow-x-auto no-scrollbar">
+      <div className="flex gap-10 mb-12 border-b border-[var(--border-light)] overflow-x-auto no-scrollbar">
         {tabs.map(tab => {
           const Icon = tab.icon
           return (
             <button
               key={tab.key}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab(tab.key) }}
-              className={`flex items-center gap-2 py-3 text-[9px] font-mono font-bold uppercase tracking-widest transition-all relative ${
-                activeTab === tab.key ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)] opacity-40 hover:opacity-100'
+              className={`flex items-center gap-3 py-4 text-[10px] font-mono font-black uppercase tracking-[0.3em] transition-all relative ${
+                activeTab === tab.key ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] opacity-60 hover:opacity-100 hover:text-[var(--text-secondary)]'
               }`}
             >
-              <Icon size={12} strokeWidth={2} />
+              <Icon size={14} strokeWidth={2} />
               {tab.label}
               {activeTab === tab.key && (
-                <div className="absolute bottom-[-1px] left-0 right-0 h-[1px] bg-[var(--text-primary)]" />
+                <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]" />
               )}
             </button>
           )
@@ -68,67 +68,68 @@ export function SessionDetail({ upload }: SessionDetailProps) {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5">
             {/* Bento Grid — Max Density */}
             <div className="lg:col-span-8 flex flex-col gap-1.5">
-               <div className="p-6 bg-[var(--bg-tertiary)]/30 border border-[var(--border-light)] rounded-sm">
-                  <h4 className="flex items-center gap-2 text-[8px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)] mb-4 opacity-50">
-                    <Target size={10} /> Summary
+               <div className="p-8 bg-[var(--bg-tertiary)]/50 border border-[var(--border-medium)] rounded-sm">
+                  <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--accent)] mb-6 opacity-80">
+                    <Target size={12} /> Narrative Core
                   </h4>
-                  <p className="text-[14px] leading-relaxed text-[var(--text-primary)] font-light">
+                  <p className="text-[17px] leading-relaxed text-[var(--text-primary)] font-light tracking-wide">
                     {a.summary}
                   </p>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
-                  <AnalystCard title="Projects" icon={FolderOpen}>
+                  <AnalystCard title="Domain Manifest" icon={FolderOpen}>
                     {a.projects?.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {a.projects.map((p: any, i: number) => (
                           <div key={i} className="flex flex-col">
-                            <span className="text-[11px] font-bold text-[var(--text-primary)]">{p.name}</span>
-                            <span className="text-[9px] text-[var(--text-tertiary)] italic line-clamp-1">{p.updates?.[0]}</span>
+                            <span className="text-[12px] font-bold text-[var(--text-primary)] mb-1">{p.name}</span>
+                            <span className="text-[10px] text-[var(--text-secondary)] italic line-clamp-2 leading-relaxed opacity-80">{p.updates?.[0]}</span>
                           </div>
                         ))}
                       </div>
-                    ) : <span className="text-[10px] opacity-20 italic">None linked</span>}
+                    ) : <span className="text-[10px] opacity-30 italic">No domain links found.</span>}
                   </AnalystCard>
 
-                  <AnalystCard title="Decisions" icon={Activity}>
+                  <AnalystCard title="Strategic Vector" icon={Activity}>
                     {a.decisions?.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {a.decisions.map((d: any, i: number) => (
-                          <div key={i} className="flex flex-col border-l border-[var(--border-medium)] pl-3">
-                            <span className="text-[11px] font-medium text-[var(--text-secondary)]">{d.decision}</span>
-                            <span className="text-[9px] text-[var(--text-tertiary)] opacity-50">{d.reasoning?.slice(0, 60)}...</span>
+                          <div key={i} className="flex flex-col border-l-2 border-[var(--accent-soft)] pl-4 py-1">
+                            <span className="text-[12px] font-bold text-[var(--text-secondary)] mb-1">{d.decision}</span>
+                            <span className="text-[10px] text-[var(--text-tertiary)] opacity-80 line-clamp-2">{d.reasoning}</span>
                           </div>
                         ))}
                       </div>
-                    ) : <span className="text-[10px] opacity-20 italic">None logged</span>}
+                    ) : <span className="text-[10px] opacity-30 italic">No decisions archived.</span>}
                   </AnalystCard>
                </div>
             </div>
 
             <div className="lg:col-span-4 flex flex-col gap-1.5">
-               <AnalystCard title="Tactical Tasks" icon={CheckCircle2}>
+               <AnalystCard title="Tactical Intake" icon={CheckCircle2}>
                   {a.action_items?.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {a.action_items.map((item: string, i: number) => (
-                        <div key={i} className="text-[11px] text-[var(--text-secondary)] py-1.5 border-b border-[var(--border-light)] last:border-0">
-                          • {item}
+                        <div key={i} className="text-[12px] text-[var(--text-secondary)] py-2 border-b border-[var(--border-light)] last:border-0 flex items-start gap-3">
+                          <span className="text-[var(--accent)] mt-1">•</span>
+                          {item}
                         </div>
                       ))}
                     </div>
-                  ) : <span className="text-[10px] opacity-20 italic">Zero intake</span>}
+                  ) : <span className="text-[10px] opacity-30 italic">Zero tactical items.</span>}
                </AnalystCard>
 
-               <AnalystCard title="Conceptual" icon={Lightbulb}>
+               <AnalystCard title="Conceptual Map" icon={Lightbulb}>
                   {a.ideas?.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                        {a.ideas.map((idea: any, i: number) => (
-                         <div key={i} className="text-[11px] text-[var(--text-tertiary)] leading-snug">
-                           {typeof idea === 'object' ? idea.text : idea}
+                         <div key={i} className="text-[11px] text-[var(--text-tertiary)] leading-relaxed italic opacity-90 border-l border-[var(--border-medium)] pl-3">
+                           &ldquo;{typeof idea === 'object' ? idea.text : idea}&rdquo;
                          </div>
                        ))}
                     </div>
-                  ) : <span className="text-[10px] opacity-20 italic">No mappings</span>}
+                  ) : <span className="text-[10px] opacity-30 italic">Conceptual slate empty.</span>}
                </AnalystCard>
             </div>
           </div>
