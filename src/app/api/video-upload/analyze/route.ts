@@ -27,6 +27,7 @@ Flag ALL PII in the "pii_detected" array. NEVER include actual PII values in any
 Analyze the transcript and return a JSON object with this EXACT structure:
 
 {
+  "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles.",
   "summary": "2-3 sentence summary of what was discussed",
   "categories": [{"name": "category", "confidence": 0.0-1.0}],
   "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",

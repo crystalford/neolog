@@ -236,6 +236,7 @@ export default function DashboardLayout({
   const secondaryNav = useMemo(() => [
     { href: '/dashboard/timeline',   icon: CalendarDays, label: 'Timeline',         section: 'INTELLIGENCE' },
     { href: '/dashboard/entities',   icon: Network,      label: 'Knowledge Graph',  section: 'INTELLIGENCE' },
+    { href: '/dashboard/finances',   icon: DollarSign,   label: 'Finances',         section: 'INTELLIGENCE' },
   ], [])
 
   // MANIFEST section — the character being built
