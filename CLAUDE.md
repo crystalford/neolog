@@ -151,3 +151,33 @@ This is a solo personal project. **Push directly to `main`** — no feature bran
 - The `_archived/` directories contain old features that were deprioritized — they exist but aren't linked in the nav
 - CSS design tokens live in `globals.css` as CSS variables (`--bg-card`, `--text-primary`, `--accent`, etc.) — always use these, not hardcoded colors
 - The user brings their own AI API keys. Never hardcode or assume system-level keys exist.
+
+---
+
+## ⚠️ DO NOT CHANGE — Thumbnail pipeline invariants
+
+These are intentional design decisions that took significant debugging to get right. **Do not "simplify" or revert them.**
+
+### `fofr/toolkit` on Replicate — correct API
+The model accepts **only** `task` (enum), `input_file`, and `fps`. It does **NOT** accept `ffmpeg_command`. Sending `ffmpeg_command` returns a 422 before creating a prediction — nothing appears in the Replicate dashboard and the step silently fails.
+
+Correct tasks:
+- `extract_video_audio_as_mp3` → returns single MP3 URL
+- `convert_input_to_mp4` → returns single H.264 MP4 URL
+- `extract_frames_from_input` → returns `List[Path]` = **array** of frame URLs (not a ZIP)
+
+### Step order in `process-upload.ts`
+`transcode-playback` (step 2c) runs **BEFORE** `extract-thumbnail` (step 2d). This is intentional.
+
+**Why:** DJI Mimo vertical (9:16) HEVC videos have rotation metadata in their MOV/MP4 container. When `fofr/toolkit extract_frames_from_input` encounters this, it silently returns 0 frames. Transcoding to H.264 first via `convert_input_to_mp4` strips the rotation metadata and produces a file that frame extraction works on reliably. The `extract-thumbnail` step then uses `playbackStoragePath` (the H.264 output) as its primary input source.
+
+**Do not swap these steps back** — it will break thumbnails for all vertical DJI videos.
+
+### `generate-thumbnail.ts` — playback_path first
+The function checks `upload.playback_path` first and uses the signed URL for that H.264 file as the input to `extract_frames_from_input`. Only if `playback_path` doesn't exist does it fall back to the original file. This is the same reason as above — original HEVC vertical files fail frame extraction.
+
+Do not remove the `playback_path` check or simplify this to only use `storage_path`.
+
+### Thumbnail storage format
+Thumbnails are stored as `data:image/jpeg;base64,...` or `data:image/png;base64,...` data URLs directly in `video_uploads.thumbnail_url`. This bypasses the Supabase signed URL chain (which expires and requires re-signing). The GET `/api/video-upload` route skips signing for columns that start with `data:`.
+
