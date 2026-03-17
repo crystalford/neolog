@@ -125,13 +125,16 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
 
     // If we already have the data (from a join), don't fetch
     if (entry.video_uploads && !fullUploadData) {
-      setFullUploadData({
-        ...entry.video_uploads,
-        id: entry.source_upload_id || entry.id,
-        file_name: entry.title,
-        recorded_at: entry.logged_at,
-        logged_at: entry.logged_at,
-      } as any)
+      const upload = Array.isArray(entry.video_uploads) ? entry.video_uploads[0] : entry.video_uploads
+      if (upload) {
+        setFullUploadData({
+          ...upload,
+          id: entry.source_upload_id || entry.id,
+          file_name: entry.title,
+          recorded_at: entry.logged_at,
+          logged_at: entry.logged_at,
+        } as any)
+      }
       return
     }
 

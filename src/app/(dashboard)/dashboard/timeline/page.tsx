@@ -24,8 +24,9 @@ export default function TimelinePage() {
         .from('log_entries')
         .select(`
           *,
-          video_uploads:source_upload_id (
+          video_uploads!source_upload_id (
             transcript_segments,
+            transcript,
             analysis
           )
         `)
@@ -159,8 +160,16 @@ export default function TimelinePage() {
           /* Infinite Script View */
           <div className="space-y-24 pb-64">
              {filteredEntries.map((entry: any, idx) => {
-                // Use segments from video_uploads if log_entry's meta is empty
-                const segments = entry.video_uploads?.transcript_segments || entry.meta?.transcript_segments || []
+                // Support both aliased and direct joins, and array/object formats
+                const upload = (Array.isArray(entry.video_uploads) ? entry.video_uploads[0] : entry.video_uploads)
+                
+                // Primary: segments. Fallback 1: raw transcript text. Fallback 2: meta segments.
+                let segments = upload?.transcript_segments || entry.meta?.transcript_segments || []
+                
+                // If no segments but raw transcript exists, create a virtual segment
+                if (segments.length === 0 && upload?.transcript) {
+                  segments = [{ start: 0, text: upload.transcript }]
+                }
                 
                 return (
                   <article key={entry.id} className="relative animate-in fade-in duration-1000 slide-in-from-bottom-4">
