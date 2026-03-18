@@ -488,17 +488,28 @@ export default function UploadsPage() {
 
   const handleGenerateThumbnail = async (id: string) => {
     setThumbnailGenIds(prev => new Set(prev).add(id))
+    let found = false
     try {
-      await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
-      // Poll for thumbnail update
-      for (let i = 0; i < 24; i++) {
+      const res = await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || `Thumbnail generation failed (${res.status})`)
+        return
+      }
+      // Poll up to 90s for a real (non-SVG-placeholder) thumbnail
+      for (let i = 0; i < 18; i++) {
         await new Promise(r => setTimeout(r, 5000))
         await fetchUploads()
         const updated = uploads.find(u => u.id === id)
-        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) break
+        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) {
+          found = true
+          break
+        }
       }
-    } catch {}
-    finally {
+      if (!found) alert('Thumbnail generation timed out — check Inngest dashboard for errors. The video may need REPLICATE_API_TOKEN set, or Replicate may have failed to extract frames from this clip.')
+    } catch (e: any) {
+      alert(e.message || 'Network error triggering thumbnail generation')
+    } finally {
       setThumbnailGenIds(prev => { const next = new Set(prev); next.delete(id); return next })
     }
   }
