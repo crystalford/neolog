@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   RefreshCw, CheckSquare, Square, ChevronDown, ChevronUp,
   ArrowLeft, Code2, BookOpen, Palette, Briefcase, User, HelpCircle,
-  ExternalLink, Clock
+  ExternalLink, Clock, Download, GitBranch, CheckCircle2, XCircle, ArrowRightLeft
 } from 'lucide-react'
 import type {
   ProjectDocument, ProjectDocumentType,
@@ -51,6 +51,7 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
   const [projectType, setProjectType] = useState<ProjectDocumentType>('tech')
   const [manualNotes, setManualNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async () => {
@@ -100,6 +101,20 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
     }, 1200)
   }
 
+  const handleExport = async (format: 'markdown' | 'linear' | 'notion') => {
+    setExportOpen(false)
+    const res = await fetch(`/api/project-documents/${slug}/export?format=${format}`)
+    if (!res.ok) return
+    const text = await res.text()
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${slug}-${format}.${format === 'linear' ? 'csv' : 'md'}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const toggleMention = (id: string) => {
     setExpandedMentions(prev => {
       const next = new Set(prev)
@@ -134,6 +149,12 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
+  const formatTimestamp = (secs: number) => {
+    const m = Math.floor(secs / 60)
+    const s = Math.floor(secs % 60)
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
 
@@ -154,15 +175,43 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
           </div>
         </div>
 
-        {/* Regenerate */}
-        <button
-          onClick={handleSynthesize}
-          disabled={synthesizing}
-          className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:border-[var(--border-medium)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-all"
-        >
-          <RefreshCw size={11} className={synthesizing ? 'animate-spin' : ''} />
-          {synthesizing ? 'Generating…' : doc ? 'Regenerate' : 'Generate Doc'}
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Export */}
+          {doc && (
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen(o => !o)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:border-[var(--border-medium)] hover:text-[var(--text-primary)] transition-all"
+              >
+                <Download size={11} />
+                Export
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl z-20 overflow-hidden">
+                  {(['markdown', 'notion', 'linear'] as const).map(fmt => (
+                    <button
+                      key={fmt}
+                      onClick={() => handleExport(fmt)}
+                      className="w-full text-left px-4 py-2.5 text-[11px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      {fmt === 'markdown' ? 'Markdown' : fmt === 'notion' ? 'Notion paste' : 'Linear CSV'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Regenerate */}
+          <button
+            onClick={handleSynthesize}
+            disabled={synthesizing}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-light)] text-[10px] font-mono uppercase tracking-widest text-[var(--text-secondary)] hover:border-[var(--border-medium)] hover:text-[var(--text-primary)] disabled:opacity-40 transition-all"
+          >
+            <RefreshCw size={11} className={synthesizing ? 'animate-spin' : ''} />
+            {synthesizing ? 'Generating…' : doc ? 'Regenerate' : 'Generate Doc'}
+          </button>
+        </div>
       </div>
 
       {/* Project type selector */}
@@ -241,13 +290,47 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
           {doc.decisions_log?.length > 0 && (
             <Section label={`Decisions (${doc.decisions_log.length})`}>
               <div className="space-y-4">
-                {(doc.decisions_log as ProjectDocumentDecision[]).map((d, i) => (
-                  <div key={i} className="border-l-2 border-[var(--border-light)] pl-4">
-                    <p className="text-[14px] font-medium text-[var(--text-primary)] mb-1">{d.decision}</p>
-                    {d.reasoning && <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">{d.reasoning}</p>}
-                    {d.date && <p className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30 mt-1">{d.date}</p>}
-                  </div>
-                ))}
+                {(doc.decisions_log as ProjectDocumentDecision[]).map((d, i) => {
+                  const statusColor =
+                    d.status === 'implemented' ? 'bg-emerald-500/10 text-emerald-400' :
+                    d.status === 'reversed'    ? 'bg-red-500/10 text-red-400' :
+                    d.status === 'superseded'  ? 'bg-yellow-500/10 text-yellow-400' :
+                    'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+                  const StatusIcon =
+                    d.status === 'implemented' ? CheckCircle2 :
+                    d.status === 'reversed'    ? XCircle :
+                    d.status === 'superseded'  ? ArrowRightLeft :
+                    GitBranch
+                  return (
+                    <div key={i} className={`border-l-2 pl-4 ${d.status === 'reversed' ? 'border-red-500/30 opacity-60' : 'border-[var(--border-light)]'}`}>
+                      <div className="flex items-start gap-2 mb-1">
+                        <p className="text-[14px] font-medium text-[var(--text-primary)] flex-1">{d.decision}</p>
+                        {d.status && (
+                          <span className={`flex items-center gap-1 text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded-sm flex-shrink-0 ${statusColor}`}>
+                            <StatusIcon size={9} />
+                            {d.status}
+                          </span>
+                        )}
+                      </div>
+                      {d.reasoning && <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">{d.reasoning}</p>}
+                      {d.lifecycle_note && (
+                        <p className="text-[11px] text-[var(--text-tertiary)] italic mt-1 opacity-70">{d.lifecycle_note}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-1">
+                        {d.date && <p className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30">{d.date}</p>}
+                        {d.source_upload_id && d.source_timestamp_seconds != null && (
+                          <Link
+                            href={`/dashboard/timeline/${d.source_upload_id}?t=${Math.floor(d.source_timestamp_seconds)}`}
+                            className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30 hover:opacity-80 hover:text-[var(--accent)] transition-all flex items-center gap-1"
+                          >
+                            <Clock size={9} />
+                            {formatTimestamp(d.source_timestamp_seconds)}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </Section>
           )}
@@ -262,7 +345,18 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
                       ? <CheckSquare size={14} className="flex-shrink-0 mt-0.5 text-emerald-500" />
                       : <Square size={14} className="flex-shrink-0 mt-0.5 text-[var(--text-tertiary)] opacity-40" />
                     }
-                    <span className={`text-[13px] leading-relaxed ${a.status === 'done' ? 'line-through text-[var(--text-tertiary)]' : 'text-[var(--text-secondary)]'}`}>{a.item}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-[13px] leading-relaxed ${a.status === 'done' ? 'line-through text-[var(--text-tertiary)]' : 'text-[var(--text-secondary)]'}`}>{a.item}</span>
+                      {a.source_upload_id && a.source_timestamp_seconds != null && (
+                        <Link
+                          href={`/dashboard/timeline/${a.source_upload_id}?t=${Math.floor(a.source_timestamp_seconds)}`}
+                          className="ml-2 text-[10px] font-mono text-[var(--text-tertiary)] opacity-30 hover:opacity-80 hover:text-[var(--accent)] transition-all inline-flex items-center gap-1"
+                        >
+                          <Clock size={9} />
+                          {formatTimestamp(a.source_timestamp_seconds)}
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

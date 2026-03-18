@@ -750,6 +750,10 @@ export type ProjectDocumentDecision = {
   reasoning: string | null
   date: string | null
   source_upload_id: string | null
+  source_timestamp_seconds: number | null
+  // Lifecycle: was this decision implemented, reversed, or superseded in a later session?
+  status: 'made' | 'implemented' | 'reversed' | 'superseded' | null
+  lifecycle_note: string | null   // e.g. "reversed in Mar 14 recording — decided to keep TypeScript"
 }
 
 export type ProjectDocumentActionItem = {
@@ -757,6 +761,7 @@ export type ProjectDocumentActionItem = {
   status: 'open' | 'done'
   mentioned_at: string | null
   source_upload_id: string | null
+  source_timestamp_seconds: number | null
 }
 
 export type ProjectDocumentRoadmapItem = {

@@ -53,7 +53,7 @@ export const synthesizeProject = inngest.createFunction(
           .single(),
         admin
           .from('entity_mentions')
-          .select('id, context, full_context, sentiment, created_at, video_upload_id, log_entry_id, source_type, video_uploads(id, file_name, recorded_at, created_at)')
+          .select('id, context, full_context, sentiment, created_at, video_upload_id, log_entry_id, source_type, video_uploads(id, file_name, recorded_at, created_at, transcript_segments)')
           .eq('entity_id', entity_id)
           .order('created_at', { ascending: true }),
         resolveProviderKeyWithClient(admin, user_id, 'openai'),
@@ -91,7 +91,7 @@ export const synthesizeProject = inngest.createFunction(
     const document = await step.run('synthesize-document', async () => {
       const { entity, mentions, projectType } = context
 
-      // Build the session journal — each mention becomes a dated entry
+      // Build the session journal — each mention becomes a dated entry with upload metadata
       const sessionJournal = mentions
         .map((m: any) => {
           const source = m.video_uploads
@@ -99,7 +99,10 @@ export const synthesizeProject = inngest.createFunction(
           const dateStr = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           const body = m.full_context || m.context || ''
           if (!body) return null
-          return `[${dateStr}]\n${body}`
+          const uploadMeta = source
+            ? `upload_id:${source.id} file:${source.file_name}`
+            : ''
+          return `[${dateStr}]${uploadMeta ? ` (${uploadMeta})` : ''}\n${body}`
         })
         .filter(Boolean)
         .join('\n\n---\n\n')
@@ -133,8 +136,8 @@ Synthesize this into a JSON living document with these fields:
 
 - "overview": 2-3 paragraph synthesis of what this project is, its purpose, current state, and direction. Be specific and concrete.
 - "origin_story": 1-2 paragraphs on how this project started — the first spark, the initial problem, what prompted it. Extract from the earliest sessions.
-- "decisions_log": array of specific decisions made about this project. Each: {"decision": "...", "reasoning": "... or null", "date": "YYYY-MM-DD or null", "source_upload_id": "null"}. Extract actual concrete decisions, not generic statements.
-- "action_items": array of concrete next steps or todos mentioned. Each: {"item": "...", "status": "open", "mentioned_at": "YYYY-MM-DD or null", "source_upload_id": "null"}. Only things framed as todos/next steps.
+- "decisions_log": array of specific decisions made about this project. Each: {"decision": "...", "reasoning": "... or null", "date": "YYYY-MM-DD or null", "source_upload_id": "the upload_id from the session header where this was decided, or null", "source_timestamp_seconds": estimate the timestamp in seconds within that recording where this was said based on the context (null if unknown), "status": one of "made"|"implemented"|"reversed"|"superseded" — check later sessions to see if this decision was acted on, contradicted, or replaced. "lifecycle_note": if status is not "made", briefly explain what happened in a later session (e.g. "reversed Mar 14 — decided against mobile-first after testing"). Extract actual concrete decisions, not generic statements.
+- "action_items": array of concrete next steps or todos mentioned. Each: {"item": "...", "status": "open" or "done" if a later session confirms it was completed, "mentioned_at": "YYYY-MM-DD or null", "source_upload_id": "the upload_id from the session header, or null", "source_timestamp_seconds": estimate timestamp in seconds within that recording (null if unknown)}. Only things framed as todos/next steps.
 - "roadmap": array of future plans and goals for this project. Each: {"item": "...", "priority": "high|medium|low", "status": "planned|in_progress|done"}.
 ${isTech ? `- "technical_notes": synthesis of all technical architecture, stack choices, infrastructure decisions, integrations, and technical problems discussed. Write as a technical reference document. Be specific about technologies, patterns, and reasoning.` : `- "technical_notes": null`}
 ${isNarrative ? `- "narrative_overview": synthesis of the narrative arc, story structure, themes, and content discussed across sessions. What is the story arc? What chapters or sections are taking shape? What themes keep emerging?` : `- "narrative_overview": null`}
