@@ -770,6 +770,14 @@ export type ProjectDocumentRoadmapItem = {
   status: 'planned' | 'in_progress' | 'done'
 }
 
+export type ProjectDocumentSnapshot = {
+  synthesized_at: string
+  mention_count: number
+  decisions_log: ProjectDocumentDecision[]
+  action_items: ProjectDocumentActionItem[]
+  roadmap: ProjectDocumentRoadmapItem[]
+}
+
 export type ProjectDocument = {
   id: string
   user_id: string
@@ -787,6 +795,9 @@ export type ProjectDocument = {
 
   // User-editable
   manual_notes: string | null
+
+  // Synthesis history (rolling last-10 snapshots for delta view)
+  synthesis_history: ProjectDocumentSnapshot[]
 
   // Meta
   last_synthesized_at: string | null

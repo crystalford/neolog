@@ -189,6 +189,26 @@ Return valid JSON only. No markdown. No explanation outside the JSON.`
       const now = new Date().toISOString()
       const model = context.anthropicKey ? 'claude-sonnet-4-6' : 'gpt-4o'
 
+      // Read existing doc to snapshot the current state before overwriting
+      const { data: existing } = await admin
+        .from('project_documents')
+        .select('decisions_log, action_items, roadmap, last_synthesized_at, mention_count_at_synthesis, synthesis_history')
+        .eq('entity_id', entity_id)
+        .maybeSingle()
+
+      // Build updated history — keep last 10 snapshots
+      const prevHistory: any[] = existing?.synthesis_history || []
+      const newHistory = [
+        ...prevHistory,
+        ...(existing?.last_synthesized_at ? [{
+          synthesized_at: existing.last_synthesized_at,
+          mention_count: existing.mention_count_at_synthesis ?? 0,
+          decisions_log: existing.decisions_log ?? [],
+          action_items: existing.action_items ?? [],
+          roadmap: existing.roadmap ?? [],
+        }] : []),
+      ].slice(-10)
+
       await admin
         .from('project_documents')
         .upsert(
@@ -204,6 +224,7 @@ Return valid JSON only. No markdown. No explanation outside the JSON.`
             technical_notes: document.technical_notes,
             narrative_overview: document.narrative_overview,
             origin_story: document.origin_story,
+            synthesis_history: newHistory,
             last_synthesized_at: now,
             synthesis_model: model,
             mention_count_at_synthesis: context.mentions.length,

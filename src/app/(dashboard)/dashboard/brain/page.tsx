@@ -6,7 +6,7 @@ import {
   ArrowUpDown, Calendar, Users,
   Target, Lightbulb, Package,
   Clock, ArrowRight, Inbox, Film,
-  GitBranch, Heart
+  GitBranch, Heart, FileText
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -254,6 +254,18 @@ export default function BrainPage() {
                       <span>{entity.mention_count} mention{entity.mention_count !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
+
+                  {entity.type === 'project' && (
+                    <Link
+                      href={`/dashboard/projects/${entity.slug}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] border border-[var(--border-light)] hover:border-[var(--accent)]/50 hover:text-[var(--accent)] transition-all flex-shrink-0"
+                      title="View project document"
+                    >
+                      <FileText size={9} />
+                      Doc
+                    </Link>
+                  )}
 
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
