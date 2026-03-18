@@ -734,10 +734,62 @@ export type Entity = {
 export type EntityMention = {
   id: string
   entity_id: string
-  video_upload_id: string
-  context: string                         // what was said about this entity
+  video_upload_id: string | null
+  log_entry_id: string | null
+  source_type: 'video' | 'chat' | 'text' | 'capture'
+  context: string                         // bullet-point summary of what was said
+  full_context: string | null             // comprehensive session journal entry for this entity
   sentiment: 'positive' | 'negative' | 'neutral' | null
   created_at: string
+}
+
+export type ProjectDocumentType = 'tech' | 'book' | 'creative' | 'business' | 'personal' | 'other'
+
+export type ProjectDocumentDecision = {
+  decision: string
+  reasoning: string | null
+  date: string | null
+  source_upload_id: string | null
+}
+
+export type ProjectDocumentActionItem = {
+  item: string
+  status: 'open' | 'done'
+  mentioned_at: string | null
+  source_upload_id: string | null
+}
+
+export type ProjectDocumentRoadmapItem = {
+  item: string
+  priority: 'high' | 'medium' | 'low'
+  status: 'planned' | 'in_progress' | 'done'
+}
+
+export type ProjectDocument = {
+  id: string
+  user_id: string
+  entity_id: string
+  project_type: ProjectDocumentType
+
+  // AI-synthesized (regeneratable)
+  overview: string | null
+  decisions_log: ProjectDocumentDecision[]
+  action_items: ProjectDocumentActionItem[]
+  roadmap: ProjectDocumentRoadmapItem[]
+  technical_notes: string | null          // architecture, stack decisions (tech)
+  narrative_overview: string | null       // story arc across sessions (book/creative)
+  origin_story: string | null             // how this started (universal)
+
+  // User-editable
+  manual_notes: string | null
+
+  // Meta
+  last_synthesized_at: string | null
+  synthesis_model: string | null
+  mention_count_at_synthesis: number | null
+
+  created_at: string
+  updated_at: string
 }
 
 export type VideoUpload = {

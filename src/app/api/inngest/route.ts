@@ -12,6 +12,7 @@ import { processCapture } from '@/inngest/functions/process-capture'
 import { processText } from '@/inngest/functions/process-text'
 import { refineSignal } from '@/inngest/functions/refine-signals'
 import { reanalyzeAllUploads } from '@/inngest/functions/reanalyze-all-uploads'
+import { synthesizeProject } from '@/inngest/functions/synthesize-project'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -20,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     generateThumbnail,
     synthesizeSession,
     synthesizeUserGraph,
+    synthesizeProject,
     triggerVoiceClone,
     triggerLoraTraining,
     assembleClip,
