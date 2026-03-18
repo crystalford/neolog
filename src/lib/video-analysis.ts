@@ -50,7 +50,9 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
        "name": "project name — use the most specific/canonical name mentioned (not 'the app' when a real name was used)",
        "status": "active|idea|stalled|completed|mentioned",
        "updates": ["what was said about it"],
-       "framing": "1 sentence: how {userName} is currently relating to this project — their energy, attitude, or emotional position toward it"
+       "framing": "1 sentence: how {userName} is currently relating to this project — their energy, attitude, or emotional position toward it",
+       "project_type": "tech|book|creative|business|personal|other",
+       "full_context": "Comprehensive 2-3 paragraph synthesis of EVERYTHING discussed about this project in this recording. Include technical decisions, plans, problems, ideas, breakthroughs, frustrations — capture the full discourse even if the project name was only mentioned once at the start and then discussed at length without repeating the name. Write it as a session journal entry for this project, in third person about {userName}."
      }
    ],
    "action_items": ["concrete next steps mentioned"],
@@ -113,7 +115,7 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
  
  GUIDELINES:
  - Be thorough. Extract MORE than you think is needed. False negatives (missing something) are worse than false positives.
- - For projects: only mark as 'active' if {userName} is actively working on it NOW. Use 'mentioned' for passing references. Use the most specific, canonical name (if they say both 'the YouTube tool' and a specific product name, use the product name).
+ - For projects: only mark as 'active' if {userName} is actively working on it NOW. Use 'mentioned' for passing references. Use the most specific, canonical name (if they say both 'the YouTube tool' and a specific product name, use the product name). For full_context: if {userName} spends 10 minutes discussing a project but only says its name once, the full_context should capture all 10 minutes of discussion — not just the one sentence with the name. project_type should be 'tech' for software/engineering projects, 'book' for books/memoirs/biographies, 'creative' for art/music/film, 'business' for companies/ventures, 'personal' for personal goals/life projects, 'other' for anything else.
  - For entity deduplication: if the same concept appears under multiple names in this session, consolidate to the most specific/canonical name used.
  - For framing: capture {userName}'s current emotional and strategic relationship to a project — not just what they said, but how they're sitting with it. "Excited and building fast" differs from "stuck and avoiding it."
  - For questions: capture "I wonder...", "what if...", "should I...", "how do I..." — these reveal what {userName} is actually thinking about.
@@ -303,6 +305,7 @@ export async function upsertEntities(
     type: string
     name: string
     context: string
+    full_context?: string | null
     sentiment?: string
     metadata?: Record<string, any>
   }> = []
@@ -313,7 +316,8 @@ export async function upsertEntities(
         type: 'project',
         name: p.name,
         context: p.updates?.join('. ') || `Mentioned as ${p.status}`,
-        metadata: { status: p.status },
+        full_context: p.full_context || null,
+        metadata: { status: p.status, project_type: p.project_type || 'other' },
       })
     }
   }
@@ -435,6 +439,7 @@ export async function upsertEntities(
           entity_id: entityId,
           ...mentionSourceFields,
           context: entity.context,
+          full_context: entity.full_context || null,
           sentiment: entity.sentiment || null,
         })
     } catch (err) {
