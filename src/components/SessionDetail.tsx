@@ -2,15 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import {
-  Brain, Target, FileText, Scissors, Shield, Sparkles, Zap,
-  Tag as TagIcon, Lightbulb, HelpCircle, FolderOpen, CheckCircle2,
-  TrendingUp, AlertTriangle, Users, BookOpen, MessageCircle, Play,
-  CalendarDays, ChevronRight, Edit2, Quote, Activity, Compass, Fingerprint,
-  Layers, Map, Terminal, Cpu, Braces
+  Sparkles, Scissors, MessageCircle, Terminal,
+  Lightbulb, FolderOpen, Activity, Target, Edit2, Share2,
+  Fingerprint, Braces, Quote
 } from 'lucide-react'
 import type { VideoUpload, TranscriptWord } from '@/types/database'
-import { TranscriptEditor } from '@/components/TranscriptEditor'
-import { format } from 'date-fns'
 
 interface SessionDetailProps {
   upload: Partial<VideoUpload> & { analysis: any }
@@ -32,16 +28,16 @@ export function SessionDetail({ upload }: SessionDetailProps) {
   }, [activeTab, upload.id, transcriptWords])
 
   const tabs = [
-    { key: 'intel' as const,      label: 'Intel',       icon: Braces },
-    { key: 'synthesis' as const,  label: 'Synthesis',   icon: Sparkles },
-    { key: 'log' as const,        label: 'Logs',        icon: Terminal },
-    { key: 'clips' as const,      label: 'Fragments',   icon: Scissors, count: upload.generated_clips?.length || 0 },
-    { key: 'posts' as const,      label: 'Drafts',      icon: MessageCircle, count: upload.generated_posts?.length || 0 },
+    { key: 'intel' as const,     label: 'Intel',     icon: Braces },
+    { key: 'synthesis' as const, label: 'Synthesis', icon: Sparkles },
+    { key: 'log' as const,       label: 'Raw',       icon: Terminal },
+    { key: 'clips' as const,     label: 'Fragments', icon: Scissors, count: upload.generated_clips?.length || 0 },
+    { key: 'posts' as const,     label: 'Posts',     icon: MessageCircle, count: upload.generated_posts?.length || 0 },
   ]
 
   return (
     <div className="session-detail-v6">
-      {/* Refined Tab Nav (No Cyan) */}
+      {/* Tab Nav */}
       <div className="flex gap-10 mb-12 border-b border-[var(--border-light)] pb-px overflow-x-auto no-scrollbar">
         {tabs.map(tab => {
           const Icon = tab.icon
@@ -55,6 +51,9 @@ export function SessionDetail({ upload }: SessionDetailProps) {
             >
               <Icon size={14} strokeWidth={2} className={activeTab === tab.key ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} />
               {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="text-[8px] opacity-40">({tab.count})</span>
+              )}
               {activeTab === tab.key && (
                 <div className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[var(--text-primary)]" />
               )}
@@ -64,143 +63,200 @@ export function SessionDetail({ upload }: SessionDetailProps) {
       </div>
 
       <div className="tab-content">
+
+        {/* ── INTEL ─────────────────────────────────────────────────────── */}
         {activeTab === 'intel' && a && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-            {/* Bento Grid — Relaxed constraints */}
-            <div className="lg:col-span-8 flex flex-col gap-2">
-               <div className="p-10 border border-[var(--border-light)] rounded-lg">
-                  <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
-                    <Target size={12} /> Narrative Core
-                  </h4>
-                  <p className="text-[17px] leading-relaxed text-[var(--text-primary)] font-light tracking-wide">
-                    {a.summary}
-                  </p>
-               </div>
+          <div className="space-y-4 max-w-3xl">
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <AnalystCard title="Projects" icon={FolderOpen} color="text-blue-400">
-                    {a.projects?.length > 0 ? (
-                      <div className="space-y-4">
-                        {a.projects.map((p: any, i: number) => (
-                          <div key={i} className="flex flex-col">
-                            <span className="text-[13px] font-bold text-[var(--text-primary)] mb-1">{p.name}</span>
-                            <span className="text-[11px] text-[var(--text-secondary)] leading-relaxed opacity-70">{p.updates?.[0]}</span>
-                          </div>
-                        ))}
+            {/* 1. Narrative Core */}
+            {a.summary && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
+                  <Target size={12} /> Narrative Core
+                </h4>
+                <p className="text-[17px] leading-relaxed text-[var(--text-primary)] font-light tracking-wide">
+                  {a.summary}
+                </p>
+              </div>
+            )}
+
+            {/* 2. Rewrite — only if the AI produced one */}
+            {a.rewrite && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
+                  <Edit2 size={12} /> Articulated
+                </h4>
+                <p className="text-[17px] leading-relaxed text-[var(--text-secondary)] font-light tracking-wide italic">
+                  {a.rewrite}
+                </p>
+              </div>
+            )}
+
+            {/* 3. Key Quotes / Signal — only if any */}
+            {a.key_quotes?.length > 0 && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-[var(--text-tertiary)] mb-6 opacity-40">
+                  <Quote size={12} /> Signal
+                </h4>
+                <div className="space-y-5">
+                  {a.key_quotes.map((q: string, i: number) => (
+                    <p key={i} className="text-[15px] text-[var(--text-secondary)] leading-relaxed border-l-2 border-[var(--border-light)] pl-6 italic">
+                      {q}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Projects — only if any */}
+            {a.projects?.length > 0 && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-blue-400 mb-6 opacity-60">
+                  <FolderOpen size={12} /> Projects
+                </h4>
+                <div className="space-y-6">
+                  {a.projects.map((p: any, i: number) => (
+                    <div key={i}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-[14px] font-bold text-[var(--text-primary)]">{p.name}</span>
+                        {p.status && (
+                          <span className="text-[8px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] opacity-40 border border-[var(--border-light)] px-2 py-0.5 rounded">
+                            {p.status}
+                          </span>
+                        )}
                       </div>
-                    ) : <span className="text-[10px] opacity-30 italic">No domain links</span>}
-                  </AnalystCard>
-
-                  <AnalystCard title="Decisions" icon={Activity} color="text-emerald-400">
-                    {a.decisions?.length > 0 ? (
-                      <div className="space-y-4">
-                        {a.decisions.map((d: any, i: number) => (
-                          <div key={i} className="flex flex-col">
-                            <span className="text-[13px] font-bold text-[var(--text-secondary)] mb-1">{d.decision}</span>
-                            <span className="text-[11px] text-[var(--text-tertiary)] opacity-60 leading-relaxed">{d.reasoning}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <span className="text-[10px] opacity-30 italic">No decisions logged</span>}
-                  </AnalystCard>
-               </div>
-            </div>
-
-            <div className="lg:col-span-4 flex flex-col gap-2">
-               <AnalystCard title="Tactical Intake" icon={CheckCircle2} color="text-amber-400">
-                  {a.action_items?.length > 0 ? (
-                    <div className="space-y-3">
-                      {a.action_items.map((item: string, i: number) => (
-                        <div key={i} className="text-[12px] text-[var(--text-secondary)] py-2 border-b border-[var(--border-light)] last:border-0 flex items-start gap-3">
-                          • {item}
-                        </div>
+                      {p.framing && (
+                        <p className="text-[13px] text-[var(--text-secondary)] opacity-60 leading-relaxed mb-2">{p.framing}</p>
+                      )}
+                      {p.updates?.map((u: string, j: number) => (
+                        <p key={j} className="text-[12px] text-[var(--text-tertiary)] opacity-50 leading-relaxed">• {u}</p>
                       ))}
                     </div>
-                  ) : <span className="text-[10px] opacity-30 italic">Zero intake</span>}
-               </AnalystCard>
+                  ))}
+                </div>
+              </div>
+            )}
 
-               <AnalystCard title="Conceptual" icon={Lightbulb} color="text-purple-400">
-                  {a.ideas?.length > 0 ? (
-                    <div className="space-y-4 text-[12px] text-[var(--text-tertiary)] leading-relaxed italic opacity-80">
-                       {a.ideas.map((idea: any, i: number) => (
-                         <div key={i}>&ldquo;{typeof idea === 'object' ? idea.text : idea}&rdquo;</div>
-                       ))}
+            {/* 4. Ideas — only if any */}
+            {a.ideas?.length > 0 && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-purple-400 mb-6 opacity-60">
+                  <Lightbulb size={12} /> Ideas
+                </h4>
+                <div className="space-y-4">
+                  {a.ideas.map((idea: any, i: number) => (
+                    <p key={i} className="text-[14px] text-[var(--text-secondary)] leading-relaxed italic opacity-80">
+                      &ldquo;{typeof idea === 'object' ? idea.text : idea}&rdquo;
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Decisions — only if any */}
+            {a.decisions?.length > 0 && (
+              <div className="p-10 border border-[var(--border-light)] rounded-lg">
+                <h4 className="flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest text-emerald-400 mb-6 opacity-60">
+                  <Activity size={12} /> Decisions
+                </h4>
+                <div className="space-y-5">
+                  {a.decisions.map((d: any, i: number) => (
+                    <div key={i}>
+                      <p className="text-[14px] font-semibold text-[var(--text-primary)] leading-snug mb-1">
+                        {typeof d === 'object' ? d.decision : d}
+                      </p>
+                      {d.reasoning && (
+                        <p className="text-[12px] text-[var(--text-tertiary)] opacity-50 leading-relaxed">{d.reasoning}</p>
+                      )}
                     </div>
-                  ) : <span className="text-[10px] opacity-30 italic">No conceptual mappings</span>}
-               </AnalystCard>
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 
+        {/* ── SYNTHESIS ─────────────────────────────────────────────────── */}
         {activeTab === 'synthesis' && (
-           <div className="py-20 px-10 border border-[var(--border-light)] rounded-xl">
-              <h4 className="flex items-center gap-3 text-[10px] font-mono font-black uppercase tracking-[0.4em] text-[var(--text-tertiary)] mb-10 opacity-30">
-                <Fingerprint size={14} /> Synthetic Perspective
-              </h4>
-              <p className="text-[18px] leading-[1.8] text-[var(--text-secondary)] font-normal">
-                {a?.reflections || "Synthesis currently offline for this node."}
-              </p>
-           </div>
+          <div className="py-20 px-10 border border-[var(--border-light)] rounded-xl">
+            <h4 className="flex items-center gap-3 text-[10px] font-mono font-black uppercase tracking-[0.4em] text-[var(--text-tertiary)] mb-10 opacity-30">
+              <Fingerprint size={14} /> Synthetic Perspective
+            </h4>
+            <p className="text-[18px] leading-[1.8] text-[var(--text-secondary)] font-normal">
+              {a?.reflections || 'Synthesis currently offline for this node.'}
+            </p>
+          </div>
         )}
 
+        {/* ── RAW ───────────────────────────────────────────────────────── */}
         {activeTab === 'log' && (
           <div className="px-10">
             {upload.transcript ? (
-               <div className="space-y-8">
-                  {upload.transcript_segments?.map((seg, i) => (
-                    <div key={i} className="flex gap-10 group">
-                       <span className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 w-16 pt-1 font-bold">{formatTimestamp(seg.start)}</span>
-                       <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] opacity-100 font-light">{seg.text}</p>
-                    </div>
-                  ))}
-               </div>
-            ) : <EmptyState text="Log record empty." />}
+              <div className="space-y-8">
+                {upload.transcript_segments?.map((seg, i) => (
+                  <div key={i} className="flex gap-10 group">
+                    <span className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 w-16 pt-1 font-bold flex-shrink-0">
+                      {formatTimestamp(seg.start)}
+                    </span>
+                    <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] font-light">{seg.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="No transcript available." />
+            )}
           </div>
         )}
 
+        {/* ── FRAGMENTS ─────────────────────────────────────────────────── */}
         {activeTab === 'clips' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {upload.generated_clips?.map((clip, i) => (
-                <div key={i} className="p-6 border border-[var(--border-light)] bg-[var(--bg-secondary)] rounded-lg">
-                   <h5 className="text-[12px] font-bold text-[var(--text-primary)] mb-3">{clip.title}</h5>
-                   <p className="text-[11px] text-[var(--text-tertiary)] opacity-60 line-clamp-3 italic leading-relaxed">&ldquo;{clip.transcript}&rdquo;</p>
-                </div>
-              ))}
-              {!upload.generated_clips?.length && <EmptyState text="Zero fragments found." />}
-           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {upload.generated_clips?.map((clip, i) => (
+              <div key={i} className="p-6 border border-[var(--border-light)] bg-[var(--bg-secondary)] rounded-lg">
+                <h5 className="text-[12px] font-bold text-[var(--text-primary)] mb-3 leading-snug">{clip.title}</h5>
+                <p className="text-[11px] text-[var(--text-tertiary)] opacity-60 italic leading-relaxed">
+                  &ldquo;{clip.transcript}&rdquo;
+                </p>
+              </div>
+            ))}
+            {!upload.generated_clips?.length && <EmptyState text="No fragments extracted." />}
+          </div>
         )}
 
+        {/* ── POSTS ─────────────────────────────────────────────────────── */}
         {activeTab === 'posts' && (
-           <div className="max-w-2xl space-y-12">
-              {upload.generated_posts?.map((post, i) => (
-                <div key={i} className="p-10 border border-[var(--border-light)] bg-[var(--bg-secondary)] rounded-lg">
-                   <span className="text-[9px] font-mono opacity-30 uppercase tracking-[0.3em] mb-4 block">{post.type}</span>
-                   <h5 className="text-[16px] font-bold mb-4">{post.title}</h5>
-                   <p className="text-[14px] text-[var(--text-secondary)] font-light leading-[1.8]">{post.content}</p>
+          <div className="max-w-2xl space-y-8">
+            {upload.generated_posts?.map((post, i) => (
+              <div key={i} className="p-10 border border-[var(--border-light)] bg-[var(--bg-secondary)] rounded-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <span className="text-[9px] font-mono opacity-30 uppercase tracking-[0.3em]">{post.type}</span>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.content)}`, '_blank')
+                    }}
+                    className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] opacity-40 hover:opacity-100 transition-opacity"
+                  >
+                    <Share2 size={11} /> Share to X
+                  </button>
                 </div>
-              ))}
-              {!upload.generated_posts?.length && <EmptyState text="No drafts." />}
-           </div>
+                <p className="text-[15px] text-[var(--text-secondary)] font-light leading-[1.8]">{post.content}</p>
+              </div>
+            ))}
+            {!upload.generated_posts?.length && <EmptyState text="No posts." />}
+          </div>
         )}
-      </div>
-    </div>
-  )
-}
 
-function AnalystCard({ title, icon: Icon, color, children }: { title: string, icon: any, color?: string, children: React.ReactNode }) {
-  return (
-    <div className="p-8 border border-[var(--border-light)] rounded-lg hover:border-[var(--border-medium)] transition-colors duration-500">
-      <h4 className={`flex items-center gap-2 text-[9px] font-mono font-black uppercase tracking-widest ${color || 'text-[var(--text-tertiary)]'} mb-6 opacity-60`}>
-        <Icon size={12} strokeWidth={3} /> {title}
-      </h4>
-      {children}
+      </div>
     </div>
   )
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="py-24 flex flex-col items-center justify-center opacity-10 border border-dashed border-[var(--border-light)] rounded-lg">
+    <div className="py-24 flex flex-col items-center justify-center opacity-10 border border-dashed border-[var(--border-light)] rounded-lg col-span-full">
       <p className="text-[10px] font-mono uppercase tracking-[0.6em] text-center font-black">{text}</p>
     </div>
   )

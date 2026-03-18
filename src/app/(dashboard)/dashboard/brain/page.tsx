@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Network, Loader2, ChevronDown, ChevronUp, Search,
-  ArrowUpDown, Zap, Calendar, Link as LinkIcon, Users,
-  Target, Lightbulb, Package, HelpCircle, Activity,
-  Clock, ArrowRight, Layers, Inbox, Film,
-  GitBranch, Heart, Wrench, Compass, BookOpen, MessageCircle,
-  Link2, BookMarked, CheckSquare, Star, BarChart2
+  ArrowUpDown, Calendar, Users,
+  Target, Lightbulb, Package,
+  Clock, ArrowRight, Inbox, Film,
+  GitBranch, Heart
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -45,23 +44,13 @@ type EntityMention = {
 }
 
 const ENTITY_TYPES = [
-  { key: 'all',        label: 'All',         icon: Network,       color: 'text-white' },
-  { key: 'project',    label: 'Projects',    icon: Package,       color: 'text-blue-400' },
-  { key: 'idea',       label: 'Ideas',       icon: Lightbulb,     color: 'text-yellow-400' },
-  { key: 'person',     label: 'People',      icon: Users,         color: 'text-green-400' },
-  { key: 'goal',       label: 'Goals',       icon: Target,        color: 'text-purple-400' },
-  { key: 'decision',   label: 'Decisions',   icon: GitBranch,     color: 'text-amber-400' },
-  { key: 'value',      label: 'Values',      icon: Heart,         color: 'text-pink-400' },
-  { key: 'tool',       label: 'Tools',       icon: Wrench,        color: 'text-slate-400' },
-  { key: 'principle',  label: 'Principles',  icon: Compass,       color: 'text-violet-400' },
-  { key: 'lesson',     label: 'Lessons',     icon: BookOpen,      color: 'text-teal-400' },
-  { key: 'opinion',    label: 'Opinions',    icon: MessageCircle, color: 'text-red-400' },
-  { key: 'reference',  label: 'References',  icon: Link2,         color: 'text-indigo-400' },
-  { key: 'story',      label: 'Stories',     icon: BookMarked,    color: 'text-orange-400' },
-  { key: 'question',   label: 'Questions',   icon: HelpCircle,    color: 'text-orange-400' },
-  { key: 'skill',      label: 'Skills',      icon: Zap,           color: 'text-cyan-400' },
-  { key: 'habit',      label: 'Habits',      icon: Activity,      color: 'text-emerald-400' },
-  { key: 'commitment', label: 'Commitments', icon: CheckSquare,   color: 'text-rose-400' },
+  { key: 'all',      label: 'All',       icon: Network,   color: 'text-white' },
+  { key: 'project',  label: 'Projects',  icon: Package,   color: 'text-blue-400' },
+  { key: 'idea',     label: 'Ideas',     icon: Lightbulb, color: 'text-yellow-400' },
+  { key: 'person',   label: 'People',    icon: Users,     color: 'text-green-400' },
+  { key: 'goal',     label: 'Goals',     icon: Target,    color: 'text-purple-400' },
+  { key: 'decision', label: 'Decisions', icon: GitBranch, color: 'text-amber-400' },
+  { key: 'value',    label: 'Values',    icon: Heart,     color: 'text-pink-400' },
 ]
 
 export default function BrainPage() {
@@ -257,7 +246,7 @@ export default function BrainPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
                       {entity.name}
                     </h3>
                     <div className="flex items-center gap-3 mt-1 text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-tight">

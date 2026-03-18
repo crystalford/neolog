@@ -86,7 +86,7 @@ function cleanTitle(entry: LogEntry): string {
        const summary = entry.meta?.summary || entry.body || ''
        if (summary.length > 10) {
           const sentence = summary.split('.')[0]
-          finalTitle = sentence.length > 100 ? sentence.slice(0, 100) + '...' : sentence
+          finalTitle = sentence
        } else {
           finalTitle = format(new Date(entry.logged_at), 'MMMM d, yyyy · H:mm')
        }
