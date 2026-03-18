@@ -697,6 +697,44 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'upsert-entities', 'done', 'Entities written to knowledge graph')
     })
 
+    // ── Step 4a-ii: Auto-update living documents for any projects mentioned ──
+    // Fire synthesize-project for each project entity found in this recording.
+    // This keeps project docs current without requiring manual "Regenerate" clicks.
+    if (analysisResult.analysis?.projects?.length > 0) {
+      await step.run('update-project-documents', async () => {
+        const projectNames: string[] = analysisResult.analysis.projects
+          .map((p: { name: string }) => p.name)
+          .filter(Boolean)
+
+        if (projectNames.length === 0) return
+
+        // Look up entity IDs for these projects
+        const slugify = (t: string) =>
+          t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 80)
+
+        const slugs = projectNames.map(slugify)
+        const { data: entities } = await admin
+          .from('entities')
+          .select('id')
+          .eq('user_id', user_id)
+          .eq('type', 'project')
+          .in('slug', slugs)
+
+        if (!entities?.length) return
+
+        // Fire a synthesize event for each project (Inngest dedupes within a short window)
+        const { inngest } = await import('@/inngest/client')
+        await Promise.all(
+          entities.map((e: { id: string }) =>
+            inngest.send({ name: 'app/project.synthesize', data: { entity_id: e.id, user_id } })
+          )
+        )
+
+        await plog(admin, video_upload_id, 'update-project-documents', 'done',
+          `Triggered document synthesis for ${entities.length} project(s)`)
+      })
+    }
+
     // ── Step 4b: Pre-populate word cuts from clip suggestions ──
     // Words OUTSIDE any generated clip window are marked is_cut=true by default
     if (transcription.words && transcription.words.length > 0 && analysisResult.clips?.length > 0) {
