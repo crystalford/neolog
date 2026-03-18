@@ -108,6 +108,7 @@ export default function UploadsPage() {
   const [reanalyzingIds, setReanalyzingIds] = useState<Set<string>>(new Set())
   const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
   const [thumbnailGenIds, setThumbnailGenIds] = useState<Set<string>>(new Set())
+  const [thumbnailErrorIds, setThumbnailErrorIds] = useState<Set<string>>(new Set())
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -487,18 +488,28 @@ export default function UploadsPage() {
   }
 
   const handleGenerateThumbnail = async (id: string) => {
+    setThumbnailErrorIds(prev => { const next = new Set(prev); next.delete(id); return next })
     setThumbnailGenIds(prev => new Set(prev).add(id))
     try {
-      await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
-      // Poll for thumbnail update
-      for (let i = 0; i < 24; i++) {
+      const res = await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setThumbnailErrorIds(prev => new Set(prev).add(id))
+        console.error('Thumbnail API error:', err.error || res.status)
+        return
+      }
+      // Poll up to 60s — Replicate typically takes 20-40s
+      for (let i = 0; i < 12; i++) {
         await new Promise(r => setTimeout(r, 5000))
         await fetchUploads()
         const updated = uploads.find(u => u.id === id)
-        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) break
+        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) return
       }
-    } catch {}
-    finally {
+      // Timed out — mark error so user knows to retry later
+      setThumbnailErrorIds(prev => new Set(prev).add(id))
+    } catch {
+      setThumbnailErrorIds(prev => new Set(prev).add(id))
+    } finally {
       setThumbnailGenIds(prev => { const next = new Set(prev); next.delete(id); return next })
     }
   }
@@ -872,8 +883,12 @@ export default function UploadsPage() {
                               <button
                                 onClick={() => handleGenerateThumbnail(upload.id)}
                                 disabled={thumbnailGenIds.has(upload.id)}
-                                title="Generate thumbnail from video"
-                                className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] transition-all border border-transparent hover:border-[var(--accent)]/20 disabled:opacity-40"
+                                title={thumbnailErrorIds.has(upload.id) ? 'Thumbnail failed — click to retry' : 'Regenerate thumbnail from video'}
+                                className={`p-1.5 rounded-lg transition-all border disabled:opacity-40 ${
+                                  thumbnailErrorIds.has(upload.id)
+                                    ? 'text-red-400 hover:bg-red-400/10 border-red-400/20 hover:border-red-400/40'
+                                    : 'text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] border-transparent hover:border-[var(--accent)]/20'
+                                }`}
                               >
                                 {thumbnailGenIds.has(upload.id)
                                   ? <Loader2 size={13} className="animate-spin" />
