@@ -607,8 +607,10 @@ export type TranscriptSegment = {
 export type VideoAnalysis = {
   // Core summary
   title?: string                          // short headline (5-8 words, noun-phrase)
+  key_win?: string                        // single most significant thing from this session
   summary: string
   summary_first_person?: string           // 2-3 sentences starting with "I"
+  emotional_arc?: string                  // how mood/energy shifted across the session
   rewrite: string | null
   categories: Array<{
     name: string
@@ -616,7 +618,11 @@ export type VideoAnalysis = {
   }>
   mood: string | null
   energy_level: 'high' | 'medium' | 'low' | null
-  reflections: string | null
+  reflections: {
+    observation: string
+    challenge: string
+    encouragement: string
+  } | string | null                       // string for backwards compat with v1.4 and earlier
 
   // Ideas & Creativity
   ideas: Array<{
@@ -636,7 +642,11 @@ export type VideoAnalysis = {
     project_type?: 'tech' | 'book' | 'creative' | 'business' | 'personal' | 'other'
     full_context?: string
   }>
-  action_items: string[]
+  action_items: Array<{
+    task: string
+    context: string | null
+    urgency: 'now' | 'soon' | 'someday'
+  } | string>                             // string for backwards compat with v1.4 and earlier
   decisions: Array<{
     decision: string
     reasoning: string | null
@@ -719,6 +729,8 @@ export type EntityType =
   | 'commitment'
   | 'skill'
   | 'blocker'
+  | 'insight'
+  | 'tool'
 
 export type Entity = {
   id: string

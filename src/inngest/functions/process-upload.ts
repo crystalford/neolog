@@ -778,14 +778,42 @@ export const processUpload = inngest.createFunction(
         return
       }
 
-      // Construct first-person body (fall back to third-person summary if new field absent)
-      let richBody = analysis.summary_first_person || analysis.summary || ''
+      // ── Build log entry body ──────────────────────────────────────────────
+      // Lead with key_win (the session pull-quote), then first-person summary
+      const bodyParts: string[] = []
+
+      if (analysis.key_win) {
+        bodyParts.push(`**${analysis.key_win}**`)
+      }
+
+      bodyParts.push(analysis.summary_first_person || analysis.summary || '')
+
+      if (analysis.emotional_arc) {
+        bodyParts.push(`_${analysis.emotional_arc}_`)
+      }
+
       if (analysis.mood || analysis.energy_level) {
-        richBody += `\n\nMood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`
+        bodyParts.push(`Mood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`)
       }
+
+      if (analysis.action_items?.length > 0) {
+        const items = analysis.action_items.map((a: any) => {
+          if (typeof a === 'string') return `- ${a}`
+          const urgencyTag = a.urgency && a.urgency !== 'someday' ? ` _(${a.urgency})_` : ''
+          return `- ${a.task}${urgencyTag}`
+        })
+        bodyParts.push(`**Action items:**\n${items.join('\n')}`)
+      }
+
+      if (analysis.lessons_learned?.length > 0) {
+        bodyParts.push(`**What I learned:**\n` + analysis.lessons_learned.map((l: string) => `- ${l}`).join('\n'))
+      }
+
       if (analysis.questions?.length > 0) {
-        richBody += `\n\n**Open Questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n')
+        bodyParts.push(`**Open questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n'))
       }
+
+      const richBody = bodyParts.filter(Boolean).join('\n\n')
 
       // Prefer AI-generated title; fall back to file name then date
       const aiTitle = analysis.title
@@ -806,10 +834,12 @@ export const processUpload = inngest.createFunction(
         thumbnail_url: thumbnailPath || (activeContext.upload as any).thumbnail_url,
         meta: {
           title: aiTitle || fileTitle,
+          key_win: analysis.key_win || null,
           model: analysisResult.modelUsed,
           categories: analysisResult.tags,
           mood: analysis.mood,
           energy: analysis.energy_level,
+          emotional_arc: analysis.emotional_arc || null,
           reflections: analysis.reflections,
           questions: analysis.questions
         }

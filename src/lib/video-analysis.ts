@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const ANALYSIS_PROMPT_VERSION = '1.4'
+export const ANALYSIS_PROMPT_VERSION = '1.5'
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited transcripts from {userName} — stream-of-consciousness recordings, voice memos, chat sessions, or text notes about {userName}'s life, work, ideas, and projects.
  
@@ -30,14 +30,20 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
  Analyze the transcript and return a JSON object with this EXACT structure:
  
  {
-   "analysis_version": "1.4",
+   "analysis_version": "1.5",
    "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles. No 'I' — use noun-phrase or imperative form (e.g. 'Building the Neolog clip pipeline', 'Planning the Super Bass album structure').",
+   "key_win": "Single most significant thing that happened, was figured out, or decided in this session. 1 punchy sentence. This is the pull-quote for the session. If nothing was truly won, use the most important topic covered. No 'I' — write as a noun-phrase or statement (e.g. 'Resolved the clip assembly ordering bug', 'Committed to hard-cuts-only editing approach').",
    "summary": "2-3 sentence summary of what was discussed, in third person about {userName}.",
    "summary_first_person": "2-3 sentences in first person starting with 'I'. What did I work on, figure out, or decide? (e.g. 'I spent this session working through the clip assembly pipeline and landed on a hard-cuts-only approach...')",
+   "emotional_arc": "How did the energy or emotional state shift across the session? 1 sentence capturing the trajectory, not just the endpoint. (e.g. 'Started scattered and avoidant, but worked through the friction and ended focused with a clear next step.', 'Consistently energized throughout — this was a high-output session.')",
    "categories": [{"name": "category", "confidence": 0.0-1.0}],
    "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",
    "energy_level": "high" | "medium" | "low",
-   "reflections": "A personalized, insightful response to {userName}. If the session is personal/emotional, provide a 'therapeutic' touch — validating, questioning, or encouraging. If it is business/productivity focused, provide a 'mentor' touch — strategic, challenging, or organizing. Speak directly to {userName}.",
+   "reflections": {
+     "observation": "What the AI noticed about this session — a pattern, contradiction, or insight that {userName} may not have explicitly stated. 2-3 sentences. Third person about {userName}.",
+     "challenge": "One specific question or reframe to push {userName}'s thinking forward. Should be slightly uncomfortable — the thing they're avoiding or haven't considered. Start with 'What if...' or 'Have you considered...' or a direct question.",
+     "encouragement": "One grounding, affirming statement that is specific to this session — not generic. Reference what they actually said or did. Direct address to {userName}."
+   },
    "rewrite": "A polished, first-person rewrite of everything {userName} said. Write exactly as if {userName} is speaking — same ideas, same sequence, authentic voice — but coherent, well-articulated prose with no rambling. This is what they meant to say. Write in first person ('I think...', 'I've been...', 'My plan is...'). Match the length of the original — don't summarize, rewrite.",
 
    "ideas": [
@@ -45,7 +51,7 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
    ],
    "questions": ["unanswered questions, wonderings, 'what if' moments — these are gold"],
    "recurring_themes": ["themes that come up multiple times in this recording"],
- 
+
    "projects": [
      {
        "name": "project name — use the most specific/canonical name mentioned (not 'the app' when a real name was used)",
@@ -56,7 +62,9 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
        "full_context": "Comprehensive 2-3 paragraph synthesis of EVERYTHING discussed about this project in this recording. Include technical decisions, plans, problems, ideas, breakthroughs, frustrations — capture the full discourse even if the project name was only mentioned once at the start and then discussed at length without repeating the name. Write it as a session journal entry for this project, in third person about {userName}."
      }
    ],
-   "action_items": ["concrete next steps mentioned"],
+   "action_items": [
+     {"task": "specific, concrete next step — actionable verb + what", "context": "why this matters or what triggered it — 1 sentence", "urgency": "now|soon|someday"}
+   ],
    "decisions": [
      {"decision": "what was decided", "reasoning": "why, if stated"}
    ],
@@ -316,7 +324,7 @@ export async function upsertEntities(
       entitiesToUpsert.push({
         type: 'project',
         name: p.name,
-        context: p.updates?.join('. ') || `Mentioned as ${p.status}`,
+        context: p.framing || p.updates?.join('. ') || `Mentioned as ${p.status}`,
         full_context: p.full_context || null,
         metadata: { status: p.status, project_type: p.project_type || 'other' },
       })
@@ -361,7 +369,7 @@ export async function upsertEntities(
     }
   }
 
-  // ── Core entity types (v1.3) ─────────────────────────────────────────────
+  // ── Core entity types ────────────────────────────────────────────────────
 
   if (analysis.decisions) {
     for (const d of analysis.decisions) {
@@ -384,6 +392,45 @@ export async function upsertEntities(
         type: 'value',
         name: v,
         context: v,
+      })
+    }
+  }
+
+  // Principles → stored as 'value' entities (explicitly articulated rules/frameworks)
+  if (analysis.principles) {
+    for (const p of analysis.principles) {
+      if (!p) continue
+      entitiesToUpsert.push({
+        type: 'value',
+        name: p,
+        context: p,
+        metadata: { source: 'principle' },
+      })
+    }
+  }
+
+  // Lessons learned → 'insight' entities (accumulate into a personal knowledge base)
+  if (analysis.lessons_learned) {
+    for (const lesson of analysis.lessons_learned) {
+      if (!lesson) continue
+      entitiesToUpsert.push({
+        type: 'insight',
+        name: lesson,
+        context: lesson,
+      })
+    }
+  }
+
+  // Tools mentioned → 'tool' entities (track usage context over time)
+  if (analysis.tools_mentioned) {
+    for (const t of analysis.tools_mentioned) {
+      const name = typeof t === 'object' ? t.name : t
+      const context = typeof t === 'object' ? t.context : t
+      if (!name) continue
+      entitiesToUpsert.push({
+        type: 'tool',
+        name,
+        context: context || name,
       })
     }
   }
