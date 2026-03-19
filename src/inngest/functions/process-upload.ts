@@ -27,7 +27,13 @@ async function plog(supabase: any, uploadId: string, step: string, status: strin
 }
 
 export const processUpload = inngest.createFunction(
-  { id: 'process-upload' },
+  {
+    id: 'process-upload',
+    concurrency: {
+      limit: 1,
+      key: 'event.data.user_id',  // one upload at a time per user
+    },
+  },
   { event: 'video-upload/process' },
   async ({ event, step }) => {
     const { video_upload_id, user_id } = event.data
