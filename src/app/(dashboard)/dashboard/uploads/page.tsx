@@ -109,6 +109,7 @@ export default function UploadsPage() {
   const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
   const [thumbnailGenIds, setThumbnailGenIds] = useState<Set<string>>(new Set())
   const [thumbnailErrorIds, setThumbnailErrorIds] = useState<Set<string>>(new Set())
+  const [retriggering, setRetriggering] = useState<'idle' | 'running' | 'done'>('idle')
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -531,6 +532,22 @@ export default function UploadsPage() {
     }
   }
 
+  const handleRetriggerThumbnails = async () => {
+    setRetriggering('running')
+    try {
+      const res = await fetch('/api/video-upload/retrigger-thumbnails', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setRetriggering('done')
+      } else {
+        alert(data.error || 'Failed to retrigger thumbnails')
+        setRetriggering('idle')
+      }
+    } catch {
+      setRetriggering('idle')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this upload and all its data?')) return
     const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
@@ -614,19 +631,34 @@ export default function UploadsPage() {
             All your videos and audio — drop files to upload, then view what was extracted.
           </p>
         </div>
-        <button
-          onClick={handleReanalyzeAll}
-          disabled={reanalyzeAllState === 'running'}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
-        >
-          {reanalyzeAllState === 'running' ? (
-            <><Loader2 size={13} className="animate-spin" /> Re-analyzing...</>
-          ) : reanalyzeAllState === 'done' ? (
-            <><Sparkles size={13} className="text-green-400" /> Queued</>
-          ) : (
-            <><Brain size={13} /> Re-analyze all</>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRetriggerThumbnails}
+            disabled={retriggering === 'running'}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
+          >
+            {retriggering === 'running' ? (
+              <><Loader2 size={13} className="animate-spin" /> Queuing...</>
+            ) : retriggering === 'done' ? (
+              <><Sparkles size={13} className="text-green-400" /> Queued</>
+            ) : (
+              <><ImageOff size={13} /> Fix all thumbnails</>
+            )}
+          </button>
+          <button
+            onClick={handleReanalyzeAll}
+            disabled={reanalyzeAllState === 'running'}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
+          >
+            {reanalyzeAllState === 'running' ? (
+              <><Loader2 size={13} className="animate-spin" /> Re-analyzing...</>
+            ) : reanalyzeAllState === 'done' ? (
+              <><Sparkles size={13} className="text-green-400" /> Queued</>
+            ) : (
+              <><Brain size={13} /> Re-analyze all</>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Control Bar */}
