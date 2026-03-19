@@ -606,7 +606,9 @@ export type TranscriptSegment = {
 
 export type VideoAnalysis = {
   // Core summary
+  title?: string                          // short headline (5-8 words, noun-phrase)
   summary: string
+  summary_first_person?: string           // 2-3 sentences starting with "I"
   rewrite: string | null
   categories: Array<{
     name: string
@@ -630,6 +632,9 @@ export type VideoAnalysis = {
     name: string
     status: 'active' | 'idea' | 'stalled' | 'completed' | 'mentioned'
     updates: string[]
+    framing?: string
+    project_type?: 'tech' | 'book' | 'creative' | 'business' | 'personal' | 'other'
+    full_context?: string
   }>
   action_items: string[]
   decisions: Array<{

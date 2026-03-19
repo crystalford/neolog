@@ -778,8 +778,8 @@ export const processUpload = inngest.createFunction(
         return
       }
 
-      // Construct rich body with summary, mood, and questions (3rd person)
-      let richBody = analysis.summary || ''
+      // Construct first-person body (fall back to third-person summary if new field absent)
+      let richBody = analysis.summary_first_person || analysis.summary || ''
       if (analysis.mood || analysis.energy_level) {
         richBody += `\n\nMood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`
       }
@@ -787,22 +787,27 @@ export const processUpload = inngest.createFunction(
         richBody += `\n\n**Open Questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n')
       }
 
+      // Prefer AI-generated title; fall back to file name then date
+      const aiTitle = analysis.title
+      const fileTitle = (() => {
+        const raw = (activeContext.upload as any).file_name || ''
+        const clean = raw.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim()
+        return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      })()
+
       await admin.from('log_entries').insert({
         user_id,
         entry_type: 'session',
-        title: (() => {
-          const raw = (activeContext.upload as any).file_name || ''
-          const clean = raw.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim()
-          return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        })(),
+        title: aiTitle || fileTitle,
         body: richBody,
         logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,
         is_public: true,
         thumbnail_url: thumbnailPath || (activeContext.upload as any).thumbnail_url,
         meta: {
+          title: aiTitle || fileTitle,
           model: analysisResult.modelUsed,
-          categories: analysisResult.tags, // Using curated tags
+          categories: analysisResult.tags,
           mood: analysis.mood,
           energy: analysis.energy_level,
           reflections: analysis.reflections,

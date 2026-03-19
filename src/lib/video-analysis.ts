@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const ANALYSIS_PROMPT_VERSION = '1.3'
+export const ANALYSIS_PROMPT_VERSION = '1.4'
 
 export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intelligence analyst for the Neolog platform. You analyze raw, unedited transcripts from {userName} — stream-of-consciousness recordings, voice memos, chat sessions, or text notes about {userName}'s life, work, ideas, and projects.
  
@@ -30,9 +30,10 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
  Analyze the transcript and return a JSON object with this EXACT structure:
  
  {
-   "analysis_version": "1.3",
-   "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles.",
-   "summary": "2-3 sentence summary of what was discussed",
+   "analysis_version": "1.4",
+   "title": "A tight, sophisticated title (5-8 words) that captures the narrative essence and psychological core of the session. Avoid generic titles. No 'I' — use noun-phrase or imperative form (e.g. 'Building the Neolog clip pipeline', 'Planning the Super Bass album structure').",
+   "summary": "2-3 sentence summary of what was discussed, in third person about {userName}.",
+   "summary_first_person": "2-3 sentences in first person starting with 'I'. What did I work on, figure out, or decide? (e.g. 'I spent this session working through the clip assembly pipeline and landed on a hard-cuts-only approach...')",
    "categories": [{"name": "category", "confidence": 0.0-1.0}],
    "mood": "overall emotional tone (energized, reflective, frustrated, excited, anxious, calm, scattered, focused, etc.)",
    "energy_level": "high" | "medium" | "low",
@@ -72,7 +73,7 @@ export const ANALYSIS_SYSTEM_PROMPT = `You are a comprehensive personal intellig
    "values_expressed": ["principles, beliefs, things that clearly matter to {userName}"],
  
    "people_mentioned": [
-     {"name": "name", "context": "how they came up", "relationship": "collaborator|friend|family|influence|acquaintance|other|null"}
+     {"name": "name", "context": "2-3 sentences of what was actually said about this person — what did {userName} discuss, think, or say about them? Capture the substance of the discussion, not just a description of who they are. Include why they came up and what was said in this specific recording.", "relationship": "collaborator|friend|family|influence|acquaintance|other|null"}
    ],
  
    "references": [
