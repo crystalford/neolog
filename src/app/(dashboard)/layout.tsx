@@ -11,7 +11,7 @@ import {
   DollarSign, Share2, Sparkles, Video, Boxes,
   Clock, List, CalendarDays, Inbox, BookUser,
   Film, Briefcase, ArrowUpRight, Trophy, Zap,
-  Brain, Cpu, Network, Radio, FolderOpen
+  Brain, Cpu, Network, Radio, FolderOpen, Mic
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { PublicationSwitcher } from '@/components/PublicationSwitcher'
@@ -236,6 +236,7 @@ export default function DashboardLayout({
   const secondaryNav = useMemo(() => [
     { href: '/dashboard/timeline',   icon: CalendarDays, label: 'Timeline',         section: 'INTELLIGENCE' },
     { href: '/dashboard/projects',   icon: FolderOpen,   label: 'Projects',         section: 'INTELLIGENCE' },
+    { href: '/dashboard/studio',     icon: Mic,          label: 'Studio',           section: 'INTELLIGENCE' },
     { href: '/dashboard/entities',   icon: Network,      label: 'Knowledge Graph',  section: 'INTELLIGENCE' },
     { href: '/dashboard/queue',      icon: Radio,        label: 'Post Queue',       section: 'INTELLIGENCE' },
     { href: '/dashboard/finances',   icon: DollarSign,   label: 'Finances',         section: 'INTELLIGENCE' },

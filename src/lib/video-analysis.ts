@@ -496,6 +496,92 @@ export async function upsertEntities(
   }
 }
 
+// ─── Voice profile extraction ─────────────────────────────────────────────────
+
+const VOICE_EXTRACTION_PROMPT = `You are analysing a raw spoken transcript to build a voice profile for a content creation system.
+The goal is to capture HOW this person talks so AI can later write scripts that sound verbatim like them — not polished, not generic.
+
+Return ONLY a JSON object with this structure:
+{
+  "signature_phrases": ["exact phrases they repeat — 'here's the thing', 'and look', 'the real issue is' etc"],
+  "sentence_rhythm": "1-sentence description: short punchy fragments? long rambling builds? mix?",
+  "humor_style": "how they use humor — dry, self-deprecating, absurdist, none, etc",
+  "argument_style": "do they lead with conclusion then support it? build slowly? use analogies?",
+  "rhetorical_moves": ["specific patterns — 'opens with a question', 'uses 'right?' as a check-in', 'restates point 3 ways'],
+  "energy_markers": ["words/phrases that carry their energy — 'absolutely', 'no question', 'honestly though'"],
+  "profanity": false,
+  "attitude": "1-sentence description of their overall stance/personality when talking",
+  "voice_summary": "2-sentence description of their voice that could guide a writer to replicate it"
+}
+
+Return ONLY the JSON. No markdown, no explanation.`
+
+export async function extractVoiceProfile(
+  transcript: string,
+  openaiKey: string | null,
+  anthropicKey: string | null,
+): Promise<Record<string, any> | null> {
+  if (!transcript || transcript.length < 200) return null
+
+  const userPrompt = `Analyse this transcript and extract the voice profile:\n\n${transcript.slice(0, 6000)}`
+
+  try {
+    let raw = ''
+
+    if (anthropicKey) {
+      const anthropic = new Anthropic({ apiKey: anthropicKey })
+      const msg = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: VOICE_EXTRACTION_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+        temperature: 0.2,
+      })
+      const t = msg.content.find(c => c.type === 'text')
+      if (t && t.type === 'text') raw = t.text
+    } else if (openaiKey) {
+      const openai = new OpenAI({ apiKey: openaiKey })
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'system', content: VOICE_EXTRACTION_PROMPT }, { role: 'user', content: userPrompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+      })
+      raw = completion.choices[0].message.content || ''
+    }
+
+    const cleaned = raw.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim()
+    return JSON.parse(cleaned)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Merge a new voice sample into an existing accumulated voice profile.
+ * Keeps arrays unique and capped, updates narrative fields with latest reading.
+ */
+export function mergeVoiceProfile(existing: Record<string, any> | null, fresh: Record<string, any>): Record<string, any> {
+  if (!existing) return { ...fresh, upload_count: 1, last_updated_at: new Date().toISOString() }
+
+  const mergeArr = (a: string[] = [], b: string[] = [], cap = 12) =>
+    [...new Set([...a, ...b])].slice(0, cap)
+
+  return {
+    signature_phrases: mergeArr(existing.signature_phrases, fresh.signature_phrases, 16),
+    sentence_rhythm: fresh.sentence_rhythm || existing.sentence_rhythm,
+    humor_style: fresh.humor_style || existing.humor_style,
+    argument_style: fresh.argument_style || existing.argument_style,
+    rhetorical_moves: mergeArr(existing.rhetorical_moves, fresh.rhetorical_moves),
+    energy_markers: mergeArr(existing.energy_markers, fresh.energy_markers),
+    profanity: fresh.profanity ?? existing.profanity ?? false,
+    attitude: fresh.attitude || existing.attitude,
+    voice_summary: fresh.voice_summary || existing.voice_summary,
+    upload_count: (existing.upload_count || 0) + 1,
+    last_updated_at: new Date().toISOString(),
+  }
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()

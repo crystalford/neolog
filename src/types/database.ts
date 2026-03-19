@@ -976,6 +976,31 @@ export type UserSynthesis = {
 
 // --- Word-level transcript ---
 
+// =============================================
+// CONTENT STUDIO TYPES
+// =============================================
+
+export type ContentDraftFormat = 'video_essay' | 'article' | 'thread'
+export type ContentDraftStatus = 'generating' | 'draft' | 'ready' | 'archived'
+
+export type ContentDraft = {
+  id: string
+  user_id: string
+  format: ContentDraftFormat
+  title: string
+  hook: string | null
+  body: string
+  word_count: number | null
+  estimated_duration_seconds: number | null
+  source_type: string | null   // 'strong_opinion' | 'idea' | 'key_win' | 'synthesis'
+  source_text: string | null
+  source_upload_ids: string[] | null
+  status: ContentDraftStatus
+  generation_model: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type TranscriptWord = {
   id: string
   video_upload_id: string

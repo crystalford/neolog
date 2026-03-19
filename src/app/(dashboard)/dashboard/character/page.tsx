@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Brain, Edit3, Save, X, Sparkles, Clock, Target, Users,
-  Lightbulb, Zap, BookOpen, TrendingUp, Hash, Link2,
+  Lightbulb, Zap, BookOpen, TrendingUp, Hash, Link2, Mic,
 } from 'lucide-react'
 
 // ─── Entity layer config ──────────────────────────────────────────────────────
@@ -145,6 +145,122 @@ function EntitySection({ layer, entities }: { layer: typeof ENTITY_LAYERS[number
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+// ─── Voice profile section ────────────────────────────────────────────────────
+
+function VoiceProfileSection({ voiceProfile, uploadCount }: { voiceProfile: any; uploadCount: number }) {
+  if (!voiceProfile) {
+    return (
+      <div className="rounded-xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)]/30 p-8 text-center">
+        <Mic size={24} className="mx-auto mb-3 text-[var(--text-tertiary)] opacity-30" />
+        <p className="text-sm text-[var(--text-tertiary)]">Voice profile building...</p>
+        <p className="text-xs text-[var(--text-tertiary)] opacity-60 mt-1 max-w-xs mx-auto">
+          After your first upload is processed, the system starts learning how you talk.
+          The more you upload, the more accurate it gets.
+        </p>
+      </div>
+    )
+  }
+
+  const sessions = voiceProfile.upload_count || 1
+
+  return (
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-5 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Mic size={13} className="text-[var(--accent)]" />
+        <h3 className="text-[11px] font-mono uppercase tracking-[0.15em] text-[var(--text-primary)]">
+          Voice Profile
+        </h3>
+        <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)]">
+          {sessions} session{sessions !== 1 ? 's' : ''} analysed
+        </span>
+      </div>
+
+      {/* Voice summary */}
+      {voiceProfile.voice_summary && (
+        <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic border-l-2 border-[var(--accent)]/30 pl-3">
+          "{voiceProfile.voice_summary}"
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Signature phrases */}
+        {voiceProfile.signature_phrases?.length > 0 && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
+              Signature phrases
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {voiceProfile.signature_phrases.map((phrase: string, i: number) => (
+                <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15">
+                  {phrase}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Energy markers */}
+        {voiceProfile.energy_markers?.length > 0 && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
+              Energy words
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {voiceProfile.energy_markers.map((word: string, i: number) => (
+                <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
+                  {word}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Row 2: attitude, rhythm, argument style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {[
+          { label: 'Attitude', value: voiceProfile.attitude },
+          { label: 'Sentence rhythm', value: voiceProfile.sentence_rhythm },
+          { label: 'Argument style', value: voiceProfile.argument_style },
+        ].filter(f => f.value).map(field => (
+          <div key={field.label} className="bg-[var(--bg-tertiary)]/40 rounded-lg p-3 border border-[var(--border-light)]">
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">
+              {field.label}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)] leading-snug">
+              {field.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Rhetorical moves */}
+      {voiceProfile.rhetorical_moves?.length > 0 && (
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
+            Rhetorical patterns
+          </p>
+          <ul className="space-y-1">
+            {voiceProfile.rhetorical_moves.map((move: string, i: number) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
+                <span className="text-[var(--accent)] mt-0.5 shrink-0">—</span>
+                {move}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[10px] text-[var(--text-tertiary)] opacity-50">
+        This profile feeds the Studio — scripts are written to sound like you, not like AI.
+      </p>
     </div>
   )
 }
@@ -342,6 +458,20 @@ export default function CharacterPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Voice profile ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Mic size={14} className="text-[var(--accent)]" />
+          <h2 className="text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+            Voice Profile
+          </h2>
+          <span className="text-[10px] text-[var(--text-tertiary)] opacity-50 ml-1">
+            — how the system knows your voice
+          </span>
+        </div>
+        <VoiceProfileSection voiceProfile={profile?.voice_profile} uploadCount={uploadCount} />
       </div>
 
       {/* ── Intelligence map ── */}
