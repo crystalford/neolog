@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
-import { runAnalysis, upsertEntities } from '@/lib/video-analysis'
+import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import Replicate from 'replicate'
 
@@ -27,7 +27,13 @@ async function plog(supabase: any, uploadId: string, step: string, status: strin
 }
 
 export const processUpload = inngest.createFunction(
-  { id: 'process-upload' },
+  {
+    id: 'process-upload',
+    concurrency: {
+      limit: 1,
+      key: 'event.data.user_id',  // one upload at a time per user
+    },
+  },
   { event: 'video-upload/process' },
   async ({ event, step }) => {
     const { video_upload_id, user_id } = event.data
@@ -697,7 +703,81 @@ export const processUpload = inngest.createFunction(
       await plog(admin, video_upload_id, 'upsert-entities', 'done', 'Entities written to knowledge graph')
     })
 
-    // ── Step 4a-ii: Auto-update living documents for any projects mentioned ──
+    // ── Step 4a-ii: Extract voice profile and accumulate on user's profile ──
+    await step.run('extract-voice-profile', async () => {
+      const transcript = transcription.text
+      if (!transcript || transcript.length < 300) return
+
+      const freshProfile = await extractVoiceProfile(
+        transcript,
+        activeContext.openaiKey,
+        activeContext.anthropicKey,
+      )
+      if (!freshProfile) return
+
+      const { data: profileRow } = await admin
+        .from('profiles')
+        .select('voice_profile')
+        .eq('id', user_id)
+        .single()
+
+      const merged = mergeVoiceProfile(
+        (profileRow?.voice_profile as Record<string, any> | null) ?? null,
+        freshProfile,
+      )
+
+      await admin.from('profiles').update({ voice_profile: merged }).eq('id', user_id)
+      await plog(admin, video_upload_id, 'extract-voice-profile', 'done',
+        `Voice profile updated (${merged.upload_count} sessions)`)
+    })
+
+    // ── Step 4a-iii: Fire develop-idea for strong content seeds ──
+    // Each strong_opinion and high-confidence idea gets expanded into a
+    // full verbatim script in the background by the develop-idea function.
+    await step.run('trigger-content-development', async () => {
+      const analysis = analysisResult.analysis
+      const seeds: Array<{ text: string; type: string }> = []
+
+      // Strong opinions are essay-ready by definition
+      for (const opinion of (analysis.strong_opinions || []).slice(0, 3)) {
+        if (opinion) seeds.push({ text: opinion, type: 'strong_opinion' })
+      }
+
+      // High-confidence ideas (0.88+)
+      for (const idea of (analysis.ideas || [])) {
+        if (typeof idea === 'object' && idea.confidence >= 0.88 && idea.text) {
+          seeds.push({ text: idea.text, type: 'idea' })
+        }
+      }
+
+      // key_win if it's substantive (more than just a task done)
+      if (analysis.key_win && analysis.key_win.length > 40) {
+        seeds.push({ text: analysis.key_win, type: 'key_win' })
+      }
+
+      if (seeds.length === 0) return
+
+      const { inngest: ig } = await import('@/inngest/client')
+      await Promise.all(
+        seeds.map(seed =>
+          ig.send({
+            name: 'neolog/develop-idea',
+            data: {
+              user_id,
+              source_text: seed.text,
+              source_type: seed.type,
+              source_upload_ids: [video_upload_id],
+              format: 'video_essay',
+            },
+          })
+        )
+      )
+
+      await plog(admin, video_upload_id, 'trigger-content-development', 'done',
+        `Triggered ${seeds.length} content development job(s)`)
+    })
+
+    // ── Step 4a-iv: Auto-update living documents for any projects mentioned ──
     // Fire synthesize-project for each project entity found in this recording.
     // This keeps project docs current without requiring manual "Regenerate" clicks.
     if (analysisResult.analysis?.projects?.length > 0) {
@@ -778,33 +858,68 @@ export const processUpload = inngest.createFunction(
         return
       }
 
-      // Construct rich body with summary, mood, and questions (3rd person)
-      let richBody = analysis.summary || ''
+      // ── Build log entry body ──────────────────────────────────────────────
+      // Lead with key_win (the session pull-quote), then first-person summary
+      const bodyParts: string[] = []
+
+      if (analysis.key_win) {
+        bodyParts.push(`**${analysis.key_win}**`)
+      }
+
+      bodyParts.push(analysis.summary_first_person || analysis.summary || '')
+
+      if (analysis.emotional_arc) {
+        bodyParts.push(`_${analysis.emotional_arc}_`)
+      }
+
       if (analysis.mood || analysis.energy_level) {
-        richBody += `\n\nMood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`
+        bodyParts.push(`Mood: ${analysis.mood || 'N/A'} | Energy: ${analysis.energy_level || 'N/A'}`)
       }
+
+      if (analysis.action_items?.length > 0) {
+        const items = analysis.action_items.map((a: any) => {
+          if (typeof a === 'string') return `- ${a}`
+          const urgencyTag = a.urgency && a.urgency !== 'someday' ? ` _(${a.urgency})_` : ''
+          return `- ${a.task}${urgencyTag}`
+        })
+        bodyParts.push(`**Action items:**\n${items.join('\n')}`)
+      }
+
+      if (analysis.lessons_learned?.length > 0) {
+        bodyParts.push(`**What I learned:**\n` + analysis.lessons_learned.map((l: string) => `- ${l}`).join('\n'))
+      }
+
       if (analysis.questions?.length > 0) {
-        richBody += `\n\n**Open Questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n')
+        bodyParts.push(`**Open questions:**\n` + analysis.questions.map((q: string) => `- ${q}`).join('\n'))
       }
+
+      const richBody = bodyParts.filter(Boolean).join('\n\n')
+
+      // Prefer AI-generated title; fall back to file name then date
+      const aiTitle = analysis.title
+      const fileTitle = (() => {
+        const raw = (activeContext.upload as any).file_name || ''
+        const clean = raw.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim()
+        return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      })()
 
       await admin.from('log_entries').insert({
         user_id,
         entry_type: 'session',
-        title: (() => {
-          const raw = (activeContext.upload as any).file_name || ''
-          const clean = raw.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ').trim()
-          return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        })(),
+        title: aiTitle || fileTitle,
         body: richBody,
         logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,
         is_public: true,
         thumbnail_url: thumbnailPath || (activeContext.upload as any).thumbnail_url,
         meta: {
+          title: aiTitle || fileTitle,
+          key_win: analysis.key_win || null,
           model: analysisResult.modelUsed,
-          categories: analysisResult.tags, // Using curated tags
+          categories: analysisResult.tags,
           mood: analysis.mood,
           energy: analysis.energy_level,
+          emotional_arc: analysis.emotional_arc || null,
           reflections: analysis.reflections,
           questions: analysis.questions
         }

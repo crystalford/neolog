@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
@@ -43,7 +43,10 @@ function getRecordedDate(upload: VideoUpload): Date {
 export default function TimelineDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const seekTo = searchParams ? Number(searchParams.get('t') ?? 0) : 0
   const supabase = createClient()
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null)
 
   const [upload, setUpload] = useState<VideoUpload | null>(null)
   const [mentions, setMentions] = useState<EntityMentionRow[]>([])
@@ -198,13 +201,25 @@ export default function TimelineDetailPage() {
           {isAudio ? (
             <div className="flex items-center gap-3 px-5 py-4">
               <Volume2 size={18} className="text-[var(--accent)] flex-shrink-0" />
-              <audio controls src={videoUrl} className="w-full h-8 accent-[var(--accent)]" />
+              <audio
+                ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                controls
+                src={videoUrl}
+                className="w-full h-8 accent-[var(--accent)]"
+                onLoadedMetadata={() => {
+                  if (seekTo > 0 && mediaRef.current) mediaRef.current.currentTime = seekTo
+                }}
+              />
             </div>
           ) : (
             <video
+              ref={mediaRef as React.RefObject<HTMLVideoElement>}
               controls
               src={videoUrl}
               className="w-full max-h-[420px] object-contain"
+              onLoadedMetadata={() => {
+                if (seekTo > 0 && mediaRef.current) mediaRef.current.currentTime = seekTo
+              }}
               onError={(e) => {
                 const code = (e.target as HTMLVideoElement).error?.code
                 const msgs: Record<number, string> = {
@@ -356,7 +371,9 @@ export default function TimelineDetailPage() {
                       m.entities && (
                         <Link
                           key={i}
-                          href={`/dashboard/entities`}
+                          href={m.entities.type === 'project'
+                              ? `/dashboard/projects/${m.entities.slug}`
+                              : `/dashboard/brain`}
                           className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-colors"
                         >
                           {m.entities.name}

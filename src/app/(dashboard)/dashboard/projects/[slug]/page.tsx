@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   RefreshCw, CheckSquare, Square, ChevronDown, ChevronUp,
   ArrowLeft, Code2, BookOpen, Palette, Briefcase, User, HelpCircle,
-  ExternalLink, Clock, Download, GitBranch, CheckCircle2, XCircle, ArrowRightLeft
+  ExternalLink, Clock, Download, GitBranch, CheckCircle2, XCircle, ArrowRightLeft,
+  Sparkles, Plus
 } from 'lucide-react'
 import type {
   ProjectDocument, ProjectDocumentType,
@@ -52,6 +53,8 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
   const [manualNotes, setManualNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [delta, setDelta] = useState<any | null>(null)
+  const [deltaOpen, setDeltaOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async () => {
@@ -61,6 +64,13 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
       setData(d)
       setProjectType((d.document?.project_type as ProjectDocumentType) || d.entity.metadata?.project_type || 'tech')
       setManualNotes(d.document?.manual_notes || '')
+      // Load delta (best-effort, may 404 if no history yet)
+      if (d.document) {
+        fetch(`/api/project-documents/${slug}/delta`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.has_changes) setDelta(d) })
+          .catch(() => {})
+      }
     }
     setLoading(false)
   }, [slug])
@@ -380,6 +390,72 @@ export default function ProjectDocPage({ params }: { params: { slug: string } })
                 ))}
               </div>
             </Section>
+          )}
+
+          {/* Delta: what changed since last synthesis */}
+          {delta && (
+            <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04] overflow-hidden">
+              <button
+                onClick={() => setDeltaOpen(o => !o)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles size={12} className="text-[var(--accent)]" />
+                  <span className="text-[11px] font-mono uppercase tracking-widest text-[var(--accent)]">
+                    What changed — {delta.changes.length} update{delta.changes.length !== 1 ? 's' : ''} since last synthesis
+                  </span>
+                </div>
+                {deltaOpen ? <ChevronUp size={12} className="text-[var(--accent)]" /> : <ChevronDown size={12} className="text-[var(--accent)]" />}
+              </button>
+              {deltaOpen && (
+                <div className="px-5 pb-5 space-y-2 border-t border-[var(--accent)]/10 pt-4">
+                  {delta.changes.map((c: any, i: number) => {
+                    if (c.type === 'new_decision') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <Plus size={11} className="text-[var(--accent)] mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Decision</span>{c.decision.decision}</span>
+                      </div>
+                    )
+                    if (c.type === 'decision_status') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <ArrowRightLeft size={11} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Decision</span>{c.decision.decision} <span className="font-mono text-[10px] text-[var(--text-tertiary)]">{c.prev_status} → {c.decision.status}</span></span>
+                      </div>
+                    )
+                    if (c.type === 'new_action_item') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <Plus size={11} className="text-[var(--accent)] mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Action</span>{c.item.item}</span>
+                      </div>
+                    )
+                    if (c.type === 'action_item_done') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <CheckCircle2 size={11} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Done</span>{c.item.item}</span>
+                      </div>
+                    )
+                    if (c.type === 'new_roadmap_item') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <Plus size={11} className="text-[var(--accent)] mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Roadmap</span>{c.item.item}</span>
+                      </div>
+                    )
+                    if (c.type === 'roadmap_status') return (
+                      <div key={i} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                        <ArrowRightLeft size={11} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+                        <span><span className="text-[var(--text-tertiary)] font-mono uppercase text-[9px] mr-1.5">Roadmap</span>{c.item.item} <span className="font-mono text-[10px] text-[var(--text-tertiary)]">{c.prev_status} → {c.item.status}</span></span>
+                      </div>
+                    )
+                    return null
+                  })}
+                  {delta.snapshot_date && (
+                    <p className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 pt-2">
+                      vs. synthesis on {formatDate(delta.snapshot_date)} ({delta.snapshot_mention_count} session{delta.snapshot_mention_count !== 1 ? 's' : ''})
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Synthesis meta */}

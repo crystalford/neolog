@@ -606,7 +606,11 @@ export type TranscriptSegment = {
 
 export type VideoAnalysis = {
   // Core summary
+  title?: string                          // short headline (5-8 words, noun-phrase)
+  key_win?: string                        // single most significant thing from this session
   summary: string
+  summary_first_person?: string           // 2-3 sentences starting with "I"
+  emotional_arc?: string                  // how mood/energy shifted across the session
   rewrite: string | null
   categories: Array<{
     name: string
@@ -614,7 +618,11 @@ export type VideoAnalysis = {
   }>
   mood: string | null
   energy_level: 'high' | 'medium' | 'low' | null
-  reflections: string | null
+  reflections: {
+    observation: string
+    challenge: string
+    encouragement: string
+  } | string | null                       // string for backwards compat with v1.4 and earlier
 
   // Ideas & Creativity
   ideas: Array<{
@@ -630,8 +638,15 @@ export type VideoAnalysis = {
     name: string
     status: 'active' | 'idea' | 'stalled' | 'completed' | 'mentioned'
     updates: string[]
+    framing?: string
+    project_type?: 'tech' | 'book' | 'creative' | 'business' | 'personal' | 'other'
+    full_context?: string
   }>
-  action_items: string[]
+  action_items: Array<{
+    task: string
+    context: string | null
+    urgency: 'now' | 'soon' | 'someday'
+  } | string>                             // string for backwards compat with v1.4 and earlier
   decisions: Array<{
     decision: string
     reasoning: string | null
@@ -714,6 +729,8 @@ export type EntityType =
   | 'commitment'
   | 'skill'
   | 'blocker'
+  | 'insight'
+  | 'tool'
 
 export type Entity = {
   id: string
@@ -770,6 +787,14 @@ export type ProjectDocumentRoadmapItem = {
   status: 'planned' | 'in_progress' | 'done'
 }
 
+export type ProjectDocumentSnapshot = {
+  synthesized_at: string
+  mention_count: number
+  decisions_log: ProjectDocumentDecision[]
+  action_items: ProjectDocumentActionItem[]
+  roadmap: ProjectDocumentRoadmapItem[]
+}
+
 export type ProjectDocument = {
   id: string
   user_id: string
@@ -787,6 +812,9 @@ export type ProjectDocument = {
 
   // User-editable
   manual_notes: string | null
+
+  // Synthesis history (rolling last-10 snapshots for delta view)
+  synthesis_history: ProjectDocumentSnapshot[]
 
   // Meta
   last_synthesized_at: string | null
@@ -947,6 +975,31 @@ export type UserSynthesis = {
 }
 
 // --- Word-level transcript ---
+
+// =============================================
+// CONTENT STUDIO TYPES
+// =============================================
+
+export type ContentDraftFormat = 'video_essay' | 'article' | 'thread'
+export type ContentDraftStatus = 'generating' | 'draft' | 'ready' | 'archived'
+
+export type ContentDraft = {
+  id: string
+  user_id: string
+  format: ContentDraftFormat
+  title: string
+  hook: string | null
+  body: string
+  word_count: number | null
+  estimated_duration_seconds: number | null
+  source_type: string | null   // 'strong_opinion' | 'idea' | 'key_win' | 'synthesis'
+  source_text: string | null
+  source_upload_ids: string[] | null
+  status: ContentDraftStatus
+  generation_model: string | null
+  created_at: string
+  updated_at: string
+}
 
 export type TranscriptWord = {
   id: string
