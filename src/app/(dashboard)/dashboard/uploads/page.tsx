@@ -391,7 +391,9 @@ export default function UploadsPage() {
           } else if (res.status === 409) {
             // Duplicate file
             const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))
-            const proceed = confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
+            // If the previous attempt errored or got stuck, silently re-upload without asking
+            const autoForce = errData.existing_status === 'error' || errData.existing_status === 'uploaded'
+            const proceed = autoForce || confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
             if (proceed) {
               // Re-POST with force flag to bypass duplicate check
               const res2 = await fetch('/api/video-upload', {
