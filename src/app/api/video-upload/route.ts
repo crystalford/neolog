@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           duplicate: true,
           existing_id: existing.id,
+          existing_status: existing.status,
           message: `"${file_name}" was already uploaded (status: ${existing.status}). Upload it again?`,
         }, { status: 409 })
       }
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '200')
     const offset = parseInt(searchParams.get('offset') || '0')
 
     let query = supabase
