@@ -30,8 +30,21 @@ export const processUpload = inngest.createFunction(
   {
     id: 'process-upload',
     concurrency: {
-      limit: 1,
-      key: 'event.data.user_id',  // one upload at a time per user
+      limit: 2,
+      key: 'event.data.user_id',  // two uploads at a time per user
+    },
+    onFailure: async ({ event, error }) => {
+      // When Inngest gives up after all retries, mark the upload as error
+      // so the UI shows the Retry button instead of leaving it stuck at 'transcribing'
+      const admin = createAdminClient()
+      if (!admin) return
+      const { video_upload_id } = event.data.event.data
+      if (!video_upload_id) return
+      await admin.from('video_uploads').update({
+        status: 'error',
+        error_message: `Processing failed: ${error.message}`,
+        updated_at: new Date().toISOString(),
+      }).eq('id', video_upload_id)
     },
   },
   { event: 'video-upload/process' },

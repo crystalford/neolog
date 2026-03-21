@@ -941,18 +941,31 @@ export default function UploadsPage() {
                             </button>
                           </>
                         ) : upload.status === 'error' ? (
-                           <button 
+                           <button
                               onClick={() => handleReprocess(upload.id)}
                               disabled={processingIds.has(upload.id)}
                               className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase bg-red-400/10 text-red-500 hover:bg-red-400/20 transition-all border border-red-400/20"
                            >
                               {processingIds.has(upload.id) ? 'Retrying...' : 'Retry'}
                            </button>
-                        ) : (
-                          <div className="flex-1 py-1.5 text-center text-[10px] font-mono text-[var(--text-tertiary)] italic">
-                            Processing...
-                          </div>
-                        )}
+                        ) : (() => {
+                          const stuckMins = (Date.now() - new Date(upload.updated_at).getTime()) / 60000
+                          const isStuck = stuckMins > 10 && ['transcribing', 'analyzing', 'uploaded'].includes(upload.status)
+                          return isStuck ? (
+                            <button
+                              onClick={() => handleReprocess(upload.id)}
+                              disabled={processingIds.has(upload.id)}
+                              title={`Stuck for ${Math.round(stuckMins)}m — click to reset and retry`}
+                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20 transition-all border border-yellow-400/20"
+                            >
+                              {processingIds.has(upload.id) ? 'Retrying...' : 'Stuck — Retry'}
+                            </button>
+                          ) : (
+                            <div className="flex-1 py-1.5 text-center text-[10px] font-mono text-[var(--text-tertiary)] italic">
+                              Processing...
+                            </div>
+                          )
+                        })()}
                         <button 
                           onClick={() => handleDelete(upload.id)}
                           className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-red-400/10 hover:text-red-400 transition-all border border-transparent hover:border-red-400/20"
