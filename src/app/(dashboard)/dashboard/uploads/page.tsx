@@ -904,6 +904,12 @@ export default function UploadsPage() {
                         )}
                      </div>
 
+                     {upload.status === 'error' && upload.error_message && (
+                       <p className="text-[10px] text-red-400/80 mb-3 leading-relaxed line-clamp-2" title={upload.error_message}>
+                         {upload.error_message}
+                       </p>
+                     )}
+
                      <div className="flex items-center gap-2">
                         {upload.status === 'processed' ? (
                           <>
