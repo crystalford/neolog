@@ -40,9 +40,20 @@ export const processUpload = inngest.createFunction(
       if (!admin) return
       const { video_upload_id } = event.data.event.data
       if (!video_upload_id) return
+
+      // Surface readable error — strip raw JSON blobs from API errors
+      let msg = error.message || 'Processing failed'
+      if (msg.includes('credit balance is too low')) {
+        msg = 'AI API credit balance too low — top up at console.anthropic.com or platform.openai.com'
+      } else if (msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
+        msg = 'Invalid AI API key — update it in Settings → API Keys'
+      } else if (msg.length > 200) {
+        msg = msg.slice(0, 200) + '…'
+      }
+
       await admin.from('video_uploads').update({
         status: 'error',
-        error_message: `Processing failed: ${error.message}`,
+        error_message: msg,
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
     },
