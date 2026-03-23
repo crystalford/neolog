@@ -117,6 +117,8 @@ export default function UploadsPage() {
   const [sortBy, setSortBy] = useState<'date' | 'size' | 'name'>('date')
   const activeUploadsRef = useRef<ActiveUpload[]>([])
   activeUploadsRef.current = activeUploads
+  const uploadsRef = useRef<UploadListItem[]>([])
+  uploadsRef.current = uploads
 
   const fetchUploads = useCallback(async () => {
     try {
@@ -502,10 +504,12 @@ export default function UploadsPage() {
         return
       }
       // Poll up to 60s — Replicate typically takes 20-40s
+      // Use uploadsRef.current (not uploads) to avoid stale closure — state updates
+      // after fetchUploads() won't be visible in the captured `uploads` variable.
       for (let i = 0; i < 12; i++) {
         await new Promise(r => setTimeout(r, 5000))
         await fetchUploads()
-        const updated = uploads.find(u => u.id === id)
+        const updated = uploadsRef.current.find(u => u.id === id)
         if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) return
       }
       // Timed out — mark error so user knows to retry later
