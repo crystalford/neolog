@@ -89,7 +89,7 @@ export const generateThumbnail = inngest.createFunction(
           input: {
             task: 'extract_frames_from_input',
             input_file: inputSource.url,
-            fps: 0.5, // fewer frames = faster + less likely to timeout
+            fps: 1, // fewer frames = faster + less likely to timeout
           },
         }) as unknown
 
@@ -111,15 +111,13 @@ export const generateThumbnail = inngest.createFunction(
       }
     })
 
-    // ── Step 4: If direct extraction failed AND we used original, transcode first ──
+    // ── Step 4: Inline transcode from original → extract frames (last resort) ──
+    // Always attempt this if direct extraction returned nothing — even if we already
+    // tried the stored H.264 playback file, it may not actually exist in storage
+    // (silent upload failure). A fresh transcode from the original is the final safety net.
     const frameUrl = directFrameUrl ?? await step.run('transcode-then-extract', async () => {
-      if (inputSource.source === 'h264_playback') {
-        // Already used H.264 — if that failed, nothing more we can do
-        await plog(admin, video_upload_id, 'transcode-then-extract', 'skipped', 'Already tried H.264 source')
-        return null
-      }
-
-      await plog(admin, video_upload_id, 'transcode-then-extract', 'info', 'Transcoding HEVC → H.264 then extracting')
+      await plog(admin, video_upload_id, 'transcode-then-extract', 'info',
+        `Inline transcode fallback (previous source: ${inputSource.source})`)
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
@@ -141,7 +139,7 @@ export const generateThumbnail = inngest.createFunction(
         if (!mp4Url) return null
 
         const framesOutput = await replicate.run('fofr/toolkit', {
-          input: { task: 'extract_frames_from_input', input_file: mp4Url, fps: 0.5 },
+          input: { task: 'extract_frames_from_input', input_file: mp4Url, fps: 1 },
         }) as unknown
 
         const frames = Array.isArray(framesOutput) ? framesOutput : (framesOutput ? [framesOutput] : [])

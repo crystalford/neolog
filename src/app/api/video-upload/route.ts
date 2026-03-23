@@ -101,12 +101,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: finalErrorMessage, details: dbError }, { status: 500 })
     }
 
-    // Trigger Inngest processing automatically on upload
+    // Trigger Inngest processing + independent thumbnail extraction on upload
     try {
-      await inngest.send({
-        name: 'video-upload/process',
-        data: { video_upload_id: record.id, user_id: session.user.id },
-      })
+      await inngest.send([
+        {
+          name: 'video-upload/process',
+          data: { video_upload_id: record.id, user_id: session.user.id },
+        },
+        // Fire thumbnail extraction as a separate job so it retries independently
+        // of the main pipeline. Two chances: here + inline in process-upload.
+        ...(mime_type.startsWith('video/') ? [{
+          name: 'video-upload/generate-thumbnail' as const,
+          data: { video_upload_id: record.id, user_id: session.user.id },
+        }] : []),
+      ])
     } catch (inngestError) {
       console.error('Inngest event failed:', inngestError)
     }

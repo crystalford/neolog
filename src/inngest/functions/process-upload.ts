@@ -40,9 +40,20 @@ export const processUpload = inngest.createFunction(
       if (!admin) return
       const { video_upload_id } = event.data.event.data
       if (!video_upload_id) return
+
+      // Surface readable error — strip raw JSON blobs from API errors
+      let msg = error.message || 'Processing failed'
+      if (msg.includes('credit balance is too low')) {
+        msg = 'AI API credit balance too low — top up at console.anthropic.com or platform.openai.com'
+      } else if (msg.includes('invalid_api_key') || msg.includes('Incorrect API key')) {
+        msg = 'Invalid AI API key — update it in Settings → API Keys'
+      } else if (msg.length > 200) {
+        msg = msg.slice(0, 200) + '…'
+      }
+
       await admin.from('video_uploads').update({
         status: 'error',
-        error_message: `Processing failed: ${error.message}`,
+        error_message: msg,
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
     },
@@ -416,11 +427,16 @@ export const processUpload = inngest.createFunction(
         const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
         const path = `${user_id}/playback/${video_upload_id}.mp4`
 
-        await admin.storage.from('videos').upload(path, mp4Buf, {
+        const { error: uploadErr } = await admin.storage.from('videos').upload(path, mp4Buf, {
           contentType: 'video/mp4',
           upsert: true,
           cacheControl: '31536000',
         })
+
+        if (uploadErr) {
+          await plog(admin, video_upload_id, 'transcode-playback', 'error', `Supabase upload failed: ${uploadErr.message}`)
+          return null
+        }
 
         await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
         await plog(admin, video_upload_id, 'transcode-playback', 'done', `H.264 stored at ${path}`)
@@ -448,7 +464,7 @@ export const processUpload = inngest.createFunction(
       const extractFrameFromUrl = async (inputUrl: string, label: string): Promise<string | null> => {
         try {
           const output = await replicate.run('fofr/toolkit', {
-            input: { task: 'extract_frames_from_input', input_file: inputUrl, fps: 0.5 },
+            input: { task: 'extract_frames_from_input', input_file: inputUrl, fps: 1 },
           }) as any
 
           await plog(admin, video_upload_id, 'extract-thumbnail', 'info',
