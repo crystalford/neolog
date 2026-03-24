@@ -74,21 +74,20 @@ export const generateThumbnail = inngest.createFunction(
 
       // Fall back to original file — retry a few times since Supabase Storage may
       // have slight propagation delay after TUS upload completes.
+      let lastError: any = null
       for (let attempt = 1; attempt <= 4; attempt++) {
         if (attempt > 1) await new Promise(r => setTimeout(r, attempt * 2000))
         const { data, error } = await admin.storage
           .from('videos')
           .createSignedUrl(upload.storage_path, 7200)
         if (data?.signedUrl) {
-          await plog(admin, video_upload_id, 'resolve-input', 'info',
-            `Using original file (attempt ${attempt}): ${upload.storage_path}`)
           return { url: data.signedUrl, source: 'original' }
         }
-        await plog(admin, video_upload_id, 'resolve-input', 'warn',
-          `Sign attempt ${attempt} failed — path: ${upload.storage_path} | error: ${JSON.stringify(error)}`)
+        lastError = error
+        console.error(`[generate-thumbnail] resolve-input attempt ${attempt} failed — path: ${upload.storage_path} | error:`, JSON.stringify(error))
       }
 
-      throw new Error(`Could not sign storage URL after 4 attempts — path: ${upload.storage_path}`)
+      throw new Error(`Could not sign storage URL — path: ${upload.storage_path} | supabase_error: ${JSON.stringify(lastError)}`)
     })
 
     // ── Step 3: Extract frames from resolved source ──
