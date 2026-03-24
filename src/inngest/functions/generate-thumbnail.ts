@@ -10,13 +10,15 @@ function extractUrl(output: unknown): string | null {
 }
 
 async function plog(admin: any, uploadId: string, step: string, status: string, message?: string) {
-  await admin.from('processing_logs').insert({
-    video_upload_id: uploadId,
-    step: `thumb:${step}`,
-    status,
-    message: message?.slice(0, 1000),
-    created_at: new Date().toISOString(),
-  }).catch(() => {/* non-fatal */})
+  try {
+    await admin.from('processing_logs').insert({
+      video_upload_id: uploadId,
+      step: `thumb:${step}`,
+      status,
+      message: message?.slice(0, 1000),
+      created_at: new Date().toISOString(),
+    })
+  } catch { /* non-fatal */ }
 }
 
 /**

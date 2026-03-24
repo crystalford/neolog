@@ -17,13 +17,15 @@ function extractReplicateUrl(output: unknown): string | null {
 // Helper for logging to processing_logs table
 async function plog(supabase: any, uploadId: string, step: string, status: string, message?: string) {
   if (!supabase) return
-  await supabase.from('processing_logs').insert({
-    video_upload_id: uploadId,
-    step,
-    status,
-    message,
-    created_at: new Date().toISOString()
-  })
+  try {
+    await supabase.from('processing_logs').insert({
+      video_upload_id: uploadId,
+      step,
+      status,
+      message,
+      created_at: new Date().toISOString()
+    })
+  } catch { /* non-fatal */ }
 }
 
 export const processUpload = inngest.createFunction(
