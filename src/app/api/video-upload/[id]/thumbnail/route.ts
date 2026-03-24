@@ -1,33 +1,27 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { inngest } from '@/inngest/client'
 
-export async function POST(
-  _req: NextRequest,
+// PATCH: Save a thumbnail captured client-side directly to DB
+export async function PATCH(
+  req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id } = params
-
-  // Verify ownership
-  const { data: upload, error } = await supabase
-    .from('video_uploads')
-    .select('id, mime_type')
-    .eq('id', id)
-    .eq('user_id', session.user.id)
-    .single()
-
-  if (error || !upload) {
-    return NextResponse.json({ error: 'Upload not found' }, { status: 404 })
+  const body = await req.json().catch(() => ({}))
+  const { thumbnail_url } = body
+  if (!thumbnail_url || typeof thumbnail_url !== 'string') {
+    return NextResponse.json({ error: 'thumbnail_url required' }, { status: 400 })
   }
 
-  await inngest.send({
-    name: 'video-upload/generate-thumbnail',
-    data: { video_upload_id: id, user_id: session.user.id },
-  })
+  const { error } = await supabase
+    .from('video_uploads')
+    .update({ thumbnail_url, updated_at: new Date().toISOString() })
+    .eq('id', params.id)
+    .eq('user_id', session.user.id)
 
-  return NextResponse.json({ status: 'queued' })
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
