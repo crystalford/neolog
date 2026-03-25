@@ -81,6 +81,46 @@ async function captureVideoThumbnail(file: File): Promise<string> {
   return `data:image/svg+xml;base64,${btoa(svg)}`
 }
 
+// Capture a thumbnail from a remote video URL (e.g. signed Supabase URL).
+// Requires CORS headers on the video URL for canvas access.
+// Returns null if the codec is unsupported or the frame is black.
+async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    let resolved = false
+    const done = (val: string | null) => {
+      if (resolved) return
+      resolved = true
+      resolve(val)
+    }
+    const timeout = setTimeout(() => done(null), 20000)
+    video.muted = true
+    video.playsInline = true
+    video.crossOrigin = 'anonymous'
+    video.preload = 'metadata'
+    video.onerror = () => { clearTimeout(timeout); done(null) }
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, (video.duration || 10) * 0.05)
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const w = Math.min(video.videoWidth || 640, 640)
+        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return done(null)
+        ctx.drawImage(video, 0, 0, w, h)
+        const imgData = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50))
+        const allBlack = imgData.data.every((v, i) => i % 4 === 3 || v < 10)
+        done(allBlack ? null : canvas.toDataURL('image/jpeg', 0.85))
+      } catch { done(null) }
+    }
+    video.src = videoUrl
+  })
+}
+
 function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
   const ref = useRef<HTMLVideoElement>(null)
   return (
@@ -496,25 +536,27 @@ export default function UploadsPage() {
     setThumbnailErrorIds(prev => { const next = new Set(prev); next.delete(id); return next })
     setThumbnailGenIds(prev => new Set(prev).add(id))
     try {
-      const res = await fetch(`/api/video-upload/${id}/thumbnail`, { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        setThumbnailErrorIds(prev => new Set(prev).add(id))
-        console.error('Thumbnail API error:', err.error || res.status)
-        return
-      }
-      // Poll up to 60s — Replicate typically takes 20-40s
-      // Use uploadsRef.current (not uploads) to avoid stale closure — state updates
-      // after fetchUploads() won't be visible in the captured `uploads` variable.
-      for (let i = 0; i < 12; i++) {
-        await new Promise(r => setTimeout(r, 5000))
-        await fetchUploads()
-        const updated = uploadsRef.current.find(u => u.id === id)
-        if (updated?.thumbnail_url && !updated.thumbnail_url.startsWith('data:image/svg+xml')) return
-      }
-      // Timed out — mark error so user knows to retry later
-      setThumbnailErrorIds(prev => new Set(prev).add(id))
-    } catch {
+      // Step 1: Get a signed video URL from the server
+      const urlRes = await fetch(`/api/video-upload/${id}/signed-url`)
+      if (!urlRes.ok) throw new Error('Could not get video URL')
+      const { signedUrl } = await urlRes.json()
+
+      // Step 2: Capture a frame directly in the browser — no Replicate, no queue
+      const thumbnail = await captureFrameFromVideoUrl(signedUrl)
+      if (!thumbnail) throw new Error('Frame capture failed (HEVC on Chrome is unsupported — try Safari)')
+
+      // Step 3: Save directly to DB
+      const saveRes = await fetch(`/api/video-upload/${id}/thumbnail`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnail_url: thumbnail }),
+      })
+      if (!saveRes.ok) throw new Error('Failed to save thumbnail')
+
+      // Step 4: Update UI immediately
+      setUploads(prev => prev.map(u => u.id === id ? { ...u, thumbnail_url: thumbnail } : u))
+    } catch (err: any) {
+      console.error('[handleGenerateThumbnail]', err.message)
       setThumbnailErrorIds(prev => new Set(prev).add(id))
     } finally {
       setThumbnailGenIds(prev => { const next = new Set(prev); next.delete(id); return next })
