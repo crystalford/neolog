@@ -1,7 +1,6 @@
 import { serve } from 'inngest/next'
 import { inngest } from '@/inngest/client'
 import { processUpload } from '@/inngest/functions/process-upload'
-import { generateThumbnail } from '@/inngest/functions/generate-thumbnail'
 import { synthesizeSession } from '@/inngest/functions/synthesize-session'
 import { synthesizeUserGraph } from '@/inngest/functions/synthesize-user-graph'
 import { triggerVoiceClone } from '@/inngest/functions/trigger-voice-clone'
@@ -19,7 +18,6 @@ export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     processUpload,
-    generateThumbnail,
     synthesizeSession,
     synthesizeUserGraph,
     synthesizeProject,
