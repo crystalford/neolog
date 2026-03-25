@@ -81,26 +81,34 @@ async function captureVideoThumbnail(file: File): Promise<string> {
   return `data:image/svg+xml;base64,${btoa(svg)}`
 }
 
-// Capture a thumbnail from a remote video URL (e.g. signed Supabase URL).
-// Requires CORS headers on the video URL for canvas access.
-// Returns null if the codec is unsupported or the frame is black.
+// Capture a thumbnail from a remote video URL.
+// Fetches the first 3MB as a blob to sidestep canvas CORS restrictions entirely.
 async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null> {
+  // Pull first 3MB — enough to get moov atom + first frames for H.264/faststart MP4
+  let blobUrl: string | null = null
+  try {
+    const res = await fetch(videoUrl, { headers: { Range: 'bytes=0-3145727' } })
+    if (!res.ok && res.status !== 206) return null
+    blobUrl = URL.createObjectURL(await res.blob())
+  } catch { return null }
+
   return new Promise((resolve) => {
     const video = document.createElement('video')
     let resolved = false
     const done = (val: string | null) => {
       if (resolved) return
       resolved = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
       resolve(val)
     }
-    const timeout = setTimeout(() => done(null), 20000)
+    const timeout = setTimeout(() => done(null), 15000)
     video.muted = true
     video.playsInline = true
-    video.crossOrigin = 'anonymous'
-    video.preload = 'metadata'
+    video.preload = 'auto'
     video.onerror = () => { clearTimeout(timeout); done(null) }
     video.onloadedmetadata = () => {
-      video.currentTime = Math.min(1, (video.duration || 10) * 0.05)
+      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 20
+      video.currentTime = Math.min(1, dur * 0.05)
     }
     video.onseeked = () => {
       clearTimeout(timeout)
@@ -112,12 +120,10 @@ async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null
         const ctx = canvas.getContext('2d')
         if (!ctx) return done(null)
         ctx.drawImage(video, 0, 0, w, h)
-        const imgData = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50))
-        const allBlack = imgData.data.every((v, i) => i % 4 === 3 || v < 10)
-        done(allBlack ? null : canvas.toDataURL('image/jpeg', 0.85))
+        done(canvas.toDataURL('image/jpeg', 0.85))
       } catch { done(null) }
     }
-    video.src = videoUrl
+    video.src = blobUrl!
   })
 }
 
