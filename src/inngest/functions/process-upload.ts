@@ -3,6 +3,7 @@ import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
+import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
 // Replicate SDK v1.4 returns FileOutput objects (not strings) and sometimes arrays.
@@ -132,11 +133,8 @@ export const processUpload = inngest.createFunction(
         return { path: upload.storage_path, extracted: false }
       }
 
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(upload.storage_path, 3600)
-
-      if (!signedData?.signedUrl) return { path: upload.storage_path, extracted: false }
+      const storageSignedUrl = await presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      if (!storageSignedUrl) return { path: upload.storage_path, extracted: false }
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
@@ -146,7 +144,7 @@ export const processUpload = inngest.createFunction(
           {
             input: {
               task: 'extract_video_audio_as_mp3',
-              input_file: signedData.signedUrl,
+              input_file: storageSignedUrl,
             },
           },
         )
@@ -183,11 +181,9 @@ export const processUpload = inngest.createFunction(
       }
 
       try {
-        const { data: signedData } = await admin.storage
-          .from('videos')
-          .createSignedUrl(upload.storage_path, 600)
+        const metaSignedUrl = await presignDownloadUrl(upload.storage_path, 600).catch(() => null)
 
-        if (signedData?.signedUrl) {
+        if (metaSignedUrl) {
 
           const replicateToken = process.env.REPLICATE_API_TOKEN
           if (!replicateToken) {
@@ -204,7 +200,7 @@ export const processUpload = inngest.createFunction(
             "fofr/toolkit",
             {
               input: {
-                input_file: signedData.signedUrl,
+                input_file: metaSignedUrl,
                 ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
               }
             }
@@ -377,16 +373,13 @@ export const processUpload = inngest.createFunction(
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
 
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(upload.storage_path, 7200)
-
-      if (!signedData?.signedUrl) return null
+      const transcodeSignedUrl = await presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
+      if (!transcodeSignedUrl) return null
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
         const output = await replicate.run('fofr/toolkit', {
-          input: { task: 'convert_input_to_mp4', input_file: signedData.signedUrl },
+          input: { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl },
         }) as any
 
         const outputUrl = extractReplicateUrl(output)
@@ -395,15 +388,10 @@ export const processUpload = inngest.createFunction(
         const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
         const path = `${user_id}/playback/${video_upload_id}.mp4`
 
-        const { error: uploadErr } = await admin.storage.from('videos').upload(path, mp4Buf, {
-          contentType: 'video/mp4',
-          upsert: true,
-          cacheControl: '31536000',
+        await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
+          console.error('[transcode-playback] R2 upload failed:', uploadErr?.message)
+          throw uploadErr
         })
-
-        if (uploadErr) {
-          return null
-        }
 
         await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
         return path
@@ -417,8 +405,8 @@ export const processUpload = inngest.createFunction(
     const transcription = await step.run('transcribe', async () => {
 
       if (activeContext.upload.mime_type === 'text/plain') {
-        const { data: fileData } = await admin.storage.from('videos').download(audioPath.path)
-        const text = fileData ? Buffer.from(await fileData.arrayBuffer()).toString('utf-8') : ''
+        const fileRes = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
+        const text = fileRes?.ok ? await fileRes.text() : ''
         return { text, language: 'en', segments: [] }
       }
 
@@ -430,11 +418,9 @@ export const processUpload = inngest.createFunction(
       if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) {
         whisperAudioUrl = audioPath.path
       } else {
-        const { data: signedData } = await admin.storage
-          .from('videos')
-          .createSignedUrl(audioPath.path, 3600)
-        if (!signedData?.signedUrl) throw new Error('Failed to sign audio URL')
-        whisperAudioUrl = signedData.signedUrl
+        const whisperSignedUrl = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
+        if (!whisperSignedUrl) throw new Error('Failed to sign audio URL for Whisper')
+        whisperAudioUrl = whisperSignedUrl
       }
 
       const replicate = new Replicate({ auth: replicateToken })

@@ -1,14 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import * as tus from 'tus-js-client'
 import {
   Upload, Video, FileAudio, Loader2, CheckCircle2, AlertCircle,
   Clock, Trash2, ChevronDown, ChevronUp, Play, Lightbulb,
   FolderOpen, Quote, Tag, Brain, Scissors, FileText, HelpCircle,
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
-  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles, ImageOff
+  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles
 } from 'lucide-react'
 import MediaInfoFactory from 'mediainfo.js'
 import type { VideoUpload } from '@/types/database'
@@ -28,7 +26,9 @@ type ActiveUpload = {
   bytesTotal: number
   status: 'uploading' | 'paused' | 'complete' | 'error'
   error: string | null
-  tusUpload: tus.Upload | null
+  abortController: AbortController | null
+  r2UploadId: string | null
+  r2Key: string | null
   recordedAt: string | null
 }
 
@@ -155,7 +155,6 @@ export default function UploadsPage() {
   const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
   const [thumbnailGenIds, setThumbnailGenIds] = useState<Set<string>>(new Set())
   const [thumbnailErrorIds, setThumbnailErrorIds] = useState<Set<string>>(new Set())
-  const [retriggering, setRetriggering] = useState<'idle' | 'running' | 'done'>('idle')
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
@@ -344,173 +343,216 @@ export default function UploadsPage() {
     }
   };
 
-  const startTusUpload = useCallback(async (file: File, sessionId?: string, preextractedDate?: string | null, thumbnailPromise?: Promise<string>) => {
-    // Ensure bucket exists and has correct fileSizeLimit (updates on every call)
-    await fetch('/api/video-upload/prepare').catch(() => {/* non-fatal */})
+  const startR2Upload = useCallback(async (
+    file: File,
+    sessionId?: string,
+    preextractedDate?: string | null,
+    thumbnailPromise?: Promise<string> | null,
+  ) => {
+    const localKey = `r2upload_${file.name}_${file.size}`
+    const CONCURRENCY = 3
+    const PART_SIZE = 50 * 1024 * 1024 // must match server
 
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    // Check for resumable state in localStorage
+    let resumeState: {
+      uploadId: string; key: string; partSize: number; totalParts: number
+      etags: Record<string, string>
+    } | null = null
+    try {
+      const stored = localStorage.getItem(localKey)
+      if (stored) resumeState = JSON.parse(stored)
+    } catch {}
 
-    const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storagePath = `${session.user.id}/videos/${timestamp}_${sanitizedName}`
+    const abortController = new AbortController()
     const uploadId = crypto.randomUUID()
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const projectId = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
+    const storedEtags = resumeState ? { ...resumeState.etags } : {} as Record<string, string>
+    const storedBytes = resumeState
+      ? Math.min(Object.keys(storedEtags).length * (resumeState.partSize ?? PART_SIZE), file.size)
+      : 0
 
     const activeUpload: ActiveUpload = {
       id: uploadId,
       file,
-      storagePath,
-      progress: 0,
-      bytesUploaded: 0,
+      storagePath: resumeState?.key ?? '',
+      progress: Math.round((storedBytes / file.size) * 100),
+      bytesUploaded: storedBytes,
       bytesTotal: file.size,
       status: 'uploading',
       error: null,
-      tusUpload: null,
-      recordedAt: preextractedDate || null,
+      abortController,
+      r2UploadId: resumeState?.uploadId ?? null,
+      r2Key: resumeState?.key ?? null,
+      recordedAt: preextractedDate ?? null,
     }
 
     setActiveUploads(prev => [...prev, activeUpload])
-
-    const updateUpload = (patch: Partial<ActiveUpload>) => {
+    const updateUpload = (patch: Partial<ActiveUpload>) =>
       setActiveUploads(prev => prev.map(u => u.id === uploadId ? { ...u, ...patch } : u))
-    }
 
-    const tusUpload = new tus.Upload(file, {
-      endpoint: `https://${projectId}.supabase.co/storage/v1/upload/resumable`,
-      retryDelays: [0, 3000, 5000, 10000, 20000],
-      headers: {
-        authorization: `Bearer ${session.access_token}`,
-        'x-upsert': 'true',
-      },
-      uploadDataDuringCreation: true,
-      removeFingerprintOnSuccess: true,
-      metadata: {
-        bucketName: 'videos',
-        objectName: storagePath,
-        contentType: file.type,
-        cacheControl: '86400',
-      },
-      chunkSize: 6 * 1024 * 1024, // 6MB — Supabase TUS requirement
-      onError: (error) => {
-        console.error('TUS upload error:', error)
-        updateUpload({ status: 'error', error: error.message })
-      },
-      onProgress: (bytesUploaded, bytesTotal) => {
-        const progress = Math.round((bytesUploaded / bytesTotal) * 100)
-        updateUpload({ progress, bytesUploaded, bytesTotal })
-      },
-      onSuccess: async () => {
-        updateUpload({ status: 'complete', progress: 100 })
+    try {
+      let r2UploadId: string
+      let r2Key: string
+      let partSize: number
+      let totalParts: number
+      const etags = storedEtags
+      let remainingPartUrls: Array<{ partNumber: number; url: string }> = []
 
-        // Register with backend → creates DB record + fires Inngest
-        try {
-          // By the time TUS upload finishes, the thumbnail capture has had plenty of time
-          const thumbnail = thumbnailPromise ? await thumbnailPromise : null
-          const payload = {
-            storage_path: storagePath,
-            file_name: file.name,
-            file_size_bytes: file.size,
-            mime_type: file.type,
-            recorded_at: preextractedDate || null,
-            ...(sessionId ? { session_id: sessionId } : {}),
-            ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
-          };
-          console.log('[Upload] Registering with payload:', payload);
+      if (resumeState) {
+        r2UploadId = resumeState.uploadId
+        r2Key = resumeState.key
+        partSize = resumeState.partSize
+        totalParts = resumeState.totalParts
+        const doneParts = new Set(Object.keys(etags).map(Number))
+        const remaining = Array.from({ length: totalParts }, (_, i) => i + 1).filter(p => !doneParts.has(p))
+        if (remaining.length > 0) {
+          const fromPart = Math.min(...remaining)
+          const res = await fetch(
+            `/api/upload/resume?uploadId=${encodeURIComponent(r2UploadId)}&key=${encodeURIComponent(r2Key)}&fromPart=${fromPart}&totalParts=${totalParts}`,
+            { signal: abortController.signal }
+          )
+          if (!res.ok) throw new Error('Failed to get resume URLs')
+          const data = await res.json()
+          remaining.forEach((partNum, idx) => {
+            remainingPartUrls.push({ partNumber: partNum, url: data.partUrls[idx] })
+          })
+        }
+      } else {
+        const res = await fetch('/api/upload/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
+          signal: abortController.signal,
+        })
+        if (!res.ok) throw new Error('Failed to initiate upload')
+        const init = await res.json()
+        r2UploadId = init.uploadId
+        r2Key = init.key
+        partSize = init.partSize
+        totalParts = init.totalParts
+        localStorage.setItem(localKey, JSON.stringify({ uploadId: r2UploadId, key: r2Key, partSize, totalParts, etags: {} }))
+        updateUpload({ storagePath: r2Key, r2UploadId, r2Key })
+        Array.from({ length: totalParts }, (_, i) => i + 1).forEach((partNum, idx) => {
+          remainingPartUrls.push({ partNumber: partNum, url: init.partUrls[idx] })
+        })
+      }
 
-          const res = await fetch('/api/video-upload', {
+      // Upload parts in parallel (CONCURRENCY at a time)
+      for (let i = 0; i < remainingPartUrls.length; i += CONCURRENCY) {
+        if (abortController.signal.aborted) break
+        const batch = remainingPartUrls.slice(i, i + CONCURRENCY)
+        await Promise.all(batch.map(async ({ partNumber, url }) => {
+          const start = (partNumber - 1) * partSize
+          const chunk = file.slice(start, Math.min(start + partSize, file.size))
+          const putRes = await fetch(url, { method: 'PUT', body: chunk, signal: abortController.signal })
+          if (!putRes.ok) throw new Error(`Part ${partNumber} failed (${putRes.status})`)
+          const etag = putRes.headers.get('ETag') ?? `"${partNumber}"`
+          etags[String(partNumber)] = etag
+          try {
+            const stored = localStorage.getItem(localKey)
+            if (stored) {
+              const s = JSON.parse(stored)
+              s.etags[String(partNumber)] = etag
+              localStorage.setItem(localKey, JSON.stringify(s))
+            }
+          } catch {}
+          const completedBytes = Math.min(Object.keys(etags).length * partSize, file.size)
+          updateUpload({ bytesUploaded: completedBytes, progress: Math.round((completedBytes / file.size) * 100) })
+        }))
+      }
+
+      if (abortController.signal.aborted) return
+
+      updateUpload({ status: 'complete', progress: 100 })
+      const thumbnail = thumbnailPromise ? await thumbnailPromise : null
+
+      const completePayload = {
+        uploadId: r2UploadId!,
+        key: r2Key!,
+        parts: Object.entries(etags)
+          .map(([n, ETag]) => ({ PartNumber: parseInt(n), ETag }))
+          .sort((a, b) => a.PartNumber - b.PartNumber),
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        mimeType: file.type,
+        recordedAt: preextractedDate ?? null,
+        ...(sessionId ? { sessionId } : {}),
+        ...(thumbnail ? { thumbnailUrl: thumbnail } : {}),
+      }
+
+      let res = await fetch('/api/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(completePayload),
+      })
+
+      if (res.status === 409) {
+        const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))
+        const autoForce = errData.existing_status === 'error' || errData.existing_status === 'uploaded'
+        const proceed = autoForce || confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
+        if (proceed) {
+          res = await fetch('/api/upload/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ ...completePayload, force: true }),
           })
-
-          if (res.ok) {
-            const data = await res.json()
-            setProcessingIds(prev => new Set(prev).add(data.id))
-            await fetchUploads()
-
-            // Remove from active uploads after a short delay ONLY if successful
-            setTimeout(() => {
-              setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
-            }, 2000)
-          } else if (res.status === 409) {
-            // Duplicate file
-            const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))
-            // If the previous attempt errored or got stuck, silently re-upload without asking
-            const autoForce = errData.existing_status === 'error' || errData.existing_status === 'uploaded'
-            const proceed = autoForce || confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
-            if (proceed) {
-              // Re-POST with force flag to bypass duplicate check
-              const res2 = await fetch('/api/video-upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...payload, force: true }),
-              })
-              if (res2.ok) {
-                const data = await res2.json()
-                setProcessingIds(prev => new Set(prev).add(data.id))
-                await fetchUploads()
-                setTimeout(() => {
-                  setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
-                }, 2000)
-              } else {
-                const e2 = await res2.json().catch(() => ({ error: res2.statusText }))
-                updateUpload({ status: 'error', error: e2.error || 'Failed' })
-              }
-            } else {
-              // User chose to skip — remove from active uploads cleanly
-              setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
-            }
-          } else {
-            // Display error and leave it in activeUploads so user can see it
-            const errData = await res.json().catch(() => ({ error: res.statusText }));
-            console.error('API Error:', res.status, errData);
-            updateUpload({ status: 'error', error: errData.error || `Failed with status ${res.status}` });
-          }
-        } catch (err: any) {
-          console.error('Failed to register upload:', err)
-          updateUpload({ status: 'error', error: err.message || 'Network error occurred' });
+        } else {
+          localStorage.removeItem(localKey)
+          setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
+          return
         }
-      },
-    })
+      }
 
-    updateUpload({ tusUpload })
-
-    // Resume any previous upload for this file
-    tusUpload.findPreviousUploads().then(previous => {
-      if (previous.length) tusUpload.resumeFromPreviousUpload(previous[0])
-      tusUpload.start()
-    })
+      if (res.ok) {
+        const data = await res.json()
+        localStorage.removeItem(localKey)
+        setProcessingIds(prev => new Set(prev).add(data.id))
+        await fetchUploads()
+        setTimeout(() => setActiveUploads(prev => prev.filter(u => u.id !== uploadId)), 2000)
+      } else {
+        const errData = await res.json().catch(() => ({ error: res.statusText }))
+        updateUpload({ status: 'error', error: errData.error ?? `Failed (${res.status})` })
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return // paused — will resume via localStorage
+      console.error('[R2 upload]', err)
+      updateUpload({ status: 'error', error: err.message ?? 'Upload failed' })
+    }
   }, [fetchUploads])
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
-    const fileArray = Array.from(files)
-    for (const file of fileArray) {
+    for (const file of Array.from(files)) {
       const recordedAt = await extractVideoDate(file)
-      // Start thumbnail capture immediately — runs in parallel with TUS upload
       const thumbnailPromise = captureVideoThumbnail(file)
-      startTusUpload(file, undefined, recordedAt, thumbnailPromise)
+      startR2Upload(file, undefined, recordedAt, thumbnailPromise)
     }
-  }, [startTusUpload])
+  }, [startR2Upload])
 
-  const handlePauseResume = (upload: ActiveUpload) => {
-    if (!upload.tusUpload) return
+  const handlePauseResume = useCallback(async (upload: ActiveUpload) => {
     if (upload.status === 'uploading') {
-      upload.tusUpload.abort()
-      setActiveUploads(prev => prev.map(u => u.id === upload.id ? { ...u, status: 'paused' } : u))
+      upload.abortController?.abort()
+      setActiveUploads(prev => prev.map(u => u.id === upload.id
+        ? { ...u, status: 'paused', abortController: null }
+        : u))
     } else if (upload.status === 'paused') {
-      upload.tusUpload.start()
-      setActiveUploads(prev => prev.map(u => u.id === upload.id ? { ...u, status: 'uploading' } : u))
+      // Remove paused entry; startR2Upload will resume from localStorage state
+      setActiveUploads(prev => prev.filter(u => u.id !== upload.id))
+      startR2Upload(upload.file, undefined, upload.recordedAt, null)
     }
-  }
+  }, [startR2Upload])
 
-  const handleCancelUpload = (upload: ActiveUpload) => {
-    if (upload.tusUpload) upload.tusUpload.abort()
+  const handleCancelUpload = useCallback(async (upload: ActiveUpload) => {
+    upload.abortController?.abort()
     setActiveUploads(prev => prev.filter(u => u.id !== upload.id))
-  }
+    const localKey = `r2upload_${upload.file.name}_${upload.file.size}`
+    localStorage.removeItem(localKey)
+    if (upload.r2UploadId && upload.r2Key) {
+      fetch('/api/upload/abort', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId: upload.r2UploadId, key: upload.r2Key }),
+      }).catch(() => {})
+    }
+  }, [])
 
   const handleReprocess = async (id: string) => {
     setProcessingIds(prev => new Set(prev).add(id))
@@ -583,22 +625,6 @@ export default function UploadsPage() {
       }
     } catch {
       setReanalyzeAllState('idle')
-    }
-  }
-
-  const handleRetriggerThumbnails = async () => {
-    setRetriggering('running')
-    try {
-      const res = await fetch('/api/video-upload/retrigger-thumbnails', { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        setRetriggering('done')
-      } else {
-        alert(data.error || 'Failed to retrigger thumbnails')
-        setRetriggering('idle')
-      }
-    } catch {
-      setRetriggering('idle')
     }
   }
 
@@ -679,26 +705,13 @@ export default function UploadsPage() {
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-light tracking-tight text-[var(--text-primary)] mb-2">
-            Uploads
+            Neovlog
           </h1>
           <p className="text-[14px] text-[var(--text-secondary)] max-w-lg leading-relaxed">
-            All your videos and audio — drop files to upload, then view what was extracted.
+            Drop recordings to ingest — transcribed, analyzed, and synthesized into intelligence.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleRetriggerThumbnails}
-            disabled={retriggering === 'running'}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
-          >
-            {retriggering === 'running' ? (
-              <><Loader2 size={13} className="animate-spin" /> Queuing...</>
-            ) : retriggering === 'done' ? (
-              <><Sparkles size={13} className="text-green-400" /> Queued</>
-            ) : (
-              <><ImageOff size={13} /> Fix all thumbnails</>
-            )}
-          </button>
           <button
             onClick={handleReanalyzeAll}
             disabled={reanalyzeAllState === 'running'}
@@ -792,10 +805,10 @@ export default function UploadsPage() {
           <Upload size={32} className="text-[var(--accent)]" />
         </div>
         <p className="text-[var(--text-primary)] text-lg font-light tracking-tight mb-1">
-          Drop files to ingest
+          Drop recordings to ingest
         </p>
         <p className="text-sm text-[var(--text-tertiary)] mb-6 opacity-60">
-          MP4, MOV, MP3, M4A — up to 5GB
+          MP4, MOV, MP3, M4A — up to 4GB via R2
         </p>
         <label className="btn btn-primary px-8 rounded-xl cursor-pointer inline-flex shadow-lg shadow-[var(--accent)]/20">
           Select Files
@@ -984,7 +997,7 @@ export default function UploadsPage() {
                               >
                                 {thumbnailGenIds.has(upload.id)
                                   ? <Loader2 size={13} className="animate-spin" />
-                                  : <ImageOff size={13} />}
+                                  : <Sparkles size={13} />}
                               </button>
                             )}
                             <button
