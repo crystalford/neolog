@@ -3,6 +3,7 @@ import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
+import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
 // Replicate SDK v1.4 returns FileOutput objects (not strings) and sometimes arrays.
@@ -14,19 +15,6 @@ function extractReplicateUrl(output: unknown): string | null {
   return url.startsWith('http') ? url : null
 }
 
-// Helper for logging to processing_logs table
-async function plog(supabase: any, uploadId: string, step: string, status: string, message?: string) {
-  if (!supabase) return
-  try {
-    await supabase.from('processing_logs').insert({
-      video_upload_id: uploadId,
-      step,
-      status,
-      message,
-      created_at: new Date().toISOString()
-    })
-  } catch { /* non-fatal */ }
-}
 
 export const processUpload = inngest.createFunction(
   {
@@ -71,11 +59,9 @@ export const processUpload = inngest.createFunction(
     }
 
     // Pre-flight
-    await plog(admin, video_upload_id, 'preflight', 'running', 'Inngest function received event')
 
     // ── Step 1: Fetch context ──
     const context = await step.run('fetch-context', async () => {
-      await plog(admin, video_upload_id, 'fetch-context', 'running')
 
       const { data: upload, error } = await admin
         .from('video_uploads')
@@ -85,12 +71,10 @@ export const processUpload = inngest.createFunction(
         .single()
 
       if (error || !upload) {
-        await plog(admin, video_upload_id, 'fetch-context', 'error', `Upload not found: ${error?.message}`)
         throw new Error('Upload not found')
       }
 
       if (upload.status === 'processed') {
-        await plog(admin, video_upload_id, 'fetch-context', 'skipped', 'Already processed')
         return { skip: true as const, upload }
       }
 
@@ -113,11 +97,9 @@ export const processUpload = inngest.createFunction(
           error_message: msg,
           updated_at: new Date().toISOString(),
         }).eq('id', video_upload_id)
-        await plog(admin, video_upload_id, 'fetch-context', 'error', msg)
         throw new Error(msg)
       }
 
-      await plog(admin, video_upload_id, 'fetch-context', 'done', `Context fetched for ${userName}. recorded_at in DB: ${upload.recorded_at}`)
       console.log(`[Inngest] Starting process for ${video_upload_id}. recorded_at in DB: ${upload.recorded_at}`);
 
       return {
@@ -142,22 +124,17 @@ export const processUpload = inngest.createFunction(
       }).eq('id', video_upload_id)
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
-        await plog(admin, video_upload_id, 'extract-audio', 'skipped', `Not a media file`)
         return { path: upload.storage_path, extracted: false }
       }
 
-      await plog(admin, video_upload_id, 'extract-audio', 'running', 'Starting signal extraction')
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) {
         return { path: upload.storage_path, extracted: false }
       }
 
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(upload.storage_path, 3600)
-
-      if (!signedData?.signedUrl) return { path: upload.storage_path, extracted: false }
+      const storageSignedUrl = await presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      if (!storageSignedUrl) return { path: upload.storage_path, extracted: false }
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
@@ -167,7 +144,7 @@ export const processUpload = inngest.createFunction(
           {
             input: {
               task: 'extract_video_audio_as_mp3',
-              input_file: signedData.signedUrl,
+              input_file: storageSignedUrl,
             },
           },
         )
@@ -175,11 +152,9 @@ export const processUpload = inngest.createFunction(
         const audioUrl = extractReplicateUrl(output)
         if (!audioUrl) return { path: upload.storage_path, extracted: false, isDirectUrl: false }
 
-        await plog(admin, video_upload_id, 'extract-audio', 'done', `Audio extracted: ${audioUrl}`)
         // Return the direct Replicate MP3 URL — transcribe step uses it without re-signing
         return { path: audioUrl, extracted: true, isDirectUrl: true }
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-audio', 'error', err?.message)
         return { path: upload.storage_path, extracted: false, isDirectUrl: false }
       }
     })
@@ -187,11 +162,9 @@ export const processUpload = inngest.createFunction(
     // ── Step 2b: Extract Metadata (exhaustive backdating check) ──
     const metadata = await step.run('extract-metadata', async () => {
       const { upload } = activeContext
-      await plog(admin, video_upload_id, 'extract-metadata', 'running')
 
       // CRITICAL: Always prioritize what was sent from the browser/frontend
       if (upload.recorded_at) {
-        await plog(admin!, video_upload_id, 'extract-metadata', 'info', `Using pre-extracted recorded_at: ${upload.recorded_at}`)
         return { 
           recorded_at: upload.recorded_at,
           raw_metadata_diagnostic: (upload.meta as any)?.raw_metadata_diagnostic || null,
@@ -200,7 +173,6 @@ export const processUpload = inngest.createFunction(
       }
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
-        await plog(admin!, video_upload_id, 'extract-metadata', 'skipped', 'Not audio/video')
         return { 
           recorded_at: (upload as any).created_at,
           raw_metadata_diagnostic: null,
@@ -209,16 +181,12 @@ export const processUpload = inngest.createFunction(
       }
 
       try {
-        const { data: signedData } = await admin.storage
-          .from('videos')
-          .createSignedUrl(upload.storage_path, 600)
+        const metaSignedUrl = await presignDownloadUrl(upload.storage_path, 600).catch(() => null)
 
-        if (signedData?.signedUrl) {
-          await plog(admin, video_upload_id, 'extract-metadata', 'debug', `Scanning all tags via Replicate ffprobe...`)
+        if (metaSignedUrl) {
 
           const replicateToken = process.env.REPLICATE_API_TOKEN
           if (!replicateToken) {
-            await plog(admin!, video_upload_id, 'extract-metadata', 'error', 'REPLICATE_API_TOKEN missing for metadata extraction')
             return { 
               recorded_at: (upload as any).recorded_at || (upload as any).created_at,
               raw_metadata_diagnostic: null,
@@ -232,7 +200,7 @@ export const processUpload = inngest.createFunction(
             "fofr/toolkit",
             {
               input: {
-                input_file: signedData.signedUrl,
+                input_file: metaSignedUrl,
                 ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
               }
             }
@@ -247,7 +215,6 @@ export const processUpload = inngest.createFunction(
             try {
               info = JSON.parse(output)
             } catch (e) {
-              await plog(admin!, video_upload_id, 'extract-metadata', 'error', `Failed to parse ffprobe output: ${output.substring(0, 100)}`)
               return { 
                 recorded_at: (upload as any).recorded_at || (upload as any).created_at,
                 raw_metadata_diagnostic: null,
@@ -259,7 +226,6 @@ export const processUpload = inngest.createFunction(
           }
           
           if (!info) {
-            await plog(admin!, video_upload_id, 'extract-metadata', 'error', 'ffprobe returned empty output')
             return { 
               recorded_at: (upload as any).recorded_at || (upload as any).created_at,
               raw_metadata_diagnostic: null,
@@ -357,9 +323,7 @@ export const processUpload = inngest.createFunction(
           }
 
           if (foundDate) {
-            await plog(admin!, video_upload_id, 'extract-metadata', 'done', `Backdated successfully! Used tag '${foundKey}' to set recorded_at to ${foundDate}`)
           } else {
-            await plog(admin!, video_upload_id, 'extract-metadata', 'warn', `No recording date found. Full metadata dictionary saved to video_uploads.meta for diagnosis.`)
           }
 
           return { 
@@ -369,7 +333,6 @@ export const processUpload = inngest.createFunction(
           }
         }
       } catch (err: any) {
-        await plog(admin!, video_upload_id, 'extract-metadata', 'skipped', `ffprobe failed: ${err?.message}`)
       }
 
       return { 
@@ -406,21 +369,17 @@ export const processUpload = inngest.createFunction(
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
 
-      await plog(admin, video_upload_id, 'transcode-playback', 'running', 'Transcoding to H.264 for web playback')
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
 
-      const { data: signedData } = await admin.storage
-        .from('videos')
-        .createSignedUrl(upload.storage_path, 7200)
-
-      if (!signedData?.signedUrl) return null
+      const transcodeSignedUrl = await presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
+      if (!transcodeSignedUrl) return null
 
       try {
         const replicate = new Replicate({ auth: replicateToken })
         const output = await replicate.run('fofr/toolkit', {
-          input: { task: 'convert_input_to_mp4', input_file: signedData.signedUrl },
+          input: { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl },
         }) as any
 
         const outputUrl = extractReplicateUrl(output)
@@ -429,180 +388,25 @@ export const processUpload = inngest.createFunction(
         const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
         const path = `${user_id}/playback/${video_upload_id}.mp4`
 
-        const { error: uploadErr } = await admin.storage.from('videos').upload(path, mp4Buf, {
-          contentType: 'video/mp4',
-          upsert: true,
-          cacheControl: '31536000',
+        await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
+          console.error('[transcode-playback] R2 upload failed:', uploadErr?.message)
+          throw uploadErr
         })
 
-        if (uploadErr) {
-          await plog(admin, video_upload_id, 'transcode-playback', 'error', `Supabase upload failed: ${uploadErr.message}`)
-          return null
-        }
-
         await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
-        await plog(admin, video_upload_id, 'transcode-playback', 'done', `H.264 stored at ${path}`)
         return path
       } catch (err: any) {
-        await plog(admin, video_upload_id, 'transcode-playback', 'error', err?.message)
         return null
       }
     })
 
-    // ── Step 2d: Extract thumbnail frame ──
-    // Use the H.264 playback version when available — avoids HEVC rotation issues
-    // that cause fofr/toolkit to silently return 0 frames for vertical DJI videos.
-    const thumbnailPath = await step.run('extract-thumbnail', async () => {
-      const { upload } = activeContext
-      if (!isVideoMimeType(upload.mime_type)) return null
-
-      await plog(admin, video_upload_id, 'extract-thumbnail', 'running', 'Extracting thumbnail frame')
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return null
-
-      const replicate = new Replicate({ auth: replicateToken })
-
-      const extractFrameFromUrl = async (inputUrl: string, label: string): Promise<string | null> => {
-        try {
-          const output = await replicate.run('fofr/toolkit', {
-            input: { task: 'extract_frames_from_input', input_file: inputUrl, fps: 1 },
-          }) as any
-
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'info',
-            `[${label}] isArray=${Array.isArray(output)} frames=${Array.isArray(output) ? output.length : 1} sample=${JSON.stringify(output)?.slice(0, 150)}`)
-
-          const frames = Array.isArray(output) ? output : (output ? [output] : [])
-          if (frames.length === 0) return null
-
-          const idx = Math.min(2, frames.length - 1)
-          const frameOutput = frames[idx]
-          const url = typeof frameOutput === 'string' ? frameOutput : String(frameOutput)
-          return url.startsWith('http') ? url : null
-        } catch (err: any) {
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'warn', `[${label}] failed: ${err?.message}`)
-          return null
-        }
-      }
-
-      // Prefer H.264 playback path (handles vertical HEVC rotation issues)
-      let frameUrl: string | null = null
-      if (playbackStoragePath) {
-        const { data: playbackSign } = await admin.storage
-          .from('videos')
-          .createSignedUrl(playbackStoragePath, 3600)
-        if (playbackSign?.signedUrl) {
-          frameUrl = await extractFrameFromUrl(playbackSign.signedUrl, 'h264_playback')
-        }
-      }
-
-      // Fallback: try original file directly
-      if (!frameUrl) {
-        const { data: signedData } = await admin.storage
-          .from('videos')
-          .createSignedUrl(upload.storage_path, 7200)
-        if (signedData?.signedUrl) {
-          frameUrl = await extractFrameFromUrl(signedData.signedUrl, 'original')
-        }
-      }
-
-      if (!frameUrl) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'All extraction attempts failed')
-        return null
-      }
-
-      try {
-        const imgBuffer = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
-        if (imgBuffer.length < 500) {
-          await plog(admin, video_upload_id, 'extract-thumbnail', 'error', 'Frame too small — corrupt')
-          return null
-        }
-
-        const isPng = imgBuffer[0] === 0x89 && imgBuffer[1] === 0x50
-        const mime = isPng ? 'image/png' : 'image/jpeg'
-        const base64DataUrl = `data:${mime};base64,${imgBuffer.toString('base64')}`
-        await admin.from('video_uploads').update({ thumbnail_url: base64DataUrl }).eq('id', video_upload_id)
-
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'done', `Stored ${imgBuffer.length} bytes as ${mime}`)
-        return base64DataUrl
-      } catch (err: any) {
-        await plog(admin, video_upload_id, 'extract-thumbnail', 'error', err?.message)
-        return null
-      }
-    })
-
-    // ── Step 2e: Extract additional face frames for neural corpus ──
-    await step.run('extract-face-frames', async () => {
-      const { upload } = activeContext
-      if (!isVideoMimeType(upload.mime_type)) return
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return
-
-      // Sample frames at 30s and 60s in addition to the 3s thumbnail already archived
-      const timestamps = ['00:00:30', '00:01:00']
-      let inserted = 0
-
-      for (const ts of timestamps) {
-        try {
-          const { data: signedData } = await admin.storage
-            .from('videos')
-            .createSignedUrl(upload.storage_path, 3600)
-
-          if (!signedData?.signedUrl) continue
-
-          const replicate = new Replicate({ auth: replicateToken })
-          const output = await replicate.run(
-            "fofr/toolkit",
-            {
-              input: {
-                input_file: signedData.signedUrl,
-                ffmpeg_command: `-ss ${ts} -i {input_file} -vframes 1 -vf scale=640:-1 output.jpg`
-              }
-            }
-          ) as any
-
-          const faceUrl = extractReplicateUrl(output)
-          if (!faceUrl) continue
-
-          const imgResponse = await fetch(faceUrl)
-          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer())
-          if (imgBuffer.length < 1000) continue // skip empty/corrupt frames
-
-          const fidelityScore = scoreFrameFidelity(imgBuffer)
-          const fidelityRank = fidelityScore >= 0.95 ? 'S' : fidelityScore >= 0.85 ? 'A' : fidelityScore >= 0.7 ? 'B' : 'C'
-          const facePath = `${user_id}/neural-corpus/faces/${video_upload_id}_${ts.replace(/:/g, '')}.jpg`
-
-          await admin.storage.from('videos').upload(facePath, imgBuffer, {
-            contentType: 'image/jpeg',
-            upsert: true,
-            cacheControl: '31536000',
-          })
-
-          await admin.from('neural_corpus').insert({
-            user_id,
-            source_upload_id: video_upload_id,
-            type: 'face',
-            storage_path: facePath,
-            fidelity_score: fidelityScore,
-            fidelity_rank: fidelityRank,
-            meta: { timestamp: ts, format: 'jpg', width: 640 },
-          })
-
-          inserted++
-        } catch { /* skip this timestamp if video is shorter */ }
-      }
-
-      await plog(admin, video_upload_id, 'extract-face-frames', 'done', `${inserted} additional face frames archived`)
-    })
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
-      await plog(admin, video_upload_id, 'transcribe', 'running', `Audio path: ${audioPath.path}`)
 
       if (activeContext.upload.mime_type === 'text/plain') {
-        const { data: fileData } = await admin.storage.from('videos').download(audioPath.path)
-        const text = fileData ? Buffer.from(await fileData.arrayBuffer()).toString('utf-8') : ''
+        const fileRes = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
+        const text = fileRes?.ok ? await fileRes.text() : ''
         return { text, language: 'en', segments: [] }
       }
 
@@ -614,11 +418,9 @@ export const processUpload = inngest.createFunction(
       if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) {
         whisperAudioUrl = audioPath.path
       } else {
-        const { data: signedData } = await admin.storage
-          .from('videos')
-          .createSignedUrl(audioPath.path, 3600)
-        if (!signedData?.signedUrl) throw new Error('Failed to sign audio URL')
-        whisperAudioUrl = signedData.signedUrl
+        const whisperSignedUrl = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
+        if (!whisperSignedUrl) throw new Error('Failed to sign audio URL for Whisper')
+        whisperAudioUrl = whisperSignedUrl
       }
 
       const replicate = new Replicate({ auth: replicateToken })
@@ -659,7 +461,6 @@ export const processUpload = inngest.createFunction(
         }
       }
 
-      await plog(admin, video_upload_id, 'transcribe', 'done', `${text.length} chars, ${words.length} words transcribed`)
       return { text, language: output?.detected_language || 'en', segments, words }
     })
 
@@ -685,13 +486,11 @@ export const processUpload = inngest.createFunction(
           await admin.from('transcript_words').insert(rows.slice(i, i + 500))
         }
 
-        await plog(admin, video_upload_id, 'store-transcript-words', 'done', `Stored ${rows.length} words`)
       })
     }
 
     // ── Step 4: Analyze ──
     const analysisResult = await step.run('analyze', async () => {
-      await plog(admin, video_upload_id, 'analyze', 'running')
 
       await admin.from('video_uploads').update({
         transcript: transcription.text,
@@ -724,14 +523,12 @@ export const processUpload = inngest.createFunction(
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
 
-      await plog(admin, video_upload_id, 'analyze', 'done', `Analyzed with ${result.modelUsed}. Generated ${clips.length} clips and ${posts.length} posts.`)
       return { ...result, tags, clips, posts }
     })
 
     // ── Step 4a: Upsert entities into knowledge graph ──
     await step.run('upsert-entities', async () => {
       await upsertEntities(admin, user_id, { videoUploadId: video_upload_id }, analysisResult.analysis)
-      await plog(admin, video_upload_id, 'upsert-entities', 'done', 'Entities written to knowledge graph')
     })
 
     // ── Step 4a-ii: Extract voice profile and accumulate on user's profile ──
@@ -758,8 +555,6 @@ export const processUpload = inngest.createFunction(
       )
 
       await admin.from('profiles').update({ voice_profile: merged }).eq('id', user_id)
-      await plog(admin, video_upload_id, 'extract-voice-profile', 'done',
-        `Voice profile updated (${merged.upload_count} sessions)`)
     })
 
     // ── Step 4a-iii: Fire develop-idea for strong content seeds ──
@@ -804,8 +599,6 @@ export const processUpload = inngest.createFunction(
         )
       )
 
-      await plog(admin, video_upload_id, 'trigger-content-development', 'done',
-        `Triggered ${seeds.length} content development job(s)`)
     })
 
     // ── Step 4a-iv: Auto-update living documents for any projects mentioned ──
@@ -841,8 +634,6 @@ export const processUpload = inngest.createFunction(
           )
         )
 
-        await plog(admin, video_upload_id, 'update-project-documents', 'done',
-          `Triggered document synthesis for ${entities.length} project(s)`)
       })
     }
 
@@ -873,8 +664,6 @@ export const processUpload = inngest.createFunction(
           }
         }
 
-        await plog(admin, video_upload_id, 'apply-clip-cuts', 'done',
-          `Marked ${cutWordIndices.length} of ${transcription.words!.length} words as cut`)
       })
     }
 
@@ -885,7 +674,6 @@ export const processUpload = inngest.createFunction(
       
       const { data: existing } = await admin.from('log_entries').select('id').eq('source_upload_id', video_upload_id).maybeSingle()
       if (existing) {
-        await plog(admin, video_upload_id, 'create-log-entry', 'skipped', 'Already exists')
         return
       }
 
@@ -942,7 +730,7 @@ export const processUpload = inngest.createFunction(
         logged_at: metadata.recorded_at,
         source_upload_id: video_upload_id,
         is_public: true,
-        thumbnail_url: thumbnailPath || (activeContext.upload as any).thumbnail_url,
+        thumbnail_url: (activeContext.upload as any).thumbnail_url,
         meta: {
           title: aiTitle || fileTitle,
           key_win: analysis.key_win || null,
@@ -956,7 +744,6 @@ export const processUpload = inngest.createFunction(
         }
       })
 
-      await plog(admin, video_upload_id, 'create-log-entry', 'done', 'Timeline entry created')
     })
 
     // ── Step 5b: Passive health log from video analysis ──
@@ -998,7 +785,6 @@ export const processUpload = inngest.createFunction(
         source_upload_id: video_upload_id,
       })
 
-      await plog(admin, video_upload_id, 'health-log', 'done', 'Health data captured from analysis')
     })
 
     // ── Step 6: Check manifest training thresholds ──

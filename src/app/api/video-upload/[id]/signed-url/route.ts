@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { presignDownloadUrl } from '@/lib/storage/r2'
 
 export async function GET(
   _request: NextRequest,
@@ -8,45 +8,28 @@ export async function GET(
 ) {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const admin = createAdminClient()
-  if (!admin) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
-  }
-
-  // Verify ownership
-  const { data: upload, error: fetchError } = await admin
+  // Verify ownership using user-auth client (RLS handles it)
+  const { data: upload, error: fetchError } = await supabase
     .from('video_uploads')
-    .select('storage_path, playback_path, user_id')
+    .select('storage_path, playback_path')
     .eq('id', params.id)
+    .eq('user_id', session.user.id)
     .single()
 
   if (fetchError || !upload) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  if (upload.user_id !== session.user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const key = upload.playback_path || upload.storage_path
+  if (!key) return NextResponse.json({ error: 'No storage path' }, { status: 404 })
+
+  try {
+    const signedUrl = await presignDownloadUrl(key, 3600)
+    return NextResponse.json({ signedUrl, hasPlayback: !!upload.playback_path })
+  } catch (err: any) {
+    console.error('[signed-url] R2 presign failed:', err.message)
+    return NextResponse.json({ error: 'Failed to generate URL' }, { status: 500 })
   }
-
-  // Prefer H.264 playback version; fall back to original
-  const path = upload.playback_path || upload.storage_path
-  if (!path) {
-    return NextResponse.json({ error: 'No storage path' }, { status: 404 })
-  }
-
-  const { data: signed, error: signError } = await admin.storage
-    .from('videos')
-    .createSignedUrl(path, 3600)
-
-  if (signError || !signed?.signedUrl) {
-    console.error('[signed-url] Failed to generate signed URL:', signError)
-    return NextResponse.json({ error: signError?.message ?? 'Failed to generate URL' }, { status: 500 })
-  }
-
-  return NextResponse.json({ signedUrl: signed.signedUrl, hasPlayback: !!upload.playback_path })
 }
