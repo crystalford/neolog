@@ -417,23 +417,31 @@ export default function UploadsPage() {
           })
         }
       } else {
-        const res = await fetch('/api/upload/initiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
-          signal: abortController.signal,
-        })
-        if (!res.ok) throw new Error('Failed to initiate upload')
-        const init = await res.json()
-        r2UploadId = init.uploadId
-        r2Key = init.key
-        partSize = init.partSize
-        totalParts = init.totalParts
-        localStorage.setItem(localKey, JSON.stringify({ uploadId: r2UploadId, key: r2Key, partSize, totalParts, etags: {} }))
-        updateUpload({ storagePath: r2Key, r2UploadId, r2Key })
-        Array.from({ length: totalParts }, (_, i) => i + 1).forEach((partNum, idx) => {
-          remainingPartUrls.push({ partNumber: partNum, url: init.partUrls[idx] })
-        })
+        try {
+          const res = await fetch('/api/upload/initiate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
+            signal: abortController.signal,
+          })
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}))
+            throw new Error(errData.error || `Initiate failed (${res.status})`)
+          }
+          const init = await res.json()
+          r2UploadId = init.uploadId
+          r2Key = init.key
+          partSize = init.partSize
+          totalParts = init.totalParts
+          localStorage.setItem(localKey, JSON.stringify({ uploadId: r2UploadId, key: r2Key, partSize, totalParts, etags: {} }))
+          updateUpload({ storagePath: r2Key, r2UploadId, r2Key })
+          Array.from({ length: totalParts }, (_, i) => i + 1).forEach((partNum, idx) => {
+            remainingPartUrls.push({ partNumber: partNum, url: init.partUrls[idx] })
+          })
+        } catch (err: any) {
+          if (err.name === 'AbortError') return
+          throw new Error(`[Initiate] ${err.message}`)
+        }
       }
 
       // Upload parts in parallel (CONCURRENCY at a time)
@@ -443,20 +451,28 @@ export default function UploadsPage() {
         await Promise.all(batch.map(async ({ partNumber, url }) => {
           const start = (partNumber - 1) * partSize
           const chunk = file.slice(start, Math.min(start + partSize, file.size))
-          const putRes = await fetch(url, { method: 'PUT', body: chunk, signal: abortController.signal })
-          if (!putRes.ok) throw new Error(`Part ${partNumber} failed (${putRes.status})`)
-          const etag = putRes.headers.get('ETag') ?? `"${partNumber}"`
-          etags[String(partNumber)] = etag
           try {
-            const stored = localStorage.getItem(localKey)
-            if (stored) {
-              const s = JSON.parse(stored)
-              s.etags[String(partNumber)] = etag
-              localStorage.setItem(localKey, JSON.stringify(s))
+            const putRes = await fetch(url, { method: 'PUT', body: chunk, signal: abortController.signal })
+            if (!putRes.ok) throw new Error(`Status ${putRes.status}`)
+            const etag = putRes.headers.get('ETag') ?? `"${partNumber}"`
+            etags[String(partNumber)] = etag
+            try {
+              const stored = localStorage.getItem(localKey)
+              if (stored) {
+                const s = JSON.parse(stored)
+                s.etags[String(partNumber)] = etag
+                localStorage.setItem(localKey, JSON.stringify(s))
+              }
+            } catch {}
+            const completedBytes = Math.min(Object.keys(etags).length * partSize, file.size)
+            updateUpload({ bytesUploaded: completedBytes, progress: Math.round((completedBytes / file.size) * 100) })
+          } catch (err: any) {
+            if (err.name === 'AbortError') return
+            if (err.message === 'Failed to fetch') {
+              throw new Error('[R2 PUT] Failed to fetch. Check Cloudflare R2 CORS settings.')
             }
-          } catch {}
-          const completedBytes = Math.min(Object.keys(etags).length * partSize, file.size)
-          updateUpload({ bytesUploaded: completedBytes, progress: Math.round((completedBytes / file.size) * 100) })
+            throw new Error(`[Part ${partNumber}] ${err.message}`)
+          }
         }))
       }
 
@@ -479,11 +495,16 @@ export default function UploadsPage() {
         ...(thumbnail ? { thumbnailUrl: thumbnail } : {}),
       }
 
-      let res = await fetch('/api/upload/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(completePayload),
-      })
+      let res: Response
+      try {
+        res = await fetch('/api/upload/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(completePayload),
+        })
+      } catch (err: any) {
+        throw new Error(`[Complete] ${err.message}`)
+      }
 
       if (res.status === 409) {
         const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))

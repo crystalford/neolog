@@ -13,7 +13,7 @@ export async function GET(
   // Verify ownership using user-auth client (RLS handles it)
   const { data: upload, error: fetchError } = await supabase
     .from('video_uploads')
-    .select('storage_path, playback_path')
+    .select('storage_path, playback_path, storage_provider')
     .eq('id', params.id)
     .eq('user_id', session.user.id)
     .single()
@@ -26,7 +26,13 @@ export async function GET(
   if (!key) return NextResponse.json({ error: 'No storage path' }, { status: 404 })
 
   try {
-    const signedUrl = await presignDownloadUrl(key, 3600)
+    let signedUrl: string | null = null
+    if (upload.storage_provider === 'r2') {
+      signedUrl = await presignDownloadUrl(key, 3600)
+    } else {
+      const { data: signed } = await supabase.storage.from('videos').createSignedUrl(key, 3600)
+      signedUrl = signed?.signedUrl || null
+    }
     return NextResponse.json({ signedUrl, hasPlayback: !!upload.playback_path })
   } catch (err: any) {
     console.error('[signed-url] R2 presign failed:', err.message)

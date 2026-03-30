@@ -59,7 +59,12 @@ export async function DELETE(
     }
 
     // Delete from storage
-    if (upload.storage_provider === 'supabase') {
+    if (upload.storage_provider === 'r2') {
+      const { deleteR2Object } = await import('@/lib/storage/r2')
+      await deleteR2Object(upload.storage_path).catch(e => {
+        console.error('R2 delete error:', e)
+      })
+    } else if (upload.storage_provider === 'supabase') {
       const { error: storageError } = await supabase.storage
         .from('videos')
         .remove([upload.storage_path])

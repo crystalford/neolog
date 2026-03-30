@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('video_uploads')
-      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path, playback_path')
+      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path, playback_path, storage_provider')
       .eq('user_id', session.user.id)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
@@ -174,56 +174,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch uploads', details: error.message }, { status: 500 })
     }
 
-    // Generate signed URLs for thumbnails stored as storage paths (skip http and data: URLs)
-    const thumbPaths = (data || [])
-      .filter((u: any) => u.thumbnail_url && !u.thumbnail_url.startsWith('http') && !u.thumbnail_url.startsWith('data:'))
-      .map((u: any) => u.thumbnail_url)
+    // Signed URL Generation Logic
+    // Since we now support Supabase and R2, we must split the list and sign accordingly.
 
-    let signedMap: Record<string, string> = {}
-    if (thumbPaths.length > 0) {
-      const { data: signed } = await supabase.storage
-        .from('videos')
-        .createSignedUrls(thumbPaths, 3600)
-      if (signed) {
-        for (const s of signed) {
-          if (s.signedUrl) signedMap[s.path] = s.signedUrl
-        }
-      }
-    }
-
-    // Generate signed video URLs for uploads missing thumbnails (prefer playback_path for H.264)
-    const videoPathEntries = (data || [])
-      .filter((u: any) => !u.thumbnail_url && u.mime_type?.startsWith('video/') && (u.playback_path || u.storage_path))
-      .map((u: any) => ({ id: u.id, path: u.playback_path || u.storage_path }))
-
-    let videoSignedMap: Record<string, string> = {}
-    if (videoPathEntries.length > 0) {
-      const { data: signedVideos } = await supabase.storage
-        .from('videos')
-        .createSignedUrls(videoPathEntries.map((e: any) => e.path), 3600)
-      if (signedVideos) {
-        for (const s of signedVideos) {
-          if (s.signedUrl) videoSignedMap[s.path] = s.signedUrl
-        }
-      }
-    }
-
-    const uploads = (data || []).map((u: any) => {
+    const uploadsWithUrls = await Promise.all((data || []).map(async (u: any) => {
+      const isR2 = u.storage_provider === 'r2'
       const videoPath = u.playback_path || u.storage_path
+      let thumbUrl = u.thumbnail_url
+      let videoUrl = null
+
+      // 1. Resolve Thumbnail
+      if (thumbUrl && !thumbUrl.startsWith('http') && !thumbUrl.startsWith('data:')) {
+        // It's a storage path
+        try {
+          if (isR2) {
+            const { presignDownloadUrl } = await import('@/lib/storage/r2')
+            thumbUrl = await presignDownloadUrl(thumbUrl, 3600)
+          } else {
+            const { data: signed } = await supabase.storage.from('videos').createSignedUrl(thumbUrl, 3600)
+            thumbUrl = signed?.signedUrl || null
+          }
+        } catch (e) {
+          console.error(`[API] Failed to sign thumbnail for ${u.id}:`, e)
+          thumbUrl = null
+        }
+      }
+
+      // 2. Resolve Video Playback (if no thumbnail or explicitly requested)
+      if (!u.thumbnail_url && videoPath) {
+        try {
+          if (isR2) {
+            const { presignDownloadUrl } = await import('@/lib/storage/r2')
+            videoUrl = await presignDownloadUrl(videoPath, 3600)
+          } else {
+            const { data: signed } = await supabase.storage.from('videos').createSignedUrl(videoPath, 3600)
+            videoUrl = signed?.signedUrl || null
+          }
+        } catch (e) {
+          console.error(`[API] Failed to sign video for ${u.id}:`, e)
+        }
+      }
+
       return {
         ...u,
-        thumbnail_url: (u.thumbnail_url?.startsWith('data:') || u.thumbnail_url?.startsWith('http'))
-          ? u.thumbnail_url
-          : u.thumbnail_url
-            ? (signedMap[u.thumbnail_url] || null)
-            : null,
-        video_url: (!u.thumbnail_url && videoPath)
-          ? (videoSignedMap[videoPath] || null)
-          : null,
+        thumbnail_url: thumbUrl,
+        video_url: videoUrl,
       }
-    })
+    }))
 
-    return NextResponse.json({ uploads })
+    return NextResponse.json({ uploads: uploadsWithUrls })
   } catch (error) {
     console.error('List video uploads error:', error)
     return NextResponse.json({ error: 'Failed to fetch uploads' }, { status: 500 })
