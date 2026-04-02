@@ -114,14 +114,19 @@ export const processUpload = inngest.createFunction(
     if (context.skip) return { status: 'already_processed', video_upload_id }
     const activeContext = context as Extract<typeof context, { skip: false }>
 
+    // Heartbeat helper to keep UI updated and prevent "stale" detection
+    const heartbeat = async (phase: string) => {
+      await admin.from('video_uploads').update({
+        status: phase,
+        updated_at: new Date().toISOString(),
+      }).eq('id', video_upload_id)
+    }
+
     // ── Step 2: Extract audio & Archive Voice Signal ──
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = activeContext
       
-      await admin.from('video_uploads').update({
-        status: 'transcribing',
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
+      await heartbeat('extracting-audio')
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
         return { path: upload.storage_path, extracted: false }
@@ -342,6 +347,11 @@ export const processUpload = inngest.createFunction(
       }
     })
 
+    // ── Update: Metadata Pulled ──
+    await step.run('heartbeat-metadata', async () => {
+      await heartbeat('metadata-extracted')
+    })
+
     // ── Step 2b-bis: Apply Metadata to DB ──
     await step.run('apply-metadata', async () => {
       const { upload } = activeContext
@@ -400,6 +410,49 @@ export const processUpload = inngest.createFunction(
       }
     })
 
+    // ── Update: Transcode Done ──
+    await step.run('heartbeat-transcode', async () => {
+      await heartbeat('transcribed-media')
+    })
+
+
+    // ── Step 2d: Thumbnail Fallback (Server-side) ──
+    // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
+    await step.run('thumbnail-fallback', async () => {
+      const { upload } = activeContext
+      if (upload.thumbnail_url) return
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return
+
+      // Prefer the transcode output for thumbnailing as it's guaranteed H.264
+      const sourcePath = playbackStoragePath || upload.storage_path
+      const signedUrl = await presignDownloadUrl(sourcePath, 3600).catch(() => null)
+      if (!signedUrl) return
+
+      try {
+        const replicate = new Replicate({ auth: replicateToken })
+        const output = await replicate.run('fofr/toolkit', {
+          input: { 
+            task: 'ffmpeg_command', 
+            input_file: signedUrl,
+            ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
+          },
+        }) as any
+
+        const outputUrl = extractReplicateUrl(output)
+        if (!outputUrl) return
+
+        const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+        const path = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
+
+        await uploadBuffer(path, imgBuf, 'image/jpeg')
+        await admin.from('video_uploads').update({ thumbnail_url: path }).eq('id', video_upload_id)
+      } catch (err: any) {
+        console.error('[thumbnail-fallback] Failed:', err?.message)
+      }
+    })
+
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
@@ -424,6 +477,8 @@ export const processUpload = inngest.createFunction(
       }
 
       const replicate = new Replicate({ auth: replicateToken })
+      await heartbeat('transcribing')
+
       const output = await replicate.run(
         'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
         {
@@ -498,6 +553,8 @@ export const processUpload = inngest.createFunction(
         status: 'analyzing',
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
+
+      await heartbeat('analyzing')
 
       const result = await runAnalysis(
         transcription.text,
@@ -669,6 +726,7 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 5: Create rich Timeline Entry ──
     await step.run('create-log-entry', async () => {
+      await heartbeat('saving-results')
       const analysis = analysisResult.analysis
       const recordedAt = metadata.recorded_at
       

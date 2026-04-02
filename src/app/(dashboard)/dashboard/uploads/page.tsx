@@ -1,169 +1,163 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Upload, Video, FileAudio, Loader2, CheckCircle2, AlertCircle,
+  Upload, Video as VideoIcon, FileAudio, Loader2, CheckCircle2, AlertCircle,
   Clock, Trash2, ChevronDown, ChevronUp, Play, Lightbulb,
   FolderOpen, Quote, Tag, Brain, Scissors, FileText, HelpCircle,
   Target, Users, BookOpen, Zap, Shield, MessageCircle, TrendingUp,
-  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles
+  AlertTriangle, X, Pause, RotateCcw, Layers, Sparkles, Grid, List, 
+  Search, RefreshCw, MoreVertical, Calendar, Database, Check, ExternalLink
 } from 'lucide-react'
 import MediaInfoFactory from 'mediainfo.js'
 import type { VideoUpload } from '@/types/database'
-import { SessionDetail } from '@/components/SessionDetail'
+
+// --- Types ---
 
 type UploadListItem = Pick<VideoUpload,
   'id' | 'file_name' | 'file_size_bytes' | 'mime_type' | 'duration_seconds' |
-  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at' | 'thumbnail_url'
-> & { video_url?: string | null }
+  'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at' | 'thumbnail_url' | 'storage_provider'
+>
 
-type ActiveUpload = {
+export type QueueItem = {
   id: string
-  file: File
-  storagePath: string
-  progress: number        // 0-100
-  bytesUploaded: number
-  bytesTotal: number
-  status: 'uploading' | 'paused' | 'complete' | 'error'
-  error: string | null
-  abortController: AbortController | null
-  r2UploadId: string | null
-  r2Key: string | null
+  fileName: string
+  fileSize: number
+  fileType: string
+  status: 'pending' | 'checking' | 'extracting' | 'uploading' | 'completing' | 'done' | 'error' | 'skipped'
+  progress: number
+  thumbnail: string | null
   recordedAt: string | null
+  error?: string
+  r2UploadId?: string | null
+  r2Key?: string | null
+  retryCount?: number
 }
 
-// Capture a thumbnail from a video file in the browser.
-// Works for H.264/WebM/etc. For HEVC on Chrome Windows it fails and returns a placeholder.
+// --- Utilities ---
+
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let lastError: any;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      if (i > 0) await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, i), 10000)));
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) return response;
+      lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+    } catch (err) { lastError = err; }
+  }
+  throw lastError;
+}
+
+/**
+ * ROBUST THUMBNAIL GENERATION
+ * Probes multiple timestamps if the frame is too black (common in HEVC/DJI).
+ */
 async function captureVideoThumbnail(file: File): Promise<string> {
-  const canvasThumb = await new Promise<string | null>((resolve) => {
-    const video = document.createElement('video')
-    const url = URL.createObjectURL(file)
-    let resolved = false
-    const done = (val: string | null) => {
-      if (resolved) return
-      resolved = true
-      URL.revokeObjectURL(url)
-      resolve(val)
-    }
-    const timeout = setTimeout(() => done(null), 8000)
-    video.muted = true
-    video.playsInline = true
-    video.preload = 'metadata'
-    video.onerror = () => { clearTimeout(timeout); done(null) }
-    video.onloadedmetadata = () => {
-      video.currentTime = Math.min(3, (video.duration || 10) * 0.1)
-    }
-    video.onseeked = () => {
-      clearTimeout(timeout)
-      try {
-        const w = Math.min(video.videoWidth || 640, 640)
-        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return done(null)
-        ctx.drawImage(video, 0, 0, w, h)
-        const data = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50))
-        // Check if frame is all black (HEVC decode failed silently)
-        const allBlack = data.data.every((v, i) => i % 4 === 3 || v < 10)
-        done(allBlack ? null : canvas.toDataURL('image/jpeg', 0.85))
-      } catch { done(null) }
-    }
-    video.src = url
-  })
+  const tryCapture = (video: HTMLVideoElement, time: number): Promise<string | null> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const onSeeked = () => {
+        if (resolved) return;
+        resolved = true;
+        video.removeEventListener('seeked', onSeeked);
+        try {
+          const w = Math.min(video.videoWidth || 640, 640);
+          const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360;
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) return resolve(null);
+          ctx.drawImage(video, 0, 0, w, h);
+          const data = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50)).data;
+          
+          // Check for "Good Frame" (not all black or solid grey)
+          let r = 0, g = 0, b = 0, count = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            r += data[i]; g += data[i+1]; b += data[i+2];
+            count++;
+          }
+          const avg = (r + g + b) / (count * 3);
+          const isTooDark = avg < 15; // Basically black
+          const isTooGrey = Math.abs(r/count - g/count) < 2 && Math.abs(g/count - b/count) < 2 && avg > 110 && avg < 140; // Flat grey decoder failure
+          
+          if (isTooDark || isTooGrey) return resolve(null);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } catch { resolve(null); }
+      };
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = time;
+      setTimeout(() => { if (!resolved) { resolved = true; video.removeEventListener('seeked', onSeeked); resolve(null); } }, 4000);
+    });
+  };
 
-  if (canvasThumb) return canvasThumb
+  const video = document.createElement('video');
+  const url = URL.createObjectURL(file);
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+  video.src = url;
 
-  // Fallback: deterministic colored placeholder with filename initial
-  const initial = (file.name[0] ?? 'V').toUpperCase()
-  const hue = file.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`
-  return `data:image/svg+xml;base64,${btoa(svg)}`
+  return new Promise<string>((resolve) => {
+    video.onloadedmetadata = async () => {
+      const dur = isFinite(video.duration) ? video.duration : 10;
+      const points = [Math.min(3, dur * 0.1), Math.min(10, dur * 0.2), dur * 0.5, 0.5, 1.0];
+      
+      for (const p of points) {
+        const thumb = await tryCapture(video, p);
+        if (thumb) {
+          URL.revokeObjectURL(url);
+          return resolve(thumb);
+        }
+      }
+      
+      // Fallback: Dynamic SVG
+      URL.revokeObjectURL(url);
+      const initial = (file.name[0] ?? 'V').toUpperCase();
+      const hue = file.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`;
+      resolve(`data:image/svg+xml;base64,${btoa(svg)}`);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(''); // Just an empty string, let the UI handle it
+    };
+  });
 }
 
-// Capture a thumbnail from a remote video URL.
-// Fetches the first 3MB as a blob to sidestep canvas CORS restrictions entirely.
-async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null> {
-  // Pull first 3MB — enough to get moov atom + first frames for H.264/faststart MP4
-  let blobUrl: string | null = null
-  try {
-    const res = await fetch(videoUrl, { headers: { Range: 'bytes=0-3145727' } })
-    if (!res.ok && res.status !== 206) return null
-    blobUrl = URL.createObjectURL(await res.blob())
-  } catch { return null }
-
-  return new Promise((resolve) => {
-    const video = document.createElement('video')
-    let resolved = false
-    const done = (val: string | null) => {
-      if (resolved) return
-      resolved = true
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-      resolve(val)
-    }
-    const timeout = setTimeout(() => done(null), 15000)
-    video.muted = true
-    video.playsInline = true
-    video.preload = 'auto'
-    video.onerror = () => { clearTimeout(timeout); done(null) }
-    video.onloadedmetadata = () => {
-      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 20
-      video.currentTime = Math.min(1, dur * 0.05)
-    }
-    video.onseeked = () => {
-      clearTimeout(timeout)
-      try {
-        const w = Math.min(video.videoWidth || 640, 640)
-        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return done(null)
-        ctx.drawImage(video, 0, 0, w, h)
-        done(canvas.toDataURL('image/jpeg', 0.85))
-      } catch { done(null) }
-    }
-    video.src = blobUrl!
-  })
+const formatBytes = (bytes: number) => {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-function VideoThumb({ videoUrl, className }: { videoUrl: string; className?: string }) {
-  const ref = useRef<HTMLVideoElement>(null)
-  return (
-    <video
-      ref={ref}
-      src={videoUrl}
-      muted
-      playsInline
-      preload="auto"
-      className={className ?? 'w-full h-full object-cover transition-transform duration-500 group-hover:scale-105'}
-      style={{ pointerEvents: 'none' }}
-      onLoadedMetadata={() => { if (ref.current) ref.current.currentTime = 3 }}
-    />
-  )
+const formatDate = (date: string | null) => {
+  if (!date) return 'Unknown date'
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+const formatDuration = (seconds: number | null) => {
+  if (!seconds) return null
+  const m = Math.floor(seconds / 60); const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// --- Main Page Component ---
 
 export default function UploadsPage() {
   const [uploads, setUploads] = useState<UploadListItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([])
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedData, setExpandedData] = useState<VideoUpload | null>(null)
+  const [queue, setQueue] = useState<QueueItem[]>([])
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
-  const [reanalyzingIds, setReanalyzingIds] = useState<Set<string>>(new Set())
-  const [reanalyzeAllState, setReanalyzeAllState] = useState<'idle' | 'running' | 'done'>('idle')
-  const [thumbnailGenIds, setThumbnailGenIds] = useState<Set<string>>(new Set())
-  const [thumbnailErrorIds, setThumbnailErrorIds] = useState<Set<string>>(new Set())
   const [dragActive, setDragActive] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'size' | 'name'>('date')
-  const activeUploadsRef = useRef<ActiveUpload[]>([])
-  activeUploadsRef.current = activeUploads
-  const uploadsRef = useRef<UploadListItem[]>([])
-  uploadsRef.current = uploads
+  const [autoSkip, setAutoSkip] = useState(true)
+  
+  const fileMap = useRef<Map<string, File>>(new Map())
+  const abortControllers = useRef<Map<string, AbortController>>(new Map())
 
   const fetchUploads = useCallback(async () => {
     try {
@@ -171,548 +165,229 @@ export default function UploadsPage() {
       if (res.ok) {
         const data = await res.json()
         setUploads(data.uploads || [])
-        setFetchError(null)
-      } else {
-        const errData = await res.json().catch(() => ({ error: res.statusText }))
-        const msg = errData.details || errData.error || `HTTP ${res.status}`
-        console.error('Uploads fetch failed:', msg)
-        setFetchError(msg)
       }
-    } catch (err: any) {
-      console.error('Failed to fetch uploads:', err)
-      setFetchError(err.message || 'Network error')
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { console.error('History fetch failed:', err) }
+    finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { fetchUploads() }, [fetchUploads])
-
-  // Auto-expand based on ?id=... URL parameter
-  useEffect(() => {
-    if (loading || uploads.length === 0) return
-    const params = new URLSearchParams(window.location.search)
-    const id = params.get('id')
-    if (id && uploads.some(u => u.id === id)) {
-      setExpandedId(id)
-      // Clear the param after expansion to prevent multiple triggers if desired, 
-      // but keeping it is fine for bookmarkability.
-    }
-  }, [loading, uploads])
-
-  // Poll for processing status
-  useEffect(() => {
-    if (processingIds.size === 0) return
-    const interval = setInterval(async () => {
-      await fetchUploads()
-      setProcessingIds(prev => {
-        const next = new Set(prev)
-        for (const id of prev) {
-          const upload = uploads.find(u => u.id === id)
-          if (upload && (upload.status === 'processed' || upload.status === 'error')) {
-            next.delete(id)
-          }
-        }
-        return next
+  const handleReset = async (id: string) => {
+    try {
+      const res = await fetch('/api/video-upload/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
       })
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [processingIds, uploads, fetchUploads])
+      if (res.ok) {
+        // Optimistic update
+        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'uploaded', error_message: null } : u))
+        fetchUploads()
+      }
+    } catch (err) {
+      console.error('Reset failed:', err)
+    }
+  }
+
+  const handleResetAll = async () => {
+    const stuck = uploads.filter(u => u.status !== 'processed' && u.status !== 'error')
+    if (stuck.length === 0) return
+    if (!confirm(`Reset processing for ${stuck.length} uploads?`)) return
+    
+    for (const item of stuck) {
+      await handleReset(item.id)
+    }
+  }
+
+  useEffect(() => { 
+    fetchUploads() 
+    const saved = localStorage.getItem('neolog_upload_queue')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as QueueItem[]
+        setQueue(parsed.map(item => ({
+          ...item,
+          status: fileMap.current.has(item.id) ? item.status : 
+                  (['done', 'skipped', 'error'].includes(item.status) ? item.status : 'error'),
+          error: fileMap.current.has(item.id) ? item.error : 'Connection lost. Please re-add.'
+        })))
+      } catch {}
+    }
+  }, [fetchUploads])
+
+  useEffect(() => {
+    const serializable = queue.map(({ id, fileName, fileSize, fileType, status, progress, thumbnail, recordedAt, error, r2UploadId, r2Key }) => ({
+      id, fileName, fileSize, fileType, status, progress, thumbnail, recordedAt, error, r2UploadId, r2Key
+    }))
+    localStorage.setItem('neolog_upload_queue', JSON.stringify(serializable))
+  }, [queue])
 
   const extractVideoDate = async (file: File): Promise<string | null> => {
     let mediainfo: any;
-    console.log(`[Metadata] Starting raw extraction for: ${file.name}`);
-    
-    // 1. FAST PATH: Filename inference
     const name = file.name;
-    const dateMatches = [
-      /(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, // 20240128_123456
-      /(\d{4})-(\d{2})-(\d{2})/,                    // 2024-01-28
-      /(\d{4})(\d{2})(\d{2})/,                       // 20240128
-    ];
-
+    const dateMatches = [/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, /(\d{4})-(\d{2})-(\d{2})/, /(\d{4})(\d{2})(\d{2})/];
     for (const regex of dateMatches) {
       const match = name.match(regex);
       if (match) {
         const [_, y, m, d, hh, mm, ss] = match;
-        // CRITICAL: Construct as a LOCAL date object by using number arguments
-        const inferred = new Date(
-          parseInt(y),
-          parseInt(m) - 1,
-          parseInt(d),
-          parseInt(hh || "12"),
-          parseInt(mm || "0"),
-          parseInt(ss || "0")
-        );
-        
-        if (!isNaN(inferred.getTime())) {
-          const iso = inferred.toISOString();
-          console.log(`[Metadata] Filename extraction SUCCESS for ${name}: ${iso} (interpreted as Local)`);
-          return iso;
-        }
+        const inferred = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), parseInt(hh || "12"), parseInt(mm || "0"), parseInt(ss || "0"));
+        if (!isNaN(inferred.getTime())) return inferred.toISOString();
       }
     }
-
-    // 2. SLOW PATH: Binary metadata extraction
     try {
-      // Use explicit version and ensure WASM is reachable
       const wasmUrl = "https://unpkg.com/mediainfo.js@0.2.1/dist/MediaInfoModule.wasm";
-      console.log(`[Metadata] Fetching MediaInfo WASM from: ${wasmUrl}`);
-      
-      mediainfo = await (MediaInfoFactory as any)({ 
-        format: 'object',
-        locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl : path
-      });
-      
-      if (!mediainfo) {
-        throw new Error("MediaInfoFactory returned null");
-      }
-
+      mediainfo = await (MediaInfoFactory as any)({ format: 'object', locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl : path });
       const getSize = () => file.size;
       const readChunk = (chunkSize: number, offset: number) =>
-        new Promise<Uint8Array>((resolve, reject) => {
+        new Promise<Uint8Array>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(new Uint8Array(e.target?.result as ArrayBuffer));
-          reader.onerror = reject;
           reader.readAsArrayBuffer(file.slice(offset, offset + chunkSize));
         });
-
-      console.log(`[Metadata] Analyzing binary header for ${file.name}...`);
       const info = await mediainfo.analyzeData(getSize, readChunk);
-      
-      if (!info?.media?.track) {
-        console.warn("[Metadata] Binary analysis found zero tracks.");
-        return null;
-      }
-
-      const dateCandidates: { key: string; val: string; date: Date }[] = [];
-      const priorityKeys = [
-        'Encoded_Date', 
-        'Tagged_Date', 
-        'Encoded_Date_Original', 
-        'Creation_Date', 
-        'Media_Create_Date',
-        'com.apple.quicktime.creationdate'
-      ];
-      
-      for (const track of info.media.track) {
-        for (const [key, val] of Object.entries(track)) {
-          if (typeof val !== 'string' || val.length < 8) continue;
-          
-          // MediaInfo often gives "UTC 2026-03-01 21:16:00"
-          // If we pass this directly to new Date(), it usually handles it correctly as UTC.
-          // If it lacks UTC, we check if it's a priority key (usually UTC in MP4).
-          const d = new Date(val);
-          if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) {
-            dateCandidates.push({ key, val, date: d });
+      if (info?.media?.track) {
+        for (const track of info.media.track) {
+          if (track.Encoded_Date) {
+            const d = new Date(track.Encoded_Date);
+            if (!isNaN(d.getTime())) return d.toISOString();
           }
         }
       }
-
-      if (dateCandidates.length > 0) {
-        let finalDate: string | null = null;
-        let finalKey: string | null = null;
-
-        // Priority find
-        for (const pk of priorityKeys) {
-          const match = dateCandidates.find(c => c.key === pk);
-          if (match) {
-            finalDate = match.date.toISOString();
-            finalKey = pk;
-            break;
-          }
-        }
-        
-        if (!finalDate) {
-          dateCandidates.sort((a, b) => a.date.getTime() - b.date.getTime());
-          finalDate = dateCandidates[0].date.toISOString();
-          finalKey = `earliest (${dateCandidates[0].key})`;
-        }
-
-        console.log(`[Metadata] Binary extraction SUCCESS for ${file.name}: ${finalDate} (via ${finalKey})`);
-        return finalDate;
-      }
-
-      console.warn(`[Metadata] NO DATE FOUND in ${file.name}. Falling back to upload date.`);
-      return null;
-    } catch (error: any) {
-      console.error(`[Metadata] EXTRACTION ERROR for ${file.name}:`, error);
-      return null;
-    } finally {
-      if (mediainfo) mediainfo.close();
-    }
+    } catch {} finally { if (mediainfo) mediainfo.close(); }
+    return null;
   };
 
-  const startR2Upload = useCallback(async (
-    file: File,
-    sessionId?: string,
-    preextractedDate?: string | null,
-    thumbnailPromise?: Promise<string> | null,
-  ) => {
-    const localKey = `r2upload_${file.name}_${file.size}`
-    const CONCURRENCY = 3
-    const PART_SIZE = 50 * 1024 * 1024 // must match server
+  const updateQueueItem = useCallback((id: string, patch: Partial<QueueItem>) => {
+    setQueue(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item))
+  }, [])
 
-    // Check for resumable state in localStorage
-    let resumeState: {
-      uploadId: string; key: string; partSize: number; totalParts: number
-      etags: Record<string, string>
-    } | null = null
+  const startR2UploadRaw = useCallback(async (item: QueueItem) => {
+    const file = fileMap.current.get(item.id)
+    if (!file) return updateQueueItem(item.id, { status: 'error', error: 'File handle lost' })
+
+    const localKey = `r2upload_${file.name}_${file.size}`
+    const CONCURRENCY = 2
+    const PART_SIZE = 50 * 1024 * 1024
+
+    let resumeState: any = null
     try {
       const stored = localStorage.getItem(localKey)
       if (stored) resumeState = JSON.parse(stored)
     } catch {}
 
-    const abortController = new AbortController()
-    const uploadId = crypto.randomUUID()
-    const storedEtags = resumeState ? { ...resumeState.etags } : {} as Record<string, string>
-    const storedBytes = resumeState
-      ? Math.min(Object.keys(storedEtags).length * (resumeState.partSize ?? PART_SIZE), file.size)
-      : 0
-
-    const activeUpload: ActiveUpload = {
-      id: uploadId,
-      file,
-      storagePath: resumeState?.key ?? '',
-      progress: Math.round((storedBytes / file.size) * 100),
-      bytesUploaded: storedBytes,
-      bytesTotal: file.size,
-      status: 'uploading',
-      error: null,
-      abortController,
-      r2UploadId: resumeState?.uploadId ?? null,
-      r2Key: resumeState?.key ?? null,
-      recordedAt: preextractedDate ?? null,
-    }
-
-    setActiveUploads(prev => [...prev, activeUpload])
-    const updateUpload = (patch: Partial<ActiveUpload>) =>
-      setActiveUploads(prev => prev.map(u => u.id === uploadId ? { ...u, ...patch } : u))
+    const controller = new AbortController()
+    abortControllers.current.set(item.id, controller)
+    updateQueueItem(item.id, { status: 'uploading' })
 
     try {
-      let r2UploadId: string
-      let r2Key: string
-      let partSize: number
-      let totalParts: number
-      const etags = storedEtags
+      let r2UploadId: string; let r2Key: string; let totalParts: number; let partSize: number
+      const etags: Record<string, string> = resumeState?.etags || {}
       let remainingPartUrls: Array<{ partNumber: number; url: string }> = []
 
       if (resumeState) {
-        r2UploadId = resumeState.uploadId
-        r2Key = resumeState.key
-        partSize = resumeState.partSize
-        totalParts = resumeState.totalParts
+        r2UploadId = resumeState.uploadId; r2Key = resumeState.key; totalParts = resumeState.totalParts; partSize = resumeState.partSize
         const doneParts = new Set(Object.keys(etags).map(Number))
         const remaining = Array.from({ length: totalParts }, (_, i) => i + 1).filter(p => !doneParts.has(p))
         if (remaining.length > 0) {
-          const fromPart = Math.min(...remaining)
-          const res = await fetch(
-            `/api/upload/resume?uploadId=${encodeURIComponent(r2UploadId)}&key=${encodeURIComponent(r2Key)}&fromPart=${fromPart}&totalParts=${totalParts}`,
-            { signal: abortController.signal }
-          )
-          if (!res.ok) throw new Error('Failed to get resume URLs')
+          const res = await fetchWithRetry(`/api/upload/resume?uploadId=${encodeURIComponent(r2UploadId)}&key=${encodeURIComponent(r2Key)}&fromPart=${Math.min(...remaining)}&totalParts=${totalParts}`, { signal: controller.signal })
           const data = await res.json()
-          remaining.forEach((partNum, idx) => {
-            remainingPartUrls.push({ partNumber: partNum, url: data.partUrls[idx] })
-          })
+          remaining.forEach((partNum, idx) => remainingPartUrls.push({ partNumber: partNum, url: data.partUrls[idx] }))
         }
       } else {
-        try {
-          const res = await fetch('/api/upload/initiate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
-            signal: abortController.signal,
-          })
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}))
-            throw new Error(errData.error || `Initiate failed (${res.status})`)
-          }
-          const init = await res.json()
-          r2UploadId = init.uploadId
-          r2Key = init.key
-          partSize = init.partSize
-          totalParts = init.totalParts
-          localStorage.setItem(localKey, JSON.stringify({ uploadId: r2UploadId, key: r2Key, partSize, totalParts, etags: {} }))
-          updateUpload({ storagePath: r2Key, r2UploadId, r2Key })
-          Array.from({ length: totalParts }, (_, i) => i + 1).forEach((partNum, idx) => {
-            remainingPartUrls.push({ partNumber: partNum, url: init.partUrls[idx] })
-          })
-        } catch (err: any) {
-          if (err.name === 'AbortError') return
-          throw new Error(`[Initiate] ${err.message}`)
-        }
+        const res = await fetchWithRetry('/api/upload/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
+          signal: controller.signal,
+        })
+        const init = await res.json()
+        r2UploadId = init.uploadId; r2Key = init.key; totalParts = init.totalParts; partSize = init.partSize
+        localStorage.setItem(localKey, JSON.stringify({ uploadId: r2UploadId, key: r2Key, partSize, totalParts, etags: {} }))
+        updateQueueItem(item.id, { r2UploadId, r2Key })
+        remainingPartUrls = init.partUrls.map((url: string, i: number) => ({ partNumber: i + 1, url }))
       }
 
-      // Upload parts in parallel (CONCURRENCY at a time)
       for (let i = 0; i < remainingPartUrls.length; i += CONCURRENCY) {
-        if (abortController.signal.aborted) break
+        if (controller.signal.aborted) break
         const batch = remainingPartUrls.slice(i, i + CONCURRENCY)
         await Promise.all(batch.map(async ({ partNumber, url }) => {
           const start = (partNumber - 1) * partSize
           const chunk = file.slice(start, Math.min(start + partSize, file.size))
+          const putRes = await fetchWithRetry(url, { method: 'PUT', body: chunk, signal: controller.signal })
+          if (!putRes.ok) throw new Error(`Part ${partNumber} failed (${putRes.status})`)
+          const etag = putRes.headers.get('ETag')
+          if (!etag) throw new Error(`Missing ETag (Check R2 CORS)`)
+          etags[String(partNumber)] = etag
+          const completedBytes = Math.min(Object.keys(etags).length * partSize, file.size)
+          updateQueueItem(item.id, { progress: Math.round((completedBytes / file.size) * 100) })
           try {
-            const putRes = await fetch(url, { method: 'PUT', body: chunk, signal: abortController.signal })
-            if (!putRes.ok) throw new Error(`Status ${putRes.status}`)
-            const etag = putRes.headers.get('ETag') ?? `"${partNumber}"`
-            etags[String(partNumber)] = etag
-            try {
-              const stored = localStorage.getItem(localKey)
-              if (stored) {
-                const s = JSON.parse(stored)
-                s.etags[String(partNumber)] = etag
-                localStorage.setItem(localKey, JSON.stringify(s))
-              }
-            } catch {}
-            const completedBytes = Math.min(Object.keys(etags).length * partSize, file.size)
-            updateUpload({ bytesUploaded: completedBytes, progress: Math.round((completedBytes / file.size) * 100) })
-          } catch (err: any) {
-            if (err.name === 'AbortError') return
-            if (err.message === 'Failed to fetch') {
-              throw new Error('[R2 PUT] Failed to fetch. Check Cloudflare R2 CORS settings.')
-            }
-            throw new Error(`[Part ${partNumber}] ${err.message}`)
-          }
+            const s = JSON.parse(localStorage.getItem(localKey) || '{}')
+            s.etags = etags; localStorage.setItem(localKey, JSON.stringify(s))
+          } catch {}
         }))
       }
 
-      if (abortController.signal.aborted) return
-
-      updateUpload({ status: 'complete', progress: 100 })
-      const thumbnail = thumbnailPromise ? await thumbnailPromise : null
-
-      const completePayload = {
-        uploadId: r2UploadId!,
-        key: r2Key!,
-        parts: Object.entries(etags)
-          .map(([n, ETag]) => ({ PartNumber: parseInt(n), ETag }))
-          .sort((a, b) => a.PartNumber - b.PartNumber),
-        fileName: file.name,
-        fileSizeBytes: file.size,
-        mimeType: file.type,
-        recordedAt: preextractedDate ?? null,
-        ...(sessionId ? { sessionId } : {}),
-        ...(thumbnail ? { thumbnailUrl: thumbnail } : {}),
-      }
-
-      let res: Response
-      try {
-        res = await fetch('/api/upload/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(completePayload),
-        })
-      } catch (err: any) {
-        throw new Error(`[Complete] ${err.message}`)
-      }
-
-      if (res.status === 409) {
-        const errData = await res.json().catch(() => ({ message: 'Duplicate file' }))
-        const autoForce = errData.existing_status === 'error' || errData.existing_status === 'uploaded'
-        const proceed = autoForce || confirm(`${errData.message}\n\nClick OK to upload anyway, Cancel to skip.`)
-        if (proceed) {
-          res = await fetch('/api/upload/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...completePayload, force: true }),
-          })
-        } else {
-          localStorage.removeItem(localKey)
-          setActiveUploads(prev => prev.filter(u => u.id !== uploadId))
-          return
-        }
-      }
+      if (controller.signal.aborted) return
+      updateQueueItem(item.id, { status: 'completing', progress: 100 })
+      const res = await fetchWithRetry('/api/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uploadId: r2UploadId, key: r2Key, fileName: file.name, fileSizeBytes: file.size, mimeType: file.type,
+          recordedAt: item.recordedAt, thumbnailUrl: item.thumbnail,
+          parts: Object.entries(etags).map(([n, ETag]) => ({ PartNumber: parseInt(n), ETag })).sort((a, b) => a.PartNumber - b.PartNumber),
+          force: true
+        }),
+        signal: controller.signal
+      })
 
       if (res.ok) {
         const data = await res.json()
         localStorage.removeItem(localKey)
+        updateQueueItem(item.id, { status: 'done' })
         setProcessingIds(prev => new Set(prev).add(data.id))
-        await fetchUploads()
-        setTimeout(() => setActiveUploads(prev => prev.filter(u => u.id !== uploadId)), 2000)
-      } else {
-        const errData = await res.json().catch(() => ({ error: res.statusText }))
-        updateUpload({ status: 'error', error: errData.error ?? `Failed (${res.status})` })
-      }
+        fetchUploads()
+        setTimeout(() => setQueue(q => q.filter(it => it.id !== item.id)), 3000)
+      } else throw new Error((await res.json().catch(() => ({}))).error || 'Completion failed')
     } catch (err: any) {
-      if (err.name === 'AbortError') return // paused — will resume via localStorage
-      console.error('[R2 upload]', err)
-      updateUpload({ status: 'error', error: err.message ?? 'Upload failed' })
-    }
-  }, [fetchUploads])
+      if (err.name === 'AbortError') return
+      updateQueueItem(item.id, { status: 'error', error: err.message })
+    } finally { abortControllers.current.delete(item.id) }
+  }, [updateQueueItem, fetchUploads])
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
-    for (const file of Array.from(files)) {
-      const recordedAt = await extractVideoDate(file)
-      const thumbnailPromise = captureVideoThumbnail(file)
-      startR2Upload(file, undefined, recordedAt, thumbnailPromise)
-    }
-  }, [startR2Upload])
+  useEffect(() => {
+    const activeCount = queue.filter(it => ['checking', 'extracting', 'uploading', 'completing'].includes(it.status)).length
+    if (activeCount >= 2) return
+    const next = queue.find(it => it.status === 'pending')
+    if (!next) return
+    (async () => {
+      const file = fileMap.current.get(next.id)
+      if (!file) return updateQueueItem(next.id, { status: 'error', error: 'File handle expired' })
+      updateQueueItem(next.id, { status: 'checking' })
+      try {
+        const checkRes = await fetch(`/api/video-upload?file_name=${encodeURIComponent(next.fileName)}&file_size_bytes=${next.fileSize}&limit=1`)
+        if ((await checkRes.json()).uploads?.length > 0 && autoSkip) {
+          updateQueueItem(next.id, { status: 'skipped' })
+          setTimeout(() => setQueue(q => q.filter(it => it.id !== next.id)), 5000)
+          return
+        }
+      } catch {}
+      updateQueueItem(next.id, { status: 'extracting' })
+      try {
+        const [recordedAt, thumbnail] = await Promise.all([extractVideoDate(file), captureVideoThumbnail(file).catch(() => null)])
+        updateQueueItem(next.id, { recordedAt, thumbnail })
+      } catch {}
+      startR2UploadRaw({ ...next, status: 'uploading' })
+    })()
+  }, [queue, autoSkip, updateQueueItem, startR2UploadRaw])
 
-  const handlePauseResume = useCallback(async (upload: ActiveUpload) => {
-    if (upload.status === 'uploading') {
-      upload.abortController?.abort()
-      setActiveUploads(prev => prev.map(u => u.id === upload.id
-        ? { ...u, status: 'paused', abortController: null }
-        : u))
-    } else if (upload.status === 'paused') {
-      // Remove paused entry; startR2Upload will resume from localStorage state
-      setActiveUploads(prev => prev.filter(u => u.id !== upload.id))
-      startR2Upload(upload.file, undefined, upload.recordedAt, null)
-    }
-  }, [startR2Upload])
-
-  const handleCancelUpload = useCallback(async (upload: ActiveUpload) => {
-    upload.abortController?.abort()
-    setActiveUploads(prev => prev.filter(u => u.id !== upload.id))
-    const localKey = `r2upload_${upload.file.name}_${upload.file.size}`
-    localStorage.removeItem(localKey)
-    if (upload.r2UploadId && upload.r2Key) {
-      fetch('/api/upload/abort', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadId: upload.r2UploadId, key: upload.r2Key }),
-      }).catch(() => {})
-    }
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    const newItems: QueueItem[] = Array.from(files).map(file => {
+      const id = crypto.randomUUID(); fileMap.current.set(id, file);
+      return { id, fileName: file.name, fileSize: file.size, fileType: file.type, status: 'pending', progress: 0, thumbnail: null, recordedAt: null }
+    })
+    setQueue(prev => [...prev, ...newItems])
   }, [])
 
-  const handleReprocess = async (id: string) => {
-    setProcessingIds(prev => new Set(prev).add(id))
-    const res = await fetch('/api/video-upload/process', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ video_upload_id: id }),
-    })
-    if (!res.ok) {
-      setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-    }
-  }
-
-  const handleReanalyze = async (id: string) => {
-    setReanalyzingIds(prev => new Set(prev).add(id))
-    try {
-      const res = await fetch(`/api/video-upload/${id}/reanalyze`, { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        alert(err.error || 'Re-analysis failed')
-      }
-    } catch {}
-    finally {
-      setReanalyzingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-    }
-  }
-
-  const handleGenerateThumbnail = async (id: string) => {
-    setThumbnailErrorIds(prev => { const next = new Set(prev); next.delete(id); return next })
-    setThumbnailGenIds(prev => new Set(prev).add(id))
-    try {
-      // Step 1: Get a signed video URL from the server
-      const urlRes = await fetch(`/api/video-upload/${id}/signed-url`)
-      if (!urlRes.ok) throw new Error('Could not get video URL')
-      const { signedUrl } = await urlRes.json()
-
-      // Step 2: Capture a frame directly in the browser — no Replicate, no queue
-      const thumbnail = await captureFrameFromVideoUrl(signedUrl)
-      if (!thumbnail) throw new Error('Frame capture failed (HEVC on Chrome is unsupported — try Safari)')
-
-      // Step 3: Save directly to DB
-      const saveRes = await fetch(`/api/video-upload/${id}/thumbnail`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thumbnail_url: thumbnail }),
-      })
-      if (!saveRes.ok) throw new Error('Failed to save thumbnail')
-
-      // Step 4: Update UI immediately
-      setUploads(prev => prev.map(u => u.id === id ? { ...u, thumbnail_url: thumbnail } : u))
-    } catch (err: any) {
-      console.error('[handleGenerateThumbnail]', err.message)
-      setThumbnailErrorIds(prev => new Set(prev).add(id))
-    } finally {
-      setThumbnailGenIds(prev => { const next = new Set(prev); next.delete(id); return next })
-    }
-  }
-
-  const handleReanalyzeAll = async () => {
-    if (!confirm('Re-analyze all processed uploads with the updated AI prompt? This will extract new entity types (decisions, values, tools, principles, etc.) from your existing transcripts. May take a few minutes.')) return
-    setReanalyzeAllState('running')
-    try {
-      const res = await fetch('/api/video-upload/reanalyze-all', { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        setReanalyzeAllState('done')
-      } else {
-        alert(data.error || 'Failed to trigger re-analysis')
-        setReanalyzeAllState('idle')
-      }
-    } catch {
-      setReanalyzeAllState('idle')
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this upload and all its data?')) return
-    const res = await fetch(`/api/video-upload/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      setUploads(prev => prev.filter(u => u.id !== id))
-      if (expandedId === id) { setExpandedId(null); setExpandedData(null) }
-    }
-  }
-
-  const toggleExpand = async (id: string) => {
-    if (expandedId === id) { setExpandedId(null); setExpandedData(null); return }
-    setExpandedId(id)
-    setExpandedData(null)
-    const res = await fetch(`/api/video-upload/${id}`)
-    if (res.ok) {
-      const data = await res.json()
-      setExpandedData(data.upload)
-    }
-  }
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(e.type === 'dragenter' || e.type === 'dragover')
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
-  }
-
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-  }
-
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return null
-    const m = Math.floor(seconds / 60)
-    const s = Math.floor(seconds % 60)
-    return `${m}:${s.toString().padStart(2, '0')}`
-  }
-
-  const statusConfig: Record<string, { label: string; icon: typeof Loader2; color: string }> = {
-    uploaded:    { label: 'Uploaded',       icon: Clock,        color: 'text-[var(--text-tertiary)]' },
-    transcribing:{ label: 'Transcribing...', icon: Loader2,      color: 'text-blue-400' },
-    analyzing:   { label: 'Analyzing...',    icon: Brain,        color: 'text-purple-400' },
-    processed:   { label: 'Processed',       icon: CheckCircle2, color: 'text-green-400' },
-    error:       { label: 'Error',           icon: AlertCircle,  color: 'text-red-400' },
-    deleting:    { label: 'Deleting...',     icon: Loader2,      color: 'text-[var(--text-tertiary)]' },
-    deleted:     { label: 'Deleted',         icon: Trash2,       color: 'text-[var(--text-tertiary)]' },
-  }
-
-  const hasActiveUploads = activeUploads.length > 0
-
-  const filteredUploads = uploads
-    .filter(u => {
-      if (filterType === 'video') return u.mime_type.startsWith('video/')
-      if (filterType === 'audio') return u.mime_type.startsWith('audio/')
-      return true
-    })
+  const sortedUploads = [...uploads]
     .filter(u => u.file_name.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
       if (sortBy === 'date') return new Date(b.recorded_at || b.created_at).getTime() - new Date(a.recorded_at || a.created_at).getTime()
@@ -721,439 +396,150 @@ export default function UploadsPage() {
     })
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 md:py-12">
-      {/* Header */}
-      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-light tracking-tight text-[var(--text-primary)] mb-2">
-            Neovlog
-          </h1>
-          <p className="text-[14px] text-[var(--text-secondary)] max-w-lg leading-relaxed">
-            Drop recordings to ingest — transcribed, analyzed, and synthesized into intelligence.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleReanalyzeAll}
-            disabled={reanalyzeAllState === 'running'}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50 whitespace-nowrap"
-          >
-            {reanalyzeAllState === 'running' ? (
-              <><Loader2 size={13} className="animate-spin" /> Re-analyzing...</>
-            ) : reanalyzeAllState === 'done' ? (
-              <><Sparkles size={13} className="text-green-400" /> Queued</>
-            ) : (
-              <><Brain size={13} /> Re-analyze all</>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Control Bar */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8 bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border-light)] shadow-sm">
-        <div className="flex-1 flex gap-2">
-          <div className="relative flex-1">
-             <input 
-               type="text" 
-               placeholder="Search files..."
-               value={searchQuery}
-               onChange={e => setSearchQuery(e.target.value)}
-               className="w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-             />
-             <Layers size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+    <div className="min-h-screen bg-[#020203] text-zinc-100 pb-20 selection:bg-blue-500/30">
+      <div className="max-w-[1600px] mx-auto px-6 pt-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="space-y-1">
+            <h1 className="text-6xl font-black tracking-tighter bg-gradient-to-b from-white to-zinc-500 bg-clip-text text-transparent">Upload Center</h1>
+            <p className="text-zinc-500 text-lg font-medium flex items-center gap-2"><Zap className="w-5 h-5 text-blue-500 fill-blue-500" />Fault-tolerant media ingestion.</p>
           </div>
-          <select 
-            value={sortBy} 
-            onChange={e => setSortBy(e.target.value as any)}
-            className="bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
-          >
-            <option value="date">Sort: Date</option>
-            <option value="size">Sort: Size</option>
-            <option value="name">Sort: Name</option>
-          </select>
+          <div className="flex items-center gap-4">
+             <div className="flex items-center gap-1 bg-zinc-900/40 p-1.5 rounded-2xl border border-zinc-800/50 backdrop-blur-xl">
+              <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-zinc-800' : 'text-zinc-600'}`}><Grid className="w-5 h-5" /></button>
+              <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-zinc-800' : 'text-zinc-600'}`}><List className="w-5 h-5" /></button>
+            </div>
+            {uploads.some(u => u.status !== 'processed' && u.status !== 'error') && (
+              <button 
+                onClick={handleResetAll}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 hover:bg-red-500/20 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Queue
+              </button>
+            )}
+            <button onClick={fetchUploads} className="p-3 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl text-zinc-500 hover:text-white transition-all shadow-lg active:scale-95"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)]">
-           <button 
-             onClick={() => setFilterType('all')}
-             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'all' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
-           >
-             All
-           </button>
-           <button 
-             onClick={() => setFilterType('video')}
-             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'video' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
-           >
-             Video
-           </button>
-           <button 
-             onClick={() => setFilterType('audio')}
-             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterType === 'audio' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
-           >
-             Audio
-           </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-light)]">
-           <button 
-             onClick={() => setViewMode('grid')}
-             className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)]'}`}
-           >
-             <Layers size={14} />
-           </button>
-           <button 
-             onClick={() => setViewMode('list')}
-             className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--text-tertiary)]'}`}
-           >
-             <X size={14} className="rotate-45" />
-           </button>
-        </div>
-      </div>
-
-      {/* Upload Zone */}
-      <div
-        className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all mb-10 ${
-          dragActive
-            ? 'border-[var(--accent)] bg-[var(--accent)]/5 shadow-inner'
-            : 'border-[var(--border-light)] hover:border-[var(--accent)]/50 bg-[var(--bg-card)]'
-        }`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        <div className="w-16 h-16 bg-[var(--accent)]/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[var(--accent)]/10">
-          <Upload size={32} className="text-[var(--accent)]" />
-        </div>
-        <p className="text-[var(--text-primary)] text-lg font-light tracking-tight mb-1">
-          Drop recordings to ingest
-        </p>
-        <p className="text-sm text-[var(--text-tertiary)] mb-6 opacity-60">
-          MP4, MOV, MP3, M4A — up to 4GB via R2
-        </p>
-        <label className="btn btn-primary px-8 rounded-xl cursor-pointer inline-flex shadow-lg shadow-[var(--accent)]/20">
-          Select Files
-          <input
-            type="file"
-            className="hidden"
-            accept="video/*,audio/*"
-            multiple
-            onChange={e => e.target.files && handleFiles(e.target.files)}
-          />
-        </label>
-      </div>
-
-      {/* Active Uploads */}
-      {hasActiveUploads && (
-        <div className="mb-6 space-y-3">
-          {activeUploads.map(upload => (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-4 space-y-8">
             <div
-              key={upload.id}
-              className="border border-[var(--border-medium)] rounded-xl bg-[var(--bg-card)] px-5 py-4"
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files) }}
+              className={`relative group cursor-pointer transition-all duration-700 rounded-[2.5rem] border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-500/5 scale-[1.02]' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'} aspect-square md:aspect-video lg:aspect-square flex flex-col items-center justify-center p-10 overflow-hidden ring-1 ring-inset ring-white/5`}
+              onClick={() => document.getElementById('file-input')?.click()}
             >
-              <div className="flex items-center gap-3 mb-3">
-                <Video size={16} className="text-[var(--text-tertiary)] flex-shrink-0" />
-                <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">
-                  {upload.file.name}
-                </span>
-                <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
-                  {formatBytes(upload.bytesUploaded)} / {formatBytes(upload.bytesTotal)}
-                </span>
-                <button
-                  onClick={() => handlePauseResume(upload)}
-                  className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-                  title={upload.status === 'uploading' ? 'Pause' : 'Resume'}
-                >
-                  {upload.status === 'uploading' ? <Pause size={14} /> : <RotateCcw size={14} />}
-                </button>
-                <button
-                  onClick={() => handleCancelUpload(upload)}
-                  className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
-                  title="Cancel"
-                >
-                  <X size={14} />
-                </button>
-              </div>
+              <input id="file-input" type="file" multiple accept="video/*" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+              <div className="relative mb-6 p-7 rounded-[2rem] bg-zinc-950 border border-zinc-800 group-hover:scale-110 group-hover:rotate-3 transition-all duration-700"><Upload className="w-12 h-12 text-blue-500 filter drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" /></div>
+              <h3 className="text-2xl font-bold text-zinc-200 tracking-tight">Ingest Recordings</h3>
+              <p className="text-zinc-500 text-sm mt-2 font-medium opacity-60">Persistent multipart ingestion</p>
+            </div>
 
-              <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    upload.status === 'complete' ? 'bg-green-400' :
-                    upload.status === 'error' ? 'bg-red-400' :
-                    upload.status === 'paused' ? 'bg-[var(--text-tertiary)]' :
-                    'bg-[var(--accent)]'
-                  }`}
-                  style={{ width: `${upload.progress}%` }}
-                />
+            {queue.length > 0 && (
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center justify-between px-4">
+                  <div className="flex items-center gap-3"><Loader2 className={`w-5 h-5 text-blue-500 ${queue.some(i => !['done','skipped','error'].includes(i.status)) ? 'animate-spin' : ''}`} /><h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400">Processing Pipeline</h3></div>
+                  <label className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 cursor-pointer bg-zinc-900/80 px-3 py-1.5 rounded-xl border border-zinc-800/50 backdrop-blur-md">
+                    <input type="checkbox" checked={autoSkip} onChange={e => setAutoSkip(e.target.checked)} className="accent-blue-500" />Auto-skip
+                  </label>
+                </div>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                  {queue.map(item => (
+                    <div key={item.id} className={`p-4 rounded-[1.75rem] border backdrop-blur-3xl transition-all duration-500 ${item.status === 'error' ? 'bg-red-500/5 border-red-500/20' : item.status === 'skipped' ? 'bg-zinc-800/20 border-zinc-800/50 grayscale' : item.status === 'done' ? 'bg-green-500/5 border-green-500/20' : 'bg-zinc-900/30 border-zinc-800'}`}>
+                      <div className="flex gap-5">
+                        <div className="relative w-16 h-16 rounded-2xl bg-zinc-950 overflow-hidden shrink-0 border border-zinc-800/50">
+                          {item.thumbnail ? <img src={item.thumbnail} className="w-full h-full object-cover" /> : <VideoIcon className="w-6 h-6 absolute inset-0 m-auto text-zinc-800" />}
+                          {item.status === 'uploading' && <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-500 transition-all duration-1000" style={{ width: `${item.progress}%` }} />}
+                          {item.status === 'done' && <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[2px]"><Check className="w-6 h-6 text-green-400" /></div>}
+                        </div>
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-sm font-bold truncate text-zinc-100 pr-2" title={item.fileName}>{item.fileName}</span>
+                             <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase tracking-widest border ${item.status === 'error' ? 'text-red-500 border-red-500/20' : item.status === 'skipped' ? 'text-zinc-500 border-zinc-700' : item.status === 'done' ? 'text-green-400 border-green-500/20' : 'text-blue-400 border-blue-500/20'}`}>
+                               {item.status}
+                             </span>
+                          </div>
+                          {item.status === 'error' ? <p className="text-red-400/80 text-[10px] italic leading-tight">{item.error}</p> : <div className="flex items-center gap-4 text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1"><span>{formatBytes(item.fileSize)}</span>{item.status === 'uploading' && <span>{item.progress}%</span>}</div>}
+                        </div>
+                        <button onClick={() => { abortControllers.current.get(item.id)?.abort(); setQueue(q => q.filter(i => i.id !== item.id)) }} className="pt-1 text-zinc-700 hover:text-white"><X className="w-5 h-5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
+            )}
+          </div>
 
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-[var(--text-tertiary)] flex items-center gap-2">
-                  {upload.status === 'complete' ? 'Upload complete — queued for processing' :
-                   upload.status === 'error' ? upload.error :
-                   upload.status === 'paused' ? 'Paused' :
-                   `${upload.progress}%`}
-                  {upload.recordedAt && (
-                    <span className="flex items-center gap-1 text-[var(--accent)] ml-2">
-                      <Sparkles size={10} /> Recorded: {new Date(upload.recordedAt).toLocaleDateString()}
-                    </span>
-                  )}
-                </span>
+          <div className="lg:col-span-8 space-y-8">
+            <div className="flex flex-col md:flex-row gap-5 items-center mb-10">
+              <div className="relative flex-1 group w-full">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600 group-focus-within:text-blue-500 transition-all duration-500" />
+                <input type="text" placeholder="Scan library signals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-zinc-900/20 border border-zinc-800/50 rounded-[1.75rem] py-4.5 pl-14 pr-6 focus:border-blue-500/30 outline-none text-base transition-all backdrop-blur-xl" />
+              </div>
+              <div className="flex bg-zinc-900/40 p-1.5 rounded-[1.25rem] border border-zinc-800/50 backdrop-blur-xl shrink-0">
+                {(['date', 'size', 'name'] as const).map(mode => <button key={mode} onClick={() => setSortBy(mode)} className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${sortBy === mode ? 'bg-zinc-800 text-white' : 'text-zinc-600'}`}>{mode}</button>)}
               </div>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Main List/Grid */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
-          <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
-        </div>
-      ) : fetchError ? (
-        <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-red-400/20 border-dashed">
-          <div className="w-16 h-16 bg-red-400/5 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle size={32} className="text-red-400/60" />
-          </div>
-          <p className="text-[var(--text-primary)] font-medium">Could not load uploads</p>
-          <p className="text-xs font-mono text-red-400/70 mt-2 max-w-md mx-auto px-4">{fetchError}</p>
-          <button
-            onClick={() => { setLoading(true); fetchUploads() }}
-            className="mt-6 px-4 py-2 rounded-lg text-sm border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
-          >
-            Retry
-          </button>
-        </div>
-      ) : filteredUploads.length === 0 && !hasActiveUploads ? (
-        <div className="text-center py-32 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-light)] border-dashed">
-          <div className="w-16 h-16 bg-[var(--bg-secondary)] rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
-             <Video size={32} className="text-[var(--text-tertiary)]" />
-          </div>
-          <p className="text-[var(--text-primary)] font-medium">No uploads yet</p>
-          <p className="text-sm text-[var(--text-tertiary)] mt-1">Drop files above to get started.</p>
-        </div>
-      ) : (
-        <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
-          {filteredUploads.map(upload => {
-            const status = statusConfig[upload.status] || statusConfig.uploaded
-            const StatusIcon = status.icon
-            const isExpanded = expandedId === upload.id
-            const isAnimating = upload.status === 'transcribing' || upload.status === 'analyzing'
-            const isVideo = upload.mime_type.startsWith('video/')
-
-            if (viewMode === 'grid') {
-              return (
-                <div 
-                  key={upload.id}
-                  className={`group relative bg-[var(--bg-card)] border rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-[var(--accent)]/5 ${isExpanded ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/20 shadow-md' : 'border-[var(--border-light)]'}`}
-                >
-                  <div className="aspect-video relative bg-[var(--bg-secondary)] overflow-hidden cursor-pointer" onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}>
-                    {upload.thumbnail_url ? (
-                      <img src={upload.thumbnail_url} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    ) : upload.video_url ? (
-                      <VideoThumb videoUrl={upload.video_url} />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-30 group-hover:opacity-50 transition-opacity">
-                         {isVideo ? <Video size={32} /> : <FileAudio size={32} />}
-                         <span className="text-[10px] font-mono tracking-widest uppercase">{isVideo ? 'Video' : 'Audio'}</span>
+            {loading && uploads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-48 bg-zinc-900/5 rounded-[3rem] border border-zinc-900/50 border-dashed"><RefreshCw className="w-16 h-16 text-zinc-800 animate-spin mb-8" /><p className="text-zinc-700 font-black uppercase tracking-[0.3em] text-xs">Syncing Archive...</p></div>
+            ) : (
+              <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8" : "space-y-6"}>
+                {sortedUploads.map(item => (
+                  <div key={item.id} className={`group relative overflow-hidden transition-all duration-700 rounded-[2rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
+                    <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
+                      {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
+                      <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
+                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border backdrop-blur-xl ${
+                          item.status === 'processed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
+                          item.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
+                          'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                        }`}>
+                          {item.status.replace(/-/g, ' ')}
+                        </div>
                       </div>
-                    )}
-                    
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white text-[10px] font-medium transition-all">
-                      <StatusIcon size={11} className={isAnimating ? 'animate-spin' : ''} />
-                      {status.label}
+                      {item.duration_seconds && <div className="absolute bottom-5 left-5 px-3 py-1.5 rounded-xl bg-black/60 text-white text-[10px] font-black tracking-widest backdrop-blur-xl border border-white/5 shadow-2xl">{formatDuration(item.duration_seconds)}</div>}
                     </div>
-
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-between text-white">
-                       <span className="text-[10px] font-mono shadow-sm">{formatBytes(upload.file_size_bytes)}</span>
-                       {upload.duration_seconds && (
-                         <span className="text-[10px] font-mono shadow-sm">{formatDuration(upload.duration_seconds)}</span>
-                       )}
-                    </div>
-                  </div>
-
-                  <div className="p-4">
-                     <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate mb-2 group-hover:text-[var(--accent)] transition-colors" title={upload.file_name}>
-                        {upload.file_name}
-                     </h3>
-                     
-                     <div className="flex items-center justify-between text-[11px] text-[var(--text-tertiary)] mb-4">
-                        <span className="flex items-center gap-1">
-                           <Clock size={10} />
-                           {new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}
-                        </span>
-                        {upload.tags && upload.tags.length > 0 && (
-                          <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-medium">
-                            {upload.tags[0]}
-                          </span>
+                    <div className="p-7">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="min-w-0 pr-4">
+                          <h4 className="font-bold text-zinc-100 truncate text-base mb-1 group-hover:text-blue-400 transition-colors" title={item.file_name}>{item.file_name}</h4>
+                          <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest opacity-60">ID: {item.id.slice(0, 8)}</p>
+                        </div>
+                        {item.status === 'error' ? (
+                          <button 
+                            onClick={() => handleReset(item.id)}
+                            className="p-2 bg-red-500/20 rounded-xl text-red-400 hover:bg-red-500/30 transition-all active:scale-90"
+                            title="Retry Upload"
+                          >
+                            <RotateCcw className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <MoreVertical className="w-5 h-5 text-zinc-800" />
                         )}
-                     </div>
-
-                     {upload.status === 'error' && upload.error_message && (
-                       <p className="text-[10px] text-red-400/80 mb-3 leading-relaxed line-clamp-2" title={upload.error_message}>
-                         {upload.error_message}
-                       </p>
-                     )}
-
-                     <div className="flex items-center gap-2">
-                        {upload.status === 'processed' ? (
-                          <>
-                            <button
-                              onClick={() => toggleExpand(upload.id)}
-                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase border border-[var(--border-light)] hover:border-[var(--accent)]/30 hover:bg-[var(--accent)]/5 transition-all"
-                            >
-                              {isExpanded ? 'Collapse' : 'Details'}
-                            </button>
-                            {isVideo && (
-                              <button
-                                onClick={() => handleGenerateThumbnail(upload.id)}
-                                disabled={thumbnailGenIds.has(upload.id)}
-                                title={thumbnailErrorIds.has(upload.id) ? 'Thumbnail failed — click to retry' : 'Regenerate thumbnail from video'}
-                                className={`p-1.5 rounded-lg transition-all border disabled:opacity-40 ${
-                                  thumbnailErrorIds.has(upload.id)
-                                    ? 'text-red-400 hover:bg-red-400/10 border-red-400/20 hover:border-red-400/40'
-                                    : 'text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] border-transparent hover:border-[var(--accent)]/20'
-                                }`}
-                              >
-                                {thumbnailGenIds.has(upload.id)
-                                  ? <Loader2 size={13} className="animate-spin" />
-                                  : <Sparkles size={13} />}
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleReanalyze(upload.id)}
-                              disabled={reanalyzingIds.has(upload.id)}
-                              title="Re-run AI analysis to extract new entity types"
-                              className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-[var(--accent)]/10 hover:text-[var(--accent)] transition-all border border-transparent hover:border-[var(--accent)]/20 disabled:opacity-40"
-                            >
-                              {reanalyzingIds.has(upload.id)
-                                ? <Loader2 size={13} className="animate-spin" />
-                                : <Brain size={13} />}
-                            </button>
-                          </>
-                        ) : upload.status === 'error' ? (
-                           <button
-                              onClick={() => handleReprocess(upload.id)}
-                              disabled={processingIds.has(upload.id)}
-                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase bg-red-400/10 text-red-500 hover:bg-red-400/20 transition-all border border-red-400/20"
-                           >
-                              {processingIds.has(upload.id) ? 'Retrying...' : 'Retry'}
-                           </button>
-                        ) : (() => {
-                          const stuckMins = (Date.now() - new Date(upload.updated_at).getTime()) / 60000
-                          const isStuck = stuckMins > 10 && ['transcribing', 'analyzing', 'uploaded'].includes(upload.status)
-                          return isStuck ? (
-                            <button
-                              onClick={() => handleReprocess(upload.id)}
-                              disabled={processingIds.has(upload.id)}
-                              title={`Stuck for ${Math.round(stuckMins)}m — click to reset and retry`}
-                              className="flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20 transition-all border border-yellow-400/20"
-                            >
-                              {processingIds.has(upload.id) ? 'Retrying...' : 'Stuck — Retry'}
-                            </button>
-                          ) : (
-                            <div className="flex-1 py-1.5 text-center text-[10px] font-mono text-[var(--text-tertiary)] italic">
-                              Processing...
-                            </div>
-                          )
-                        })()}
-                        <button 
-                          onClick={() => handleDelete(upload.id)}
-                          className="p-1.5 rounded-lg text-[var(--text-tertiary)] hover:bg-red-400/10 hover:text-red-400 transition-all border border-transparent hover:border-red-400/20"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                     </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/60 backdrop-blur-sm shadow-2xl" onClick={() => setExpandedId(null)}>
-                       <div className="bg-[var(--bg-primary)] w-full max-w-4xl max-h-full rounded-3xl overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center justify-between p-6 border-b border-[var(--border-light)] bg-[var(--bg-secondary)]">
-                             <div>
-                               <h2 className="text-xl font-medium text-[var(--text-primary)]">{upload.file_name}</h2>
-                               <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest mt-1">{new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}</p>
-                             </div>
-                             <button onClick={() => setExpandedId(null)} className="p-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-all">
-                               <X size={20} className="text-[var(--text-secondary)]" />
-                             </button>
-                          </div>
-                          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                             {!expandedData ? (
-                               <div className="flex flex-col items-center justify-center py-20 gap-4">
-                                 <Loader2 size={32} className="animate-spin text-[var(--accent)] opacity-40" />
-                                 <p className="text-xs font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Loading...</p>
-                               </div>
-                             ) : (
-                               <SessionDetail upload={expandedData} />
-                             )}
-                          </div>
-                       </div>
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            return (
-              <div
-                key={upload.id}
-                className={`border rounded-xl bg-[var(--bg-card)] overflow-hidden transition-all ${isExpanded ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/10' : 'border-[var(--border-light)]'}`}
-              >
-                <div
-                  className="flex items-center gap-4 px-5 py-3 cursor-pointer hover:bg-[var(--bg-tertiary)]/50 transition-colors"
-                  onClick={() => upload.status === 'processed' && toggleExpand(upload.id)}
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0 border border-[var(--border-light)]">
-                    {isVideo ? <Video size={18} className="text-[var(--text-tertiary)]" /> : <FileAudio size={18} className="text-[var(--text-tertiary)]" />}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{upload.file_name}</p>
-                    <div className="flex items-center gap-3 mt-0.5 opacity-60">
-                      <span className="text-[10px] font-mono">{formatBytes(upload.file_size_bytes)}</span>
-                      <span className="text-[10px] font-mono">{new Date(upload.recorded_at || upload.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  <div className={`hidden sm:flex items-center gap-1.5 flex-shrink-0 ${status.color}`}>
-                    <StatusIcon size={12} className={isAnimating ? 'animate-spin' : ''} />
-                    <span className="text-[10px] font-mono uppercase tracking-[0.1em]">{status.label}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {upload.status === 'processed' && (
-                      <button className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </button>
-                    )}
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDelete(upload.id) }}
-                      className="p-1.5 text-[var(--text-tertiary)] hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="border-t border-[var(--border-light)] p-8 bg-[var(--bg-primary)]">
-                    {!expandedData ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
                       </div>
-                    ) : (
-                      <SessionDetail upload={expandedData} />
-                    )}
+                      {item.status === 'error' && item.error_message && (
+                        <div className="mb-4 p-3 bg-red-500/5 rounded-2xl border border-red-500/10 overflow-hidden">
+                          <p className="text-[10px] text-red-400/80 font-medium italic line-clamp-2 leading-relaxed">{item.error_message}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-6 border-t border-zinc-800/50 pt-5 mt-2">
+                        <div className="flex items-center gap-2.5 text-[10px] text-zinc-400 font-black tracking-[0.15em]"><Calendar className="w-3.5 h-3.5 text-blue-500/50" />{formatDate(item.recorded_at || item.created_at)}</div>
+                        <div className="flex items-center gap-2.5 text-[10px] text-zinc-400 font-black tracking-[0.15em]"><Database className="w-3.5 h-3.5 text-blue-500/50" />{formatBytes(item.file_size_bytes)}</div>
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
-            )
-          })}
+            )}
+          </div>
         </div>
-      )}
+      </div>
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #18181b; border-radius: 10px; }
+      `}</style>
     </div>
   )
 }
-

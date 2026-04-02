@@ -152,6 +152,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const fileName = searchParams.get('file_name')
+    const fileSizeBytes = searchParams.get('file_size_bytes')
     const limit = parseInt(searchParams.get('limit') || '200')
     const offset = parseInt(searchParams.get('offset') || '0')
 
@@ -161,13 +163,19 @@ export async function GET(request: NextRequest) {
       .eq('user_id', session.user.id)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
 
     if (status) {
       query = query.eq('status', status)
     }
+    if (fileName) {
+      query = query.eq('file_name', fileName)
+    }
+    if (fileSizeBytes) {
+      query = query.eq('file_size_bytes', parseInt(fileSizeBytes))
+    }
 
     const { data, error } = await query
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Supabase query error in GET /api/video-upload:', error)
