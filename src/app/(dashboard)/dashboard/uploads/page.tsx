@@ -121,10 +121,18 @@ async function captureVideoThumbnail(source: File | string): Promise<string> {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`;
       resolve(`data:image/svg+xml;base64,${btoa(svg)}`);
     };
-    video.onerror = () => {
+    video.onerror = (e) => {
+      console.error("[captureVideoThumbnail] Media error:", video.error || e);
       if (!isUrl) URL.revokeObjectURL(url);
-      resolve('');
+      resolve("");
     };
+
+    // Global 10s timeout to prevent hanging the UI
+    setTimeout(() => {
+      console.warn("[captureVideoThumbnail] Global timeout reached.");
+      if (!isUrl) URL.revokeObjectURL(url);
+      resolve("");
+    }, 100000);
   });
 }
 
@@ -209,11 +217,13 @@ export default function UploadsPage() {
               setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
               return
             }
+          } else {
+            console.warn('[Instant Fix] Browser returned empty thumb or SVG. Falling back to backend.');
           }
         } catch (err) {
           console.error('[Instant Fix] Browser capture failed:', err)
         }
-        setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+        // Fall through to fallback path if instant fix fails or returns empty
       }
 
       // Fallback: Trigger Inngest pipeline (the "Slow Path" which I've also fixed)
@@ -225,7 +235,7 @@ export default function UploadsPage() {
       })
       if (res.ok) {
         setMenuOpenId(null)
-        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'starting', error_message: null } : u))
+        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'starting' as any, error_message: null } : u))
         fetchUploads()
       }
       setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
@@ -547,7 +557,7 @@ export default function UploadsPage() {
                 {sortedUploads.map(item => (
                   <div 
                     key={item.id} 
-                    className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'} ${menuOpenId === item.id ? 'z-[100]' : 'z-0'}`}
+                    className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'} ${menuOpenId === item.id ? 'z-50' : 'z-0'}`}
                   >
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
