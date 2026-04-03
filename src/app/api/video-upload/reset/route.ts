@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Upload not found' }, { status: 404 })
     }
 
-    // 2. Reset status to 'uploaded' and clear error
+    // 2. Reset status to 'starting' (to provide immediate feedback) and clear error
     const { error: updateError } = await supabase
       .from('video_uploads')
       .update({
-        status: 'uploaded',
+        status: 'starting',
         error_message: null,
         updated_at: new Date().toISOString(),
       })
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[API] Reset (${mode}) and re-triggered processing for upload ${id}`);
 
-    return NextResponse.json({ success: true, id, status: 'uploaded' })
+    return NextResponse.json({ success: true, id, status: 'starting' })
   } catch (error: any) {
     console.error('Reset upload error:', error)
     return NextResponse.json({ error: 'Reset failed', message: error.message }, { status: 500 })

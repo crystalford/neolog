@@ -543,7 +543,7 @@ export default function UploadsPage() {
             ) : (
               <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" : "space-y-6"}>
                 {sortedUploads.map(item => (
-                  <div key={item.id} className={`group relative overflow-hidden transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
+                  <div key={item.id} className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
                       <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
@@ -568,20 +568,20 @@ export default function UploadsPage() {
                             onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === item.id ? null : item.id) }} 
                             className={`p-2 rounded-xl transition-all ${menuOpenId === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:text-white'}`}
                           >
-                            <MoreVertical className="w-5 h-5" />
+                            <MoreVertical className={`w-5 h-5 ${processingIds.has(item.id) ? 'animate-spin' : ''}`} />
                           </button>
                           
                           {menuOpenId === item.id && (
                             <div 
                               ref={menuRef}
-                              className="absolute right-0 top-12 w-56 bg-zinc-900 border border-zinc-800 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200"
+                              className="absolute right-0 top-12 w-56 bg-zinc-900 border border-zinc-800 rounded-2xl p-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] animate-in fade-in zoom-in-95 duration-200"
                             >
                               <button 
                                 onClick={() => handleReset(item.id, 'thumbnail')}
                                 className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-800 hover:text-white rounded-xl transition-all"
                               >
                                 <Zap className="w-4 h-4 text-blue-500" />
-                                Fix Preview (Low Cost)
+                                Fix Thumbnail (Fast Fix)
                               </button>
                               <button 
                                 onClick={() => handleReset(item.id, 'full')}

@@ -74,7 +74,8 @@ export const processUpload = inngest.createFunction(
         throw new Error('Upload not found')
       }
 
-      if (upload.status === 'processed') {
+      const mode = event.data.mode || 'full'
+      if (upload.status === 'processed' && mode !== 'full') {
         return { skip: true as const, upload }
       }
 

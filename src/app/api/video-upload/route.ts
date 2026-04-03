@@ -208,8 +208,8 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 2. Resolve Video Playback (if no thumbnail or explicitly requested)
-      if (!u.thumbnail_url && videoPath) {
+      // 2. Resolve Video Playback (always provide if it exists, so Fix Preview can use it)
+      if (videoPath) {
         try {
           if (isR2) {
             const { presignDownloadUrl } = await import('@/lib/storage/r2')
