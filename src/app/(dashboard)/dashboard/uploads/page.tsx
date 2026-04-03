@@ -217,6 +217,7 @@ export default function UploadsPage() {
       }
 
       // Fallback: Trigger Inngest pipeline (the "Slow Path" which I've also fixed)
+      setProcessingIds(prev => new Set(prev).add(id)) // Show loading state early
       const res = await fetch('/api/video-upload/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -224,9 +225,10 @@ export default function UploadsPage() {
       })
       if (res.ok) {
         setMenuOpenId(null)
-        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'uploaded', error_message: null } : u))
+        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'starting', error_message: null } : u))
         fetchUploads()
       }
+      setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
     } catch (err) {
       console.error('Reset failed:', err)
     }
@@ -543,7 +545,10 @@ export default function UploadsPage() {
             ) : (
               <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" : "space-y-6"}>
                 {sortedUploads.map(item => (
-                  <div key={item.id} className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
+                  <div 
+                    key={item.id} 
+                    className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'} ${menuOpenId === item.id ? 'z-[100]' : 'z-0'}`}
+                  >
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
                       <div className="absolute top-5 right-5 flex flex-col items-end gap-2">

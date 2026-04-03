@@ -591,6 +591,8 @@ export type VideoBrief = {
 
 export type VideoUploadStatus =
   | 'uploaded'
+  | 'starting'
+  | 'processing'
   | 'transcribing'
   | 'analyzing'
   | 'processed'
