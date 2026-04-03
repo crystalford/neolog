@@ -183,12 +183,12 @@ export default function UploadsPage() {
     finally { setLoading(false) }
   }, [])
 
-  const handleReset = async (id: string) => {
+  const handleReset = async (id: string, mode: 'thumbnail' | 'full' = 'full') => {
     try {
       const res = await fetch('/api/video-upload/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, mode })
       })
       if (res.ok) {
         setMenuOpenId(null)
@@ -437,11 +437,11 @@ export default function UploadsPage() {
             </div>
             {uploads.some(u => u.status !== 'processed' && u.status !== 'error') && (
               <button 
-                onClick={handleResetAll}
+                onClick={() => handleResetAll()}
                 className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 hover:bg-red-500/20 transition-all text-xs font-black uppercase tracking-widest"
               >
                 <RotateCcw className="w-4 h-4" />
-                Reset Queue
+                Reset Stuck Queue
               </button>
             )}
             <button onClick={fetchUploads} className="p-3 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl text-zinc-500 hover:text-white transition-all shadow-lg active:scale-95"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
@@ -546,11 +546,18 @@ export default function UploadsPage() {
                               className="absolute right-0 top-12 w-56 bg-zinc-900 border border-zinc-800 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200"
                             >
                               <button 
-                                onClick={() => handleReset(item.id)}
+                                onClick={() => handleReset(item.id, 'thumbnail')}
                                 className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-800 hover:text-white rounded-xl transition-all"
                               >
-                                <RotateCcw className="w-4 h-4 text-blue-500" />
-                                Fix / Reprocess
+                                <Zap className="w-4 h-4 text-blue-500" />
+                                Fix Preview (Low Cost)
+                              </button>
+                              <button 
+                                onClick={() => handleReset(item.id, 'full')}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-xl transition-all"
+                              >
+                                <RotateCcw className="w-4 h-4 text-zinc-600" />
+                                Full Reprocess
                               </button>
                               <button 
                                 onClick={() => handleDelete(item.id)}

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id } = body
+    const { id, mode = 'full' } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Missing upload ID' }, { status: 400 })
@@ -51,10 +51,10 @@ export async function POST(request: NextRequest) {
     // 3. Re-trigger Inngest
     await inngest.send({
       name: 'video-upload/process',
-      data: { video_upload_id: id, user_id: session.user.id },
+      data: { video_upload_id: id, user_id: session.user.id, mode },
     })
 
-    console.log(`[API] Reset and re-triggered processing for upload ${id}`);
+    console.log(`[API] Reset (${mode}) and re-triggered processing for upload ${id}`);
 
     return NextResponse.json({ success: true, id, status: 'uploaded' })
   } catch (error: any) {

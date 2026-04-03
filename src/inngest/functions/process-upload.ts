@@ -461,6 +461,19 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 3: Transcribe ──
     const transcription = await step.run('transcribe', async () => {
+      const mode = event.data.mode || 'full'
+      const { upload } = activeContext
+
+      // Smart Skip: If we just need a thumbnail and already have a transcript, don't re-run Whisper
+      if (mode === 'thumbnail' && upload.transcript) {
+        console.log(`[Inngest] Skipping transcription for ${video_upload_id} (thumbnail mode)`)
+        return { 
+          text: upload.transcript, 
+          language: upload.analysis?.language || 'en', 
+          segments: upload.transcript_segments || [],
+          skipped: true 
+        }
+      }
 
       if (activeContext.upload.mime_type === 'text/plain') {
         const fileRes = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
@@ -551,6 +564,21 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 4: Analyze ──
     const analysisResult = await step.run('analyze', async () => {
+      const mode = event.data.mode || 'full'
+      const { upload } = activeContext
+
+      // Smart Skip: If we already have analysis and just need a thumbnail
+      if (mode === 'thumbnail' && (upload as any).analysis) {
+        console.log(`[Inngest] Skipping analysis for ${video_upload_id} (thumbnail mode)`)
+        return { 
+          analysis: (upload as any).analysis, 
+          modelUsed: (upload as any).analysis_model || 'skipped',
+          tags: (upload as any).tags || [],
+          clips: (upload as any).generated_clips || [],
+          posts: (upload as any).generated_posts || [],
+          skipped: true 
+        }
+      }
 
       await admin.from('video_uploads').update({
         transcript: transcription.text,
@@ -585,7 +613,7 @@ export const processUpload = inngest.createFunction(
         updated_at: new Date().toISOString(),
       }).eq('id', video_upload_id)
 
-      return { ...result, tags, clips, posts }
+      return { ...result, tags, clips, posts, skipped: false }
     })
 
     // ── Step 4a: Upsert entities into knowledge graph ──
