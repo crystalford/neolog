@@ -156,8 +156,21 @@ export default function UploadsPage() {
   const [sortBy, setSortBy] = useState<'date' | 'size' | 'name'>('date')
   const [autoSkip, setAutoSkip] = useState(true)
   
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const fileMap = useRef<Map<string, File>>(new Map())
   const abortControllers = useRef<Map<string, AbortController>>(new Map())
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpenId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const fetchUploads = useCallback(async () => {
     try {
@@ -178,12 +191,26 @@ export default function UploadsPage() {
         body: JSON.stringify({ id })
       })
       if (res.ok) {
+        setMenuOpenId(null)
         // Optimistic update
         setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'uploaded', error_message: null } : u))
         fetchUploads()
       }
     } catch (err) {
       console.error('Reset failed:', err)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Permanently remove this recording signal?')) return
+    try {
+      const res = await fetch(`/api/video-upload?id=${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setMenuOpenId(null)
+        setUploads(prev => prev.filter(u => u.id !== id))
+      }
+    } catch (err) {
+      console.error('Delete failed:', err)
     }
   }
 
@@ -421,48 +448,45 @@ export default function UploadsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <div className="lg:col-span-4 space-y-8">
+        <div className="space-y-12">
+          {/* Header Actions & Dropzone Row */}
+          <div className="flex flex-col lg:flex-row gap-8 items-start">
+            {/* Upload Dropzone - Now more compact and integrated */}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
               onDragLeave={() => setDragActive(false)}
               onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files) }}
-              className={`relative group cursor-pointer transition-all duration-700 rounded-[2.5rem] border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-500/5 scale-[1.02]' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'} aspect-square md:aspect-video lg:aspect-square flex flex-col items-center justify-center p-10 overflow-hidden ring-1 ring-inset ring-white/5`}
+              className={`relative group cursor-pointer transition-all duration-700 rounded-[2rem] border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-500/5 scale-[1.01]' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'} flex items-center gap-6 p-8 min-w-[320px] ring-1 ring-inset ring-white/5 shadow-2xl`}
               onClick={() => document.getElementById('file-input')?.click()}
             >
               <input id="file-input" type="file" multiple accept="video/*" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-              <div className="relative mb-6 p-7 rounded-[2rem] bg-zinc-950 border border-zinc-800 group-hover:scale-110 group-hover:rotate-3 transition-all duration-700"><Upload className="w-12 h-12 text-blue-500 filter drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" /></div>
-              <h3 className="text-2xl font-bold text-zinc-200 tracking-tight">Ingest Recordings</h3>
-              <p className="text-zinc-500 text-sm mt-2 font-medium opacity-60">Persistent multipart ingestion</p>
+              <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 group-hover:scale-110 group-hover:rotate-3 transition-all duration-700"><Upload className="w-6 h-6 text-blue-500" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-zinc-200">Ingest Recordings</h3>
+                <p className="text-zinc-500 text-xs mt-1 font-medium opacity-60">Persistent multipart ingestion</p>
+              </div>
             </div>
 
+            {/* Active Pipeline Stats / Queue Mini-view (if active) */}
             {queue.length > 0 && (
-              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center justify-between px-4">
-                  <div className="flex items-center gap-3"><Loader2 className={`w-5 h-5 text-blue-500 ${queue.some(i => !['done','skipped','error'].includes(i.status)) ? 'animate-spin' : ''}`} /><h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400">Processing Pipeline</h3></div>
-                  <label className="flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 cursor-pointer bg-zinc-900/80 px-3 py-1.5 rounded-xl border border-zinc-800/50 backdrop-blur-md">
-                    <input type="checkbox" checked={autoSkip} onChange={e => setAutoSkip(e.target.checked)} className="accent-blue-500" />Auto-skip
-                  </label>
+              <div className="flex-1 w-full space-y-4 animate-in slide-in-from-top-4 duration-700 overflow-hidden">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3"><Loader2 className="w-5 h-5 text-blue-500 animate-spin" /><h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">Processing Pipeline</h3></div>
+                  <button onClick={() => setQueue([])} className="text-[10px] uppercase font-black tracking-widest text-zinc-600 hover:text-white">Clear Queue</button>
                 </div>
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
                   {queue.map(item => (
-                    <div key={item.id} className={`p-4 rounded-[1.75rem] border backdrop-blur-3xl transition-all duration-500 ${item.status === 'error' ? 'bg-red-500/5 border-red-500/20' : item.status === 'skipped' ? 'bg-zinc-800/20 border-zinc-800/50 grayscale' : item.status === 'done' ? 'bg-green-500/5 border-green-500/20' : 'bg-zinc-900/30 border-zinc-800'}`}>
-                      <div className="flex gap-5">
-                        <div className="relative w-16 h-16 rounded-2xl bg-zinc-950 overflow-hidden shrink-0 border border-zinc-800/50">
-                          {item.thumbnail ? <img src={item.thumbnail} className="w-full h-full object-cover" /> : <VideoIcon className="w-6 h-6 absolute inset-0 m-auto text-zinc-800" />}
-                          {item.status === 'uploading' && <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-500 transition-all duration-1000" style={{ width: `${item.progress}%` }} />}
-                          {item.status === 'done' && <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[2px]"><Check className="w-6 h-6 text-green-400" /></div>}
+                    <div key={item.id} className={`min-w-[280px] p-4 rounded-2xl border backdrop-blur-3xl transition-all duration-500 ${item.status === 'error' ? 'bg-red-500/5 border-red-500/20' : item.status === 'done' ? 'bg-green-500/5 border-green-500/20' : 'bg-zinc-900/40 border-zinc-800'}`}>
+                      <div className="flex gap-4 items-center">
+                        <div className="relative w-12 h-12 rounded-xl bg-zinc-950 overflow-hidden shrink-0 border border-zinc-800/50">
+                          {item.thumbnail ? <img src={item.thumbnail} className="w-full h-full object-cover" /> : <VideoIcon className="w-5 h-5 absolute inset-0 m-auto text-zinc-800" />}
+                          {item.status === 'uploading' && <div className="absolute inset-x-0 bottom-0 h-1 bg-blue-500" style={{ width: `${item.progress}%` }} />}
                         </div>
-                        <div className="flex-1 min-w-0 py-0.5">
-                          <div className="flex items-center justify-between mb-2">
-                             <span className="text-sm font-bold truncate text-zinc-100 pr-2" title={item.fileName}>{item.fileName}</span>
-                             <span className={`text-[9px] px-2 py-0.5 rounded-lg font-black uppercase tracking-widest border ${item.status === 'error' ? 'text-red-500 border-red-500/20' : item.status === 'skipped' ? 'text-zinc-500 border-zinc-700' : item.status === 'done' ? 'text-green-400 border-green-500/20' : 'text-blue-400 border-blue-500/20'}`}>
-                               {item.status}
-                             </span>
-                          </div>
-                          {item.status === 'error' ? <p className="text-red-400/80 text-[10px] italic leading-tight">{item.error}</p> : <div className="flex items-center gap-4 text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1"><span>{formatBytes(item.fileSize)}</span>{item.status === 'uploading' && <span>{item.progress}%</span>}</div>}
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-xs font-bold truncate text-zinc-100">{item.fileName}</p>
+                          <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${item.status === 'error' ? 'text-red-500' : 'text-blue-400'}`}>{item.status}</p>
                         </div>
-                        <button onClick={() => { abortControllers.current.get(item.id)?.abort(); setQueue(q => q.filter(i => i.id !== item.id)) }} className="pt-1 text-zinc-700 hover:text-white"><X className="w-5 h-5" /></button>
+                        <button onClick={() => { abortControllers.current.get(item.id)?.abort(); setQueue(q => q.filter(i => i.id !== item.id)) }} className="text-zinc-700 hover:text-white"><X className="w-4 h-4" /></button>
                       </div>
                     </div>
                   ))}
@@ -471,8 +495,9 @@ export default function UploadsPage() {
             )}
           </div>
 
-          <div className="lg:col-span-8 space-y-8">
-            <div className="flex flex-col md:flex-row gap-5 items-center mb-10">
+          {/* Library Section */}
+          <div className="space-y-8">
+            <div className="flex flex-col md:flex-row gap-5 items-center">
               <div className="relative flex-1 group w-full">
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600 group-focus-within:text-blue-500 transition-all duration-500" />
                 <input type="text" placeholder="Scan library signals..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-zinc-900/20 border border-zinc-800/50 rounded-[1.75rem] py-4.5 pl-14 pr-6 focus:border-blue-500/30 outline-none text-base transition-all backdrop-blur-xl" />
@@ -485,9 +510,9 @@ export default function UploadsPage() {
             {loading && uploads.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-48 bg-zinc-900/5 rounded-[3rem] border border-zinc-900/50 border-dashed"><RefreshCw className="w-16 h-16 text-zinc-800 animate-spin mb-8" /><p className="text-zinc-700 font-black uppercase tracking-[0.3em] text-xs">Syncing Archive...</p></div>
             ) : (
-              <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8" : "space-y-6"}>
+              <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" : "space-y-6"}>
                 {sortedUploads.map(item => (
-                  <div key={item.id} className={`group relative overflow-hidden transition-all duration-700 rounded-[2rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
+                  <div key={item.id} className={`group relative overflow-hidden transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'}`}>
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
                       <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
@@ -502,22 +527,41 @@ export default function UploadsPage() {
                       {item.duration_seconds && <div className="absolute bottom-5 left-5 px-3 py-1.5 rounded-xl bg-black/60 text-white text-[10px] font-black tracking-widest backdrop-blur-xl border border-white/5 shadow-2xl">{formatDuration(item.duration_seconds)}</div>}
                     </div>
                     <div className="p-7">
-                      <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-start justify-between mb-4">
                         <div className="min-w-0 pr-4">
                           <h4 className="font-bold text-zinc-100 truncate text-base mb-1 group-hover:text-blue-400 transition-colors" title={item.file_name}>{item.file_name}</h4>
                           <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest opacity-60">ID: {item.id.slice(0, 8)}</p>
                         </div>
-                        {item.status === 'error' ? (
+                        <div className="relative">
                           <button 
-                            onClick={() => handleReset(item.id)}
-                            className="p-2 bg-red-500/20 rounded-xl text-red-400 hover:bg-red-500/30 transition-all active:scale-90"
-                            title="Retry Upload"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === item.id ? null : item.id) }} 
+                            className={`p-2 rounded-xl transition-all ${menuOpenId === item.id ? 'bg-zinc-800 text-white' : 'text-zinc-600 hover:text-white'}`}
                           >
-                            <RotateCcw className="w-5 h-5" />
+                            <MoreVertical className="w-5 h-5" />
                           </button>
-                        ) : (
-                          <MoreVertical className="w-5 h-5 text-zinc-800" />
-                        )}
+                          
+                          {menuOpenId === item.id && (
+                            <div 
+                              ref={menuRef}
+                              className="absolute right-0 top-12 w-56 bg-zinc-900 border border-zinc-800 rounded-2xl p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200"
+                            >
+                              <button 
+                                onClick={() => handleReset(item.id)}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-zinc-300 hover:bg-zinc-800 hover:text-white rounded-xl transition-all"
+                              >
+                                <RotateCcw className="w-4 h-4 text-blue-500" />
+                                Fix / Reprocess
+                              </button>
+                              <button 
+                                onClick={() => handleDelete(item.id)}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Remove Signal
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {item.status === 'error' && item.error_message && (
                         <div className="mb-4 p-3 bg-red-500/5 rounded-2xl border border-red-500/10 overflow-hidden">

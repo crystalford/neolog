@@ -122,6 +122,9 @@ export const processUpload = inngest.createFunction(
       }).eq('id', video_upload_id)
     }
 
+    // Immediate feedback for the UI
+    await heartbeat('starting')
+
     // ── Step 2: Extract audio & Archive Voice Signal ──
     const audioPath = await step.run('extract-audio', async () => {
       const { upload } = activeContext
@@ -420,7 +423,9 @@ export const processUpload = inngest.createFunction(
     // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
     await step.run('thumbnail-fallback', async () => {
       const { upload } = activeContext
-      if (upload.thumbnail_url) return
+      
+      // Overwrite if missing OR if it's just a placeholder SVG from the browser
+      if (upload.thumbnail_url && !upload.thumbnail_url.startsWith('data:image/svg')) return
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return
@@ -520,13 +525,13 @@ export const processUpload = inngest.createFunction(
     })
 
     // ── Step 3b: Store word-level transcript ──
-    if (transcription.words && transcription.words.length > 0) {
+    if (transcription && 'words' in transcription && transcription.words && transcription.words.length > 0) {
       await step.run('store-transcript-words', async () => {
         // Delete any existing words for this upload (idempotent)
         await admin.from('transcript_words').delete().eq('video_upload_id', video_upload_id)
 
         // Insert in batches of 500
-        const rows = transcription.words!.map((w, i) => ({
+        const rows = (transcription as any).words.map((w: any, i: number) => ({
           video_upload_id,
           user_id,
           word: w.word,
@@ -696,18 +701,18 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 4b: Pre-populate word cuts from clip suggestions ──
     // Words OUTSIDE any generated clip window are marked is_cut=true by default
-    if (transcription.words && transcription.words.length > 0 && analysisResult.clips?.length > 0) {
+    if (transcription && 'words' in transcription && transcription.words && transcription.words.length > 0 && analysisResult.clips?.length > 0) {
       await step.run('apply-clip-cuts', async () => {
         const clips = analysisResult.clips as Array<{ start: number; end: number }>
 
         // Words inside at least one clip window = keep (is_cut=false)
         // Words outside all clip windows = cut (is_cut=true)
-        const cutWordIndices: number[] = transcription.words!
-          .map((w, i) => {
+        const cutWordIndices: number[] = (transcription as any).words
+          .map((w: any, i: number) => {
             const inWindow = clips.some(c => w.start >= c.start && w.end <= c.end)
             return inWindow ? -1 : i
           })
-          .filter(i => i >= 0)
+          .filter((i: number) => i >= 0)
 
         if (cutWordIndices.length > 0) {
           // Batch update in chunks
