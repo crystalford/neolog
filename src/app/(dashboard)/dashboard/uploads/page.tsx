@@ -17,7 +17,7 @@ import type { VideoUpload } from '@/types/database'
 type UploadListItem = Pick<VideoUpload,
   'id' | 'file_name' | 'file_size_bytes' | 'mime_type' | 'duration_seconds' |
   'status' | 'tags' | 'error_message' | 'source_deleted' | 'processed_at' | 'recorded_at' | 'created_at' | 'updated_at' | 'thumbnail_url' | 'storage_provider'
->
+> & { video_url?: string | null }
 
 export type QueueItem = {
   id: string
@@ -54,7 +54,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3)
  * ROBUST THUMBNAIL GENERATION
  * Probes multiple timestamps if the frame is too black (common in HEVC/DJI).
  */
-async function captureVideoThumbnail(file: File): Promise<string> {
+async function captureVideoThumbnail(source: File | string): Promise<string> {
   const tryCapture = (video: HTMLVideoElement, time: number): Promise<string | null> => {
     return new Promise((resolve) => {
       let resolved = false;
@@ -72,15 +72,14 @@ async function captureVideoThumbnail(file: File): Promise<string> {
           ctx.drawImage(video, 0, 0, w, h);
           const data = ctx.getImageData(0, 0, Math.min(w, 50), Math.min(h, 50)).data;
           
-          // Check for "Good Frame" (not all black or solid grey)
           let r = 0, g = 0, b = 0, count = 0;
           for (let i = 0; i < data.length; i += 4) {
             r += data[i]; g += data[i+1]; b += data[i+2];
             count++;
           }
           const avg = (r + g + b) / (count * 3);
-          const isTooDark = avg < 15; // Basically black
-          const isTooGrey = Math.abs(r/count - g/count) < 2 && Math.abs(g/count - b/count) < 2 && avg > 110 && avg < 140; // Flat grey decoder failure
+          const isTooDark = avg < 15;
+          const isTooGrey = Math.abs(r/count - g/count) < 2 && Math.abs(g/count - b/count) < 2 && avg > 110 && avg < 140;
           
           if (isTooDark || isTooGrey) return resolve(null);
           resolve(canvas.toDataURL('image/jpeg', 0.85));
@@ -93,35 +92,38 @@ async function captureVideoThumbnail(file: File): Promise<string> {
   };
 
   const video = document.createElement('video');
-  const url = URL.createObjectURL(file);
+  const isUrl = typeof source === 'string';
+  const url = isUrl ? source : URL.createObjectURL(source);
+  
   video.muted = true;
   video.playsInline = true;
   video.preload = 'metadata';
+  if (isUrl) video.crossOrigin = 'anonymous'; // Critical for CORS
   video.src = url;
 
   return new Promise<string>((resolve) => {
     video.onloadedmetadata = async () => {
       const dur = isFinite(video.duration) ? video.duration : 10;
-      const points = [Math.min(3, dur * 0.1), Math.min(10, dur * 0.2), dur * 0.5, 0.5, 1.0];
+      const points = [Math.min(3, dur * 0.1), Math.min(10, dur * 0.2), dur * 0.5, 0.5, 1.0, 0];
       
       for (const p of points) {
         const thumb = await tryCapture(video, p);
         if (thumb) {
-          URL.revokeObjectURL(url);
+          if (!isUrl) URL.revokeObjectURL(url);
           return resolve(thumb);
         }
       }
       
-      // Fallback: Dynamic SVG
-      URL.revokeObjectURL(url);
-      const initial = (file.name[0] ?? 'V').toUpperCase();
-      const hue = file.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
+      if (!isUrl) URL.revokeObjectURL(url);
+      const initial = (isUrl ? 'V' : (source as File).name[0] ?? 'V').toUpperCase();
+      const seed = isUrl ? source : (source as File).name;
+      const hue = seed.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0) % 360;
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="hsl(${hue},25%,12%)"/><text x="320" y="195" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="130" fill="hsl(${hue},50%,45%)" opacity="0.35">${initial}</text></svg>`;
       resolve(`data:image/svg+xml;base64,${btoa(svg)}`);
     };
     video.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(''); // Just an empty string, let the UI handle it
+      if (!isUrl) URL.revokeObjectURL(url);
+      resolve('');
     };
   });
 }
@@ -185,6 +187,36 @@ export default function UploadsPage() {
 
   const handleReset = async (id: string, mode: 'thumbnail' | 'full' = 'full') => {
     try {
+      const item = uploads.find(u => u.id === id)
+      
+      // OPTIMIZATION: "Instant Fix" for thumbnails
+      // If we have a video_url (playback MP4) and only need a thumbnail fix, 
+      // try to do it in the browser immediately.
+      if (mode === 'thumbnail' && item?.video_url) {
+        setProcessingIds(prev => new Set(prev).add(id)) // Show loading state
+        try {
+          const thumb = await captureVideoThumbnail(item.video_url)
+          if (thumb && !thumb.startsWith('data:image/svg')) {
+            const patchRes = await fetch(`/api/video-upload/${id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ thumbnail_data: thumb, status: 'processed' })
+            })
+            if (patchRes.ok) {
+              setMenuOpenId(null)
+              setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'processed', thumbnail_url: thumb, error_message: null } : u))
+              fetchUploads()
+              setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+              return
+            }
+          }
+        } catch (err) {
+          console.error('[Instant Fix] Browser capture failed:', err)
+        }
+        setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+      }
+
+      // Fallback: Trigger Inngest pipeline (the "Slow Path" which I've also fixed)
       const res = await fetch('/api/video-upload/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,7 +224,6 @@ export default function UploadsPage() {
       })
       if (res.ok) {
         setMenuOpenId(null)
-        // Optimistic update
         setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'uploaded', error_message: null } : u))
         fetchUploads()
       }

@@ -423,9 +423,12 @@ export const processUpload = inngest.createFunction(
     // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
     await step.run('thumbnail-fallback', async () => {
       const { upload } = activeContext
+      const mode = event.data.mode || 'full'
       
       // Overwrite if missing OR if it's just a placeholder SVG from the browser
-      if (upload.thumbnail_url && !upload.thumbnail_url.startsWith('data:image/svg')) return
+      // OR if we are explicitly in 'thumbnail' fix mode
+      const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
+      if (!isPlaceholder && mode !== 'thumbnail') return
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return
@@ -570,6 +573,14 @@ export const processUpload = inngest.createFunction(
       // Smart Skip: If we already have analysis and just need a thumbnail
       if (mode === 'thumbnail' && (upload as any).analysis) {
         console.log(`[Inngest] Skipping analysis for ${video_upload_id} (thumbnail mode)`)
+        
+        // CRITICAL: Ensure we still mark as processed in the database
+        await admin.from('video_uploads').update({
+          status: 'processed',
+          processed_at: (upload as any).processed_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', video_upload_id)
+
         return { 
           analysis: (upload as any).analysis, 
           modelUsed: (upload as any).analysis_model || 'skipped',
