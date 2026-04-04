@@ -305,6 +305,18 @@ export default function UploadsPage() {
     }
   }
 
+  const handleFixAllThumbnails = async () => {
+    const missing = uploads.filter(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg'))
+    if (missing.length === 0) return
+    
+    if (!confirm(`Fix ${missing.length} missing thumbnails using the browser-based capture?`)) return
+    
+    // Process sequentially to avoid slamming the browser/network
+    for (const item of missing) {
+      await handleReset(item.id, 'thumbnail')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Permanently remove this recording signal?')) return
     try {
@@ -539,6 +551,15 @@ export default function UploadsPage() {
               <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-zinc-800' : 'text-zinc-600'}`}><Grid className="w-5 h-5" /></button>
               <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-zinc-800' : 'text-zinc-600'}`}><List className="w-5 h-5" /></button>
             </div>
+            {uploads.some(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg')) && (
+              <button 
+                onClick={handleFixAllThumbnails}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black uppercase tracking-widest"
+              >
+                <Zap className="w-4 h-4" />
+                Fix All Missing
+              </button>
+            )}
             {uploads.some(u => u.status !== 'processed' && u.status !== 'error') && (
               <button 
                 onClick={() => handleResetAll()}
@@ -622,6 +643,18 @@ export default function UploadsPage() {
                   >
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
+                      
+                      {/* Quick Fix Button for broken thumbnails */}
+                      {(!item.thumbnail_url || item.thumbnail_url.startsWith('data:image/svg')) && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleReset(item.id, 'thumbnail') }}
+                          className="absolute inset-0 m-auto w-12 h-12 bg-blue-500/80 hover:bg-blue-500 text-white rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-95 z-20"
+                          title="Quick Fix Thumbnail"
+                        >
+                          {processingIds.has(item.id) ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6 fill-current" />}
+                        </button>
+                      )}
+
                       <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
                         <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border backdrop-blur-xl ${
                           item.status === 'processed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
