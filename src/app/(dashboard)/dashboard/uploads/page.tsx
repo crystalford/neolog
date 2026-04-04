@@ -136,6 +136,54 @@ async function captureVideoThumbnail(source: File | string): Promise<string> {
   });
 }
 
+// Capture a thumbnail from a remote video URL.
+// Fetches the first 3MB as a blob to sidestep canvas CORS restrictions entirely.
+async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null> {
+  let blobUrl: string | null = null
+  try {
+    const res = await fetch(videoUrl, { headers: { Range: 'bytes=0-3145727' } })
+    if (!res.ok && res.status !== 206) return null
+    blobUrl = URL.createObjectURL(await res.blob())
+  } catch (e) {
+    console.error('[captureFrameFromVideoUrl] fetch failed:', e)
+    return null
+  }
+
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    let resolved = false
+    const done = (val: string | null) => {
+      if (resolved) return
+      resolved = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+      resolve(val)
+    }
+    const timeout = setTimeout(() => done(null), 15000)
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.onerror = () => { clearTimeout(timeout); done(null) }
+    video.onloadedmetadata = () => {
+      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 20
+      video.currentTime = Math.min(1, dur * 0.05)
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const w = Math.min(video.videoWidth || 640, 640)
+        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return done(null)
+        ctx.drawImage(video, 0, 0, w, h)
+        done(canvas.toDataURL('image/jpeg', 0.85))
+      } catch { done(null) }
+    }
+    video.src = blobUrl!
+  })
+}
+
 const formatBytes = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -197,37 +245,45 @@ export default function UploadsPage() {
     try {
       const item = uploads.find(u => u.id === id)
       
-      // OPTIMIZATION: "Instant Fix" for thumbnails
-      // If we have a video_url (playback MP4) and only need a thumbnail fix, 
-      // try to do it in the browser immediately.
-      if (mode === 'thumbnail' && item?.video_url) {
-        setProcessingIds(prev => new Set(prev).add(id)) // Show loading state
-        // Optimistically set status to 'capturing' (local state only)
+      // FAST PATH: Browser-side thumbnail capture
+      // Uses blob-fetch approach to completely sidestep CORS restrictions
+      if (mode === 'thumbnail') {
+        setProcessingIds(prev => new Set(prev).add(id))
+        setMenuOpenId(null)
         setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'capturing' as any } : u))
         try {
-          console.log(`[Instant Fix] Attempting browser capture for ${id}...`);
-          const thumb = await captureVideoThumbnail(item.video_url)
-          if (thumb && !thumb.startsWith('data:image/svg')) {
-            console.log(`[Instant Fix] Capture successful, updating DB...`);
-            const patchRes = await fetch(`/api/video-upload/${id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ thumbnail_data: thumb, status: 'processed' })
-            })
-            if (patchRes.ok) {
-              setMenuOpenId(null)
-              setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'processed', thumbnail_url: thumb, error_message: null } : u))
-              fetchUploads()
-              setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
-              return
-            }
-          } else {
-            console.warn('[Instant Fix] Browser returned empty thumb or SVG. Falling back to backend.');
-          }
-        } catch (err) {
-          console.error('[Instant Fix] Browser capture failed:', err)
+          // Step 1: Get a signed video URL from our own server
+          console.log(`[Fix Thumbnail] Getting signed URL for ${id}...`)
+          const urlRes = await fetch(`/api/video-upload/${id}/signed-url`)
+          if (!urlRes.ok) throw new Error('Could not get video URL')
+          const { signedUrl } = await urlRes.json()
+
+          // Step 2: Capture a frame in the browser (fetches first 3MB as blob — no CORS issues)
+          console.log(`[Fix Thumbnail] Capturing frame from blob...`)
+          const thumbnail = await captureFrameFromVideoUrl(signedUrl)
+          if (!thumbnail) throw new Error('Frame capture failed — video may use unsupported codec (HEVC on Chrome)')
+
+          // Step 3: Save directly to DB via the dedicated thumbnail endpoint
+          console.log(`[Fix Thumbnail] Saving thumbnail to DB...`)
+          const saveRes = await fetch(`/api/video-upload/${id}/thumbnail`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumbnail_url: thumbnail }),
+          })
+          if (!saveRes.ok) throw new Error('Failed to save thumbnail')
+
+          // Step 4: Update UI immediately with the data URL
+          console.log(`[Fix Thumbnail] Success!`)
+          setUploads(prev => prev.map(u => u.id === id ? { ...u, thumbnail_url: thumbnail, status: 'processed' } : u))
+          setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+          return
+        } catch (err: any) {
+          console.error('[Fix Thumbnail] Failed:', err.message)
+          // Don't fall through to full reprocess — just show the error and stop
+          setUploads(prev => prev.map(u => u.id === id ? { ...u, status: item?.status || 'error' as any, error_message: err.message } : u))
+          setProcessingIds(prev => { const next = new Set(prev); next.delete(id); return next })
+          return
         }
-        // Fall through to fallback path if instant fix fails or returns empty
       }
 
       // Fallback: Trigger Inngest pipeline (the "Slow Path" which I've also fixed)
