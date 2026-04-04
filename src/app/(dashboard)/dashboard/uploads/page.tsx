@@ -122,17 +122,17 @@ async function captureVideoThumbnail(source: File | string): Promise<string> {
       resolve(`data:image/svg+xml;base64,${btoa(svg)}`);
     };
     video.onerror = (e) => {
-      console.error("[captureVideoThumbnail] Media error:", video.error || e);
+      console.error("[captureVideoThumbnail] Media error for src:", video.src, video.error || e);
       if (!isUrl) URL.revokeObjectURL(url);
       resolve("");
     };
 
     // Global 10s timeout to prevent hanging the UI
     setTimeout(() => {
-      console.warn("[captureVideoThumbnail] Global timeout reached.");
+      console.warn("[captureVideoThumbnail] Global timeout reached for src:", video.src);
       if (!isUrl) URL.revokeObjectURL(url);
       resolve("");
-    }, 100000);
+    }, 10000); // 10 seconds
   });
 }
 
@@ -202,9 +202,13 @@ export default function UploadsPage() {
       // try to do it in the browser immediately.
       if (mode === 'thumbnail' && item?.video_url) {
         setProcessingIds(prev => new Set(prev).add(id)) // Show loading state
+        // Optimistically set status to 'capturing' (local state only)
+        setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'capturing' as any } : u))
         try {
+          console.log(`[Instant Fix] Attempting browser capture for ${id}...`);
           const thumb = await captureVideoThumbnail(item.video_url)
           if (thumb && !thumb.startsWith('data:image/svg')) {
+            console.log(`[Instant Fix] Capture successful, updating DB...`);
             const patchRes = await fetch(`/api/video-upload/${id}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
@@ -227,6 +231,7 @@ export default function UploadsPage() {
       }
 
       // Fallback: Trigger Inngest pipeline (the "Slow Path" which I've also fixed)
+      setUploads(prev => prev.map(u => u.id === id ? { ...u, status: 'starting' as any, error_message: null } : u))
       setProcessingIds(prev => new Set(prev).add(id)) // Show loading state early
       const res = await fetch('/api/video-upload/reset', {
         method: 'POST',
@@ -557,7 +562,7 @@ export default function UploadsPage() {
                 {sortedUploads.map(item => (
                   <div 
                     key={item.id} 
-                    className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'} ${menuOpenId === item.id ? 'z-50' : 'z-0'}`}
+                    className={`group relative transition-all duration-700 rounded-[2.5rem] border ${item.status === 'error' ? 'border-red-500/20' : 'border-zinc-800 bg-zinc-900/10 hover:border-zinc-700 shadow-xl'} ${viewMode === 'list' ? 'flex items-center p-5' : 'flex flex-col'} ${menuOpenId === item.id ? 'z-[100]' : 'z-0'}`}
                   >
                     <div className={`relative overflow-hidden aspect-video bg-zinc-950 ${viewMode === 'list' ? 'w-56 rounded-2xl mr-8 h-32 shrink-0' : 'w-full'}`}>
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}

@@ -456,7 +456,11 @@ export const processUpload = inngest.createFunction(
         const path = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
 
         await uploadBuffer(path, imgBuf, 'image/jpeg')
-        await admin.from('video_uploads').update({ thumbnail_url: path }).eq('id', video_upload_id)
+        await admin.from('video_uploads').update({ 
+          thumbnail_url: path,
+          // If we only needed a thumbnail, mark as processed now
+          ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
+        }).eq('id', video_upload_id)
       } catch (err: any) {
         console.error('[thumbnail-fallback] Failed:', err?.message)
       }

@@ -136,17 +136,14 @@ export async function PATCH(
 
     // 2. Handle base64 thumbnail upload if provided
     if (thumbnail_data && thumbnail_data.startsWith('data:image')) {
-      try {
-        const base64Data = thumbnail_data.split(',')[1]
-        const buffer = Buffer.from(base64Data, 'base64')
-        const path = `${session.user.id}/thumbnails/${params.id}_fastfix.jpg`
-        
-        const { uploadBuffer } = await import('@/lib/storage/r2')
-        await uploadBuffer(path, buffer, 'image/jpeg')
-        updateData.thumbnail_url = path
-      } catch (err: any) {
-        console.error('[PATCH] Thumbnail upload failed:', err.message)
-      }
+      const base64Data = thumbnail_data.split(',')[1]
+      const buffer = Buffer.from(base64Data, 'base64')
+      const path = `${session.user.id}/thumbnails/${params.id}_fastfix.jpg`
+      
+      const { uploadBuffer } = await import('@/lib/storage/r2')
+      await uploadBuffer(path, buffer, 'image/jpeg')
+      updateData.thumbnail_url = path
+      console.log(`[PATCH] Uploaded new thumbnail to ${path}`)
     }
 
     // 3. Update DB record
