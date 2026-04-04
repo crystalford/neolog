@@ -14,6 +14,8 @@ import { reanalyzeAllUploads } from '@/inngest/functions/reanalyze-all-uploads'
 import { synthesizeProject } from '@/inngest/functions/synthesize-project'
 import { developIdea } from '@/inngest/functions/develop-idea'
 
+export const maxDuration = 300
+
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [

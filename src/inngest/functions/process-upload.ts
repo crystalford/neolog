@@ -375,14 +375,64 @@ export const processUpload = inngest.createFunction(
       await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
     })
 
-    // ── Step 2c: Transcode to H.264 for browser-compatible playback ──
-    // NOTE: This now runs BEFORE thumbnail extraction so we can use the H.264
-    // output for frame extraction — critical for vertical DJI HEVC videos which
-    // have rotation metadata that causes fofr/toolkit to fail on the original file.
+    // ── Step 2c: Thumbnail Fallback (Server-side) ──
+    // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
+    // Moved before transcoding to handle large files faster
+    const thumbnailPath = await step.run('thumbnail-fallback', async () => {
+      const { upload } = activeContext
+      const mode = event.data.mode || 'full'
+      
+      const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
+      if (!isPlaceholder && mode !== 'thumbnail') return null
+
+      const replicateToken = process.env.REPLICATE_API_TOKEN
+      if (!replicateToken) return null
+
+      const signedUrl = await presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      if (!signedUrl) return null
+
+      try {
+        const replicate = new Replicate({ auth: replicateToken })
+        const output = await replicate.run('fofr/toolkit', {
+          input: { 
+            task: 'ffmpeg_command', 
+            input_file: signedUrl,
+            ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
+          },
+        }) as any
+
+        const outputUrl = extractReplicateUrl(output)
+        if (!outputUrl) return null
+
+        const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+        const path = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
+
+        await uploadBuffer(path, imgBuf, 'image/jpeg')
+        await admin.from('video_uploads').update({ 
+          thumbnail_url: path,
+          // If we only needed a thumbnail, mark as processed now
+          ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
+        }).eq('id', video_upload_id)
+        return path
+      } catch (err: any) {
+        console.error('[thumbnail-fallback] Failed:', err?.message)
+        return null
+      }
+    })
+
+    // If we only needed a thumbnail, we can stop here
+    if (event.data.mode === 'thumbnail' && thumbnailPath) {
+      return { status: 'thumbnail_fixed', video_upload_id }
+    }
+
+
+    // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
     const playbackStoragePath = await step.run('transcode-playback', async () => {
+      const mode = event.data.mode || 'full'
+      if (mode === 'thumbnail') return null // Skip heavy transcode if we only need a thumbnail
+
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
-
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
@@ -417,53 +467,6 @@ export const processUpload = inngest.createFunction(
     // ── Update: Transcode Done ──
     await step.run('heartbeat-transcode', async () => {
       await heartbeat('transcribed-media')
-    })
-
-
-    // ── Step 2d: Thumbnail Fallback (Server-side) ──
-    // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
-    await step.run('thumbnail-fallback', async () => {
-      const { upload } = activeContext
-      const mode = event.data.mode || 'full'
-      
-      // Overwrite if missing OR if it's just a placeholder SVG from the browser
-      // OR if we are explicitly in 'thumbnail' fix mode
-      const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
-      if (!isPlaceholder && mode !== 'thumbnail') return
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return
-
-      // Prefer the transcode output for thumbnailing as it's guaranteed H.264
-      const sourcePath = playbackStoragePath || upload.storage_path
-      const signedUrl = await presignDownloadUrl(sourcePath, 3600).catch(() => null)
-      if (!signedUrl) return
-
-      try {
-        const replicate = new Replicate({ auth: replicateToken })
-        const output = await replicate.run('fofr/toolkit', {
-          input: { 
-            task: 'ffmpeg_command', 
-            input_file: signedUrl,
-            ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
-          },
-        }) as any
-
-        const outputUrl = extractReplicateUrl(output)
-        if (!outputUrl) return
-
-        const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-        const path = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
-
-        await uploadBuffer(path, imgBuf, 'image/jpeg')
-        await admin.from('video_uploads').update({ 
-          thumbnail_url: path,
-          // If we only needed a thumbnail, mark as processed now
-          ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
-        }).eq('id', video_upload_id)
-      } catch (err: any) {
-        console.error('[thumbnail-fallback] Failed:', err?.message)
-      }
     })
 
 

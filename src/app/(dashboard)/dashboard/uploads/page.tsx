@@ -138,49 +138,102 @@ async function captureVideoThumbnail(source: File | string): Promise<string> {
 
 // Capture a thumbnail from a remote video URL.
 // Fetches the first 3MB as a blob to sidestep canvas CORS restrictions entirely.
+// Capture a thumbnail from a remote video URL.
+// Fetches chunks from the start and end (to handle MOOV position) to bypass CORS restrictions.
 async function captureFrameFromVideoUrl(videoUrl: string): Promise<string | null> {
-  let blobUrl: string | null = null
-  try {
-    const res = await fetch(videoUrl, { headers: { Range: 'bytes=0-3145727' } })
-    if (!res.ok && res.status !== 206) return null
-    blobUrl = URL.createObjectURL(await res.blob())
-  } catch (e) {
-    console.error('[captureFrameFromVideoUrl] fetch failed:', e)
-    return null
+  const fetchChunk = async (range: string) => {
+    try {
+      const res = await fetch(videoUrl, { headers: { Range: range } })
+      if (!res.ok && res.status !== 206) return null
+      return await res.blob()
+    } catch (e) {
+      return null
+    }
   }
 
-  return new Promise((resolve) => {
+  // Strategy 1: First 3MB (Fast Start files)
+  let blob = await fetchChunk('bytes=0-3145727')
+  
+  return new Promise(async (resolve) => {
     const video = document.createElement('video')
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+
     let resolved = false
     const done = (val: string | null) => {
       if (resolved) return
       resolved = true
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
       resolve(val)
     }
-    const timeout = setTimeout(() => done(null), 15000)
-    video.muted = true
-    video.playsInline = true
-    video.preload = 'auto'
-    video.onerror = () => { clearTimeout(timeout); done(null) }
-    video.onloadedmetadata = () => {
-      const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 20
-      video.currentTime = Math.min(1, dur * 0.05)
+
+    const tryBlob = async (currentBlob: Blob | null) => {
+      if (!currentBlob) return false
+      const url = URL.createObjectURL(currentBlob)
+      
+      return new Promise<boolean>((res) => {
+        let seeked = false
+        const timeout = setTimeout(() => {
+          if (!seeked) {
+            URL.revokeObjectURL(url)
+            res(false)
+          }
+        }, 5000)
+
+        video.onloadedmetadata = () => {
+          video.currentTime = Math.min(1, video.duration > 0 ? video.duration * 0.05 : 1)
+        }
+        video.onseeked = () => {
+          if (seeked) return
+          seeked = true
+          clearTimeout(timeout)
+          try {
+            const canvas = document.createElement('canvas')
+            canvas.width = Math.min(video.videoWidth || 640, 640)
+            canvas.height = video.videoHeight ? Math.round(canvas.width * video.videoHeight / video.videoWidth) : 360
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+              URL.revokeObjectURL(url)
+              res(true)
+              done(dataUrl)
+            } else {
+              URL.revokeObjectURL(url)
+              res(false)
+            }
+          } catch { 
+            URL.revokeObjectURL(url)
+            res(false) 
+          }
+        }
+        video.onerror = () => {
+          clearTimeout(timeout)
+          URL.revokeObjectURL(url)
+          res(false)
+        }
+        video.src = url
+      })
     }
-    video.onseeked = () => {
-      clearTimeout(timeout)
-      try {
-        const w = Math.min(video.videoWidth || 640, 640)
-        const h = video.videoHeight ? Math.round(w * video.videoHeight / video.videoWidth) : 360
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return done(null)
-        ctx.drawImage(video, 0, 0, w, h)
-        done(canvas.toDataURL('image/jpeg', 0.85))
-      } catch { done(null) }
+
+    // Attempt 1: First 3MB
+    if (await tryBlob(blob)) return
+
+    // Attempt 2: Last 3MB (for files with MOOV at end)
+    console.log('[captureFrameFromVideoUrl] Strategy 1 failed, trying end of file...')
+    const headRes = await fetch(videoUrl, { method: 'HEAD' }).catch(() => null)
+    const fileSize = parseInt(headRes?.headers.get('content-length') || '0')
+    if (fileSize > 3145728) {
+      const lastChunk = await fetchChunk(`bytes=${fileSize - 3145728}-${fileSize - 1}`)
+      if (await tryBlob(lastChunk)) return
     }
-    video.src = blobUrl!
+
+    // Attempt 3: Larger first chunk (10MB)
+    console.log('[captureFrameFromVideoUrl] Strategy 2 failed, trying larger start chunk...')
+    const bigChunk = await fetchChunk('bytes=0-10485759')
+    if (await tryBlob(bigChunk)) return
+
+    done(null)
   })
 }
 
