@@ -359,12 +359,21 @@ export default function UploadsPage() {
   }
 
   const handleFixAllThumbnails = async () => {
-    const missing = uploads.filter(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg'))
-    if (missing.length === 0) return
+    // Inclusive check for missing or placeholder thumbnails
+    const isBroken = (u: UploadListItem) => !u.thumbnail_url || 
+      u.thumbnail_url.startsWith('data:image/svg') || 
+      u.thumbnail_url.includes('_placeholder') ||
+      (u.status === 'error' && !u.thumbnail_url);
+
+    const missing = uploads.filter(isBroken)
+    if (missing.length === 0) {
+      alert("No missing thumbnails detected.")
+      return
+    }
     
-    if (!confirm(`Fix ${missing.length} missing thumbnails using the browser-based capture?`)) return
+    if (!confirm(`Fix ${missing.length} broken thumbnails using the high-reliability browser capture?`)) return
     
-    // Process sequentially to avoid slamming the browser/network
+    // Process sequentially to avoid network congestion
     for (const item of missing) {
       await handleReset(item.id, 'thumbnail')
     }
@@ -395,6 +404,21 @@ export default function UploadsPage() {
 
   useEffect(() => { 
     fetchUploads() 
+    
+    // Polling logic: if any upload is in a "active" processing state, poll every 8 seconds
+    const hasActiveUploads = uploads.some(u => {
+      const s = u.status as string
+      return s !== 'processed' && s !== 'error' && s !== 'deleted'
+    })
+
+    let interval: NodeJS.Timeout | null = null
+    if (hasActiveUploads) {
+      interval = setInterval(() => {
+        console.log('[Polling] Refreshing upload status...')
+        fetchUploads()
+      }, 8000)
+    }
+
     const saved = localStorage.getItem('neolog_upload_queue')
     if (saved) {
       try {
@@ -407,7 +431,8 @@ export default function UploadsPage() {
         })))
       } catch {}
     }
-  }, [fetchUploads])
+    return () => { if (interval) clearInterval(interval) }
+  }, [fetchUploads, uploads.length, uploads.some(u => u.status === 'processed' || u.status === 'error')])
 
   useEffect(() => {
     const serializable = queue.map(({ id, fileName, fileSize, fileType, status, progress, thumbnail, recordedAt, error, r2UploadId, r2Key }) => ({
@@ -604,12 +629,16 @@ export default function UploadsPage() {
               <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-zinc-800' : 'text-zinc-600'}`}><Grid className="w-5 h-5" /></button>
               <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-zinc-800' : 'text-zinc-600'}`}><List className="w-5 h-5" /></button>
             </div>
-            {uploads.some(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg')) && (
+            {uploads.length > 0 && (
               <button 
                 onClick={handleFixAllThumbnails}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-400 hover:bg-blue-500/20 transition-all text-xs font-black uppercase tracking-widest"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl transition-all text-xs font-black uppercase tracking-widest ${
+                  uploads.some(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg') || u.thumbnail_url.includes('_placeholder'))
+                    ? 'bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+                    : 'bg-zinc-900/50 border border-zinc-800/50 text-zinc-600 cursor-not-allowed opacity-50'
+                }`}
               >
-                <Zap className="w-4 h-4" />
+                <Zap className={`w-4 h-4 ${uploads.some(u => !u.thumbnail_url || u.thumbnail_url.startsWith('data:image/svg')) ? 'fill-blue-500/20 animate-pulse' : ''}`} />
                 Fix All Missing
               </button>
             )}
@@ -698,22 +727,25 @@ export default function UploadsPage() {
                       {item.thumbnail_url ? <img src={item.thumbnail_url} className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110" /> : <div className="w-full h-full flex items-center justify-center"><VideoIcon className="w-10 h-10 text-zinc-900" /></div>}
                       
                       {/* Quick Fix Button for broken thumbnails */}
-                      {(!item.thumbnail_url || item.thumbnail_url.startsWith('data:image/svg')) && (
+                      {(!item.thumbnail_url || item.thumbnail_url.startsWith('data:image/svg') || item.thumbnail_url?.includes('_placeholder')) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleReset(item.id, 'thumbnail') }}
                           className="absolute inset-0 m-auto w-12 h-12 bg-blue-500/80 hover:bg-blue-500 text-white rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-95 z-20"
                           title="Quick Fix Thumbnail"
                         >
-                          {processingIds.has(item.id) ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-6 h-6 fill-current" />}
+                          {processingIds.has(item.id) ? <Loader2 className="w-6 h-6 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
                         </button>
                       )}
 
                       <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
-                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border backdrop-blur-xl ${
+                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border backdrop-blur-xl flex items-center gap-1.5 ${
                           item.status === 'processed' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
                           item.status === 'error' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
-                          'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                          'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]'
                         }`}>
+                          {!(item.status === 'processed' || item.status === 'error') && (
+                            <span className="flex h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                          )}
                           {item.status.replace(/-/g, ' ')}
                         </div>
                       </div>

@@ -171,6 +171,7 @@ export const processUpload = inngest.createFunction(
     // ── Step 2b: Extract Metadata (exhaustive backdating check) ──
     const metadata = await step.run('extract-metadata', async () => {
       const { upload } = activeContext
+      await heartbeat('extracting-metadata')
 
       // CRITICAL: Always prioritize what was sent from the browser/frontend
       if (upload.recorded_at) {
@@ -380,6 +381,7 @@ export const processUpload = inngest.createFunction(
     // Moved before transcoding to handle large files faster
     const thumbnailPath = await step.run('thumbnail-fallback', async () => {
       const { upload } = activeContext
+      await heartbeat('generating-thumbnail')
       const mode = event.data.mode || 'full'
       
       const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
@@ -430,6 +432,7 @@ export const processUpload = inngest.createFunction(
     const playbackStoragePath = await step.run('transcode-playback', async () => {
       const mode = event.data.mode || 'full'
       if (mode === 'thumbnail') return null // Skip heavy transcode if we only need a thumbnail
+      await heartbeat('transcoding-video')
 
       const { upload } = activeContext
       if (!isVideoMimeType(upload.mime_type)) return null
@@ -577,6 +580,7 @@ export const processUpload = inngest.createFunction(
     const analysisResult = await step.run('analyze', async () => {
       const mode = event.data.mode || 'full'
       const { upload } = activeContext
+      await heartbeat('analyzing-media')
 
       // Smart Skip: If we already have analysis and just need a thumbnail
       if (mode === 'thumbnail' && (upload as any).analysis) {
