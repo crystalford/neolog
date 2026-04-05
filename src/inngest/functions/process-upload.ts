@@ -822,8 +822,9 @@ export const processUpload = inngest.createFunction(
     }
 
     // ── Step 5: Create rich Timeline Entry ──
+    await reportStatus('saving-results')
     await step.run('create-log-entry', async () => {
-      await heartbeat('saving-results')
+      console.log(`[${Date.now()}] [create-log-entry] Starting...`);
       const analysis = analysisResult.analysis
       const recordedAt = metadata.recorded_at
       
