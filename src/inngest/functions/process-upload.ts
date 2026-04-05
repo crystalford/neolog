@@ -264,15 +264,15 @@ export const processUpload = inngest.createFunction(
             }
           }
 
-          const replicate = new Replicate({ auth: replicateToken })
           // Use fofr/toolkit to run ffprobe and get JSON
-          const output = await replicate.run(
-            "fofr/toolkit",
+          const output = await runReplicateAsync(
+            step,
+            'extract-metadata-prober',
+            replicateToken,
+            'fofr/toolkit',
             {
-              input: {
-                input_file: metaSignedUrl,
-                ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
-              }
+              input_file: metaSignedUrl,
+              ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
             }
           ) as any
 

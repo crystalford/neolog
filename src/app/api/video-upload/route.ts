@@ -21,14 +21,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
 
-    if (!session) {
+    if (!user || !userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     try {
-      const run = await startJobRun('video-upload.register', { user_id: session.user.id })
+      const run = await startJobRun('video-upload.register', { user_id: userId })
       runId = run.id
     } catch {
       // best-effort
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the storage path belongs to this user
-    if (!storage_path.startsWith(`${session.user.id}/`)) {
+    if (!storage_path.startsWith(`${userId}/`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       const { data: existing } = await supabase
         .from('video_uploads')
         .select('id, status, created_at')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .eq('file_name', file_name)
         .eq('file_size_bytes', file_size_bytes)
         .order('created_at', { ascending: false })
@@ -76,12 +77,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    finalMeta = { user_id: session.user.id, file_name, file_size_bytes, mime_type }
+    finalMeta = { user_id: userId, file_name, file_size_bytes, mime_type }
 
     const { data: record, error: dbError } = await supabase
       .from('video_uploads')
       .insert({
-        user_id: session.user.id,
+        user_id: userId,
         file_name,
         file_size_bytes,
         mime_type,
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     try {
       await inngest.send({
         name: 'video-upload/process',
-        data: { video_upload_id: record.id, user_id: session.user.id },
+        data: { video_upload_id: record.id, user_id: userId },
       })
     } catch (inngestError) {
       console.error('Inngest event failed:', inngestError)
@@ -144,9 +145,10 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
 
-    if (!session) {
+    if (!user || !userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -160,7 +162,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('video_uploads')
       .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path, playback_path, storage_provider')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
 

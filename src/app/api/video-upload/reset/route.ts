@@ -9,9 +9,10 @@ import { inngest } from '@/inngest/client'
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
 
-    if (!session) {
+    if (!user || !userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       .from('video_uploads')
       .select('*')
       .eq('id', id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .single()
 
     if (fetchError || !upload) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     // 3. Re-trigger Inngest
     await inngest.send({
       name: 'video-upload/process',
-      data: { video_upload_id: id, user_id: session.user.id, mode },
+      data: { video_upload_id: id, user_id: userId, mode },
     })
 
     console.log(`[API] Reset (${mode}) and re-triggered processing for upload ${id}`);
