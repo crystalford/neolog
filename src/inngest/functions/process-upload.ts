@@ -21,18 +21,34 @@ function extractReplicateUrl(output: unknown): string | null {
  * this creates a prediction then polls every 15s via step.sleep,
  * so each Vercel call lasts only a few seconds.
  * Max wait: ~30 minutes (120 polls x 15s)
+ *
+ * modelRef format: 'owner/name' (resolves latest version) OR 'owner/name:hash' (pinned version)
  */
 async function runReplicateAsync(
   step: any,
   stepId: string,
   replicateToken: string,
-  model: string,
+  modelRef: string,
   input: Record<string, any>
 ): Promise<unknown> {
-  // Step 1: Create the prediction (fast, returns in <1s)
+  // Step 1: Create the prediction
+  // Community models need a version hash — we extract it from 'model:hash' or resolve latest.
   const predictionId: string = await step.run(`${stepId}-create`, async () => {
     const replicate = new Replicate({ auth: replicateToken })
-    const prediction = await replicate.predictions.create({ model, input })
+
+    let version: string | undefined
+    if (modelRef.includes(':')) {
+      // Pinned version e.g. 'openai/whisper:8099...'
+      version = modelRef.split(':')[1]
+    } else {
+      // Resolve latest version for community models e.g. 'fofr/toolkit'
+      const [owner, name] = modelRef.split('/')
+      const modelData = await replicate.models.get(owner, name)
+      version = (modelData as any).latest_version?.id
+      if (!version) throw new Error(`Could not resolve version for Replicate model: ${modelRef}`)
+    }
+
+    const prediction = await replicate.predictions.create({ version, input })
     return prediction.id
   })
 
@@ -549,7 +565,7 @@ export const processUpload = inngest.createFunction(
         step,
         'transcribe',
         replicateToken,
-        'openai/whisper',
+        'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
         {
           audio: whisperAudioUrl,
           model: 'large-v3',
