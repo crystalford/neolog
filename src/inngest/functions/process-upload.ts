@@ -15,6 +15,47 @@ function extractReplicateUrl(output: unknown): string | null {
   return url.startsWith('http') ? url : null
 }
 
+/**
+ * Async Replicate runner using polling + step.sleep.
+ * Instead of blocking a single Vercel invocation for minutes,
+ * this creates a prediction then polls every 15s via step.sleep,
+ * so each Vercel call lasts only a few seconds.
+ * Max wait: ~30 minutes (120 polls x 15s)
+ */
+async function runReplicateAsync(
+  step: any,
+  stepId: string,
+  replicateToken: string,
+  model: string,
+  input: Record<string, any>
+): Promise<unknown> {
+  // Step 1: Create the prediction (fast, returns in <1s)
+  const predictionId: string = await step.run(`${stepId}-create`, async () => {
+    const replicate = new Replicate({ auth: replicateToken })
+    const prediction = await replicate.predictions.create({ model, input })
+    return prediction.id
+  })
+
+  // Step 2: Poll until done (each sleep is a fresh, short Vercel invocation)
+  for (let i = 0; i < 120; i++) {
+    await step.sleep(`${stepId}-poll-wait-${i}`, '15s')
+
+    const result: { status: string; output: unknown; error: string | null } = await step.run(`${stepId}-poll-${i}`, async () => {
+      const replicate = new Replicate({ auth: replicateToken })
+      const prediction = await replicate.predictions.get(predictionId)
+      return { status: prediction.status, output: prediction.output, error: prediction.error as string | null }
+    })
+
+    if (result.status === 'succeeded') return result.output
+    if (result.status === 'failed' || result.status === 'canceled') {
+      throw new Error(`Replicate prediction ${predictionId} ${result.status}: ${result.error}`)
+    }
+    // still processing — loop again
+  }
+
+  throw new Error(`Replicate prediction ${predictionId} timed out after 30 minutes`)
+}
+
 
 export const processUpload = inngest.createFunction(
   {
@@ -126,47 +167,39 @@ export const processUpload = inngest.createFunction(
     // Immediate feedback for the UI
     await heartbeat('starting')
 
-    // ── Step 2: Extract audio & Archive Voice Signal ──
-    const audioPath = await step.run('extract-audio', async () => {
+    // ── Step 2: Extract audio ──
+    const audioPath = await (async () => {
       const { upload } = activeContext
-      
       await heartbeat('extracting-audio')
 
       if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
         return { path: upload.storage_path, extracted: false }
       }
 
-
       const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) {
-        return { path: upload.storage_path, extracted: false }
-      }
+      if (!replicateToken) return { path: upload.storage_path, extracted: false }
 
-      const storageSignedUrl = await presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      const storageSignedUrl = await step.run('extract-audio-sign-url', async () =>
+        presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      )
       if (!storageSignedUrl) return { path: upload.storage_path, extracted: false }
 
       try {
-        const replicate = new Replicate({ auth: replicateToken })
-        // fofr/toolkit correct API: task + input_file (no ffmpeg_command parameter)
-        const output = await replicate.run(
+        const output = await runReplicateAsync(
+          step,
+          'extract-audio',
+          replicateToken,
           'fofr/toolkit',
-          {
-            input: {
-              task: 'extract_video_audio_as_mp3',
-              input_file: storageSignedUrl,
-            },
-          },
+          { task: 'extract_video_audio_as_mp3', input_file: storageSignedUrl }
         )
-
         const audioUrl = extractReplicateUrl(output)
         if (!audioUrl) return { path: upload.storage_path, extracted: false, isDirectUrl: false }
-
-        // Return the direct Replicate MP3 URL — transcribe step uses it without re-signing
         return { path: audioUrl, extracted: true, isDirectUrl: true }
       } catch (err: any) {
+        console.error('[extract-audio] Failed:', err?.message)
         return { path: upload.storage_path, extracted: false, isDirectUrl: false }
       }
-    })
+    })()
 
     // ── Step 2b: Extract Metadata (exhaustive backdating check) ──
     const metadata = await step.run('extract-metadata', async () => {
@@ -377,50 +410,54 @@ export const processUpload = inngest.createFunction(
     })
 
     // ── Step 2c: Thumbnail Fallback (Server-side) ──
-    // If client-side thumbnailing failed, we attempt to extract a frame at 1s mark
-    // Moved before transcoding to handle large files faster
-    const thumbnailPath = await step.run('thumbnail-fallback', async () => {
+    const thumbnailPath = await (async () => {
       const { upload } = activeContext
       await heartbeat('generating-thumbnail')
       const mode = event.data.mode || 'full'
-      
+
       const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
       if (!isPlaceholder && mode !== 'thumbnail') return null
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
 
-      const signedUrl = await presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      const signedUrl = await step.run('thumbnail-sign-url', async () =>
+        presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      )
       if (!signedUrl) return null
 
       try {
-        const replicate = new Replicate({ auth: replicateToken })
-        const output = await replicate.run('fofr/toolkit', {
-          input: { 
-            task: 'ffmpeg_command', 
+        const output = await runReplicateAsync(
+          step,
+          'thumbnail-fallback',
+          replicateToken,
+          'fofr/toolkit',
+          {
+            task: 'ffmpeg_command',
             input_file: signedUrl,
             ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
-          },
-        }) as any
+          }
+        )
 
         const outputUrl = extractReplicateUrl(output)
         if (!outputUrl) return null
 
-        const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-        const path = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
-
-        await uploadBuffer(path, imgBuf, 'image/jpeg')
-        await admin.from('video_uploads').update({ 
-          thumbnail_url: path,
-          // If we only needed a thumbnail, mark as processed now
-          ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
-        }).eq('id', video_upload_id)
+        const path = await step.run('thumbnail-upload', async () => {
+          const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+          const p = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
+          await uploadBuffer(p, imgBuf, 'image/jpeg')
+          await admin.from('video_uploads').update({
+            thumbnail_url: p,
+            ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
+          }).eq('id', video_upload_id)
+          return p
+        })
         return path
       } catch (err: any) {
         console.error('[thumbnail-fallback] Failed:', err?.message)
         return null
       }
-    })
+    })()
 
     // If we only needed a thumbnail, we can stop here
     if (event.data.mode === 'thumbnail' && thumbnailPath) {
@@ -429,9 +466,9 @@ export const processUpload = inngest.createFunction(
 
 
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
-    const playbackStoragePath = await step.run('transcode-playback', async () => {
+    const playbackStoragePath = await (async () => {
       const mode = event.data.mode || 'full'
-      if (mode === 'thumbnail') return null // Skip heavy transcode if we only need a thumbnail
+      if (mode === 'thumbnail') return null
       await heartbeat('transcoding-video')
 
       const { upload } = activeContext
@@ -440,32 +477,38 @@ export const processUpload = inngest.createFunction(
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) return null
 
-      const transcodeSignedUrl = await presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
+      const transcodeSignedUrl = await step.run('transcode-sign-url', async () =>
+        presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
+      )
       if (!transcodeSignedUrl) return null
 
       try {
-        const replicate = new Replicate({ auth: replicateToken })
-        const output = await replicate.run('fofr/toolkit', {
-          input: { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl },
-        }) as any
+        const output = await runReplicateAsync(
+          step,
+          'transcode-playback',
+          replicateToken,
+          'fofr/toolkit',
+          { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl }
+        )
 
         const outputUrl = extractReplicateUrl(output)
         if (!outputUrl) return null
 
-        const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-        const path = `${user_id}/playback/${video_upload_id}.mp4`
-
-        await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
-          console.error('[transcode-playback] R2 upload failed:', uploadErr?.message)
-          throw uploadErr
+        return await step.run('transcode-upload', async () => {
+          const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+          const path = `${user_id}/playback/${video_upload_id}.mp4`
+          await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
+            console.error('[transcode-playback] R2 upload failed:', uploadErr?.message)
+            throw uploadErr
+          })
+          await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
+          return path
         })
-
-        await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
-        return path
       } catch (err: any) {
+        console.error('[transcode-playback] Failed:', err?.message)
         return null
       }
-    })
+    })()
 
     // ── Update: Transcode Done ──
     await step.run('heartbeat-transcode', async () => {
@@ -474,82 +517,62 @@ export const processUpload = inngest.createFunction(
 
 
     // ── Step 3: Transcribe ──
-    const transcription = await step.run('transcribe', async () => {
+    const transcription = await (async () => {
       const mode = event.data.mode || 'full'
       const { upload } = activeContext
 
-      // Smart Skip: If we just need a thumbnail and already have a transcript, don't re-run Whisper
       if (mode === 'thumbnail' && upload.transcript) {
-        console.log(`[Inngest] Skipping transcription for ${video_upload_id} (thumbnail mode)`)
-        return { 
-          text: upload.transcript, 
-          language: upload.analysis?.language || 'en', 
-          segments: upload.transcript_segments || [],
-          skipped: true 
-        }
+        return { text: upload.transcript, language: upload.analysis?.language || 'en', segments: upload.transcript_segments || [], skipped: true }
       }
 
       if (activeContext.upload.mime_type === 'text/plain') {
-        const fileRes = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
-        const text = fileRes?.ok ? await fileRes.text() : ''
-        return { text, language: 'en', segments: [] }
+        const fileRes = await step.run('transcribe-text-read', async () => {
+          const r = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
+          return r?.ok ? r.text() : ''
+        })
+        return { text: fileRes, language: 'en', segments: [] }
       }
 
       const replicateToken = process.env.REPLICATE_API_TOKEN
       if (!replicateToken) throw new Error('REPLICATE_API_TOKEN missing')
 
-      // If audio extraction succeeded, audioPath.path is a direct URL; otherwise sign the storage path
-      let whisperAudioUrl: string
-      if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) {
-        whisperAudioUrl = audioPath.path
-      } else {
-        const whisperSignedUrl = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
-        if (!whisperSignedUrl) throw new Error('Failed to sign audio URL for Whisper')
-        whisperAudioUrl = whisperSignedUrl
-      }
+      const whisperAudioUrl: string = await step.run('transcribe-sign-url', async () => {
+        if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) return audioPath.path
+        const signed = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
+        if (!signed) throw new Error('Failed to sign audio URL for Whisper')
+        return signed
+      })
 
-      const replicate = new Replicate({ auth: replicateToken })
       await heartbeat('transcribing')
 
-      const output = await replicate.run(
-        'openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e',
+      const output = await runReplicateAsync(
+        step,
+        'transcribe',
+        replicateToken,
+        'openai/whisper',
         {
-          input: {
-            audio: whisperAudioUrl,
-            model: 'large-v3',
-            transcription: 'plain text',
-            language: 'auto',
-            word_timestamps: true,
-          },
+          audio: whisperAudioUrl,
+          model: 'large-v3',
+          transcription: 'plain text',
+          language: 'auto',
+          word_timestamps: true,
         }
       ) as any
 
       const text = output?.transcription || ''
-      const segments = (output?.segments || []).map((s: any) => ({
-        start: s.start,
-        end: s.end,
-        text: s.text,
-      }))
-
-      // Extract word-level data if available
+      const segments = (output?.segments || []).map((s: any) => ({ start: s.start, end: s.end, text: s.text }))
       const words: Array<{ word: string; start: number; end: number; probability: number }> = []
       for (const seg of (output?.segments || [])) {
         if (Array.isArray(seg.words)) {
           for (const w of seg.words) {
             if (w.word && typeof w.start === 'number' && typeof w.end === 'number') {
-              words.push({
-                word: w.word.trim(),
-                start: w.start,
-                end: w.end,
-                probability: w.probability ?? 1,
-              })
+              words.push({ word: w.word.trim(), start: w.start, end: w.end, probability: w.probability ?? 1 })
             }
           }
         }
       }
-
       return { text, language: output?.detected_language || 'en', segments, words }
-    })
+    })()
 
     // ── Step 3b: Store word-level transcript ──
     if (transcription && 'words' in transcription && transcription.words && transcription.words.length > 0) {
