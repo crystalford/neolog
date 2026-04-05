@@ -119,6 +119,7 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 1: Fetch context ──
     const context = await step.run('fetch-context', async () => {
+      console.log(`[${Date.now()}] [fetch-context] Starting for upload: ${video_upload_id}`);
 
       const { data: upload, error } = await admin
         .from('video_uploads')
@@ -128,6 +129,7 @@ export const processUpload = inngest.createFunction(
         .single()
 
       if (error || !upload) {
+        console.error(`[${Date.now()}] [fetch-context] Error or not found:`, error);
         throw new Error('Upload not found')
       }
 
@@ -158,8 +160,7 @@ export const processUpload = inngest.createFunction(
         throw new Error(msg)
       }
 
-      console.log(`[Inngest] Starting process for ${video_upload_id}. recorded_at in DB: ${upload.recorded_at}`);
-
+      console.log(`[${Date.now()}] [fetch-context] Success. Mode: ${mode}`);
       return {
         skip: false as const,
         upload,
@@ -169,58 +170,68 @@ export const processUpload = inngest.createFunction(
       }
     })
 
-    if (context.skip) return { status: 'already_processed', video_upload_id }
+    if (context.skip) {
+      console.log(`[${Date.now()}] [process-upload] Skipping already processed: ${video_upload_id}`);
+      return { status: 'already_processed', video_upload_id }
+    }
     const activeContext = context as Extract<typeof context, { skip: false }>
 
-    // Heartbeat helper to keep UI updated and prevent "stale" detection
-    const heartbeat = async (phase: string) => {
-      await admin.from('video_uploads').update({
-        status: phase,
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
+    // Status transition helper using deterministic step IDs
+    const reportStatus = async (phase: string) => {
+      console.log(`[${Date.now()}] [status-update] Transitioning to: ${phase}`);
+      await step.run(`status-update-${phase}`, async () => {
+        await admin.from('video_uploads').update({
+          status: phase,
+          updated_at: new Date().toISOString(),
+        }).eq('id', video_upload_id)
+      })
     }
 
-    // Immediate feedback for the UI
-    await heartbeat('starting')
+    await reportStatus('starting')
 
     // ── Step 2: Extract audio ──
-    const audioPath = await (async () => {
-      const { upload } = activeContext
-      await heartbeat('extracting-audio')
+    const { upload } = activeContext
+    await reportStatus('extracting-audio')
 
-      if (!isVideoMimeType(upload.mime_type) && !upload.mime_type.startsWith('audio/')) {
-        return { path: upload.storage_path, extracted: false }
+    let audioPath: { path: string, extracted: boolean, isDirectUrl?: boolean } = { path: upload.storage_path, extracted: false }
+
+    const shouldExtractAudio = isVideoMimeType(upload.mime_type) || upload.mime_type.startsWith('audio/')
+    const replicateToken = process.env.REPLICATE_API_TOKEN
+
+    if (shouldExtractAudio && replicateToken) {
+      const storageSignedUrl = await step.run('extract-audio-sign-url', async () => {
+        console.log(`[${Date.now()}] [extract-audio] Signing download URL...`);
+        return presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      })
+
+      if (storageSignedUrl) {
+        try {
+          console.log(`[${Date.now()}] [extract-audio] Starting Replicate job...`);
+          const output = await runReplicateAsync(
+            step,
+            'extract-audio',
+            replicateToken,
+            'fofr/toolkit',
+            { task: 'extract_video_audio_as_mp3', input_file: storageSignedUrl }
+          )
+          const audioUrl = extractReplicateUrl(output)
+          if (audioUrl) {
+            console.log(`[${Date.now()}] [extract-audio] Success: ${audioUrl}`);
+            audioPath = { path: audioUrl, extracted: true, isDirectUrl: true }
+          } else {
+            console.warn(`[${Date.now()}] [extract-audio] No audio URL in Replicate output`);
+          }
+        } catch (err: any) {
+          console.error(`[${Date.now()}] [extract-audio] Failed:`, err?.message);
+        }
       }
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return { path: upload.storage_path, extracted: false }
-
-      const storageSignedUrl = await step.run('extract-audio-sign-url', async () =>
-        presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
-      )
-      if (!storageSignedUrl) return { path: upload.storage_path, extracted: false }
-
-      try {
-        const output = await runReplicateAsync(
-          step,
-          'extract-audio',
-          replicateToken,
-          'fofr/toolkit',
-          { task: 'extract_video_audio_as_mp3', input_file: storageSignedUrl }
-        )
-        const audioUrl = extractReplicateUrl(output)
-        if (!audioUrl) return { path: upload.storage_path, extracted: false, isDirectUrl: false }
-        return { path: audioUrl, extracted: true, isDirectUrl: true }
-      } catch (err: any) {
-        console.error('[extract-audio] Failed:', err?.message)
-        return { path: upload.storage_path, extracted: false, isDirectUrl: false }
-      }
-    })()
+    }
 
     // ── Step 2b: Extract Metadata (exhaustive backdating check) ──
+    await reportStatus('extracting-metadata')
     const metadata = await step.run('extract-metadata', async () => {
       const { upload } = activeContext
-      await heartbeat('extracting-metadata')
+      console.log(`[${Date.now()}] [extract-metadata] Starting...`);
 
       // CRITICAL: Always prioritize what was sent from the browser/frontend
       if (upload.recorded_at) {
@@ -402,12 +413,11 @@ export const processUpload = inngest.createFunction(
     })
 
     // ── Update: Metadata Pulled ──
-    await step.run('heartbeat-metadata', async () => {
-      await heartbeat('metadata-extracted')
-    })
+    await reportStatus('metadata-extracted')
 
     // ── Step 2b-bis: Apply Metadata to DB ──
     await step.run('apply-metadata', async () => {
+      console.log(`[${Date.now()}] [apply-metadata] Applying to database...`);
       const { upload } = activeContext
       const updateData: any = {
         meta: {
@@ -423,57 +433,56 @@ export const processUpload = inngest.createFunction(
       }
 
       await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
+      console.log(`[${Date.now()}] [apply-metadata] Success`);
     })
 
     // ── Step 2c: Thumbnail Fallback (Server-side) ──
-    const thumbnailPath = await (async () => {
-      const { upload } = activeContext
-      await heartbeat('generating-thumbnail')
-      const mode = event.data.mode || 'full'
+    await reportStatus('generating-thumbnail')
+    let thumbnailPath: string | null = null
+    const mode = event.data.mode || 'full'
+    const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
+    
+    if ((isPlaceholder || mode === 'thumbnail') && replicateToken) {
+      const signedUrl = await step.run('thumbnail-sign-url', async () => {
+        console.log(`[${Date.now()}] [thumbnail-fallback] Signing download URL...`);
+        return presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
+      })
 
-      const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
-      if (!isPlaceholder && mode !== 'thumbnail') return null
+      if (signedUrl) {
+        try {
+          console.log(`[${Date.now()}] [thumbnail-fallback] Starting Replicate job...`);
+          const output = await runReplicateAsync(
+            step,
+            'thumbnail-fallback',
+            replicateToken,
+            'fofr/toolkit',
+            {
+              task: 'ffmpeg_command',
+              input_file: signedUrl,
+              ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
+            }
+          )
 
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return null
-
-      const signedUrl = await step.run('thumbnail-sign-url', async () =>
-        presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
-      )
-      if (!signedUrl) return null
-
-      try {
-        const output = await runReplicateAsync(
-          step,
-          'thumbnail-fallback',
-          replicateToken,
-          'fofr/toolkit',
-          {
-            task: 'ffmpeg_command',
-            input_file: signedUrl,
-            ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
+          const outputUrl = extractReplicateUrl(output)
+          if (outputUrl) {
+            thumbnailPath = await step.run('thumbnail-upload', async () => {
+              console.log(`[${Date.now()}] [thumbnail-fallback] Fetching and uploading buffer...`);
+              const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+              const p = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
+              await uploadBuffer(p, imgBuf, 'image/jpeg')
+              await admin.from('video_uploads').update({
+                thumbnail_url: p,
+                ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
+              }).eq('id', video_upload_id)
+              return p
+            })
+            console.log(`[${Date.now()}] [thumbnail-fallback] Success: ${thumbnailPath}`);
           }
-        )
-
-        const outputUrl = extractReplicateUrl(output)
-        if (!outputUrl) return null
-
-        const path = await step.run('thumbnail-upload', async () => {
-          const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-          const p = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
-          await uploadBuffer(p, imgBuf, 'image/jpeg')
-          await admin.from('video_uploads').update({
-            thumbnail_url: p,
-            ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
-          }).eq('id', video_upload_id)
-          return p
-        })
-        return path
-      } catch (err: any) {
-        console.error('[thumbnail-fallback] Failed:', err?.message)
-        return null
+        } catch (err: any) {
+          console.error(`[${Date.now()}] [thumbnail-fallback] Failed:`, err?.message);
+        }
       }
-    })()
+    }
 
     // If we only needed a thumbnail, we can stop here
     if (event.data.mode === 'thumbnail' && thumbnailPath) {
@@ -482,85 +491,77 @@ export const processUpload = inngest.createFunction(
 
 
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
-    const playbackStoragePath = await (async () => {
-      const mode = event.data.mode || 'full'
-      if (mode === 'thumbnail') return null
-      await heartbeat('transcoding-video')
+    let playbackStoragePath: string | null = null
+    const shouldTranscode = isVideoMimeType(upload.mime_type) && mode !== 'thumbnail' && replicateToken
 
-      const { upload } = activeContext
-      if (!isVideoMimeType(upload.mime_type)) return null
+    if (shouldTranscode) {
+      await reportStatus('transcoding-video')
 
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) return null
+      const transcodeSignedUrl = await step.run('transcode-sign-url', async () => {
+        console.log(`[${Date.now()}] [transcode-playback] Signing download URL...`);
+        return presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
+      })
 
-      const transcodeSignedUrl = await step.run('transcode-sign-url', async () =>
-        presignDownloadUrl(upload.storage_path, 7200).catch(() => null)
-      )
-      if (!transcodeSignedUrl) return null
+      if (transcodeSignedUrl) {
+        try {
+          console.log(`[${Date.now()}] [transcode-playback] Starting Replicate job...`);
+          const output = await runReplicateAsync(
+            step,
+            'transcode-playback',
+            replicateToken,
+            'fofr/toolkit',
+            { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl }
+          )
 
-      try {
-        const output = await runReplicateAsync(
-          step,
-          'transcode-playback',
-          replicateToken,
-          'fofr/toolkit',
-          { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl }
-        )
-
-        const outputUrl = extractReplicateUrl(output)
-        if (!outputUrl) return null
-
-        return await step.run('transcode-upload', async () => {
-          const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-          const path = `${user_id}/playback/${video_upload_id}.mp4`
-          await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
-            console.error('[transcode-playback] R2 upload failed:', uploadErr?.message)
-            throw uploadErr
-          })
-          await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
-          return path
-        })
-      } catch (err: any) {
-        console.error('[transcode-playback] Failed:', err?.message)
-        return null
+          const outputUrl = extractReplicateUrl(output)
+          if (outputUrl) {
+            playbackStoragePath = await step.run('transcode-upload', async () => {
+              console.log(`[${Date.now()}] [transcode-playback] Fetching and uploading buffer...`);
+              const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+              const path = `${user_id}/playback/${video_upload_id}.mp4`
+              await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
+                console.error(`[${Date.now()}] [transcode-playback] R2 upload failed:`, uploadErr?.message)
+                throw uploadErr
+              })
+              await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
+              console.log(`[${Date.now()}] [transcode-playback] Success: ${path}`);
+              return path
+            })
+          }
+        } catch (err: any) {
+          console.error(`[${Date.now()}] [transcode-playback] Failed:`, err?.message);
+        }
       }
-    })()
+    }
 
     // ── Update: Transcode Done ──
-    await step.run('heartbeat-transcode', async () => {
-      await heartbeat('transcribed-media')
-    })
-
+    await reportStatus('transcribed-media')
 
     // ── Step 3: Transcribe ──
-    const transcription = await (async () => {
-      const mode = event.data.mode || 'full'
-      const { upload } = activeContext
+    let transcription: any = null
 
-      if (mode === 'thumbnail' && upload.transcript) {
-        return { text: upload.transcript, language: upload.analysis?.language || 'en', segments: upload.transcript_segments || [], skipped: true }
-      }
-
-      if (activeContext.upload.mime_type === 'text/plain') {
-        const fileRes = await step.run('transcribe-text-read', async () => {
-          const r = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
-          return r?.ok ? r.text() : ''
-        })
-        return { text: fileRes, language: 'en', segments: [] }
-      }
-
-      const replicateToken = process.env.REPLICATE_API_TOKEN
-      if (!replicateToken) throw new Error('REPLICATE_API_TOKEN missing')
-
+    if (mode === 'thumbnail' && upload.transcript) {
+      console.log(`[${Date.now()}] [transcribe] Skipping (thumbnail mode and already exists)`);
+      transcription = { text: upload.transcript, language: upload.analysis?.language || 'en', segments: (upload as any).transcript_segments || [], skipped: true }
+    } else if (upload.mime_type === 'text/plain') {
+      const fileRes = await step.run('transcribe-text-read', async () => {
+        console.log(`[${Date.now()}] [transcribe] Reading plain text file...`);
+        const r = await fetch(await presignDownloadUrl(audioPath.path, 600)).catch(() => null)
+        return r?.ok ? r.text() : ''
+      })
+      transcription = { text: fileRes, language: 'en', segments: [] }
+    } else if (replicateToken) {
       const whisperAudioUrl: string = await step.run('transcribe-sign-url', async () => {
+        console.log(`[${Date.now()}] [transcribe] Signing audio URL...`);
         if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) return audioPath.path
         const signed = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
         if (!signed) throw new Error('Failed to sign audio URL for Whisper')
         return signed
       })
 
-      await heartbeat('transcribing')
+      await reportStatus('transcribing')
 
+      console.log(`[${Date.now()}] [transcribe] Starting Replicate Whisper job...`);
       const output = await runReplicateAsync(
         step,
         'transcribe',
@@ -575,6 +576,7 @@ export const processUpload = inngest.createFunction(
         }
       ) as any
 
+      console.log(`[${Date.now()}] [transcribe] Extraction segment data...`);
       const text = output?.transcription || ''
       const segments = (output?.segments || []).map((s: any) => ({ start: s.start, end: s.end, text: s.text }))
       const words: Array<{ word: string; start: number; end: number; probability: number }> = []
@@ -587,12 +589,14 @@ export const processUpload = inngest.createFunction(
           }
         }
       }
-      return { text, language: output?.detected_language || 'en', segments, words }
-    })()
+      console.log(`[${Date.now()}] [transcribe] Success. Text length: ${text.length}`);
+      transcription = { text, language: output?.detected_language || 'en', segments, words }
+    }
 
     // ── Step 3b: Store word-level transcript ──
     if (transcription && 'words' in transcription && transcription.words && transcription.words.length > 0) {
       await step.run('store-transcript-words', async () => {
+        console.log(`[${Date.now()}] [store-transcript-words] Starting for ${transcription.words.length} words...`);
         // Delete any existing words for this upload (idempotent)
         await admin.from('transcript_words').delete().eq('video_upload_id', video_upload_id)
 
@@ -611,46 +615,38 @@ export const processUpload = inngest.createFunction(
         for (let i = 0; i < rows.length; i += 500) {
           await admin.from('transcript_words').insert(rows.slice(i, i + 500))
         }
-
+        console.log(`[${Date.now()}] [store-transcript-words] Success`);
       })
     }
 
     // ── Step 4: Analyze ──
-    const analysisResult = await step.run('analyze', async () => {
-      const mode = event.data.mode || 'full'
-      const { upload } = activeContext
-      await heartbeat('analyzing-media')
+    await reportStatus('analyzing-media')
+    let analysisResult: any = null
 
-      // Smart Skip: If we already have analysis and just need a thumbnail
-      if (mode === 'thumbnail' && (upload as any).analysis) {
-        console.log(`[Inngest] Skipping analysis for ${video_upload_id} (thumbnail mode)`)
-        
-        // CRITICAL: Ensure we still mark as processed in the database
+    // Smart Skip: If we already have analysis and just need a thumbnail
+    if (mode === 'thumbnail' && (upload as any).analysis) {
+      console.log(`[${Date.now()}] [analyze] Skipping (thumbnail mode and already exists)`);
+      
+      // CRITICAL: Ensure we still mark as processed in the database
+      await step.run('finalize-thumbnail-mode', async () => {
         await admin.from('video_uploads').update({
           status: 'processed',
           processed_at: (upload as any).processed_at || new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }).eq('id', video_upload_id)
+      })
 
-        return { 
-          analysis: (upload as any).analysis, 
-          modelUsed: (upload as any).analysis_model || 'skipped',
-          tags: (upload as any).tags || [],
-          clips: (upload as any).generated_clips || [],
-          posts: (upload as any).generated_posts || [],
-          skipped: true 
-        }
+      analysisResult = { 
+        analysis: (upload as any).analysis, 
+        modelUsed: (upload as any).analysis_model || 'skipped',
+        tags: (upload as any).tags || [],
+        clips: (upload as any).generated_clips || [],
+        posts: (upload as any).generated_posts || [],
+        skipped: true 
       }
-
-      await admin.from('video_uploads').update({
-        transcript: transcription.text,
-        transcript_segments: transcription.segments,
-        status: 'analyzing',
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
-
-      await heartbeat('analyzing')
-
+    } else if (transcription) {
+      // ── Step 4: Run Analysis ──
+      console.log(`[${Date.now()}] [analyze] Running runAnalysis...`);
       const result = await runAnalysis(
         transcription.text,
         activeContext.openaiKey,
@@ -664,19 +660,25 @@ export const processUpload = inngest.createFunction(
       const clips = generateClipSuggestions(transcription.segments, result.analysis.key_quotes || [])
       const posts = generatePostSuggestions(result.analysis, metadata.recorded_at)
 
-      await admin.from('video_uploads').update({
-        analysis: result.analysis,
-        analysis_model: result.modelUsed,
-        tags,
-        generated_clips: clips,
-        generated_posts: posts,
-        status: 'processed',
-        processed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq('id', video_upload_id)
+      await step.run('apply-analysis-results', async () => {
+        console.log(`[${Date.now()}] [analyze] Saving results to DB...`);
+        await admin.from('video_uploads').update({
+          transcript: transcription.text,
+          transcript_segments: transcription.segments,
+          analysis: result.analysis,
+          analysis_model: result.modelUsed,
+          tags,
+          generated_clips: clips,
+          generated_posts: posts,
+          status: 'processed',
+          processed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq('id', video_upload_id)
+        console.log(`[${Date.now()}] [analyze] DB update success`);
+      })
 
-      return { ...result, tags, clips, posts, skipped: false }
-    })
+      analysisResult = { ...result, tags, clips, posts, skipped: false }
+    }
 
     // ── Step 4a: Upsert entities into knowledge graph ──
     await step.run('upsert-entities', async () => {
