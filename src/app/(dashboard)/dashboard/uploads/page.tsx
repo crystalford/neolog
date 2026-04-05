@@ -402,23 +402,9 @@ export default function UploadsPage() {
     }
   }
 
+  // Initial load
   useEffect(() => { 
     fetchUploads() 
-    
-    // Polling logic: if any upload is in a "active" processing state, poll every 8 seconds
-    const hasActiveUploads = uploads.some(u => {
-      const s = u.status as string
-      return s !== 'processed' && s !== 'error' && s !== 'deleted'
-    })
-
-    let interval: NodeJS.Timeout | null = null
-    if (hasActiveUploads) {
-      interval = setInterval(() => {
-        console.log('[Polling] Refreshing upload status...')
-        fetchUploads()
-      }, 8000)
-    }
-
     const saved = localStorage.getItem('neolog_upload_queue')
     if (saved) {
       try {
@@ -431,8 +417,22 @@ export default function UploadsPage() {
         })))
       } catch {}
     }
-    return () => { if (interval) clearInterval(interval) }
-  }, [fetchUploads, uploads.length, uploads.some(u => u.status === 'processed' || u.status === 'error')])
+  }, [fetchUploads])
+
+  // Separate polling effect — always runs a 5s interval, only fetches when there are active uploads
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const hasActive = uploads.some(u => {
+        const s = u.status as string
+        return s !== 'processed' && s !== 'error' && s !== 'deleted' && s !== 'deleting'
+      })
+      if (hasActive) {
+        console.log('[Polling] Active uploads detected, refreshing...')
+        fetchUploads()
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [uploads, fetchUploads])
 
   useEffect(() => {
     const serializable = queue.map(({ id, fileName, fileSize, fileType, status, progress, thumbnail, recordedAt, error, r2UploadId, r2Key }) => ({
