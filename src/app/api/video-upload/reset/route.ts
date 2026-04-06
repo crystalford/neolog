@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('video_uploads')
       .update({
-        status: 'starting',
+        status: 'uploaded',
         error_message: null,
         updated_at: new Date().toISOString(),
       })
