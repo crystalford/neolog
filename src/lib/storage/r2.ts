@@ -149,6 +149,24 @@ export async function uploadBuffer(key: string, buffer: Buffer, contentType: str
 }
 
 /**
+ * Handle streaming upload directly to R2 using chunking without keeping the entire file in memory.
+ */
+export async function uploadStream(key: string, stream: AsyncIterable<any> | ReadableStream, contentType: string) {
+  const { Upload } = await import('@aws-sdk/lib-storage')
+  const client = getR2Client()
+  const upload = new Upload({
+    client,
+    params: {
+      Bucket: R2_BUCKET,
+      Key: key,
+      Body: stream,
+      ContentType: contentType,
+    },
+  })
+  await upload.done()
+}
+
+/**
  * Delete an object from R2.
  */
 export async function deleteR2Object(key: string) {

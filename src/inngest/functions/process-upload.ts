@@ -492,7 +492,7 @@ export const processUpload = inngest.createFunction(
 
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
     let playbackStoragePath: string | null = null
-    const shouldTranscode = isVideoMimeType(upload.mime_type) && mode !== 'thumbnail' && replicateToken
+    const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && mode !== 'thumbnail' && replicateToken
 
     if (shouldTranscode) {
       await reportStatus('transcoding-video')
@@ -516,11 +516,16 @@ export const processUpload = inngest.createFunction(
           const outputUrl = extractReplicateUrl(output)
           if (outputUrl) {
             playbackStoragePath = await step.run('transcode-upload', async () => {
-              console.log(`[${Date.now()}] [transcode-playback] Fetching and uploading buffer...`);
-              const mp4Buf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
+              console.log(`[${Date.now()}] [transcode-playback] Fetching stream...`);
+              const response = await fetch(outputUrl)
+              if (!response.body) throw new Error('Failed to start fetch stream.')
+
               const path = `${user_id}/playback/${video_upload_id}.mp4`
-              await uploadBuffer(path, mp4Buf, 'video/mp4').catch((uploadErr: any) => {
-                console.error(`[${Date.now()}] [transcode-playback] R2 upload failed:`, uploadErr?.message)
+              console.log(`[${Date.now()}] [transcode-playback] Streaming directly to R2...`);
+
+              const { uploadStream } = await import('@/lib/storage/r2')
+              await uploadStream(path, response.body, 'video/mp4').catch((uploadErr: any) => {
+                console.error(`[${Date.now()}] [transcode-playback] R2 streaming failed:`, uploadErr?.message)
                 throw uploadErr
               })
               await admin.from('video_uploads').update({ playback_path: path }).eq('id', video_upload_id)
