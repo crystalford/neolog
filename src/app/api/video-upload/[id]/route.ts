@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'edge'
+
 // GET: Fetch a single video upload with all details
 export async function GET(
   request: NextRequest,
