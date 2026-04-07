@@ -6,6 +6,8 @@ import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
+export const runtime = 'edge'
+
 // Replicate SDK v1.4 returns FileOutput objects (not strings) and sometimes arrays.
 // This helper safely extracts the URL from any output shape.
 function extractReplicateUrl(output: unknown): string | null {

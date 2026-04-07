@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { inngest } from '@/inngest/client'
 
+export const runtime = 'edge'
+
 /**
  * POST /api/video-upload/reset
  * Resets a stuck or failed upload and re-triggers the processing pipeline.

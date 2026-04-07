@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 import { inngest } from '@/inngest/client'
 
+export const runtime = 'edge'
+
 const VALID_TYPES = [
   'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska',
   'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/x-m4a',
