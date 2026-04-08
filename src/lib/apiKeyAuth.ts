@@ -1,8 +1,8 @@
-import crypto from 'node:crypto'
 import type { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sha256 } from '@/lib/embeddings'
 
-const hashKey = (key: string) => crypto.createHash('sha256').update(key).digest('hex')
+const hashKey = async (key: string) => await sha256(key)
 
 export async function requireAutomationKey(request: NextRequest) {
   const raw =
@@ -21,7 +21,7 @@ export async function requireAutomationKey(request: NextRequest) {
     return { ok: false as const, error: 'Server missing Supabase admin configuration.' }
   }
 
-  const keyHash = hashKey(key)
+  const keyHash = await hashKey(key)
 
   const { data: row, error } = await admin
     .from('api_keys')
