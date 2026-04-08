@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import { createClient } from '@/lib/supabase/server'
 
 const getSecretKey = () => {

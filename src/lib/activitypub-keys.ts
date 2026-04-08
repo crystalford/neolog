@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 type ActivityPubKeyPair = {

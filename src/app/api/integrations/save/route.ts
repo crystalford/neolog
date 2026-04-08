@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'
 
 const getKey = () => {

@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import { getOrCreateActorKeys } from '@/lib/activitypub-keys'
 import { getOrCreatePublicationKeys } from '@/lib/activitypub-publication-keys'
 

@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 
 const sha256Hex = (data: string) =>
   crypto.createHash('sha256').update(data, 'utf8').digest('hex')

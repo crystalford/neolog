@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 
 type EmbeddingResponse = {
   data: Array<{ embedding: number[] }>
