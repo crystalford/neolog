@@ -14,10 +14,7 @@ import {
   Brain, Cpu, Network, Radio, FolderOpen, Mic
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { PublicationSwitcher } from '@/components/PublicationSwitcher'
 import { Logo } from '@/components/Logo'
-import { onSelectedPublicationIdChange, readSelectedPublicationId, writeSelectedPublicationId } from '@/lib/publicationContext'
-import { useUserMaturity } from '@/hooks/useUserMaturity'
 
 const DashboardCommandPalette = dynamic(
   () => import('@/components/DashboardCommandPalette').then((mod) => mod.DashboardCommandPalette),
@@ -33,62 +30,10 @@ export default function DashboardLayout({
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(null)
-  const [selectedPublicationSlug, setSelectedPublicationSlug] = useState<string | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    setSelectedPublicationId(readSelectedPublicationId())
-
-    const unsubscribe = onSelectedPublicationIdChange((publicationId) => {
-      if (publicationId) setSelectedPublicationId(publicationId)
-    })
-
-    return unsubscribe
-  }, [])
-
-  useEffect(() => {
-    const loadPublicationSlug = async () => {
-      if (!user) return
-
-      let publicationId = selectedPublicationId
-
-      if (!publicationId) {
-        const { data: fallback } = await supabase
-          .from('publications')
-          .select('id, slug')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-
-        if (fallback && fallback[0]) {
-          publicationId = fallback[0].id
-          setSelectedPublicationId(fallback[0].id)
-          writeSelectedPublicationId(fallback[0].id)
-          setSelectedPublicationSlug(fallback[0].slug)
-          return
-        }
-      }
-
-      if (!publicationId) {
-        setSelectedPublicationSlug(null)
-        return
-      }
-
-      const { data } = await supabase
-        .from('publications')
-        .select('slug')
-        .eq('id', publicationId)
-        .eq('owner_id', user.id)
-        .maybeSingle()
-
-      setSelectedPublicationSlug(data?.slug || null)
-    }
-
-    void loadPublicationSlug()
-  }, [selectedPublicationId, user, supabase])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hostname.startsWith('www.')) {
@@ -217,8 +162,6 @@ export default function DashboardLayout({
     router.push('/')
   }
 
-  // User maturity for progressive disclosure
-  const { capabilities, loading: maturityLoading } = useUserMaturity(user?.id ?? null)
 
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
@@ -388,7 +331,7 @@ export default function DashboardLayout({
           {profile && (
             <div className="flex flex-col gap-0.5">
               <Link
-                href={`/${profile.username}/log`}
+                href="/dashboard"
                 target="_blank"
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors"
                 title="View your public log"
@@ -433,15 +376,6 @@ export default function DashboardLayout({
               {/* Page Title */}
               <h1 className="text-sm font-medium text-[var(--text-primary)] tracking-tight">{activeLabel}</h1>
 
-              {/* Publication Switcher (if applicable) */}
-              {capabilities.showPublicationsManagement && (
-                <div className="hidden sm:block">
-                  <PublicationSwitcher
-                    currentPublicationId={selectedPublicationId}
-                    onPublicationChange={(publicationId) => setSelectedPublicationId(publicationId)}
-                  />
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -475,7 +409,7 @@ export default function DashboardLayout({
               {/* User avatar */}
               {profile && (
                 <Link
-                  href={`/${profile.username}/log`}
+                  href="/dashboard"
                   target="_blank"
                   className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-medium)] overflow-hidden flex items-center justify-center hover:border-[var(--border-heavy)] transition-colors"
                   title="View your public log"

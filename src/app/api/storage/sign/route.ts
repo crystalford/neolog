@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   const safeName = sanitizeName(filename)
   const key = `uploads/${session.user.id}/${Date.now()}-${safeName}`
 
-  const uploadUrl = presignS3Url({
+  const uploadUrl = await presignS3Url({
     accessKeyId: connection.access_key_id,
     secretKey,
     bucket: connection.bucket,

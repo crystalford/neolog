@@ -6,26 +6,12 @@ export async function GET() {
 
   const body = `# Neolog
 
-Neolog is a protocol-native publishing platform.
+Neolog is an intelligence-first video and audio journal.
 
-## Preferred machine-readable endpoints
-
-### Profile JSON
-- ${baseUrl}/{username}?format=json
-  - Rewrites to: ${baseUrl}/api/agent/user?username={username}
-
-### Post JSON
-- ${baseUrl}/{username}/{slug}?format=json
-  - Rewrites to: ${baseUrl}/api/agent/post?username={username}&slug={slug}
-
-### Feeds
-- User RSS:  ${baseUrl}/{username}/feed
-- User Atom: ${baseUrl}/{username}/feed?format=atom
-- User JSON: ${baseUrl}/{username}/feed?format=json
-
-- Global RSS:  ${baseUrl}/api/feeds/global
-- Global Atom: ${baseUrl}/api/feeds/global?format=atom
-- Global JSON: ${baseUrl}/api/feeds/global?format=json
+## Core Features
+- Video/Audio Log Ingestion
+- Semantic Search & Knowledge Graph
+- Narrative Synthesis & Pattern Discovery
 
 ## Discovery
 - Robots:  ${baseUrl}/robots.txt

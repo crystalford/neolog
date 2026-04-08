@@ -2,14 +2,13 @@
 
 export const runtime = 'edge'
 
-
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ensureProfile } from '@/lib/profile'
 import {
   ArrowRight, Loader2, Camera, Check, Sparkles,
-  PenLine, Users, Rss
+  Zap, Brain, Database
 } from 'lucide-react'
 
 export default function OnboardingPage() {
@@ -69,30 +68,10 @@ export default function OnboardingPage() {
   }
 
   const RESERVED_USERNAMES = new Set([
-    'api',
-    '_next',
-    'dashboard',
-    'auth',
-    'explore',
-    'visuals',
-    'privacy',
-    'tos',
-    'search',
-    'tags',
-    'tag',
-    'unsubscribe',
-    'admin',
-    'earnings',
-    'curators',
-    'onboarding',
-    'login',
-    'signup',
-    'forgot-password',
-    'reset-password',
-    'preview',
-    'readme',
-    'roadmap',
-    'architecture',
+    'api', '_next', 'dashboard', 'auth', 'explore', 'visuals', 'privacy', 'tos',
+    'search', 'tags', 'tag', 'unsubscribe', 'admin', 'earnings', 'curators',
+    'onboarding', 'login', 'signup', 'forgot-password', 'reset-password',
+    'preview', 'readme', 'roadmap', 'architecture',
   ])
 
   const normalizeUsername = (value: string) =>
@@ -153,25 +132,6 @@ export default function OnboardingPage() {
       return false
     }
 
-    const { data: publicationData, error: publicationError } = await supabase
-      .from('publications')
-      .select('id')
-      .eq('slug', normalized)
-      .limit(1)
-
-    if (publicationError) {
-      setUsernameStatus('idle')
-      setUsernameMessage('Could not check username availability.')
-      return false
-    }
-
-    const publicationTaken = Array.isArray(publicationData) && publicationData.length > 0
-    if (publicationTaken) {
-      setUsernameStatus('taken')
-      setUsernameMessage('That name is already used by a publication.')
-      return false
-    }
-
     setUsernameStatus('available')
     setUsernameMessage(null)
     return true
@@ -181,13 +141,11 @@ export default function OnboardingPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setSaveError('Image size must be less than 5MB')
       return
     }
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setSaveError('Please upload an image file')
       return
@@ -200,12 +158,7 @@ export default function OnboardingPage() {
       const currentProfile = profile || (user ? await ensureProfile(supabase, user) : null)
       if (!currentProfile) {
         setSaveError('Unable to load your profile. Please try again.')
-        setUploadingAvatar(false)
         return
-      }
-
-      if (!profile) {
-        setProfile(currentProfile)
       }
 
       const fileExt = file.name.split('.').pop()
@@ -216,9 +169,7 @@ export default function OnboardingPage() {
         .upload(fileName, file, { upsert: true })
 
       if (uploadError) {
-        console.error('Upload error:', uploadError)
         setSaveError(`Failed to upload image: ${uploadError.message}`)
-        setUploadingAvatar(false)
         return
       }
 
@@ -228,8 +179,7 @@ export default function OnboardingPage() {
 
       setAvatarUrl(publicUrl)
     } catch (err) {
-      console.error('Avatar upload error:', err)
-      setSaveError('An unexpected error occurred while uploading. Please try again.')
+      setSaveError('An unexpected error occurred while uploading.')
     } finally {
       setUploadingAvatar(false)
     }
@@ -237,7 +187,6 @@ export default function OnboardingPage() {
 
   const handleNext = async () => {
     if (step === 1) {
-      // Validate step 1
       if (!displayName.trim()) return
       const ok = await checkUsernameAvailability(username)
       if (!ok) return
@@ -245,7 +194,6 @@ export default function OnboardingPage() {
     } else if (step === 2) {
       setStep(3)
     } else if (step === 3) {
-      // Save and finish
       setSaving(true)
       setSaveError(null)
 
@@ -254,9 +202,6 @@ export default function OnboardingPage() {
         setSaveError('Unable to load your profile. Please try again.')
         setSaving(false)
         return
-      }
-      if (!profile) {
-        setProfile(currentProfile)
       }
 
       const { error } = await supabase
@@ -271,46 +216,9 @@ export default function OnboardingPage() {
         .eq('id', currentProfile.id)
 
       if (error) {
-        if ((error as any).code === '23505') {
-          setSaveError('That username is already taken.')
-        } else if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
-          setSaveError('Username must be 3-30 characters and only use a-z, 0-9, and _.')
-        } else {
-          setSaveError('Unable to finish setup. Please try again.')
-        }
-        setSaving(false)
-        return
-      }
-
-      const { data: existingPublications, error: publicationLookupError } = await supabase
-        .from('publications')
-        .select('id')
-        .eq('owner_id', currentProfile.id)
-        .limit(1)
-
-      if (publicationLookupError) {
         setSaveError('Unable to finish setup. Please try again.')
         setSaving(false)
         return
-      }
-
-      if (!existingPublications || existingPublications.length === 0) {
-        const { error: publicationError } = await supabase
-          .from('publications')
-          .insert({
-            owner_id: currentProfile.id,
-            name: displayName.trim() || username.trim(),
-            slug: normalizeUsername(username),
-            description: bio || null,
-          })
-          .select('id')
-          .single()
-
-        if (publicationError) {
-          setSaveError('Unable to create your publication. Please try again.')
-          setSaving(false)
-          return
-        }
       }
 
       router.push('/dashboard')
@@ -318,8 +226,7 @@ export default function OnboardingPage() {
   }
 
   const topicOptions = [
-    'Technology', 'AI & Machine Learning', 'Writing', 'Business',
-    'Startups', 'Science', 'Health', 'Finance', 'Crypto',
+    'Technology', 'AI & Machine Learning', 'Science', 'Health', 'Finance',
     'Design', 'Politics', 'Culture', 'Philosophy', 'Productivity',
     'Marketing', 'Personal Development', 'Climate', 'Education'
   ]
@@ -342,7 +249,6 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 h-1 bg-[var(--bg-secondary)]">
         <div
           className="h-full bg-[var(--accent)] transition-all duration-500"
@@ -351,7 +257,6 @@ export default function OnboardingPage() {
       </div>
 
       <div className="max-w-xl mx-auto px-6 py-16">
-        {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-12">
           <div className="w-10 h-10 bg-[var(--accent)] rounded-lg flex items-center justify-center font-mono text-lg font-bold text-white">
             N
@@ -359,18 +264,16 @@ export default function OnboardingPage() {
           <span className="font-display text-2xl">Neolog</span>
         </div>
 
-        {/* Step 1: Basic info */}
         {step === 1 && (
           <div className="animate-fade-up">
             <div className="text-center mb-8">
-              <h1 className="font-display text-3xl mb-2">Welcome to Neolog!</h1>
+              <h1 className="font-display text-3xl mb-2">Welcome!</h1>
               <p className="text-[var(--text-secondary)]">
-                Let's set up your publication so readers can find you
+                Let's set up your profile to personalize your experience
               </p>
             </div>
 
             <div className="space-y-6">
-              {/* Avatar */}
               <div className="flex flex-col items-center">
                 <div className="relative mb-3">
                   {avatarUrl ? (
@@ -400,28 +303,26 @@ export default function OnboardingPage() {
                     />
                   </label>
                 </div>
-                <p className="text-sm text-[var(--text-tertiary)]">Add a logo</p>
+                <p className="text-sm text-[var(--text-tertiary)]">Add a profile picture</p>
               </div>
 
-              {/* Display name */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Publication name
+                  Display name
                 </label>
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your publication"
+                  placeholder="Your name"
                   className="input text-lg py-3"
                   autoFocus
                 />
               </div>
 
-              {/* Username */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Publication handle
+                  Username
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-[var(--text-tertiary)]">@</span>
@@ -438,16 +339,8 @@ export default function OnboardingPage() {
                     }}
                     placeholder="your_handle"
                     className="input text-lg py-3 flex-1"
-                    inputMode="text"
-                    autoCapitalize="none"
-                    autoCorrect="off"
                   />
                 </div>
-                {(profile?.username?.startsWith('user_') || username.startsWith('user_')) && (
-                  <p className="mt-2 text-sm text-[var(--text-tertiary)]">
-                    We created a temporary username for you - pick the one you want now.
-                  </p>
-                )}
                 <div className="mt-2 text-sm">
                   {usernameStatus === 'checking' ? (
                     <span className="text-[var(--text-tertiary)]">Checking availability...</span>
@@ -461,33 +354,28 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* Bio */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Tell readers what this publication is about
+                  Tell us a bit about yourself
                 </label>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="What people can expect to read here..."
+                  placeholder="What you're working on, learning, or interested in..."
                   className="input min-h-[100px] resize-none"
                   maxLength={160}
                 />
-                <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                  {bio.length}/160
-                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 2: Interests */}
         {step === 2 && (
           <div className="animate-fade-up">
             <div className="text-center mb-8">
-              <h1 className="font-display text-3xl mb-2">What do you write about?</h1>
+              <h1 className="font-display text-3xl mb-2">What interests you?</h1>
               <p className="text-[var(--text-secondary)]">
-                Select topics to help readers discover your work
+                Select topics to personalize your intelligence feed
               </p>
             </div>
 
@@ -506,14 +394,9 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-
-            <p className="text-sm text-[var(--text-tertiary)] text-center">
-              You can always change these later
-            </p>
           </div>
         )}
 
-        {/* Step 3: Ready */}
         {step === 3 && (
           <div className="animate-fade-up text-center">
             <div className="w-20 h-20 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-6">
@@ -528,36 +411,36 @@ export default function OnboardingPage() {
             <div className="grid gap-4 text-left mb-8">
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0">
-                  <PenLine size={20} className="text-[var(--accent)]" />
+                  <Database size={20} className="text-[var(--accent)]" />
                 </div>
                 <div>
-                  <p className="font-medium">Write and publish</p>
+                  <p className="font-medium">Build your Neural Corpus</p>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    Rich editor with formatting, images, and code blocks
+                    Upload video and audio to archive high-fidelity signals
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0">
-                  <Users size={20} className="text-[var(--accent)]" />
+                  <Brain size={20} className="text-[var(--accent)]" />
                 </div>
                 <div>
-                  <p className="font-medium">Build your audience</p>
+                  <p className="font-medium">Discover Patterns</p>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    Subscribers, email notifications, and engagement
+                    AI-driven synthesis across your entire knowledge graph
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                 <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center flex-shrink-0">
-                  <Rss size={20} className="text-[var(--accent)]" />
+                  <Zap size={20} className="text-[var(--accent)]" />
                 </div>
                 <div>
-                  <p className="font-medium">Own your content</p>
+                  <p className="font-medium">Instant Insight</p>
                   <p className="text-sm text-[var(--text-secondary)]">
-                    RSS feeds, full export, no lock-in ever
+                    Search and query your corpus for immediate continuity
                   </p>
                 </div>
               </div>
@@ -565,7 +448,6 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Navigation */}
         <div className="flex justify-between items-center mt-8">
           {step > 1 ? (
             <button
