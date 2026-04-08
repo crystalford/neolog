@@ -1,4 +1,3 @@
-import crypto from 'node:crypto'
 
 type EmbeddingResponse = {
   data: Array<{ embedding: number[] }>
@@ -10,7 +9,12 @@ type EmbeddingResponse = {
 
 export const EMBEDDING_DIM = 1536
 
-export const sha256 = (input: string) => crypto.createHash('sha256').update(input).digest('hex')
+export const sha256 = async (input: string) => {
+  const msgUint8 = new TextEncoder().encode(input)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
 export const vectorLiteral = (vec: number[]) => `[${vec.join(',')}]`
 

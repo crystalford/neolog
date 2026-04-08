@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
                   {
                     post_id: postId,
                     embedding: vectorLiteral(embedding),
-                    content_hash: sha256(text),
+                    content_hash: await sha256(text),
                     updated_at: new Date().toISOString(),
                   },
                   { onConflict: 'post_id' },

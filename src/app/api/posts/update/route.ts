@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
           })
 
           if (text) {
-            const newHash = sha256(text)
+            const newHash = await sha256(text)
 
             const { data: existingEmbedding } = await admin
               .from('post_embeddings')
