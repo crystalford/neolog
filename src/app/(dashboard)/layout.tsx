@@ -133,12 +133,6 @@ export default function DashboardLayout({
         setCommandOpen(true)
         return
       }
-
-      if (isModifier && event.key.toLowerCase() === 'n') {
-        if (isEditable) return
-        event.preventDefault()
-        router.push('/write')
-      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
