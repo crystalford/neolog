@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Auto-Post Syndication dashboard
 import React from "react";
 

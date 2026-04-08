@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest } from 'next/server'
 import { finishJobRun, startJobRun } from '@/lib/jobRuns'

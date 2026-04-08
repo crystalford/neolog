@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Platform Connections dashboard
 import React from "react";
 

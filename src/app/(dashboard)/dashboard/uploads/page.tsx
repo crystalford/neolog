@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {

@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import { useState, useEffect, useCallback } from 'react'
 import { Copy, Share2, Check } from 'lucide-react'

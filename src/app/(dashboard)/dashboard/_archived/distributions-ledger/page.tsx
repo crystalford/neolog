@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Distributions Ledger dashboard
 import React from "react";
 

@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import { SyndicationSettings } from '@/components/SyndicationSettings'
 import { Share2 } from 'lucide-react'

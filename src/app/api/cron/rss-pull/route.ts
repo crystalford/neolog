@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { parseRss } from '@/lib/rss/parse'
 import { createAdminClient } from '@/lib/supabase/admin'

@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { format, isToday, isYesterday, parseISO } from 'date-fns'

@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 /**
  * DELETE /api/upload/abort
  *

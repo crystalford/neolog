@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import { PublicationDomainSection } from '@/components/PublicationDomainSection'
 import { Globe } from 'lucide-react'

@@ -1,4 +1,5 @@
-'use client'
+'use client'export const runtime = 'edge'
+
 
 import { ApiKeyManager } from '@/components/ApiKeyManager'
 import { AICaptureSettings } from '@/components/AICaptureSettings'

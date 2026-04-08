@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Engagement Sync dashboard
 import React from "react";
 

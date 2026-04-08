@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Deepgram/Gemini Ingest dashboard
 import React from "react";
 

@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Quick Capture dashboard
 import React from "react";
 

@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Visuals Engine dashboard
 import React from "react";
 

@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Freshness/Revive dashboard
 import React from "react";
 

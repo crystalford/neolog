@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 // Minimal scaffold for Lineage Analytics dashboard
 import React from "react";
 

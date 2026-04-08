@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 import { createClient } from '@/lib/supabase/server'
 import { sendNewPostNotifications } from '@/lib/email'
 import { resolveProviderKey } from '@/lib/ai-provider'

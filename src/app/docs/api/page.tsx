@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 import { Share2, Lock, Zap, FileText, Image as ImageIcon } from 'lucide-react'
 
 export const metadata = {

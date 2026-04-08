@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 import { redirect } from 'next/navigation'
 
 // Quick Ingest was merged into the Log page

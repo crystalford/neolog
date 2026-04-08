@@ -1,3 +1,4 @@
+export const runtime = 'edge'
 /**
  * GET /api/upload/resume?uploadId=X&key=Y&fromPart=N
  *
