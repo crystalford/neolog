@@ -1,5 +1,7 @@
 'use client'
 
+export const runtime = 'edge'
+
 import Link from 'next/link'
 import { FileQuestion, Home, Search, ArrowLeft } from 'lucide-react'
 
@@ -20,10 +22,6 @@ export default function NotFound() {
           <Link href="/" className="btn btn-primary w-full sm:w-auto">
             <Home size={16} />
             Go Home
-          </Link>
-          <Link href="/explore" className="btn btn-secondary w-full sm:w-auto">
-            <Search size={16} />
-            Explore
           </Link>
         </div>
 

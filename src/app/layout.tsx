@@ -5,6 +5,7 @@ import './globals.css'
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neolog.ai'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 export const metadata: Metadata = {
   title: 'Neolog - Your Life Extended',
