@@ -19,7 +19,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   webpack: (config) => {
-    config.externals.push('node:crypto');
+    config.externals.push({ 'node:crypto': 'commonjs node:crypto' });
     return config;
   },
   async headers() {
