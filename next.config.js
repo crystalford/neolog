@@ -18,10 +18,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config) => {
-    config.externals.push({ 'node:crypto': 'commonjs node:crypto' });
-    return config;
-  },
   async headers() {
     return [
       {
