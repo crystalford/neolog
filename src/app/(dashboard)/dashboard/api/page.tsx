@@ -1,4 +1,6 @@
-'use client'export const runtime = 'edge'
+'use client'
+
+export const runtime = 'edge'
 
 
 import { ApiKeyManager } from '@/components/ApiKeyManager'
