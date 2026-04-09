@@ -28,6 +28,7 @@ export default function BrainPage() {
   const [mentions, setMentions] = useState<any[]>([])
   const [loadingMentions, setLoadingMentions] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'graph'>('grid')
+  const [isSynthesizing, setIsSynthesizing] = useState(false)
 
   const supabase = createClient()
 
@@ -86,6 +87,39 @@ export default function BrainPage() {
     return d.toLocaleDateString()
   }
 
+  const handleGlobalSynthesis = async () => {
+    setIsSynthesizing(true)
+    try {
+      const res = await fetch('/api/synthesize-graph', { method: 'POST' })
+      if (!res.ok) {
+        const error = await res.json()
+        alert(error.error || 'Failed to start synthesis')
+      } else {
+        alert('Universal synthesis triggered. This may take a few minutes.')
+      }
+    } catch (err) {
+      console.error('Synthesis error:', err)
+    } finally {
+      setIsSynthesizing(false)
+    }
+  }
+
+  const handleEntitySynthesis = async (entityId: string, type: string) => {
+     // If project, trigger project synthesis
+     if (type === 'project') {
+       try {
+         const res = await fetch(`/api/portfolio/project/${entityId}/generate`, { method: 'POST' })
+         if (res.ok) {
+           alert('Project synthesis triggered.')
+         }
+       } catch (err) {
+         console.error('Project synthesis error:', err)
+       }
+     } else {
+       alert('Synthesis for this node type coming soon.')
+     }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-10">
       {/* Header */}
@@ -105,22 +139,32 @@ export default function BrainPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
-             <button 
-               onClick={() => setViewMode('grid')}
-               className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-black shadow-lg' : 'text-[var(--text-tertiary)] hover:text-white'}`}
-               title="Grid View"
-             >
-               <LayoutGrid size={18} />
-             </button>
-             <button 
-               onClick={() => setViewMode('graph')}
-               className={`p-2 rounded-lg transition-all ${viewMode === 'graph' ? 'bg-white text-black shadow-lg' : 'text-[var(--text-tertiary)] hover:text-white'}`}
-               title="Graph View"
-             >
-               <Network size={18} />
-             </button>
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleGlobalSynthesis}
+              disabled={isSynthesizing}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100"
+            >
+              {isSynthesizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              Synthesize Universal Graph
+            </button>
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
+               <button 
+                 onClick={() => setViewMode('grid')}
+                 className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-black shadow-lg' : 'text-[var(--text-tertiary)] hover:text-white'}`}
+                 title="Grid View"
+               >
+                 <LayoutGrid size={18} />
+               </button>
+               <button 
+                 onClick={() => setViewMode('graph')}
+                 className={`p-2 rounded-lg transition-all ${viewMode === 'graph' ? 'bg-white text-black shadow-lg' : 'text-[var(--text-tertiary)] hover:text-white'}`}
+                 title="Graph View"
+               >
+                 <Network size={18} />
+               </button>
+            </div>
           </div>
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-focus-within:text-[var(--accent)] transition-colors" size={16} />
@@ -132,6 +176,7 @@ export default function BrainPage() {
           </div>
         </div>
       </div>
+
 
       <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-light)] to-transparent" />
 
@@ -216,7 +261,10 @@ export default function BrainPage() {
                         </div>
                       </div>
                       
-                      <button className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-[var(--accent)] text-white font-bold text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                      <button 
+                        onClick={() => handleEntitySynthesis(entity.id, entity.type)}
+                        className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-[var(--accent)] text-white font-bold text-[10px] uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
                         Synthesize Insights
                         <Sparkles size={14} />
                       </button>

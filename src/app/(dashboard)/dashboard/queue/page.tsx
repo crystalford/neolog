@@ -45,6 +45,8 @@ export default function QueuePage() {
     fetchQueue()
   }, [fetchQueue])
 
+  const [refiningId, setRefiningId] = useState<string | null>(null)
+
   const handleUpdateStatus = async (id: string, status: SocialPost['status'], scheduled_at?: string) => {
     try {
       const res = await fetch('/api/social-queue', {
@@ -56,6 +58,24 @@ export default function QueuePage() {
       }
     } catch (err) {
       console.error('Failed to update post:', err)
+    }
+  }
+
+  const handleRefine = async (id: string, currentContent: string) => {
+    setRefiningId(id)
+    try {
+      const res = await fetch('/api/social-queue/refine', {
+        method: 'POST',
+        body: JSON.stringify({ content: currentContent })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPosts(prev => prev.map(p => p.id === id ? { ...p, content: data.refinedContent } : p))
+      }
+    } catch (err) {
+      console.error('Failed to refine post:', err)
+    } finally {
+      setRefiningId(null)
     }
   }
 
@@ -112,11 +132,14 @@ export default function QueuePage() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {posts.map((post) => (
-            <div 
-              key={post.id}
-              className="group relative flex flex-col gap-6 p-8 border border-[var(--border-light)] rounded-[2.5rem] bg-[var(--bg-card)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 transition-all duration-500"
-            >
+          {posts.map((post) => {
+            const isRefining = refiningId === post.id
+
+            return (
+              <div 
+                key={post.id}
+                className="group relative flex flex-col gap-6 p-8 border border-[var(--border-light)] rounded-[2.5rem] bg-[var(--bg-card)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 transition-all duration-500"
+              >
               {/* Post Meta */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -147,7 +170,8 @@ export default function QueuePage() {
                 <div className="absolute -left-4 top-0 bottom-0 w-1 bg-[var(--accent)]/10 rounded-full group-hover:bg-[var(--accent)]/30 transition-colors" />
                 <textarea 
                   className="w-full min-h-[120px] bg-transparent border-none p-0 text-xl leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-tertiary)]/30 focus:ring-0 resize-none font-medium"
-                  defaultValue={post.content}
+                  value={post.content}
+                  onChange={(e) => setPosts(prev => prev.map(p => p.id === post.id ? { ...p, content: e.target.value } : p))}
                 />
               </div>
 
@@ -158,6 +182,15 @@ export default function QueuePage() {
                       <MessageSquare size={12} />
                       {post.content.length} / 280 characters
                    </div>
+                   <button 
+                      onClick={() => handleRefine(post.id, post.content)}
+                      disabled={isRefining}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border border-[var(--accent)]/20 disabled:opacity-50"
+                   >
+                      {isRefining ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                      Refine with AI
+                   </button>
+
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -191,8 +224,9 @@ export default function QueuePage() {
               <div className="absolute top-4 right-4 h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 hover:!opacity-100 cursor-pointer transition-all">
                 <MoreHorizontal size={20} />
               </div>
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
 

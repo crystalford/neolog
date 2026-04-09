@@ -15,28 +15,19 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const projectId = params.id
-  const user_id = session.user.id
-
-  // 1. Verify the entity exists and belongs to the user
-  const { data: entity, error } = await supabase
-    .from('entities')
-    .select('id, name')
-    .eq('id', projectId)
-    .eq('user_id', user_id)
-    .single()
-
-  if (error || !entity) {
-    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+  const { id } = params
+  if (!id) {
+    return NextResponse.json({ error: 'Missing entity ID' }, { status: 400 })
   }
 
-  // 2. Trigger Inngest synthesis
+  // Trigger project-specific synthesis
+  // This function aggregates all logs/uploads mentioning this project and writes a narrative to project_documents
   await inngest.send({
     name: 'app/project.synthesize',
-    data: {
-      entity_id: projectId,
-      user_id: user_id
-    }
+    data: { 
+      entity_id: id,
+      user_id: session.user.id 
+    },
   })
 
   return NextResponse.json({ queued: true })

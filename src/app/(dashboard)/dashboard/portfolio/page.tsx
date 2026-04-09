@@ -302,6 +302,31 @@ export default function PortfolioPage() {
                         </div>
                       </div>
 
+                      {/* Narrative Evolution Section */}
+                      {Array.isArray(doc.synthesis_history) && doc.synthesis_history.length > 0 && (
+                        <div className="space-y-6">
+                           <h4 className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-widest flex items-center gap-2">
+                             <TrendingUp size={12} className="text-amber-400" /> Narrative Evolution
+                           </h4>
+                           <div className="space-y-6 relative ml-2 px-6 border-l border-white/5">
+                              {doc.synthesis_history.slice(0, 5).map((snap: any, i: number) => (
+                                <div key={i} className="relative">
+                                  <div className="absolute -left-[30px] top-1.5 w-2 h-2 rounded-full bg-amber-400/30 border border-amber-400/50" />
+                                  <div className="space-y-1">
+                                    <p className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">
+                                      {new Date(snap.synthesized_at).toLocaleDateString()} · {snap.mention_count} signals
+                                    </p>
+                                    <p className="text-xs text-[var(--text-secondary)] italic">
+                                      {snap.action_items?.[0]?.item || "Shift in project trajectory detected."}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                      )}
+
+
                       <button 
                         onClick={() => setActiveProject(null)}
                         className="w-full py-4 text-[10px] font-bold uppercase tracking-widest border border-white/5 hover:bg-white/5 rounded-2xl transition-all"
