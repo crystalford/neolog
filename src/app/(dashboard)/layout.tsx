@@ -166,8 +166,8 @@ export default function DashboardLayout({
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
     { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
-    { href: '/dashboard/uploads', icon: Film,      label: 'Neovlog',       section: 'INGEST' },
-  ], [])
+    { href: '/dashboard/uploads', icon: Film,      label: 'Uploads',       section: 'INGEST' },
+], [])
 
   // INTELLIGENCE section — what the system extracted
   const secondaryNav = useMemo(() => [
@@ -176,14 +176,12 @@ export default function DashboardLayout({
     { href: '/dashboard/studio',     icon: Mic,          label: 'Studio',           section: 'INTELLIGENCE' },
     { href: '/dashboard/entities',   icon: Network,      label: 'Knowledge Graph',  section: 'INTELLIGENCE' },
     { href: '/dashboard/queue',      icon: Radio,        label: 'Post Queue',       section: 'INTELLIGENCE' },
-    { href: '/dashboard/finances',   icon: DollarSign,   label: 'Finances',         section: 'INTELLIGENCE' },
   ], [])
 
   // MANIFEST section — the character being built
   const characterNav = useMemo(() => [
     { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'MANIFEST' },
     { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest',   section: 'MANIFEST' },
-    { href: '/dashboard/health',     icon: Brain,     label: 'Health',            section: 'MANIFEST' },
   ], [])
 
   const commandItems = useMemo(() => {
@@ -195,7 +193,7 @@ export default function DashboardLayout({
     }))
     items.push(
       { label: 'New Log Entry', href: '/dashboard/log', description: 'Action' },
-      { label: 'Upload Video', href: '/dashboard/uploads', description: 'Neovlog' },
+      { label: 'Upload Video', href: '/dashboard/uploads', description: 'Uploads' },
     )
     return items
   }, [primaryNav, secondaryNav, characterNav])

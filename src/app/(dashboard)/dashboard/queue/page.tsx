@@ -1,189 +1,229 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
+import { 
+  Calendar, CheckCircle2, Clock, 
+  MoreHorizontal, RotateCcw, Send, 
+  SkipForward, Trash2, XCircle,
+  MessageSquare, Sparkles, AlertCircle
+} from 'lucide-react'
+
 export const runtime = 'edge'
 
-
-import { useState, useEffect, useCallback } from 'react'
-import { Copy, Share2, Check } from 'lucide-react'
-
-type FlatPost = {
+type SocialPost = {
+  id: string
   content: string
-  type: string
-  source_upload_id: string
-  source_file_name: string
-  source_date: string
+  platform: string
+  status: 'pending' | 'approved' | 'scheduled' | 'posted' | 'skipped'
+  source_name?: string
+  created_at: string
+  scheduled_at?: string
 }
 
 export default function QueuePage() {
-  const [posts, setPosts] = useState<FlatPost[]>([])
+  const [posts, setPosts] = useState<SocialPost[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'opinion' | 'quote'>('all')
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'pending' | 'scheduled' | 'history'>('pending')
 
-  const fetchPosts = useCallback(async () => {
+  const fetchQueue = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await fetch('/api/generated-posts')
+      const status = activeTab === 'pending' ? 'pending' : activeTab === 'scheduled' ? 'scheduled' : 'posted'
+      const res = await fetch(`/api/social-queue?status=${status}`)
       if (res.ok) {
         const data = await res.json()
-        setPosts(data.posts ?? [])
+        setPosts(data.posts || [])
       }
+    } catch (err) {
+      console.error('Failed to fetch queue:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeTab])
 
-  useEffect(() => { fetchPosts() }, [fetchPosts])
+  useEffect(() => {
+    fetchQueue()
+  }, [fetchQueue])
 
-  const handleCopy = (content: string, idx: number) => {
-    navigator.clipboard.writeText(content)
-    setCopiedIdx(idx)
-    setTimeout(() => setCopiedIdx(null), 2000)
+  const handleUpdateStatus = async (id: string, status: SocialPost['status'], scheduled_at?: string) => {
+    try {
+      const res = await fetch('/api/social-queue', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, status, scheduled_at })
+      })
+      if (res.ok) {
+        setPosts(prev => prev.filter(p => p.id !== id))
+      }
+    } catch (err) {
+      console.error('Failed to update post:', err)
+    }
   }
-
-  const handleShare = (content: string) => {
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(content)}`, '_blank')
-  }
-
-  const handleDismiss = (key: string) => {
-    setDismissed(prev => new Set(prev).add(key))
-  }
-
-  const filtered = posts.filter(p => {
-    if (dismissed.has(p.source_upload_id + p.content.slice(0, 40))) return false
-    if (filter === 'all') return true
-    return p.type === filter
-  })
-
-  const opinionCount = posts.filter(p => p.type === 'opinion').length
-  const quoteCount = posts.filter(p => p.type === 'quote').length
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-6 py-12 space-y-10">
       {/* Header */}
-      <div className="mb-8">
-        <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] opacity-50 mb-2">Voice</p>
-        <h1 className="text-2xl font-medium text-[var(--text-primary)] tracking-tight">Post Queue</h1>
-        {!loading && (
-          <p className="text-sm text-[var(--text-tertiary)] mt-1">
-            {posts.length} extracted · {opinionCount} take{opinionCount !== 1 ? 's' : ''} · {quoteCount} quote{quoteCount !== 1 ? 's' : ''}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+             <div className="p-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)]">
+               <Sparkles size={16} />
+             </div>
+             <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)]">
+               Social Narrator
+             </h2>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">The Approval Queue</h1>
+          <p className="text-sm text-[var(--text-tertiary)] mt-3 max-w-xl">
+            Narrative-driven social posts synthesized from your recordings. Review, refine, and drip them into the world.
           </p>
-        )}
-      </div>
+        </div>
 
-      {/* Filter tabs */}
-      {!loading && posts.length > 0 && (
-        <div className="flex items-center gap-1 mb-8 border-b border-[var(--border-light)] pb-1">
-          {(['all', 'opinion', 'quote'] as const).map(f => (
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] shadow-sm">
+          {(['pending', 'scheduled', 'history'] as const).map(tab => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${
-                filter === f
-                  ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                activeTab === tab
+                  ? 'bg-white text-black shadow-lg'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
               }`}
             >
-              {f === 'all' ? `All (${posts.length})` : f === 'opinion' ? `Takes (${opinionCount})` : `Quotes (${quoteCount})`}
+              {tab}
             </button>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="space-y-4">
+      <div className="h-px bg-gradient-to-r from-[var(--border-light)] via-[var(--border-medium)] to-[var(--border-light)]" />
+
+      {/* Main Content */}
+      {loading ? (
+        <div className="space-y-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 skeleton rounded-xl" />
+            <div key={i} className="h-48 rounded-3xl bg-[var(--bg-secondary)]/50 animate-pulse border border-[var(--border-light)]" />
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32 border border-dashed border-[var(--border-light)] rounded-[2.5rem] bg-[var(--bg-secondary)]/10">
+          <AlertCircle size={40} className="text-[var(--text-tertiary)] opacity-20 mb-4" />
+          <h3 className="text-lg font-medium text-[var(--text-secondary)]">Queue is empty</h3>
+          <p className="text-xs text-[var(--text-tertiary)] mt-2">No {activeTab} posts found. Keep recording to generate new content.</p>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {posts.map((post) => (
+            <div 
+              key={post.id}
+              className="group relative flex flex-col gap-6 p-8 border border-[var(--border-light)] rounded-[2.5rem] bg-[var(--bg-card)] hover:border-[var(--accent)]/30 hover:shadow-2xl hover:shadow-[var(--accent)]/5 transition-all duration-500"
+            >
+              {/* Post Meta */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex -space-x-2">
+                    <div className="w-8 h-8 rounded-full bg-black border border-white/10 flex items-center justify-center text-[10px] font-bold text-white shadow-xl z-20">X</div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Platform: X.com</span>
+                    <span className="text-[9px] text-[var(--text-tertiary)] opacity-50 flex items-center gap-1">
+                      <Clock size={10} /> {new Date(post.created_at).toLocaleDateString()} · From {post.source_name || 'Analysis'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
+                    post.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                    post.status === 'scheduled' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                    'bg-green-500/10 text-green-500 border-green-500/20'
+                  }`}>
+                    {post.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Content Editor */}
+              <div className="relative">
+                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-[var(--accent)]/10 rounded-full group-hover:bg-[var(--accent)]/30 transition-colors" />
+                <textarea 
+                  className="w-full min-h-[120px] bg-transparent border-none p-0 text-xl leading-relaxed text-[var(--text-primary)] placeholder-[var(--text-tertiary)]/30 focus:ring-0 resize-none font-medium"
+                  defaultValue={post.content}
+                />
+              </div>
+
+              {/* Interaction Bar */}
+              <div className="flex items-center justify-between pt-4 border-t border-[var(--border-light)]/50">
+                <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--text-tertiary)]">
+                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
+                      <MessageSquare size={12} />
+                      {post.content.length} / 280
+                   </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleUpdateStatus(post.id, 'skipped')}
+                    className="p-3 rounded-2xl text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-400/5 transition-all"
+                    title="Skip/Dismiss"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  
+                  {activeTab === 'pending' ? (
+                    <button 
+                      onClick={() => handleUpdateStatus(post.id, 'scheduled', new Date(Date.now() + 86400000).toISOString())}
+                      className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--accent)] text-white font-bold text-xs uppercase tracking-[0.15em] shadow-xl shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <CheckCircle2 size={16} />
+                      Approve & Drip
+                    </button>
+                  ) : (
+                    <button 
+                      className="px-6 py-3 rounded-2xl bg-[var(--bg-secondary)] text-[var(--text-primary)] font-bold text-xs uppercase tracking-[0.15em] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] transition-all"
+                    >
+                      Reschedule
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Detail toggle */}
+              <div className="absolute top-4 right-4 h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 hover:!opacity-100 cursor-pointer transition-all">
+                <MoreHorizontal size={20} />
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* Empty */}
-      {!loading && posts.length === 0 && (
-        <div className="py-24 text-center border border-dashed border-[var(--border-light)] rounded-xl">
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] opacity-40">No posts yet</p>
-          <p className="text-xs text-[var(--text-tertiary)] opacity-30 mt-2">Upload and process videos to extract takes and quotes</p>
+      {/* Footer Drip Stats */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
+        <div className="flex items-center gap-6">
+           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[#4f46e5] flex items-center justify-center text-white shadow-2xl">
+              <RotateCcw size={32} />
+           </div>
+           <div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)] mb-1">Drip Status</p>
+              <h4 className="text-xl font-bold">1 Post / Day</h4>
+              <p className="text-xs text-[var(--text-tertiary)]">Optimized for EST morning slots.</p>
+           </div>
         </div>
-      )}
 
-      {/* Ranked list */}
-      {!loading && filtered.length > 0 && (
-        <div className="space-y-3">
-          {filtered.map((post, i) => {
-            const key = post.source_upload_id + post.content.slice(0, 40)
-            const isOpinion = post.type === 'opinion'
-            const date = new Date(post.source_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-
-            return (
-              <div
-                key={key}
-                className="group relative p-6 border border-[var(--border-light)] rounded-xl bg-[var(--bg-card)] hover:border-[var(--border-medium)] transition-all"
-              >
-                {/* Rank + type */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-mono text-[var(--text-tertiary)] opacity-30 tabular-nums">#{i + 1}</span>
-                    <span className={`text-[9px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-sm ${
-                      isOpinion
-                        ? 'bg-[var(--accent)]/10 text-[var(--accent)] opacity-80'
-                        : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] opacity-60'
-                    }`}>
-                      {isOpinion ? 'take' : 'quote'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleDismiss(key)}
-                    className="opacity-0 group-hover:opacity-20 hover:!opacity-50 text-[var(--text-tertiary)] text-xs transition-opacity"
-                    title="Hide"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Content */}
-                <p className={`text-[15px] leading-[1.75] mb-5 ${
-                  isOpinion
-                    ? 'text-[var(--text-primary)] font-normal'
-                    : 'text-[var(--text-secondary)] italic'
-                }`}>
-                  {isOpinion ? post.content : `"${post.content}"`}
-                </p>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30" title={post.source_file_name}>
-                    {date}
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleCopy(post.content, i)}
-                      className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] opacity-40 hover:opacity-80 transition-opacity"
-                    >
-                      {copiedIdx === i ? <Check size={11} /> : <Copy size={11} />}
-                      {copiedIdx === i ? 'Copied' : 'Copy'}
-                    </button>
-                    <button
-                      onClick={() => handleShare(post.content)}
-                      className="flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] opacity-40 hover:opacity-80 transition-opacity"
-                    >
-                      <Share2 size={11} /> Post to X
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+        <div className="flex items-center gap-8">
+           <div className="text-center">
+              <p className="text-[9px] font-mono uppercase text-[var(--text-tertiary)]">Queued</p>
+              <p className="text-2xl font-bold">12</p>
+           </div>
+           <div className="w-px h-10 bg-[var(--border-light)]" />
+           <div className="text-center">
+              <p className="text-[9px] font-mono uppercase text-[var(--text-tertiary)]">Dripped</p>
+              <p className="text-2xl font-bold">48</p>
+           </div>
+           <button className="px-6 py-3 rounded-2xl bg-black text-white text-[10px] font-bold uppercase tracking-widest border border-white/10 hover:border-white/30 transition-all shadow-2xl">
+             Settings
+           </button>
         </div>
-      )}
-
-      {/* Scheduling teaser */}
-      {!loading && posts.length > 0 && (
-        <div className="mt-12 p-5 border border-dashed border-[var(--border-light)] rounded-xl opacity-30">
-          <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] mb-1">Coming soon</p>
-          <p className="text-xs text-[var(--text-tertiary)]">Auto-schedule — drip these to X automatically, 1–2 per day</p>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
