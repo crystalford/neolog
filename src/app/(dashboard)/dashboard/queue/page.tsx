@@ -69,7 +69,7 @@ export default function QueuePage() {
                <Sparkles size={16} />
              </div>
              <h2 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--accent)]">
-               Social Narrator
+               X Narrator
              </h2>
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">The Approval Queue</h1>
@@ -156,7 +156,7 @@ export default function QueuePage() {
                 <div className="flex items-center gap-4 text-[10px] font-mono text-[var(--text-tertiary)]">
                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)]">
                       <MessageSquare size={12} />
-                      {post.content.length} / 280
+                      {post.content.length} / 280 characters
                    </div>
                 </div>
 
