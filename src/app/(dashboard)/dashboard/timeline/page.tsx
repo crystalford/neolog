@@ -45,12 +45,16 @@ export default function TimelinePage() {
             .in('id', uploadIds)
 
           if (!uploadsError && uploads) {
-            // Merge uploads into logs manually
             const uploadMap = new Map(uploads.map(u => [u.id, u]))
-            const mergedEntries = logs.map(log => ({
-              ...log,
-              video_uploads: log.source_upload_id ? uploadMap.get(log.source_upload_id) : null
-            }))
+            const mergedEntries = logs.map(log => {
+              const upload = log.source_upload_id ? uploadMap.get(log.source_upload_id) : null
+              return {
+                ...log,
+                // Prioritize the upload's thumbnail if it exists
+                thumbnail_url: upload?.thumbnail_url || log.thumbnail_url,
+                video_uploads: upload
+              }
+            })
             setEntries(mergedEntries as any)
           } else {
             console.error('UPLOADS_FETCH_ERROR:', uploadsError)

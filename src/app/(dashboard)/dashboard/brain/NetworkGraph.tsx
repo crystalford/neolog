@@ -190,9 +190,23 @@ export default function NetworkGraph() {
   }
 
   const handleWheel = (e: React.WheelEvent) => {
-    const zoomSpeed = 0.001
-    const newK = Math.min(3, Math.max(0.2, transform.k - e.deltaY * zoomSpeed))
-    setTransform(prev => ({ ...prev, k: newK }))
+    e.preventDefault()
+    if (!containerRef.current) return
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+
+    const zoomSpeed = 0.0015
+    const delta = -e.deltaY * zoomSpeed
+    const nextK = Math.min(4, Math.max(0.1, transform.k * (1 + delta)))
+
+    // Coordinate-aware zoom: adjust x and y so the mouse stays over the same point
+    const factor = nextK / transform.k
+    const nextX = mouseX - (mouseX - transform.x) * factor
+    const nextY = mouseY - (mouseY - transform.y) * factor
+
+    setTransform({ x: nextX, y: nextY, k: nextK })
   }
 
   const zoomIn = () => setTransform(prev => ({ ...prev, k: Math.min(3, prev.k + 0.2) }))
@@ -207,6 +221,19 @@ export default function NetworkGraph() {
   )
 
   if (!data || data.nodes.length === 0) return null
+
+  // Density Filter: only show high-mention nodes unless zoomed in
+  // or if there are few nodes total.
+  const isZoomedIn = transform.k > 1.5
+  const filteredNodes = data.nodes.filter(n => 
+    isZoomedIn || 
+    n.mention_count > 1 || 
+    data.nodes.length < 15
+  )
+  const filteredLinks = data.links.filter(l => 
+    filteredNodes.some(n => n.id === l.source) && 
+    filteredNodes.some(n => n.id === l.target)
+  )
 
   const nodeColor = (type: string) => {
     switch (type) {
@@ -259,10 +286,13 @@ export default function NetworkGraph() {
               <Maximize2 size={16} />
             </button>
          </div>
-         <div className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)]/80 backdrop-blur-md border border-[var(--border-light)] text-[9px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest shadow-xl flex items-center gap-2">
-           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-           {data.nodes.length} Nodes · {data.links.length} Links
-         </div>
+          <div className="px-3 py-1.5 rounded-lg bg-[var(--bg-card)]/80 backdrop-blur-md border border-[var(--border-light)] text-[9px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest shadow-xl flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {filteredNodes.length} Nodes · {filteredLinks.length} Links
+            {!isZoomedIn && data.nodes.length > filteredNodes.length && (
+              <span className="text-[var(--accent)] ml-1 opacity-60">(+{data.nodes.length - filteredNodes.length} hidden)</span>
+            )}
+          </div>
       </div>
 
       <svg 
@@ -286,7 +316,7 @@ export default function NetworkGraph() {
 
         <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.k})`}>
           {/* Links */}
-          {data.links.map((link, i) => {
+          {filteredLinks.map((link, i) => {
             const s = positions[link.source]
             const t = positions[link.target]
             if (!s || !t) return null
@@ -310,7 +340,7 @@ export default function NetworkGraph() {
           })}
 
           {/* Nodes */}
-          {data.nodes.map((node) => {
+          {filteredNodes.map((node) => {
             const pos = positions[node.id]
             if (!pos) return null
 

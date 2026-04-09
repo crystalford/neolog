@@ -1,310 +1,272 @@
 'use client'
 
-export const runtime = 'edge'
-
-
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ContentDraft } from '@/types/database'
-import {
-  Mic, FileText, Hash, Clock, Loader2, CheckCircle2,
-  Archive, Copy, Check, ChevronDown, ChevronUp, Sparkles,
-  Eye, ArrowRight,
+import { 
+  Sparkles, Zap, ArrowRight, BookOpen, X, Film, 
+  Brain, Cpu, MessageSquare, History, ChevronRight
 } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatMinutes(secs: number | null) {
-  if (!secs) return null
-  const m = Math.round(secs / 60)
-  return `~${m} min`
+interface EditorialTopic {
+  topic_title: string
+  hook: string
+  angle: string
+  required_elements: string[]
+  script_status: string
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const FORMAT_LABELS: Record<string, string> = {
-  video_essay: 'Video Essay',
-  article: 'Article',
-  thread: 'Thread',
-}
-
-const SOURCE_LABELS: Record<string, string> = {
-  strong_opinion: 'Strong take',
-  idea: 'Idea',
-  key_win: 'Key insight',
-  synthesis: 'Cross-session',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  generating: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20',
-  draft: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  ready: 'bg-green-500/15 text-green-400 border-green-500/20',
-  archived: 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] border-[var(--border-light)]',
-}
-
-// ── Draft card ────────────────────────────────────────────────────────────────
-
-function DraftCard({ draft, onStatusChange }: {
-  draft: ContentDraft
-  onStatusChange: (id: string, status: string) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(draft.body)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const isGenerating = draft.status === 'generating'
-
+function ScriptModal({ script, onClose }: { script: { topic: string, content: string }; onClose: () => void }) {
   return (
-    <div className={`rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] overflow-hidden transition-all ${draft.status === 'archived' ? 'opacity-50' : ''}`}>
-      {/* Card header */}
-      <div className="p-5">
-        {/* Top row: format + status + date */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 rounded">
-            <Mic size={9} />
-            {FORMAT_LABELS[draft.format] || draft.format}
-          </span>
-          {draft.source_type && (
-            <span className="text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-tertiary)]/50 px-2 py-0.5 rounded">
-              from {SOURCE_LABELS[draft.source_type] || draft.source_type}
-            </span>
-          )}
-          <span className={`ml-auto text-[10px] font-mono px-2 py-0.5 rounded border ${STATUS_COLORS[draft.status] || STATUS_COLORS.draft}`}>
-            {isGenerating ? (
-              <span className="flex items-center gap-1"><Loader2 size={8} className="animate-spin" /> Writing...</span>
-            ) : draft.status}
-          </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] w-full max-w-4xl max-h-[85vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="p-8 border-b border-[var(--border-light)] flex items-center justify-between bg-white/[0.02]">
+           <div>
+             <h2 className="text-xl font-bold tracking-tight">{script.topic}</h2>
+             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Drafted Script (AI Refined)</p>
+           </div>
+           <button onClick={onClose} className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-[var(--text-tertiary)] hover:text-white transition-all">
+             <X size={20} />
+           </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-10 font-serif text-lg leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-white">
+           {script.content}
         </div>
 
-        {/* Title */}
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] leading-tight mb-2">
-          {draft.title}
-        </h3>
-
-        {/* Hook preview */}
-        {draft.hook && !isGenerating && (
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-2 italic">
-            "{draft.hook}"
-          </p>
-        )}
-
-        {/* Meta row */}
-        {!isGenerating && (
-          <div className="flex items-center gap-3 mt-3 text-[10px] text-[var(--text-tertiary)] font-mono">
-            {draft.word_count && (
-              <span className="flex items-center gap-1">
-                <FileText size={9} />
-                {draft.word_count} words
-              </span>
-            )}
-            {draft.estimated_duration_seconds && (
-              <span className="flex items-center gap-1">
-                <Clock size={9} />
-                {formatMinutes(draft.estimated_duration_seconds)}
-              </span>
-            )}
-            <span className="ml-auto">{formatDate(draft.created_at)}</span>
-          </div>
-        )}
-
-        {/* Action row */}
-        {!isGenerating && (
-          <div className="flex items-center gap-2 mt-4">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              <Eye size={11} />
-              {expanded ? 'Collapse' : 'Read script'}
-              {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-            </button>
-
-            <div className="ml-auto flex items-center gap-2">
-              {draft.status === 'draft' && (
-                <button
-                  onClick={() => onStatusChange(draft.id, 'ready')}
-                  className="flex items-center gap-1 text-[10px] font-mono text-green-400 hover:text-green-300 px-2 py-1 rounded border border-green-500/20 bg-green-500/8 transition-colors"
-                >
-                  <CheckCircle2 size={10} />
-                  Mark ready
-                </button>
-              )}
-              {draft.status === 'ready' && (
-                <button
-                  onClick={() => onStatusChange(draft.id, 'draft')}
-                  className="text-[10px] font-mono text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-                >
-                  Back to draft
-                </button>
-              )}
-              {draft.status !== 'archived' && (
-                <button
-                  onClick={() => onStatusChange(draft.id, 'archived')}
-                  className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-                >
-                  <Archive size={10} />
-                  Archive
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="p-8 border-t border-[var(--border-light)] flex items-center gap-4 bg-white/[0.02]">
+           <button 
+             onClick={() => {
+               navigator.clipboard.writeText(script.content)
+               alert('Script copied to clipboard!')
+             }}
+             className="flex-1 py-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-2xl font-mono text-xs uppercase tracking-[0.2em] font-bold transition-all shadow-lg shadow-[var(--accent)]/20 flex items-center justify-center gap-2"
+           >
+              Copy Script
+           </button>
+        </div>
       </div>
-
-      {/* Expanded script */}
-      {expanded && draft.body && (
-        <div className="border-t border-[var(--border-light)]">
-          <div className="flex items-center justify-between px-5 py-3 bg-[var(--bg-tertiary)]/30">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">
-              Teleprompter script
-            </span>
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 text-[11px] text-[var(--accent)] hover:opacity-70 transition-opacity"
-            >
-              {copied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy all</>}
-            </button>
-          </div>
-          <div className="px-5 py-5">
-            <p className="text-sm text-[var(--text-primary)] leading-[1.85] whitespace-pre-wrap font-mono">
-              {draft.body}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function EditorialBoardSection({ topics, onRefresh, refreshing, onDraft, drafting }: { topics: EditorialTopic[]; onRefresh: () => void; refreshing: boolean; onDraft: (topic: EditorialTopic) => void; drafting: string | null }) {
+  if (!topics || topics.length === 0) return (
+    <div className="rounded-[3rem] border border-dashed border-[var(--border-light)] p-20 text-center bg-white/[0.01]">
+       <div className="w-16 h-16 rounded-3xl bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mx-auto mb-6">
+          <Sparkles size={32} />
+       </div>
+       <h3 className="text-xl font-bold mb-2">Editorial Board Offline</h3>
+       <p className="text-sm text-[var(--text-tertiary)] max-w-xs mx-auto mb-8 font-serif leading-relaxed italic">The synthesis engine requires manual invocation to map your latest intellectual peaks.</p>
+       <button 
+         onClick={onRefresh} 
+         disabled={refreshing} 
+         className="px-8 py-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[10px] font-mono uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl shadow-[var(--accent)]/20 disabled:opacity-50"
+       >
+         {refreshing ? 'Triggering Synthesis...' : 'Invoke Editorial Board'}
+       </button>
+    </div>
+  )
 
-type FilterTab = 'all' | 'ready' | 'draft' | 'archived'
+  return (
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] shadow-inner"><Sparkles size={24} /></div>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">Active Production Queue</h2>
+            <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.3em] font-mono mt-1">AI-Synthesized Narrative Hooks & Script Ready Topics</p>
+          </div>
+        </div>
+        <button 
+          onClick={onRefresh} 
+          disabled={refreshing}
+          className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 hover:border-[var(--accent)]/20 text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all flex items-center gap-3 group disabled:opacity-50"
+        >
+           {refreshing ? 'Synthesizing...' : 'Re-Invoke Board'} <ArrowRight size={12} className={`group-hover:translate-x-1 transition-transform ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {topics.map((topic, i) => (
+          <div key={i} className="group relative bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--accent)]/40 rounded-[3rem] p-10 transition-all hover:shadow-3xl hover:shadow-[var(--accent)]/10 flex flex-col overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[var(--accent)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity blur-2xl" />
+            
+            <div className="space-y-6 flex-1 relative z-10">
+              <div className="flex items-center gap-3">
+                 <span className="text-[10px] font-mono text-[var(--accent)] px-2 py-0.5 rounded-full bg-[var(--accent)]/10">TOPIC {i+1}</span>
+                 <div className="h-px flex-1 bg-[var(--border-light)]" />
+              </div>
+
+              <h3 className="text-2xl font-bold leading-tight group-hover:text-[var(--accent)] transition-colors">{topic.topic_title}</h3>
+              
+              <div className="relative">
+                <div className="absolute -left-4 top-0 bottom-0 w-1 bg-[var(--accent)]/20 rounded-full" />
+                <p className="text-base text-[var(--text-secondary)] leading-relaxed font-serif italic pl-4 py-1">
+                  "{topic.hook}"
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] flex items-center gap-2">
+                  <Brain size={12} /> The Production Angle
+                </p>
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{topic.angle}</p>
+              </div>
+
+              {topic.required_elements?.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-4">
+                  {topic.required_elements.map((el, j) => (
+                    <span key={j} className="text-[10px] px-3 py-1 rounded-xl bg-white/5 border border-white/5 text-[var(--text-tertiary)] whitespace-nowrap">
+                      # {el}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-10 mt-auto relative z-10">
+              <button 
+                onClick={() => onDraft(topic)}
+                disabled={Boolean(drafting)}
+                className="w-full py-5 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[11px] font-mono uppercase tracking-[0.3em] font-bold transition-all flex items-center justify-center gap-3 shadow-2xl shadow-[var(--accent)]/30 disabled:opacity-50"
+              >
+                {drafting === topic.topic_title ? (
+                  <>
+                    <Cpu size={16} className="animate-spin" /> Drafting Script...
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={16} /> Draft Full Production Script
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function StudioPage() {
-  const [drafts, setDrafts] = useState<ContentDraft[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const supabase = createClient()
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [drafting, setDrafting] = useState<string | null>(null)
+  const [selectedScript, setSelectedScript] = useState<{ topic: string, content: string } | null>(null)
+  const [editorialTopics, setEditorialTopics] = useState<EditorialTopic[]>([])
 
   useEffect(() => {
-    loadDrafts()
-    // Poll while any drafts are generating
-    const interval = setInterval(() => {
-      if (drafts.some(d => d.status === 'generating')) loadDrafts()
-    }, 8000)
-    return () => clearInterval(interval)
-  }, [drafts.some(d => d.status === 'generating')])
+    loadStudioData()
+  }, [])
 
-  async function loadDrafts() {
+  const loadStudioData = async () => {
+    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
-    const { data } = await supabase
-      .from('content_drafts')
-      .select('*')
+    const { data: synthesisData } = await supabase
+      .from('user_synthesis')
+      .select('editorial_board')
       .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .limit(100)
+      .not('editorial_board', 'is', null)
+      .order('synthesized_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    setDrafts((data as ContentDraft[]) || [])
+    if (synthesisData) {
+      setEditorialTopics((synthesisData as any).editorial_board || [])
+    }
     setLoading(false)
   }
 
-  async function handleStatusChange(id: string, status: string) {
-    await supabase.from('content_drafts').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
-    setDrafts(prev => prev.map(d => d.id === id ? { ...d, status: status as any } : d))
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      const res = await fetch('/api/synthesize-graph', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to trigger synthesis')
+      console.log('Synthesis queued')
+      // Poll or wait a bit? For now, just let it work in background
+      alert('Brain synthesis initiated. Refresh page in a minute to see updated board.')
+    } catch (err: any) {
+      console.error(err)
+      alert(err.message)
+    } finally {
+      setTimeout(() => setRefreshing(false), 2000)
+    }
   }
 
-  const filtered = drafts.filter(d => {
-    if (activeTab === 'all') return d.status !== 'archived'
-    return d.status === activeTab
-  })
-
-  const counts = {
-    all: drafts.filter(d => d.status !== 'archived').length,
-    ready: drafts.filter(d => d.status === 'ready').length,
-    draft: drafts.filter(d => d.status === 'draft').length,
-    archived: drafts.filter(d => d.status === 'archived').length,
+  const handleDraftScript = async (topic: EditorialTopic) => {
+    setDrafting(topic.topic_title)
+    try {
+      const res = await fetch('/api/editorial/generate-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(topic)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate script')
+      setSelectedScript({ topic: topic.topic_title, content: data.script })
+    } catch (err: any) {
+      console.error(err)
+      alert(err.message)
+    } finally {
+      setDrafting(null)
+    }
   }
 
-  const generatingCount = drafts.filter(d => d.status === 'generating').length
-
-  if (loading) return (
-    <div className="p-8 text-[var(--text-tertiary)] font-mono text-xs uppercase tracking-widest animate-pulse">
-      Loading...
-    </div>
-  )
+  if (loading) {
+    return (
+      <div className="p-12 animate-pulse space-y-8">
+        <div className="h-8 w-48 bg-white/5 rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="h-96 bg-white/5 rounded-[3rem]" />
+          <div className="h-96 bg-white/5 rounded-[3rem]" />
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 pb-32 space-y-6">
+    <div className="min-h-screen bg-[var(--bg-primary)] p-8 lg:p-12 space-y-16">
+      <div className="max-w-7xl mx-auto space-y-16">
+        
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/20">
+              <Film size={12} /> Neural Production Engine Active
+            </div>
+            <h1 className="text-5xl lg:text-7xl font-black tracking-tighter">Studio</h1>
+            <p className="text-lg text-[var(--text-secondary)] font-serif max-w-2xl leading-relaxed italic">
+              Where raw intellectual signals are distilled into cinematic output. Use the board to find your next breakthrough topic.
+            </p>
+          </div>
+          <div className="flex items-center gap-6">
+             <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">Production Status</p>
+                <p className="text-sm font-bold flex items-center justify-end gap-2">Ready for Draft <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" /></p>
+             </div>
+          </div>
+        </header>
 
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <Mic size={16} className="text-[var(--accent)]" />
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Studio</h1>
-          {generatingCount > 0 && (
-            <span className="flex items-center gap-1.5 text-[11px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-full">
-              <Loader2 size={10} className="animate-spin" />
-              {generatingCount} writing...
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-[var(--text-tertiary)] ml-7">
-          Video essay scripts generated from your recordings — ready to read verbatim
-        </p>
+        <EditorialBoardSection 
+          topics={editorialTopics} 
+          onRefresh={handleRefresh} 
+          refreshing={refreshing} 
+          onDraft={handleDraftScript}
+          drafting={drafting}
+        />
+
+        {selectedScript && (
+          <ScriptModal 
+            script={selectedScript} 
+            onClose={() => setSelectedScript(null)} 
+          />
+        )}
+
       </div>
-
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1">
-        {(['all', 'ready', 'draft', 'archived'] as FilterTab[]).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === tab
-                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            {tab === 'ready' && <CheckCircle2 size={10} className="text-green-400" />}
-            <span className="capitalize">{tab}</span>
-            {counts[tab] > 0 && (
-              <span className="text-[10px] opacity-60">{counts[tab]}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Draft list */}
-      {filtered.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)]/30 p-12 text-center">
-          <Sparkles size={28} className="mx-auto mb-3 text-[var(--text-tertiary)] opacity-30" />
-          {drafts.length === 0 ? (
-            <>
-              <p className="text-sm text-[var(--text-tertiary)] mb-1">No scripts yet</p>
-              <p className="text-xs text-[var(--text-tertiary)] opacity-60 max-w-sm mx-auto">
-                Scripts are generated automatically when you upload recordings. Strong opinions and high-confidence ideas become full video essay scripts.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-[var(--text-tertiary)]">Nothing in {activeTab}</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filtered.map(draft => (
-            <DraftCard key={draft.id} draft={draft} onStatusChange={handleStatusChange} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

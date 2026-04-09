@@ -969,23 +969,7 @@ export const processUpload = inngest.createFunction(
       })
     }
 
-    // ── Step 7: Auto-trigger cross-corpus synthesis every 10th upload ──
-    const shouldTriggerSynthesis = await step.run('check-synthesis-milestone', async () => {
-      const { count } = await admin
-        .from('video_uploads')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user_id)
-        .eq('status', 'processed')
-
-      return !!(count && count >= 3 && count % 10 === 0)
-    })
-
-    if (shouldTriggerSynthesis) {
-      await step.sendEvent('trigger-synthesis', {
-        name: 'neolog/synthesize-graph',
-        data: { user_id },
-      })
-    }
+    // Step 7: Automated synthesis disabled per user preference (Strictly manual via Studio)
 
     return { status: 'success', video_upload_id }
   }

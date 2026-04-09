@@ -3,14 +3,41 @@
 export const runtime = 'edge'
 
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Brain, Edit3, Save, X, Sparkles, Clock, Target, Users,
   Lightbulb, Zap, BookOpen, TrendingUp, Hash, Link2, Mic,
+  Cpu, ImageIcon, CheckCircle, AlertCircle, Shield, ArrowRight
 } from 'lucide-react'
+import Link from 'next/link'
 
-// ─── Entity layer config ──────────────────────────────────────────────────────
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+
+interface CorpusStats {
+  voice: number
+  face: number
+  voiceMinutes: number
+  qualifiedFaces: number
+}
+
+interface RecentSignal {
+  id: string
+  type: string
+  fidelity_score: number
+  fidelity_rank: string
+  created_at: string
+  meta: any
+  source_upload_id: string
+}
+
+interface ManifestModel {
+  signal_type: string
+  is_training_ready: boolean
+  quality_score: number
+  metadata: any
+  created_at: string
+}
 
 const ENTITY_LAYERS = [
   {
@@ -111,7 +138,12 @@ const ENTITY_LAYERS = [
   },
 ] as const
 
-// ─── Entity section ───────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const VOICE_THRESHOLD_MINUTES = 180
+const FACE_THRESHOLD = 25
+
+// ─── Sub-Components ──────────────────────────────────────────────────────────
 
 function EntitySection({ layer, entities }: { layer: typeof ENTITY_LAYERS[number]; entities: any[] }) {
   const Icon = layer.icon
@@ -142,141 +174,71 @@ function EntitySection({ layer, entities }: { layer: typeof ENTITY_LAYERS[number
             )}
           </div>
         ))}
-        {entities.length > 16 && (
-          <span className="inline-flex items-center px-2.5 py-1 text-[10px] text-[var(--text-tertiary)]">
-            +{entities.length - 16} more
-          </span>
-        )}
       </div>
     </div>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-// ─── Voice profile section ────────────────────────────────────────────────────
-
-function VoiceProfileSection({ voiceProfile, uploadCount }: { voiceProfile: any; uploadCount: number }) {
+function VoiceProfileSection({ voiceProfile }: { voiceProfile: any }) {
   if (!voiceProfile) {
     return (
       <div className="rounded-xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)]/30 p-8 text-center">
         <Mic size={24} className="mx-auto mb-3 text-[var(--text-tertiary)] opacity-30" />
         <p className="text-sm text-[var(--text-tertiary)]">Voice profile building...</p>
         <p className="text-xs text-[var(--text-tertiary)] opacity-60 mt-1 max-w-xs mx-auto">
-          After your first upload is processed, the system starts learning how you talk.
-          The more you upload, the more accurate it gets.
+          The system is learning how you talk from your uploads.
         </p>
       </div>
     )
   }
 
-  const sessions = voiceProfile.upload_count || 1
-
   return (
-    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-5 space-y-4">
-      {/* Header */}
+    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] p-5 space-y-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Mic size={13} className="text-[var(--accent)]" />
         <h3 className="text-[11px] font-mono uppercase tracking-[0.15em] text-[var(--text-primary)]">
-          Voice Profile
+          Voice DNA
         </h3>
-        <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)]">
-          {sessions} session{sessions !== 1 ? 's' : ''} analysed
-        </span>
       </div>
-
-      {/* Voice summary */}
       {voiceProfile.voice_summary && (
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed italic border-l-2 border-[var(--accent)]/30 pl-3">
           "{voiceProfile.voice_summary}"
         </p>
       )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Signature phrases */}
         {voiceProfile.signature_phrases?.length > 0 && (
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
-              Signature phrases
-            </p>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">Signature</p>
             <div className="flex flex-wrap gap-1.5">
               {voiceProfile.signature_phrases.map((phrase: string, i: number) => (
-                <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15">
+                <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/15 font-medium">
                   {phrase}
                 </span>
               ))}
             </div>
           </div>
         )}
-
-        {/* Energy markers */}
-        {voiceProfile.energy_markers?.length > 0 && (
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
-              Energy words
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {voiceProfile.energy_markers.map((word: string, i: number) => (
-                <span key={i} className="text-[11px] px-2 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]">
-                  {word}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Row 2: attitude, rhythm, argument style */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[
-          { label: 'Attitude', value: voiceProfile.attitude },
-          { label: 'Sentence rhythm', value: voiceProfile.sentence_rhythm },
-          { label: 'Argument style', value: voiceProfile.argument_style },
-        ].filter(f => f.value).map(field => (
-          <div key={field.label} className="bg-[var(--bg-tertiary)]/40 rounded-lg p-3 border border-[var(--border-light)]">
-            <p className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">
-              {field.label}
-            </p>
-            <p className="text-xs text-[var(--text-secondary)] leading-snug">
-              {field.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Rhetorical moves */}
-      {voiceProfile.rhetorical_moves?.length > 0 && (
-        <div>
-          <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">
-            Rhetorical patterns
-          </p>
-          <ul className="space-y-1">
-            {voiceProfile.rhetorical_moves.map((move: string, i: number) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-[var(--text-secondary)]">
-                <span className="text-[var(--accent)] mt-0.5 shrink-0">—</span>
-                {move}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <p className="text-[10px] text-[var(--text-tertiary)] opacity-50">
-        This profile feeds the Studio — scripts are written to sound like you, not like AI.
-      </p>
     </div>
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Main Page ───────────────────────────────────────────────────────────────
 
-export default function CharacterPage() {
+export default function IdentityPage() {
   const [profile, setProfile] = useState<any>(null)
   const [entities, setEntities] = useState<any[]>([])
   const [uploadCount, setUploadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  
+  // Corpus State (from Manifest)
+  const [corpus, setCorpus] = useState<CorpusStats>({ voice: 0, face: 0, voiceMinutes: 0, qualifiedFaces: 0 })
+  const [recentSignals, setRecentSignals] = useState<RecentSignal[]>([])
+  const [models, setModels] = useState<ManifestModel[]>([])
+  const [faceThumbnails, setFaceThumbnails] = useState<string[]>([])
+  
   const [formData, setFormData] = useState<any>({
     display_name: '', bio: '', website_url: '', twitter_url: '', github_url: '',
   })
@@ -292,10 +254,14 @@ export default function CharacterPage() {
         { data: profileData },
         { data: entitiesData },
         { count },
+        { data: corpusData },
+        { data: signalsData },
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', session.user.id).single(),
         supabase.from('entities').select('*').eq('user_id', session.user.id).order('mention_count', { ascending: false }),
         supabase.from('video_uploads').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
+        supabase.from('neural_corpus').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
+        supabase.from('neural_signals').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
       ])
 
       if (profileData) {
@@ -306,10 +272,26 @@ export default function CharacterPage() {
           website_url: profileData.website_url || '',
           twitter_url: profileData.twitter_url || '',
           github_url: profileData.github_url || '',
-
         })
       }
 
+      if (corpusData) {
+        const voiceEntries = corpusData.filter((c: any) => c.type === 'voice')
+        const faceEntries = corpusData.filter((c: any) => c.type === 'face')
+        const voiceMinutes = voiceEntries.reduce((acc: number, v: any) => acc + (v.meta?.duration_seconds || 300) / 60, 0)
+        const qualifiedFaces = faceEntries.filter((f: any) => (f.fidelity_score ?? 0.7) >= 0.6).length
+        
+        setCorpus({
+          voice: voiceEntries.length,
+          face: faceEntries.length,
+          voiceMinutes: Math.round(voiceMinutes),
+          qualifiedFaces,
+        })
+        setFaceThumbnails(faceEntries.sort((a: any, b: any) => (b.fidelity_score || 0) - (a.fidelity_score || 0)).slice(0, 6).map((f: any) => f.storage_path))
+        setRecentSignals(corpusData.slice(0, 8) as RecentSignal[])
+      }
+
+      setModels(signalsData || [])
       setEntities(entitiesData || [])
       setUploadCount(count || 0)
       setLoading(false)
@@ -326,219 +308,192 @@ export default function CharacterPage() {
     setSaving(false)
   }
 
-  // Group entities by type
   const byType = (type: string) => entities.filter((e: any) => e.type === type)
-
-  // Fallback: entities that don't match any specific type go into 'other'
-  const knownTypes = ENTITY_LAYERS.map(l => l.key as string)
-  const otherEntities = entities.filter((e: any) => !knownTypes.includes(e.type))
-
   const totalMentions = entities.reduce((acc: number, e: any) => acc + (e.mention_count || 0), 0)
 
-  if (loading) return (
-    <div className="p-8 text-[var(--text-tertiary)] font-mono text-xs uppercase tracking-widest animate-pulse">
-      Loading...
-    </div>
-  )
+  if (loading) return <div className="p-8 text-[var(--text-tertiary)] font-mono text-xs uppercase tracking-widest animate-pulse">Synchronizing Identity...</div>
+
+  const voicePct = Math.min(100, Math.round((corpus.voiceMinutes / VOICE_THRESHOLD_MINUTES) * 100))
+  const facePct = Math.min(100, Math.round((corpus.qualifiedFaces / FACE_THRESHOLD) * 100))
+  const voiceModel = models.find(m => m.signal_type === 'voice')
+  const imageModel = models.find(m => m.signal_type === 'image')
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 pb-32 space-y-8">
+    <div className="max-w-7xl mx-auto px-8 py-12 pb-64 space-y-16">
+      
+      {/* ── Section 1: Core Identity ── */}
+      <div className="flex flex-col lg:flex-row gap-10">
+        <div className="flex-1 space-y-8">
+           <div className="flex items-start gap-8 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-[2.5rem] p-8 shadow-sm">
+             <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-[var(--accent)]/20 shadow-2xl shrink-0">
+               {profile?.avatar_url ? (
+                 <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center text-white text-4xl font-black">
+                   {(profile?.username || '?')[0].toUpperCase()}
+                 </div>
+               )}
+             </div>
 
-      {/* ── Identity header ── */}
-      <div className="flex items-start gap-6 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-2xl p-6">
+             <div className="flex-1 min-w-0">
+               <div className="flex items-center gap-4 mb-2">
+                 <h1 className="text-3xl font-black tracking-tight text-[var(--text-primary)]">
+                   {profile?.display_name || profile?.username || 'Anonymous'}
+                 </h1>
+                 <button onClick={() => setEditing(!editing)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--accent)] transition-all">
+                   {editing ? <X size={16} /> : <Edit3 size={16} />}
+                 </button>
+               </div>
+               <p className="text-xs text-[var(--text-tertiary)] font-mono uppercase tracking-widest mb-6">@{profile?.username}</p>
+               
+               {editing ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
+                    <input value={formData.display_name} onChange={e => setFormData({...formData, display_name: e.target.value})} placeholder="Display Name" className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                    <textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} placeholder="Bio" className="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-[var(--accent)] min-h-[80px]" />
+                    <button onClick={handleSave} disabled={saving} className="btn btn-primary py-3 rounded-xl font-bold uppercase tracking-widest text-[10px]">{saving ? 'Saving...' : 'Save Profile'}</button>
+                 </div>
+               ) : (
+                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xl italic whitespace-pre-wrap">{profile?.bio || "No bio established yet."}</p>
+               )}
+             </div>
+           </div>
 
-        {/* Avatar */}
-        <div className="flex-shrink-0">
-          <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-[var(--accent)]/40">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[var(--accent)] to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
-                {(profile?.username || '?')[0].toUpperCase()}
-              </div>
-            )}
-          </div>
+           <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Sessions', val: uploadCount, icon: Clock },
+                { label: 'Entities', val: entities.length, icon: Brain },
+                { label: 'Mentions', val: totalMentions, icon: Zap },
+              ].map(s => (
+                <div key={s.label} className="bg-[var(--bg-secondary)]/50 p-6 rounded-3xl border border-[var(--border-light)] flex flex-col items-center text-center gap-2">
+                   <s.icon size={16} className="text-[var(--accent)] opacity-40" />
+                   <p className="text-2xl font-black text-[var(--text-primary)] tracking-tighter">{s.val}</p>
+                   <p className="text-[9px] font-mono text-[var(--text-tertiary)] uppercase tracking-[0.2em]">{s.label}</p>
+                </div>
+              ))}
+           </div>
         </div>
 
-        {/* Identity text */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-              {profile?.display_name || profile?.username || 'Anonymous'}
-            </h1>
-            <button
-              onClick={() => setEditing(!editing)}
-              className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] hover:opacity-70 transition-opacity"
-            >
-              {editing ? <><X size={10} /> Cancel</> : <><Edit3 size={10} /> Edit</>}
-            </button>
-          </div>
-          <p className="text-xs text-[var(--text-tertiary)] font-mono mb-3">@{profile?.username}</p>
-
-          {editing ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-              <div className="space-y-2.5">
-                <div>
-                  <label className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">Display Name</label>
-                  <input
-                    value={formData.display_name}
-                    onChange={e => setFormData({ ...formData, display_name: e.target.value })}
-                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-sm mt-1 focus:border-[var(--accent)] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">Bio</label>
-                  <textarea
-                    value={formData.bio}
-                    onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                    className="w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-sm mt-1 focus:border-[var(--accent)] outline-none min-h-[70px] resize-none"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2.5">
-                {['website_url', 'twitter_url', 'github_url'].map(field => (
-                  <div key={field}>
-                    <label className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">{field.replace('_url', '')}</label>
-                    <input
-                      value={formData[field]}
-                      onChange={e => setFormData({ ...formData, [field]: e.target.value })}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg px-3 py-2 text-xs mt-1 focus:border-[var(--accent)] outline-none"
-                    />
-                  </div>
-                ))}
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full btn btn-primary py-2 flex items-center justify-center gap-2 text-sm"
-                >
-                  {saving ? <Sparkles className="animate-spin" size={14} /> : <><Save size={14} /> Save</>}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {profile?.bio && (
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xl">
-                  {profile.bio}
-                </p>
-              )}
-              {/* Links */}
-              {(profile?.website_url || profile?.twitter_url || profile?.github_url) && (
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
-                  {[
-                    { key: 'website_url', label: 'Website' },
-                    { key: 'twitter_url', label: 'Twitter' },
-                    { key: 'github_url', label: 'GitHub' },
-
-                  ].filter(l => profile?.[l.key]).map(l => (
-                    <a
-                      key={l.key}
-                      href={profile[l.key]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[10px] font-mono text-[var(--accent)] hover:underline"
-                    >
-                      <Link2 size={9} />
-                      {l.label}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="flex-shrink-0 grid grid-cols-3 gap-2 text-center">
-          {[
-            { val: uploadCount, label: 'Sessions' },
-            { val: entities.length, label: 'Entities' },
-            { val: totalMentions, label: 'Mentions' },
-          ].map(s => (
-            <div key={s.label} className="bg-[var(--bg-tertiary)]/50 px-3 py-2.5 rounded-xl border border-[var(--border-light)]">
-              <p className="text-lg font-bold text-[var(--text-primary)]">{s.val}</p>
-              <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider mt-0.5">{s.label}</p>
-            </div>
-          ))}
+        <div className="w-full lg:w-96 shrink-0">
+           <VoiceProfileSection voiceProfile={profile?.voice_profile} />
         </div>
       </div>
 
-      {/* ── Voice profile ── */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Mic size={14} className="text-[var(--accent)]" />
-          <h2 className="text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-            Voice Profile
-          </h2>
-          <span className="text-[10px] text-[var(--text-tertiary)] opacity-50 ml-1">
-            — how the system knows your voice
-          </span>
+      {/* ── Section 2: Neural Manifest (The Corpus) ── */}
+      <div className="space-y-10">
+        <div className="flex items-center gap-4">
+           <div className="p-2 rounded-xl bg-orange-500/10 text-orange-500"><Cpu size={18} /></div>
+           <div>
+             <h2 className="text-xl font-bold tracking-tight">Biometric Corpus</h2>
+             <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-widest font-mono">Archive health & Training readiness</p>
+           </div>
         </div>
-        <VoiceProfileSection voiceProfile={profile?.voice_profile} uploadCount={uploadCount} />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           {/* Voice Health */}
+           <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-[2rem] p-8 space-y-6 shadow-sm">
+              <div className="flex justify-between items-start">
+                 <div className="flex items-center gap-3">
+                    <Mic size={20} className="text-emerald-400" />
+                    <div>
+                      <h3 className="font-bold underline decoration-emerald-400/30">Voice Archive</h3>
+                      <p className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">{corpus.voiceMinutes} / {VOICE_THRESHOLD_MINUTES} min</p>
+                    </div>
+                 </div>
+                 {voicePct === 100 && <div className="px-3 py-1 bg-emerald-400/10 text-emerald-400 text-[9px] font-mono uppercase tracking-widest rounded-full border border-emerald-400/20">Ready</div>}
+              </div>
+              <div className="h-3 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
+                 <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(52,211,153,0.3)]" style={{ width: `${voicePct}%` }} />
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed italic opacity-70">
+                {voiceModel?.is_training_ready ? "✓ Your ElevenLabs Professional Voice Clone is trained and active." : `Accumulating clean audio samples. ${VOICE_THRESHOLD_MINUTES - corpus.voiceMinutes} minutes remain until training trigger.`}
+              </p>
+           </div>
+
+           {/* Visual Health */}
+           <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-[2rem] p-8 space-y-6 shadow-sm">
+              <div className="flex justify-between items-start">
+                 <div className="flex items-center gap-3">
+                    <ImageIcon size={20} className="text-indigo-400" />
+                    <div>
+                      <h3 className="font-bold underline decoration-indigo-400/30">Visual Corpus</h3>
+                      <p className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">{corpus.qualifiedFaces} / {FACE_THRESHOLD} frames</p>
+                    </div>
+                 </div>
+                 {facePct === 100 && <div className="px-3 py-1 bg-indigo-400/10 text-indigo-400 text-[9px] font-mono uppercase tracking-widest rounded-full border border-indigo-400/20">Ready</div>}
+              </div>
+              <div className="h-3 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
+                 <div className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(129,140,248,0.3)]" style={{ width: `${facePct}%` }} />
+              </div>
+              <div className="flex gap-2">
+                 {faceThumbnails.map((path, i) => (
+                    <div key={i} className="w-10 h-10 rounded-lg overflow-hidden border border-white/5 bg-black/20">
+                       <img src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${path}`} className="w-full h-full object-cover" onError={e => e.currentTarget.style.display='none'} />
+                    </div>
+                 ))}
+                 {corpus.qualifiedFaces === 0 && <div className="text-[10px] text-[var(--text-tertiary)] italic">Awaiting high-fidelity frames...</div>}
+              </div>
+           </div>
+        </div>
+
+        <div className="bg-black/20 rounded-3xl border border-white/5 p-8">
+           <h3 className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] mb-6">Recent Biometric Signals</h3>
+           <div className="overflow-x-auto">
+             <table className="w-full text-left">
+                <thead className="text-[9px] font-mono text-[var(--text-tertiary)] uppercase tracking-widest">
+                   <tr>
+                      <th className="pb-4">Type</th>
+                      <th className="pb-4">Fidelity</th>
+                      <th className="pb-4">Rank</th>
+                      <th className="pb-4">Captured</th>
+                   </tr>
+                </thead>
+                <tbody className="text-xs">
+                   {recentSignals.map(sig => (
+                      <tr key={sig.id} className="border-t border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                         <td className="py-3 flex items-center gap-2">
+                           {sig.type === 'voice' ? <Mic size={12} className="text-emerald-400" /> : <ImageIcon size={12} className="text-indigo-400" />}
+                           <span className="font-mono opacity-60 uppercase">{sig.type}</span>
+                         </td>
+                         <td className="py-3">
+                           <div className="w-24 h-1 rounded-full bg-white/5 overflow-hidden">
+                              <div className="h-full bg-[var(--accent)]" style={{ width: `${(sig.fidelity_score || 0.7) * 100}%` }} />
+                           </div>
+                         </td>
+                         <td className="py-3 font-mono font-black">{sig.fidelity_rank || 'B'}</td>
+                         <td className="py-3 text-[var(--text-tertiary)] font-mono">{new Date(sig.created_at).toLocaleDateString()}</td>
+                      </tr>
+                   ))}
+                </tbody>
+             </table>
+           </div>
+        </div>
       </div>
 
-      {/* ── Intelligence map ── */}
-      {entities.length > 0 ? (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Brain size={14} className="text-[var(--accent)]" />
-            <h2 className="text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-              Intelligence Map
-            </h2>
-            <span className="text-[10px] text-[var(--text-tertiary)] opacity-50 ml-1">
-              — accumulated across {uploadCount} session{uploadCount !== 1 ? 's' : ''}
-            </span>
-          </div>
+      {/* ── Section 3: Intelligence Map (Entities) ── */}
+      <div className="space-y-10">
+        <div className="flex items-center gap-4">
+           <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500"><Brain size={18} /></div>
+           <div>
+             <h2 className="text-xl font-bold tracking-tight">Memory Architecture</h2>
+             <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-widest font-mono">Synthesized entity network</p>
+           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {entities.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ENTITY_LAYERS.map(layer => {
               const layerEntities = byType(layer.key as string)
               if (layerEntities.length === 0) return null
-              return (
-                <EntitySection key={layer.key} layer={layer} entities={layerEntities} />
-              )
+              return <EntitySection key={layer.key} layer={layer} entities={layerEntities} />
             })}
-
-            {/* Catch-all for entity types not in the defined layers */}
-            {otherEntities.length > 0 && (
-              <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/30 p-5">
-                <div className="flex items-center gap-2 mb-1">
-                  <BookOpen size={13} className="text-[var(--text-tertiary)]" />
-                  <h3 className="text-[11px] font-mono uppercase tracking-[0.15em] text-[var(--text-primary)]">
-                    Other
-                  </h3>
-                  <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)]">
-                    {otherEntities.length}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {otherEntities.slice(0, 16).map((e: any) => (
-                    <div
-                      key={e.id}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-secondary)]"
-                    >
-                      <span>{e.name}</span>
-                      {e.mention_count > 1 && (
-                        <span className="opacity-40 text-[9px]">×{e.mention_count}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-[var(--border-light)] border-dashed bg-[var(--bg-secondary)]/30 p-10 text-center">
-          <Brain size={32} className="mx-auto mb-3 text-[var(--text-tertiary)] opacity-30" />
-          <p className="text-sm text-[var(--text-tertiary)]">
-            Your intelligence map will build here as you upload and process sessions.
-          </p>
-          <p className="text-xs text-[var(--text-tertiary)] opacity-60 mt-1">
-            Projects, people, goals, ideas, and patterns — all extracted automatically.
-          </p>
-        </div>
-      )}
+        ) : (
+          <div className="py-20 text-center bg-[var(--bg-secondary)]/30 border border-dashed border-[var(--border-light)] rounded-[3rem] opacity-30">
+             <Brain size={48} className="mx-auto mb-4" />
+             <p className="text-sm">Neural map initializing...</p>
+          </div>
+        )}
+      </div>
 
     </div>
   )

@@ -10,8 +10,7 @@
  * this function looks at the entire accumulated corpus over time.
  *
  * Triggered by:
- *   - POST /api/synthesize-graph (manual trigger from dashboard)
- *   - neolog/upload.processed after every 10th processed upload
+ *   - POST /api/synthesize-graph (manual trigger from Studio)
  */
 
 import { inngest } from '@/inngest/client'
@@ -144,9 +143,13 @@ export const synthesizeUserGraph = inngest.createFunction(
         .filter(Boolean)
         .join('\n')
 
-      const systemPrompt = `You are an intelligence analyst for a single person's entire recorded thought output. You read across all their raw brain-dump videos and find the actual narratives, tensions, and momentum — not just themes, but story arcs with beginning, middle, and unresolved tension.
+      const systemPrompt = `You are the lead Executive Producer and Head of Content for a high-output intellectual. You read across all their raw brain-dump videos and find the actual narratives, tensions, and momentum.
+      
+Your goal is twofold:
+1. INFRASTRUCTURE: Map the entity graph, contradictions, and narrative arcs.
+2. PRODUCTION: Act as an Editorial Board. Identify compelling "Video Essay" topics that would make for high-production YouTube content, grounded in the user's actual spoken insights.
 
-You are analytical, not motivational. You don't tell the user what they want to hear. You find what's actually happening in the pattern of their words.
+You are analytical, provocative, and production-minded. You find what's actually happening in the pattern of their words and suggest how to turn it into production-level media.
 
 Return only valid JSON. No markdown, no explanation outside the JSON object.`
 
@@ -199,7 +202,16 @@ Return this exact JSON structure:
     "accelerating": ["Project or idea gaining energy and forward motion"],
     "stalling": ["Project or idea that's losing momentum or getting stuck"],
     "dormant": ["Things mentioned but completely silent recently"]
-  }
+  },
+  "editorial_board": [
+    {
+      "topic_title": "Video essay title concept",
+      "hook": "A 1-sentence provocative opening for a video",
+      "angle": "The unique intellectual 'take' or thesis based on their data",
+      "required_elements": ["Key entities or projects to mention"],
+      "script_status": "draft_ready"
+    }
+  ]
 }
 
 Rules:
@@ -270,6 +282,7 @@ Rules:
         contradictions: parsed.contradictions ?? null,
         commitments_open: parsed.commitments_open ?? null,
         momentum: parsed.momentum ?? null,
+        editorial_board: parsed.editorial_board ?? null,
         synthesis_model: model,
       })
     })

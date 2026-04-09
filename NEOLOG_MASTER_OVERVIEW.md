@@ -1,15 +1,15 @@
 # Neolog: The Personal Intelligence Engine (Master Overview)
 
 ## 1. Project Philosophy
-**Neolog is an extension of the mind itself.**
-It acts as a cognitive prosthetic that bypasses the friction of text-based logging. Instead of writing, you talk into it—raw, messy video/audio dumps—and Neolog transforms them into a structured, living ledger of your mind. It is a "Liquid CMS" that synthesizes raw inputs into manageable, trackable entities (Projects, Ideas, Skills, Health markers).
+**Neolog is a cognitive prosthetic and production engine.**
+It acts as an extension of the mind that bypasses the friction of content creation. Instead of writing scripts or staring at a blank page, you talk into Neolog—raw, messy video/audio dumps—and it transforms them into a structured ledger and an **Editorial Board** that drafts videos for you. It is a "Liquid CMS" that synthesizes raw inputs into manageable, trackable entities (Projects, Ideas, Skills).
 
 ## 2. The Core Workflow
 1. **Multimodal Ingest**: Upload large video/audio files (resumable TUS uploads).
 2. **Metadata Extraction**: Extracts "Media Created" timestamps from binary headers (MP4/QuickTime) to ensure perfect timeline placement.
 3. **Durable Pipeline**: Background processing via **Inngest** handles transcribing (Whisper), PII scrubbing, and deep AI analysis without timeouts.
 4. **Entity Synthesis**: Extracting a 20+ dimension taxonomy (Actions, Decisions, Projects, People, Blockers) and linking them cross-session.
-5. **RPG Representation**: Visualizing life data as "Character Stats" (XP, Levels, Attributes) and physical assets as "Inventory Loadouts."
+5. **Editorial Synthesis**: Automatically identifying the "Narrative Spine" of your week to suggest video essay topics and weekly script drafts.
 
 ## 3. Technical Stack
 - **Framework**: Next.js 15 (App Router).
@@ -25,11 +25,10 @@ It acts as a cognitive prosthetic that bypasses the friction of text-based loggi
 - **Intelligence Timeline**: Chronological log of sessions with AI-generated "Perspectives."
 - **Entity Knowledge Graph**: Automated tracking of Projects, Skills, and People mentioned across time.
 - **Media Database**: Professional gallery for raw uploads with Grid/List modes and semantic sorting.
-- **RPG Profile (Character Sheet)**: 
-  - **Level/XP System**: Based on ingestion volume and intelligence depth.
-  - **Bio-Map**: A humanoid heatmap that glows where you have health issues (extracted from logs).
-  - **Skill Attributes**: Auto-ranking your mastered skills from session data.
-- **Inventory & Assets**: Managing physical and digital gear (Cars, Gear, Hardware) with maintenance tracking.
+- **Editorial Board**:
+  - **Narrative Peaks**: Auto-identifying high-energy topics from the Brain Graph.
+  - **Script Drafting**: Generating video essay scripts in the user's voice based on accumulated history.
+- **Biometric Identity**: Tracking voice and face training readiness for AI avatar production.
 - **Portfolio Engine**: Auto-generating professional summaries and project case studies from evidence.
 
 ## 5. Key API / Internal Logic

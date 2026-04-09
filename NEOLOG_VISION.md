@@ -6,11 +6,11 @@
 
 ## What This System Is
 
-A life ingestion engine for a type of mind: high-output, multi-project, nonlinear. Best thinking happens in motion. The system is the interface — not the blank page.
+A life ingestion engine for a type of mind: high-output, multi-project, nonlinear. The system is the interface — an intelligence layer that transforms raw life data into production-level media.
 
-**The system is multi-tenant by design. Every feature is built for a user, not for a specific user. The founder is user zero — the first person to run the full system against their own life. Nothing about the founder's specific projects, habits, or creative works should appear in code, prompts, or architecture. Those are data. The system is the container.**
+**The system is multi-tenant by design. Nothing about the user's specific projects or creative works should appear in code. The system is the container.**
 
-Private depth is what makes the public surface trustworthy and interesting. The loop: ingest privately → synthesize → publish automatically. Without the public output layer the system is a private vault, which misses half the vision.
+The loop: ingest privately → synthesize → Editorial Board → publish automatically. The goal is to eliminate the 'blank page' problem by auto-generating scripts and video concepts from your accumulated corpus.
 
 ---
 
@@ -18,15 +18,15 @@ Private depth is what makes the public surface trustworthy and interesting. The 
 
 This is not five products. It is one stack with five output modes. The same entity graph powers all of them.
 
-**NeoMind** — the graph layer. The entity graph surfaced as a first-class interface. Not the timeline, not the sessions — the pure graph. Concepts, their relationships, their evolution, their contradictions. Navigable and queryable. The thing a user looks at and recognizes as how they actually think. This is the exocortex layer — an external model of the user's mind that can be inspected, corrected, and navigated. Everything else is downstream of this.
+**NeoMind (THE BRAIN)** — the graph layer. The exocortex layer — an external model of the user's mind. Navigable and queryable.
 
-**NeoLog** — the raw capture layer. Lines, fragments, session captures. The unedited chronological record. Video, voice, text, chat, imports — all land here. The log is the input surface. It is also the public feed in its rawest form.
+**NeoLog (THE TIMELINE)** — the raw capture layer. Video, voice, text — all land here. The chronological record of the mind in motion.
 
-**NeoBlog** — the text synthesis layer. Living documents that grow automatically as the user talks about a topic. Draft blog posts, articles, project histories, screenplay scenes, autobiographical entries — all auto-initiated when the entity graph detects sufficient density around a theme. The moment a concept is mentioned for the second time, a draft opens. Every subsequent mention adds to it. The user never starts from blank — the document is always already in progress, assembled from what they have already said, waiting to be shaped rather than initiated. Two modes: written by the user (first person, their voice) and written about the user (third person, biographical). The system knows which mode it is in and uses different prompts accordingly.
+**NeoProduction (THE IDENTITY)** — the synthesis layer. Biometric health (Voice/Face) + Thematic Peaks. This is where raw influence creates production-grade content.
 
-**NeoVlog** — the video output layer. Reads from the same entity graph. The same upload that triggers NeoLog ingestion optionally triggers NeoVlog processing — one toggle per project in settings (not per upload — some projects are public, others are private research). The autonomous content pipeline: one video input produces a short-form edit with captions, a long-form documentary cut, a blog post from the transcript, and entity graph updates. One input, four outputs, zero editing. Generic AI video is commodity. Personalized AI video grounded in months of accumulated context — the system knows the user's voice, projects, recurring themes — is a different category.
+**NeoEditorial (THE BOARD)** — the output planning layer. AI scans the graph for story arcs and unresolved questions, suggesting video essay topics and drafting weekly scripts.
 
-**NeoFeed** — the distribution layer. Takes all outputs and routes them to the right platforms automatically. Blog post goes to the public log or connected publication. Short clip routes to X, TikTok, YouTube Shorts. Long video goes to YouTube. The living resume updates. The public profile reflects the new state. This is the layer that closes the loop from private ingestion to public presence without the user touching anything. Without NeoFeed, outputs exist inside the system but do not move. NeoFeed is the arrow to World at the end of the stack.
+**NeoFeed (THE DISTRIBUTION)** — the loop-closer. Distributes scripts to the user for recording, and finished media to X and other platforms. One input, four outputs, zero manual editing.
 
 ---
 

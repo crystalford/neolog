@@ -166,22 +166,20 @@ export default function DashboardLayout({
   // INGEST section — primary actions
   const primaryNav = useMemo(() => [
     { href: '/dashboard',         icon: Command,   label: 'Control Room',  section: 'INGEST' },
+    { href: '/dashboard/studio',  icon: Film,      label: 'Studio',        section: 'INGEST' },
     { href: '/dashboard/uploads', icon: Film,      label: 'Uploads',       section: 'INGEST' },
 ], [])
 
   // INTELLIGENCE section — what the system extracted
   const secondaryNav = useMemo(() => [
     { href: '/dashboard/timeline',   icon: CalendarDays, label: 'Timeline',         section: 'INTELLIGENCE' },
-    { href: '/dashboard/projects',   icon: FolderOpen,   label: 'Projects',         section: 'INTELLIGENCE' },
-    { href: '/dashboard/studio',     icon: Mic,          label: 'Studio',           section: 'INTELLIGENCE' },
     { href: '/dashboard/entities',   icon: Network,      label: 'Knowledge Graph',  section: 'INTELLIGENCE' },
     { href: '/dashboard/queue',      icon: Radio,        label: 'Post Queue',       section: 'INTELLIGENCE' },
   ], [])
 
   // MANIFEST section — the character being built
   const characterNav = useMemo(() => [
-    { href: '/dashboard/character',  icon: UserIcon,  label: 'Character',         section: 'MANIFEST' },
-    { href: '/dashboard/manifest',   icon: Cpu,       label: 'Neural Manifest',   section: 'MANIFEST' },
+    { href: '/dashboard/character',  icon: UserIcon,  label: 'Identity',         section: 'MANIFEST' },
   ], [])
 
   const commandItems = useMemo(() => {

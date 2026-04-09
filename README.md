@@ -1,8 +1,8 @@
 # Neolog 2.0 (Personal Intelligence System)
 
-**Neolog is a Personal Intelligence Engine — a living ledger of your mind.**
+**Neolog is a Neural Production Engine — a system that transforms raw life data into cinema-grade media.**
 
-You talk into it—raw, unedited, messy—and it turns your sprawling thoughts into structured knowledge over time. Your projects, ideas, goals, people, and patterns accumulate automatically. It is a "liquid CMS" that ingests multimodal brain dumps and synthesizes them into manageable, trackable entities, allowing you to converse with your past thoughts or publish refined clips and insights effortlessly.
+You talk into it—raw, unedited, messy—and it turns your sprawling thoughts into structured knowledge and automated content. Your projects, ideas, and patterns accumulate into an "Editorial Board" that suggests video essay topics and drafts weekly scripts in your voice.
 
 ## The Core Concept
 
@@ -55,5 +55,8 @@ npx inngest-cli@latest dev
 ```
 Open [http://localhost:3000](http://localhost:3000)
 
-## The Origin (Neolog 1.0)
-*Note: Neolog was originally built as an advanced publishing / blogging platform (a Substack alternative). The codebase still contains the legacy "Posts", "Publications", and "ActivityPub" routing logic. While functional, the primary focus and development velocity has pivoted entirely to the Personal Intelligence System (V2.0) outlined above. The old documentation for 1.0 has been moved to the `_archived_docs` directory.*
+## Project Evolution: From v1.0 to Neural Production
+
+**Neolog 1.0 (LEGACY)**: Originally built as an ActivityPub-federated blogging platform. This version has been completely decommissioned and all legacy social/distribution code has been purged.
+
+**Neolog 2.0 (FOCUS CLEANUP)**: The current version recently underwent a consolidation phase. Underdeveloped prototypes for Finances, Health, and RPG-style features were removed to eliminate code bloat and focus 100% on the **Neural Production Engine**—transforming your raw multi-modal corpus into cinema-grade media and weekly scripts.
