@@ -21,7 +21,7 @@ type GraphData = {
   links: Link[]
 }
 
-export function NetworkGraph() {
+export default function NetworkGraph() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [data, setData] = useState<GraphData | null>(null)
   const [loading, setLoading] = useState(true)
