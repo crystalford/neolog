@@ -62,7 +62,7 @@ export default function SyndicationPage() {
       <div className="grid gap-3 md:grid-cols-2">
         {[
           { id: 'x', name: 'X (Threads)', desc: 'Post a 5-6 tweet thread on publish.' },
-          { id: 'linkedin', name: 'LinkedIn', desc: 'Publish a short case study post.' },
+
           { id: 'reddit', name: 'Reddit', desc: 'Submit to a chosen subreddit.' },
           { id: 'threads', name: 'Threads (Meta)', desc: 'Publish a threaded summary post.' },
           { id: 'medium', name: 'Medium', desc: 'Syndicate with canonical URL for SEO.' },

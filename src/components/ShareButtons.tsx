@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Share2, Twitter, Linkedin, Link as LinkIcon, Check, Mail } from 'lucide-react'
+import { Share2, Twitter, Link as LinkIcon, Check, Mail } from 'lucide-react'
 
 interface ShareButtonsProps {
   url: string
@@ -18,7 +18,6 @@ export function ShareButtons({ url, title, className = '' }: ShareButtonsProps) 
 
   const shareLinks = {
     twitter: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
     email: `mailto:?subject=${encodedTitle}&body=Check out this post: ${encodedUrl}`,
   }
 
@@ -70,16 +69,7 @@ export function ShareButtons({ url, title, className = '' }: ShareButtonsProps) 
               <Twitter size={16} />
               Twitter
             </a>
-            <a
-              href={shareLinks.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-secondary)] transition-colors"
-              onClick={() => setShowMenu(false)}
-            >
-              <Linkedin size={16} />
-              LinkedIn
-            </a>
+
             <a
               href={shareLinks.email}
               className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[var(--bg-secondary)] transition-colors"
@@ -144,16 +134,7 @@ export function ShareBar({ url, title }: { url: string; title: string }) {
           <Twitter size={16} className="text-[var(--text-tertiary)]" />
         </a>
         
-        <a
-          href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-9 h-9 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center hover:border-[var(--border-medium)] transition-colors"
-          title="Share on LinkedIn"
-          aria-label="Share on LinkedIn"
-        >
-          <Linkedin size={16} className="text-[var(--text-tertiary)]" />
-        </a>
+
         
         <button
           onClick={copyLink}

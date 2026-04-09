@@ -160,7 +160,7 @@ Rules for edit_plans:
 - Generate as many edit plans as the material supports (typically 2-5)
 - "short_form": 45-90 seconds, single focused idea, high energy moments — for Reels/TikTok/Shorts
 - "long_form": 5-15 minutes, multiple connected ideas woven into a narrative — for YouTube
-- "general": 2-5 minutes, balanced — for LinkedIn/Twitter
+- "general": 2-5 minutes, balanced — for Twitter/X
 - Each segment start/end must align with actual transcript segment boundaries
 - Only include segments where the speaker is making a clear, on-point contribution to the narrative
 - Remove anything where the speaker goes off on a tangent or loses their thread

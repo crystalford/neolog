@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { 
   Trophy, Star, Zap, Activity, Shield, Users, 
   ChevronRight, Sparkles, Brain, Target, Flame,
-  Edit3, Save, X, Globe, Link2, Github, Twitter, Linkedin
+  Edit3, Save, X, Globe, Link2, Github, Twitter
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -34,7 +34,7 @@ export default function ProfilePage() {
     website_url: '',
     twitter_url: '',
     github_url: '',
-    linkedin_url: '',
+
   })
   
   const supabase = createClient()
@@ -59,7 +59,7 @@ export default function ProfilePage() {
           website_url: profile.website_url || '',
           twitter_url: profile.twitter_url || '',
           github_url: profile.github_url || '',
-          linkedin_url: profile.linkedin_url || '',
+
         })
       }
 

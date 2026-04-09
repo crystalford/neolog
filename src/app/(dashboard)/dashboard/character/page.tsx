@@ -278,7 +278,7 @@ export default function CharacterPage() {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({
-    display_name: '', bio: '', website_url: '', twitter_url: '', github_url: '', linkedin_url: '',
+    display_name: '', bio: '', website_url: '', twitter_url: '', github_url: '',
   })
 
   const supabase = createClient()
@@ -306,7 +306,7 @@ export default function CharacterPage() {
           website_url: profileData.website_url || '',
           twitter_url: profileData.twitter_url || '',
           github_url: profileData.github_url || '',
-          linkedin_url: profileData.linkedin_url || '',
+
         })
       }
 
@@ -396,7 +396,7 @@ export default function CharacterPage() {
                 </div>
               </div>
               <div className="space-y-2.5">
-                {['website_url', 'twitter_url', 'github_url', 'linkedin_url'].map(field => (
+                {['website_url', 'twitter_url', 'github_url'].map(field => (
                   <div key={field}>
                     <label className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">{field.replace('_url', '')}</label>
                     <input
@@ -423,13 +423,13 @@ export default function CharacterPage() {
                 </p>
               )}
               {/* Links */}
-              {(profile?.website_url || profile?.twitter_url || profile?.github_url || profile?.linkedin_url) && (
+              {(profile?.website_url || profile?.twitter_url || profile?.github_url) && (
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
                   {[
                     { key: 'website_url', label: 'Website' },
                     { key: 'twitter_url', label: 'Twitter' },
                     { key: 'github_url', label: 'GitHub' },
-                    { key: 'linkedin_url', label: 'LinkedIn' },
+
                   ].filter(l => profile?.[l.key]).map(l => (
                     <a
                       key={l.key}

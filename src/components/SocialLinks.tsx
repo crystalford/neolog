@@ -1,4 +1,4 @@
-import { Twitter, Github, Linkedin, Globe } from 'lucide-react'
+import { Twitter, Github, Globe } from 'lucide-react'
 
 interface SocialLinksProps {
   profile: any // Using 'any' here ensures it works regardless of your database schema
@@ -12,7 +12,6 @@ export function SocialLinks({ profile, className = '' }: SocialLinksProps) {
   const links = [
     { url: profile.twitter, icon: Twitter, label: 'Twitter' },
     { url: profile.github, icon: Github, label: 'GitHub' },
-    { url: profile.linkedin, icon: Linkedin, label: 'LinkedIn' },
     { url: profile.website, icon: Globe, label: 'Website' },
   ].filter(l => l.url)
 

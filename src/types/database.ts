@@ -10,7 +10,6 @@ export type Profile = {
   website_url: string | null
   twitter_url: string | null
   github_url: string | null
-  linkedin_url: string | null
   is_pro?: boolean | null
   // Health / physical profile
   date_of_birth: string | null          // stored as DATE string 'YYYY-MM-DD'
@@ -125,7 +124,6 @@ export type PostDistributionPack = {
   author_id: string
   status: 'pending' | 'ready' | 'error'
   x_thread: string[]
-  linkedin_post: string | null
   reddit_title: string | null
   reddit_body: string | null
   hooks: string[]
@@ -258,7 +256,6 @@ export type CreateProfileInput = {
   website_url?: string
   twitter_url?: string
   github_url?: string
-  linkedin_url?: string
 }
 
 export type UpdateProfileInput = Partial<CreateProfileInput>
@@ -716,7 +713,7 @@ export type SuggestedClip = {
   end: number
   title: string
   transcript: string
-  platform: 'x' | 'linkedin' | 'tiktok' | 'instagram' | 'general'
+  platform: 'x' | 'tiktok' | 'instagram' | 'general'
 }
 
 // Entity: a living, accumulating concept tracked across sessions

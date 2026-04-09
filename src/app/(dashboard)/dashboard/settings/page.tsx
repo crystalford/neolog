@@ -93,7 +93,7 @@ export default function SettingsPage() {
     avatar_url: '',
     twitter_url: '',
     github_url: '',
-    linkedin_url: '',
+
     context_md: '',
     // Health / physical profile
     date_of_birth: '',
@@ -456,7 +456,7 @@ export default function SettingsPage() {
           avatar_url: data.avatar_url || '',
           twitter_url: data.twitter_url || '',
           github_url: data.github_url || '',
-          linkedin_url: data.linkedin_url || '',
+
           context_md: data.context_md || '',
           date_of_birth: data.date_of_birth || '',
           height_cm: data.height_cm ? String(data.height_cm) : '',
@@ -492,7 +492,7 @@ export default function SettingsPage() {
           avatar_url: formData.avatar_url || null,
           twitter_url: formData.twitter_url || null,
           github_url: formData.github_url || null,
-          linkedin_url: formData.linkedin_url || null,
+
           context_md: formData.context_md || null,
           date_of_birth: formData.date_of_birth || null,
           height_cm: formData.height_cm ? parseInt(formData.height_cm) : null,
