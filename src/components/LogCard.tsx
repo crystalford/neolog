@@ -24,6 +24,7 @@ export type LogEntry = {
   video_uploads?: {
     transcript_segments: any[]
     analysis: any
+    thumbnail_url?: string | null
   } | null
 }
 
@@ -113,7 +114,8 @@ export function LogCard({ entry, username, showPrivacyBadge, isPublicView }: Log
   const [isLoading, setIsLoading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const thumbnail = entry.thumbnail_url || entry.asset?.image_url
+  const upload = Array.isArray(entry.video_uploads) ? entry.video_uploads[0] : entry.video_uploads
+  const thumbnail = entry.thumbnail_url || upload?.thumbnail_url || entry.asset?.image_url
   const hasBody = entry.body && entry.body.trim().length > 0
   const actionLabel = getActionLabel(entry.entry_type)
   const displayTitle = cleanTitle(entry)

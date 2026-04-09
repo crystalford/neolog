@@ -41,7 +41,7 @@ export default function TimelinePage() {
         if (uploadIds.length > 0) {
           const { data: uploads, error: uploadsError } = await supabase
             .from('video_uploads')
-            .select('id, transcript_segments, transcript, analysis')
+            .select('id, transcript_segments, transcript, analysis, thumbnail_url')
             .in('id', uploadIds)
 
           if (!uploadsError && uploads) {
