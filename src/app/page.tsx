@@ -2,7 +2,6 @@
 
 export const runtime = 'edge'
 
-
 import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { Activity, Shield, Cpu, Database, Fingerprint, Zap, Brain, Target, Flame, Box, ChevronRight, Share2, Unlock } from 'lucide-react'

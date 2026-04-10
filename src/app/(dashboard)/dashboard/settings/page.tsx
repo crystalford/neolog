@@ -11,7 +11,7 @@ import {
   User, Download, Rss, Shield, Loader2, Camera,
   Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
   KeyRound, Brain, Sparkles, Heart,
-  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert, Ruler
+  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert, Ruler, Twitter, Share2
 } from 'lucide-react'
 
 // ─── Re-analyze all uploads widget ───────────────────────────────────────────
@@ -143,6 +143,8 @@ export default function SettingsPage() {
     public_base_url: '',
   })
   const [storageSaving, setStorageSaving] = useState(false)
+  const [socialIntegrations, setSocialIntegrations] = useState<any[]>([])
+  const [socialLoading, setSocialLoading] = useState(true)
 
   const router = useRouter()
   const supabase = createClient()
@@ -153,6 +155,7 @@ export default function SettingsPage() {
     loadApiKeys()
     loadStorage()
     loadUsageCaps()
+    loadSocialIntegrations()
   }, [])
 
   const aiProviders = [
@@ -252,6 +255,30 @@ export default function SettingsPage() {
     } finally {
       setUsageCapsSaving(false)
     }
+  }
+
+  const loadSocialIntegrations = async () => {
+    setSocialLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('social_integrations')
+        .select('*')
+        .eq('user_id', session.user.id)
+      setSocialIntegrations(data || [])
+    } finally {
+      setSocialLoading(false)
+    }
+  }
+
+  const disconnectSocial = async (platform: string) => {
+    if (!confirm(`Disconnect ${platform}?`)) return
+    const { error } = await supabase
+      .from('social_integrations')
+      .delete()
+      .eq('platform', platform)
+    if (!error) loadSocialIntegrations()
   }
 
   const loadIntegrations = async () => {
@@ -1186,6 +1213,53 @@ export default function SettingsPage() {
                 </div>
               </label>
             ))}
+          </div>
+        </section>
+
+        {/* Social Sync */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Share2 size={20} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Social Sync</h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Connect your social accounts to enable the Post Queue narrator.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-6">
+            <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-between" style={{ background: 'rgba(13,13,22,0.2)' }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-black border border-white/5 flex items-center justify-center text-white shadow-xl">
+                  <Twitter size={24} fill="currentColor" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">X (Twitter)</h3>
+                  <p className="text-xs text-[var(--text-tertiary)]">
+                    {socialIntegrations.find(s => s.platform === 'x') 
+                      ? `Connected as @${socialIntegrations.find(s => s.platform === 'x').platform_username}`
+                      : 'Not connected'}
+                  </p>
+                </div>
+              </div>
+
+              {socialIntegrations.find(s => s.platform === 'x') ? (
+                <button 
+                  onClick={() => disconnectSocial('x')}
+                  className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-widest border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <a 
+                  href="/api/social/x/connect"
+                  className="px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all"
+                >
+                  Connect X
+                </a>
+              )}
+            </div>
           </div>
         </section>
 

@@ -9,6 +9,7 @@ import { assembleClip } from '@/inngest/functions/assemble-clip'
 import { reanalyzeAllUploads } from '@/inngest/functions/reanalyze-all-uploads'
 import { synthesizeProject } from '@/inngest/functions/synthesize-project'
 import { developIdea } from '@/inngest/functions/develop-idea'
+import { scatterScheduler, postDispatcher } from '@/inngest/functions/scatter-scheduler'
 
 export const runtime = 'edge'
 
@@ -24,5 +25,7 @@ export const { GET, POST, PUT } = serve({
     assembleClip,
     reanalyzeAllUploads,
     developIdea,
+    scatterScheduler,
+    postDispatcher,
   ],
 })
