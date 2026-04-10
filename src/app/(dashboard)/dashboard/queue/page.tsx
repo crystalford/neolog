@@ -36,27 +36,29 @@ export default function QueuePage() {
     setLoading(true)
     try {
       const status = activeTab === 'pending' ? 'pending' : activeTab === 'scheduled' ? 'scheduled' : 'posted'
-      const { data, error } = await supabase
-        .from('social_queue')
-        .select('*')
-        .eq('status', status)
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        setPosts(data as any)
+      
+      // RESTORING USE OF API ROUTE:
+      // This route contains necessary fallbacks to extract posts from video analysis 
+      // when the social_queue table is empty or missing.
+      const res = await fetch(`/api/social-queue?status=${status}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPosts(data.posts || [])
         
         // Calculate runway based on scheduled posts
         if (activeTab === 'scheduled') {
-           const days = new Set(data.map((p: any) => new Date(p.scheduled_at).toLocaleDateString())).size
+           const days = new Set(data.posts.map((p: any) => new Date(p.scheduled_at).toLocaleDateString())).size
            setRunwayDays(days)
         }
+      } else {
+        console.error('API_ERROR:', res.statusText)
       }
     } catch (err) {
       console.error('Failed to fetch queue:', err)
     } finally {
       setLoading(false)
     }
-  }, [activeTab, supabase])
+  }, [activeTab])
 
   useEffect(() => {
     fetchQueue()
@@ -64,12 +66,13 @@ export default function QueuePage() {
 
   const handleUpdateStatus = async (id: string, status: SocialPost['status'], scheduled_at?: string) => {
     try {
-      const { error } = await supabase
-        .from('social_queue')
-        .update({ status, scheduled_at })
-        .eq('id', id)
+      // Also using API route for updates for consistency and server-side verification
+      const res = await fetch('/api/social-queue', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, status, scheduled_at })
+      })
       
-      if (!error) {
+      if (res.ok) {
         setPosts(prev => prev.filter(p => p.id !== id))
       }
     } catch (err) {
@@ -95,6 +98,7 @@ export default function QueuePage() {
     }
   }
 
+  // ... rest of the UI remains the same
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans relative overflow-hidden">
       {/* Ambience */}
@@ -224,7 +228,7 @@ export default function QueuePage() {
                            <div className="w-1 h-3 rounded-full bg-emerald-500 animate-pulse" />
                         </div>
                         <span className="text-[9px] font-mono text-[var(--text-tertiary)] uppercase opacity-60 flex items-center gap-2 mt-1">
-                          <Terminal size={10} /> {new Date(post.created_at).toLocaleTimeString()} // SOURCE: {post.source_name || 'NEURAL_EXTRACT'}
+                          <Terminal size={10} /> {new Date(post.created_at || Date.now()).toLocaleTimeString()} // SOURCE: {post.source_name || 'NEURAL_EXTRACT'}
                         </span>
                       </div>
                     </div>
@@ -258,10 +262,10 @@ export default function QueuePage() {
                        
                        <button 
                           onClick={() => handleRefine(post.id, post.content)}
-                          disabled={isRefining}
+                          disabled={refiningId === post.id}
                           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)]/5 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all border border-[var(--accent)]/20 disabled:opacity-50 text-[10px] font-bold uppercase tracking-widest shadow-sm"
                        >
-                          {isRefining ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          {refiningId === post.id ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                           Refine Intelligence
                        </button>
                     </div>
@@ -330,7 +334,7 @@ export default function QueuePage() {
                  <p className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-tertiary)]">Dripped</p>
                  <p className="text-4xl font-black italic text-emerald-500">48</p>
               </div>
-              <button className="px-8 py-4 rounded-2xl bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-widest border border-[var(--border-light)] transition-all flex items-center gap-3">
+              <button className="px-8 py-4 rounded-2xl bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-widest border border-white/5 transition-all flex items-center gap-3">
                 <Settings2 size={16} /> Production Config
               </button>
            </div>
