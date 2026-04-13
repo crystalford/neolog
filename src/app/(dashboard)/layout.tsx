@@ -32,6 +32,7 @@ export default function DashboardLayout({
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -51,6 +52,10 @@ export default function DashboardLayout({
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
 
   const navigation = [
     { name: 'Control Room', href: '/dashboard', icon: Home },
@@ -92,7 +97,7 @@ export default function DashboardLayout({
       />
 
       {/* Persistent Technical Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 w-72 border-r border-[var(--border-light)] bg-[var(--bg-card)]/30 backdrop-blur-3xl transition-transform lg:translate-x-0 lg:static lg:inset-0 lg:block">
+      <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-[var(--border-light)] bg-[var(--bg-card)]/30 backdrop-blur-3xl transition-transform lg:translate-x-0 lg:static lg:inset-0 lg:block ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
           
           {/* Logo & System Pulse */}
@@ -195,7 +200,28 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Viewport */}
-      <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg-primary)] relative">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Main Content Viewport */}
+      <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg-primary)] relative h-screen">
+        {/* Mobile Header (Hidden on Desktop) */}
+        <div className="lg:hidden flex items-center justify-between p-4 border-b border-[var(--border-light)] bg-[var(--bg-card)]/50 backdrop-blur-md sticky top-0 z-20">
+          <Link href="/" className="block">
+            <Logo size="default" />
+          </Link>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-secondary)]"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+        </div>
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] pointer-events-none" />
         <div className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
           {children}
