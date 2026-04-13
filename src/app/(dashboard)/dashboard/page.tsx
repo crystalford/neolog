@@ -9,7 +9,7 @@ import Link from 'next/link'
 import {
   Activity, Brain, Zap, Target,
   Mic, ImageIcon, Sparkles, AlertCircle, TrendingUp,
-  ShieldCheck, Share2, Radio, Terminal, Cpu, Clock, ChevronRight, ArrowUpRight
+  ShieldCheck, Share2, Radio, Terminal, Cpu, Clock, ChevronRight, ArrowUpRight, Database
 } from 'lucide-react'
 
 export default function LiveMindDashboard() {
