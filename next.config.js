@@ -18,6 +18,27 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  async redirects() {
+    return [
+      // Old routes → new routes
+      { source: '/dashboard/brain',     destination: '/dashboard', permanent: false },
+      { source: '/dashboard/entities',  destination: '/dashboard', permanent: false },
+      { source: '/dashboard/synthesis', destination: '/dashboard', permanent: false },
+      { source: '/dashboard/log',       destination: '/dashboard', permanent: false },
+      { source: '/dashboard/log/new',   destination: '/dashboard', permanent: false },
+      { source: '/dashboard/character', destination: '/dashboard', permanent: false },
+      { source: '/dashboard/inventory', destination: '/dashboard', permanent: false },
+      { source: '/dashboard/portfolio', destination: '/dashboard', permanent: false },
+      { source: '/dashboard/projects',  destination: '/dashboard', permanent: false },
+      { source: '/dashboard/captures',  destination: '/dashboard', permanent: false },
+      { source: '/dashboard/agents',    destination: '/dashboard', permanent: false },
+      { source: '/dashboard/workspace', destination: '/dashboard', permanent: false },
+      { source: '/dashboard/queue',     destination: '/dashboard/posts',    permanent: false },
+      { source: '/dashboard/ingest',    destination: '/dashboard/videos',   permanent: false },
+      { source: '/dashboard/uploads',   destination: '/dashboard/videos',   permanent: false },
+      { source: '/dashboard/sessions',  destination: '/dashboard/timeline', permanent: false },
+    ]
+  },
   async headers() {
     return [
       {
