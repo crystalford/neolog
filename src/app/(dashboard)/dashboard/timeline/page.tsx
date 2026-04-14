@@ -53,10 +53,14 @@ function formatDate(ts: string) {
   const now = new Date()
   const diff = now.getTime() - d.getTime()
   const days = Math.floor(diff / 86400000)
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  if (days === 0) return `Today · ${time}`
-  if (days === 1) return `Yesterday · ${time}`
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ` · ${time}`
+  // Sentinel: time unknown — stored as midnight or noon UTC from filename-only extraction
+  const utcH = d.getUTCHours(), utcM = d.getUTCMinutes(), utcS = d.getUTCSeconds()
+  const timeUnknown = (utcH === 0 || utcH === 12) && utcM === 0 && utcS === 0
+  const time = timeUnknown ? null : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const suffix = time ? ` · ${time}` : ''
+  if (days === 0) return `Today${suffix}`
+  if (days === 1) return `Yesterday${suffix}`
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + suffix
 }
 
 function formatDuration(secs: number | null) {
