@@ -5,7 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { VideoUpload, VideoAnalysis } from '@/types/database'
+import type { VideoUpload, VideoAnalysis, TranscriptSegment } from '@/types/database'
 
 const C = {
   bg:           '#070706',
@@ -66,6 +66,14 @@ function formatDuration(secs: number | null) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+function formatSegTime(secs: number) {
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function TimelinePage() {
   const router = useRouter()
   const supabase = createClient()
@@ -75,6 +83,11 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true)
   const [pageNum, setPageNum] = useState(0)
   const PAGE_SIZE = 10
+
+  // For transcript view: load all uploads oldest→newest
+  const [transcriptUploads, setTranscriptUploads] = useState<VideoUpload[]>([])
+  const [transcriptLoading, setTranscriptLoading] = useState(false)
+  const [transcriptLoaded, setTranscriptLoaded] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -93,6 +106,28 @@ export default function TimelinePage() {
     }
     load()
   }, [])
+
+  // Load full transcript dataset when user switches to transcript view
+  useEffect(() => {
+    if (viewMode !== 'transcript' || transcriptLoaded) return
+    async function loadTranscripts() {
+      setTranscriptLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('video_uploads')
+        .select('id, file_name, recorded_at, created_at, transcript, transcript_segments, analysis, duration_seconds, status')
+        .eq('user_id', session.user.id)
+        .not('status', 'eq', 'uploading')
+        .not('transcript', 'is', null)
+        .order('recorded_at', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      setTranscriptUploads((data ?? []) as VideoUpload[])
+      setTranscriptLoading(false)
+      setTranscriptLoaded(true)
+    }
+    loadTranscripts()
+  }, [viewMode, transcriptLoaded])
 
   const loadMore = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -122,7 +157,9 @@ export default function TimelinePage() {
             Timeline
           </div>
           <div style={{ fontSize: 10, color: C.textDim, marginTop: 3, letterSpacing: 1 }}>
-            Your living record · {uploads.length} sessions loaded
+            {viewMode === 'transcript'
+              ? `Full transcript record · ${transcriptUploads.length} sessions`
+              : `Your living record · ${uploads.length} sessions loaded`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
@@ -141,42 +178,147 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 60px' }}>
-        {loading ? (
-          <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
-        ) : uploads.length === 0 ? (
-          <div style={{ padding: '64px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>NO SESSIONS YET</div>
-          </div>
-        ) : (
-          uploads.map((upload, i) => (
-            <TimelineEntry
-              key={upload.id}
-              upload={upload}
-              viewMode={viewMode}
-              isExpanded={expanded === upload.id}
-              onToggle={() => setExpanded(expanded === upload.id ? null : upload.id)}
-              onOpenStudio={() => router.push('/dashboard/studio')}
-              showConnector={i < uploads.length - 1}
-            />
-          ))
-        )}
-        {!loading && uploads.length > 0 && (
-          <div style={{ textAlign: 'center', paddingTop: 36 }}>
-            <button onClick={loadMore} style={{
-              background: 'none', border: `1px solid ${C.border}`,
-              color: C.textDim, fontSize: 9, letterSpacing: 2,
-              padding: '9px 22px', cursor: 'pointer',
-              fontFamily: "'JetBrains Mono', monospace",
-            }}>
-              LOAD EARLIER SESSIONS
-            </button>
-          </div>
-        )}
-      </div>
+      {/* ── Transcript view: continuous document ─────────────────────────── */}
+      {viewMode === 'transcript' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 80px' }}>
+          {transcriptLoading ? (
+            <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING TRANSCRIPTS…</div>
+          ) : transcriptUploads.length === 0 ? (
+            <div style={{ padding: '64px 0', textAlign: 'center', fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>
+              NO TRANSCRIPTS YET
+            </div>
+          ) : (
+            transcriptUploads.map((upload, i) => (
+              <TranscriptBlock key={upload.id} upload={upload} index={i} />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── Analysis + Combined views: paginated cards ───────────────────── */}
+      {viewMode !== 'transcript' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 60px' }}>
+          {loading ? (
+            <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
+          ) : uploads.length === 0 ? (
+            <div style={{ padding: '64px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>NO SESSIONS YET</div>
+            </div>
+          ) : (
+            uploads.map((upload, i) => (
+              <TimelineEntry
+                key={upload.id}
+                upload={upload}
+                viewMode={viewMode}
+                isExpanded={expanded === upload.id}
+                onToggle={() => setExpanded(expanded === upload.id ? null : upload.id)}
+                onOpenStudio={() => router.push('/dashboard/studio')}
+                showConnector={i < uploads.length - 1}
+              />
+            ))
+          )}
+          {!loading && uploads.length > 0 && uploads.length % PAGE_SIZE === 0 && (
+            <div style={{ textAlign: 'center', paddingTop: 36 }}>
+              <button onClick={loadMore} style={{
+                background: 'none', border: `1px solid ${C.border}`,
+                color: C.textDim, fontSize: 9, letterSpacing: 2,
+                padding: '9px 22px', cursor: 'pointer',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                LOAD EARLIER SESSIONS
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
+
+// ─── Transcript block: full text for one recording ───────────────────────────
+
+function TranscriptBlock({ upload, index }: { upload: VideoUpload; index: number }) {
+  const analysis = upload.analysis as VideoAnalysis | null
+  const ts = upload.recorded_at ?? upload.created_at
+  const title = analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '') ?? 'Untitled'
+  const segments = upload.transcript_segments as TranscriptSegment[] | null
+  const hasSegments = segments && segments.length > 0
+
+  return (
+    <div style={{ paddingTop: 48 }}>
+      {/* Session separator */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 28 }}>
+        <div style={{
+          fontSize: 9, letterSpacing: 3, color: C.amberDim,
+          textTransform: 'uppercase', whiteSpace: 'nowrap',
+        }}>
+          {formatDate(ts)}
+        </div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: C.textPrimary }}>
+          {title}
+        </div>
+        {upload.duration_seconds && (
+          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+            {formatDuration(upload.duration_seconds)}
+          </div>
+        )}
+      </div>
+
+      {/* Full transcript */}
+      {hasSegments ? (
+        // Segments with timestamps
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {segments.map((seg, i) => (
+            <div key={i} style={{
+              display: 'flex', gap: 24, alignItems: 'flex-start',
+              padding: '6px 0',
+              borderTop: i === 0 ? `1px solid ${C.border}` : 'none',
+            }}>
+              <div style={{
+                fontSize: 10, color: C.textDimmer, fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: 1, paddingTop: 2, flexShrink: 0, width: 38, textAlign: 'right',
+              }}>
+                {formatSegTime(seg.start)}
+              </div>
+              <div style={{
+                width: 1, background: C.border, alignSelf: 'stretch', flexShrink: 0,
+              }} />
+              <div style={{
+                fontSize: 14, color: C.textSecond, lineHeight: 1.75,
+                letterSpacing: 0.2, flex: 1,
+              }}>
+                {seg.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : upload.transcript ? (
+        // Plain transcript text
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          paddingTop: 18,
+          fontSize: 14, color: C.textSecond, lineHeight: 1.85,
+          letterSpacing: 0.2,
+        }}>
+          {upload.transcript}
+        </div>
+      ) : (
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          paddingTop: 14,
+          fontSize: 11, color: C.textDimmer, fontStyle: 'italic',
+        }}>
+          Transcript not available.
+        </div>
+      )}
+
+      {/* Connector to next */}
+      <div style={{ marginTop: 48, height: 1, background: C.border, opacity: 0.4 }} />
+    </div>
+  )
+}
+
+// ─── Analysis entry: collapsible card ────────────────────────────────────────
 
 function TimelineEntry({
   upload, viewMode, isExpanded, onToggle, onOpenStudio, showConnector,
@@ -192,7 +334,8 @@ function TimelineEntry({
   const ts = upload.recorded_at ?? upload.created_at
   const ideaCount = (analysis?.content_ideas?.length ?? 0) + (analysis?.strong_opinions?.length ?? 0)
   const keyQuotes = (analysis?.key_quotes ?? []) as string[]
-  const transcriptPreview = upload.transcript?.slice(0, 300).trim() ?? null
+  const segments = upload.transcript_segments as TranscriptSegment[] | null
+  const hasSegments = segments && segments.length > 0
 
   return (
     <div style={{ paddingTop: 24 }}>
@@ -240,7 +383,8 @@ function TimelineEntry({
         {/* Expanded content */}
         {isExpanded && (
           <div style={{ borderTop: `1px solid ${C.border}` }}>
-            {(viewMode === 'analysis' || viewMode === 'combined') && analysis && (
+            {/* Analysis section */}
+            {analysis && (
               <div style={{ padding: '18px 20px' }}>
                 {analysis.key_win && (
                   <div style={{ marginBottom: 18 }}>
@@ -309,21 +453,39 @@ function TimelineEntry({
                 </button>
               </div>
             )}
-            {(viewMode === 'transcript' || viewMode === 'combined') && (
+
+            {/* Transcript section (combined mode only) */}
+            {viewMode === 'combined' && (
               <div style={{
                 padding: '18px 20px',
-                borderTop: viewMode === 'combined' && analysis ? `1px solid ${C.border}` : 'none',
+                borderTop: analysis ? `1px solid ${C.border}` : 'none',
               }}>
                 <Label>TRANSCRIPT</Label>
-                {transcriptPreview ? (
-                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSecond, lineHeight: 1.8, fontStyle: 'italic' }}>
-                    "{transcriptPreview}{upload.transcript && upload.transcript.length > 300 ? '…' : ''}"
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 8, fontSize: 11, color: C.textDimmer }}>
-                    {upload.status === 'processing' ? 'Transcript processing…' : 'No transcript available.'}
-                  </div>
-                )}
+                <div style={{ marginTop: 12 }}>
+                  {hasSegments ? (
+                    segments.map((seg, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+                        <div style={{
+                          fontSize: 9, color: C.textDimmer, fontFamily: "'JetBrains Mono', monospace",
+                          paddingTop: 3, flexShrink: 0, width: 34, textAlign: 'right',
+                        }}>
+                          {formatSegTime(seg.start)}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.textSecond, lineHeight: 1.7, flex: 1 }}>
+                          {seg.text}
+                        </div>
+                      </div>
+                    ))
+                  ) : upload.transcript ? (
+                    <div style={{ fontSize: 12, color: C.textSecond, lineHeight: 1.8 }}>
+                      {upload.transcript}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: C.textDimmer }}>
+                      {upload.status === 'processing' ? 'Transcript processing…' : 'No transcript available.'}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
