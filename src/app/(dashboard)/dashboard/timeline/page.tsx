@@ -2,422 +2,503 @@
 
 export const runtime = 'edge'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { format, isToday, isYesterday, parseISO } from 'date-fns'
-import { 
-  Calendar, Filter, Search, Plus, Loader2, Sparkles, SlidersHorizontal, 
-  ArrowUpRight, BookOpen, Layers, Zap, TrendingUp, Target, Brain, 
-  Radio, Quote, AlertCircle, ArrowRight, Terminal, Clock, Database, ChevronRight
-} from 'lucide-react'
-import { LogCard, type LogEntry } from '@/components/LogCard'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
+import type { VideoUpload, VideoAnalysis, TranscriptSegment } from '@/types/database'
+
+const C = {
+  bg:           '#070706',
+  bgSurface:    '#0e0d0b',
+  bgRaised:     '#141210',
+  border:       '#1e1b16',
+  borderBright: '#2c2820',
+  amber:        '#C8902A',
+  amberDim:     '#7a5618',
+  amberBright:  '#E8A840',
+  amberGlow:    'rgba(200,144,42,0.09)',
+  textPrimary:  '#EDE3CC',
+  textSecond:   '#9A8E78',
+  textDim:      '#5A5040',
+  textDimmer:   '#2e2820',
+  green:        '#4A8A60',
+  blue:         '#4870A8',
+}
+
+type ViewMode = 'analysis' | 'transcript' | 'combined'
+
+function Tag({ children, color = C.amber }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span style={{
+      fontSize: 9, letterSpacing: 2, color,
+      background: `${color}12`, border: `1px solid ${color}25`,
+      padding: '2px 8px', borderRadius: 2,
+      textTransform: 'uppercase', whiteSpace: 'nowrap', fontWeight: 500,
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 9, letterSpacing: 3, color: C.amberDim, textTransform: 'uppercase' }}>
+      {children}
+    </div>
+  )
+}
+
+function formatDate(ts: string) {
+  const d = new Date(ts)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  const days = Math.floor(diff / 86400000)
+  // Sentinel: time unknown — stored as midnight or noon UTC from filename-only extraction
+  const utcH = d.getUTCHours(), utcM = d.getUTCMinutes(), utcS = d.getUTCSeconds()
+  const timeUnknown = (utcH === 0 || utcH === 12) && utcM === 0 && utcS === 0
+  const time = timeUnknown ? null : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const suffix = time ? ` · ${time}` : ''
+  if (days === 0) return `Today${suffix}`
+  if (days === 1) return `Yesterday${suffix}`
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + suffix
+}
+
+function formatDuration(secs: number | null) {
+  if (!secs) return null
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function formatSegTime(secs: number) {
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TimelinePage() {
-  const [entries, setEntries] = useState<LogEntry[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'archive' | 'script' | 'neural'>('archive')
-  const [synthesis, setSynthesis] = useState<any>(null)
-  const [entities, setEntities] = useState<any[]>([])
+  const router = useRouter()
   const supabase = createClient()
+  const [viewMode, setViewMode] = useState<ViewMode>('analysis')
+  const [uploads, setUploads] = useState<VideoUpload[]>([])
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [pageNum, setPageNum] = useState(0)
+  const PAGE_SIZE = 10
+
+  // For transcript view: load all uploads oldest→newest
+  const [transcriptUploads, setTranscriptUploads] = useState<VideoUpload[]>([])
+  const [transcriptLoading, setTranscriptLoading] = useState(false)
+  const [transcriptLoaded, setTranscriptLoaded] = useState(false)
 
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
-
-      // Fetch log entries
-      const { data: logs, error: logsError } = await supabase
-        .from('log_entries')
+      const { data } = await supabase
+        .from('video_uploads')
         .select('*')
         .eq('user_id', session.user.id)
-        .order('logged_at', { ascending: false })
-
-      if (logsError) console.error('LOGS_FETCH_ERROR:', logsError)
-
-      // Recent Synthesis
-      const { data: synthData } = await supabase
-        .from('user_synthesis')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('synthesized_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      
-      if (synthData) setSynthesis(synthData)
-
-      // Top Entities
-      const { data: entityData } = await supabase
-        .from('entities')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('mention_count', { ascending: false })
-        .limit(20)
-      
-      if (entityData) setEntities(entityData)
-
-      if (logs) {
-        const uploadIds = Array.from(new Set(logs.map(l => l.source_upload_id).filter(id => !!id))) as string[]
-        
-        if (uploadIds.length > 0) {
-          const { data: uploads, error: uploadsError } = await supabase
-            .from('video_uploads')
-            .select('id, transcript_segments, transcript, analysis, thumbnail_url')
-            .in('id', uploadIds)
-
-          if (!uploadsError && uploads) {
-            const uploadMap = new Map(uploads.map(u => [u.id, u]))
-            const mergedEntries = logs.map(log => {
-              const upload = log.source_upload_id ? uploadMap.get(log.source_upload_id) : null
-              return {
-                ...log,
-                thumbnail_url: upload?.thumbnail_url || log.thumbnail_url,
-                video_uploads: upload
-              }
-            })
-            setEntries(mergedEntries as any)
-          } else {
-            setEntries(logs as any)
-          }
-        } else {
-          setEntries(logs as any)
-        }
-      }
-      
-      setIsLoading(false)
+        .not('status', 'eq', 'uploading')
+        .order('recorded_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1)
+      setUploads((data ?? []) as VideoUpload[])
+      setLoading(false)
     }
     load()
-  }, [supabase])
+  }, [])
 
-  const filteredEntries = useMemo(() => {
-    return entries.filter(e => 
-      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.body?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.entry_type.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [entries, searchQuery])
+  // Load full transcript dataset when user switches to transcript view
+  useEffect(() => {
+    if (viewMode !== 'transcript' || transcriptLoaded) return
+    async function loadTranscripts() {
+      setTranscriptLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('video_uploads')
+        .select('id, file_name, recorded_at, created_at, transcript, transcript_segments, analysis, duration_seconds, status')
+        .eq('user_id', session.user.id)
+        .not('status', 'eq', 'uploading')
+        .not('transcript', 'is', null)
+        .order('recorded_at', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+      setTranscriptUploads((data ?? []) as VideoUpload[])
+      setTranscriptLoading(false)
+      setTranscriptLoaded(true)
+    }
+    loadTranscripts()
+  }, [viewMode, transcriptLoaded])
 
-  const groupedEntries = useMemo(() => {
-    const groups: Record<string, LogEntry[]> = {}
-    filteredEntries.forEach(entry => {
-      const date = format(parseISO(entry.logged_at), 'yyyy-MM-dd')
-      if (!groups[date]) groups[date] = []
-      groups[date].push(entry)
-    })
-    return groups
-  }, [filteredEntries])
-
-  const dates = Object.keys(groupedEntries).sort((a, b) => b.localeCompare(a))
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 animate-pulse">
-        <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]">
-           <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
-        </div>
-        <span className="text-[9px] font-mono uppercase tracking-[0.4em] text-[var(--text-tertiary)]">Syncing Narrative Manifold...</span>
-      </div>
-    )
+  const loadMore = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const nextPage = pageNum + 1
+    const { data } = await supabase
+      .from('video_uploads')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .not('status', 'eq', 'uploading')
+      .order('recorded_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .range(nextPage * PAGE_SIZE, (nextPage + 1) * PAGE_SIZE - 1)
+    setUploads(prev => [...prev, ...((data ?? []) as VideoUpload[])])
+    setPageNum(nextPage)
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] relative font-sans">
-      {/* Background ambience */}
-      <div className="absolute top-0 right-0 w-[40%] h-[400px] bg-gradient-to-bl from-[var(--accent)]/5 to-transparent pointer-events-none" />
-
-      {/* Persistent Terminal Header */}
-      <header className="sticky top-0 z-50 border-b border-[var(--border-light)] bg-[var(--bg-card)]/60 backdrop-blur-3xl px-8 py-6">
-        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col">
-               <div className="flex items-center gap-2 mb-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]" />
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--accent)]">Signal Stream: Live</span>
-               </div>
-               <h1 className="text-2xl font-black tracking-tighter uppercase italic">The Narrative Archive</h1>
-            </div>
-
-            <nav className="flex items-center gap-1 p-1 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-xl">
-               {[
-                 { id: 'archive', label: 'Records', icon: Layers },
-                 { id: 'neural', label: 'Neural', icon: Sparkles },
-                 { id: 'script', label: 'Script', icon: BookOpen }
-               ].map(tab => (
-                 <button 
-                  key={tab.id}
-                  onClick={() => setViewMode(tab.id as any)}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all ${
-                    viewMode === tab.id ? 'bg-[var(--text-primary)] text-[var(--bg-primary)] shadow-xl' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                  }`}
-                 >
-                   <tab.icon size={14} /> {tab.label}
-                 </button>
-               ))}
-            </nav>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        padding: '22px 40px 18px',
+        borderBottom: `1px solid ${C.border}`,
+        display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
+            Timeline
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] opacity-40 group-focus-within:opacity-100 transition-opacity" />
-              <input 
-                type="text"
-                placeholder="Search Narrative Vectors..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[var(--bg-secondary)]/50 border border-[var(--border-light)] rounded-xl pl-12 pr-6 py-2.5 text-xs w-64 lg:w-[400px] focus:border-[var(--accent)]/50 focus:bg-[var(--bg-secondary)] outline-none transition-all placeholder:text-[var(--text-tertiary)]/30"
-              />
-            </div>
+          <div style={{ fontSize: 10, color: C.textDim, marginTop: 3, letterSpacing: 1 }}>
+            {viewMode === 'transcript'
+              ? `Full transcript record · ${transcriptUploads.length} sessions`
+              : `Your living record · ${uploads.length} sessions loaded`}
           </div>
         </div>
-      </header>
+        <div style={{ display: 'flex', gap: 2 }}>
+          {(['analysis', 'transcript', 'combined'] as ViewMode[]).map(m => (
+            <button key={m} onClick={() => setViewMode(m)} style={{
+              background: viewMode === m ? C.amberGlow : 'none',
+              border: `1px solid ${viewMode === m ? C.amber : C.border}`,
+              color: viewMode === m ? C.amberBright : C.textDim,
+              fontSize: 9, letterSpacing: 2, padding: '5px 12px',
+              transition: 'all 0.12s', textTransform: 'uppercase',
+              cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+            }}>
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <main className="max-w-[1400px] mx-auto px-8 py-16">
-        {viewMode === 'archive' ? (
-          /* High-Fidelity Record View */
-          dates.length > 0 ? (
-            <div className="space-y-24">
-              {dates.map((dateStr) => {
-                const dateObj = parseISO(dateStr)
-                const entriesForDate = groupedEntries[dateStr]
-                
-                return (
-                  <section key={dateStr} className="relative group">
-                    <div className="flex items-center gap-6 mb-12">
-                       <h2 className="text-[12px] font-mono font-black text-[var(--text-primary)] uppercase tracking-[0.4em] whitespace-nowrap">
-                          {isToday(dateObj) ? 'SYSTEM_TODAY' : isYesterday(dateObj) ? 'SYSTEM_YESTERDAY' : format(dateObj, 'MMM_dd_yyyy').toUpperCase()}
-                       </h2>
-                       <div className="h-[1px] flex-1 bg-gradient-to-r from-[var(--border-light)] to-transparent" />
-                       <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30 font-bold uppercase tracking-widest">
-                          {entriesForDate.length} LOG_SIGNALS
-                       </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-1">
-                      {entriesForDate.map((entry) => (
-                        <LogCard key={entry.id} entry={entry} />
-                      ))}
-                    </div>
-                  </section>
-                )
-              })}
+      {/* ── Transcript view: continuous document ─────────────────────────── */}
+      {viewMode === 'transcript' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 80px' }}>
+          {transcriptLoading ? (
+            <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING TRANSCRIPTS…</div>
+          ) : transcriptUploads.length === 0 ? (
+            <div style={{ padding: '64px 0', textAlign: 'center', fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>
+              NO TRANSCRIPTS YET
             </div>
           ) : (
-            <EmptyState message="Zero Narrative Captured" />
-          )
-        ) : viewMode === 'neural' ? (
-          <NeuralFYP key="neural-view" synthesis={synthesis} entities={entities} />
-        ) : (
-          /* Professional Infinite Script View */
-          <div className="max-w-4xl mx-auto space-y-32 pb-40">
-             {filteredEntries.map((entry: any, idx) => {
-                const upload = (Array.isArray(entry.video_uploads) ? entry.video_uploads[0] : entry.video_uploads)
-                let segments = upload?.transcript_segments || entry.meta?.transcript_segments || []
-                
-                if (segments.length === 0 && upload?.transcript) {
-                  segments = [{ start: 0, text: upload.transcript }]
-                }
-                
-                return (
-                  <article key={entry.id} className="relative group/article">
-                     <div className="flex items-center gap-6 mb-16 opacity-30 group-hover/article:opacity-100 transition-opacity duration-700">
-                        <div className="p-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--accent)]">
-                           <Terminal size={14} />
-                        </div>
-                        <span className="text-[10px] font-mono font-black uppercase tracking-[0.5em] text-[var(--text-tertiary)] whitespace-nowrap">
-                           {format(parseISO(entry.logged_at), 'MMM dd · HH:mm')} // SIGNAL_{idx + 1}
-                        </span>
-                        <div className="h-[1px] flex-1 bg-gradient-to-r from-[var(--border-light)] via-[var(--border-light)] to-transparent" />
-                     </div>
+            transcriptUploads.map((upload, i) => (
+              <TranscriptBlock key={upload.id} upload={upload} index={i} />
+            ))
+          )}
+        </div>
+      )}
 
-                     {segments.length > 0 ? (
-                        <div className="space-y-12">
-                           {segments.map((seg: any, sIdx: number) => (
-                              <div key={sIdx} className="flex gap-16 group/seg">
-                                 <div className="flex flex-col items-center gap-4 pt-1">
-                                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-30 w-12 text-right font-black tracking-tighter group-hover/seg:opacity-100 transition-opacity">
-                                       {formatTime(seg.start)}
-                                    </span>
-                                    <div className="w-[1px] flex-1 bg-[var(--border-light)]/50 group-hover/seg:bg-[var(--accent)]/30 transition-colors" />
-                                 </div>
-                                 <p className="text-[20px] leading-[1.8] text-[var(--text-secondary)] font-light tracking-wide group-hover/seg:text-[var(--text-primary)] transition-colors">
-                                    {seg.text}
-                                 </p>
-                              </div>
-                           ))}
-                        </div>
-                     ) : (
-                        <div className="pl-28 py-10 opacity-40 italic border-l border-[var(--border-light)]">
-                           <p className="text-[12px] font-mono font-black uppercase tracking-[0.3em] text-[var(--text-tertiary)]">
-                              [ NO ANALYTICAL LOG RECOVERED FOR THIS SIGNAL ]
-                           </p>
-                        </div>
-                     )}
-                  </article>
-                )
-             })}
-             {filteredEntries.length === 0 && <EmptyState message="The script manifold is empty." />}
+      {/* ── Analysis + Combined views: paginated cards ───────────────────── */}
+      {viewMode !== 'transcript' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 60px' }}>
+          {loading ? (
+            <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
+          ) : uploads.length === 0 ? (
+            <div style={{ padding: '64px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>NO SESSIONS YET</div>
+            </div>
+          ) : (
+            uploads.map((upload, i) => (
+              <TimelineEntry
+                key={upload.id}
+                upload={upload}
+                viewMode={viewMode}
+                isExpanded={expanded === upload.id}
+                onToggle={() => setExpanded(expanded === upload.id ? null : upload.id)}
+                onOpenStudio={() => router.push('/dashboard/studio')}
+                showConnector={i < uploads.length - 1}
+              />
+            ))
+          )}
+          {!loading && uploads.length > 0 && uploads.length % PAGE_SIZE === 0 && (
+            <div style={{ textAlign: 'center', paddingTop: 36 }}>
+              <button onClick={loadMore} style={{
+                background: 'none', border: `1px solid ${C.border}`,
+                color: C.textDim, fontSize: 9, letterSpacing: 2,
+                padding: '9px 22px', cursor: 'pointer',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                LOAD EARLIER SESSIONS
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Transcript block: full text for one recording ───────────────────────────
+
+function TranscriptBlock({ upload, index }: { upload: VideoUpload; index: number }) {
+  const analysis = upload.analysis as VideoAnalysis | null
+  const ts = upload.recorded_at ?? upload.created_at
+  const title = analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '') ?? 'Untitled'
+  const segments = upload.transcript_segments as TranscriptSegment[] | null
+  const hasSegments = segments && segments.length > 0
+
+  return (
+    <div style={{ paddingTop: 48 }}>
+      {/* Session separator */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 28 }}>
+        <div style={{
+          fontSize: 9, letterSpacing: 3, color: C.amberDim,
+          textTransform: 'uppercase', whiteSpace: 'nowrap',
+        }}>
+          {formatDate(ts)}
+        </div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700, color: C.textPrimary }}>
+          {title}
+        </div>
+        {upload.duration_seconds && (
+          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+            {formatDuration(upload.duration_seconds)}
           </div>
         )}
-      </main>
-    </div>
-  )
-}
-
-function NeuralFYP({ synthesis, entities }: { synthesis: any; entities: any[] }) {
-  if (!synthesis) {
-    return (
-      <div className="flex flex-col items-center justify-center py-48 gap-8 border-2 border-dashed border-[var(--border-light)] rounded-[3rem] bg-[var(--bg-card)]/30 backdrop-blur-3xl">
-        <div className="w-16 h-16 rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-center text-[var(--text-tertiary)] animate-bounce">
-           <Brain size={32} />
-        </div>
-        <p className="text-[11px] font-mono uppercase tracking-[0.6em] font-black text-[var(--text-tertiary)]">Standby for Synthesis...</p>
-        <Link href="/dashboard/studio" className="px-6 py-3 rounded-xl bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all">
-          Initialize Hub
-        </Link>
       </div>
-    )
-  }
 
-  const momentumArr = [
-    ...(synthesis.momentum?.accelerating?.map((m: any) => ({ type: 'momentum-up', title: m, category: 'Accelerating Vector' })) || []),
-    ...(synthesis.momentum?.stalling?.map((m: any) => ({ type: 'momentum-down', title: m, category: 'Stalled Directive' })) || []),
-    ...(synthesis.momentum?.dormant?.map((m: any) => ({ type: 'momentum-dormant', title: m, category: 'Dormant Thread' })) || []),
-  ]
-
-  return (
-    <div className="space-y-16 animate-in fade-in duration-1000 slide-in-from-bottom-8">
-      
-      {/* Cinematic Chapter Header */}
-      <section className="relative group p-12 rounded-[3.5rem] bg-gradient-to-br from-[var(--bg-secondary)] to-transparent border border-[var(--border-light)] overflow-hidden">
-         <div className="absolute top-0 right-0 p-12 opacity-[0.05] pointer-events-none group-hover:scale-110 transition-transform duration-1000">
-            <Radio size={280} />
-         </div>
-         <div className="relative space-y-6">
-            <div className="flex items-center gap-3">
-               <span className="px-4 py-1.5 rounded-full bg-[var(--accent)] text-white text-[9px] font-mono font-black uppercase tracking-[0.3em] shadow-lg shadow-[var(--accent)]/20">Current Chapter Spine</span>
-               <div className="h-[1px] w-24 bg-[var(--border-light)]" />
+      {/* Full transcript */}
+      {hasSegments ? (
+        // Segments with timestamps
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {segments.map((seg, i) => (
+            <div key={i} style={{
+              display: 'flex', gap: 24, alignItems: 'flex-start',
+              padding: '6px 0',
+              borderTop: i === 0 ? `1px solid ${C.border}` : 'none',
+            }}>
+              <div style={{
+                fontSize: 10, color: C.textDimmer, fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: 1, paddingTop: 2, flexShrink: 0, width: 38, textAlign: 'right',
+              }}>
+                {formatSegTime(seg.start)}
+              </div>
+              <div style={{
+                width: 1, background: C.border, alignSelf: 'stretch', flexShrink: 0,
+              }} />
+              <div style={{
+                fontSize: 14, color: C.textSecond, lineHeight: 1.75,
+                letterSpacing: 0.2, flex: 1,
+              }}>
+                {seg.text}
+              </div>
             </div>
-            <h2 className="text-4xl md:text-6xl font-black italic tracking-tighter text-[var(--text-primary)] max-w-4xl leading-[0.95] uppercase">
-              "{synthesis.spine}"
-            </h2>
-            <p className="text-sm text-[var(--text-tertiary)] max-w-2xl font-light italic">
-               Narrative trajectory synthesized on {new Date(synthesis.synthesized_at).toLocaleDateString()} from {entities.length} active cognitive nodes.
-            </p>
-         </div>
-      </section>
+          ))}
+        </div>
+      ) : upload.transcript ? (
+        // Plain transcript text
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          paddingTop: 18,
+          fontSize: 14, color: C.textSecond, lineHeight: 1.85,
+          letterSpacing: 0.2,
+        }}>
+          {upload.transcript}
+        </div>
+      ) : (
+        <div style={{
+          borderTop: `1px solid ${C.border}`,
+          paddingTop: 14,
+          fontSize: 11, color: C.textDimmer, fontStyle: 'italic',
+        }}>
+          Transcript not available.
+        </div>
+      )}
 
-      {/* Intelligence Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-         {momentumArr.map((m: any, i: number) => (
-           <NeuralCard 
-             key={`momentum-${i}`}
-             icon={m.type === 'momentum-up' ? <TrendingUp size={20} /> : m.type === 'momentum-down' ? <Zap size={20} /> : <Radio size={20} />}
-             type={m.category}
-             title={m.title}
-             variant={m.type === 'momentum-up' ? 'accent' : 'dim'}
-           />
-         ))}
+      {/* Connector to next */}
+      <div style={{ marginTop: 48, height: 1, background: C.border, opacity: 0.4 }} />
+    </div>
+  )
+}
 
-         {synthesis.commitments_open?.map((c: any, i: number) => (
-           <NeuralCard 
-             key={`commitment-${i}`}
-             icon={<Target size={20} />}
-             type="Active Commitment"
-             title={typeof c === 'string' ? c : c.commitment}
-             subtitle={typeof c === 'object' ? c.context : undefined}
-             variant="warning"
-           />
-         ))}
+// ─── Analysis entry: collapsible card ────────────────────────────────────────
 
-         {synthesis.contradictions?.map((c: any, i: number) => (
-           <NeuralCard 
-             key={`contradiction-${i}`}
-             icon={<AlertCircle size={20} />}
-             type="Cognitive Dissonance"
-             title={c.topic}
-             body={`Previously held: "${c.position_a}" // Recent Signal: "${c.position_b}"`}
-             variant="danger"
-           />
-         ))}
+function TimelineEntry({
+  upload, viewMode, isExpanded, onToggle, onOpenStudio, showConnector,
+}: {
+  upload: VideoUpload
+  viewMode: ViewMode
+  isExpanded: boolean
+  onToggle: () => void
+  onOpenStudio: () => void
+  showConnector: boolean
+}) {
+  const analysis = upload.analysis as VideoAnalysis | null
+  const ts = upload.recorded_at ?? upload.created_at
+  const ideaCount = (analysis?.content_ideas?.length ?? 0) + (analysis?.strong_opinions?.length ?? 0)
+  const keyQuotes = (analysis?.key_quotes ?? []) as string[]
+  const segments = upload.transcript_segments as TranscriptSegment[] | null
+  const hasSegments = segments && segments.length > 0
 
-         {synthesis.narratives?.map((n: any, i: number) => (
-           <NeuralCard 
-             key={`narrative-${i}`}
-             icon={<Brain size={20} />}
-             type={`Arc: ${n.arc_type}`}
-             title={n.title}
-             body={n.description}
-             variant="info"
-           />
-         ))}
-
-         {entities.slice(0, 9).map((e: any, i: number) => (
-           <NeuralCard 
-             key={`entity-${i}`}
-             icon={<Radio size={16} />}
-             type={`Active Node: ${e.mention_count}x`}
-             title={e.name}
-             subtitle={e.summary}
-             variant="ghost"
-           />
-         ))}
+  return (
+    <div style={{ paddingTop: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2, whiteSpace: 'nowrap' }}>
+          {formatDate(ts)}
+        </div>
+        <div style={{ flex: 1, height: 1, background: C.border }} />
       </div>
-    </div>
-  )
-}
 
-function NeuralCard({ icon, type, title, body, subtitle, variant }: { icon: any, type: string, title: string, body?: string, subtitle?: string, variant: string }) {
-  const variantStyles: any = {
-    accent: 'border-[var(--accent)]/40 bg-[var(--accent)]/5 shadow-[0_0_40px_-10px_rgba(124,106,245,0.15)]',
-    dim: 'border-[var(--border-light)] opacity-70 hover:opacity-100',
-    warning: 'border-amber-500/30 bg-amber-500/5 shadow-[0_0_40px_-10px_rgba(245,158,11,0.1)]',
-    danger: 'border-rose-500/30 bg-rose-500/5 shadow-[0_0_40px_-10px_rgba(244,63,94,0.1)]',
-    info: 'border-blue-500/30 bg-blue-500/5 shadow-[0_0_40px_-10px_rgba(59,130,246,0.1)]',
-    ghost: 'border-transparent hover:border-[var(--border-light)] bg-white/[0.01]',
-  }
-
-  return (
-    <div className={`p-10 rounded-[2.5rem] border transition-all duration-700 hover:-translate-y-2 hover:shadow-2xl flex flex-col gap-8 group ${variantStyles[variant] || variantStyles.dim}`}>
-       <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-             <div className="p-3 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
-                {icon}
-             </div>
-             <span className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-[var(--text-tertiary)] opacity-60 group-hover:opacity-100 transition-all">
-                {type}
-             </span>
+      <div style={{ border: `1px solid ${isExpanded ? C.borderBright : C.border}`, background: C.bgSurface }}>
+        {/* Header row */}
+        <div onClick={onToggle} style={{
+          padding: '16px 20px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 14,
+        }}>
+          <div style={{
+            width: 72, height: 44, background: C.bgRaised, border: `1px solid ${C.border}`,
+            flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            {upload.thumbnail_url ? (
+              <img src={upload.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ fontSize: 14, color: C.textDimmer }}>▶</span>
+            )}
           </div>
-          <ArrowUpRight size={18} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 transition-opacity" />
-       </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 600, color: C.textPrimary, marginBottom: 3 }}>
+              {analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '') ?? 'Untitled'}
+            </div>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {formatDuration(upload.duration_seconds) && <span>{formatDuration(upload.duration_seconds)}</span>}
+              {analysis?.mood && <span style={{ color: C.amberDim }}>{analysis.mood}</span>}
+              {analysis?.energy_level && <span>{analysis.energy_level} energy</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {ideaCount > 0 && <Tag color={C.amber}>{ideaCount} IDEAS</Tag>}
+            {upload.status === 'processing' && <Tag color={C.blue}>PROCESSING</Tag>}
+          </div>
+          <div style={{ color: C.textDim, fontSize: 12, flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</div>
+        </div>
 
-       <div className="space-y-4">
-          <h3 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] leading-tight uppercase italic">{title}</h3>
-          {subtitle && <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] opacity-50 leading-relaxed font-bold">{subtitle}</p>}
-          {body && <p className="text-[15px] leading-relaxed text-[var(--text-secondary)] font-light italic border-l-2 border-[var(--accent)]/20 pl-6 group-hover:border-[var(--accent)] transition-colors">{body}</p>}
-       </div>
+        {/* Expanded content */}
+        {isExpanded && (
+          <div style={{ borderTop: `1px solid ${C.border}` }}>
+            {/* Analysis section */}
+            {analysis && (
+              <div style={{ padding: '18px 20px' }}>
+                {analysis.key_win && (
+                  <div style={{ marginBottom: 18 }}>
+                    <Label>KEY WIN</Label>
+                    <div style={{ marginTop: 8, fontSize: 13, color: C.textPrimary, lineHeight: 1.7, fontStyle: 'italic' }}>
+                      "{analysis.key_win}"
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 16 }}>
+                  {analysis.content_ideas && analysis.content_ideas.length > 0 && (
+                    <div>
+                      <Label>IDEAS SURFACED</Label>
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {analysis.content_ideas.slice(0, 4).map((idea, j) => (
+                          <div key={j} style={{
+                            fontSize: 11, color: C.textSecond, padding: '7px 10px',
+                            background: C.bgRaised, border: `1px solid ${C.border}`,
+                            display: 'flex', alignItems: 'center', gap: 7,
+                          }}>
+                            <span style={{ color: C.amberDim }}>◆</span>
+                            {typeof idea === 'object' ? (idea as any).topic : String(idea)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {keyQuotes.length > 0 && (
+                    <div>
+                      <Label>KEY QUOTES</Label>
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {keyQuotes.slice(0, 3).map((q, j) => (
+                          <div key={j} style={{
+                            fontSize: 11, color: C.textSecond, padding: '7px 10px',
+                            background: C.bgRaised, border: `1px solid ${C.border}`,
+                            fontStyle: 'italic',
+                          }}>
+                            "{typeof q === 'string' ? q : (q as any).text ?? String(q)}"
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {analysis.strong_opinions && analysis.strong_opinions.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Label>STRONG OPINIONS</Label>
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {analysis.strong_opinions.slice(0, 3).map((op, j) => (
+                        <div key={j} style={{
+                          fontSize: 11, color: C.textSecond, padding: '7px 10px',
+                          background: C.bgRaised, border: `1px solid ${C.border}`,
+                        }}>
+                          {op}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <button onClick={onOpenStudio} style={{
+                  background: C.amberGlow, border: `1px solid ${C.amberDim}`,
+                  color: C.amberBright, fontSize: 9, letterSpacing: 2, padding: '5px 12px',
+                  cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+                }}>
+                  OPEN IN STUDIO →
+                </button>
+              </div>
+            )}
 
-       <div className="mt-auto pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button className="flex items-center gap-2 text-[10px] font-mono font-black uppercase tracking-widest text-[var(--accent)]">
-             Review Vector Data <ArrowRight size={14} />
-          </button>
-       </div>
+            {/* Transcript section (combined mode only) */}
+            {viewMode === 'combined' && (
+              <div style={{
+                padding: '18px 20px',
+                borderTop: analysis ? `1px solid ${C.border}` : 'none',
+              }}>
+                <Label>TRANSCRIPT</Label>
+                <div style={{ marginTop: 12 }}>
+                  {hasSegments ? (
+                    segments.map((seg, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+                        <div style={{
+                          fontSize: 9, color: C.textDimmer, fontFamily: "'JetBrains Mono', monospace",
+                          paddingTop: 3, flexShrink: 0, width: 34, textAlign: 'right',
+                        }}>
+                          {formatSegTime(seg.start)}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.textSecond, lineHeight: 1.7, flex: 1 }}>
+                          {seg.text}
+                        </div>
+                      </div>
+                    ))
+                  ) : upload.transcript ? (
+                    <div style={{ fontSize: 12, color: C.textSecond, lineHeight: 1.8 }}>
+                      {upload.transcript}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: C.textDimmer }}>
+                      {upload.status === 'processing' ? 'Transcript processing…' : 'No transcript available.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showConnector && (
+        <div style={{ marginLeft: 57, width: 1, height: 18, background: C.border }} />
+      )}
     </div>
   )
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-48 gap-8 border-2 border-dashed border-[var(--border-light)] rounded-[3rem] opacity-30">
-      <Sparkles size={48} className="text-[var(--text-tertiary)]" />
-      <p className="text-[12px] font-mono uppercase tracking-[0.6em] font-black text-[var(--text-tertiary)]">{message}</p>
-    </div>
-  )
-}
-
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
 }

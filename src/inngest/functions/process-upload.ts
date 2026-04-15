@@ -383,7 +383,7 @@ export const processUpload = inngest.createFunction(
               const fileMatch = upload.file_name.match(regex);
               if (fileMatch) {
                 const [_, y, m, d, hh, mm, ss] = fileMatch;
-                const dStr = hh ? `${y}-${m}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${m}-${d}T12:00:00Z`;
+                const dStr = hh ? `${y}-${m}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${m}-${d}T00:00:00Z`;
                 const inferred = new Date(dStr);
                 if (!isNaN(inferred.getTime())) {
                   foundDate = inferred.toISOString();

@@ -4,70 +4,65 @@ export const runtime = 'edge'
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
-import {
-  Home, Settings, LogOut, User as UserIcon,
-  PenLine, Command, Search, Upload, BarChart3,
-  DollarSign, Share2, Sparkles, Video, Boxes,
-  Clock, List, CalendarDays, Inbox, BookUser,
-  Film, Briefcase, ArrowUpRight, Trophy, Zap,
-  Brain, Cpu, Network, Radio, FolderOpen, Mic
-} from 'lucide-react'
-import dynamic from 'next/dynamic'
-import { Logo } from '@/components/Logo'
 
-// Use a typed dynamic import for the Command Palette (Named Export)
-const DashboardCommandPalette = dynamic(
-  () => import('@/components/DashboardCommandPalette').then((mod) => ({ default: mod.DashboardCommandPalette })),
-  { ssr: false }
-)
+const C = {
+  bg:          '#070706',
+  bgSurface:   '#0e0d0b',
+  border:      '#1e1b16',
+  borderBright:'#2c2820',
+  amber:       '#C8902A',
+  amberBright: '#E8A840',
+  amberGlow:   'rgba(200,144,42,0.09)',
+  textPrimary: '#EDE3CC',
+  textSecond:  '#9A8E78',
+  textDim:     '#5A5040',
+  textDimmer:  '#2e2820',
+  green:       '#4A8A60',
+}
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [user, setUser] = useState<User | null>(null)
+const NAV = [
+  { id: 'home',     label: 'Home',     href: '/dashboard',          icon: '⌂' },
+  { id: 'videos',   label: 'Videos',   href: '/dashboard/videos',   icon: '▶' },
+  { id: 'timeline', label: 'Timeline', href: '/dashboard/timeline', icon: '≡' },
+  { id: 'posts',    label: 'Posts',    href: '/dashboard/posts',    icon: '↗' },
+  { id: 'studio',   label: 'Studio',   href: '/dashboard/studio',   icon: '◈' },
+  { id: 'system',   label: 'System',   href: '/dashboard/system',   icon: '⟳' },
+  { id: 'settings', label: 'Settings', href: '/dashboard/settings', icon: '⚙' },
+]
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [sessionCount, setSessionCount] = useState<number>(0)
+  const [postsCount, setPostsCount] = useState<number>(0)
+  const [voiceReady, setVoiceReady] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    async function getUser() {
-      // In Edge Runtime, session might need careful handling if Supabase isn't configured for it
+    async function init() {
       const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
+      if (!session) {
+        router.push('/login')
+        return
+      }
       setLoading(false)
+
+      // Load sidebar stats in background — non-blocking
+      const [
+        { count: uploadCount },
+        { count: pendingPosts },
+      ] = await Promise.all([
+        supabase.from('video_uploads').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id),
+        supabase.from('post_candidates').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('status', 'ready'),
+      ])
+      setSessionCount(uploadCount ?? 0)
+      setPostsCount(pendingPosts ?? 0)
     }
-    getUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
+    init()
   }, [])
-
-  const navigation = [
-    { name: 'Control Room', href: '/dashboard', icon: Home },
-    { name: 'Timeline', href: '/dashboard/timeline', icon: List },
-    { name: 'Archive', href: '/dashboard/uploads', icon: Inbox },
-    { name: 'Queue', href: '/dashboard/queue', icon: Share2 },
-    { name: 'Synthesis', href: '/dashboard/synthesis', icon: Sparkles },
-    { name: 'Entities', href: '/dashboard/entities', icon: Cpu },
-    { name: 'Studio', href: '/dashboard/studio', icon: Video },
-  ]
-
-  const commandItems = [
-    ...navigation.map(n => ({ label: `Go to ${n.name}`, href: n.href, description: `Navigate to the ${n.name} module.` })),
-    { label: 'Upload Signal', href: '/dashboard/uploads', description: 'Upload a new video or audio recording.' },
-    { label: 'Manage Profile', href: '/dashboard/profile', description: 'Update your user profile and identity settings.' },
-    { label: 'System Settings', href: '/dashboard/settings', description: 'Configure project-wide parameters.' },
-  ]
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -76,144 +71,157 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[var(--bg-primary)] font-mono text-xs uppercase tracking-[0.3em] text-[var(--text-tertiary)] animate-pulse">
-        Initializing Terminal...
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: C.bg,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 10,
+        letterSpacing: 3,
+        color: C.textDimmer,
+        textTransform: 'uppercase',
+      }}>
+        Loading…
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans">
-      <DashboardCommandPalette
-        items={commandItems}
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onOpen={() => setIsCommandPaletteOpen(true)}
-      />
-
-      {/* Persistent Technical Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 w-72 border-r border-[var(--border-light)] bg-[var(--bg-card)]/30 backdrop-blur-3xl transition-transform lg:translate-x-0 lg:static lg:inset-0 lg:block">
-        <div className="flex flex-col h-full">
-          
-          {/* Logo & System Pulse */}
-          <div className="px-8 py-10">
-            <Link href="/" className="block">
-              <Logo size="default" />
-            </Link>
-            
-            <div className="mt-8 p-4 rounded-2xl bg-[var(--bg-secondary)]/50 border border-[var(--border-light)] space-y-3">
-               <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)]">System Pulse</span>
-                  <div className="flex gap-1">
-                     <div className="w-1 h-3 rounded-full bg-[var(--accent)] animate-pulse" />
-                     <div className="w-1 h-3 rounded-full bg-[var(--accent)] animate-pulse delay-75" />
-                     <div className="w-1 h-3 rounded-full bg-[var(--accent)] animate-pulse delay-150" />
-                  </div>
-               </div>
-               <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  <span className="text-[10px] font-mono uppercase text-emerald-500 font-bold">Encrypted Link Active</span>
-               </div>
-            </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg }}>
+      {/* Sidebar */}
+      <aside style={{
+        width: 196,
+        flexShrink: 0,
+        height: '100vh',
+        background: C.bgSurface,
+        borderRight: `1px solid ${C.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Wordmark */}
+        <div style={{
+          padding: '22px 20px 18px',
+          borderBottom: `1px solid ${C.border}`,
+        }}>
+          <div style={{
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 800,
+            fontSize: 20,
+            letterSpacing: -0.5,
+            color: C.textPrimary,
+          }}>
+            NEO<span style={{ color: C.amber }}>LOG</span>
           </div>
-
-          {/* User Meta (Technical Data) */}
-          <div className="px-8 mb-6">
-            <div className="p-4 rounded-xl border border-[var(--border-light)] bg-black/20 font-mono text-[9px] text-[var(--text-tertiary)] uppercase tracking-widest space-y-2">
-               <div className="flex justify-between">
-                  <span>Authorized</span>
-                  <span className="text-[var(--text-secondary)]">{user?.user_metadata?.username || 'GUEST'}</span>
-               </div>
-               <div className="flex justify-between">
-                  <span>Level</span>
-                  <span className="text-[var(--accent)]">Admin</span>
-               </div>
-               <div className="flex justify-between overflow-hidden">
-                  <span>Session</span>
-                  <span className="truncate ml-4">{user?.id?.slice(0, 12) || '---'}</span>
-               </div>
-            </div>
+          <div style={{
+            fontSize: 9,
+            color: C.textDim,
+            letterSpacing: 2,
+            marginTop: 3,
+          }}>
+            CREATIVE INTELLIGENCE
           </div>
+        </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-            <p className="px-4 mb-4 text-[9px] font-mono font-bold uppercase tracking-[0.3em] text-[var(--text-tertiary)]">Main Terminal</p>
-            {navigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                    isActive 
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shadow-[0_0_20px_rgba(124,106,245,0.1)]' 
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  <item.icon size={18} className={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] group-hover:text-[var(--accent)]'} />
-                  <span className="text-sm font-bold tracking-tight">{item.name}</span>
-                  {isActive && (
-                    <div className="ml-auto w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_5px_var(--accent)]" />
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
+          {NAV.map(item => {
+            const isActive = item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href)
+            const badge = item.id === 'posts' && postsCount > 0 ? postsCount : null
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 11,
+                  width: '100%',
+                  padding: '10px 20px',
+                  background: isActive ? C.amberGlow : 'none',
+                  borderLeft: isActive ? `2px solid ${C.amber}` : '2px solid transparent',
+                  color: isActive ? C.amberBright : C.textDim,
+                  fontSize: 12,
+                  transition: 'all 0.12s',
+                  textDecoration: 'none',
+                }}
+              >
+                <span style={{ fontSize: 13, opacity: 0.8, width: 16 }}>{item.icon}</span>
+                {item.label}
+                {badge && (
+                  <span style={{
+                    marginLeft: 'auto',
+                    background: C.amber,
+                    color: C.bg,
+                    fontSize: 8,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 2,
+                  }}>
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
 
-          {/* Utility Footer */}
-          <div className="p-4 border-t border-[var(--border-light)] space-y-1">
-             <button
-               onClick={() => setIsCommandPaletteOpen(true)}
-               className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-white transition-all group border border-transparent hover:border-[var(--border-light)]"
-             >
-               <div className="flex items-center gap-3">
-                 <Command size={18} className="text-[var(--text-tertiary)] group-hover:text-[var(--accent)]" />
-                 <span className="text-sm font-bold">Command Palette</span>
-               </div>
-               <span className="text-[10px] font-mono text-[var(--text-tertiary)] bg-black/40 px-1.5 py-0.5 rounded border border-white/5">⌘/</span>
-             </button>
-
-             <Link
-               href="/dashboard/settings"
-               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                 pathname === '/dashboard/settings' ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
-               }`}
-             >
-               <Settings size={18} className="text-[var(--text-tertiary)]" />
-               <span className="text-sm font-bold">Preferences</span>
-             </Link>
-
-             <button
-               onClick={handleSignOut}
-               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400/70 hover:bg-rose-500/10 hover:text-rose-400 transition-all font-bold text-sm"
-             >
-               <LogOut size={18} />
-               <span>Terminate Session</span>
-             </button>
+        {/* Footer status */}
+        <div style={{
+          padding: '14px 20px',
+          borderTop: `1px solid ${C.border}`,
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 6,
+          }}>
+            <span style={{
+              display: 'inline-block',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: C.green,
+              animation: 'pulse 2s ease-in-out infinite',
+            }} />
+            <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+              ACTIVE · {sessionCount} SESSION{sessionCount !== 1 ? 'S' : ''}
+            </span>
           </div>
+          <div style={{ fontSize: 9, color: C.textDimmer, letterSpacing: 1 }}>
+            {voiceReady ? 'voice clone ready' : 'voice not configured'}
+          </div>
+          <button
+            onClick={handleSignOut}
+            style={{
+              marginTop: 10,
+              background: 'none',
+              border: 'none',
+              fontSize: 9,
+              color: C.textDimmer,
+              letterSpacing: 1,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              padding: 0,
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </aside>
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg-primary)] relative">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] pointer-events-none" />
-        <div className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
-          {children}
-        </div>
+      {/* Main content */}
+      <main style={{
+        flex: 1,
+        overflow: 'hidden',
+        animation: 'fadeIn 0.18s ease',
+      }}>
+        {children}
       </main>
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-      `}</style>
     </div>
   )
 }

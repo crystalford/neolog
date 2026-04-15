@@ -2,1612 +2,608 @@
 
 export const runtime = 'edge'
 
-
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { ensureProfile } from '@/lib/profile'
-import {
-  User, Download, Rss, Shield, Loader2, Camera,
-  Check, ExternalLink, Copy, Globe, Bell, Mail, Trash2,
-  KeyRound, Brain, Sparkles, Heart,
-  AlertTriangle, Settings as SettingsIcon, Link2, ShieldAlert, Ruler, Twitter, Share2
-} from 'lucide-react'
 
-// ─── Re-analyze all uploads widget ───────────────────────────────────────────
+const C = {
+  bg:           '#070706',
+  bgSurface:    '#0e0d0b',
+  bgRaised:     '#141210',
+  border:       '#1e1b16',
+  borderBright: '#2c2820',
+  amber:        '#C8902A',
+  amberDim:     '#7a5618',
+  amberBright:  '#E8A840',
+  amberGlow:    'rgba(200,144,42,0.09)',
+  textPrimary:  '#EDE3CC',
+  textSecond:   '#9A8E78',
+  textDim:      '#5A5040',
+  textDimmer:   '#2e2820',
+  green:        '#4A8A60',
+  red:          '#8A4040',
+  redBright:    '#CC6666',
+}
 
-function ReanalyzeAllButton() {
-  const [state, setState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
-  const [message, setMessage] = useState('')
+type SettingsTab = 'profile' | 'api' | 'storage' | 'danger'
 
-  const trigger = async () => {
-    if (!confirm('Re-analyze all processed uploads with the updated AI prompt?\n\nThis extracts new entity types (decisions, values, tools, principles, stories, opinions, lessons, references) from your existing transcripts — no re-upload needed. May take a few minutes.')) return
-    setState('running')
-    try {
-      const res = await fetch('/api/video-upload/reanalyze-all', { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        setState('done')
-        setMessage(data.message || `Queued ${data.queued} uploads`)
-      } else {
-        setState('error')
-        setMessage(data.error || 'Failed')
-      }
-    } catch (e: any) {
-      setState('error')
-      setMessage(e.message || 'Network error')
-    }
-  }
-
+function Label({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/30 p-5">
-      <p className="text-sm text-[var(--text-secondary)] mb-1">
-        Retroactive entity extraction
-      </p>
-      <p className="text-xs text-[var(--text-tertiary)] mb-4 leading-relaxed">
-        New entity types have been added: <span className="font-mono text-[var(--accent)]">decision</span>, <span className="font-mono text-[var(--accent)]">value</span>, <span className="font-mono text-[var(--accent)]">tool</span>, <span className="font-mono text-[var(--accent)]">principle</span>, <span className="font-mono text-[var(--accent)]">story</span>, <span className="font-mono text-[var(--accent)]">opinion</span>, <span className="font-mono text-[var(--accent)]">lesson</span>, <span className="font-mono text-[var(--accent)]">reference</span>.
-        Re-analyzing your existing uploads will extract these from already-stored transcripts — no re-uploading needed.
-      </p>
-      {message && (
-        <p className={`text-xs font-mono mb-3 ${state === 'error' ? 'text-red-400' : 'text-green-400'}`}>
-          {message}
-        </p>
-      )}
-      <button
-        onClick={trigger}
-        disabled={state === 'running' || state === 'done'}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border-light)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 transition-all disabled:opacity-50"
-      >
-        {state === 'running' ? <><Loader2 size={14} className="animate-spin" /> Running...</>
-          : state === 'done' ? <><Sparkles size={14} className="text-green-400" /> Queued — check Inngest dashboard</>
-          : <><Brain size={14} /> Re-analyze all uploads</>}
-      </button>
+    <div style={{ fontSize: 9, letterSpacing: 3, color: C.amberDim, textTransform: 'uppercase', marginBottom: 8 }}>
+      {children}
     </div>
   )
 }
 
-export default function SettingsPage() {
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
-  const [user, setUser] = useState<any>(null)
-  const [usernameDraft, setUsernameDraft] = useState('')
-  const [usernameSaving, setUsernameSaving] = useState(false)
+function Field({
+  label, value, onChange, type = 'text', placeholder, hint, mono,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  placeholder?: string
+  hint?: string
+  mono?: boolean
+}) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <Label>{label}</Label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', background: C.bgRaised, border: `1px solid ${C.border}`,
+          color: C.textPrimary, fontSize: mono ? 11 : 12, padding: '9px 12px',
+          outline: 'none', fontFamily: mono ? "'JetBrains Mono', monospace" : 'inherit',
+          boxSizing: 'border-box',
+        }}
+      />
+      {hint && (
+        <div style={{ fontSize: 9, color: C.textDim, marginTop: 5, letterSpacing: 1 }}>{hint}</div>
+      )}
+    </div>
+  )
+}
 
-  const [usageCaps, setUsageCaps] = useState<{
-    openai: { day: string; month: string }
-    anthropic: { day: string; month: string }
-    groq: { day: string; month: string }
-  }>({
-    openai: { day: '', month: '' },
-    anthropic: { day: '', month: '' },
-    groq: { day: '', month: '' },
-  })
-  const [usageCapsSaving, setUsageCapsSaving] = useState(false)
+function SaveBtn({ onClick, saving, saved }: { onClick: () => void; saving: boolean; saved: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={saving}
+      style={{
+        background: saved ? `${C.green}22` : C.amber,
+        border: `1px solid ${saved ? C.green : C.amber}`,
+        color: saved ? C.green : C.bg,
+        fontSize: 10, letterSpacing: 2, fontWeight: 700,
+        padding: '8px 22px', cursor: 'pointer',
+        fontFamily: "'JetBrains Mono', monospace",
+        opacity: saving ? 0.6 : 1,
+        transition: 'all 0.15s',
+      }}
+    >
+      {saving ? 'SAVING…' : saved ? 'SAVED ✓' : 'SAVE'}
+    </button>
+  )
+}
 
-  const [formData, setFormData] = useState({
-    display_name: '',
-    bio: '',
-    website_url: '',
-    avatar_url: '',
-    twitter_url: '',
-    github_url: '',
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <div style={{
+        fontSize: 9, letterSpacing: 3, color: C.amberDim, textTransform: 'uppercase',
+        marginBottom: 16, paddingBottom: 8, borderBottom: `1px solid ${C.border}`,
+      }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
 
-    context_md: '',
-    // Health / physical profile
-    date_of_birth: '',
-    height_cm: '',
-    weight_kg: '',
-    biological_sex: '',
-    unit_preference: 'imperial' as 'imperial' | 'metric',
-  })
+// ─── Profile Tab ─────────────────────────────────────────────────────────────
 
-  const [emailPrefs, setEmailPrefs] = useState({
-    email_new_follower: true,
-    email_new_comment: true,
-    email_comment_reply: true,
-    email_post_upvote: false,
-    email_weekly_digest: false,
-  })
-
-  const [copied, setCopied] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
-  const [deleting, setDeleting] = useState(false)
-  const [resetting, setResetting] = useState(false)
-  const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [resetConfirmText, setResetConfirmText] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [integrationKeys, setIntegrationKeys] = useState<{
-    id: string
-    provider: string
-    label: string | null
-    is_active: boolean
-    created_at?: string | null
-  }[]>([])
-  const [integrationDrafts, setIntegrationDrafts] = useState<Record<string, string>>({})
-  const [integrationLabels, setIntegrationLabels] = useState<Record<string, string>>({})
-  const [integrationSaving, setIntegrationSaving] = useState<string | null>(null)
-  const [apiKeys, setApiKeys] = useState<{ id: string; label: string | null; last_used_at: string | null }[]>([])
-  const [apiKeyLabel, setApiKeyLabel] = useState('')
-  const [apiKeyCreated, setApiKeyCreated] = useState<string | null>(null)
-  const [apiKeySaving, setApiKeySaving] = useState(false)
-  const [storageConfig, setStorageConfig] = useState({
-    provider: 'r2',
-    access_key_id: '',
-    bucket: '',
-    region: '',
-    endpoint: '',
-    public_base_url: '',
-  })
-  const [storageSaving, setStorageSaving] = useState(false)
-  const [socialIntegrations, setSocialIntegrations] = useState<any[]>([])
-  const [socialLoading, setSocialLoading] = useState(true)
-
-  const router = useRouter()
+function ProfileTab() {
   const supabase = createClient()
+  const [form, setForm] = useState({
+    display_name: '', bio: '', website_url: '', twitter_url: '', github_url: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [email, setEmail] = useState('')
 
   useEffect(() => {
-    loadProfile()
-    loadIntegrations()
-    loadApiKeys()
-    loadStorage()
-    loadUsageCaps()
-    loadSocialIntegrations()
+    async function load() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      setEmail(session.user.email ?? '')
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, bio, website_url, twitter_url, github_url')
+        .eq('id', session.user.id)
+        .single()
+      if (data) setForm({
+        display_name: data.display_name ?? '',
+        bio: data.bio ?? '',
+        website_url: data.website_url ?? '',
+        twitter_url: data.twitter_url ?? '',
+        github_url: data.github_url ?? '',
+      })
+    }
+    load()
   }, [])
 
-  const aiProviders = [
-    { id: 'openai', label: 'OpenAI' },
-    { id: 'anthropic', label: 'Anthropic (Claude)' },
-    { id: 'groq', label: 'Groq (Speed)' },
-    { id: 'replicate', label: 'Replicate (Flux)' },
-    { id: 'elevenlabs', label: 'ElevenLabs (Voice)' },
-  ]
-
-  const providerValidation: Record<string, { pattern?: RegExp; hint: string }> = {
-    openai: { pattern: /^sk-(proj-)?[A-Za-z0-9]{10,}/, hint: 'OpenAI keys start with sk-' },
-    anthropic: { pattern: /^sk-ant-[A-Za-z0-9-]{10,}/, hint: 'Anthropic keys start with sk-ant-' },
-    groq: { pattern: /^gsk_[A-Za-z0-9]{10,}/, hint: 'Groq keys start with gsk_' },
-    elevenlabs: { pattern: /^[A-Za-z0-9]{20,}/, hint: 'ElevenLabs keys are long alphanumeric strings' },
-    replicate: { pattern: /^r8_[A-Za-z0-9]{10,}/, hint: 'Replicate keys start with r8_' },
+  const handleSave = async () => {
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase.from('profiles').upsert({ id: session.user.id, ...form })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
   }
 
-  const getIntegrationHint = (provider: string, value: string) => {
-    if (!value) return null
-    if (value.length < 12) {
-      return { tone: 'error', text: 'Key is too short.' }
-    }
-    const validation = providerValidation[provider]
-    if (validation?.pattern && !validation.pattern.test(value)) {
-      return { tone: 'warning', text: validation.hint }
-    }
-    return null
-  }
+  const set = (k: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
-  const loadUsageCaps = async () => {
-    try {
-      const response = await fetch('/api/usage/limits')
-      if (!response.ok) return
-      const data = await response.json()
-      const next = {
-        openai: { day: '', month: '' },
-        anthropic: { day: '', month: '' },
-        groq: { day: '', month: '' },
-      }
+  return (
+    <div>
+      <Section title="Account">
+        <div style={{ marginBottom: 20 }}>
+          <Label>EMAIL</Label>
+          <div style={{ fontSize: 12, color: C.textSecond, padding: '9px 12px', background: C.bgRaised, border: `1px solid ${C.border}` }}>
+            {email}
+          </div>
+          <div style={{ fontSize: 9, color: C.textDim, marginTop: 5, letterSpacing: 1 }}>
+            Email is managed via authentication — contact support to change.
+          </div>
+        </div>
+      </Section>
 
-      for (const row of (data?.limits || []) as Array<any>) {
-        const provider = row?.provider
-        const period = row?.period
-        const tokenLimit = row?.token_limit
+      <Section title="Identity">
+        <Field label="Display Name" value={form.display_name} onChange={set('display_name')} placeholder="Your name" />
+        <div style={{ marginBottom: 20 }}>
+          <Label>BIO</Label>
+          <textarea
+            value={form.bio}
+            onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+            placeholder="Short bio"
+            rows={3}
+            style={{
+              width: '100%', background: C.bgRaised, border: `1px solid ${C.border}`,
+              color: C.textPrimary, fontSize: 12, padding: '9px 12px',
+              outline: 'none', resize: 'vertical', fontFamily: 'inherit',
+              boxSizing: 'border-box', lineHeight: 1.6,
+            }}
+          />
+        </div>
+      </Section>
 
-        if ((provider === 'openai' || provider === 'anthropic' || provider === 'groq') && (period === 'day' || period === 'month')) {
-          ; (next as any)[provider][period] = tokenLimit == null ? '' : String(tokenLimit)
-        }
-      }
+      <Section title="Links">
+        <Field label="Website" value={form.website_url} onChange={set('website_url')} placeholder="https://yoursite.com" />
+        <Field label="Twitter / X" value={form.twitter_url} onChange={set('twitter_url')} placeholder="https://twitter.com/handle" />
+        <Field label="GitHub" value={form.github_url} onChange={set('github_url')} placeholder="https://github.com/handle" />
+      </Section>
 
-      setUsageCaps(next)
-    } catch {
-      // ignore
-    }
-  }
+      <SaveBtn onClick={handleSave} saving={saving} saved={saved} />
+    </div>
+  )
+}
 
-  const saveUsageCaps = async () => {
-    setUsageCapsSaving(true)
-    setError(null)
-    setSuccess(null)
+// ─── API Tab ──────────────────────────────────────────────────────────────────
 
-    const parseLimit = (value: string) => {
-      const trimmed = (value || '').trim()
-      if (!trimmed) return null
-      const n = Number(trimmed)
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
-        throw new Error('Token caps must be a positive whole number (or blank for unlimited).')
-      }
-      return n
-    }
+const API_PROVIDERS = [
+  { id: 'openai',      label: 'OpenAI',      hint: 'Used for Whisper transcription and GPT-4o analysis', placeholder: 'sk-...' },
+  { id: 'anthropic',   label: 'Anthropic',   hint: 'Used for Claude debrief, script generation, and post writing', placeholder: 'sk-ant-...' },
+  { id: 'assemblyai',  label: 'AssemblyAI',  hint: 'Used for fast audio transcription (alternative to Whisper)', placeholder: 'aai_...' },
+  { id: 'replicate',   label: 'Replicate',   hint: 'Used for audio extraction and video assembly via FFmpeg toolkit', placeholder: 'r8_...' },
+  { id: 'elevenlabs',  label: 'ElevenLabs',  hint: 'Used for voice synthesis in produced videos', placeholder: 'Your ElevenLabs API key' },
+]
 
-    try {
-      const limits = [
-        { provider: 'openai', period: 'day', token_limit: parseLimit(usageCaps.openai.day) },
-        { provider: 'openai', period: 'month', token_limit: parseLimit(usageCaps.openai.month) },
-        { provider: 'anthropic', period: 'day', token_limit: parseLimit(usageCaps.anthropic.day) },
-        { provider: 'anthropic', period: 'month', token_limit: parseLimit(usageCaps.anthropic.month) },
-        { provider: 'groq', period: 'day', token_limit: parseLimit(usageCaps.groq.day) },
-        { provider: 'groq', period: 'month', token_limit: parseLimit(usageCaps.groq.month) },
-      ]
+function ApiTab() {
+  const supabase = createClient()
+  const [keys, setKeys] = useState<Record<string, string>>({})
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
 
-      const response = await fetch('/api/usage/limits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limits }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save usage caps.')
-      }
-
-      setSuccess('Usage caps saved.')
-      await loadUsageCaps()
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save usage caps.')
-    } finally {
-      setUsageCapsSaving(false)
-    }
-  }
-
-  const loadSocialIntegrations = async () => {
-    setSocialLoading(true)
-    try {
+  useEffect(() => {
+    async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       const { data } = await supabase
-        .from('social_integrations')
+        .from('integration_keys')
+        .select('provider, key_value, is_active')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+      if (data) {
+        const map: Record<string, string> = {}
+        data.forEach((r: any) => { map[r.provider] = r.key_value ?? '' })
+        setKeys(map)
+        setDrafts(map)
+      }
+    }
+    load()
+  }, [])
+
+  const handleSave = async (provider: string) => {
+    setSaving(provider)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const value = drafts[provider] ?? ''
+
+    // Deactivate existing
+    await supabase
+      .from('integration_keys')
+      .update({ is_active: false })
+      .eq('user_id', session.user.id)
+      .eq('provider', provider)
+
+    if (value.trim()) {
+      await supabase.from('integration_keys').insert({
+        user_id: session.user.id,
+        provider,
+        key_value: value.trim(),
+        is_active: true,
+      })
+    }
+
+    setKeys(k => ({ ...k, [provider]: value.trim() }))
+    setSaving(null)
+    setSaved(provider)
+    setTimeout(() => setSaved(null), 2500)
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24, fontSize: 11, color: C.textDim, lineHeight: 1.7 }}>
+        API keys are stored encrypted in your account. They are used only for your content processing pipeline
+        and are never shared.
+      </div>
+
+      {API_PROVIDERS.map(({ id, label, hint, placeholder }) => (
+        <Section key={id} title={label}>
+          <div style={{ marginBottom: 12 }}>
+            <input
+              type="password"
+              value={drafts[id] ?? ''}
+              onChange={e => setDrafts(d => ({ ...d, [id]: e.target.value }))}
+              placeholder={placeholder}
+              style={{
+                width: '100%', background: C.bgRaised, border: `1px solid ${C.border}`,
+                color: C.textPrimary, fontSize: 11, padding: '9px 12px',
+                outline: 'none', fontFamily: "'JetBrains Mono', monospace",
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: 9, color: C.textDim, marginTop: 5, letterSpacing: 1 }}>{hint}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SaveBtn
+              onClick={() => handleSave(id)}
+              saving={saving === id}
+              saved={saved === id}
+            />
+            {keys[id] && (
+              <div style={{ fontSize: 9, color: C.green, letterSpacing: 1 }}>KEY ACTIVE</div>
+            )}
+          </div>
+        </Section>
+      ))}
+    </div>
+  )
+}
+
+// ─── Storage Tab ──────────────────────────────────────────────────────────────
+
+function StorageTab() {
+  const supabase = createClient()
+  const [config, setConfig] = useState({
+    access_key_id: '',
+    secret_access_key: '',
+    bucket: '',
+    region: 'auto',
+    endpoint: '',
+    public_base_url: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('storage_connections')
         .select('*')
         .eq('user_id', session.user.id)
-      setSocialIntegrations(data || [])
-    } finally {
-      setSocialLoading(false)
-    }
-  }
-
-  const disconnectSocial = async (platform: string) => {
-    if (!confirm(`Disconnect ${platform}?`)) return
-    const { error } = await supabase
-      .from('social_integrations')
-      .delete()
-      .eq('platform', platform)
-    if (!error) loadSocialIntegrations()
-  }
-
-  const loadIntegrations = async () => {
-    try {
-      const response = await fetch('/api/integrations/list')
-      if (!response.ok) return
-      const data = await response.json()
-      setIntegrationKeys(data.keys || [])
-    } catch (err) {
-      console.error('Integration load error:', err)
-    }
-  }
-
-  const loadApiKeys = async () => {
-    try {
-      const response = await fetch('/api/keys/list')
-      if (!response.ok) return
-      const data = await response.json()
-      setApiKeys(data.keys || [])
-    } catch (err) {
-      console.error('API key load error:', err)
-    }
-  }
-
-  const loadStorage = async () => {
-    try {
-      const response = await fetch('/api/storage/get')
-      if (!response.ok) return
-      const data = await response.json()
-      if (data.connection) {
-        setStorageConfig({
-          provider: data.connection.provider || 'r2',
-          access_key_id: data.connection.access_key_id || '',
-          bucket: data.connection.bucket || '',
-          region: data.connection.region || '',
-          endpoint: data.connection.endpoint || '',
-          public_base_url: data.connection.public_base_url || '',
-        })
-      }
-    } catch (err) {
-      console.error('Storage load error:', err)
-    }
-  }
-
-  const createApiKey = async () => {
-    setApiKeySaving(true)
-    setError(null)
-    setSuccess(null)
-    setApiKeyCreated(null)
-    try {
-      const response = await fetch('/api/keys/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: apiKeyLabel.trim() || null }),
+        .eq('provider', 'r2')
+        .single()
+      if (data) setConfig({
+        access_key_id: data.access_key_id ?? '',
+        secret_access_key: data.secret_access_key ?? '',
+        bucket: data.bucket ?? '',
+        region: data.region ?? 'auto',
+        endpoint: data.endpoint ?? '',
+        public_base_url: data.public_base_url ?? '',
       })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create key.')
-      }
-      setApiKeyCreated(data.key)
-      setApiKeyLabel('')
-      await loadApiKeys()
-    } catch (err: any) {
-      setError(err.message || 'Failed to create key.')
-    } finally {
-      setApiKeySaving(false)
     }
-  }
-
-  const revokeApiKey = async (id: string) => {
-    setError(null)
-    const response = await fetch('/api/keys/revoke', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    if (!response.ok) {
-      const data = await response.json()
-      setError(data.error || 'Failed to revoke key.')
-      return
-    }
-    setApiKeys((prev) => prev.filter((item) => item.id !== id))
-  }
-
-  const saveIntegration = async (provider: string) => {
-    const apiKey = integrationDrafts[provider]?.trim()
-    if (!apiKey) {
-      setError('Enter an API key before saving.')
-      return
-    }
-    const hint = getIntegrationHint(provider, apiKey)
-    if (hint?.tone === 'error') {
-      setError(hint.text)
-      return
-    }
-    setIntegrationSaving(provider)
-    setError(null)
-    setSuccess(null)
-    try {
-      const response = await fetch('/api/integrations/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          apiKey,
-          label: integrationLabels[provider]?.trim() || null,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save integration.')
-      }
-      setSuccess('Integration saved.')
-      setIntegrationDrafts((prev) => ({ ...prev, [provider]: '' }))
-      setIntegrationLabels((prev) => ({ ...prev, [provider]: '' }))
-      await loadIntegrations()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save integration.')
-    } finally {
-      setIntegrationSaving(null)
-    }
-  }
-
-  const isConnected = (provider: string) =>
-    integrationKeys.some((key) => key.provider === provider && key.is_active)
-
-  const getProviderKeys = (provider: string) =>
-    integrationKeys.filter((key) => key.provider === provider)
-
-  const setActiveIntegration = async (id: string) => {
-    setError(null)
-    const response = await fetch('/api/integrations/toggle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    if (!response.ok) {
-      const data = await response.json()
-      setError(data.error || 'Failed to update integration.')
-      return
-    }
-    await loadIntegrations()
-  }
-
-  const deleteIntegration = async (id: string) => {
-    setError(null)
-    const response = await fetch('/api/integrations/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    if (!response.ok) {
-      const data = await response.json()
-      setError(data.error || 'Failed to delete integration.')
-      return
-    }
-    await loadIntegrations()
-  }
-
-  const saveStorage = async () => {
-    setStorageSaving(true)
-    setError(null)
-    setSuccess(null)
-    try {
-      const response = await fetch('/api/storage/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(storageConfig),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to save storage config.')
-      }
-      setSuccess('Storage settings saved.')
-      await loadStorage()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save storage config.')
-    } finally {
-      setStorageSaving(false)
-    }
-  }
-
-  const loadProfile = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-        return
-      }
-
-      setUser(session.user)
-
-      const data = await ensureProfile(supabase, session.user)
-
-      if (data) {
-        setProfile(data)
-        setUsernameDraft(data.username || '')
-        setFormData({
-          display_name: data.display_name || '',
-          bio: data.bio || '',
-          website_url: data.website_url || '',
-          avatar_url: data.avatar_url || '',
-          twitter_url: data.twitter_url || '',
-          github_url: data.github_url || '',
-
-          context_md: data.context_md || '',
-          date_of_birth: data.date_of_birth || '',
-          height_cm: data.height_cm ? String(data.height_cm) : '',
-          weight_kg: data.weight_kg ? String(data.weight_kg) : '',
-          biological_sex: data.biological_sex || '',
-          unit_preference: data.unit_preference || 'imperial',
-        })
-        setError(null)
-      } else {
-        setError('Unable to load your profile. Please try refreshing the page or contact support.')
-      }
-    } catch (err) {
-      console.error('Profile load error:', err)
-      setError('An error occurred while loading your profile. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+    load()
+  }, [])
 
   const handleSave = async () => {
-    if (!profile) return
     setSaving(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          display_name: formData.display_name || null,
-          bio: formData.bio || null,
-          website_url: formData.website_url || null,
-          avatar_url: formData.avatar_url || null,
-          twitter_url: formData.twitter_url || null,
-          github_url: formData.github_url || null,
-
-          context_md: formData.context_md || null,
-          date_of_birth: formData.date_of_birth || null,
-          height_cm: formData.height_cm ? parseInt(formData.height_cm) : null,
-          weight_kg: formData.weight_kg ? parseFloat(formData.weight_kg) : null,
-          biological_sex: formData.biological_sex || null,
-          unit_preference: formData.unit_preference || 'imperial',
-        })
-        .eq('id', profile.id)
-
-      if (error) {
-        setError('Failed to save profile. Please try again.')
-        console.error('Save error:', error)
-      } else {
-        setProfile({ ...profile, ...formData })
-        setSuccess('Profile saved successfully!')
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
-      console.error('Save error:', err)
-    } finally {
-      setSaving(false)
-    }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase.from('storage_connections').upsert({
+      user_id: session.user.id,
+      provider: 'r2',
+      ...config,
+    }, { onConflict: 'user_id,provider' })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
   }
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !profile) return
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image size must be less than 5MB')
-      return
-    }
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file')
-      return
-    }
-
-    setUploadingAvatar(true)
-    setError(null)
-    setSuccess(null)
-
+  const handleExport = async () => {
+    setExportLoading(true)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${profile.id}/avatar.${fileExt}`
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        setError(`Failed to upload image: ${uploadError.message}. Make sure the storage bucket exists.`)
-        setUploadingAvatar(false)
-        return
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName)
-
-      // Update profile
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', profile.id)
-
-      if (updateError) {
-        console.error('Update error:', updateError)
-        setError('Failed to update profile with new avatar')
-      } else {
-        setFormData({ ...formData, avatar_url: publicUrl })
-        setProfile({ ...profile, avatar_url: publicUrl })
-        setSuccess('Profile picture updated successfully!')
-        setTimeout(() => setSuccess(null), 3000)
-      }
-    } catch (err) {
-      console.error('Avatar upload error:', err)
-      setError('An unexpected error occurred while uploading. Please try again.')
-    } finally {
-      setUploadingAvatar(false)
+      const res = await fetch('/api/export/uploads')
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `neolog-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error(e)
     }
+    setExportLoading(false)
   }
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(key)
-    setTimeout(() => setCopied(null), 2000)
-  }
+  const set = (k: keyof typeof config) => (v: string) => setConfig(c => ({ ...c, [k]: v }))
 
-  const RESERVED_USERNAMES = new Set([
-    'api',
-    '_next',
-    'dashboard',
-    'auth',
-    'explore',
-    'visuals',
-    'privacy',
-    'tos',
-    'search',
-    'tags',
-    'tag',
-    'unsubscribe',
-    'admin',
-    'earnings',
-    'curators',
-    'onboarding',
-    'login',
-    'signup',
-    'forgot-password',
-    'reset-password',
-    'preview',
-    'readme',
-    'roadmap',
-    'architecture',
-  ])
+  return (
+    <div>
+      <div style={{ marginBottom: 24, fontSize: 11, color: C.textDim, lineHeight: 1.7 }}>
+        Neolog uses Cloudflare R2 for video storage. These credentials are used for multipart upload
+        and signed URL generation. Your videos are stored under your own R2 bucket.
+      </div>
 
-  const normalizeUsername = (value: string) =>
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, '')
-      .slice(0, 30)
+      <Section title="Cloudflare R2">
+        <Field label="Access Key ID" value={config.access_key_id} onChange={set('access_key_id')} mono placeholder="R2 access key ID" />
+        <Field label="Secret Access Key" value={config.secret_access_key} onChange={set('secret_access_key')} mono type="password" placeholder="R2 secret access key" />
+        <Field label="Bucket Name" value={config.bucket} onChange={set('bucket')} mono placeholder="my-neolog-videos" />
+        <Field label="Region" value={config.region} onChange={set('region')} mono placeholder="auto" hint="Use 'auto' for Cloudflare R2" />
+        <Field
+          label="Endpoint URL"
+          value={config.endpoint}
+          onChange={set('endpoint')}
+          mono
+          placeholder="https://<account-id>.r2.cloudflarestorage.com"
+          hint="Found in your Cloudflare R2 dashboard"
+        />
+        <Field
+          label="Public Base URL"
+          value={config.public_base_url}
+          onChange={set('public_base_url')}
+          mono
+          placeholder="https://pub-xxx.r2.dev or your custom domain"
+          hint="Used to generate public video URLs for playback"
+        />
+      </Section>
 
-  const handleUsernameSave = async () => {
-    if (!profile) return
+      <div style={{ marginBottom: 36 }}>
+        <SaveBtn onClick={handleSave} saving={saving} saved={saved} />
+      </div>
 
-    setError(null)
-    setSuccess(null)
-    setUsernameSaving(true)
+      <Section title="Export">
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 14, lineHeight: 1.7 }}>
+          Export all your upload metadata, transcripts, and analysis as JSON.
+          Video files remain in your R2 bucket.
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={exportLoading}
+          style={{
+            background: 'none', border: `1px solid ${C.borderBright}`,
+            color: C.textSecond, fontSize: 10, letterSpacing: 2,
+            padding: '8px 18px', cursor: 'pointer',
+            fontFamily: "'JetBrains Mono', monospace",
+            opacity: exportLoading ? 0.5 : 1,
+          }}
+        >
+          {exportLoading ? 'EXPORTING…' : 'EXPORT DATA'}
+        </button>
+      </Section>
+    </div>
+  )
+}
 
-    try {
-      const normalized = normalizeUsername(usernameDraft)
-      if (normalized !== usernameDraft) {
-        setUsernameDraft(normalized)
-      }
+// ─── Danger Tab ───────────────────────────────────────────────────────────────
 
-      if (!normalized || normalized.length < 3) {
-        setError('Username must be at least 3 characters.')
-        return
-      }
+function DangerTab() {
+  const supabase = createClient()
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [resetEntitiesConfirm, setResetEntitiesConfirm] = useState(false)
+  const [resettingEntities, setResettingEntities] = useState(false)
+  const [entityResetDone, setEntityResetDone] = useState(false)
 
-      if (RESERVED_USERNAMES.has(normalized)) {
-        setError('That username is reserved.')
-        return
-      }
-
-      if (normalized === profile.username) {
-        setError('That is already your username.')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ username: normalized })
-        .eq('id', profile.id)
-        .select('username')
-        .single()
-
-      if (error) {
-        if ((error as any).code === '23505') {
-          setError('That username is already taken.')
-          return
-        }
-        if ((error as any).message?.includes('username_format') || (error as any).message?.includes('username_length')) {
-          setError('Username must be 3"30 characters and only use a-z, 0-9, and _.')
-          return
-        }
-        console.error('Username update error:', error)
-        setError('Failed to update username. Please try again.')
-        return
-      }
-
-      setProfile((prev: any) => ({ ...prev, username: data.username }))
-      setSuccess('Username updated.')
-      setTimeout(() => setSuccess(null), 3000)
-      router.refresh()
-    } finally {
-      setUsernameSaving(false)
-    }
+  const handleResetEntities = async () => {
+    setResettingEntities(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    await supabase.from('entities').delete().eq('user_id', session.user.id)
+    await supabase.from('entity_mentions').delete().eq('user_id', session.user.id)
+    setResettingEntities(false)
+    setEntityResetDone(true)
+    setResetEntitiesConfirm(false)
   }
 
   const handleDeleteAccount = async () => {
-    if (!profile) return
-    if (deleteConfirmText !== profile.username) return
-
+    if (confirmText !== 'DELETE MY ACCOUNT') return
     setDeleting(true)
-    setError(null)
-    setSuccess(null)
-
     try {
-      const response = await fetch('/api/account/delete', { method: 'POST' })
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete account.')
-      }
-
+      await fetch('/api/account/delete', { method: 'DELETE' })
       await supabase.auth.signOut()
-      router.push('/?deleted=true')
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete account.')
-    } finally {
+      window.location.href = '/'
+    } catch (e) {
       setDeleting(false)
     }
   }
 
-  const handleReset = async () => {
-    if (!profile) return
-    if (resetConfirmText !== 'RESET') return
-
-    setResetting(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const response = await fetch('/api/admin/reset', { method: 'POST' })
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to wipe memory.')
-      }
-
-      setSuccess('All intelligence data has been wiped. Your system is fresh.')
-      setShowResetConfirm(false)
-      setResetConfirmText('')
-      router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Failed to wipe memory.')
-    } finally {
-      setResetting(false)
-    }
-  }
-
-  const baseUrl = typeof window !== 'undefined'
-    ? window.location.origin
-    : 'https://neolog.ai'
-
-  if (loading) {
-    return (
-      <main className="px-6 lg:px-12 py-10 max-w-2xl mx-auto">
-        <div className="h-8 w-32 skeleton rounded mb-8" />
-        <div className="space-y-4">
-          <div className="h-20 skeleton rounded-xl" />
-          <div className="h-20 skeleton rounded-xl" />
-        </div>
-      </main>
-    )
-  }
-
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8 md:py-12" style={{ fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
-      <div className="mb-12">
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.15em', color: 'var(--text-tertiary)', marginBottom: '0.75rem', fontWeight: 600 }}>
-          CONTROL ROOM
-        </p>
-        <h1 style={{ fontSize: '32px', fontWeight: 300, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
-          Settings
-        </h1>
-        <p className="text-sm text-[var(--text-secondary)] max-w-xl leading-relaxed">
-          Configure your intelligence layer and manage your sovereign data. (Persona management moved to <a href="/dashboard/profile" className="text-[var(--accent)] hover:underline">Character</a>).
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-8 p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-sm text-red-500 flex items-center gap-3">
-          <AlertTriangle size={18} />
-          {error}
+    <div>
+      <Section title="Reset Entity Graph">
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 14, lineHeight: 1.7 }}>
+          Clear all accumulated entities and mentions. Your videos, transcripts, and analysis remain intact.
+          Entities will be re-extracted on next analysis run.
         </div>
-      )}
-      {success && (
-        <div className="mb-8 p-4 rounded-xl border border-[var(--success)]/20 bg-[var(--success)]/5 text-sm text-[var(--success)] flex items-center gap-3">
-          <Check size={18} />
-          {success}
+        {!resetEntitiesConfirm ? (
+          <button
+            onClick={() => setResetEntitiesConfirm(true)}
+            style={{
+              background: `${C.red}15`, border: `1px solid ${C.red}`,
+              color: C.redBright, fontSize: 10, letterSpacing: 2,
+              padding: '8px 18px', cursor: 'pointer',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            RESET ENTITY GRAPH
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleResetEntities}
+              disabled={resettingEntities}
+              style={{
+                background: C.red, border: `1px solid ${C.red}`,
+                color: '#fff', fontSize: 10, letterSpacing: 2,
+                padding: '8px 18px', cursor: 'pointer',
+                fontFamily: "'JetBrains Mono', monospace",
+                opacity: resettingEntities ? 0.6 : 1,
+              }}
+            >
+              {resettingEntities ? 'RESETTING…' : 'CONFIRM RESET'}
+            </button>
+            <button
+              onClick={() => setResetEntitiesConfirm(false)}
+              style={{
+                background: 'none', border: `1px solid ${C.border}`,
+                color: C.textDim, fontSize: 10, letterSpacing: 2,
+                padding: '8px 18px', cursor: 'pointer',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              CANCEL
+            </button>
+          </div>
+        )}
+        {entityResetDone && (
+          <div style={{ fontSize: 10, color: C.green, marginTop: 10, letterSpacing: 1 }}>
+            Entity graph cleared.
+          </div>
+        )}
+      </Section>
+
+      <Section title="Delete Account">
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 14, lineHeight: 1.7 }}>
+          Permanently delete your account and all associated data. This cannot be undone.
+          Your video files in R2 will remain — delete them separately from your Cloudflare dashboard.
         </div>
-      )}
-
-      <div className="space-y-12">
-        {/* 1. Assistant Persona & Memory */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Globe size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">AI Context</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Give the AI context about who you are and how you work.</p>
-            </div>
-          </div>
-          
-          <div className="relative group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--accent)] to-violet-500 rounded-2xl blur opacity-[0.03] group-focus-within:opacity-10 transition duration-500"></div>
-            <textarea
-              value={formData.context_md}
-              onChange={(event) => setFormData({ ...formData, context_md: event.target.value })}
-              placeholder="e.g. My tone is concise, data-first, skeptical of hype. I am a software engineer focused on agentic coding."
-              className="input min-h-[180px] font-mono leading-relaxed transition-all resize-y"
-            />
-          </div>
-        </section>
-
-
-        {/* 2. Integrations (BYOK) */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Link2 size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">AI Providers (BYOK)</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Plug in your own API keys for OpenAI, Anthropic, or Groq.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            {aiProviders.map((provider) => {
-              const keys = getProviderKeys(provider.id)
-              const draft = integrationDrafts[provider.id] || ''
-              const label = integrationLabels[provider.id] || ''
-              const hint = getIntegrationHint(provider.id, draft)
-
-              return (
-                <div key={provider.id} className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] transition-all hover:border-[var(--border-medium)]" style={{ background: 'rgba(13,13,22,0.2)' }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{provider.label}</span>
-                      {isConnected(provider.id) && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-wider">
-                          <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                          Active
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {keys.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      {keys.map((k) => (
-                        <div key={k.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--border-light)] text-[10px] font-mono">
-                          <div className="flex items-center gap-3">
-                            <span className="text-[var(--text-secondary)] opacity-60">••••{k.label ? ` [${k.label}]` : ''}</span>
-                            {!k.is_active && (
-                              <button
-                                onClick={() => setActiveIntegration(k.id)}
-                                className="text-[var(--accent)] hover:opacity-80 font-bold uppercase tracking-widest"
-                              >
-                                Activate
-                              </button>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => deleteIntegration(k.id)}
-                            className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors uppercase font-bold tracking-widest"
-                          >
-                            Revoke
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!isConnected(provider.id) && (
-                    <div className="space-y-4">
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          value={draft}
-                          onChange={(e) => setIntegrationDrafts({ ...integrationDrafts, [provider.id]: e.target.value })}
-                          placeholder={`Enter ${provider.label} API Key...`}
-                          className="input flex-1"
-                        />
-                        <button
-                          onClick={() => saveIntegration(provider.id)}
-                          disabled={integrationSaving === provider.id || !draft}
-                          className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
-                        >
-                          {integrationSaving === provider.id ? <Loader2 className="animate-spin" size={16} /> : 'Connect'}
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        value={label}
-                        onChange={(e) => setIntegrationLabels({ ...integrationLabels, [provider.id]: e.target.value })}
-                        placeholder="Key label (e.g. Personal)"
-                        className="input mt-2 py-1.5 text-[10px] opacity-70 focus:opacity-100"
-                      />
-                      {hint && (
-                        <p className={`text-[10px] ${hint.tone === 'error' ? 'text-red-500' : 'text-amber-500'} font-mono uppercase tracking-tight`}>
-                          [{hint.tone}] {hint.text}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </section>
-
-        {/* 3. Sovereign Storage */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <ShieldAlert size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Sovereign Storage (R2/S3)</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Your files, your bucket. Total data sovereignty.</p>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Provider</label>
-                <select
-                  value={storageConfig.provider}
-                  onChange={(e) => setStorageConfig({ ...storageConfig, provider: e.target.value })}
-                  className="input appearance-none"
-                >
-                  <option value="r2">Cloudflare R2</option>
-                  <option value="s3">AWS S3</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Bucket Name</label>
-                <input
-                  type="text"
-                  value={storageConfig.bucket}
-                  onChange={(e) => setStorageConfig({ ...storageConfig, bucket: e.target.value })}
-                  className="input"
-                  placeholder="my-neolog-assets"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Access Key ID</label>
-              <input
-                type="text"
-                value={storageConfig.access_key_id}
-                onChange={(e) => setStorageConfig({ ...storageConfig, access_key_id: e.target.value })}
-                className="input font-mono"
-                placeholder="xxxxxx"
-              />
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Region</label>
-                <input
-                  type="text"
-                  value={storageConfig.region}
-                  onChange={(e) => setStorageConfig({ ...storageConfig, region: e.target.value })}
-                  className="input"
-                  placeholder="auto"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Endpoint (Required for R2)</label>
-                <input
-                  type="text"
-                  value={storageConfig.endpoint}
-                  onChange={(e) => setStorageConfig({ ...storageConfig, endpoint: e.target.value })}
-                  className="input"
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Public Base URL (CDN)</label>
-              <input
-                type="text"
-                value={storageConfig.public_base_url}
-                onChange={(e) => setStorageConfig({ ...storageConfig, public_base_url: e.target.value })}
-                className="input"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <button
-                onClick={saveStorage}
-                disabled={storageSaving}
-                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
-              >
-                {storageSaving ? <Loader2 size={16} className="animate-spin" /> : 'Save Storage Configuration'}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* 4. Automation API Keys */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <SettingsIcon size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Automation API Keys</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Securely bridge Neolog with external platforms like n8n or Zapier.</p>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={apiKeyLabel}
-                onChange={(e) => setApiKeyLabel(e.target.value)}
-                placeholder="Key Description (e.g. n8n workflow)"
-                className="input flex-1"
-              />
-              <button
-                onClick={createApiKey}
-                disabled={apiKeySaving || !apiKeyLabel.trim()}
-                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-40 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
-              >
-                {apiKeySaving ? <Loader2 size={16} className="animate-spin" /> : 'Generate'}
-              </button>
-            </div>
-
-            {apiKeyCreated && (
-              <div className="p-5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-200/90 text-xs font-mono leading-relaxed">
-                <p className="font-bold uppercase tracking-widest mb-3 text-amber-500 flex items-center gap-2">
-                  <Shield size={14} /> Secret Key Generated
-                </p>
-                <p className="mb-4 text-[var(--text-tertiary)]">Copy this key now. It will not be visible again once you leave this page.</p>
-                <div className="relative group">
-                  <code className="block p-4 bg-black/40 rounded-xl border border-white/5 break-all select-all pr-12">
-                    {apiKeyCreated}
-                  </code>
-                  <button 
-                    onClick={() => copyToClipboard(apiKeyCreated, 'api_key')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white/5 rounded-lg transition-colors"
-                  >
-                    <Copy size={16} className="text-[var(--text-tertiary)]" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {apiKeys.length === 0 && !apiKeyCreated && (
-                <div className="text-center py-6 border border-dashed border-[var(--border-light)] rounded-xl">
-                  <p className="text-[10px] text-[var(--text-tertiary)] font-mono uppercase tracking-widest">No Active Automation Keys</p>
-                </div>
-              )}
-              {apiKeys.map((k) => (
-                <div key={k.id} className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)]/30 border border-[var(--border-light)]/40 hover:border-[var(--border-light)] transition-all">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold">{k.label || 'Unnamed Integration'}</span>
-                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] opacity-60">
-                      ID: {k.id.slice(0, 8)}... • Activity: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => revokeApiKey(k.id)}
-                    className="p-2 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-[var(--text-tertiary)] transition-colors"
-                    title="Revoke Access"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* 5. AI Usage Caps */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Shield size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Usage Caps</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Set hard limits on token usage to prevent billing surprises.</p>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-6" style={{ background: 'rgba(13,13,22,0.2)' }}>
-            <div className="grid gap-6">
-              {([
-                { id: 'openai', label: 'OpenAI (GPT-4o/o1)' },
-                { id: 'anthropic', label: 'Anthropic (Claude 3.5/3.7)' },
-                { id: 'groq', label: 'Groq (Llama 3/Mistral)' },
-              ] as const).map((provider) => (
-                <div key={provider.id} className="p-5 rounded-xl bg-[var(--bg-primary)]/20 border border-[var(--border-light)]/40 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">{provider.label}</span>
-                    <div className="h-px flex-1 mx-4 bg-[var(--border-light)]/30" />
-                  </div>
-                  
-                  <div className="grid sm:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Daily Limit (Tokens)</label>
-                      <input
-                        type="number"
-                        value={(usageCaps as any)[provider.id].day}
-                        onChange={(event) =>
-                          setUsageCaps((prev) => ({
-                            ...prev,
-                            [provider.id]: {
-                              ...(prev as any)[provider.id],
-                              day: event.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Unlimited"
-                        className="input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Monthly Limit (Tokens)</label>
-                      <input
-                        type="number"
-                        value={(usageCaps as any)[provider.id].month}
-                        onChange={(event) =>
-                          setUsageCaps((prev) => ({
-                            ...prev,
-                            [provider.id]: {
-                              ...(prev as any)[provider.id],
-                              month: event.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="Unlimited"
-                        className="input"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={saveUsageCaps}
-                disabled={usageCapsSaving}
-                className="px-6 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50 shadow-[0_0_20px_-5px_rgba(124,106,245,0.4)] transition-all"
-              >
-                {usageCapsSaving ? <Loader2 size={16} className="animate-spin" /> : 'Lock Budget Limits'}
-              </button>
-            </div>
-          </div>
-        </section>
-        {/* Profile management moved to Character page */}
-
-        {/* 7. Notifications */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Bell size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Notifications</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Control when you receive email alerts.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3">
-            {[
-              { key: 'email_new_follower', label: 'New Subscribers', desc: 'Alert when a new user follows your log.' },
-              { key: 'email_new_comment', label: 'Interaction Updates', desc: 'Alert when someone comments on your sessions.' },
-              { key: 'email_comment_reply', label: 'Reply Notifications', desc: 'Alert when someone responds to your thread.' },
-            ].map(({ key, label, desc }) => (
-              <label
-                key={key}
-                className="group flex items-center justify-between p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] cursor-pointer hover:border-[var(--accent)]/30 transition-all"
-                style={{ background: 'rgba(13,13,22,0.2)' }}
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none">{label}</p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
-                </div>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={(emailPrefs as any)[key]}
-                    onChange={(e) => setEmailPrefs({ ...emailPrefs, [key]: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5 bg-[var(--bg-primary)] rounded-full border border-[var(--border-light)] peer-checked:bg-[var(--accent)] peer-checked:border-[var(--accent)] transition-all duration-300"></div>
-                  <div className="absolute left-1 top-1 w-3 h-3 bg-[var(--text-tertiary)] rounded-full peer-checked:translate-x-5 peer-checked:bg-white transition-all duration-300"></div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        {/* Social Sync */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Share2 size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Social Sync</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Connect your social accounts to enable the Post Queue narrator.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] flex items-center justify-between" style={{ background: 'rgba(13,13,22,0.2)' }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-black border border-white/5 flex items-center justify-center text-white shadow-xl">
-                  <Twitter size={24} fill="currentColor" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold">X (Twitter)</h3>
-                  <p className="text-xs text-[var(--text-tertiary)]">
-                    {socialIntegrations.find(s => s.platform === 'x') 
-                      ? `Connected as @${socialIntegrations.find(s => s.platform === 'x').platform_username}`
-                      : 'Not connected'}
-                  </p>
-                </div>
-              </div>
-
-              {socialIntegrations.find(s => s.platform === 'x') ? (
-                <button 
-                  onClick={() => disconnectSocial('x')}
-                  className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-widest border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
-                >
-                  Disconnect
-                </button>
-              ) : (
-                <a 
-                  href="/api/social/x/connect"
-                  className="px-6 py-2.5 rounded-xl bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-[var(--accent)]/20 hover:scale-105 active:scale-95 transition-all"
-                >
-                  Connect X
-                </a>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* 8. Feeds */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Rss size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Feeds</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">RSS and Atom feeds for your public content.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { label: 'RSS Protcol', url: `${baseUrl}/${profile?.username}/feed`, icon: <Globe size={18} /> },
-              { label: 'JSON protocol', url: `${baseUrl}/${profile?.username}/feed?format=json`, icon: <Link2 size={18} /> },
-            ].map(({ label, url, icon }) => (
-              <div
-                key={label}
-                className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-4 hover:border-[var(--border-medium)] transition-all"
-                style={{ background: 'rgba(13,13,22,0.1)' }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[var(--accent)]">
-                    {icon}
-                    <span className="text-xs font-bold uppercase tracking-widest">{label}</span>
-                  </div>
-                  <button
-                    onClick={() => copyToClipboard(url, label)}
-                    className="p-2 rounded-lg bg-[var(--bg-primary)]/50 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    {copied === label ? (
-                      <Check size={14} className="text-emerald-500" />
-                    ) : (
-                      <Copy size={14} />
-                    )}
-                  </button>
-                </div>
-                <div className="px-3 py-2 rounded-lg bg-black/20 border border-white/5 font-mono text-[10px] text-[var(--text-tertiary)] truncate">
-                  {url}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* 9. Physical Profile */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Heart size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Physical Profile</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Used for health tracking and your AI context. Passive health data is captured from your videos.</p>
-            </div>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] space-y-5" style={{ background: 'rgba(13,13,22,0.2)' }}>
-
-            {/* Units toggle */}
-            <div>
-              <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">Units</p>
-              <div className="flex items-center gap-2">
-                {(['imperial', 'metric'] as const).map(u => (
-                  <button
-                    key={u}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, unit_preference: u })}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      formData.unit_preference === u
-                        ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-primary)]/50 border-[var(--border-light)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    {u === 'imperial' ? 'ft / lbs' : 'cm / kg'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-              {/* Date of birth */}
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
-                  Date of Birth
-                </label>
-                <input
-                  type="date"
-                  value={formData.date_of_birth}
-                  onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
-                  className="input w-full"
-                />
-              </div>
-
-              {/* Biological sex */}
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
-                  Biological Sex
-                </label>
-                <select
-                  value={formData.biological_sex}
-                  onChange={e => setFormData({ ...formData, biological_sex: e.target.value })}
-                  className="input w-full"
-                >
-                  <option value="">Prefer not to say</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              {/* Height */}
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
-                  Height ({formData.unit_preference === 'imperial' ? 'in' : 'cm'})
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={50}
-                    max={300}
-                    value={formData.height_cm
-                      ? (formData.unit_preference === 'imperial'
-                          ? Math.round(parseInt(formData.height_cm) / 2.54)
-                          : formData.height_cm)
-                      : ''}
-                    onChange={e => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v)) {
-                        const cm = formData.unit_preference === 'imperial' ? Math.round(v * 2.54) : v
-                        setFormData({ ...formData, height_cm: String(cm) })
-                      } else {
-                        setFormData({ ...formData, height_cm: '' })
-                      }
-                    }}
-                    placeholder={formData.unit_preference === 'imperial' ? 'e.g. 71' : 'e.g. 180'}
-                    className="input w-full pr-12"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[var(--text-tertiary)]">
-                    {formData.unit_preference === 'imperial' ? 'in' : 'cm'}
-                  </span>
-                </div>
-                {formData.height_cm && formData.unit_preference === 'imperial' && (
-                  <p className="text-[10px] text-[var(--text-tertiary)] mt-1 font-mono">
-                    {Math.floor(parseInt(formData.height_cm) / 30.48)}′ {Math.round((parseInt(formData.height_cm) % 30.48) / 2.54)}″
-                  </p>
-                )}
-              </div>
-
-              {/* Weight */}
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">
-                  Weight ({formData.unit_preference === 'imperial' ? 'lbs' : 'kg'})
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={20}
-                    max={500}
-                    step={0.1}
-                    value={formData.weight_kg
-                      ? (formData.unit_preference === 'imperial'
-                          ? Math.round(parseFloat(formData.weight_kg) * 2.20462 * 10) / 10
-                          : formData.weight_kg)
-                      : ''}
-                    onChange={e => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v)) {
-                        const kg = formData.unit_preference === 'imperial'
-                          ? Math.round(v / 2.20462 * 10) / 10
-                          : v
-                        setFormData({ ...formData, weight_kg: String(kg) })
-                      } else {
-                        setFormData({ ...formData, weight_kg: '' })
-                      }
-                    }}
-                    placeholder={formData.unit_preference === 'imperial' ? 'e.g. 175' : 'e.g. 79.5'}
-                    className="input w-full pr-12"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-[var(--text-tertiary)]">
-                    {formData.unit_preference === 'imperial' ? 'lbs' : 'kg'}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </section>
-
-        {/* 10. Intelligence */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Brain size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Intelligence</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Re-run AI analysis on existing uploads to extract new entity types.</p>
-            </div>
-          </div>
-
-          <ReanalyzeAllButton />
-        </section>
-
-        {/* 10. Export */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <Download size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Data Portability (Export)</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Export your entire neolog archive in open formats.</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { format: 'json', label: 'Archive (JSON)', desc: 'Complete system snapshot.' },
-              { format: 'markdown', label: 'Journal (MD)', desc: 'All logs as markdown files.' },
-            ].map(({ format, label, desc }) => (
-              <a
-                key={format}
-                href={`/api/export?format=${format}`}
-                className="group flex items-center justify-between p-5 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] transition-all"
-                style={{ background: 'rgba(13,13,22,0.1)' }}
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium leading-none group-hover:text-[var(--accent)] transition-colors">{label}</p>
-                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-tight font-mono">{desc}</p>
-                </div>
-                <Download size={16} className="text-[var(--text-tertiary)] opacity-40 group-hover:opacity-100 transition-opacity" />
-              </a>
-            ))}
-          </div>
-        </section>
-
-        {/* 10. Account */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-              <KeyRound size={20} strokeWidth={1.5} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Security & Auth</h2>
-              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">Manage your core authentication and session security.</p>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)]" style={{ background: 'rgba(13,13,22,0.2)' }}>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">Primary Email</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="input cursor-not-allowed opacity-60 font-mono"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/40"></div>
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-emerald-500/80">Verified</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 11. Danger Zone */}
-        <section className="pt-8">
-          <div className="p-8 rounded-3xl border border-red-500/20 bg-red-500/5 space-y-8 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-              <Trash2 size={120} />
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 shadow-sm border border-red-500/20">
-                <Trash2 size={20} strokeWidth={1.5} />
-              </div>
-              <div>
-                <h2 className="text-lg font-medium tracking-tight text-red-500">Danger Zone</h2>
-                <p className="text-xs text-red-500/60 mt-0.5 font-medium">Irreversible actions regarding your identity and data.</p>
-              </div>
-            </div>
-
-            {/* Memory Wipe */}
-            {!showResetConfirm ? (
-              <div className="flex items-center justify-between gap-6 p-6 rounded-2xl bg-black/20 border border-white/5 mt-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold">Reset All Data</h3>
-                  <p className="text-xs text-[var(--text-tertiary)] leading-relaxed max-w-sm">
-                    This will wipe all log entries, entities, and video uploads. Your profile and settings will remain.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="px-6 py-2.5 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/30 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all shadow-xl shadow-amber-500/5 active:scale-95 whitespace-nowrap"
-                >
-                  Initiate Reset
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4 p-6 rounded-2xl bg-black/40 border border-amber-500/20 animate-in fade-in slide-in-from-bottom-2 mt-4">
-                <p className="text-xs font-medium text-amber-500/80 uppercase tracking-widest flex items-center gap-2 mb-2">
-                  <AlertTriangle size={14} /> Critical Confirmation Required
-                </p>
-                <p className="text-sm">
-                  Please type <span className="font-mono text-white bg-white/10 px-2 py-0.5 rounded border border-white/5">RESET</span> to confirm total memory wipe.
-                </p>
-                <input
-                  type="text"
-                  value={resetConfirmText}
-                  onChange={(e) => setResetConfirmText(e.target.value)}
-                  className="input border-amber-500/30 focus:border-amber-500 text-amber-500 font-mono"
-                  placeholder="Type RESET"
-                  autoFocus
-                />
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={handleReset}
-                    disabled={resetConfirmText !== 'RESET' || resetting}
-                    className="flex-1 px-6 py-3 rounded-xl bg-amber-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-amber-500/20 active:scale-95"
-                  >
-                    {resetting ? 'Wiping Intelligence...' : 'Confirm System Reset'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowResetConfirm(false)
-                      setResetConfirmText('')
-                    }}
-                    className="px-6 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-xs font-bold uppercase tracking-widest hover:bg-[var(--bg-tertiary)] transition-all"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Delete Account */}
-          </div>
-        </section>
-      </div>
-    </main>
+        <div style={{ marginBottom: 14 }}>
+          <Label>TYPE "DELETE MY ACCOUNT" TO CONFIRM</Label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={e => setConfirmText(e.target.value)}
+            placeholder="DELETE MY ACCOUNT"
+            style={{
+              width: 280, background: C.bgRaised, border: `1px solid ${C.red}44`,
+              color: C.textPrimary, fontSize: 11, padding: '9px 12px',
+              outline: 'none', fontFamily: "'JetBrains Mono', monospace",
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+        <button
+          onClick={handleDeleteAccount}
+          disabled={confirmText !== 'DELETE MY ACCOUNT' || deleting}
+          style={{
+            background: confirmText === 'DELETE MY ACCOUNT' ? C.red : `${C.red}22`,
+            border: `1px solid ${C.red}`,
+            color: confirmText === 'DELETE MY ACCOUNT' ? '#fff' : C.textDim,
+            fontSize: 10, letterSpacing: 2,
+            padding: '8px 22px', cursor: 'pointer',
+            fontFamily: "'JetBrains Mono', monospace",
+            opacity: deleting ? 0.6 : 1,
+            transition: 'all 0.15s',
+          }}
+        >
+          {deleting ? 'DELETING…' : 'DELETE ACCOUNT'}
+        </button>
+      </Section>
+    </div>
   )
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function SettingsPage() {
+  const [tab, setTab] = useState<SettingsTab>('profile')
+
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: 'profile',  label: 'PROFILE' },
+    { id: 'api',      label: 'API' },
+    { id: 'storage',  label: 'STORAGE' },
+    { id: 'danger',   label: 'DANGER' },
+  ]
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{
+        padding: '22px 40px 0',
+        borderBottom: `1px solid ${C.border}`,
+        flexShrink: 0,
+      }}>
+        <div style={{
+          fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700,
+          color: C.textPrimary, marginBottom: 18,
+        }}>
+          Settings
+        </div>
+        <div style={{ display: 'flex', gap: 0 }}>
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                background: 'none', border: 'none',
+                borderBottom: tab === t.id ? `2px solid ${C.amber}` : '2px solid transparent',
+                color: tab === t.id ? C.amberBright : C.textDim,
+                fontSize: 10, letterSpacing: 2, padding: '0 16px 11px',
+                transition: 'all 0.12s',
+                cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', maxWidth: 600 }}>
+        {tab === 'profile' && <ProfileTab />}
+        {tab === 'api'     && <ApiTab />}
+        {tab === 'storage' && <StorageTab />}
+        {tab === 'danger'  && <DangerTab />}
+      </div>
+    </div>
+  )
+}

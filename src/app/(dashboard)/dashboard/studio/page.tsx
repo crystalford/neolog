@@ -2,393 +2,726 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { 
-  Sparkles, Zap, ArrowRight, BookOpen, X, Film, 
-  Brain, Cpu, MessageSquare, History, ChevronRight,
-  Radio, Terminal, Target, Activity, Database, Layout, Share2, Loader2, Play
-} from 'lucide-react'
-import Link from 'next/link'
+import type { VideoUpload, VideoAnalysis } from '@/types/database'
 
-interface EditorialTopic {
-  topic_title: string
-  hook: string
-  angle: string
-  required_elements: string[]
-  script_status: string
+const C = {
+  bg:           '#070706',
+  bgSurface:    '#0e0d0b',
+  bgRaised:     '#141210',
+  border:       '#1e1b16',
+  borderBright: '#2c2820',
+  amber:        '#C8902A',
+  amberDim:     '#7a5618',
+  amberBright:  '#E8A840',
+  amberGlow:    'rgba(200,144,42,0.09)',
+  amberGlowMid: 'rgba(200,144,42,0.15)',
+  textPrimary:  '#EDE3CC',
+  textSecond:   '#9A8E78',
+  textDim:      '#5A5040',
+  textDimmer:   '#2e2820',
+  green:        '#4A8A60',
+  blue:         '#4870A8',
+  red:          '#8A4040',
 }
 
-function ScriptModal({ script, onClose }: { script: { topic: string, content: string }; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-3xl animate-in fade-in duration-300">
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-light)] w-full max-w-4xl max-h-[85vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="p-8 border-b border-[var(--border-light)] flex items-center justify-between bg-white/[0.02]">
-           <div>
-             <h2 className="text-xl font-bold tracking-tight uppercase italic">{script.topic}</h2>
-             <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--text-tertiary)]">Drafted Script // Neural Protocol 0.8</p>
-           </div>
-           <button onClick={onClose} className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-[var(--text-tertiary)] hover:text-white transition-all">
-             <X size={20} />
-           </button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-12 font-serif text-xl leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-white">
-           {script.content}
-        </div>
+type Screen = 'sessions' | 'debrief' | 'style' | 'script' | 'produce' | 'review'
 
-        <div className="p-10 border-t border-[var(--border-light)] flex items-center gap-4 bg-white/[0.02]">
-           <button 
-             onClick={() => {
-               navigator.clipboard.writeText(script.content)
-             }}
-             className="flex-1 py-5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-2xl font-mono text-xs uppercase tracking-[0.2em] font-bold transition-all shadow-xl shadow-[var(--accent)]/30 flex items-center justify-center gap-3"
-           >
-              Copy Production Artifact
-           </button>
-        </div>
-      </div>
+function Tag({ children, color = C.amber }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span style={{
+      fontSize: 9, letterSpacing: 2, color,
+      background: `${color}12`, border: `1px solid ${color}25`,
+      padding: '2px 8px', borderRadius: 2,
+      textTransform: 'uppercase', whiteSpace: 'nowrap', fontWeight: 500,
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 9, letterSpacing: 3, color: C.amberDim, textTransform: 'uppercase' }}>
+      {children}
     </div>
   )
 }
 
-function ProductionEngineVisualization() {
-  const stages = [
-    { id: 'signal', label: 'Raw Signal', icon: Radio, status: 'Active', pulse: true },
-    { id: 'synthesis', label: 'Cognitive Synthesis', icon: Brain, status: 'Processing', pulse: true },
-    { id: 'scripting', label: 'Narrative Scripting', icon: Terminal, status: 'Standby', pulse: false },
-    { id: 'assembly', label: 'Neural Assembly', icon: Activity, status: 'Standby', pulse: false },
-    { id: 'distribution', label: 'Protocol Export', icon: Share2, status: 'Standby', pulse: false },
-  ]
-
+function Btn({ children, onClick, primary, small }: {
+  children: React.ReactNode
+  onClick?: () => void
+  primary?: boolean
+  small?: boolean
+}) {
   return (
-    <section className="p-10 rounded-[3rem] bg-[var(--bg-card)] border border-[var(--border-light)] shadow-2xl relative overflow-hidden group">
-       <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/5 to-transparent pointer-events-none" />
-       
-       <div className="flex items-center gap-4 mb-12 relative z-10">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]" />
-          <span className="text-[10px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--accent)]">Production Engine Topology</span>
-       </div>
-
-       <div className="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10">
-          {stages.map((stage, idx) => (
-            <div key={stage.id} className="flex flex-col lg:flex-row items-center gap-8 flex-1">
-               <div className="flex flex-col items-center gap-4 group/node">
-                  <div className={`w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] border ${stage.status !== 'Standby' ? 'border-[var(--accent)]/40' : 'border-[var(--border-light)]'} flex items-center justify-center relative transition-all duration-500 group-hover/node:scale-110`}>
-                     <stage.icon size={24} className={stage.status !== 'Standby' ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] opacity-30'} />
-                     {stage.pulse && (
-                       <div className="absolute inset-0 rounded-2xl border border-[var(--accent)] animate-ping opacity-20" />
-                     )}
-                     {stage.status === 'Processing' && (
-                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-[var(--bg-card)] animate-pulse" />
-                     )}
-                  </div>
-                  <div className="text-center">
-                     <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-primary)]">{stage.label}</p>
-                     <p className={`text-[8px] font-mono uppercase tracking-[0.2em] mt-1 ${stage.status === 'Active' ? 'text-emerald-500' : stage.status === 'Processing' ? 'text-amber-500' : 'text-[var(--text-tertiary)] opacity-40'}`}>
-                        {stage.status}
-                     </p>
-                  </div>
-               </div>
-
-               {idx < stages.length - 1 && (
-                 <div className="hidden lg:flex items-center gap-2 opacity-20 flex-1">
-                    <div className="h-[2px] w-full bg-gradient-to-r from-[var(--border-light)] to-transparent rounded-full" />
-                    <ChevronRight size={14} className="text-[var(--text-tertiary)]" />
-                 </div>
-               )}
-            </div>
-          ))}
-       </div>
-
-       {/* Engine Specs */}
-       <div className="mt-12 pt-8 border-t border-[var(--border-light)]/50 grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-             <p className="text-[8px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">Signal Buffers</p>
-             <p className="text-xs font-bold text-[var(--text-secondary)]">24 Active Manifolds</p>
-          </div>
-          <div>
-             <p className="text-[8px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">Synthesis Latency</p>
-             <p className="text-xs font-bold text-[var(--text-secondary)]">420ms // P99</p>
-          </div>
-          <div>
-             <p className="text-[8px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1">Assembly Queue</p>
-             <p className="text-xs font-bold text-[var(--text-secondary)]">3 Productions Pending</p>
-          </div>
-          <div className="text-right">
-             <span className="text-[10px] font-mono font-black uppercase tracking-[0.3em] text-[var(--accent)]">System_Optimal</span>
-          </div>
-       </div>
-    </section>
+    <button onClick={onClick} style={{
+      background: primary ? C.amber : 'none',
+      border: `1px solid ${primary ? C.amber : C.borderBright}`,
+      color: primary ? C.bg : C.textSecond,
+      fontSize: small ? 9 : 10, letterSpacing: 2,
+      fontWeight: primary ? 700 : 400,
+      padding: small ? '4px 10px' : '8px 18px',
+      transition: 'all 0.12s', whiteSpace: 'nowrap',
+      cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+    }}>
+      {children}
+    </button>
   )
 }
 
-function EditorialBoardSection({ topics, onRefresh, refreshing, onDraft, drafting }: { topics: EditorialTopic[]; onRefresh: () => void; refreshing: boolean; onDraft: (topic: EditorialTopic) => void; drafting: string | null }) {
-  if (!topics || topics.length === 0) return (
-    <div className="rounded-[3rem] border-2 border-dashed border-[var(--border-light)] p-24 text-center bg-[var(--bg-card)]/30 backdrop-blur-3xl">
-       <div className="w-20 h-20 rounded-[2rem] bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mx-auto mb-8 border border-[var(--accent)]/20 shadow-2xl">
-          <Sparkles size={40} />
-       </div>
-       <h3 className="text-2xl font-black italic tracking-tight mb-4">Board Latency Detected</h3>
-       <p className="text-sm text-[var(--text-tertiary)] max-w-sm mx-auto mb-10 font-light leading-relaxed uppercase tracking-widest">Invoke the cognitive protocol to map your latest narrative vectors.</p>
-       <button 
-         onClick={onRefresh} 
-         disabled={refreshing} 
-         className="px-10 py-5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-[11px] font-mono uppercase tracking-[0.3em] font-bold rounded-2xl transition-all shadow-2xl shadow-[var(--accent)]/30 disabled:opacity-50 flex items-center justify-center gap-3 mx-auto"
-       >
-         {refreshing ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
-         {refreshing ? 'Triggering Synthesis...' : 'Invoke Editorial Protocol'}
-       </button>
-    </div>
-  )
+// ── Sub-screen: Sessions ─────────────────────────────────────────────────────
 
-  return (
-    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-      <div className="flex items-center justify-between border-b border-[var(--border-light)] pb-8">
-        <div className="flex items-center gap-6">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-[var(--accent)]/20 to-transparent border border-[var(--accent)]/20 text-[var(--accent)] shadow-xl"><Database size={28} /></div>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-               <span className="text-[10px] font-mono font-bold uppercase tracking-[0.3em] text-[var(--accent)]">Active Manifolds</span>
-               <div className="w-1 h-3 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <h2 className="text-3xl font-black tracking-tighter uppercase italic">Board Directives</h2>
-          </div>
-        </div>
-        <button 
-          onClick={onRefresh} 
-          disabled={refreshing}
-          className="px-8 py-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-light)] hover:border-[var(--accent)]/40 text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all flex items-center gap-4 group disabled:opacity-50 shadow-sm"
-        >
-           {refreshing ? <Loader2 className="animate-spin" size={14} /> : <RotateCcw size={14} />}
-           {refreshing ? 'Synthesizing...' : 'Refresh Matrix'} 
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
-        {topics.map((topic, i) => (
-          <div key={i} className="group relative bg-[var(--bg-card)]/50 backdrop-blur-2xl border border-[var(--border-light)] hover:border-[var(--accent)]/40 rounded-[3rem] p-12 transition-all duration-700 hover:shadow-[0_0_60px_rgba(124,106,245,0.05)] flex flex-col">
-            <div className="absolute top-0 right-12 w-24 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            
-            <div className="space-y-8 flex-1 relative z-10">
-              <div className="flex items-center justify-between mb-2">
-                 <span className="text-[10px] font-mono text-[var(--accent)] font-bold tracking-[0.3em] uppercase">Topic_Vector_{i+1}</span>
-                 <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[8px] font-mono font-bold text-[var(--text-tertiary)] uppercase whitespace-nowrap">
-                    Ready for Draft
-                 </div>
-              </div>
-
-              <h3 className="text-3xl font-bold leading-tight tracking-tight uppercase italic group-hover:text-[var(--accent)] transition-colors duration-500">{topic.topic_title}</h3>
-              
-              <div className="relative">
-                <div className="absolute -left-6 top-1 bottom-1 w-[2px] bg-[var(--accent)]/20 rounded-full group-hover:bg-[var(--accent)]/60 transition-colors" />
-                <p className="text-lg text-[var(--text-secondary)] leading-relaxed font-serif italic pl-4">
-                  "{topic.hook}"
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] font-black flex items-center gap-3">
-                  <Brain size={14} className="opacity-40" /> Cognitive Angle
-                </p>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-light">{topic.angle}</p>
-              </div>
-
-              {topic.required_elements?.length > 0 && (
-                <div className="flex flex-wrap gap-3 pt-6">
-                  {topic.required_elements.map((el, j) => (
-                    <span key={j} className="text-[9px] font-mono font-bold px-4 py-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-light)] text-[var(--text-tertiary)] uppercase tracking-wider group-hover:border-[var(--accent)]/20 transition-all">
-                      {el}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="pt-12 mt-auto relative z-10">
-              <button 
-                onClick={() => onDraft(topic)}
-                disabled={Boolean(drafting)}
-                className="w-full py-6 rounded-2xl bg-[var(--accent)]/5 hover:bg-[var(--accent)] text-[var(--accent)] hover:text-white text-[11px] font-mono uppercase tracking-[0.4em] font-black transition-all duration-700 flex items-center justify-center gap-4 border border-[var(--accent)]/20 hover:border-[var(--accent)] hover:shadow-[0_0_30px_var(--accent)/20] disabled:opacity-30"
-              >
-                {drafting === topic.topic_title ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" /> Drafting Intelligence Artifact...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen size={18} /> Initialize Production Script
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function RotateCcw(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-    </svg>
-  )
-}
-
-export default function StudioPage() {
+function SessionsScreen({ onBegin }: { onBegin: (upload: VideoUpload) => void }) {
   const supabase = createClient()
+  const [uploads, setUploads] = useState<VideoUpload[]>([])
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [drafting, setDrafting] = useState<string | null>(null)
-  const [selectedScript, setSelectedScript] = useState<{ topic: string, content: string } | null>(null)
-  const [editorialTopics, setEditorialTopics] = useState<EditorialTopic[]>([])
 
   useEffect(() => {
-    loadStudioData()
+    async function load() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('video_uploads')
+        .select('id, file_name, created_at, recorded_at, status, duration_seconds, analysis')
+        .eq('user_id', session.user.id)
+        .in('status', ['processed', 'ready'])
+        .order('recorded_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setUploads((data ?? []) as VideoUpload[])
+      setLoading(false)
+    }
+    load()
   }, [])
 
-  const loadStudioData = async () => {
-    setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-
-    const { data: synthesisData } = await supabase
-      .from('user_synthesis')
-      .select('editorial_board')
-      .eq('user_id', session.user.id)
-      .not('editorial_board', 'is', null)
-      .order('synthesized_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (synthesisData) {
-      setEditorialTopics((synthesisData as any).editorial_board || [])
-    }
-    setLoading(false)
+  const getIdeasCount = (u: VideoUpload) => {
+    const a = u.analysis as VideoAnalysis | null
+    return (a?.content_ideas?.length ?? 0) + (a?.strong_opinions?.length ?? 0)
   }
 
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    try {
-      const res = await fetch('/api/synthesize-graph', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to trigger synthesis')
-      console.log('Synthesis queued')
-      alert('Cognitive synthesis protocol initiated. Please wait for signal integration.')
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message)
-    } finally {
-      setTimeout(() => setRefreshing(false), 3000)
-    }
+  const formatDate = (ts: string) => {
+    const d = new Date(ts)
+    const now = new Date()
+    const days = Math.floor((now.getTime() - d.getTime()) / 86400000)
+    if (days === 0) return `Today · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    if (days === 1) return 'Yesterday'
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const handleDraftScript = async (topic: EditorialTopic) => {
-    setDrafting(topic.topic_title)
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px' }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 3 }}>
+        Ready to produce
+      </div>
+      <div style={{ fontSize: 12, color: C.textSecond, marginBottom: 26 }}>
+        Select a session to begin the production flow.
+      </div>
+      {loading ? (
+        <div style={{ fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
+      ) : uploads.length === 0 ? (
+        <div style={{ fontSize: 11, color: C.textDimmer }}>
+          No processed sessions yet. Upload a vlog and wait for analysis to complete.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {uploads.map(u => {
+            const title = (u.analysis as any)?.title ?? u.file_name?.replace(/\.[^.]+$/, '') ?? 'Untitled'
+            const ideas = getIdeasCount(u)
+            return (
+              <div
+                key={u.id}
+                style={{
+                  padding: '16px 20px', background: C.bgSurface,
+                  border: `1px solid ${C.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  transition: 'all 0.12s', cursor: 'pointer',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = C.amber)}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = C.border)}
+              >
+                <div>
+                  <div style={{ fontSize: 13, color: C.textPrimary, marginBottom: 4 }}>{title}</div>
+                  <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1 }}>
+                    {formatDate(u.recorded_at ?? u.created_at)}
+                    {ideas > 0 && ` · ${ideas} ideas surfaced`}
+                  </div>
+                </div>
+                <Btn primary small onClick={() => onBegin(u)}>BEGIN →</Btn>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sub-screen: Debrief ──────────────────────────────────────────────────────
+
+type Message = { role: 'user' | 'assistant'; content: string }
+
+function DebriefScreen({
+  upload,
+  onContinue,
+}: {
+  upload: VideoUpload | null
+  onContinue: () => void
+}) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const [started, setStarted] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const analysis = upload?.analysis as VideoAnalysis | null
+
+  const startDebrief = async () => {
+    if (!upload || started) return
+    setStarted(true)
+    setStreaming(true)
+
+    // Build a synthetic opening from the extracted data
+    const ideas = analysis?.content_ideas?.slice(0, 3) ?? []
+    const opinions = analysis?.strong_opinions?.slice(0, 2) ?? []
+    const keyWin = analysis?.key_win ?? ''
+    const quotes = (analysis?.key_quotes ?? []) as string[]
+
+    const topIdea = ideas[0]
+    const topIdeaText = topIdea ? (typeof topIdea === 'object' ? (topIdea as any).topic : String(topIdea)) : null
+
+    const opener = topIdeaText
+      ? `${upload.analysis ? '1 session' : 'Your vlogs'}, one idea kept coming up. Here's the one worth making this week:\n\n**${topIdeaText}**\n\n${keyWin ? `You said: "${keyWin}"` : ''}\n\n${quotes[0] ? `The pull quote: "${quotes[0]}"` : ''}\n\nIs this the one, or is there something else you'd rather develop?`
+      : `I've gone through your session. ${keyWin ? `The strongest signal: "${keyWin}"` : 'A few things worth developing.'} What do you want to make this week?`
+
+    setMessages([{ role: 'assistant', content: opener }])
+    setStreaming(false)
+  }
+
+  useEffect(() => {
+    if (upload && !started) startDebrief()
+  }, [upload])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const sendMessage = async () => {
+    if (!input.trim() || streaming) return
+    const userMsg = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }])
+    setStreaming(true)
+
     try {
-      const res = await fetch('/api/editorial/generate-script', {
+      const res = await fetch('/api/debrief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(topic)
+        body: JSON.stringify({
+          upload_id: upload?.id,
+          messages: [...messages, { role: 'user', content: userMsg }],
+        }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to generate script')
-      setSelectedScript({ topic: topic.topic_title, content: data.script })
-    } catch (err: any) {
-      console.error(err)
-      alert(err.message)
+      if (!res.ok || !res.body) throw new Error('API error')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let assistantText = ''
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        assistantText += decoder.decode(value, { stream: true })
+        setMessages(prev => [
+          ...prev.slice(0, -1),
+          { role: 'assistant', content: assistantText },
+        ])
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Try again.' }])
     } finally {
-      setDrafting(null)
+      setStreaming(false)
     }
   }
 
-  if (loading) {
+  const ideas = analysis?.content_ideas?.slice(0, 3) ?? []
+
+  return (
+    <div style={{ height: '100%', display: 'flex' }}>
+      {/* Idea cards sidebar */}
+      <div style={{
+        width: 270, borderRight: `1px solid ${C.border}`,
+        padding: '18px', overflowY: 'auto', flexShrink: 0,
+        background: C.bgSurface,
+      }}>
+        <Label>IDEAS SURFACED{ideas.length > 0 ? ` — ${ideas.length}` : ''}</Label>
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {ideas.map((idea, i) => {
+            const text = typeof idea === 'object' ? (idea as any).topic : String(idea)
+            const format = typeof idea === 'object' ? (idea as any).format : 'content'
+            return (
+              <div key={i} style={{
+                padding: '11px 13px', border: `1px solid ${C.border}`,
+                background: C.bgRaised,
+              }}>
+                <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+                  <Tag color={C.amber}>{format?.toUpperCase() ?? 'IDEA'}</Tag>
+                </div>
+                <div style={{
+                  fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 600,
+                  color: C.textPrimary, lineHeight: 1.3, marginBottom: 4,
+                }}>
+                  {text}
+                </div>
+              </div>
+            )
+          })}
+          {analysis?.strong_opinions?.slice(0, 2).map((op, i) => (
+            <div key={`op-${i}`} style={{
+              padding: '11px 13px', border: `1px solid ${C.border}`, background: C.bgRaised,
+            }}>
+              <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+                <Tag color={C.blue}>OPINION</Tag>
+              </div>
+              <div style={{ fontSize: 11, color: C.textSecond, lineHeight: 1.4 }}>{op}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Chat area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, padding: '22px 26px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 540 }}>
+            {messages.map((m, i) => (
+              <div key={i} style={{ display: 'flex', gap: 11 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: m.role === 'assistant' ? C.amberGlow : C.bgRaised,
+                  border: `1px solid ${m.role === 'assistant' ? C.amberDim : C.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 8, color: m.role === 'assistant' ? C.amber : C.textSecond,
+                  marginTop: 2,
+                }}>
+                  {m.role === 'assistant' ? 'NL' : 'C'}
+                </div>
+                <div style={{
+                  fontSize: 12, lineHeight: 1.75, color: C.textPrimary, paddingTop: 2,
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {m.content}
+                  {streaming && i === messages.length - 1 && m.role === 'assistant' && (
+                    <span style={{ opacity: 0.5, animation: 'pulse 1s infinite' }}>▊</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        </div>
+
+        <div style={{ padding: '11px 26px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 7 }}>
+          <Btn primary onClick={onContinue}>SET VISUAL STYLE →</Btn>
+          <Btn>DIFFERENT IDEA</Btn>
+        </div>
+        <div style={{ padding: '9px 26px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 7 }}>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            placeholder="Ask about an idea or refine the angle…"
+            style={{
+              flex: 1, background: C.bgRaised, border: `1px solid ${C.border}`,
+              color: C.textPrimary, fontSize: 11, padding: '8px 12px', outline: 'none',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={streaming}
+            style={{
+              background: C.bgRaised, border: `1px solid ${C.border}`,
+              color: C.amber, padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            ↵
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Sub-screen: Style ────────────────────────────────────────────────────────
+
+const REGISTER_OPTIONS = [
+  { id: 'dark_atmospheric', label: 'Dark atmospheric', desc: 'High contrast, mist, practical light' },
+  { id: 'observational_doc', label: 'Observational documentary', desc: '16mm grain, natural light' },
+  { id: 'abstract', label: 'Abstract conceptual', desc: 'Metaphor-driven, mood over meaning' },
+  { id: 'mixed', label: 'Mixed registers', desc: 'Cinematic + raw screen capture' },
+]
+
+function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
+  const [reg, setReg] = useState<string | null>(null)
+  const [palette, setPalette] = useState('')
+  const [reference, setReference] = useState('')
+  const [locked, setLocked] = useState(false)
+
+  if (locked) {
     return (
-      <div className="p-16 animate-pulse space-y-16">
-        <div className="h-20 w-[400px] bg-[var(--bg-secondary)] rounded-3xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div className="h-[600px] bg-[var(--bg-secondary)] rounded-[3rem]" />
-          <div className="h-[600px] bg-[var(--bg-secondary)] rounded-[3rem]" />
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 30, color: C.green }}>✓</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>Style locked</div>
+        <div style={{ fontSize: 12, color: C.textSecond }}>Writing script…</div>
+        <div style={{ marginTop: 8 }}>
+          <Btn primary onClick={() => onLock({ register: reg, palette, reference })}>
+            VIEW SCRIPT →
+          </Btn>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] relative font-sans overflow-hidden">
-      {/* Background Ambience */}
-      <div className="absolute top-0 right-0 w-[60%] h-[700px] bg-gradient-to-bl from-[var(--accent)]/5 to-transparent pointer-events-none" />
+    <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px', maxWidth: 600 }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 3 }}>
+        Visual style
+      </div>
+      <div style={{ fontSize: 12, color: C.textSecond, marginBottom: 28 }}>
+        Three questions. Locks the visual world for every generated image.
+      </div>
 
-      <div className="max-w-7xl mx-auto px-10 py-20 space-y-20 relative z-10">
-        
-        {/* Terminal Header */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-12 group">
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-               <div className="p-3 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-indigo-600 text-white shadow-2xl group-hover:rotate-[10deg] transition-transform duration-700">
-                  <Film size={32} />
-               </div>
-               <div className="flex flex-col">
-                  <div className="flex items-center gap-3 mb-1">
-                     <span className="text-[10px] font-mono font-bold uppercase tracking-[0.4em] text-[var(--accent)]">Production Engine Status: Ready</span>
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  </div>
-                  <h1 className="text-5xl lg:text-7xl font-black tracking-tighter uppercase italic">The Studio</h1>
-               </div>
+      {/* Q1: Register */}
+      <div style={{ marginBottom: 24 }}>
+        <Label>01 — REGISTER</Label>
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {REGISTER_OPTIONS.map(o => (
+            <div
+              key={o.id}
+              onClick={() => setReg(o.id)}
+              style={{
+                padding: '11px 14px',
+                border: `1px solid ${reg === o.id ? C.amber : C.border}`,
+                background: reg === o.id ? C.amberGlow : C.bgSurface,
+                cursor: 'pointer', transition: 'all 0.12s',
+              }}
+            >
+              <div style={{ fontSize: 12, color: C.textPrimary, marginBottom: 2 }}>{o.label}</div>
+              <div style={{ fontSize: 10, color: C.textDim }}>{o.desc}</div>
             </div>
-            <p className="text-lg lg:text-xl text-[var(--text-secondary)] font-light max-w-2xl leading-relaxed">
-               Where raw intellectual data is synthesized into cinematic narrative artifacts. <br /> Initialize your <span className="text-[var(--text-primary)] font-bold italic underline decoration-[var(--accent)]/30 underline-offset-8">Production Logic</span> below.
-            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* Q2: Colour anchor */}
+      {reg && (
+        <div style={{ marginBottom: 24 }}>
+          <Label>02 — COLOUR ANCHOR</Label>
+          <div style={{ fontSize: 9, color: C.textDim, marginTop: 7, marginBottom: 9 }}>
+            One sentence · e.g. "amber on black"
           </div>
-
-          <div className="flex items-center gap-10">
-             <div className="text-right space-y-1">
-                <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-tertiary)] opacity-60">Engine Load</p>
-                <div className="flex justify-end gap-1">
-                   {[1,2,3,4,5,6,7].map(i => (
-                     <div key={i} className={`h-4 w-1 rounded-sm ${i < 4 ? 'bg-emerald-500/40' : 'bg-white/5'}`} />
-                   ))}
-                </div>
-             </div>
-             <button className="px-8 py-4 rounded-2xl bg-black text-white text-[11px] font-mono font-bold uppercase tracking-widest border border-white/10 hover:border-white/30 transition-all shadow-2xl">
-               System Prefs
-             </button>
-          </div>
-        </header>
-
-        {/* Engine Visualization */}
-        <ProductionEngineVisualization />
-
-        {/* Editorial Board */}
-        <EditorialBoardSection 
-          topics={editorialTopics} 
-          onRefresh={handleRefresh} 
-          refreshing={refreshing} 
-          onDraft={handleDraftScript}
-          drafting={drafting}
-        />
-
-        {selectedScript && (
-          <ScriptModal 
-            script={selectedScript} 
-            onClose={() => setSelectedScript(null)} 
+          <input
+            value={palette}
+            onChange={e => setPalette(e.target.value)}
+            placeholder="Your colour anchor…"
+            style={{
+              width: '100%', background: C.bgRaised, border: `1px solid ${C.border}`,
+              color: C.textPrimary, fontSize: 13, padding: '10px 13px', outline: 'none',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
           />
-        )}
+        </div>
+      )}
 
+      {/* Q3: Reference (optional) */}
+      {reg && palette.length > 3 && (
+        <div style={{ marginBottom: 24 }}>
+          <Label>03 — REFERENCE (OPTIONAL)</Label>
+          <div style={{ fontSize: 9, color: C.textDim, marginTop: 7, marginBottom: 9 }}>
+            Describe one image that lives in the world of this piece.
+          </div>
+          <input
+            value={reference}
+            onChange={e => setReference(e.target.value)}
+            placeholder="A film still, a memory, a scene… or leave blank."
+            style={{
+              width: '100%', background: C.bgRaised, border: `1px solid ${C.border}`,
+              color: C.textPrimary, fontSize: 13, padding: '10px 13px', outline: 'none',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Style card preview + lock */}
+      {reg && palette.length > 3 && (
+        <div>
+          <div style={{ padding: 16, border: `1px solid ${C.amberDim}`, background: C.amberGlow, marginBottom: 18 }}>
+            <Label>STYLE CARD</Label>
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                ['register', reg],
+                ['palette', palette],
+                ['film_stock', '16mm Ektachrome pushed two stops'],
+                ['lens', '35mm prime f/2, shallow depth of field'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', gap: 12, fontSize: 10 }}>
+                  <div style={{ color: C.textDim, width: 80, flexShrink: 0, letterSpacing: 1 }}>{k}</div>
+                  <div style={{ color: C.textSecond }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <Btn primary onClick={() => setLocked(true)}>LOCK + WRITE SCRIPT →</Btn>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Sub-screen: Script (placeholder — script is generated async) ──────────────
+
+function ScriptScreen({ onApprove }: { onApprove: () => void }) {
+  return (
+    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 2 }}>SCRIPT GENERATION</div>
+      <div style={{ fontSize: 12, color: C.textSecond, maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>
+        Script generation via Claude Opus runs as a background job. This screen will show the full segment browser once ready.
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <Btn primary onClick={onApprove}>APPROVE + PRODUCE →</Btn>
+      </div>
+    </div>
+  )
+}
+
+// ── Sub-screen: Produce ──────────────────────────────────────────────────────
+
+const PIPELINE_STAGES = [
+  { label: 'Voice synthesis', sub: 'ElevenLabs · voice clone' },
+  { label: 'Music generation', sub: 'Suno · custom track' },
+  { label: 'Image generation', sub: 'FLUX 2 Pro · start + end frames' },
+  { label: 'Video generation', sub: 'Kling 3.0 Pro · first+last frame' },
+  { label: 'Assembly + captions', sub: 'FFmpeg · multi-ratio output' },
+]
+
+function ProduceScreen({ onPreview }: { onPreview: () => void }) {
+  const [stage, setStage] = useState(0)
+
+  useEffect(() => {
+    if (stage >= PIPELINE_STAGES.length) return
+    const t = setTimeout(() => setStage(s => s + 1), 2000)
+    return () => clearTimeout(t)
+  }, [stage])
+
+  const pct = Math.round((stage / PIPELINE_STAGES.length) * 100)
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px', maxWidth: 600 }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 3 }}>
+        Producing
+      </div>
+      <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, marginBottom: 32 }}>
+        est. 8–12 min · estimated cost shown before billing
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 2, background: C.bgRaised, marginBottom: 32, borderRadius: 2 }}>
+        <div style={{
+          height: '100%', width: `${pct}%`,
+          background: C.amber, borderRadius: 2,
+          transition: 'width 0.5s',
+        }} />
+      </div>
+
+      {/* Stage list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 28 }}>
+        {PIPELINE_STAGES.map((p, i) => {
+          const status = i < stage ? 'done' : i === stage ? 'active' : 'pending'
+          return (
+            <div key={i} style={{
+              padding: '14px 18px',
+              border: `1px solid ${status === 'active' ? C.amberDim : C.border}`,
+              background: status === 'active' ? C.amberGlow : C.bgSurface,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <div style={{
+                  width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: status === 'done' ? C.green : status === 'active' ? C.amber : C.textDimmer,
+                  animation: status === 'active' ? 'pulse 2s ease-in-out infinite' : 'none',
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: status === 'pending' ? C.textDim : C.textPrimary }}>
+                    {p.label}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, letterSpacing: 1 }}>{p.sub}</div>
+                </div>
+                {status === 'done' && <span style={{ fontSize: 10, color: C.green }}>✓</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <Btn onClick={onPreview}>PREVIEW →</Btn>
+    </div>
+  )
+}
+
+// ── Sub-screen: Review ───────────────────────────────────────────────────────
+
+type Platform = 'youtube' | 'tiktok' | 'instagram' | 'x'
+
+const PLATFORM_SPECS: Record<Platform, string> = {
+  youtube:   'YouTube · 16:9 · up to 15 min',
+  tiktok:    'TikTok · 9:16 · up to 3 min',
+  instagram: 'Instagram · 9:16 · up to 60s',
+  x:         'X · 16:9 · up to 2:20',
+}
+
+function ReviewScreen() {
+  const [plat, setPlat] = useState<Platform>('youtube')
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px' }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 24 }}>
+        Review & publish
+      </div>
+      <div style={{ display: 'flex', gap: 44 }}>
+        {/* Preview area */}
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
+            {(Object.keys(PLATFORM_SPECS) as Platform[]).map(p => (
+              <button key={p} onClick={() => setPlat(p)} style={{
+                background: plat === p ? C.amberGlow : 'none',
+                border: `1px solid ${plat === p ? C.amber : C.border}`,
+                color: plat === p ? C.amberBright : C.textDim,
+                fontSize: 9, letterSpacing: 2, padding: '4px 10px',
+                cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {p.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div style={{
+            width: '100%',
+            maxWidth: (plat === 'youtube' || plat === 'x') ? 420 : 230,
+            aspectRatio: (plat === 'youtube' || plat === 'x') ? '16/9' : '9/16',
+            background: C.bgRaised, border: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 9, color: C.textDim, marginBottom: 8,
+          }}>
+            <div style={{ fontSize: 20, color: C.textDimmer }}>▶</div>
+            <div style={{ fontSize: 8, letterSpacing: 2 }}>VIDEO READY</div>
+          </div>
+          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>{PLATFORM_SPECS[plat]}</div>
+        </div>
+
+        {/* Publish panel */}
+        <div style={{ width: 250, flexShrink: 0 }}>
+          <Label>PUBLISH</Label>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 14 }}>
+            {[
+              { p: 'YouTube', selected: true },
+              { p: 'TikTok', selected: true },
+              { p: 'X', selected: false },
+            ].map((item, i) => (
+              <div key={i} style={{
+                padding: '10px 13px', border: `1px solid ${C.border}`,
+                background: C.bgSurface, display: 'flex', alignItems: 'center', gap: 9,
+              }}>
+                <div style={{
+                  width: 14, height: 14,
+                  border: `1px solid ${item.selected ? C.amber : C.border}`,
+                  background: item.selected ? C.amberGlow : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 8, color: C.amber,
+                }}>
+                  {item.selected ? '✓' : ''}
+                </div>
+                <div style={{ fontSize: 11, color: C.textPrimary }}>{item.p}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <Btn primary>PUBLISH ALL →</Btn>
+            <Btn>DOWNLOAD</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Studio Page ─────────────────────────────────────────────────────────
+
+const SUB_NAV: Array<{ id: Screen; label: string }> = [
+  { id: 'sessions', label: 'Sessions' },
+  { id: 'debrief',  label: 'Debrief'  },
+  { id: 'style',    label: 'Style'    },
+  { id: 'script',   label: 'Script'   },
+  { id: 'produce',  label: 'Produce'  },
+  { id: 'review',   label: 'Review'   },
+]
+
+export default function StudioPage() {
+  const [screen, setScreen] = useState<Screen>('sessions')
+  const [activeUpload, setActiveUpload] = useState<VideoUpload | null>(null)
+
+  return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Sub-nav */}
+      <div style={{
+        borderBottom: `1px solid ${C.border}`,
+        padding: '0 40px',
+        display: 'flex', alignItems: 'center',
+        height: 46, flexShrink: 0,
+        background: C.bgSurface,
+      }}>
+        <div style={{
+          fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
+          color: C.amber, marginRight: 24,
+        }}>
+          Studio
+        </div>
+        {SUB_NAV.map(s => (
+          <button
+            key={s.id}
+            onClick={() => setScreen(s.id)}
+            style={{
+              background: 'none', border: 'none',
+              borderBottom: screen === s.id ? `2px solid ${C.amber}` : '2px solid transparent',
+              color: screen === s.id ? C.amberBright : C.textDim,
+              fontSize: 10, letterSpacing: 1.5, padding: '0 13px',
+              height: 46, transition: 'all 0.12s', cursor: 'pointer',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Screen content */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {screen === 'sessions' && (
+          <SessionsScreen onBegin={u => { setActiveUpload(u); setScreen('debrief') }} />
+        )}
+        {screen === 'debrief' && (
+          <DebriefScreen upload={activeUpload} onContinue={() => setScreen('style')} />
+        )}
+        {screen === 'style' && (
+          <StyleScreen onLock={() => setScreen('script')} />
+        )}
+        {screen === 'script' && (
+          <ScriptScreen onApprove={() => setScreen('produce')} />
+        )}
+        {screen === 'produce' && (
+          <ProduceScreen onPreview={() => setScreen('review')} />
+        )}
+        {screen === 'review' && <ReviewScreen />}
       </div>
     </div>
   )
