@@ -21,7 +21,7 @@ The legacy writing platform layer (posts, publications, newsletters, ActivityPub
 
 **Intelligence layer (Brain)** — 6-region view at `/dashboard/brain`: Memory, Executive, Emotional, Pattern, Marinating, Conflict. Entities accumulate across sessions. Synthesize Graph button triggers cross-session synthesis. Entity detail pages at `/dashboard/entities/[id]`.
 
-**Studio pipeline** — sessions → debrief (streaming Claude chat, select idea) → style (saved cards) → script (Claude generates segments with narration + visual direction) → produce (polls status) → review. Script generation is fully wired via `produce-studio-video.ts` Inngest function.
+**Studio pipeline** — sessions → debrief → style → script → record (teleprompter, beat by beat) → produce → review. Full pipeline: script via Claude (`produce-studio-video.ts`) → operator records each beat (`RecordScreen.tsx`) → audio assembled via Replicate FFmpeg (`assemble-studio-audio.ts`) → Flux image per segment (`generate-segment-visuals.ts`) → images + audio composited to MP4 (`compose-studio-video.ts`).
 
 **Posts** — post candidates auto-created from analysis (quotes, opinions, observations). X publishing wired at `/api/posts/publish`. Requires X OAuth connected in Settings.
 
@@ -35,30 +35,25 @@ The legacy writing platform layer (posts, publications, newsletters, ActivityPub
 
 ## What we're building next
 
-### 1. Auto-edit from vlogs
-Use transcripts already in the DB to automatically find the best moments across all recordings and cut them into an edited video. No re-recording needed.
-- Source: `video_uploads` transcripts + analysis (key_win, strong_opinions, key_quotes)
-- Find timestamp ranges for best moments using transcript word timing
-- Assemble via Replicate FFmpeg (`assemble-clip.ts` infrastructure exists)
-- Output stored in `productions` table
+### 1. Auto-edit from vlogs ✅ (built — `/dashboard/edit`)
+AI selects best transcript moments → Replicate FFmpeg assembles the MP4. Claude picks timestamps, user reviews plan, then assembles.
 
-### 2. Teleprompter / chunk recording system ✅ (built)
-Script → operator reads each segment aloud in the Record screen → audio assembled via Replicate FFmpeg.
-Next: wire in visual generation (Phase B below) so the assembled audio gets a proper image/video track.
+### 2. Teleprompter / chunk recording + visual production ✅ (built)
+Script → operator records each beat → audio stitched → Flux images per segment → composited to MP4.
+Full production pipeline status flow: `queued → running → scripted → assembling → generating-visuals → composing → done`
 
 ### 3. Production quality tiers
 
-All tiers produce a proper visual video — no "audio only" tier. The difference is what generates the visuals:
+Current implementation is lo-fi: Flux Schnell still images + FFmpeg composition. Next tiers to build:
 
-| Tier | Visuals | Audio | Est. cost |
-|------|---------|-------|-----------|
-| **Lo-fi** | Flux still images + Ken Burns motion | Operator recorded | ~$0.50–$1.50 |
-| **Mid** | Flux images + short Runway/Kling clip per key segment | Operator recorded | ~$2–$5 |
-| **Hi-fi** | Full Runway/Kling video per segment + ElevenLabs TTS option | Operator recorded or TTS | ~$5–$15 |
+| Tier | Visuals | What needs building |
+|------|---------|---------------------|
+| **Lo-fi** ✅ | Flux Schnell stills + static frames | Done |
+| **Mid** | Flux images + short Kling clip on key segments | Kling API integration per segment |
+| **Hi-fi** | Full Kling/Runway video per segment | Per-segment video gen + longer timeouts |
 
-Cost estimate shown before user commits. `productions.estimated_cost_cents` + `productions.user_approved_cost` already in DB schema.
-
-The tier picker goes in Studio between Style and Script (or at the top of Script). Tier affects which segment_assets generation jobs fire after recording completes.
+Cost estimate before commit: `productions.estimated_cost_cents` + `productions.user_approved_cost` in DB schema, not yet wired in UI.
+Tier picker UI not yet built — currently always runs lo-fi path.
 
 ---
 

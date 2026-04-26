@@ -13,6 +13,8 @@ import { scatterScheduler, postDispatcher } from '@/inngest/functions/scatter-sc
 import { produceStudioVideo } from '@/inngest/functions/produce-studio-video'
 import { autoEdit } from '@/inngest/functions/auto-edit'
 import { assembleStudioAudio } from '@/inngest/functions/assemble-studio-audio'
+import { generateSegmentVisuals } from '@/inngest/functions/generate-segment-visuals'
+import { composeStudioVideo } from '@/inngest/functions/compose-studio-video'
 
 export const runtime = 'edge'
 
@@ -33,5 +35,7 @@ export const { GET, POST, PUT } = serve({
     produceStudioVideo,
     autoEdit,
     assembleStudioAudio,
+    generateSegmentVisuals,
+    composeStudioVideo,
   ],
 })

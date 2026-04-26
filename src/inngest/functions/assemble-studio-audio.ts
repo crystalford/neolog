@@ -121,15 +121,20 @@ export const assembleStudioAudio = inngest.createFunction(
       return key
     })
 
-    // ── Step 5: Finalize ──
+    // ── Step 5: Store audio, kick off visual generation ──
     await step.run('finalize', async () => {
       await admin.from('productions').update({
         voiceover_r2_key: r2Key,
-        status: 'done',
+        status: 'generating-visuals',
         updated_at: new Date().toISOString(),
       }).eq('id', production_id)
+
+      await inngest.send({
+        name: 'studio/generate-visuals',
+        data: { production_id, user_id },
+      })
     })
 
-    return { status: 'done', production_id, r2Key, segments: assets.length }
+    return { status: 'generating-visuals', production_id, r2Key, segments: assets.length }
   },
 )

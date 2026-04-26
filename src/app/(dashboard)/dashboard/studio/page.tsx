@@ -690,12 +690,10 @@ function ScriptScreen({
 // ── Sub-screen: Produce ──────────────────────────────────────────────────────
 
 const PIPELINE_STAGES = [
-  { id: 'script',   label: 'Script generation', sub: 'Claude Sonnet · structured script' },
-  { id: 'voice',    label: 'Voice synthesis',   sub: 'ElevenLabs · voice clone' },
-  { id: 'music',    label: 'Music generation',  sub: 'Suno · custom track' },
-  { id: 'images',   label: 'Image generation',  sub: 'FLUX 2 Pro · start + end frames' },
-  { id: 'video',    label: 'Video generation',  sub: 'Kling 3.0 Pro · first+last frame' },
-  { id: 'assemble', label: 'Assembly', sub: 'FFmpeg · multi-ratio output' },
+  { id: 'script',     label: 'Script generation',  sub: 'Claude Sonnet · structured segments' },
+  { id: 'assemble',   label: 'Audio assembly',      sub: 'FFmpeg · stitch recorded beats' },
+  { id: 'visuals',    label: 'Image generation',    sub: 'Flux Schnell · one frame per beat' },
+  { id: 'compose',    label: 'Video composition',   sub: 'FFmpeg · images + audio → MP4' },
 ]
 
 function ProduceScreen({ productionId, onPreview }: { productionId: string | null; onPreview: () => void }) {
@@ -729,9 +727,11 @@ function ProduceScreen({ productionId, onPreview }: { productionId: string | nul
 
   // Map DB status → which stage is active
   const stageIndex = prodStatus === 'queued' ? 0
-    : prodStatus === 'running' ? 1
-    : prodStatus === 'scripted' ? 1   // script done, awaiting recording
-    : prodStatus === 'assembling' ? 2 // audio being stitched
+    : prodStatus === 'running' ? 0
+    : prodStatus === 'scripted' ? 1         // script done, recording complete
+    : prodStatus === 'assembling' ? 1       // audio being stitched
+    : prodStatus === 'generating-visuals' ? 2 // Flux images per segment
+    : prodStatus === 'composing' ? 3        // images + audio → video
     : prodStatus === 'done' ? PIPELINE_STAGES.length
     : 0
   const pct = Math.round((stageIndex / PIPELINE_STAGES.length) * 100)
