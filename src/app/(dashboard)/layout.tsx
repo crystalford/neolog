@@ -28,6 +28,7 @@ const NAV = [
   { id: 'timeline', label: 'Timeline', href: '/dashboard/timeline', icon: '≡' },
   { id: 'posts',    label: 'Posts',    href: '/dashboard/posts',    icon: '↗' },
   { id: 'studio',    label: 'Studio',    href: '/dashboard/studio',    icon: '◈' },
+  { id: 'edit',      label: 'Edit',      href: '/dashboard/edit',      icon: '▤' },
   { id: 'system',    label: 'System',    href: '/dashboard/system',    icon: '⟳' },
   { id: 'settings',  label: 'Settings',  href: '/dashboard/settings',  icon: '⚙' },
 ]
