@@ -12,6 +12,7 @@ import { developIdea } from '@/inngest/functions/develop-idea'
 import { scatterScheduler, postDispatcher } from '@/inngest/functions/scatter-scheduler'
 import { produceStudioVideo } from '@/inngest/functions/produce-studio-video'
 import { autoEdit } from '@/inngest/functions/auto-edit'
+import { assembleStudioAudio } from '@/inngest/functions/assemble-studio-audio'
 
 export const runtime = 'edge'
 
@@ -31,5 +32,6 @@ export const { GET, POST, PUT } = serve({
     postDispatcher,
     produceStudioVideo,
     autoEdit,
+    assembleStudioAudio,
   ],
 })

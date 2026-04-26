@@ -171,14 +171,30 @@ export const produceStudioVideo = inngest.createFunction(
       }).eq('id', script_id)
     })
 
-    // ── Step 4: Mark production done (video assembly is phase 2) ──
+    // ── Step 4: Seed segment_assets (one row per beat) ──
+    await step.run('seed-segment-assets', async () => {
+      const rows = (scriptJson.segments ?? []).map((seg: any) => ({
+        production_id,
+        segment_id: `seg_${seg.order}`,
+        segment_order: seg.order,
+        segment_type: seg.type,
+        narration: seg.narration,
+        planned_duration_seconds: seg.duration_seconds ?? null,
+        status: 'pending',
+      }))
+      if (rows.length > 0) {
+        await admin.from('segment_assets').insert(rows)
+      }
+    })
+
+    // ── Step 5: Mark production 'scripted' — awaiting operator recording ──
     await step.run('finalize', async () => {
       await admin.from('productions').update({
-        status: 'done',
+        status: 'scripted',
         updated_at: new Date().toISOString(),
       }).eq('id', production_id)
     })
 
-    return { status: 'done', production_id, script_id, segments: scriptJson.segments?.length ?? 0 }
+    return { status: 'scripted', production_id, script_id, segments: scriptJson.segments?.length ?? 0 }
   },
 )

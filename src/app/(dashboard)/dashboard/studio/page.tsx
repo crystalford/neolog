@@ -5,6 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { VideoUpload, VideoAnalysis } from '@/types/database'
+import { RecordScreen } from './RecordScreen'
 
 const C = {
   bg:           '#070706',
@@ -26,7 +27,7 @@ const C = {
   red:          '#8A4040',
 }
 
-type Screen = 'sessions' | 'debrief' | 'style' | 'script' | 'produce' | 'review'
+type Screen = 'sessions' | 'debrief' | 'style' | 'script' | 'record' | 'produce' | 'review'
 
 function Tag({ children, color = C.amber }: { children: React.ReactNode; color?: string }) {
   return (
@@ -580,12 +581,12 @@ function ScriptScreen({
   upload: VideoUpload | null
   styleCard: any
   selectedIdea: { text: string; format: string } | null
-  onApprove: (productionId: string) => void
+  onApprove: (productionId: string, status: 'scripted' | 'done') => void
 }) {
   const [phase, setPhase] = useState<'firing' | 'generating' | 'done' | 'error'>('firing')
   const [error, setError] = useState<string | null>(null)
   const [productionId, setProductionId] = useState<string | null>(null)
-  const [scriptData, setScriptData] = useState<{ title?: string; segments?: any[] } | null>(null)
+  const [scriptData, setScriptData] = useState<{ title?: string; segments?: any[]; prodStatus?: string } | null>(null)
 
   useEffect(() => {
     if (!upload) { setError('No session selected.'); setPhase('error'); return }
@@ -609,9 +610,9 @@ function ScriptScreen({
           const r = await fetch(`/api/studio/production-status?id=${production_id}`)
           if (!r.ok || cancelled) continue
           const d = await r.json()
-          if (d.status === 'done' && d.script?.script_json) {
-            const segs = Array.isArray(d.script.script_json) ? d.script.script_json : []
-            setScriptData({ title: d.script.title, segments: segs })
+          if ((d.status === 'done' || d.status === 'scripted') && d.scripts?.script_json) {
+            const segs = Array.isArray(d.scripts.script_json) ? d.scripts.script_json : []
+            setScriptData({ title: d.scripts.title, segments: segs, prodStatus: d.status })
             setPhase('done')
             break
           }
@@ -679,7 +680,9 @@ function ScriptScreen({
           </div>
         ))}
       </div>
-      <Btn primary onClick={() => productionId && onApprove(productionId)}>APPROVE + PRODUCE →</Btn>
+      <Btn primary onClick={() => productionId && onApprove(productionId, scriptData?.prodStatus === 'scripted' ? 'scripted' : 'done')}>
+        {scriptData?.prodStatus === 'scripted' ? 'APPROVE + RECORD →' : 'APPROVE + PRODUCE →'}
+      </Btn>
     </div>
   )
 }
@@ -715,7 +718,7 @@ function ProduceScreen({ productionId, onPreview }: { productionId: string | nul
         if (data) {
           setProdStatus(data.status)
           if (data.error_message) setErrorMsg(data.error_message)
-          if (data.status === 'done' || data.status === 'error') break
+          if (data.status === 'done' || data.status === 'error' || data.status === 'scripted') break
         }
         await new Promise(r => setTimeout(r, 4000))
       }
@@ -727,6 +730,8 @@ function ProduceScreen({ productionId, onPreview }: { productionId: string | nul
   // Map DB status → which stage is active
   const stageIndex = prodStatus === 'queued' ? 0
     : prodStatus === 'running' ? 1
+    : prodStatus === 'scripted' ? 1   // script done, awaiting recording
+    : prodStatus === 'assembling' ? 2 // audio being stitched
     : prodStatus === 'done' ? PIPELINE_STAGES.length
     : 0
   const pct = Math.round((stageIndex / PIPELINE_STAGES.length) * 100)
@@ -788,6 +793,49 @@ function ProduceScreen({ productionId, onPreview }: { productionId: string | nul
   )
 }
 
+// ── Audio download helper ────────────────────────────────────────────────────
+
+function AudioDownloadBtn({ productionId }: { productionId: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleGet = async () => {
+    setLoading(true)
+    const res = await fetch(`/api/studio/download-audio?id=${productionId}`)
+    const data = await res.json()
+    if (data.url) setUrl(data.url)
+    setLoading(false)
+  }
+
+  if (url) {
+    return (
+      <a href={url} download style={{
+        display: 'block', background: C.green, border: `1px solid ${C.green}`,
+        color: '#fff', fontSize: 10, letterSpacing: 2, fontWeight: 700,
+        padding: '8px 18px', textDecoration: 'none', textAlign: 'center',
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        DOWNLOAD AUDIO ↓
+      </a>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleGet}
+      disabled={loading}
+      style={{
+        background: C.green, border: `1px solid ${C.green}`,
+        color: '#fff', fontSize: 10, letterSpacing: 2, fontWeight: 700,
+        padding: '8px 18px', cursor: loading ? 'default' : 'pointer',
+        opacity: loading ? 0.6 : 1, fontFamily: "'JetBrains Mono', monospace",
+      }}
+    >
+      {loading ? 'GETTING LINK…' : 'GET AUDIO →'}
+    </button>
+  )
+}
+
 // ── Sub-screen: Review ───────────────────────────────────────────────────────
 
 function ReviewScreen({ productionId }: { productionId: string | null }) {
@@ -800,7 +848,7 @@ function ReviewScreen({ productionId }: { productionId: string | null }) {
     async function load() {
       const { data } = await supabase
         .from('productions')
-        .select('*, scripts(title, script_json, status)')
+        .select('*, scripts(title, script_json, status), voiceover_r2_key, final_video_r2_keys')
         .eq('id', productionId)
         .single()
       setProduction(data)
@@ -812,6 +860,7 @@ function ReviewScreen({ productionId }: { productionId: string | null }) {
   const script = production?.scripts
   const segments: any[] = Array.isArray(script?.script_json) ? script.script_json : []
   const hasVideo = !!(production?.final_video_r2_keys)
+  const hasAudio = !!(production?.voiceover_r2_key)
 
   if (loading) {
     return (
@@ -860,15 +909,16 @@ function ReviewScreen({ productionId }: { productionId: string | null }) {
           <Label>OUTPUT</Label>
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ padding: '12px 14px', border: `1px solid ${C.border}`, background: C.bgSurface }}>
-              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, marginBottom: 5 }}>VIDEO STATUS</div>
-              <div style={{ fontSize: 11, color: hasVideo ? C.green : C.textDimmer }}>
-                {hasVideo ? '✓ Ready to download' : 'Assembly pending'}
+              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, marginBottom: 5 }}>STATUS</div>
+              <div style={{ fontSize: 11, color: hasVideo ? C.green : hasAudio ? C.green : C.textDimmer }}>
+                {hasVideo ? '✓ Video ready' : hasAudio ? '✓ Audio ready' : 'Assembly pending'}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
+              {hasAudio && <AudioDownloadBtn productionId={production.id} />}
               {hasVideo
-                ? <Btn primary>DOWNLOAD →</Btn>
-                : <Btn>DOWNLOAD (PENDING)</Btn>
+                ? <Btn primary>DOWNLOAD VIDEO →</Btn>
+                : !hasAudio && <Btn>DOWNLOAD (PENDING)</Btn>
               }
             </div>
           </div>
@@ -885,16 +935,25 @@ const SUB_NAV: Array<{ id: Screen; label: string }> = [
   { id: 'debrief',  label: 'Debrief'  },
   { id: 'style',    label: 'Style'    },
   { id: 'script',   label: 'Script'   },
+  { id: 'record',   label: 'Record'   },
   { id: 'produce',  label: 'Produce'  },
   { id: 'review',   label: 'Review'   },
 ]
 
 export default function StudioPage() {
+  const supabase = createClient()
   const [screen, setScreen] = useState<Screen>('sessions')
   const [activeUpload, setActiveUpload] = useState<VideoUpload | null>(null)
   const [selectedIdea, setSelectedIdea] = useState<{ text: string; format: string } | null>(null)
   const [styleCard, setStyleCard] = useState<any>(null)
   const [productionId, setProductionId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string>('')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserId(session.user.id)
+    })
+  }, [])
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -946,7 +1005,18 @@ export default function StudioPage() {
             upload={activeUpload}
             styleCard={styleCard}
             selectedIdea={selectedIdea}
-            onApprove={(pid) => { setProductionId(pid); setScreen('produce') }}
+            onApprove={(pid, status) => {
+              setProductionId(pid)
+              setScreen(status === 'scripted' ? 'record' : 'produce')
+            }}
+          />
+        )}
+        {screen === 'record' && productionId && userId && (
+          <RecordScreen
+            productionId={productionId}
+            userId={userId}
+            onComplete={() => setScreen('produce')}
+            onPause={() => setScreen('script')}
           />
         )}
         {screen === 'produce' && (
