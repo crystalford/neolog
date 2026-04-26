@@ -1020,7 +1020,7 @@ export const processUpload = inngest.createFunction(
           .from('marinating_ideas')
           .select('id, mention_count')
           .eq('user_id', userId)
-          .ilike('idea_text', idea.text.slice(0, 60) + '%')
+          .ilike('idea', idea.text.slice(0, 60) + '%')
           .limit(1)
 
         if (existing && existing.length > 0) {
@@ -1037,7 +1037,7 @@ export const processUpload = inngest.createFunction(
           // New marinating idea
           await admin.from('marinating_ideas').insert({
             user_id: userId,
-            idea_text: idea.text,
+            idea: idea.text,
             format: idea.format,
             source_upload_id: video_upload_id,
             last_upload_id: video_upload_id,
