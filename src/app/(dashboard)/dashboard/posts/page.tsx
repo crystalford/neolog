@@ -93,6 +93,9 @@ export default function PostsPage() {
   const [selVer, setSelVer] = useState(0)
   const [editText, setEditText] = useState('')
   const [loading, setLoading] = useState(true)
+  const [xConnected, setXConnected] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -103,6 +106,7 @@ export default function PostsPage() {
         { data: ready },
         { data: sched },
         { data: pub },
+        { data: xIntegration },
       ] = await Promise.all([
         supabase
           .from('post_candidates')
@@ -123,11 +127,18 @@ export default function PostsPage() {
           .eq('status', 'published')
           .order('published_at', { ascending: false })
           .limit(20),
+        supabase
+          .from('social_integrations')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('platform', 'x')
+          .limit(1),
       ])
 
       setCandidates(ready ?? [])
       setScheduled(sched ?? [])
       setPublished(pub ?? [])
+      setXConnected((xIntegration?.length ?? 0) > 0)
 
       if (ready && ready.length > 0) {
         setSel(ready[0].id)
@@ -153,6 +164,28 @@ export default function PostsPage() {
   const handleSelectVersion = (i: number) => {
     setSelVer(i)
     setEditText(versions[i]?.text ?? '')
+  }
+
+  const handlePublish = async () => {
+    if (!sel || !editText.trim()) return
+    if (!xConnected) { router.push('/dashboard/settings'); return }
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const res = await fetch('/api/posts/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: sel, text: editText.trim(), platform: 'x' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Publish failed')
+      setCandidates(prev => prev.filter(c => c.id !== sel))
+      setSel(candidates.find(c => c.id !== sel)?.id ?? null)
+    } catch (e: any) {
+      setPublishError(e.message)
+    } finally {
+      setPublishing(false)
+    }
   }
 
   const handleDiscard = async () => {
@@ -320,12 +353,22 @@ export default function PostsPage() {
                 <div style={{
                   padding: '12px 26px 18px',
                   borderTop: `1px solid ${C.border}`,
-                  display: 'flex', gap: 8, flexWrap: 'wrap',
                 }}>
-                  <Btn primary>POST NOW</Btn>
-                  <Btn>SCHEDULE</Btn>
-                  <Btn onClick={handleDevelopInStudio}>DEVELOP IN STUDIO</Btn>
-                  <Btn onClick={handleDiscard}>DISCARD</Btn>
+                  {publishError && (
+                    <div style={{ fontSize: 9, color: C.red, marginBottom: 8, letterSpacing: 1 }}>{publishError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Btn primary onClick={handlePublish}>
+                      {publishing ? 'POSTING…' : xConnected ? 'POST TO X →' : 'CONNECT X TO POST'}
+                    </Btn>
+                    <Btn onClick={handleDevelopInStudio}>DEVELOP IN STUDIO</Btn>
+                    <Btn onClick={handleDiscard}>DISCARD</Btn>
+                    {!xConnected && (
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                        Connect X in Settings to enable publishing
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

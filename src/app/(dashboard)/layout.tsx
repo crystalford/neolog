@@ -27,9 +27,10 @@ const NAV = [
   { id: 'videos',   label: 'Videos',   href: '/dashboard/videos',   icon: '▶' },
   { id: 'timeline', label: 'Timeline', href: '/dashboard/timeline', icon: '≡' },
   { id: 'posts',    label: 'Posts',    href: '/dashboard/posts',    icon: '↗' },
-  { id: 'studio',   label: 'Studio',   href: '/dashboard/studio',   icon: '◈' },
-  { id: 'system',   label: 'System',   href: '/dashboard/system',   icon: '⟳' },
-  { id: 'settings', label: 'Settings', href: '/dashboard/settings', icon: '⚙' },
+  { id: 'studio',    label: 'Studio',    href: '/dashboard/studio',    icon: '◈' },
+  { id: 'character', label: 'Character', href: '/dashboard/character', icon: '◉' },
+  { id: 'system',    label: 'System',    href: '/dashboard/system',    icon: '⟳' },
+  { id: 'settings',  label: 'Settings',  href: '/dashboard/settings',  icon: '⚙' },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

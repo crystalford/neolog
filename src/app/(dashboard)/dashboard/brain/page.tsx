@@ -274,6 +274,8 @@ export default function BrainPage() {
   const supabase = createClient()
   const [data, setData] = useState<BrainData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [synthesizing, setSynthesizing] = useState(false)
+  const [synthMsg, setSynthMsg] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -346,16 +348,41 @@ export default function BrainPage() {
           <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 17, color: C.textPrimary }}>Brain</div>
           <div style={{ fontSize: 8, letterSpacing: 2, color: C.amberDim, textTransform: 'uppercase' as const }}>experimental · 6 regions</div>
         </div>
-        {data && (
-          <div style={{ display: 'flex', gap: 24 }}>
-            {([['sessions', data.totalSessions], ['entities', data.topEntities.length], ['patterns', data.patterns.length]] as const).map(([label, val]) => (
-              <div key={label} style={{ textAlign: 'right' as const }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.amberBright }}>{val}</div>
-                <div style={{ fontSize: 7, letterSpacing: 2, color: C.textDimmer, textTransform: 'uppercase' as const }}>{label}</div>
-              </div>
-            ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          {data && (
+            <div style={{ display: 'flex', gap: 24 }}>
+              {([['sessions', data.totalSessions], ['entities', data.topEntities.length], ['patterns', data.patterns.length]] as const).map(([label, val]) => (
+                <div key={label} style={{ textAlign: 'right' as const }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.amberBright }}>{val}</div>
+                  <div style={{ fontSize: 7, letterSpacing: 2, color: C.textDimmer, textTransform: 'uppercase' as const }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <button
+              onClick={async () => {
+                setSynthesizing(true); setSynthMsg(null)
+                try {
+                  const res = await fetch('/api/synthesize-graph', { method: 'POST' })
+                  const d = await res.json()
+                  setSynthMsg(res.ok ? 'Synthesis queued — refresh in a few minutes' : (d.error ?? 'Failed'))
+                } catch { setSynthMsg('Failed to start synthesis') }
+                setSynthesizing(false)
+              }}
+              disabled={synthesizing}
+              style={{
+                background: 'none', border: `1px solid ${C.borderBright}`,
+                color: C.textDim, fontSize: 8, letterSpacing: 2, padding: '4px 12px',
+                cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+                textTransform: 'uppercase' as const, opacity: synthesizing ? 0.5 : 1,
+              }}
+            >
+              {synthesizing ? 'QUEUING…' : 'SYNTHESIZE GRAPH ⟳'}
+            </button>
+            {synthMsg && <div style={{ fontSize: 8, color: C.textDim, letterSpacing: 1, textAlign: 'right' as const }}>{synthMsg}</div>}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Grid */}

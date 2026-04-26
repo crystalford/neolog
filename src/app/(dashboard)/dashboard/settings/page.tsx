@@ -24,7 +24,7 @@ const C = {
   redBright:    '#CC6666',
 }
 
-type SettingsTab = 'profile' | 'api' | 'storage' | 'danger'
+type SettingsTab = 'profile' | 'api' | 'voice' | 'storage' | 'danger'
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -294,6 +294,133 @@ function ApiTab() {
   )
 }
 
+// ─── Voice Tab ────────────────────────────────────────────────────────────────
+
+function VoiceTab() {
+  const supabase = createClient()
+  const [status, setStatus] = useState<'loading' | 'idle' | 'triggering' | 'done' | 'error'>('loading')
+  const [voiceId, setVoiceId] = useState<string | null>(null)
+  const [uploadMinutes, setUploadMinutes] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const MIN_MINUTES = 180
+
+  useEffect(() => {
+    async function load() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const [trainingRes, uploadsRes] = await Promise.all([
+        supabase
+          .from('manifest_training_state')
+          .select('voice_clone_model_id, voice_clone_status')
+          .eq('user_id', session.user.id)
+          .single(),
+        supabase
+          .from('video_uploads')
+          .select('duration_seconds')
+          .eq('user_id', session.user.id)
+          .in('status', ['processed', 'ready']),
+      ])
+
+      if (trainingRes.data?.voice_clone_model_id) {
+        setVoiceId(trainingRes.data.voice_clone_model_id)
+        setStatus('done')
+      } else {
+        setStatus('idle')
+      }
+
+      const totalSecs = (uploadsRes.data ?? []).reduce((acc, u) => acc + (u.duration_seconds ?? 0), 0)
+      setUploadMinutes(Math.round(totalSecs / 60))
+    }
+    load()
+  }, [])
+
+  const handleTrigger = async () => {
+    setStatus('triggering')
+    setError(null)
+    try {
+      const res = await fetch('/api/voice/trigger-clone', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to start voice clone')
+      setStatus('done')
+      if (data.voice_id) setVoiceId(data.voice_id)
+    } catch (e: any) {
+      setError(e.message)
+      setStatus('idle')
+    }
+  }
+
+  const pct = Math.min(100, Math.round((uploadMinutes / MIN_MINUTES) * 100))
+  const hasEnough = uploadMinutes >= MIN_MINUTES
+
+  if (status === 'loading') {
+    return <div style={{ fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
+  }
+
+  return (
+    <div>
+      <Section title="Voice Clone Status">
+        <div style={{ marginBottom: 18, fontSize: 11, color: C.textDim, lineHeight: 1.7 }}>
+          Neolog can clone your voice from your recording corpus using ElevenLabs.
+          You need at least {MIN_MINUTES} minutes of recordings and an ElevenLabs API key.
+        </div>
+
+        {/* Corpus progress */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 2, textTransform: 'uppercase' }}>
+              Recording corpus
+            </div>
+            <div style={{ fontSize: 9, color: hasEnough ? C.green : C.amber, letterSpacing: 1 }}>
+              {uploadMinutes} / {MIN_MINUTES} min
+            </div>
+          </div>
+          <div style={{ height: 3, background: C.bgRaised, borderRadius: 2 }}>
+            <div style={{
+              height: '100%', width: `${pct}%`,
+              background: hasEnough ? C.green : C.amber,
+              borderRadius: 2, transition: 'width 0.3s',
+            }} />
+          </div>
+        </div>
+
+        {voiceId && (
+          <div style={{ marginBottom: 18, padding: '10px 14px', border: `1px solid ${C.green}30`, background: `${C.green}10` }}>
+            <div style={{ fontSize: 9, color: C.green, letterSpacing: 2, marginBottom: 4 }}>VOICE CLONE ACTIVE</div>
+            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'JetBrains Mono', monospace" }}>{voiceId}</div>
+          </div>
+        )}
+
+        {error && (
+          <div style={{ fontSize: 9, color: C.red, marginBottom: 12, letterSpacing: 1 }}>{error}</div>
+        )}
+
+        <button
+          onClick={handleTrigger}
+          disabled={status === 'triggering' || !hasEnough}
+          style={{
+            background: hasEnough ? C.amber : 'none',
+            border: `1px solid ${hasEnough ? C.amber : C.border}`,
+            color: hasEnough ? C.bg : C.textDimmer,
+            fontSize: 10, letterSpacing: 2, fontWeight: hasEnough ? 700 : 400,
+            padding: '8px 22px', cursor: hasEnough ? 'pointer' : 'default',
+            fontFamily: "'JetBrains Mono', monospace",
+            opacity: status === 'triggering' ? 0.6 : 1,
+            transition: 'all 0.15s',
+          }}
+        >
+          {status === 'triggering' ? 'STARTING…' : voiceId ? 'RETRAIN VOICE →' : 'START VOICE CLONE →'}
+        </button>
+        {!hasEnough && (
+          <div style={{ fontSize: 9, color: C.textDimmer, marginTop: 8, letterSpacing: 1 }}>
+            Need {MIN_MINUTES - uploadMinutes} more minutes of recordings
+          </div>
+        )}
+      </Section>
+    </div>
+  )
+}
+
 // ─── Storage Tab ──────────────────────────────────────────────────────────────
 
 function StorageTab() {
@@ -559,6 +686,7 @@ export default function SettingsPage() {
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'profile',  label: 'PROFILE' },
     { id: 'api',      label: 'API' },
+    { id: 'voice',    label: 'VOICE' },
     { id: 'storage',  label: 'STORAGE' },
     { id: 'danger',   label: 'DANGER' },
   ]
@@ -601,6 +729,7 @@ export default function SettingsPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', maxWidth: 600 }}>
         {tab === 'profile' && <ProfileTab />}
         {tab === 'api'     && <ApiTab />}
+        {tab === 'voice'   && <VoiceTab />}
         {tab === 'storage' && <StorageTab />}
         {tab === 'danger'  && <DangerTab />}
       </div>

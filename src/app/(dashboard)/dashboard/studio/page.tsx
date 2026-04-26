@@ -422,8 +422,22 @@ function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
     loadCards()
   }, [])
 
-  const handleLockNew = () => {
-    onLock({ register: reg, palette, film_stock: '16mm Ektachrome pushed two stops', lens: '35mm prime f/2, shallow depth of field', reference })
+  const handleLockNew = async () => {
+    const card = { register: reg, palette, film_stock: '16mm Ektachrome pushed two stops', lens: '35mm prime f/2, shallow depth of field', reference }
+    // Save to DB in background — don't block the UI
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      supabase.from('style_cards').insert({
+        user_id: session.user.id,
+        name: `${reg ?? 'Custom'} — ${palette || 'no palette'}`,
+        register: card.register,
+        palette: card.palette,
+        film_stock: card.film_stock,
+        lens: card.lens,
+        reference_image_prompt: reference || null,
+      }).then(() => {})
+    }
+    onLock(card)
   }
 
   return (

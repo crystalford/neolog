@@ -395,6 +395,7 @@ export default function VideosPage() {
                 upload={v}
                 onOpenStudio={() => router.push('/dashboard/studio')}
                 onDelete={() => handleDelete(v.id)}
+                onReanalyzed={fetchUploads}
               />
             ))}
           </div>
@@ -408,15 +409,38 @@ function VideoRow({
   upload,
   onOpenStudio,
   onDelete,
+  onReanalyzed,
 }: {
   upload: any
   onOpenStudio: () => void
   onDelete: () => void
+  onReanalyzed: () => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const [reanalyzing, setReanalyzing] = useState(false)
+  const [reanalyzeFeedback, setReanalyzeFeedback] = useState<string | null>(null)
   const isReady = upload.status === 'processed' || upload.status === 'ready'
   const isProcessing = ['processing', 'transcribing', 'analyzing', 'uploading'].includes(upload.status)
   const title = upload.analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ') ?? 'Untitled'
+
+  const handleReanalyze = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setReanalyzing(true)
+    setReanalyzeFeedback(null)
+    try {
+      const res = await fetch(`/api/video-upload/${upload.id}/reanalyze`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Reanalysis failed')
+      setReanalyzeFeedback(data.message ?? 'Done')
+      onReanalyzed()
+      setTimeout(() => setReanalyzeFeedback(null), 4000)
+    } catch (e: any) {
+      setReanalyzeFeedback(e.message)
+      setTimeout(() => setReanalyzeFeedback(null), 4000)
+    } finally {
+      setReanalyzing(false)
+    }
+  }
 
   return (
     <div
@@ -476,8 +500,18 @@ function VideoRow({
         {!isReady && (
           <Tag color={statusColor(upload.status)}>{statusLabel(upload.status)}</Tag>
         )}
-        {isReady && (
-          <Btn small onClick={onOpenStudio}>OPEN IN STUDIO</Btn>
+        {reanalyzeFeedback && (
+          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, maxWidth: 180 }}>{reanalyzeFeedback}</div>
+        )}
+        {isReady && !reanalyzeFeedback && (
+          <>
+            <Btn small onClick={onOpenStudio}>STUDIO</Btn>
+            {hovered && (
+              <Btn small onClick={handleReanalyze}>
+                {reanalyzing ? '…' : 'REANALYZE'}
+              </Btn>
+            )}
+          </>
         )}
         {hovered && (
           <button
