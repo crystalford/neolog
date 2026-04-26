@@ -2,11 +2,19 @@
 
 ## What this is
 
-Neolog is a **personal intelligence system** for capturing and synthesizing raw thought into publishable content.
+Neolog is a **life log and content production system** — an evolution of the vlog/blog concept. The core idea: you record yourself talking (brain dumps, voice notes, iPhone videos) and Neolog turns that raw footage into structured intelligence, publishable content, and eventually a produced video.
 
-The core idea: the user records themselves talking — brain dumps, voice notes, iPhone videos — and Neolog turns that unedited content into structured intelligence, then all the way to a finished, AI-produced video. Transcription → AI analysis → entity tracking → pattern recognition → script writing → production.
+It's a log of your life and thinking — everything you feed it accumulates into an intelligent record of who you are, what you're working on, and what you think. Over time it builds a picture of your ideas, patterns, energy, projects, and blockers.
 
-**The primary user is the builder/creator themselves, not a public audience.**
+**The product is open to users**, not just a personal tool.
+
+The flow:
+1. **Record** — upload a video or voice note
+2. **Process** — Whisper transcribes, Claude extracts ideas/entities/quotes/patterns
+3. **Accumulate** — entities and ideas build up across sessions in the intelligence layer (Brain)
+4. **Debrief** — streaming AI conversation to surface the best idea from a session
+5. **Produce** — style card → Claude-written script → (eventually) video output
+6. **Publish** — post candidates auto-surface, user refines and publishes to X
 
 The codebase has a legacy writing platform layer (posts, publications, subscriptions, newsletters, ActivityPub). That code exists but is fully backgrounded. **Do not build in it, do not delete it.**
 
@@ -15,35 +23,65 @@ The codebase has a legacy writing platform layer (posts, publications, subscript
 ## Active product areas (build here)
 
 ### Studio — production pipeline (primary focus)
-- `/dashboard/studio` — the main creation flow. Multi-screen pipeline:
-  1. **Sessions** — pick a processed video upload to work from
-  2. **Debrief** — streaming AI conversation that surfaces ideas from the recording
-  3. **Style** — choose or create a style card (visual identity: register, palette, lighting, lens, mood)
-  4. **Script** — AI-generated script with segments, based on selected idea card + style card
-  5. **Produce** — trigger video assembly
-  6. **Review** — watch and download the finished production
-- DB tables: `idea_cards`, `marinating_ideas`, `debrief_messages`, `style_cards`, `scripts`, `productions`
+`/dashboard/studio` — multi-screen flow:
+1. **Sessions** — pick a processed upload
+2. **Debrief** — streaming Claude chat that surfaces ideas; user selects one
+3. **Style** — choose saved style card or create new (register, palette, lens, mood) — saves to DB
+4. **Script** — auto-fires produce API on mount, polls until Claude generates script segments, shows them for review
+5. **Produce** — shows pipeline stages, polls production status
+6. **Review** — loads real production + script data, shows segments, download when ready
+
+API: `POST /api/studio/produce` → creates script + production rows, fires `studio/produce` Inngest event
+API: `GET /api/studio/production-status?id=` → returns production status + script segments
+Inngest: `produce-studio-video.ts` — loads context, calls Claude claude-sonnet-4-6, saves script JSON, marks done
+
+DB tables: `style_cards`, `scripts`, `productions`, `idea_cards`, `marinating_ideas`, `debrief_messages`
 
 ### Video uploads + processing
-- `/dashboard/videos` — video library; browse, trigger reanalysis
-- Uploads happen at `/dashboard/uploads` — TUS resumable upload (direct browser → Supabase Storage, bypasses Vercel). Supports 4GB+ files.
-- After upload: Inngest pipeline → Replicate FFmpeg extracts audio → Whisper transcribes → Claude/GPT-4o analyzes
-- Analysis extracts: ideas, projects, action items, decisions, blockers, goals, people, quotes, themes, content ideas, mood, energy
-- Entities (projects, people, goals, ideas) accumulate across sessions in the `entities` table
+- `/dashboard/videos` — library; browse, reanalyze (hover → REANALYZE button), delete
+- Upload: multipart direct upload (R2 presigned URLs). Supports 4GB+ files.
+- After upload: Inngest `process-upload.ts` pipeline:
+  - Replicate FFmpeg extracts audio
+  - Whisper transcribes
+  - Claude claude-sonnet-4-6 analyzes (ideas, entities, quotes, themes, energy, blockers, etc.)
+  - Entities upserted to `entities` table
+  - Post candidates inserted to `post_candidates`
+  - Recurring ideas written to `marinating_ideas`
+- Reanalysis: `POST /api/video-upload/[id]/reanalyze` — re-runs analysis without re-uploading
+
+### Brain (experimental)
+- `/dashboard/brain` — 6-region intelligence view (also accessible at `/dashboard/entities`)
+- Regions: Memory (log entries), Executive (projects + actions), Emotional (energy/mood sparkline), Pattern (recurring themes + top entities), Marinating (ideas accumulating across sessions), Conflict (blockers, questions, commitments)
+- **Synthesize Graph** button in header triggers `synthesize-user-graph` Inngest function (needs 3+ processed uploads)
+- Entity detail: `/dashboard/entities/[id]` — session mentions, context quotes, related entities
+
+### Posts / social
+- `/dashboard/posts` — post candidates surfaced from video analysis
+- Source types: `quote`, `strong_opinion`, `observation`
+- **POST TO X** button calls `POST /api/posts/publish` with `candidate_id + text + platform`
+- Requires X OAuth connected via Settings → (social_integrations table)
+- `POST /api/social/x/connect` → PKCE OAuth flow → `/api/social/x/callback`
 
 ### Timeline
-- `/dashboard/timeline` — continuous transcript view across all uploads, searchable
-
-### Posts / social queue
-- `/dashboard/posts` — social posts ready to publish (X/Twitter)
-- Post candidates surface from video analysis; user can refine and publish
-- DB table: `post_candidates`
-
-### System
-- `/dashboard/system` — live Claude API diagnostic (tests Haiku, Sonnet, Opus), system health
+- `/dashboard/timeline` — continuous transcript view across all uploads, full-text search
 
 ### Settings
-- `/dashboard/settings` — API keys (Anthropic, OpenAI, Replicate, HeyGen, Synthesia), profile
+`/dashboard/settings` — tabs: Profile, API, Voice, Storage, Danger
+- API tab: Anthropic, OpenAI, AssemblyAI, Replicate, ElevenLabs keys (stored in `integration_keys`)
+- Voice tab: corpus progress toward 180-min threshold, trigger voice clone (fires `manifest/voice-threshold-met` Inngest event) — **deprioritized, don't build further**
+- Storage tab: Cloudflare R2 config
+
+### System
+- `/dashboard/system` — live Claude API health check (tests Haiku, Sonnet, Opus)
+
+---
+
+## What is NOT a priority right now
+
+- **Character / Avatar / LoRA** — page exists at `/dashboard/character`, Inngest stubs exist (`trigger-lora-training.ts`, `trigger-voice-clone.ts`). Do not build further. Do not add to nav.
+- **HeyGen / Synthesia** — API routes exist, do not build further
+- **Legacy writing platform** — posts, publications, newsletters, ActivityPub. Do not build in it, do not delete it.
+- **`/dashboard/sessions`** — legacy clip session synthesis, still works but not linked in nav
 
 ---
 
@@ -54,64 +92,44 @@ src/
   app/
     (auth)/              — login, signup, reset password
     (dashboard)/
-      layout.tsx         — sidebar nav (7 routes), auth guard, session count
+      layout.tsx         — sidebar nav, auth guard
       dashboard/
-        page.tsx         — home: recent uploads, quick stats
-        videos/          — video library browser
-        uploads/         — TUS upload UI
+        page.tsx         — home: key_win hero, stats, recent sessions, posts ready
+        videos/          — video library + upload
         timeline/        — continuous transcript view
-        timeline/[id]/   — session timeline detail
-        posts/           — social queue
-        studio/          — production pipeline (primary feature)
+        timeline/[id]/   — session detail
+        posts/           — social queue + X publish
+        studio/          — production pipeline (PRIMARY)
+        brain/           — 6-region intelligence view (experimental)
+        entities/        — redirects to brain
+        entities/[id]/   — entity detail page
+        settings/        — API keys, voice, storage, danger
         system/          — API health check
-        settings/        — API keys + profile
-        sessions/        — clip session synthesis (legacy, still works)
-        brain/           — entity graph browser
-        entities/        — entity list
-        log/             — text capture log
-        character/       — character/persona management
-        _archived/       — deprioritized features, do not link in nav
+        character/       — portrait corpus (deprioritized, keep but don't link prominently)
+        _archived/       — do not link in nav
     api/
-      video-upload/      — TUS registration, list, reanalyze, thumbnails
-      clip-sessions/     — session CRUD, synthesize, assemble, download
-      inngest/           — Inngest function endpoint
+      debrief/           — streaming Claude debrief chat
+      studio/produce/    — creates script+production, fires Inngest
+      studio/production-status/ — polls production status + script
+      posts/publish/     — publishes post_candidate to X
+      video-upload/      — upload registration, list, reanalyze, thumbnails
+      synthesize-graph/  — triggers synthesize-user-graph Inngest
+      social/x/          — X OAuth connect + callback + publish
       entities/          — entity CRUD + graph
-      capture/           — text capture
-      social-queue/      — post candidates, refine, publish
-      social/x/          — X OAuth + publish
-      project-documents/ — project doc CRUD + synthesis
-      assets/            — media asset CRUD + search
-      storage/           — R2 signed URLs
-      log-entries/       — text log CRUD
-      transcript-words/  — transcript full-text search
-      video/heygen/      — HeyGen avatar video generation
-      video/synthesia/   — Synthesia video generation
-      editorial/         — script generation
-      inngest/           — Inngest endpoint
+      voice/trigger-clone/ — fires voice clone Inngest (deprioritized)
+      character/trigger-lora/ — fires LoRA Inngest (deprioritized)
   inngest/
     functions/
-      process-upload.ts       — main video pipeline (extract audio → transcribe → analyze → entities)
-      synthesize-session.ts   — cross-clip synthesis → EDLs
-      assemble-clip.ts        — FFmpeg video assembly via Replicate
-      synthesize-project.ts   — per-project synthesis
-      synthesize-user-graph.ts — whole-graph user intelligence
-      process-capture.ts      — text capture analysis
-      process-chat.ts         — chat session analysis
-      develop-idea.ts         — idea development + content angles
-      refine-signals.ts       — entity deduplication
-      trigger-lora-training.ts — LoRA training stub
-      trigger-voice-clone.ts  — voice clone via Replicate
+      process-upload.ts        — main pipeline (audio → transcribe → analyze → entities → posts → marinating)
+      produce-studio-video.ts  — script generation via Claude
+      synthesize-user-graph.ts — whole-graph intelligence synthesis
+      trigger-voice-clone.ts   — ElevenLabs voice clone (deprioritized stub)
+      trigger-lora-training.ts — LoRA training (deprioritized stub)
+      [others]                 — legacy, don't touch
   lib/
-    video-analysis.ts    — AI analysis prompt + entity extraction (593 LOC)
-    audio-processing.ts  — chunking utilities for Whisper
-    ai-provider.ts       — resolves OpenAI/Anthropic/Replicate/HeyGen keys per user
-    ai-assistant.ts      — dashboard chat interface
-    storage/r2.ts        — Cloudflare R2 upload/download/presign
-    embeddings.ts        — pgvector semantic search
-    email/               — Resend email + templates
+    video-analysis.ts    — AI analysis prompt + entity extraction
+    ai-provider.ts       — resolves per-user API keys
     supabase/            — client, server, admin clients
-  types/
-    database.ts          — all TypeScript types
 ```
 
 ---
@@ -121,23 +139,23 @@ src/
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router) |
-| Runtime | Cloudflare Edge (`export const runtime = 'edge'` on all routes + pages) |
+| Runtime | Cloudflare Edge (`export const runtime = 'edge'` on every route + page) |
 | Hosting | Vercel |
 | Database | Supabase (Postgres + RLS) |
 | Storage | Supabase Storage (videos) + Cloudflare R2 (assets) |
-| Upload | TUS resumable (tus-js-client, direct browser → Supabase) |
-| Async jobs | Inngest (durable, step-based, retries) |
+| Upload | Multipart direct to R2 via presigned URLs |
+| Async jobs | Inngest (durable, step-based) |
 | Transcription | OpenAI Whisper (whisper-1) |
-| AI analysis | Claude (claude-sonnet-4-5/4-6) or GPT-4o depending on user's keys |
-| Video processing | Replicate FFmpeg (audio extraction + clip assembly) |
+| AI | Claude claude-sonnet-4-6 (primary — debrief, script, analysis) · GPT-4o (fallback) |
+| Video processing | Replicate FFmpeg toolkit (audio extraction) |
 | Auth | Supabase Auth |
-| Styling | Inline styles using `C` color object (see Design System below) |
+| Styling | Inline styles with `C` color object — no Tailwind, no CSS variables |
 
 ---
 
 ## Design system
 
-The app uses a **dark amber terminal aesthetic**. All styling is done with inline styles using a `C` constants object — **not** Tailwind classes or CSS variables. Copy this pattern exactly when building new pages:
+Dark amber terminal aesthetic. All styling via inline styles with the `C` constants object:
 
 ```typescript
 const C = {
@@ -160,10 +178,10 @@ const C = {
 }
 ```
 
-Font: `'JetBrains Mono', monospace` (monospace terminal feel throughout).  
-Labels: `fontSize: 9, letterSpacing: 3, textTransform: 'uppercase'`.  
-Active nav item: `borderLeft: '2px solid amber'` + `amberGlow` background.  
-Do **not** use Tailwind classes or `globals.css` CSS variables for new pages.
+Font: `'JetBrains Mono', monospace`. Headlines: `'Syne', sans-serif` fontWeight 700–800.
+Labels: `fontSize: 9, letterSpacing: 3, textTransform: 'uppercase'`.
+Active nav: `borderLeft: '2px solid amber'` + `amberGlow` background.
+**Never use Tailwind classes or CSS variables.**
 
 ---
 
@@ -175,10 +193,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 INNGEST_EVENT_KEY
 INNGEST_SIGNING_KEY
-REPLICATE_API_TOKEN          ← needed for audio extraction + video assembly
+REPLICATE_API_TOKEN       ← audio extraction via fofr/toolkit
+X_CLIENT_ID               ← X OAuth
+X_CLIENT_SECRET
 ```
 
-Users supply their own OpenAI/Anthropic keys via Settings → API Keys. The system resolves these per-user at processing time (`lib/ai-provider.ts`).
+Users supply Anthropic/OpenAI/ElevenLabs/Replicate keys via Settings → API. Resolved per-user at runtime via `lib/ai-provider.ts`.
 
 ---
 
@@ -186,82 +206,57 @@ Users supply their own OpenAI/Anthropic keys via Settings → API Keys. The syst
 
 | Table | Purpose |
 |---|---|
-| `video_uploads` | Every uploaded video/audio file + its transcript + analysis JSON |
-| `clip_sessions` | Groups of uploads for cross-clip synthesis + edit plans |
-| `entities` | Accumulated concepts (projects, people, goals, ideas) across all uploads |
+| `video_uploads` | Every upload + transcript + analysis JSON |
+| `entities` | Accumulated concepts across sessions (projects, people, goals, ideas, etc.) |
 | `entity_mentions` | Each time an entity appears in a specific upload |
-| `style_cards` | Visual identity cards (register, palette, lighting, lens, mood) per production |
-| `idea_cards` | Content ideas surfaced from debrief conversations |
-| `marinating_ideas` | Ideas not ready yet — accumulate across sessions until promoted |
-| `debrief_messages` | Streaming debrief conversation history (role: user/assistant) |
-| `scripts` | Versioned scripts with segment JSON, linked to idea_card + style_card |
-| `productions` | Video output tracking (linked to script) |
-| `post_candidates` | Social posts ready for review + publishing |
-| `log_entries` | Text captures with analysis |
+| `style_cards` | Visual identity cards saved by user |
+| `idea_cards` | Content ideas surfaced from debrief |
+| `marinating_ideas` | Ideas accumulating across sessions (written by process-upload) |
+| `scripts` | Generated script JSON (segments with narration + visual direction) |
+| `productions` | Video production tracking (status: queued/running/done/error) |
+| `post_candidates` | Social posts ready for review (source: quote/strong_opinion/observation) |
+| `integration_keys` | Per-user API keys (Anthropic, OpenAI, ElevenLabs, Replicate) |
+| `social_integrations` | X OAuth tokens |
 | `profiles` | User profiles |
-| `posts` | Written posts (legacy writing platform — do not remove) |
-| `publications` | Publication management (legacy — do not remove) |
-
----
-
-## Git workflow
-
-This is a solo personal project. **Push directly to `main`** — no feature branches, no PRs. Every push to main deploys to production automatically via Vercel.
-
----
-
-## Roadmap (not started)
-
-- **End-to-end Studio pipeline** — debrief → idea card → script → produce → review flow needs to be tested and hardened end-to-end. The DB schema and UI screens exist; the assembly step needs to wire up `assemble-clip` Inngest function triggered from the produce screen.
-- **Image uploads for Character/Avatar** — upload photos of the user to `/dashboard/character`. Goal: corpus of portrait photos → LoRA training pipeline → hyper-realistic AI portraits. `trigger-lora-training` Inngest function exists as a stub.
-- **Voice clone integration** — `trigger-voice-clone` Inngest function exists. Needs UI to trigger + status tracking.
+| `posts` | Legacy writing platform — do not remove |
+| `publications` | Legacy — do not remove |
 
 ---
 
 ## What matters most right now
 
-1. **Studio pipeline end-to-end** — the multi-screen flow (sessions → debrief → style → script → produce → review) is the core product. The screens exist, the DB schema is in place, but the produce→assemble connection needs wiring and end-to-end testing.
-2. **Video upload pipeline** — must work for 4GB+ iPhone videos. TUS upload is implemented. Needs `REPLICATE_API_TOKEN` in env to activate audio extraction.
-3. **Post candidates / social queue** — `post_candidates` table is used by the posts page; verify the table exists and the `social-queue` API is routing correctly.
-4. **The writing platform layer** (posts, publications, newsletters, ActivityPub) exists but is not the focus. Don't delete it, don't build in it.
+1. **Studio pipeline works end-to-end** — sessions → debrief (selects idea) → style → script (Claude generates, shows segments) → produce → review. The script generation Inngest function is wired. The video assembly step (`assemble-clip`) is not yet connected to the produce flow.
+
+2. **Upload pipeline is solid** — multipart upload → Inngest processing → analysis → entities + posts surface. This is the core data flywheel.
+
+3. **Posts surface and publish** — post_candidates auto-created from analysis. X publishing wired but requires OAuth connection in Settings.
+
+4. **Brain accumulates** — entities, patterns, marinating ideas build up across sessions. Synthesize Graph enriches it.
 
 ---
 
 ## Things to know
 
-- Vercel has a 4.5MB body size limit for serverless functions — never route file uploads through API routes
-- Inngest functions run as Vercel serverless functions — same memory/time constraints per step, but steps chain durably
-- The `_archived/` directories contain old features that were deprioritized — they exist but are not linked in the nav
-- **Do not use Tailwind classes or CSS variables for new UI** — use inline styles with the `C` color object (see Design System above)
-- The user brings their own AI API keys. Never hardcode or assume system-level keys exist.
-- `export const runtime = 'edge'` is required on every route and page — the app runs on Cloudflare Edge
-- AI models in use: `claude-sonnet-4-6` (chat, project synthesis), `claude-sonnet-4-5` (video analysis, idea development), `claude-opus-4-5` (session synthesis, user graph), `gpt-4o` (fallback when no Anthropic key)
+- Vercel 4.5MB body limit — never route file uploads through API routes
+- `export const runtime = 'edge'` required on every route and page
+- User brings their own API keys — never hardcode or assume system keys exist
+- The `_archived/` directories exist but are not linked in nav — leave them alone
+- AI model to use: `claude-sonnet-4-6` for everything new
 
 ---
 
 ## ⚠️ DO NOT CHANGE — Thumbnail pipeline invariants
 
-These are intentional design decisions that took significant debugging to get right. **Do not "simplify" or revert them.**
+### `fofr/toolkit` on Replicate
+Accepts **only** `task`, `input_file`, `fps`. Does NOT accept `ffmpeg_command`.
 
-### `fofr/toolkit` on Replicate — correct API
-The model accepts **only** `task` (enum), `input_file`, and `fps`. It does **NOT** accept `ffmpeg_command`. Sending `ffmpeg_command` returns a 422 before creating a prediction — nothing appears in the Replicate dashboard and the step silently fails.
-
-Correct tasks:
-- `extract_video_audio_as_mp3` → returns single MP3 URL
-- `convert_input_to_mp4` → returns single H.264 MP4 URL
-- `extract_frames_from_input` → returns `List[Path]` = **array** of frame URLs (not a ZIP)
+Tasks:
+- `extract_video_audio_as_mp3` → single MP3 URL
+- `convert_input_to_mp4` → single H.264 MP4 URL
+- `extract_frames_from_input` → array of frame URLs
 
 ### Step order in `process-upload.ts`
-`transcode-playback` (step 2c) runs **BEFORE** `extract-thumbnail` (step 2d). This is intentional.
+`transcode-playback` runs **before** `extract-thumbnail`. DJI Mimo vertical HEVC videos have rotation metadata that causes `extract_frames_from_input` to return 0 frames. Transcoding to H.264 first strips the rotation metadata. Do not swap these steps.
 
-**Why:** DJI Mimo vertical (9:16) HEVC videos have rotation metadata in their MOV/MP4 container. When `fofr/toolkit extract_frames_from_input` encounters this, it silently returns 0 frames. Transcoding to H.264 first via `convert_input_to_mp4` strips the rotation metadata and produces a file that frame extraction works on reliably. The `extract-thumbnail` step then uses `playbackStoragePath` (the H.264 output) as its primary input source.
-
-**Do not swap these steps back** — it will break thumbnails for all vertical DJI videos.
-
-### `generate-thumbnail.ts` — playback_path first
-The function checks `upload.playback_path` first and uses the signed URL for that H.264 file as the input to `extract_frames_from_input`. Only if `playback_path` doesn't exist does it fall back to the original file. This is the same reason as above — original HEVC vertical files fail frame extraction.
-
-Do not remove the `playback_path` check or simplify this to only use `storage_path`.
-
-### Thumbnail storage format
-Thumbnails are stored as `data:image/jpeg;base64,...` or `data:image/png;base64,...` data URLs directly in `video_uploads.thumbnail_url`. This bypasses the Supabase signed URL chain (which expires and requires re-signing). The GET `/api/video-upload` route skips signing for columns that start with `data:`.
+### Thumbnail storage
+Stored as `data:image/jpeg;base64,...` directly in `video_uploads.thumbnail_url`. Bypasses Supabase signed URL expiry. GET `/api/video-upload` skips signing for columns starting with `data:`.
