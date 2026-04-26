@@ -695,7 +695,7 @@ const PIPELINE_STAGES = [
   { id: 'music',    label: 'Music generation',  sub: 'Suno · custom track' },
   { id: 'images',   label: 'Image generation',  sub: 'FLUX 2 Pro · start + end frames' },
   { id: 'video',    label: 'Video generation',  sub: 'Kling 3.0 Pro · first+last frame' },
-  { id: 'assemble', label: 'Assembly + captions', sub: 'FFmpeg · multi-ratio output' },
+  { id: 'assemble', label: 'Assembly', sub: 'FFmpeg · multi-ratio output' },
 ]
 
 function ProduceScreen({ productionId, onPreview }: { productionId: string | null; onPreview: () => void }) {

@@ -2,7 +2,7 @@ import { inngest } from '@/inngest/client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Anthropic from '@anthropic-ai/sdk'
 
-const SCRIPT_PROMPT = `You are a video script writer. You will receive a transcript and analysis from a personal brain-dump recording.
+const SCRIPT_PROMPT = `You are a video script writer for documentary and video essay productions. You will receive a transcript and analysis from a personal brain-dump recording.
 
 Your task: write a tight, compelling script for a short-form video (2–4 minutes) based on the strongest idea from this session.
 
@@ -16,7 +16,7 @@ Return ONLY valid JSON with this shape:
       "order": 1,
       "type": "hook" | "setup" | "development" | "turn" | "payoff" | "cta",
       "narration": "exact words to say",
-      "visual_direction": "what the viewer sees",
+      "visual_direction": "cinematic description of what the viewer sees — location, light, mood, subject, motion. No text, no captions, no graphics, no on-screen words.",
       "duration_seconds": number
     }
   ]
@@ -28,6 +28,7 @@ Rules:
 - Total under 4 minutes
 - Write narration as first-person, present tense, conversational
 - No filler, no corporate-speak
+- visual_direction is purely cinematic: describe shots, light, environment, movement. Never describe text overlays, captions, lower thirds, or on-screen graphics.
 - End with a clear payoff or call to action`
 
 type StudioProduceEvent = {

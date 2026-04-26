@@ -42,13 +42,23 @@ Use transcripts already in the DB to automatically find the best moments across 
 - Assemble via Replicate FFmpeg (`assemble-clip.ts` infrastructure exists)
 - Output stored in `productions` table
 
-### 2. Teleprompter / chunk recording system (port from Canopticon)
-The intelligence layer writes a script. User records it in chunks:
-- Show one script segment at a time (like a teleprompter)
-- User records that chunk
-- System assembles the chunks + visuals (described in text per segment)
-- Works like a "game of fight" chunk-by-chunk recording flow
-- Reference: Canopticon implementation (user to provide)
+### 2. Teleprompter / chunk recording system ✅ (built)
+Script → operator reads each segment aloud in the Record screen → audio assembled via Replicate FFmpeg.
+Next: wire in visual generation (Phase B below) so the assembled audio gets a proper image/video track.
+
+### 3. Production quality tiers
+
+All tiers produce a proper visual video — no "audio only" tier. The difference is what generates the visuals:
+
+| Tier | Visuals | Audio | Est. cost |
+|------|---------|-------|-----------|
+| **Lo-fi** | Flux still images + Ken Burns motion | Operator recorded | ~$0.50–$1.50 |
+| **Mid** | Flux images + short Runway/Kling clip per key segment | Operator recorded | ~$2–$5 |
+| **Hi-fi** | Full Runway/Kling video per segment + ElevenLabs TTS option | Operator recorded or TTS | ~$5–$15 |
+
+Cost estimate shown before user commits. `productions.estimated_cost_cents` + `productions.user_approved_cost` already in DB schema.
+
+The tier picker goes in Studio between Style and Script (or at the top of Script). Tier affects which segment_assets generation jobs fire after recording completes.
 
 ---
 
@@ -205,6 +215,10 @@ Users supply Anthropic/OpenAI/ElevenLabs/Replicate keys via Settings → API. Re
 - Never use Tailwind or CSS variables — inline styles with `C` object only
 - Never route file uploads through API routes (Vercel 4.5MB limit)
 - The `_archived/` directories exist — do not link them in nav, do not delete them
+
+## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
+
+These are documentary / short film / video essay productions. **Never add captions, subtitles, or text overlays to video output.** No burned-in text, no SRT files, no caption tracks, no lower thirds. The visual track is purely cinematic — images, motion, cuts. The audio carries the narration. Do not propose or build caption features.
 
 ---
 
