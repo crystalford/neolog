@@ -481,17 +481,52 @@ function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
   )
 }
 
-// ── Sub-screen: Script (placeholder — script is generated async) ──────────────
+// ── Sub-screen: Script ───────────────────────────────────────────────────────
 
-function ScriptScreen({ onApprove }: { onApprove: () => void }) {
+function ScriptScreen({
+  upload,
+  styleCard,
+  onApprove,
+}: {
+  upload: VideoUpload | null
+  styleCard: any
+  onApprove: (productionId: string) => void
+}) {
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'error'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  const handleProduce = async () => {
+    if (!upload) { setError('No session selected. Go back and pick a recording.'); return }
+    setStatus('submitting')
+    setError(null)
+    try {
+      const res = await fetch('/api/studio/produce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id: upload.id, style_card: styleCard }),
+      })
+      if (!res.ok) { throw new Error(await res.text()) }
+      const { production_id } = await res.json()
+      onApprove(production_id)
+    } catch (e: any) {
+      setError(e.message || 'Failed to start production')
+      setStatus('idle')
+    }
+  }
+
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 2 }}>SCRIPT GENERATION</div>
       <div style={{ fontSize: 12, color: C.textSecond, maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>
-        Script generation via Claude Opus runs as a background job. This screen will show the full segment browser once ready.
+        Claude will write a structured script from your recording&apos;s strongest idea. The script is generated as a background job and saved to the production.
       </div>
+      {error && (
+        <div style={{ fontSize: 10, color: C.red, maxWidth: 400, textAlign: 'center' }}>{error}</div>
+      )}
       <div style={{ marginTop: 8 }}>
-        <Btn primary onClick={onApprove}>APPROVE + PRODUCE →</Btn>
+        <Btn primary onClick={handleProduce}>
+          {status === 'submitting' ? 'STARTING…' : 'APPROVE + PRODUCE →'}
+        </Btn>
       </div>
     </div>
   )
@@ -500,23 +535,49 @@ function ScriptScreen({ onApprove }: { onApprove: () => void }) {
 // ── Sub-screen: Produce ──────────────────────────────────────────────────────
 
 const PIPELINE_STAGES = [
-  { label: 'Voice synthesis', sub: 'ElevenLabs · voice clone' },
-  { label: 'Music generation', sub: 'Suno · custom track' },
-  { label: 'Image generation', sub: 'FLUX 2 Pro · start + end frames' },
-  { label: 'Video generation', sub: 'Kling 3.0 Pro · first+last frame' },
-  { label: 'Assembly + captions', sub: 'FFmpeg · multi-ratio output' },
+  { id: 'script',   label: 'Script generation', sub: 'Claude Sonnet · structured script' },
+  { id: 'voice',    label: 'Voice synthesis',   sub: 'ElevenLabs · voice clone' },
+  { id: 'music',    label: 'Music generation',  sub: 'Suno · custom track' },
+  { id: 'images',   label: 'Image generation',  sub: 'FLUX 2 Pro · start + end frames' },
+  { id: 'video',    label: 'Video generation',  sub: 'Kling 3.0 Pro · first+last frame' },
+  { id: 'assemble', label: 'Assembly + captions', sub: 'FFmpeg · multi-ratio output' },
 ]
 
-function ProduceScreen({ onPreview }: { onPreview: () => void }) {
-  const [stage, setStage] = useState(0)
+function ProduceScreen({ productionId, onPreview }: { productionId: string | null; onPreview: () => void }) {
+  const supabase = createClient()
+  const [prodStatus, setProdStatus] = useState<string>('queued')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    if (stage >= PIPELINE_STAGES.length) return
-    const t = setTimeout(() => setStage(s => s + 1), 2000)
-    return () => clearTimeout(t)
-  }, [stage])
+    if (!productionId) return
+    let cancelled = false
 
-  const pct = Math.round((stage / PIPELINE_STAGES.length) * 100)
+    const poll = async () => {
+      while (!cancelled) {
+        const { data } = await supabase
+          .from('productions')
+          .select('status, error_message')
+          .eq('id', productionId)
+          .single()
+        if (cancelled) break
+        if (data) {
+          setProdStatus(data.status)
+          if (data.error_message) setErrorMsg(data.error_message)
+          if (data.status === 'done' || data.status === 'error') break
+        }
+        await new Promise(r => setTimeout(r, 4000))
+      }
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [productionId])
+
+  // Map DB status → which stage is active
+  const stageIndex = prodStatus === 'queued' ? 0
+    : prodStatus === 'running' ? 1
+    : prodStatus === 'done' ? PIPELINE_STAGES.length
+    : 0
+  const pct = Math.round((stageIndex / PIPELINE_STAGES.length) * 100)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px', maxWidth: 600 }}>
@@ -539,33 +600,38 @@ function ProduceScreen({ onPreview }: { onPreview: () => void }) {
       {/* Stage list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 28 }}>
         {PIPELINE_STAGES.map((p, i) => {
-          const status = i < stage ? 'done' : i === stage ? 'active' : 'pending'
+          const st = i < stageIndex ? 'done' : i === stageIndex ? 'active' : 'pending'
           return (
             <div key={i} style={{
               padding: '14px 18px',
-              border: `1px solid ${status === 'active' ? C.amberDim : C.border}`,
-              background: status === 'active' ? C.amberGlow : C.bgSurface,
+              border: `1px solid ${st === 'active' ? C.amberDim : C.border}`,
+              background: st === 'active' ? C.amberGlow : C.bgSurface,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <div style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: status === 'done' ? C.green : status === 'active' ? C.amber : C.textDimmer,
-                  animation: status === 'active' ? 'pulse 2s ease-in-out infinite' : 'none',
+                  background: st === 'done' ? C.green : st === 'active' ? C.amber : C.textDimmer,
+                  animation: st === 'active' ? 'pulse 2s ease-in-out infinite' : 'none',
                 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: status === 'pending' ? C.textDim : C.textPrimary }}>
-                    {p.label}
-                  </div>
+                  <div style={{ fontSize: 11, color: st === 'pending' ? C.textDim : C.textPrimary }}>{p.label}</div>
                   <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, letterSpacing: 1 }}>{p.sub}</div>
                 </div>
-                {status === 'done' && <span style={{ fontSize: 10, color: C.green }}>✓</span>}
+                {st === 'done' && <span style={{ fontSize: 10, color: C.green }}>✓</span>}
               </div>
             </div>
           )
         })}
       </div>
 
-      <Btn onClick={onPreview}>PREVIEW →</Btn>
+      {prodStatus === 'error' && errorMsg && (
+        <div style={{ fontSize: 10, color: C.red, marginBottom: 14 }}>{errorMsg}</div>
+      )}
+
+      {prodStatus === 'done'
+        ? <Btn primary onClick={onPreview}>VIEW RESULT →</Btn>
+        : <Btn onClick={onPreview}>PREVIEW (PLACEHOLDER) →</Btn>
+      }
     </div>
   )
 }
@@ -669,6 +735,8 @@ const SUB_NAV: Array<{ id: Screen; label: string }> = [
 export default function StudioPage() {
   const [screen, setScreen] = useState<Screen>('sessions')
   const [activeUpload, setActiveUpload] = useState<VideoUpload | null>(null)
+  const [styleCard, setStyleCard] = useState<any>(null)
+  const [productionId, setProductionId] = useState<string | null>(null)
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -713,13 +781,17 @@ export default function StudioPage() {
           <DebriefScreen upload={activeUpload} onContinue={() => setScreen('style')} />
         )}
         {screen === 'style' && (
-          <StyleScreen onLock={() => setScreen('script')} />
+          <StyleScreen onLock={(card) => { setStyleCard(card); setScreen('script') }} />
         )}
         {screen === 'script' && (
-          <ScriptScreen onApprove={() => setScreen('produce')} />
+          <ScriptScreen
+            upload={activeUpload}
+            styleCard={styleCard}
+            onApprove={(pid) => { setProductionId(pid); setScreen('produce') }}
+          />
         )}
         {screen === 'produce' && (
-          <ProduceScreen onPreview={() => setScreen('review')} />
+          <ProduceScreen productionId={productionId} onPreview={() => setScreen('review')} />
         )}
         {screen === 'review' && <ReviewScreen />}
       </div>

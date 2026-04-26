@@ -10,6 +10,7 @@ import { reanalyzeAllUploads } from '@/inngest/functions/reanalyze-all-uploads'
 import { synthesizeProject } from '@/inngest/functions/synthesize-project'
 import { developIdea } from '@/inngest/functions/develop-idea'
 import { scatterScheduler, postDispatcher } from '@/inngest/functions/scatter-scheduler'
+import { produceStudioVideo } from '@/inngest/functions/produce-studio-video'
 
 export const runtime = 'edge'
 
@@ -27,5 +28,6 @@ export const { GET, POST, PUT } = serve({
     developIdea,
     scatterScheduler,
     postDispatcher,
+    produceStudioVideo,
   ],
 })
