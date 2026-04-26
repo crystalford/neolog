@@ -167,6 +167,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )
           })}
+
+          {/* Experimental separator */}
+          <div style={{ margin: '10px 20px 4px', borderTop: `1px solid ${C.border}` }} />
+          <div style={{ padding: '2px 20px 6px', fontSize: 7, letterSpacing: 2, color: C.textDimmer, textTransform: 'uppercase' as const }}>
+            Experimental
+          </div>
+          <Link
+            href="/dashboard/brain"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 11,
+              width: '100%', padding: '10px 20px',
+              background: pathname.startsWith('/dashboard/brain') ? C.amberGlow : 'none',
+              borderLeft: pathname.startsWith('/dashboard/brain') ? `2px solid ${C.amber}` : '2px solid transparent',
+              color: pathname.startsWith('/dashboard/brain') ? C.amberBright : C.textDim,
+              fontSize: 12, transition: 'all 0.12s', textDecoration: 'none',
+            }}
+          >
+            <span style={{ fontSize: 13, opacity: 0.8, width: 16 }}>◉</span>
+            Brain
+            <span style={{ marginLeft: 'auto', fontSize: 7, letterSpacing: 1, color: C.amberDim, textTransform: 'uppercase' as const }}>β</span>
+          </Link>
         </nav>
 
         {/* Footer status */}
