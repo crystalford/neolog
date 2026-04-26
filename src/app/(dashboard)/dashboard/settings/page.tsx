@@ -24,7 +24,7 @@ const C = {
   redBright:    '#CC6666',
 }
 
-type SettingsTab = 'profile' | 'api' | 'voice' | 'storage' | 'danger'
+type SettingsTab = 'profile' | 'api' | 'storage' | 'danger'
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -686,7 +686,6 @@ export default function SettingsPage() {
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'profile',  label: 'PROFILE' },
     { id: 'api',      label: 'API' },
-    { id: 'voice',    label: 'VOICE' },
     { id: 'storage',  label: 'STORAGE' },
     { id: 'danger',   label: 'DANGER' },
   ]
@@ -729,7 +728,6 @@ export default function SettingsPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', maxWidth: 600 }}>
         {tab === 'profile' && <ProfileTab />}
         {tab === 'api'     && <ApiTab />}
-        {tab === 'voice'   && <VoiceTab />}
         {tab === 'storage' && <StorageTab />}
         {tab === 'danger'  && <DangerTab />}
       </div>
