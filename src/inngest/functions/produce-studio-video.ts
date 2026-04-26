@@ -42,6 +42,7 @@ type StudioProduceEvent = {
       palette: string
       reference?: string
     } | null
+    selected_idea: { text: string; format: string } | null
   }
 }
 
@@ -54,7 +55,7 @@ export const produceStudioVideo = inngest.createFunction(
   },
   { event: 'studio/produce' },
   async ({ event, step }) => {
-    const { production_id, script_id, upload_id, user_id, style_card } = event.data
+    const { production_id, script_id, upload_id, user_id, style_card, selected_idea } = event.data
     const admin = createAdminClient()
     if (!admin) throw new Error('Admin client not available')
 
@@ -107,8 +108,11 @@ export const produceStudioVideo = inngest.createFunction(
       const transcript = context.transcript ?? ''
       const analysis = context.analysis ?? {}
 
-      const topIdea = analysis.content_ideas?.[0]
-      const topIdeaText = topIdea ? (typeof topIdea === 'object' ? topIdea.topic : String(topIdea)) : null
+      // Prefer the user-selected idea from debrief; fall back to top analysis idea
+      const topIdeaText = selected_idea?.text
+        ?? (analysis.content_ideas?.[0]
+          ? (typeof analysis.content_ideas[0] === 'object' ? analysis.content_ideas[0].topic : String(analysis.content_ideas[0]))
+          : null)
       const keyWin = analysis.key_win ?? ''
       const keyQuotes = (analysis.key_quotes ?? []).slice(0, 3).join('\n')
       const strongOpinions = (analysis.strong_opinions ?? []).slice(0, 2).join('\n')

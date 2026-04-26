@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return new Response('Unauthorized', { status: 401 })
 
-  const { upload_id, style_card } = await req.json()
+  const { upload_id, style_card, selected_idea } = await req.json()
   if (!upload_id) return new Response('upload_id required', { status: 400 })
 
   // Create a placeholder script row (the Inngest function will fill it in)
@@ -57,6 +57,7 @@ export async function POST(req: Request) {
       upload_id,
       user_id: session.user.id,
       style_card: style_card ?? null,
+      selected_idea: selected_idea ?? null,
     },
   })
 
