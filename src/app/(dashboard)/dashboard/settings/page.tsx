@@ -193,7 +193,8 @@ function ProfileTab() {
 // ─── API Tab ──────────────────────────────────────────────────────────────────
 
 const API_PROVIDERS = [
-  { id: 'openai',      label: 'OpenAI',      hint: 'Used for Whisper transcription and GPT-4o analysis', placeholder: 'sk-...' },
+  { id: 'openai',      label: 'OpenAI',      hint: 'Used for Whisper transcription (fallback) and GPT-4o analysis', placeholder: 'sk-...' },
+  { id: 'groq',        label: 'Groq',        hint: 'Fast cheap Whisper transcription (10–25× cheaper than Replicate). Free tier: 120 min/day.', placeholder: 'gsk_...' },
   { id: 'anthropic',   label: 'Anthropic',   hint: 'Used for Claude debrief, script generation, and post writing', placeholder: 'sk-ant-...' },
   { id: 'assemblyai',  label: 'AssemblyAI',  hint: 'Used for fast audio transcription (alternative to Whisper)', placeholder: 'aai_...' },
   { id: 'replicate',   label: 'Replicate',   hint: 'Used for audio extraction and video assembly via FFmpeg toolkit', placeholder: 'r8_...' },

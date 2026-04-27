@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
-import { isVideoMimeType } from '@/lib/audio-processing'
+import { isVideoMimeType, chunkBuffer, needsChunking, mergeTranscriptions } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
 import { presignDownloadUrl } from '@/lib/storage/r2'
@@ -72,6 +72,89 @@ async function runReplicateAsync(
   }
 
   throw new Error(`Replicate prediction ${predictionId} timed out after 30 minutes`)
+}
+
+
+// Groq Whisper API — OpenAI-compatible transcription endpoint.
+// 10–25× cheaper than Replicate Whisper. Free tier covers ~120 min/day.
+// Handles 25 MB upload limit by chunking + merging.
+async function transcribeWithGroq(
+  audioBuffer: Buffer,
+  groqKey: string,
+  mimeType: string = 'audio/mpeg'
+): Promise<{ text: string; language: string; segments: Array<{ start: number; end: number; text: string }>; words: Array<{ word: string; start: number; end: number; probability: number }> }> {
+  const callGroq = async (buf: Buffer): Promise<any> => {
+    const fd = new FormData()
+    fd.append('file', new Blob([buf as any], { type: mimeType }), 'audio')
+    fd.append('model', 'whisper-large-v3-turbo')
+    fd.append('response_format', 'verbose_json')
+    fd.append('timestamp_granularities[]', 'word')
+    fd.append('timestamp_granularities[]', 'segment')
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${groqKey}` },
+      body: fd,
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`Groq transcription failed (${res.status}): ${errText.slice(0, 300)}`)
+    }
+    return res.json()
+  }
+
+  if (!needsChunking(audioBuffer.length)) {
+    const r = await callGroq(audioBuffer)
+    return {
+      text: r.text || '',
+      language: r.language || 'en',
+      segments: (r.segments || []).map((s: any) => ({ start: s.start, end: s.end, text: s.text })),
+      words: (r.words || []).map((w: any) => ({
+        word: (w.word || '').trim(),
+        start: w.start,
+        end: w.end,
+        probability: 1,
+      })),
+    }
+  }
+
+  // File >25 MB: chunk, transcribe in parallel, merge with time offsets
+  const chunks = chunkBuffer(audioBuffer)
+  console.log(`[transcribe-groq] Chunking ${audioBuffer.length} bytes into ${chunks.length} chunks`)
+
+  const results = await Promise.all(chunks.map(c => callGroq(c)))
+
+  // mergeTranscriptions handles text + segments. Merge words manually with same offset logic.
+  const merged = mergeTranscriptions(
+    results.map(r => ({
+      text: r.text || '',
+      segments: (r.segments || []).map((s: any) => ({ start: s.start, end: s.end, text: s.text })),
+      duration: r.duration || 0,
+    }))
+  )
+
+  const allWords: Array<{ word: string; start: number; end: number; probability: number }> = []
+  let timeOffset = 0
+  for (const r of results) {
+    for (const w of r.words || []) {
+      if (w.word && typeof w.start === 'number' && typeof w.end === 'number') {
+        allWords.push({
+          word: String(w.word).trim(),
+          start: w.start + timeOffset,
+          end: w.end + timeOffset,
+          probability: 1,
+        })
+      }
+    }
+    timeOffset += r.duration || 0
+  }
+
+  return {
+    text: merged.text,
+    language: results[0]?.language || 'en',
+    segments: merged.segments,
+    words: allWords,
+  }
 }
 
 
@@ -191,6 +274,7 @@ export const processUpload = inngest.createFunction(
 
       const openaiKeyRes = await resolveProviderKeyWithClient(admin, user_id, 'openai')
       const anthropicKeyRes = await resolveProviderKeyWithClient(admin, user_id, 'anthropic')
+      const groqKeyRes = await resolveProviderKeyWithClient(admin, user_id, 'groq')
 
       // Fetch user profile for personalization
       const { data: profile } = await admin
@@ -218,6 +302,7 @@ export const processUpload = inngest.createFunction(
         userName,
         openaiKey: openaiKeyRes?.key || null,
         anthropicKey: anthropicKeyRes?.key || null,
+        groqKey: groqKeyRes?.key || null,
       }
     })
 
@@ -510,6 +595,33 @@ export const processUpload = inngest.createFunction(
         return r?.ok ? r.text() : ''
       })
       transcription = { text: fileRes, language: 'en', segments: [] }
+    } else if (activeContext.groqKey) {
+      // Groq path — 10-25x cheaper than Replicate Whisper
+      await reportStatus('transcribing')
+      console.log(`[${Date.now()}] [transcribe] Using Groq whisper-large-v3-turbo`)
+
+      transcription = await step.run('transcribe-groq', async () => {
+        // Resolve audio URL: direct (Replicate temp URL) or presigned R2
+        let audioUrl: string
+        if ((audioPath as any).isDirectUrl && audioPath.path.startsWith('http')) {
+          audioUrl = audioPath.path
+        } else {
+          const signed = await presignDownloadUrl(audioPath.path, 3600).catch(() => null)
+          if (!signed) throw new Error('Failed to sign audio URL for Groq')
+          audioUrl = signed
+        }
+
+        // Download audio bytes (Groq needs a file upload, not a URL)
+        console.log(`[${Date.now()}] [transcribe-groq] Downloading audio bytes...`)
+        const audioRes = await fetch(audioUrl)
+        if (!audioRes.ok) throw new Error(`Audio fetch failed: ${audioRes.status}`)
+        const audioBuf = Buffer.from(await audioRes.arrayBuffer())
+        console.log(`[${Date.now()}] [transcribe-groq] Downloaded ${Math.round(audioBuf.length / 1024 / 1024 * 10) / 10} MB`)
+
+        const result = await transcribeWithGroq(audioBuf, activeContext.groqKey!, 'audio/mpeg')
+        console.log(`[${Date.now()}] [transcribe-groq] Success. Text length: ${result.text.length}, words: ${result.words.length}`)
+        return result
+      })
     } else if (replicateToken) {
       const whisperAudioUrl: string = await step.run('transcribe-sign-url', async () => {
         console.log(`[${Date.now()}] [transcribe] Signing audio URL...`);
