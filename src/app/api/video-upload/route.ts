@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         file_size_bytes,
         mime_type,
         storage_path,
-        storage_provider: 'supabase',
+        storage_provider: 'r2',
         status: 'uploaded',
         recorded_at: recorded_at || null,
         ...(session_id ? { session_id } : {}),

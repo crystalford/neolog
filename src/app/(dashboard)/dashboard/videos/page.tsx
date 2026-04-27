@@ -111,28 +111,42 @@ function formatDate(ts: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+const PROCESSING_STATUSES = new Set([
+  'starting', 'extracting-audio', 'extracting-metadata', 'metadata-extracted',
+  'transcribing-media', 'transcribed-media', 'analyzing', 'processing', 'transcribing',
+])
+
 function statusColor(status: string) {
-  switch (status) {
-    case 'processed':
-    case 'ready':    return C.green
-    case 'error':    return C.red
-    case 'processing':
-    case 'transcribing':
-    case 'analyzing': return C.blue
-    default:         return C.textDim
-  }
+  if (status === 'processed' || status === 'ready') return C.green
+  if (status === 'error') return C.red
+  if (PROCESSING_STATUSES.has(status)) return C.blue
+  return C.textDim
 }
 
 function statusLabel(status: string) {
   switch (status) {
-    case 'processed': return 'READY'
-    case 'processing': return 'PROCESSING'
-    case 'transcribing': return 'TRANSCRIBING'
-    case 'analyzing': return 'ANALYZING'
-    case 'error': return 'ERROR'
-    case 'uploading': return 'UPLOADING'
-    default: return status.toUpperCase()
+    case 'processed':           return 'READY'
+    case 'uploaded':            return 'QUEUED'
+    case 'starting':            return 'STARTING'
+    case 'extracting-audio':    return 'EXTRACTING AUDIO'
+    case 'extracting-metadata': return 'READING METADATA'
+    case 'metadata-extracted':  return 'TRANSCRIBING'
+    case 'transcribing-media':  return 'TRANSCRIBING'
+    case 'transcribed-media':   return 'ANALYZING'
+    case 'analyzing':           return 'ANALYZING'
+    case 'processing':          return 'PROCESSING'
+    case 'transcribing':        return 'TRANSCRIBING'
+    case 'error':               return 'ERROR'
+    default:                    return status.toUpperCase()
   }
+}
+
+function isStuck(upload: any): boolean {
+  if (!upload.updated_at) return false
+  const age = Date.now() - new Date(upload.updated_at).getTime()
+  if (upload.status === 'uploaded') return age > 5 * 60 * 1000
+  if (PROCESSING_STATUSES.has(upload.status)) return age > 20 * 60 * 1000
+  return false
 }
 
 // Core multipart upload — direct browser → R2 using presigned URLs
@@ -232,7 +246,7 @@ export default function VideosPage() {
   // Poll while any uploads are processing
   useEffect(() => {
     const hasProcessing = uploads.some(u =>
-      ['processing', 'transcribing', 'analyzing', 'uploading'].includes(u.status)
+      u.status === 'uploaded' || PROCESSING_STATUSES.has(u.status)
     )
     if (!hasProcessing) return
     const t = setInterval(fetchUploads, 8000)
@@ -426,27 +440,49 @@ function VideoRow({
 }) {
   const [hovered, setHovered] = useState(false)
   const [reanalyzing, setReanalyzing] = useState(false)
-  const [reanalyzeFeedback, setReanalyzeFeedback] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
   const isReady = upload.status === 'processed' || upload.status === 'ready'
-  const isProcessing = ['processing', 'transcribing', 'analyzing', 'uploading'].includes(upload.status)
+  const isProcessing = PROCESSING_STATUSES.has(upload.status)
+  const stuck = isStuck(upload)
   const title = upload.analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ') ?? 'Untitled'
+
+  const showFeedback = (msg: string, ms = 5000) => {
+    setFeedback(msg)
+    setTimeout(() => setFeedback(null), ms)
+  }
 
   const handleReanalyze = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setReanalyzing(true)
-    setReanalyzeFeedback(null)
+    setFeedback(null)
     try {
       const res = await fetch(`/api/video-upload/${upload.id}/reanalyze`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Reanalysis failed')
-      setReanalyzeFeedback(data.message ?? 'Done')
+      showFeedback(data.message ?? 'Done')
       onReanalyzed()
-      setTimeout(() => setReanalyzeFeedback(null), 4000)
     } catch (e: any) {
-      setReanalyzeFeedback(e.message)
-      setTimeout(() => setReanalyzeFeedback(null), 4000)
+      showFeedback(e.message)
     } finally {
       setReanalyzing(false)
+    }
+  }
+
+  const handleRetry = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRetrying(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/video-upload/${upload.id}/retry`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Retry failed')
+      showFeedback('Queued for processing')
+      onReanalyzed()
+    } catch (e: any) {
+      showFeedback(e.message)
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -498,39 +534,53 @@ function VideoRow({
       </div>
 
       {/* Status + actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <span style={{
-          display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-          background: statusColor(upload.status),
-          animation: isProcessing ? 'pulse 2s ease-in-out infinite' : 'none',
-          flexShrink: 0,
-        }} />
-        {!isReady && (
-          <Tag color={statusColor(upload.status)}>{statusLabel(upload.status)}</Tag>
-        )}
-        {reanalyzeFeedback && (
-          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, maxWidth: 180 }}>{reanalyzeFeedback}</div>
-        )}
-        {isReady && !reanalyzeFeedback && (
-          <>
-            <Btn small onClick={onOpenStudio}>STUDIO</Btn>
-            {hovered && (
-              <Btn small onClick={handleReanalyze}>
-                {reanalyzing ? '…' : 'REANALYZE'}
-              </Btn>
-            )}
-          </>
-        )}
-        {hovered && (
-          <button
-            onClick={e => { e.stopPropagation(); onDelete() }}
-            style={{
-              background: 'none', border: 'none',
-              color: C.textDimmer, cursor: 'pointer', fontSize: 12, padding: '2px 4px',
-            }}
-          >
-            ✕
-          </button>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+            background: stuck ? C.amberDim : statusColor(upload.status),
+            animation: isProcessing && !stuck ? 'pulse 2s ease-in-out infinite' : 'none',
+            flexShrink: 0,
+          }} />
+          {!isReady && (
+            <Tag color={stuck ? C.amberDim : statusColor(upload.status)}>
+              {stuck ? 'STUCK' : statusLabel(upload.status)}
+            </Tag>
+          )}
+          {feedback && (
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, maxWidth: 200 }}>{feedback}</div>
+          )}
+          {isReady && !feedback && (
+            <>
+              <Btn small onClick={onOpenStudio}>STUDIO</Btn>
+              {hovered && (
+                <Btn small onClick={handleReanalyze}>
+                  {reanalyzing ? '…' : 'REANALYZE'}
+                </Btn>
+              )}
+            </>
+          )}
+          {(upload.status === 'error' || stuck) && hovered && !feedback && (
+            <Btn small onClick={handleRetry}>
+              {retrying ? '…' : 'RETRY'}
+            </Btn>
+          )}
+          {hovered && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete() }}
+              style={{
+                background: 'none', border: 'none',
+                color: C.textDimmer, cursor: 'pointer', fontSize: 12, padding: '2px 4px',
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {upload.status === 'error' && upload.error_message && (
+          <div style={{ fontSize: 9, color: C.red, letterSpacing: 0.5, maxWidth: 260, textAlign: 'right' }}>
+            {upload.error_message}
+          </div>
         )}
       </div>
     </div>

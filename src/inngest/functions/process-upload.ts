@@ -113,8 +113,7 @@ export const processUpload = inngest.createFunction(
     const admin = createAdminClient()
 
     if (!admin) {
-      console.error('Failed to create admin client')
-      return { status: 'error', error: 'admin_client_failed' }
+      throw new Error('Admin client failed — SUPABASE_SERVICE_ROLE_KEY not configured')
     }
 
     // Pre-flight
