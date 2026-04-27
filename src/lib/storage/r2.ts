@@ -1,73 +1,104 @@
 /**
- * Cloudflare R2 storage client (S3-compatible).
+ * Cloudflare R2 storage client.
  *
- * All video files are stored here. Supabase is only used for database + auth.
+ * Uses aws4fetch (Cloudflare-Workers-compatible SigV4 signing) instead of
+ * @aws-sdk/client-s3, which depends on DOMParser and breaks in edge runtime.
  *
  * Env vars required:
- *   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+ *   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
  *   R2_BUCKET_NAME, R2_ENDPOINT (https://<account_id>.r2.cloudflarestorage.com)
  */
 
-import {
-  S3Client,
-  CreateMultipartUploadCommand,
-  UploadPartCommand,
-  CompleteMultipartUploadCommand,
-  AbortMultipartUploadCommand,
-  ListPartsCommand,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { AwsClient } from 'aws4fetch'
 
 export const R2_BUCKET = process.env.R2_BUCKET_NAME!
 export const PART_SIZE = 50 * 1024 * 1024 // 50MB per part
 
-export function getR2Client() {
+function getConfig() {
   const endpoint = process.env.R2_ENDPOINT
   const accessKeyId = process.env.R2_ACCESS_KEY_ID
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+  const bucket = process.env.R2_BUCKET_NAME
 
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error('R2 env vars not configured (R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)')
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
+    throw new Error('R2 env vars not configured (R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME)')
   }
 
-  return new S3Client({
+  return {
+    endpoint: endpoint.replace(/\/$/, ''),
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+  }
+}
+
+export function getR2Client(): AwsClient {
+  const { accessKeyId, secretAccessKey } = getConfig()
+  return new AwsClient({
+    accessKeyId,
+    secretAccessKey,
     region: 'auto',
-    endpoint,
-    credentials: { accessKeyId, secretAccessKey },
+    service: 's3',
   })
+}
+
+function encodeKey(key: string): string {
+  return key.split('/').map(encodeURIComponent).join('/')
+}
+
+function objectUrl(key: string): string {
+  const { endpoint, bucket } = getConfig()
+  return `${endpoint}/${bucket}/${encodeKey(key)}`
+}
+
+function extract(xml: string, tag: string): string | null {
+  const re = new RegExp(`<${tag}>([^<]+)</${tag}>`)
+  const m = xml.match(re)
+  return m ? m[1] : null
 }
 
 /**
  * Start a multipart upload and return presigned PUT URLs for every part.
- * All URLs are generated server-side in one call (pure crypto, no R2 network per part).
  */
 export async function initiateMultipartUpload(key: string, contentType: string, totalSize: number) {
-  const client = getR2Client()
+  const aws = getR2Client()
+  const url = `${objectUrl(key)}?uploads=`
 
-  const { UploadId } = await client.send(new CreateMultipartUploadCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
-  }))
+  const res = await aws.fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType },
+  })
 
-  if (!UploadId) throw new Error('R2 did not return an UploadId')
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`R2 CreateMultipartUpload failed: ${res.status} ${text.slice(0, 500)}`)
+  }
+
+  const xml = await res.text()
+  const UploadId = extract(xml, 'UploadId')
+  if (!UploadId) throw new Error(`R2 did not return an UploadId. Response: ${xml.slice(0, 500)}`)
 
   const totalParts = Math.ceil(totalSize / PART_SIZE)
   const partUrls = await Promise.all(
     Array.from({ length: totalParts }, (_, i) =>
-      getSignedUrl(client, new UploadPartCommand({
-        Bucket: R2_BUCKET,
-        Key: key,
-        UploadId,
-        PartNumber: i + 1,
-      }), { expiresIn: 86400 }) // 24h — enough for slow / paused uploads
-    )
+      presignPartUrl(key, UploadId, i + 1, 86400),
+    ),
   )
 
   return { uploadId: UploadId, key, partUrls, totalParts }
+}
+
+async function presignPartUrl(key: string, uploadId: string, partNumber: number, expiresInSec: number): Promise<string> {
+  const aws = getR2Client()
+  const u = new URL(objectUrl(key))
+  u.searchParams.set('partNumber', String(partNumber))
+  u.searchParams.set('uploadId', uploadId)
+  u.searchParams.set('X-Amz-Expires', String(expiresInSec))
+
+  const signed = await aws.sign(new Request(u.toString(), { method: 'PUT' }), {
+    aws: { signQuery: true },
+  })
+  return signed.url
 }
 
 /**
@@ -78,100 +109,139 @@ export async function completeMultipartUpload(
   uploadId: string,
   parts: Array<{ PartNumber: number; ETag: string }>,
 ) {
-  const client = getR2Client()
-  await client.send(new CompleteMultipartUploadCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    UploadId: uploadId,
-    MultipartUpload: { Parts: parts },
-  }))
+  const aws = getR2Client()
+  const url = `${objectUrl(key)}?uploadId=${encodeURIComponent(uploadId)}`
+
+  const sorted = parts.slice().sort((a, b) => a.PartNumber - b.PartNumber)
+  const partsXml = sorted
+    .map(p => `<Part><PartNumber>${p.PartNumber}</PartNumber><ETag>${p.ETag}</ETag></Part>`)
+    .join('')
+  const body = `<CompleteMultipartUpload>${partsXml}</CompleteMultipartUpload>`
+
+  const res = await aws.fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/xml' },
+    body,
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`R2 CompleteMultipartUpload failed: ${res.status} ${text.slice(0, 500)}`)
+  }
 }
 
 /**
  * Abort an incomplete multipart upload (cleanup for cancelled uploads).
  */
 export async function abortMultipartUpload(key: string, uploadId: string) {
-  const client = getR2Client()
-  await client.send(new AbortMultipartUploadCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    UploadId: uploadId,
-  }))
+  const aws = getR2Client()
+  const url = `${objectUrl(key)}?uploadId=${encodeURIComponent(uploadId)}`
+  const res = await aws.fetch(url, { method: 'DELETE' })
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text()
+    throw new Error(`R2 AbortMultipartUpload failed: ${res.status} ${text.slice(0, 500)}`)
+  }
 }
 
 /**
  * List parts already uploaded for a multipart upload (for resume).
  */
-export async function listUploadedParts(key: string, uploadId: string) {
-  const client = getR2Client()
-  const { Parts } = await client.send(new ListPartsCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    UploadId: uploadId,
-  }))
-  return Parts ?? []
+export async function listUploadedParts(key: string, uploadId: string): Promise<Array<{ PartNumber: number; ETag: string; Size?: number }>> {
+  const aws = getR2Client()
+  const url = `${objectUrl(key)}?uploadId=${encodeURIComponent(uploadId)}`
+  const res = await aws.fetch(url, { method: 'GET' })
+  if (!res.ok) {
+    if (res.status === 404) return []
+    const text = await res.text()
+    throw new Error(`R2 ListParts failed: ${res.status} ${text.slice(0, 500)}`)
+  }
+  const xml = await res.text()
+  const parts: Array<{ PartNumber: number; ETag: string; Size?: number }> = []
+  const partRe = /<Part>([\s\S]*?)<\/Part>/g
+  let m: RegExpExecArray | null
+  while ((m = partRe.exec(xml))) {
+    const block = m[1]
+    const partNumber = Number(extract(block, 'PartNumber'))
+    const etag = extract(block, 'ETag')
+    const size = extract(block, 'Size')
+    if (partNumber && etag) {
+      parts.push({ PartNumber: partNumber, ETag: etag, Size: size ? Number(size) : undefined })
+    }
+  }
+  return parts
 }
 
 /**
  * Generate a presigned GET URL for a private R2 object.
- * Default expiry: 1 hour.
- */
-export async function presignGetUrl(key: string, expiresIn = 3600): Promise<string> {
-  const client = getR2Client()
-  return getSignedUrl(client, new HeadObjectCommand({ Bucket: R2_BUCKET, Key: key }), { expiresIn })
-    .catch(async () => {
-      // HeadObject for presigning isn't universally supported — fall back to GetObject
-      const { GetObjectCommand } = await import('@aws-sdk/client-s3')
-      return getSignedUrl(client, new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }), { expiresIn })
-    })
-}
-
-/**
- * Generate a presigned GET URL using GetObject (preferred for playback).
  */
 export async function presignDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
-  const { GetObjectCommand } = await import('@aws-sdk/client-s3')
-  const client = getR2Client()
-  return getSignedUrl(client, new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }), { expiresIn })
+  const aws = getR2Client()
+  const u = new URL(objectUrl(key))
+  u.searchParams.set('X-Amz-Expires', String(expiresIn))
+
+  const signed = await aws.sign(new Request(u.toString(), { method: 'GET' }), {
+    aws: { signQuery: true },
+  })
+  return signed.url
 }
 
+// Alias for the old name used in some routes
+export const presignGetUrl = presignDownloadUrl
+
 /**
- * Upload a Buffer directly to R2 (for server-side pipeline use, e.g. storing transcoded MP4).
+ * Upload a Buffer directly to R2 (server-side pipeline use).
  */
 export async function uploadBuffer(key: string, buffer: Buffer, contentType: string) {
-  const client = getR2Client()
-  await client.send(new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: contentType,
-  }))
+  const aws = getR2Client()
+  const res = await aws.fetch(objectUrl(key), {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: buffer as any,
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`R2 PutObject failed: ${res.status} ${text.slice(0, 500)}`)
+  }
 }
 
 /**
- * Handle streaming upload directly to R2 using chunking without keeping the entire file in memory.
+ * Stream upload to R2. Buffers the stream then PUTs in one call.
+ * For files >100MB, prefer the multipart upload path from the browser.
  */
 export async function uploadStream(key: string, stream: AsyncIterable<any> | ReadableStream, contentType: string) {
-  const { Upload } = await import('@aws-sdk/lib-storage')
-  const client = getR2Client()
-  const upload = new Upload({
-    client,
-    params: {
-      Bucket: R2_BUCKET,
-      Key: key,
-      Body: stream,
-      ContentType: contentType,
-    },
-  })
-  await upload.done()
+  const chunks: Uint8Array[] = []
+  if (stream instanceof ReadableStream) {
+    const reader = stream.getReader()
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (value) chunks.push(value)
+    }
+  } else {
+    for await (const chunk of stream as AsyncIterable<any>) {
+      chunks.push(chunk instanceof Uint8Array ? chunk : Buffer.from(chunk))
+    }
+  }
+  const total = chunks.reduce((sum, c) => sum + c.byteLength, 0)
+  const buf = new Uint8Array(total)
+  let offset = 0
+  for (const c of chunks) {
+    buf.set(c, offset)
+    offset += c.byteLength
+  }
+  await uploadBuffer(key, Buffer.from(buf), contentType)
 }
 
 /**
  * Delete an object from R2.
  */
 export async function deleteR2Object(key: string) {
-  const client = getR2Client()
-  await client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }))
+  const aws = getR2Client()
+  const res = await aws.fetch(objectUrl(key), { method: 'DELETE' })
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text()
+    throw new Error(`R2 DeleteObject failed: ${res.status} ${text.slice(0, 500)}`)
+  }
 }
 
 /**
@@ -182,15 +252,5 @@ export async function presignResumeParts(
   uploadId: string,
   partNumbers: number[],
 ): Promise<string[]> {
-  const client = getR2Client()
-  return Promise.all(
-    partNumbers.map(partNumber =>
-      getSignedUrl(client, new UploadPartCommand({
-        Bucket: R2_BUCKET,
-        Key: key,
-        UploadId: uploadId,
-        PartNumber: partNumber,
-      }), { expiresIn: 86400 })
-    )
-  )
+  return Promise.all(partNumbers.map(n => presignPartUrl(key, uploadId, n, 86400)))
 }
