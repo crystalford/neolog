@@ -182,7 +182,11 @@ async function runMultipartUpload(
     body: JSON.stringify({ uploadId, key, parts }),
     signal,
   })
-  if (!completeRes.ok) throw new Error(`Complete failed: ${completeRes.status}`)
+  if (!completeRes.ok) {
+    const body = await completeRes.json().catch(() => null)
+    const detail = body?.detail || body?.error || `${completeRes.status}`
+    throw new Error(`Complete failed: ${detail}`)
+  }
   onProgress(95)
 
   // Step 4: Register with Supabase + trigger Inngest pipeline
