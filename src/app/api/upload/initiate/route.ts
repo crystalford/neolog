@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...result, partSize: PART_SIZE })
   } catch (err: any) {
     console.error('[upload/initiate]', err.message)
-    return NextResponse.json({ error: 'Failed to initiate upload' }, { status: 500 })
+    return NextResponse.json({
+      error: 'Failed to initiate upload',
+      detail: err?.message ?? String(err),
+      name: err?.name ?? null,
+    }, { status: 500 })
   }
 }
