@@ -206,49 +206,62 @@ function ApiTab() {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    async function load() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const { data } = await supabase
-        .from('integration_keys')
-        .select('provider, key_value, is_active')
-        .eq('user_id', session.user.id)
-        .eq('is_active', true)
-      if (data) {
-        const map: Record<string, string> = {}
-        data.forEach((r: any) => { map[r.provider] = r.key_value ?? '' })
-        setKeys(map)
-        setDrafts(map)
-      }
-    }
-    load()
-  }, [])
+  const reload = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const { data } = await supabase
+      .from('integration_keys')
+      .select('provider, key_value, is_active')
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+    const map: Record<string, string> = {}
+    ;(data || []).forEach((r: any) => { map[r.provider] = r.key_value ?? '' })
+    setKeys(map)
+    setDrafts(d => ({ ...map, ...d }))
+  }
+
+  useEffect(() => { reload() }, [])
 
   const handleSave = async (provider: string) => {
     setSaving(provider)
+    setErrors(e => ({ ...e, [provider]: '' }))
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    const value = drafts[provider] ?? ''
+    if (!session) {
+      setErrors(e => ({ ...e, [provider]: 'Not signed in' }))
+      setSaving(null)
+      return
+    }
+    const value = (drafts[provider] ?? '').trim()
 
-    // Deactivate existing
-    await supabase
+    const { error: deactivateError } = await supabase
       .from('integration_keys')
       .update({ is_active: false })
       .eq('user_id', session.user.id)
       .eq('provider', provider)
 
-    if (value.trim()) {
-      await supabase.from('integration_keys').insert({
-        user_id: session.user.id,
-        provider,
-        key_value: value.trim(),
-        is_active: true,
-      })
+    if (deactivateError) {
+      setErrors(e => ({ ...e, [provider]: `Update failed: ${deactivateError.message}` }))
+      setSaving(null)
+      return
     }
 
-    setKeys(k => ({ ...k, [provider]: value.trim() }))
+    if (value) {
+      const { error: insertError } = await supabase.from('integration_keys').insert({
+        user_id: session.user.id,
+        provider,
+        key_value: value,
+        is_active: true,
+      })
+      if (insertError) {
+        setErrors(e => ({ ...e, [provider]: `Insert failed: ${insertError.message}` }))
+        setSaving(null)
+        return
+      }
+    }
+
+    await reload()
     setSaving(null)
     setSaved(provider)
     setTimeout(() => setSaved(null), 2500)
@@ -286,6 +299,9 @@ function ApiTab() {
             />
             {keys[id] && (
               <div style={{ fontSize: 9, color: C.green, letterSpacing: 1 }}>KEY ACTIVE</div>
+            )}
+            {errors[id] && (
+              <div style={{ fontSize: 9, color: C.red, letterSpacing: 0.5, maxWidth: 320 }}>{errors[id]}</div>
             )}
           </div>
         </Section>
