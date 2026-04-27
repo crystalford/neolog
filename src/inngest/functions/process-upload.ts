@@ -212,7 +212,7 @@ export const processUpload = inngest.createFunction(
             step,
             'extract-audio',
             replicateToken,
-            'fofr/toolkit:13d8a44358d693ca2ed9965d35fbf6329c313200787d55956046e7f8648e7a02',
+            'fofr/toolkit',
             { task: 'extract_video_audio_as_mp3', input_file: storageSignedUrl }
           )
           const audioUrl = extractReplicateUrl(output)
@@ -270,7 +270,7 @@ export const processUpload = inngest.createFunction(
             step,
             'extract-metadata-prober',
             replicateToken,
-            'fofr/toolkit:13d8a44358d693ca2ed9965d35fbf6329c313200787d55956046e7f8648e7a02',
+            'fofr/toolkit',
             {
               input_file: metaSignedUrl,
               ffmpeg_command: "-v quiet -print_format json -show_format -show_streams {input_file}"
@@ -456,7 +456,7 @@ export const processUpload = inngest.createFunction(
             step,
             'thumbnail-fallback',
             replicateToken,
-            'fofr/toolkit:13d8a44358d693ca2ed9965d35fbf6329c313200787d55956046e7f8648e7a02',
+            'fofr/toolkit',
             {
               task: 'ffmpeg_command',
               input_file: signedUrl,
@@ -510,7 +510,7 @@ export const processUpload = inngest.createFunction(
             step,
             'transcode-playback',
             replicateToken,
-            'fofr/toolkit:13d8a44358d693ca2ed9965d35fbf6329c313200787d55956046e7f8648e7a02',
+            'fofr/toolkit',
             { task: 'convert_input_to_mp4', input_file: transcodeSignedUrl }
           )
 

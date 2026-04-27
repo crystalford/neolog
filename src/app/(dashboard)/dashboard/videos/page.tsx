@@ -150,6 +150,15 @@ function isStuck(upload: any): boolean {
 }
 
 // Core multipart upload — direct browser → R2 using presigned URLs
+
+function extractRecordedAt(file: File): string | null {
+  // DJI filename: DJI_YYYYMMDDHHMMSS_NNNN_X.MP4
+  const m = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`
+  // Fall back to file modification date (better than upload date)
+  if (file.lastModified) return new Date(file.lastModified).toISOString()
+  return null
+}
 async function runMultipartUpload(
   file: File,
   onProgress: (pct: number) => void,
@@ -212,6 +221,7 @@ async function runMultipartUpload(
       file_name: file.name,
       file_size_bytes: file.size,
       mime_type: file.type,
+      recorded_at: extractRecordedAt(file),
     }),
     signal,
   })
