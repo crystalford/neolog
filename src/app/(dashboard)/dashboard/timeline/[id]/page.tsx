@@ -306,11 +306,15 @@ export default function TimelineDetailPage() {
             <section>
               <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-3">Key Moments</p>
               <div className="space-y-3">
-                {a.key_quotes.slice(0, 4).map((q, i) => (
-                  <blockquote key={i} className="border-l-2 border-[var(--accent)]/40 pl-4">
-                    <p className="text-[13.5px] italic leading-relaxed text-[var(--text-secondary)]">"{q}"</p>
-                  </blockquote>
-                ))}
+                {a.key_quotes.slice(0, 4).map((q: any, i) => {
+                  const text = typeof q === 'string' ? q : (q?.text || q?.quote || '')
+                  if (!text) return null
+                  return (
+                    <blockquote key={i} className="border-l-2 border-[var(--accent)]/40 pl-4">
+                      <p className="text-[13.5px] italic leading-relaxed text-[var(--text-secondary)]">"{text}"</p>
+                    </blockquote>
+                  )
+                })}
               </div>
             </section>
           )}
@@ -338,12 +342,23 @@ export default function TimelineDetailPage() {
             <section>
               <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">Actions</p>
               <ul className="space-y-1.5">
-                {a.action_items.slice(0, 8).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-[var(--text-secondary)]">
-                    <CheckSquare size={12} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
+                {a.action_items.slice(0, 8).map((item: any, i) => {
+                  // Schema is {task, urgency} but legacy rows may have plain strings.
+                  const text = typeof item === 'string' ? item : (item?.task || item?.text || '')
+                  const urgency = typeof item === 'object' ? item?.urgency : null
+                  if (!text) return null
+                  return (
+                    <li key={i} className="flex items-start gap-2 text-[13px] text-[var(--text-secondary)]">
+                      <CheckSquare size={12} className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0" />
+                      <span>{text}</span>
+                      {urgency && (
+                        <span className="ml-auto flex-shrink-0 text-[10px] font-mono text-[var(--text-tertiary)]">
+                          {urgency}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           )}

@@ -6,11 +6,29 @@ export const runtime = 'edge'
 
 const MP4_EPOCH_OFFSET_SEC = 2082844800
 
+async function tryRange(url: string, range: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(url, { headers: { Range: range } })
+    if (!res.ok && res.status !== 206) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
 async function readMp4CreationTime(signedUrl: string): Promise<string | null> {
-  const res = await fetch(signedUrl, { headers: { Range: 'bytes=0-2097151' } })
-  if (!res.ok && res.status !== 206) return null
-  const buf = new Uint8Array(await res.arrayBuffer())
-  return walkAtoms(buf, 'moov', (moovBuf) => walkAtoms(moovBuf, 'mvhd', readMvhdDate))
+  // moov atom can live at the start (streaming-optimized) or end (camera raw
+  // output, including DJI). Try the head first, then the tail as fallback.
+  const head = await tryRange(signedUrl, 'bytes=0-2097151')
+  if (head) {
+    const fromHead = walkAtoms(head, 'moov', (moovBuf) => walkAtoms(moovBuf, 'mvhd', readMvhdDate))
+    if (fromHead) return fromHead
+  }
+  const tail = await tryRange(signedUrl, 'bytes=-4194304')
+  if (tail) {
+    return walkAtoms(tail, 'moov', (moovBuf) => walkAtoms(moovBuf, 'mvhd', readMvhdDate))
+  }
+  return null
 }
 
 function walkAtoms(buf: Uint8Array, target: string, onMatch: (inner: Uint8Array) => string | null): string | null {
