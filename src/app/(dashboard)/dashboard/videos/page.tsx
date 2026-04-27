@@ -112,7 +112,8 @@ function formatDate(ts: string) {
 }
 
 const PROCESSING_STATUSES = new Set([
-  'starting', 'extracting-audio', 'extracting-metadata', 'metadata-extracted',
+  'uploaded', 'starting', 'extracting-audio', 'generating-thumbnail',
+  'extracting-metadata', 'metadata-extracted', 'transcoding-video',
   'transcribing-media', 'transcribed-media', 'analyzing', 'processing', 'transcribing',
 ])
 
@@ -125,19 +126,22 @@ function statusColor(status: string) {
 
 function statusLabel(status: string) {
   switch (status) {
-    case 'processed':           return 'READY'
-    case 'uploaded':            return 'QUEUED'
-    case 'starting':            return 'STARTING'
-    case 'extracting-audio':    return 'EXTRACTING AUDIO'
-    case 'extracting-metadata': return 'READING METADATA'
-    case 'metadata-extracted':  return 'TRANSCRIBING'
-    case 'transcribing-media':  return 'TRANSCRIBING'
-    case 'transcribed-media':   return 'ANALYZING'
-    case 'analyzing':           return 'ANALYZING'
-    case 'processing':          return 'PROCESSING'
-    case 'transcribing':        return 'TRANSCRIBING'
-    case 'error':               return 'ERROR'
-    default:                    return status.toUpperCase()
+    case 'processed':            return 'READY'
+    case 'uploaded':             return 'QUEUED'
+    case 'starting':             return 'STARTING'
+    case 'extracting-audio':     return 'EXTRACTING AUDIO'
+    case 'generating-thumbnail': return 'GENERATING THUMBNAIL'
+    case 'extracting-metadata':  return 'READING METADATA'
+    case 'metadata-extracted':   return 'TRANSCRIBING'
+    case 'transcoding-video':    return 'TRANSCODING'
+    case 'transcribing-media':   return 'TRANSCRIBING'
+    case 'transcribed-media':    return 'ANALYZING'
+    case 'analyzing-media':      return 'ANALYZING'
+    case 'analyzing':            return 'ANALYZING'
+    case 'processing':           return 'PROCESSING'
+    case 'transcribing':         return 'TRANSCRIBING'
+    case 'error':                return 'ERROR'
+    default:                     return status.toUpperCase()
   }
 }
 
@@ -152,19 +156,58 @@ function isStuck(upload: any): boolean {
 // Core multipart upload — direct browser → R2 using presigned URLs
 
 function extractRecordedAt(file: File): string | null {
-  // DJI filename: DJI_YYYYMMDDHHMMSS_NNNN_X.MP4
-  const dji = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/)
+  // DJI: DJI_YYYYMMDDHHMMSS_NNNN.MP4 or DJI_YYYYMMDD_HHMMSS_NNNN.MP4 (underscore between date and time)
+  const dji = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/)
   if (dji) return `${dji[1]}-${dji[2]}-${dji[3]}T${dji[4]}:${dji[5]}:${dji[6]}`
   // iPhone: IMG_YYYYMMDD_HHMMSS or IMG_YYYY-MM-DD-HH-MM-SS
   const iphone = file.name.match(/IMG_(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})/)
   if (iphone) return `${iphone[1]}-${iphone[2]}-${iphone[3]}T${iphone[4]}:${iphone[5]}:${iphone[6]}`
+  // GoPro: GH/GX/GO YYMMDD files
+  const gopro = file.name.match(/G[HXO]\d+_(\d{2})(\d{2})(\d{2})/)
+  if (gopro) return `20${gopro[1]}-${gopro[2]}-${gopro[3]}T00:00:00`
   // No reliable filename pattern — let the backend extract from video metadata
   return null
 }
+
+// Capture a JPEG thumbnail from the video file in the browser (instant, no server round-trip).
+// Returns a data: URL or null if the browser can't decode the video (e.g. HEVC on Chrome).
+function captureVideoThumbnail(file: File): Promise<string | null> {
+  if (!file.type.startsWith('video/')) return Promise.resolve(null)
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+    const timeout = setTimeout(() => { URL.revokeObjectURL(url); resolve(null) }, 15000)
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, video.duration * 0.05)
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const canvas = document.createElement('canvas')
+        const aspect = video.videoHeight > 0 ? video.videoHeight / video.videoWidth : 9 / 16
+        canvas.width = 320
+        canvas.height = Math.round(320 * aspect) || 180
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      } catch {
+        URL.revokeObjectURL(url)
+        resolve(null)
+      }
+    }
+    video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(null) }
+    video.src = url
+  })
+}
+
 async function runMultipartUpload(
   file: File,
   onProgress: (pct: number) => void,
   signal: AbortSignal,
+  thumbnailPromise: Promise<string | null>,
 ): Promise<{ key: string }> {
   // Step 1: Initiate and get presigned part URLs
   const initRes = await fetch('/api/upload/initiate', {
@@ -215,6 +258,8 @@ async function runMultipartUpload(
   onProgress(95)
 
   // Step 4: Register with Supabase + trigger Inngest pipeline
+  // Thumbnail should be ready by now (captured in parallel with the upload)
+  const thumbnail = await thumbnailPromise
   const regRes = await fetch('/api/video-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -224,6 +269,7 @@ async function runMultipartUpload(
       file_size_bytes: file.size,
       mime_type: file.type,
       recorded_at: extractRecordedAt(file),
+      thumbnail_url: thumbnail ?? undefined,
     }),
     signal,
   })
@@ -280,10 +326,14 @@ export default function VideosPage() {
 
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'uploading' } : j))
 
+      // Start thumbnail capture immediately in parallel — usually finishes well before upload
+      const thumbnailPromise = captureVideoThumbnail(job.file)
+
       runMultipartUpload(
         job.file,
         pct => setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: pct } : j)),
         abort.signal,
+        thumbnailPromise,
       )
         .then(() => {
           setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'done', progress: 100 } : j))

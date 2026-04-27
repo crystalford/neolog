@@ -3,7 +3,7 @@ import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
-import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
+import { presignDownloadUrl } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
 export const runtime = 'edge'
@@ -348,57 +348,16 @@ export const processUpload = inngest.createFunction(
       console.log(`[${Date.now()}] [apply-metadata] Success`);
     })
 
-    // ── Step 2c: Thumbnail Fallback (Server-side) ──
-    await reportStatus('generating-thumbnail')
-    let thumbnailPath: string | null = null
+    // ── Step 2c: Thumbnail ──
+    // Thumbnails are captured client-side (canvas) at upload time and stored as data: URLs.
+    // For videos where the browser couldn't capture a frame (HEVC on Chrome, audio files),
+    // thumbnail_url will be null — no server-side fallback since fofr/toolkit does not support
+    // frame extraction in a way compatible with its accepted input schema.
     const mode = event.data.mode || 'full'
-    const isPlaceholder = !upload.thumbnail_url || upload.thumbnail_url.startsWith('data:image/svg') || (upload as any).thumbnail_url?.includes('_placeholder')
-    
-    if ((isPlaceholder || mode === 'thumbnail') && replicateToken) {
-      const signedUrl = await step.run('thumbnail-sign-url', async () => {
-        console.log(`[${Date.now()}] [thumbnail-fallback] Signing download URL...`);
-        return presignDownloadUrl(upload.storage_path, 3600).catch(() => null)
-      })
+    const hasThumbnail = upload.thumbnail_url && !upload.thumbnail_url.startsWith('data:image/svg')
 
-      if (signedUrl) {
-        try {
-          console.log(`[${Date.now()}] [thumbnail-fallback] Starting Replicate job...`);
-          const output = await runReplicateAsync(
-            step,
-            'thumbnail-fallback',
-            replicateToken,
-            'fofr/toolkit',
-            {
-              task: 'ffmpeg_command',
-              input_file: signedUrl,
-              ffmpeg_command: "-ss 00:00:01 -i {input_file} -vframes 1 -q:v 2 {output_file}.jpg"
-            }
-          )
-
-          const outputUrl = extractReplicateUrl(output)
-          if (outputUrl) {
-            thumbnailPath = await step.run('thumbnail-upload', async () => {
-              console.log(`[${Date.now()}] [thumbnail-fallback] Fetching and uploading buffer...`);
-              const imgBuf = Buffer.from(await (await fetch(outputUrl)).arrayBuffer())
-              const p = `${user_id}/thumbnails/${video_upload_id}_fallback.jpg`
-              await uploadBuffer(p, imgBuf, 'image/jpeg')
-              await admin.from('video_uploads').update({
-                thumbnail_url: p,
-                ...(mode === 'thumbnail' ? { status: 'processed', updated_at: new Date().toISOString() } : {})
-              }).eq('id', video_upload_id)
-              return p
-            })
-            console.log(`[${Date.now()}] [thumbnail-fallback] Success: ${thumbnailPath}`);
-          }
-        } catch (err: any) {
-          console.error(`[${Date.now()}] [thumbnail-fallback] Failed:`, err?.message);
-        }
-      }
-    }
-
-    // If we only needed a thumbnail, we can stop here
-    if (event.data.mode === 'thumbnail' && thumbnailPath) {
-      return { status: 'thumbnail_fixed', video_upload_id }
+    if (!hasThumbnail) {
+      console.log(`[${Date.now()}] [thumbnail] No client thumbnail available for ${video_upload_id} — leaving null`)
     }
 
 
