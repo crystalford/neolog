@@ -3,7 +3,7 @@ import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
-import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
+import { presignDownloadUrl } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
 export const runtime = 'edge'
@@ -430,21 +430,25 @@ export const processUpload = inngest.createFunction(
     await reportStatus('transcribed-media')
 
     // ── Step 2c: Thumbnail extraction (server-side fallback) ──
-    // Client-side canvas capture fails for HEVC/H.265 (most DJI, modern iPhone) and audio files.
-    // We run this AFTER transcode-playback so we have a clean H.264 source to extract from.
+    // Runs AFTER transcode-playback so we have a clean H.264 source. HEVC/DJI rotation
+    // metadata causes frame extraction to return 0 frames on the original file.
     if (!hasThumbnail && replicateToken) {
       await reportStatus('generating-thumbnail')
 
-      // Use the transcoded H.264 file if available, else fall back to original
       const thumbSourcePath = playbackStoragePath || upload.storage_path
       const thumbSignedUrl = await step.run('thumbnail-sign-url', async () => {
-        console.log(`[${Date.now()}] [thumbnail] Signing URL for ${thumbSourcePath}`)
-        return presignDownloadUrl(thumbSourcePath, 1800).catch(() => null)
+        console.log(`[${Date.now()}] [thumbnail] source=${thumbSourcePath}`)
+        return presignDownloadUrl(thumbSourcePath, 1800).catch((e: any) => {
+          console.error(`[${Date.now()}] [thumbnail] presign failed:`, e?.message)
+          return null
+        })
       })
+
+      console.log(`[${Date.now()}] [thumbnail] thumbSignedUrl obtained: ${thumbSignedUrl ? 'YES' : 'NO'}`)
 
       if (thumbSignedUrl) {
         try {
-          console.log(`[${Date.now()}] [thumbnail] Starting Replicate frame extraction...`)
+          console.log(`[${Date.now()}] [thumbnail] Firing Replicate extract_video_thumbnails, fps=0.5`)
           const output = await runReplicateAsync(
             step,
             'thumbnail-extract',
@@ -452,23 +456,38 @@ export const processUpload = inngest.createFunction(
             'fofr/toolkit',
             { task: 'extract_video_thumbnails', input_file: thumbSignedUrl, fps: 0.5 }
           )
-          // extract_video_thumbnails returns an array of frame URLs — take the first
-          const frameUrl = Array.isArray(output) ? (output[0] ? String(output[0]) : null) : extractReplicateUrl(output)
+          // Log raw output so we can debug task name / output shape issues from Cloudflare logs
+          console.log(`[${Date.now()}] [thumbnail] raw output type=${typeof output}, isArray=${Array.isArray(output)}, value=${JSON.stringify(output)?.slice(0, 300)}`)
+
+          const frameUrl = Array.isArray(output)
+            ? (output[0] ? String(output[0]) : null)
+            : extractReplicateUrl(output)
+
+          console.log(`[${Date.now()}] [thumbnail] frameUrl=${frameUrl}`)
+
           if (frameUrl && frameUrl.startsWith('http')) {
-            await step.run('thumbnail-upload', async () => {
-              console.log(`[${Date.now()}] [thumbnail] Uploading frame to R2...`)
-              const imgBuf = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
-              const path = `${user_id}/thumbnails/${video_upload_id}.jpg`
-              await uploadBuffer(path, imgBuf, 'image/jpeg')
-              await admin.from('video_uploads').update({ thumbnail_url: path }).eq('id', video_upload_id)
-              console.log(`[${Date.now()}] [thumbnail] Success: ${path}`)
+            await step.run('thumbnail-save', async () => {
+              console.log(`[${Date.now()}] [thumbnail] Fetching frame and saving as data URL...`)
+              const res = await fetch(frameUrl)
+              if (!res.ok) throw new Error(`Frame fetch failed: ${res.status}`)
+              const buf = await res.arrayBuffer()
+              const b64 = Buffer.from(buf).toString('base64')
+              const dataUrl = `data:image/jpeg;base64,${b64}`
+              await admin.from('video_uploads').update({ thumbnail_url: dataUrl }).eq('id', video_upload_id)
+              console.log(`[${Date.now()}] [thumbnail] Saved data URL (${Math.round(b64.length / 1024)}KB base64)`)
             })
           } else {
-            console.warn(`[${Date.now()}] [thumbnail] No frame URL in Replicate output`)
+            console.warn(`[${Date.now()}] [thumbnail] No usable frame URL — output was: ${JSON.stringify(output)?.slice(0, 200)}`)
           }
         } catch (err: any) {
-          console.error(`[${Date.now()}] [thumbnail] Failed:`, err?.message)
+          console.error(`[${Date.now()}] [thumbnail] Replicate job failed:`, err?.message)
         }
+      }
+
+      // Always reset status after thumbnail attempt (success or fail) so the pipeline
+      // never gets permanently stuck at 'generating-thumbnail'.
+      if (mode !== 'thumbnail') {
+        await reportStatus('transcribed-media')
       }
     }
 

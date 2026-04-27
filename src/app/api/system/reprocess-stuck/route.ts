@@ -21,7 +21,7 @@ export async function POST() {
       .from('video_uploads')
       .select('id, user_id, file_name, status')
       .eq('user_id', user.id)
-      .in('status', ['saving-results', 'error', 'uploaded'])
+      .in('status', ['saving-results', 'error', 'uploaded', 'generating-thumbnail'])
       .lt('updated_at', cutoff)
       .limit(50)
 
