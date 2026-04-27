@@ -239,7 +239,15 @@ export default function SystemPage() {
   const [formats, setFormats] = useState<any[]>([])
   const [reprocessing, setReprocessing] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
-  const [backfillResult, setBackfillResult] = useState<{ updated: number; skipped: number } | null>(null)
+  const [backfillResult, setBackfillResult] = useState<{
+    ok: boolean
+    status?: number
+    message?: string
+    updated?: number
+    skipped?: number
+    total?: number
+    summary?: { totalUploads: number; nullRecordedAt: number; emptyRecordedAt: number; truthyRecordedAt: number }
+  } | null>(null)
   const [fixingThumbnails, setFixingThumbnails] = useState(false)
   const [thumbProgress, setThumbProgress] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<{
@@ -663,8 +671,20 @@ export default function SystemPage() {
                     Extracts dates from MP4 metadata (head + tail for DJI files) and filenames. Falls back to upload date. Runs directly — no queue.
                   </div>
                   {backfillResult && (
-                    <div style={{ marginTop: 8, fontSize: 10, color: C.green, letterSpacing: 1 }}>
-                      {backfillResult.updated} updated{backfillResult.skipped > 0 ? ` · ${backfillResult.skipped} skipped` : ''}
+                    <div style={{ marginTop: 8, fontSize: 10, letterSpacing: 1, lineHeight: 1.6 }}>
+                      <div style={{ color: backfillResult.ok ? C.green : C.red }}>
+                        {backfillResult.ok
+                          ? `${backfillResult.updated ?? 0} updated · ${backfillResult.skipped ?? 0} skipped${typeof backfillResult.total === 'number' ? ` · ${backfillResult.total} matched` : ''}`
+                          : `HTTP ${backfillResult.status ?? '?'} — ${backfillResult.message ?? 'unknown error'}`}
+                      </div>
+                      {backfillResult.summary && (
+                        <div style={{ color: C.textDim, marginTop: 2 }}>
+                          {backfillResult.summary.totalUploads} total · {backfillResult.summary.nullRecordedAt} null · {backfillResult.summary.emptyRecordedAt} empty · {backfillResult.summary.truthyRecordedAt} dated
+                        </div>
+                      )}
+                      {backfillResult.message && backfillResult.ok && (
+                        <div style={{ color: C.textDim, marginTop: 2 }}>{backfillResult.message}</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -673,10 +693,20 @@ export default function SystemPage() {
                   setBackfillResult(null)
                   try {
                     const res = await fetch('/api/system/run-date-backfill', { method: 'POST' })
-                    const data = await res.json()
-                    setBackfillResult({ updated: data.updated ?? 0, skipped: data.skipped ?? 0 })
+                    const body = await res.json().catch(() => ({}))
+                    setBackfillResult({
+                      ok: res.ok,
+                      status: res.status,
+                      message: body.error || body.note,
+                      updated: body.updated,
+                      skipped: body.skipped,
+                      total: body.total,
+                      summary: body.summary,
+                    })
                     fetchPipelineStatus()
-                  } catch { /* silent */ }
+                  } catch (e: any) {
+                    setBackfillResult({ ok: false, message: e?.message || 'Network error' })
+                  }
                   setBackfilling(false)
                 }}>
                   {backfilling ? 'RUNNING…' : 'RUN'}

@@ -95,17 +95,37 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // Coarse summary so the response can always explain what's in the DB
+    // even when the filtered query returns nothing.
+    const { data: all, error: summaryErr } = await supabase
+      .from('video_uploads')
+      .select('id, recorded_at')
+      .eq('user_id', user.id)
+
+    const summary = {
+      totalUploads: all?.length ?? 0,
+      nullRecordedAt: (all ?? []).filter((r: any) => r.recorded_at === null).length,
+      emptyRecordedAt: (all ?? []).filter((r: any) => r.recorded_at === '').length,
+      truthyRecordedAt: (all ?? []).filter((r: any) => !!r.recorded_at).length,
+    }
+    console.log('[backfill] user=', user.id, 'summary=', summary, 'summaryErr=', summaryErr?.message)
+
+    // Match NULL OR empty string defensively in case a prior code path wrote ''.
     const { data: uploads, error } = await supabase
       .from('video_uploads')
-      .select('id, file_name, storage_path, mime_type, meta, created_at')
+      .select('id, file_name, storage_path, mime_type, meta, created_at, recorded_at')
       .eq('user_id', user.id)
-      .is('recorded_at', null)
+      .or('recorded_at.is.null,recorded_at.eq.')
       .order('created_at', { ascending: false })
       .limit(200)
 
-    if (error) return NextResponse.json({ error: `query failed: ${error.message}` }, { status: 500 })
+    if (error) return NextResponse.json({ error: `query failed: ${error.message}`, summary }, { status: 500 })
     if (!uploads || uploads.length === 0) {
-      return NextResponse.json({ updated: 0, skipped: 0, total: 0, note: 'No uploads with null recorded_at found' })
+      return NextResponse.json({
+        updated: 0, skipped: 0, total: 0,
+        note: 'No uploads matched recorded_at IS NULL OR empty',
+        summary,
+      })
     }
 
     let updated = 0
@@ -155,7 +175,7 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ updated, skipped, total: uploads.length, results })
+    return NextResponse.json({ updated, skipped, total: uploads.length, results, summary })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
