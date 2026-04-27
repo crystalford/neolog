@@ -152,6 +152,48 @@ OUTPUT: Valid JSON array only. [{format_name, text}]`,
   },
 }
 
+// Loads a video URL into a hidden element, seeks to ~5%, and grabs a JPEG
+// frame as a data URL. Returns null if the browser can't decode it.
+async function captureFrameFromUrl(url: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.crossOrigin = 'anonymous'
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+
+    const cleanup = () => {
+      video.removeAttribute('src')
+      video.load()
+    }
+    const timeout = setTimeout(() => { cleanup(); resolve(null) }, 30000)
+
+    video.onloadedmetadata = () => {
+      const target = video.duration > 2 ? video.duration * 0.05 : 0.1
+      try { video.currentTime = Math.min(target, Math.max(0.1, video.duration - 0.1)) }
+      catch { /* some browsers fire seeked from load */ }
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const canvas = document.createElement('canvas')
+        const aspect = video.videoHeight > 0 ? video.videoHeight / video.videoWidth : 9 / 16
+        canvas.width = 320
+        canvas.height = Math.round(320 * aspect) || 180
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82)
+        cleanup()
+        resolve(dataUrl)
+      } catch {
+        cleanup()
+        resolve(null)
+      }
+    }
+    video.onerror = () => { clearTimeout(timeout); cleanup(); resolve(null) }
+    video.src = url
+  })
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -198,6 +240,7 @@ export default function SystemPage() {
   const [reprocessing, setReprocessing] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
   const [fixingThumbnails, setFixingThumbnails] = useState(false)
+  const [thumbProgress, setThumbProgress] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<{
     total: number; done: number; inProgress: number; queued: number; failed: number;
     nullDates: number; missingThumbnails: number; estimatedMinutes: number;
@@ -541,12 +584,12 @@ export default function SystemPage() {
                 </Btn>
               </div>
 
-              {/* Fix thumbnails */}
+              {/* Generate thumbnails (client-side, no Replicate) */}
               <div style={{
                 padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
               }}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
                     Generate missing thumbnails
                     {pipelineStatus && pipelineStatus.missingThumbnails > 0 && (
@@ -556,18 +599,48 @@ export default function SystemPage() {
                     )}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
-                    Runs server-side frame extraction for uploads with no thumbnail (HEVC, audio, etc). Up to 100 at a time.
+                    Captures a frame from each video in your browser. No Replicate, no rate limits, free. Keep this tab open while it runs.
                   </div>
+                  {thumbProgress && (
+                    <div style={{ marginTop: 8, fontSize: 10, color: C.amber, letterSpacing: 1 }}>
+                      {thumbProgress.done} / {thumbProgress.total} done
+                      {thumbProgress.failed > 0 && (
+                        <span style={{ marginLeft: 8, color: C.red }}>· {thumbProgress.failed} skipped</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Btn small onClick={async () => {
+                  if (fixingThumbnails) return
                   setFixingThumbnails(true)
+                  setThumbProgress({ done: 0, total: 0, failed: 0 })
                   try {
-                    await fetch('/api/system/fix-thumbnails', { method: 'POST' })
+                    const res = await fetch('/api/system/list-missing-thumbnails')
+                    if (!res.ok) throw new Error(`list failed: ${res.status}`)
+                    const { items } = await res.json() as { items: Array<{ id: string; url: string }> }
+                    setThumbProgress({ done: 0, total: items.length, failed: 0 })
+                    let done = 0, failed = 0
+                    for (const item of items) {
+                      try {
+                        const dataUrl = await captureFrameFromUrl(item.url)
+                        if (!dataUrl) { failed++; setThumbProgress({ done, total: items.length, failed }); continue }
+                        const saveRes = await fetch('/api/video-upload/save-thumbnail', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ video_upload_id: item.id, data_url: dataUrl }),
+                        })
+                        if (!saveRes.ok) failed++
+                        else done++
+                      } catch {
+                        failed++
+                      }
+                      setThumbProgress({ done, total: items.length, failed })
+                    }
                     fetchPipelineStatus()
                   } catch { /* silent */ }
                   setFixingThumbnails(false)
                 }}>
-                  {fixingThumbnails ? 'QUEUING…' : 'RUN'}
+                  {fixingThumbnails ? 'CAPTURING…' : 'RUN'}
                 </Btn>
               </div>
 

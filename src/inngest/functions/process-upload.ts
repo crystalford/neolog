@@ -455,13 +455,11 @@ export const processUpload = inngest.createFunction(
     }
 
     const mode = earlyMode
-    const hasThumbnail = upload.thumbnail_url &&
-      !upload.thumbnail_url.startsWith('data:image/svg') &&
-      !(upload.thumbnail_url as string).includes('_placeholder')
 
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
-    // Runs before thumbnail extraction because HEVC/DJI rotation metadata causes
-    // frame extraction to return 0 frames on the original file.
+    // HEVC files (DJI Mimo etc.) won't play in Chrome, and the same rotation
+    // metadata also breaks browser frame capture. Transcoding once gives us
+    // both: working playback AND a source the browser can grab a frame from.
     // Skip if a playback file already exists in DB (from a previous run).
     let playbackStoragePath: string | null = (upload as any).playback_path || null
     // Include thumbnail mode: HEVC/DJI files need transcoding before frame extraction works.
@@ -515,72 +513,13 @@ export const processUpload = inngest.createFunction(
     // ── Update: Transcode Done ──
     await reportStatus('transcribed-media')
 
-    // ── Step 2c: Thumbnail extraction (server-side fallback) ──
-    // Runs AFTER transcode-playback so we have a clean H.264 source. HEVC/DJI rotation
-    // metadata causes frame extraction to return 0 frames on the original file.
-    if (!hasThumbnail && replicateToken) {
-      await reportStatus('generating-thumbnail')
-
-      const thumbSourcePath = playbackStoragePath || upload.storage_path
-      const thumbSignedUrl = await step.run('thumbnail-sign-url', async () => {
-        console.log(`[${Date.now()}] [thumbnail] source=${thumbSourcePath}`)
-        return presignDownloadUrl(thumbSourcePath, 1800).catch((e: any) => {
-          console.error(`[${Date.now()}] [thumbnail] presign failed:`, e?.message)
-          return null
-        })
-      })
-
-      console.log(`[${Date.now()}] [thumbnail] thumbSignedUrl obtained: ${thumbSignedUrl ? 'YES' : 'NO'}`)
-
-      if (thumbSignedUrl) {
-        try {
-          console.log(`[${Date.now()}] [thumbnail] Firing Replicate extract_video_thumbnails, fps=0.5`)
-          const output = await runReplicateAsync(
-            step,
-            'thumbnail-extract',
-            replicateToken,
-            'fofr/toolkit',
-            { task: 'extract_video_thumbnails', input_file: thumbSignedUrl, fps: 0.5 }
-          )
-          // Log raw output so we can debug task name / output shape issues from Cloudflare logs
-          console.log(`[${Date.now()}] [thumbnail] raw output type=${typeof output}, isArray=${Array.isArray(output)}, value=${JSON.stringify(output)?.slice(0, 300)}`)
-
-          const frameUrl = Array.isArray(output)
-            ? (output[0] ? String(output[0]) : null)
-            : extractReplicateUrl(output)
-
-          console.log(`[${Date.now()}] [thumbnail] frameUrl=${frameUrl}`)
-
-          if (frameUrl && frameUrl.startsWith('http')) {
-            await step.run('thumbnail-save', async () => {
-              console.log(`[${Date.now()}] [thumbnail] Fetching frame and saving as data URL...`)
-              const res = await fetch(frameUrl)
-              if (!res.ok) throw new Error(`Frame fetch failed: ${res.status}`)
-              const buf = await res.arrayBuffer()
-              const b64 = Buffer.from(buf).toString('base64')
-              const dataUrl = `data:image/jpeg;base64,${b64}`
-              await admin.from('video_uploads').update({ thumbnail_url: dataUrl }).eq('id', video_upload_id)
-              console.log(`[${Date.now()}] [thumbnail] Saved data URL (${Math.round(b64.length / 1024)}KB base64)`)
-            })
-          } else {
-            console.warn(`[${Date.now()}] [thumbnail] No usable frame URL — output was: ${JSON.stringify(output)?.slice(0, 200)}`)
-          }
-        } catch (err: any) {
-          console.error(`[${Date.now()}] [thumbnail] Replicate job failed:`, err?.message)
-        }
-      }
-
-      // Always reset status after thumbnail attempt (success or fail) so the pipeline
-      // never gets permanently stuck at 'generating-thumbnail'.
-      if (mode !== 'thumbnail') {
-        await reportStatus('transcribed-media')
-      }
-    }
-
-    // If we only needed a thumbnail, stop here
+    // Thumbnails are captured client-side at upload time (see captureVideoThumbnail
+    // in dashboard/videos/page.tsx) and retroactively via the System page button.
+    // No Replicate involvement — that path was rate-limited, expensive, and
+    // unreliable on HEVC. If mode is 'thumbnail' there is nothing to do here.
     if (mode === 'thumbnail') {
       await reportStatus('processed')
-      return { status: 'thumbnail_fixed', video_upload_id }
+      return { status: 'thumbnail_noop', video_upload_id }
     }
 
     // ── Step 3: Transcribe ──
