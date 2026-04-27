@@ -464,7 +464,8 @@ export const processUpload = inngest.createFunction(
     // frame extraction to return 0 frames on the original file.
     // Skip if a playback file already exists in DB (from a previous run).
     let playbackStoragePath: string | null = (upload as any).playback_path || null
-    const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && mode !== 'thumbnail' && replicateToken && !playbackStoragePath
+    // Include thumbnail mode: HEVC/DJI files need transcoding before frame extraction works.
+    const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && replicateToken && !playbackStoragePath
 
     if (shouldTranscode) {
       await reportStatus('transcoding-video')
