@@ -155,7 +155,7 @@ export async function runAnalysis(
   if (anthropicKey) {
     const anthropic = new Anthropic({ apiKey: anthropicKey })
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -165,7 +165,7 @@ export async function runAnalysis(
     if (textContent && textContent.type === 'text') {
       analysisText = textContent.text
     }
-    modelUsed = 'claude-sonnet-4-6'
+    modelUsed = 'claude-haiku-4-5'
   } else if (openaiKey) {
     const openai = new OpenAI({ apiKey: openaiKey })
     const completion = await openai.chat.completions.create({
@@ -531,7 +531,7 @@ export async function extractVoiceProfile(
     if (anthropicKey) {
       const anthropic = new Anthropic({ apiKey: anthropicKey })
       const msg = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         max_tokens: 1024,
         system: VOICE_EXTRACTION_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],

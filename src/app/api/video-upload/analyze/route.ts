@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     } else if (anthropicKey) {
       const anthropic = new Anthropic({ apiKey: anthropicKey.key })
       const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-haiku-4-5',
         max_tokens: 4096,
         system: ANALYSIS_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
       if (textContent && textContent.type === 'text') {
         analysisText = textContent.text
       }
-      modelUsed = 'claude-sonnet-4-5'
+      modelUsed = 'claude-haiku-4-5'
     }
 
     // Parse the JSON analysis
