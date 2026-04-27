@@ -153,10 +153,12 @@ function isStuck(upload: any): boolean {
 
 function extractRecordedAt(file: File): string | null {
   // DJI filename: DJI_YYYYMMDDHHMMSS_NNNN_X.MP4
-  const m = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/)
-  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`
-  // Fall back to file modification date (better than upload date)
-  if (file.lastModified) return new Date(file.lastModified).toISOString()
+  const dji = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/)
+  if (dji) return `${dji[1]}-${dji[2]}-${dji[3]}T${dji[4]}:${dji[5]}:${dji[6]}`
+  // iPhone: IMG_YYYYMMDD_HHMMSS or IMG_YYYY-MM-DD-HH-MM-SS
+  const iphone = file.name.match(/IMG_(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})/)
+  if (iphone) return `${iphone[1]}-${iphone[2]}-${iphone[3]}T${iphone[4]}:${iphone[5]}:${iphone[6]}`
+  // No reliable filename pattern — let the backend extract from video metadata
   return null
 }
 async function runMultipartUpload(
