@@ -113,7 +113,7 @@ export async function POST() {
     // Match NULL OR empty string defensively in case a prior code path wrote ''.
     const { data: uploads, error } = await supabase
       .from('video_uploads')
-      .select('id, file_name, storage_path, mime_type, meta, created_at, recorded_at')
+      .select('id, file_name, storage_path, mime_type, created_at, recorded_at')
       .eq('user_id', user.id)
       .or('recorded_at.is.null,recorded_at.eq.')
       .order('created_at', { ascending: false })
@@ -159,10 +159,10 @@ export async function POST() {
       }
 
       if (recordedAt) {
-        const { error: updateErr } = await supabase.from('video_uploads').update({
-          recorded_at: recordedAt,
-          meta: { ...(upload.meta || {}), recorded_at_source: source, backfilled: true },
-        }).eq('id', upload.id)
+        const { error: updateErr } = await supabase
+          .from('video_uploads')
+          .update({ recorded_at: recordedAt })
+          .eq('id', upload.id)
         if (updateErr) {
           skipped++
           results.push({ id: upload.id, source: 'update-failed', date: updateErr.message })
