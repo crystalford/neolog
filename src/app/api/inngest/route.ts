@@ -15,6 +15,7 @@ import { autoEdit } from '@/inngest/functions/auto-edit'
 import { assembleStudioAudio } from '@/inngest/functions/assemble-studio-audio'
 import { generateSegmentVisuals } from '@/inngest/functions/generate-segment-visuals'
 import { composeStudioVideo } from '@/inngest/functions/compose-studio-video'
+import { backfillRecordedAt } from '@/inngest/functions/backfill-recorded-at'
 
 export const runtime = 'edge'
 
@@ -37,5 +38,6 @@ export const { GET, POST, PUT } = serve({
     assembleStudioAudio,
     generateSegmentVisuals,
     composeStudioVideo,
+    backfillRecordedAt,
   ],
 })

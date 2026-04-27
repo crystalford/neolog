@@ -197,6 +197,8 @@ export default function SystemPage() {
   const [formats, setFormats] = useState<any[]>([])
   const [reprocessing, setReprocessing] = useState(false)
   const [reprocessResult, setReprocessResult] = useState<string | null>(null)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<string | null>(null)
   const [addingFormat, setAddingFormat] = useState(false)
   const [newFormat, setNewFormat] = useState({ name: '', instruction: '' })
 
@@ -407,6 +409,39 @@ export default function SystemPage() {
                   setReprocessing(false)
                 }}>
                   {reprocessing ? 'RUNNING…' : 'RUN'}
+                </Btn>
+              </div>
+
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>Backfill recording dates</div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Re-extracts recorded_at from MP4 metadata and filenames for uploads showing "Today" instead of actual date. Up to 200 at a time.
+                  </div>
+                  {backfillResult && (
+                    <div style={{ fontSize: 10, color: C.green, marginTop: 6 }}>{backfillResult}</div>
+                  )}
+                </div>
+                <Btn small onClick={async () => {
+                  setBackfilling(true)
+                  setBackfillResult(null)
+                  try {
+                    const res = await fetch('/api/system/backfill-dates', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.queued) {
+                      setBackfillResult('Queued. Check back in a minute — dates will update as uploads are processed.')
+                    } else {
+                      setBackfillResult(data.error || 'Request failed.')
+                    }
+                  } catch {
+                    setBackfillResult('Request failed.')
+                  }
+                  setBackfilling(false)
+                }}>
+                  {backfilling ? 'QUEUING…' : 'RUN'}
                 </Btn>
               </div>
             </div>
