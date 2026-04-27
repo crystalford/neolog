@@ -477,7 +477,8 @@ export default function VideosPage() {
               <VideoRow
                 key={v.id}
                 upload={v}
-                onOpenStudio={() => router.push('/dashboard/studio')}
+                onOpenStudio={() => router.push(`/dashboard/studio?v=${v.id}`)}
+                onOpenDetail={() => router.push(`/dashboard/timeline/${v.id}`)}
                 onDelete={() => handleDelete(v.id)}
                 onReanalyzed={fetchUploads}
               />
@@ -492,11 +493,13 @@ export default function VideosPage() {
 function VideoRow({
   upload,
   onOpenStudio,
+  onOpenDetail,
   onDelete,
   onReanalyzed,
 }: {
   upload: any
   onOpenStudio: () => void
+  onOpenDetail: () => void
   onDelete: () => void
   onReanalyzed: () => void
 }) {
@@ -561,13 +564,17 @@ function VideoRow({
       }}
     >
       {/* Thumbnail */}
-      <div style={{
-        width: 72, height: 44, flexShrink: 0,
-        background: C.bgRaised,
-        border: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
-      }}>
+      <div
+        onClick={isReady ? onOpenDetail : undefined}
+        style={{
+          width: 72, height: 44, flexShrink: 0,
+          background: C.bgRaised,
+          border: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
+          cursor: isReady ? 'pointer' : 'default',
+        }}
+      >
         {upload.thumbnail_url ? (
           <img
             src={upload.thumbnail_url}
@@ -580,10 +587,14 @@ function VideoRow({
       </div>
 
       {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={isReady ? onOpenDetail : undefined}
+        style={{ flex: 1, minWidth: 0, cursor: isReady ? 'pointer' : 'default' }}
+      >
         <div style={{
-          fontSize: 12, color: C.textPrimary, marginBottom: 3,
+          fontSize: 12, color: hovered && isReady ? C.amberBright : C.textPrimary, marginBottom: 3,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          transition: 'color 0.12s',
         }}>
           {title}
         </div>

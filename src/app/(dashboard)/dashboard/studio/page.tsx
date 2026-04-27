@@ -3,6 +3,7 @@
 export const runtime = 'edge'
 
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { VideoUpload, VideoAnalysis } from '@/types/database'
 import { RecordScreen } from './RecordScreen'
@@ -942,6 +943,8 @@ const SUB_NAV: Array<{ id: Screen; label: string }> = [
 
 export default function StudioPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const videoId = searchParams?.get('v') ?? null
   const [screen, setScreen] = useState<Screen>('sessions')
   const [activeUpload, setActiveUpload] = useState<VideoUpload | null>(null)
   const [selectedIdea, setSelectedIdea] = useState<{ text: string; format: string } | null>(null)
@@ -954,6 +957,27 @@ export default function StudioPage() {
       if (session) setUserId(session.user.id)
     })
   }, [])
+
+  // If a ?v={id} is provided, preload that video and jump straight to debrief.
+  useEffect(() => {
+    if (!videoId || activeUpload) return
+    let cancelled = false
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('video_uploads')
+        .select('id, file_name, created_at, recorded_at, status, duration_seconds, analysis, transcript')
+        .eq('id', videoId)
+        .eq('user_id', session.user.id)
+        .single()
+      if (!cancelled && data) {
+        setActiveUpload(data as VideoUpload)
+        setScreen('debrief')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [videoId])
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
