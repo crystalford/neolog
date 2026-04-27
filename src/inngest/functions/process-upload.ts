@@ -969,7 +969,85 @@ export const processUpload = inngest.createFunction(
       })
     }
 
-    // Step 7: Automated synthesis disabled per user preference (Strictly manual via Studio)
+    // ── Step 7: Surface post candidates from analysis ──
+    await step.run('create-post-candidates', async () => {
+      const analysis = analysisResult.analysis
+      const sessionId = String(video_upload_id)
+      const rows: Array<{
+        user_id: string
+        session_id: string
+        source_type: string
+        raw_content: string
+        generated_versions: any[]
+        status: string
+      }> = []
+
+      for (const quote of (analysis.key_quotes ?? []) as string[]) {
+        if (quote?.trim()) {
+          rows.push({ user_id, session_id: sessionId, source_type: 'quote', raw_content: quote.trim(), generated_versions: [], status: 'ready' })
+        }
+      }
+      for (const op of (analysis.strong_opinions ?? []) as string[]) {
+        if (op?.trim()) {
+          rows.push({ user_id, session_id: sessionId, source_type: 'strong_opinion', raw_content: op.trim(), generated_versions: [], status: 'ready' })
+        }
+      }
+      for (const idea of (analysis.content_ideas ?? []) as Array<{ topic: string; format: string }>) {
+        const text = typeof idea === 'object' ? idea.topic : String(idea)
+        if (text?.trim()) {
+          rows.push({ user_id, session_id: sessionId, source_type: 'observation', raw_content: text.trim(), generated_versions: [], status: 'ready' })
+        }
+      }
+
+      if (rows.length > 0) {
+        await admin.from('post_candidates').insert(rows)
+      }
+    })
+
+    // ── Step: Populate marinating_ideas for recurring ideas ──
+    await step.run('populate-marinating-ideas', async () => {
+      const ideas: Array<{ text: string; format: string }> = []
+      for (const idea of (analysisResult?.content_ideas ?? []).slice(0, 10)) {
+        const text = typeof idea === 'object' ? (idea as any).topic : String(idea)
+        const format = typeof idea === 'object' ? ((idea as any).format ?? 'content') : 'content'
+        if (text) ideas.push({ text, format })
+      }
+      if (ideas.length === 0) return
+
+      // Check which ideas have appeared in other uploads (entity_mentions for idea-type entities)
+      for (const idea of ideas) {
+        const { data: existing } = await admin
+          .from('marinating_ideas')
+          .select('id, mention_count')
+          .eq('user_id', userId)
+          .ilike('idea', idea.text.slice(0, 60) + '%')
+          .limit(1)
+
+        if (existing && existing.length > 0) {
+          // Already exists — increment mention count
+          await admin
+            .from('marinating_ideas')
+            .update({
+              mention_count: (existing[0].mention_count ?? 1) + 1,
+              last_seen_at: new Date().toISOString(),
+              last_upload_id: video_upload_id,
+            })
+            .eq('id', existing[0].id)
+        } else {
+          // New marinating idea
+          await admin.from('marinating_ideas').insert({
+            user_id: userId,
+            idea: idea.text,
+            format: idea.format,
+            source_upload_id: video_upload_id,
+            last_upload_id: video_upload_id,
+            mention_count: 1,
+            last_seen_at: new Date().toISOString(),
+            status: 'marinating',
+          }).then(() => {})
+        }
+      }
+    })
 
     return { status: 'success', video_upload_id }
   }

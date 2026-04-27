@@ -50,9 +50,9 @@ const NODES: PipelineNode[] = [
   { id: 'music',     label: 'Music',       color: C.green,  x: 220, y: 200, desc: 'Suno API · AI-generated per production · No Content ID exposure' },
   { id: 'images',    label: 'Images',      color: C.green,  x: 380, y: 200, desc: 'FLUX 2 Pro · Start + end frames per segment · 1920×1080 PNG' },
   { id: 'video',     label: 'Video',       color: C.green,  x: 540, y: 200, desc: 'Kling 3.0 Pro via fal.ai · First+last frame · 5s clips' },
-  { id: 'assembly',  label: 'Assembly',    color: C.amber,  x: 700, y: 120, desc: 'FFmpeg · Cut types · VO + music layers · Caption burn · Multi-ratio output' },
+  { id: 'assembly',  label: 'Assembly',    color: C.amber,  x: 700, y: 120, desc: 'FFmpeg · Cut types · VO + music layers · Multi-ratio output' },
   { id: 'posts',     label: 'Posts',       color: C.purple, x: 700, y: 40,  desc: 'Claude Sonnet (Batch) · Quote → post candidate · Format templates · X publishing', promptKey: 'posts' },
-  { id: 'publish',   label: 'Publish',     color: C.amber,  x: 700, y: 200, desc: 'YouTube, TikTok, X · Multi-ratio export · Generated captions and hashtags' },
+  { id: 'publish',   label: 'Publish',     color: C.amber,  x: 700, y: 200, desc: 'YouTube, TikTok, X · Multi-ratio export' },
 ]
 
 // ── Default prompt content ────────────────────────────────────────────────────

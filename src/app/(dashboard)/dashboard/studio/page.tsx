@@ -5,6 +5,7 @@ export const runtime = 'edge'
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { VideoUpload, VideoAnalysis } from '@/types/database'
+import { RecordScreen } from './RecordScreen'
 
 const C = {
   bg:           '#070706',
@@ -26,7 +27,7 @@ const C = {
   red:          '#8A4040',
 }
 
-type Screen = 'sessions' | 'debrief' | 'style' | 'script' | 'produce' | 'review'
+type Screen = 'sessions' | 'debrief' | 'style' | 'script' | 'record' | 'produce' | 'review'
 
 function Tag({ children, color = C.amber }: { children: React.ReactNode; color?: string }) {
   return (
@@ -167,12 +168,13 @@ function DebriefScreen({
   onContinue,
 }: {
   upload: VideoUpload | null
-  onContinue: () => void
+  onContinue: (idea: { text: string; format: string } | null) => void
 }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [started, setStarted] = useState(false)
+  const [selectedIdea, setSelectedIdea] = useState<{ text: string; format: string } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const analysis = upload?.analysis as VideoAnalysis | null
@@ -261,13 +263,21 @@ function DebriefScreen({
           {ideas.map((idea, i) => {
             const text = typeof idea === 'object' ? (idea as any).topic : String(idea)
             const format = typeof idea === 'object' ? (idea as any).format : 'content'
+            const isSelected = selectedIdea?.text === text
             return (
-              <div key={i} style={{
-                padding: '11px 13px', border: `1px solid ${C.border}`,
-                background: C.bgRaised,
-              }}>
-                <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+              <div
+                key={i}
+                onClick={() => setSelectedIdea({ text, format: format ?? 'content' })}
+                style={{
+                  padding: '11px 13px',
+                  border: `1px solid ${isSelected ? C.amber : C.border}`,
+                  background: isSelected ? C.amberGlow : C.bgRaised,
+                  cursor: 'pointer', transition: 'all 0.12s',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 6 }}>
                   <Tag color={C.amber}>{format?.toUpperCase() ?? 'IDEA'}</Tag>
+                  {isSelected && <span style={{ fontSize: 8, color: C.amber, letterSpacing: 1 }}>SELECTED ✓</span>}
                 </div>
                 <div style={{
                   fontFamily: "'Syne', sans-serif", fontSize: 12, fontWeight: 600,
@@ -278,16 +288,28 @@ function DebriefScreen({
               </div>
             )
           })}
-          {analysis?.strong_opinions?.slice(0, 2).map((op, i) => (
-            <div key={`op-${i}`} style={{
-              padding: '11px 13px', border: `1px solid ${C.border}`, background: C.bgRaised,
-            }}>
-              <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
-                <Tag color={C.blue}>OPINION</Tag>
+          {analysis?.strong_opinions?.slice(0, 2).map((op, i) => {
+            const opText = typeof op === 'string' ? op : String(op)
+            const isSelected = selectedIdea?.text === opText
+            return (
+              <div
+                key={`op-${i}`}
+                onClick={() => setSelectedIdea({ text: opText, format: 'opinion' })}
+                style={{
+                  padding: '11px 13px',
+                  border: `1px solid ${isSelected ? C.blue : C.border}`,
+                  background: isSelected ? `${C.blue}12` : C.bgRaised,
+                  cursor: 'pointer', transition: 'all 0.12s',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 5, marginBottom: 6 }}>
+                  <Tag color={C.blue}>OPINION</Tag>
+                  {isSelected && <span style={{ fontSize: 8, color: C.blue, letterSpacing: 1 }}>SELECTED ✓</span>}
+                </div>
+                <div style={{ fontSize: 11, color: C.textSecond, lineHeight: 1.4 }}>{opText}</div>
               </div>
-              <div style={{ fontSize: 11, color: C.textSecond, lineHeight: 1.4 }}>{op}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -322,9 +344,25 @@ function DebriefScreen({
           </div>
         </div>
 
-        <div style={{ padding: '11px 26px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 7 }}>
-          <Btn primary onClick={onContinue}>SET VISUAL STYLE →</Btn>
-          <Btn>DIFFERENT IDEA</Btn>
+        <div style={{ padding: '11px 26px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 7, alignItems: 'center' }}>
+          <button
+            onClick={() => selectedIdea && onContinue(selectedIdea)}
+            style={{
+              background: selectedIdea ? C.amber : C.bgRaised,
+              border: `1px solid ${selectedIdea ? C.amber : C.border}`,
+              color: selectedIdea ? C.bg : C.textDim,
+              fontSize: 9, letterSpacing: 2, fontWeight: selectedIdea ? 700 : 400,
+              padding: '8px 18px', cursor: selectedIdea ? 'pointer' : 'default',
+              fontFamily: "'JetBrains Mono', monospace", transition: 'all 0.12s',
+            }}
+          >
+            {selectedIdea ? 'SET VISUAL STYLE →' : 'SELECT AN IDEA FIRST'}
+          </button>
+          {selectedIdea && (
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedIdea.text}
+            </div>
+          )}
         </div>
         <div style={{ padding: '9px 26px 14px', borderTop: `1px solid ${C.border}`, display: 'flex', gap: 7 }}>
           <input
@@ -364,24 +402,43 @@ const REGISTER_OPTIONS = [
 ]
 
 function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
+  const supabase = createClient()
+  const [savedCards, setSavedCards] = useState<any[]>([])
   const [reg, setReg] = useState<string | null>(null)
   const [palette, setPalette] = useState('')
   const [reference, setReference] = useState('')
-  const [locked, setLocked] = useState(false)
 
-  if (locked) {
-    return (
-      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 30, color: C.green }}>✓</div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>Style locked</div>
-        <div style={{ fontSize: 12, color: C.textSecond }}>Writing script…</div>
-        <div style={{ marginTop: 8 }}>
-          <Btn primary onClick={() => onLock({ register: reg, palette, reference })}>
-            VIEW SCRIPT →
-          </Btn>
-        </div>
-      </div>
-    )
+  useEffect(() => {
+    async function loadCards() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const { data } = await supabase
+        .from('style_cards')
+        .select('id, name, register, palette, film_stock, lens, mood, reference_image_prompt')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(6)
+      setSavedCards(data ?? [])
+    }
+    loadCards()
+  }, [])
+
+  const handleLockNew = async () => {
+    const card = { register: reg, palette, film_stock: '16mm Ektachrome pushed two stops', lens: '35mm prime f/2, shallow depth of field', reference }
+    // Save to DB in background — don't block the UI
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      supabase.from('style_cards').insert({
+        user_id: session.user.id,
+        name: `${reg ?? 'Custom'} — ${palette || 'no palette'}`,
+        register: card.register,
+        palette: card.palette,
+        film_stock: card.film_stock,
+        lens: card.lens,
+        reference_image_prompt: reference || null,
+      }).then(() => {})
+    }
+    onLock(card)
   }
 
   return (
@@ -390,8 +447,40 @@ function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
         Visual style
       </div>
       <div style={{ fontSize: 12, color: C.textSecond, marginBottom: 28 }}>
-        Three questions. Locks the visual world for every generated image.
+        Choose a saved style card or define a new one.
       </div>
+
+      {/* Saved cards */}
+      {savedCards.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <Label>SAVED STYLE CARDS</Label>
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {savedCards.map(card => (
+              <div
+                key={card.id}
+                onClick={() => onLock(card)}
+                style={{
+                  padding: '12px 15px', border: `1px solid ${C.border}`,
+                  background: C.bgSurface, cursor: 'pointer', transition: 'all 0.12s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = C.amber }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = C.border }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, color: C.textPrimary, marginBottom: 3 }}>{card.name ?? card.register}</div>
+                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                    {[card.palette, card.lens].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                <span style={{ fontSize: 9, color: C.amber, letterSpacing: 1 }}>USE →</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ margin: '20px 0 24px', borderBottom: `1px solid ${C.border}` }} />
+          <Label>OR DEFINE NEW</Label>
+        </div>
+      )}
 
       {/* Q1: Register */}
       <div style={{ marginBottom: 24 }}>
@@ -474,25 +563,126 @@ function StyleScreen({ onLock }: { onLock: (styleCard: any) => void }) {
               ))}
             </div>
           </div>
-          <Btn primary onClick={() => setLocked(true)}>LOCK + WRITE SCRIPT →</Btn>
+          <Btn primary onClick={handleLockNew}>LOCK + WRITE SCRIPT →</Btn>
         </div>
       )}
     </div>
   )
 }
 
-// ── Sub-screen: Script (placeholder — script is generated async) ──────────────
+// ── Sub-screen: Script ───────────────────────────────────────────────────────
 
-function ScriptScreen({ onApprove }: { onApprove: () => void }) {
+function ScriptScreen({
+  upload,
+  styleCard,
+  selectedIdea,
+  onApprove,
+}: {
+  upload: VideoUpload | null
+  styleCard: any
+  selectedIdea: { text: string; format: string } | null
+  onApprove: (productionId: string, status: 'scripted' | 'done') => void
+}) {
+  const [phase, setPhase] = useState<'firing' | 'generating' | 'done' | 'error'>('firing')
+  const [error, setError] = useState<string | null>(null)
+  const [productionId, setProductionId] = useState<string | null>(null)
+  const [scriptData, setScriptData] = useState<{ title?: string; segments?: any[]; prodStatus?: string } | null>(null)
+
+  useEffect(() => {
+    if (!upload) { setError('No session selected.'); setPhase('error'); return }
+    let cancelled = false
+
+    async function run() {
+      try {
+        const res = await fetch('/api/studio/produce', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ upload_id: upload!.id, style_card: styleCard, selected_idea: selectedIdea }),
+        })
+        if (!res.ok) throw new Error(await res.text())
+        const { production_id } = await res.json()
+        if (cancelled) return
+        setProductionId(production_id)
+        setPhase('generating')
+
+        while (!cancelled) {
+          await new Promise(r => setTimeout(r, 4000))
+          const r = await fetch(`/api/studio/production-status?id=${production_id}`)
+          if (!r.ok || cancelled) continue
+          const d = await r.json()
+          if ((d.status === 'done' || d.status === 'scripted') && d.scripts?.script_json) {
+            const segs = Array.isArray(d.scripts.script_json) ? d.scripts.script_json : []
+            setScriptData({ title: d.scripts.title, segments: segs, prodStatus: d.status })
+            setPhase('done')
+            break
+          }
+          if (d.status === 'error') {
+            setError(d.error_message || 'Script generation failed')
+            setPhase('error')
+            break
+          }
+        }
+      } catch (e: any) {
+        if (!cancelled) { setError(e.message || 'Failed to start production'); setPhase('error') }
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [])
+
+  if (phase === 'firing' || phase === 'generating') {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: C.amber, animation: 'pulse 1.5s ease-in-out infinite' }} />
+        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 2 }}>
+          {phase === 'firing' ? 'STARTING PRODUCTION…' : 'CLAUDE IS WRITING YOUR SCRIPT…'}
+        </div>
+        <div style={{ fontSize: 10, color: C.textDimmer }}>This takes 1–2 minutes</div>
+      </div>
+    )
+  }
+
+  if (phase === 'error') {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14 }}>
+        <div style={{ fontSize: 10, color: C.red }}>{error}</div>
+      </div>
+    )
+  }
+
+  // done — show script
+  const segments = scriptData?.segments ?? []
   return (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 2 }}>SCRIPT GENERATION</div>
-      <div style={{ fontSize: 12, color: C.textSecond, maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>
-        Script generation via Claude Opus runs as a background job. This screen will show the full segment browser once ready.
+    <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px' }}>
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 3 }}>
+        {scriptData?.title ?? 'Script'}
       </div>
-      <div style={{ marginTop: 8 }}>
-        <Btn primary onClick={onApprove}>APPROVE + PRODUCE →</Btn>
+      <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, marginBottom: 24 }}>
+        {segments.length} segment{segments.length !== 1 ? 's' : ''} · review and approve to produce
       </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
+        {segments.map((seg: any, i: number) => (
+          <div key={i} style={{ padding: '14px 18px', border: `1px solid ${C.border}`, background: C.bgSurface }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
+              <Tag color={C.amber}>{seg.type?.toUpperCase() ?? `SEG ${i + 1}`}</Tag>
+              {seg.duration_seconds && (
+                <span style={{ fontSize: 8, color: C.textDim, letterSpacing: 1, marginLeft: 'auto' }}>
+                  {seg.duration_seconds}s
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: C.textPrimary, lineHeight: 1.65, marginBottom: 8 }}>{seg.narration}</div>
+            {seg.visual_direction && (
+              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, fontStyle: 'italic' }}>
+                ↳ {seg.visual_direction}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Btn primary onClick={() => productionId && onApprove(productionId, scriptData?.prodStatus === 'scripted' ? 'scripted' : 'done')}>
+        {scriptData?.prodStatus === 'scripted' ? 'APPROVE + RECORD →' : 'APPROVE + PRODUCE →'}
+      </Btn>
     </div>
   )
 }
@@ -500,23 +690,51 @@ function ScriptScreen({ onApprove }: { onApprove: () => void }) {
 // ── Sub-screen: Produce ──────────────────────────────────────────────────────
 
 const PIPELINE_STAGES = [
-  { label: 'Voice synthesis', sub: 'ElevenLabs · voice clone' },
-  { label: 'Music generation', sub: 'Suno · custom track' },
-  { label: 'Image generation', sub: 'FLUX 2 Pro · start + end frames' },
-  { label: 'Video generation', sub: 'Kling 3.0 Pro · first+last frame' },
-  { label: 'Assembly + captions', sub: 'FFmpeg · multi-ratio output' },
+  { id: 'script',     label: 'Script generation',  sub: 'Claude Sonnet · structured segments' },
+  { id: 'assemble',   label: 'Audio assembly',      sub: 'FFmpeg · stitch recorded beats' },
+  { id: 'visuals',    label: 'Image generation',    sub: 'Flux Schnell · one frame per beat' },
+  { id: 'compose',    label: 'Video composition',   sub: 'FFmpeg · images + audio → MP4' },
 ]
 
-function ProduceScreen({ onPreview }: { onPreview: () => void }) {
-  const [stage, setStage] = useState(0)
+function ProduceScreen({ productionId, onPreview }: { productionId: string | null; onPreview: () => void }) {
+  const supabase = createClient()
+  const [prodStatus, setProdStatus] = useState<string>('queued')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    if (stage >= PIPELINE_STAGES.length) return
-    const t = setTimeout(() => setStage(s => s + 1), 2000)
-    return () => clearTimeout(t)
-  }, [stage])
+    if (!productionId) return
+    let cancelled = false
 
-  const pct = Math.round((stage / PIPELINE_STAGES.length) * 100)
+    const poll = async () => {
+      while (!cancelled) {
+        const { data } = await supabase
+          .from('productions')
+          .select('status, error_message')
+          .eq('id', productionId)
+          .single()
+        if (cancelled) break
+        if (data) {
+          setProdStatus(data.status)
+          if (data.error_message) setErrorMsg(data.error_message)
+          if (data.status === 'done' || data.status === 'error' || data.status === 'scripted') break
+        }
+        await new Promise(r => setTimeout(r, 4000))
+      }
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [productionId])
+
+  // Map DB status → which stage is active
+  const stageIndex = prodStatus === 'queued' ? 0
+    : prodStatus === 'running' ? 0
+    : prodStatus === 'scripted' ? 1         // script done, recording complete
+    : prodStatus === 'assembling' ? 1       // audio being stitched
+    : prodStatus === 'generating-visuals' ? 2 // Flux images per segment
+    : prodStatus === 'composing' ? 3        // images + audio → video
+    : prodStatus === 'done' ? PIPELINE_STAGES.length
+    : 0
+  const pct = Math.round((stageIndex / PIPELINE_STAGES.length) * 100)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px', maxWidth: 600 }}>
@@ -539,115 +757,170 @@ function ProduceScreen({ onPreview }: { onPreview: () => void }) {
       {/* Stage list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 28 }}>
         {PIPELINE_STAGES.map((p, i) => {
-          const status = i < stage ? 'done' : i === stage ? 'active' : 'pending'
+          const st = i < stageIndex ? 'done' : i === stageIndex ? 'active' : 'pending'
           return (
             <div key={i} style={{
               padding: '14px 18px',
-              border: `1px solid ${status === 'active' ? C.amberDim : C.border}`,
-              background: status === 'active' ? C.amberGlow : C.bgSurface,
+              border: `1px solid ${st === 'active' ? C.amberDim : C.border}`,
+              background: st === 'active' ? C.amberGlow : C.bgSurface,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <div style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: status === 'done' ? C.green : status === 'active' ? C.amber : C.textDimmer,
-                  animation: status === 'active' ? 'pulse 2s ease-in-out infinite' : 'none',
+                  background: st === 'done' ? C.green : st === 'active' ? C.amber : C.textDimmer,
+                  animation: st === 'active' ? 'pulse 2s ease-in-out infinite' : 'none',
                 }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: status === 'pending' ? C.textDim : C.textPrimary }}>
-                    {p.label}
-                  </div>
+                  <div style={{ fontSize: 11, color: st === 'pending' ? C.textDim : C.textPrimary }}>{p.label}</div>
                   <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, letterSpacing: 1 }}>{p.sub}</div>
                 </div>
-                {status === 'done' && <span style={{ fontSize: 10, color: C.green }}>✓</span>}
+                {st === 'done' && <span style={{ fontSize: 10, color: C.green }}>✓</span>}
               </div>
             </div>
           )
         })}
       </div>
 
-      <Btn onClick={onPreview}>PREVIEW →</Btn>
+      {prodStatus === 'error' && errorMsg && (
+        <div style={{ fontSize: 10, color: C.red, marginBottom: 14 }}>{errorMsg}</div>
+      )}
+
+      {prodStatus === 'done'
+        ? <Btn primary onClick={onPreview}>VIEW RESULT →</Btn>
+        : <Btn onClick={onPreview}>PREVIEW (PLACEHOLDER) →</Btn>
+      }
     </div>
+  )
+}
+
+// ── Audio download helper ────────────────────────────────────────────────────
+
+function AudioDownloadBtn({ productionId }: { productionId: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleGet = async () => {
+    setLoading(true)
+    const res = await fetch(`/api/studio/download-audio?id=${productionId}`)
+    const data = await res.json()
+    if (data.url) setUrl(data.url)
+    setLoading(false)
+  }
+
+  if (url) {
+    return (
+      <a href={url} download style={{
+        display: 'block', background: C.green, border: `1px solid ${C.green}`,
+        color: '#fff', fontSize: 10, letterSpacing: 2, fontWeight: 700,
+        padding: '8px 18px', textDecoration: 'none', textAlign: 'center',
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        DOWNLOAD AUDIO ↓
+      </a>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleGet}
+      disabled={loading}
+      style={{
+        background: C.green, border: `1px solid ${C.green}`,
+        color: '#fff', fontSize: 10, letterSpacing: 2, fontWeight: 700,
+        padding: '8px 18px', cursor: loading ? 'default' : 'pointer',
+        opacity: loading ? 0.6 : 1, fontFamily: "'JetBrains Mono', monospace",
+      }}
+    >
+      {loading ? 'GETTING LINK…' : 'GET AUDIO →'}
+    </button>
   )
 }
 
 // ── Sub-screen: Review ───────────────────────────────────────────────────────
 
-type Platform = 'youtube' | 'tiktok' | 'instagram' | 'x'
+function ReviewScreen({ productionId }: { productionId: string | null }) {
+  const supabase = createClient()
+  const [production, setProduction] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-const PLATFORM_SPECS: Record<Platform, string> = {
-  youtube:   'YouTube · 16:9 · up to 15 min',
-  tiktok:    'TikTok · 9:16 · up to 3 min',
-  instagram: 'Instagram · 9:16 · up to 60s',
-  x:         'X · 16:9 · up to 2:20',
-}
+  useEffect(() => {
+    if (!productionId) { setLoading(false); return }
+    async function load() {
+      const { data } = await supabase
+        .from('productions')
+        .select('*, scripts(title, script_json, status), voiceover_r2_key, final_video_r2_keys')
+        .eq('id', productionId)
+        .single()
+      setProduction(data)
+      setLoading(false)
+    }
+    load()
+  }, [productionId])
 
-function ReviewScreen() {
-  const [plat, setPlat] = useState<Platform>('youtube')
+  const script = production?.scripts
+  const segments: any[] = Array.isArray(script?.script_json) ? script.script_json : []
+  const hasVideo = !!(production?.final_video_r2_keys)
+  const hasAudio = !!(production?.voiceover_r2_key)
+
+  if (loading) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>
+        LOADING…
+      </div>
+    )
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '26px 40px' }}>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 24 }}>
-        Review & publish
+      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary, marginBottom: 4 }}>
+        {script?.title ?? 'Production'}
       </div>
-      <div style={{ display: 'flex', gap: 44 }}>
-        {/* Preview area */}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 5, marginBottom: 14, flexWrap: 'wrap' }}>
-            {(Object.keys(PLATFORM_SPECS) as Platform[]).map(p => (
-              <button key={p} onClick={() => setPlat(p)} style={{
-                background: plat === p ? C.amberGlow : 'none',
-                border: `1px solid ${plat === p ? C.amber : C.border}`,
-                color: plat === p ? C.amberBright : C.textDim,
-                fontSize: 9, letterSpacing: 2, padding: '4px 10px',
-                cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
-              }}>
-                {p.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <div style={{
-            width: '100%',
-            maxWidth: (plat === 'youtube' || plat === 'x') ? 420 : 230,
-            aspectRatio: (plat === 'youtube' || plat === 'x') ? '16/9' : '9/16',
-            background: C.bgRaised, border: `1px solid ${C.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexDirection: 'column', gap: 9, color: C.textDim, marginBottom: 8,
-          }}>
-            <div style={{ fontSize: 20, color: C.textDimmer }}>▶</div>
-            <div style={{ fontSize: 8, letterSpacing: 2 }}>VIDEO READY</div>
-          </div>
-          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>{PLATFORM_SPECS[plat]}</div>
-        </div>
+      <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, marginBottom: 26 }}>
+        {production?.status ?? 'unknown'} · {segments.length} segment{segments.length !== 1 ? 's' : ''}
+      </div>
 
-        {/* Publish panel */}
-        <div style={{ width: 250, flexShrink: 0 }}>
-          <Label>PUBLISH</Label>
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 14 }}>
-            {[
-              { p: 'YouTube', selected: true },
-              { p: 'TikTok', selected: true },
-              { p: 'X', selected: false },
-            ].map((item, i) => (
-              <div key={i} style={{
-                padding: '10px 13px', border: `1px solid ${C.border}`,
-                background: C.bgSurface, display: 'flex', alignItems: 'center', gap: 9,
-              }}>
-                <div style={{
-                  width: 14, height: 14,
-                  border: `1px solid ${item.selected ? C.amber : C.border}`,
-                  background: item.selected ? C.amberGlow : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 8, color: C.amber,
-                }}>
-                  {item.selected ? '✓' : ''}
+      <div style={{ display: 'flex', gap: 36 }}>
+        {/* Script segments */}
+        <div style={{ flex: 1 }}>
+          <Label>SCRIPT</Label>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {segments.length === 0 && (
+              <div style={{ fontSize: 10, color: C.textDimmer }}>No script data available.</div>
+            )}
+            {segments.map((seg: any, i: number) => (
+              <div key={i} style={{ padding: '12px 16px', border: `1px solid ${C.border}`, background: C.bgSurface }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 7 }}>
+                  <Tag color={C.amber}>{seg.type?.toUpperCase() ?? `${i + 1}`}</Tag>
+                  {seg.duration_seconds && (
+                    <span style={{ fontSize: 8, color: C.textDim, letterSpacing: 1, marginLeft: 'auto' }}>{seg.duration_seconds}s</span>
+                  )}
                 </div>
-                <div style={{ fontSize: 11, color: C.textPrimary }}>{item.p}</div>
+                <div style={{ fontSize: 12, color: C.textPrimary, lineHeight: 1.65, marginBottom: 6 }}>{seg.narration}</div>
+                {seg.visual_direction && (
+                  <div style={{ fontSize: 9, color: C.textDim, fontStyle: 'italic' }}>↳ {seg.visual_direction}</div>
+                )}
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Btn primary>PUBLISH ALL →</Btn>
-            <Btn>DOWNLOAD</Btn>
+        </div>
+
+        {/* Actions panel */}
+        <div style={{ width: 220, flexShrink: 0 }}>
+          <Label>OUTPUT</Label>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ padding: '12px 14px', border: `1px solid ${C.border}`, background: C.bgSurface }}>
+              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, marginBottom: 5 }}>STATUS</div>
+              <div style={{ fontSize: 11, color: hasVideo ? C.green : hasAudio ? C.green : C.textDimmer }}>
+                {hasVideo ? '✓ Video ready' : hasAudio ? '✓ Audio ready' : 'Assembly pending'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
+              {hasAudio && <AudioDownloadBtn productionId={production.id} />}
+              {hasVideo
+                ? <Btn primary>DOWNLOAD VIDEO →</Btn>
+                : !hasAudio && <Btn>DOWNLOAD (PENDING)</Btn>
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -662,13 +935,25 @@ const SUB_NAV: Array<{ id: Screen; label: string }> = [
   { id: 'debrief',  label: 'Debrief'  },
   { id: 'style',    label: 'Style'    },
   { id: 'script',   label: 'Script'   },
+  { id: 'record',   label: 'Record'   },
   { id: 'produce',  label: 'Produce'  },
   { id: 'review',   label: 'Review'   },
 ]
 
 export default function StudioPage() {
+  const supabase = createClient()
   const [screen, setScreen] = useState<Screen>('sessions')
   const [activeUpload, setActiveUpload] = useState<VideoUpload | null>(null)
+  const [selectedIdea, setSelectedIdea] = useState<{ text: string; format: string } | null>(null)
+  const [styleCard, setStyleCard] = useState<any>(null)
+  const [productionId, setProductionId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string>('')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserId(session.user.id)
+    })
+  }, [])
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -710,18 +995,34 @@ export default function StudioPage() {
           <SessionsScreen onBegin={u => { setActiveUpload(u); setScreen('debrief') }} />
         )}
         {screen === 'debrief' && (
-          <DebriefScreen upload={activeUpload} onContinue={() => setScreen('style')} />
+          <DebriefScreen upload={activeUpload} onContinue={(idea) => { setSelectedIdea(idea); setScreen('style') }} />
         )}
         {screen === 'style' && (
-          <StyleScreen onLock={() => setScreen('script')} />
+          <StyleScreen onLock={(card) => { setStyleCard(card); setScreen('script') }} />
         )}
         {screen === 'script' && (
-          <ScriptScreen onApprove={() => setScreen('produce')} />
+          <ScriptScreen
+            upload={activeUpload}
+            styleCard={styleCard}
+            selectedIdea={selectedIdea}
+            onApprove={(pid, status) => {
+              setProductionId(pid)
+              setScreen(status === 'scripted' ? 'record' : 'produce')
+            }}
+          />
+        )}
+        {screen === 'record' && productionId && userId && (
+          <RecordScreen
+            productionId={productionId}
+            userId={userId}
+            onComplete={() => setScreen('produce')}
+            onPause={() => setScreen('script')}
+          />
         )}
         {screen === 'produce' && (
-          <ProduceScreen onPreview={() => setScreen('review')} />
+          <ProduceScreen productionId={productionId} onPreview={() => setScreen('review')} />
         )}
-        {screen === 'review' && <ReviewScreen />}
+        {screen === 'review' && <ReviewScreen productionId={productionId} />}
       </div>
     </div>
   )
