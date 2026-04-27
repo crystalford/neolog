@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import { presignDownloadUrl } from '@/lib/storage/r2'
 
@@ -96,10 +95,7 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const admin = createAdminClient()
-    if (!admin) return NextResponse.json({ error: 'Admin unavailable' }, { status: 500 })
-
-    const { data: uploads, error } = await admin
+    const { data: uploads, error } = await supabase
       .from('video_uploads')
       .select('id, file_name, storage_path, mime_type, meta, created_at')
       .eq('user_id', user.id)
@@ -107,8 +103,10 @@ export async function POST() {
       .order('created_at', { ascending: false })
       .limit(200)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    if (!uploads || uploads.length === 0) return NextResponse.json({ updated: 0, skipped: 0 })
+    if (error) return NextResponse.json({ error: `query failed: ${error.message}` }, { status: 500 })
+    if (!uploads || uploads.length === 0) {
+      return NextResponse.json({ updated: 0, skipped: 0, total: 0, note: 'No uploads with null recorded_at found' })
+    }
 
     let updated = 0
     let skipped = 0
@@ -141,12 +139,17 @@ export async function POST() {
       }
 
       if (recordedAt) {
-        await admin.from('video_uploads').update({
+        const { error: updateErr } = await supabase.from('video_uploads').update({
           recorded_at: recordedAt,
           meta: { ...(upload.meta || {}), recorded_at_source: source, backfilled: true },
         }).eq('id', upload.id)
-        updated++
-        results.push({ id: upload.id, source, date: recordedAt })
+        if (updateErr) {
+          skipped++
+          results.push({ id: upload.id, source: 'update-failed', date: updateErr.message })
+        } else {
+          updated++
+          results.push({ id: upload.id, source, date: recordedAt })
+        }
       } else {
         skipped++
       }
