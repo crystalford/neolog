@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const C = {
@@ -196,9 +196,15 @@ export default function SystemPage() {
   const [customFields, setCustomFields] = useState<any[]>([])
   const [formats, setFormats] = useState<any[]>([])
   const [reprocessing, setReprocessing] = useState(false)
-  const [reprocessResult, setReprocessResult] = useState<string | null>(null)
   const [backfilling, setBackfilling] = useState(false)
-  const [backfillResult, setBackfillResult] = useState<string | null>(null)
+  const [fixingThumbnails, setFixingThumbnails] = useState(false)
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    total: number; done: number; inProgress: number; queued: number; failed: number;
+    nullDates: number; missingThumbnails: number; estimatedMinutes: number;
+    counts: Record<string, number>;
+  } | null>(null)
+  const [lastRefresh, setLastRefresh] = useState<number | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [addingFormat, setAddingFormat] = useState(false)
   const [newFormat, setNewFormat] = useState({ name: '', instruction: '' })
 
@@ -236,6 +242,22 @@ export default function SystemPage() {
       setFormats(fmts ?? [])
     }
     load()
+  }, [])
+
+  const fetchPipelineStatus = async () => {
+    try {
+      const res = await fetch('/api/system/pipeline-status')
+      if (!res.ok) return
+      const data = await res.json()
+      setPipelineStatus(data)
+      setLastRefresh(Date.now())
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => {
+    fetchPipelineStatus()
+    pollRef.current = setInterval(fetchPipelineStatus, 4000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
   const startEdit = () => {
@@ -377,8 +399,126 @@ export default function SystemPage() {
 
           {/* Maintenance */}
           <div style={{ marginTop: 36 }}>
-            <Label>MAINTENANCE</Label>
-            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <Label>MAINTENANCE</Label>
+              {lastRefresh && (
+                <span style={{ fontSize: 9, color: C.textDimmer, letterSpacing: 1 }}>
+                  LIVE · UPDATES EVERY 4S
+                </span>
+              )}
+            </div>
+
+            {/* Pipeline status panel */}
+            {pipelineStatus && (
+              <div style={{
+                padding: '16px', background: C.bgRaised, border: `1px solid ${C.border}`,
+                marginBottom: 10,
+              }}>
+                <div style={{ fontSize: 9, color: C.amberDim, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+                  PIPELINE STATUS
+                </div>
+
+                {/* Main progress bar */}
+                {pipelineStatus.total > 0 && (() => {
+                  const pct = Math.round((pipelineStatus.done / pipelineStatus.total) * 100)
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 10, color: C.textPrimary }}>
+                          {pipelineStatus.done} of {pipelineStatus.total} processed
+                        </span>
+                        <span style={{ fontSize: 10, color: pct === 100 ? C.green : C.amber }}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div style={{ height: 4, background: C.border, borderRadius: 2 }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          width: `${pct}%`,
+                          background: pct === 100 ? C.green : C.amber,
+                          transition: 'width 0.4s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Per-status breakdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                  {[
+                    { key: 'processed', label: 'done', color: C.green },
+                    { key: 'transcribing', label: 'transcribing', color: C.blue },
+                    { key: 'analyzing', label: 'analyzing', color: C.amber },
+                    { key: 'saving-results', label: 'saving results', color: C.amber },
+                    { key: 'extracting-audio', label: 'extracting audio', color: C.blue },
+                    { key: 'transcoding-video', label: 'transcoding', color: C.blue },
+                    { key: 'generating-thumbnail', label: 'thumbnail', color: C.blue },
+                    { key: 'uploaded', label: 'queued', color: C.textDim },
+                    { key: 'error', label: 'error', color: C.red },
+                  ].filter(({ key }) => (pipelineStatus.counts[key] || 0) > 0).map(({ key, label, color }) => {
+                    const count = pipelineStatus.counts[key] || 0
+                    const pct = pipelineStatus.total > 0 ? (count / pipelineStatus.total) * 100 : 0
+                    return (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 80, fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: 'uppercase', flexShrink: 0 }}>
+                          {label}
+                        </div>
+                        <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 1 }}>
+                          <div style={{ height: '100%', borderRadius: 1, width: `${pct}%`, background: color }} />
+                        </div>
+                        <div style={{ width: 24, fontSize: 10, color, textAlign: 'right', flexShrink: 0 }}>
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Footer stats */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {pipelineStatus.inProgress > 0 && (
+                    <span style={{ fontSize: 9, color: C.amber, letterSpacing: 1 }}>
+                      ● {pipelineStatus.inProgress} PROCESSING
+                    </span>
+                  )}
+                  {pipelineStatus.queued > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.queued} QUEUED
+                    </span>
+                  )}
+                  {pipelineStatus.failed > 0 && (
+                    <span style={{ fontSize: 9, color: C.red, letterSpacing: 1 }}>
+                      {pipelineStatus.failed} FAILED
+                    </span>
+                  )}
+                  {pipelineStatus.estimatedMinutes > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      ~{pipelineStatus.estimatedMinutes < 60
+                        ? `${pipelineStatus.estimatedMinutes}m remaining`
+                        : `${Math.round(pipelineStatus.estimatedMinutes / 60)}h remaining`}
+                    </span>
+                  )}
+                  {pipelineStatus.nullDates > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.nullDates} DATES MISSING
+                    </span>
+                  )}
+                  {pipelineStatus.missingThumbnails > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.missingThumbnails} THUMBNAILS MISSING
+                    </span>
+                  )}
+                  {pipelineStatus.inProgress === 0 && pipelineStatus.queued === 0 && pipelineStatus.failed === 0 && (
+                    <span style={{ fontSize: 9, color: C.green, letterSpacing: 1 }}>
+                      ✓ ALL CAUGHT UP
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Reprocess */}
               <div style={{
                 padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
@@ -386,59 +526,74 @@ export default function SystemPage() {
                 <div>
                   <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>Reprocess stuck uploads</div>
                   <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
-                    Restarts uploads stuck at saving-results, error, or uploaded (idle &gt;5 min). Up to 50 at a time.
+                    Restarts uploads stuck at saving-results, error, or uploaded (idle &gt;5 min). Runs 2 at a time — watch the status above.
                   </div>
-                  {reprocessResult && (
-                    <div style={{ fontSize: 10, color: C.green, marginTop: 6 }}>{reprocessResult}</div>
-                  )}
                 </div>
                 <Btn small onClick={async () => {
                   setReprocessing(true)
-                  setReprocessResult(null)
                   try {
-                    const res = await fetch('/api/system/reprocess-stuck', { method: 'POST' })
-                    const data = await res.json()
-                    if (data.reprocessed === 0) {
-                      setReprocessResult('No stuck uploads found.')
-                    } else {
-                      setReprocessResult(`Restarted ${data.reprocessed} upload${data.reprocessed === 1 ? '' : 's'}.`)
-                    }
-                  } catch {
-                    setReprocessResult('Request failed.')
-                  }
+                    await fetch('/api/system/reprocess-stuck', { method: 'POST' })
+                    fetchPipelineStatus()
+                  } catch { /* silent */ }
                   setReprocessing(false)
                 }}>
                   {reprocessing ? 'RUNNING…' : 'RUN'}
                 </Btn>
               </div>
 
+              {/* Fix thumbnails */}
               <div style={{
                 padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
               }}>
                 <div>
-                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>Backfill recording dates</div>
-                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
-                    Re-extracts recorded_at from MP4 metadata and filenames for uploads showing "Today" instead of actual date. Up to 200 at a time.
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
+                    Generate missing thumbnails
+                    {pipelineStatus && pipelineStatus.missingThumbnails > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: 9, color: C.amberDim, letterSpacing: 1 }}>
+                        {pipelineStatus.missingThumbnails} MISSING
+                      </span>
+                    )}
                   </div>
-                  {backfillResult && (
-                    <div style={{ fontSize: 10, color: C.green, marginTop: 6 }}>{backfillResult}</div>
-                  )}
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Runs server-side frame extraction for uploads with no thumbnail (HEVC, audio, etc). Up to 100 at a time.
+                  </div>
+                </div>
+                <Btn small onClick={async () => {
+                  setFixingThumbnails(true)
+                  try {
+                    await fetch('/api/system/fix-thumbnails', { method: 'POST' })
+                    fetchPipelineStatus()
+                  } catch { /* silent */ }
+                  setFixingThumbnails(false)
+                }}>
+                  {fixingThumbnails ? 'QUEUING…' : 'RUN'}
+                </Btn>
+              </div>
+
+              {/* Backfill dates */}
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
+                    Backfill recording dates
+                    {pipelineStatus && pipelineStatus.nullDates > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: 9, color: C.amberDim, letterSpacing: 1 }}>
+                        {pipelineStatus.nullDates} MISSING
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Re-extracts recorded_at from MP4 metadata and filenames for uploads showing "Today". Up to 200 at a time.
+                  </div>
                 </div>
                 <Btn small onClick={async () => {
                   setBackfilling(true)
-                  setBackfillResult(null)
                   try {
-                    const res = await fetch('/api/system/backfill-dates', { method: 'POST' })
-                    const data = await res.json()
-                    if (data.queued) {
-                      setBackfillResult('Queued. Check back in a minute — dates will update as uploads are processed.')
-                    } else {
-                      setBackfillResult(data.error || 'Request failed.')
-                    }
-                  } catch {
-                    setBackfillResult('Request failed.')
-                  }
+                    await fetch('/api/system/backfill-dates', { method: 'POST' })
+                  } catch { /* silent */ }
                   setBackfilling(false)
                 }}>
                   {backfilling ? 'QUEUING…' : 'RUN'}

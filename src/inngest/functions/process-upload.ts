@@ -3,7 +3,7 @@ import { inngest } from '@/inngest/client'
 import { isVideoMimeType } from '@/lib/audio-processing'
 import { runAnalysis, upsertEntities, extractVoiceProfile, mergeVoiceProfile } from '@/lib/video-analysis'
 import { resolveProviderKeyWithClient } from '@/lib/ai-provider'
-import { presignDownloadUrl } from '@/lib/storage/r2'
+import { presignDownloadUrl, uploadBuffer } from '@/lib/storage/r2'
 import Replicate from 'replicate'
 
 export const runtime = 'edge'
@@ -356,20 +356,14 @@ export const processUpload = inngest.createFunction(
       console.log(`[${Date.now()}] [apply-metadata] Success`);
     })
 
-    // ── Step 2c: Thumbnail ──
-    // Thumbnails are captured client-side (canvas) at upload time and stored as data: URLs.
-    // For videos where the browser couldn't capture a frame (HEVC on Chrome, audio files),
-    // thumbnail_url will be null — no server-side fallback since fofr/toolkit does not support
-    // frame extraction in a way compatible with its accepted input schema.
     const mode = event.data.mode || 'full'
-    const hasThumbnail = upload.thumbnail_url && !upload.thumbnail_url.startsWith('data:image/svg')
-
-    if (!hasThumbnail) {
-      console.log(`[${Date.now()}] [thumbnail] No client thumbnail available for ${video_upload_id} — leaving null`)
-    }
-
+    const hasThumbnail = upload.thumbnail_url &&
+      !upload.thumbnail_url.startsWith('data:image/svg') &&
+      !(upload.thumbnail_url as string).includes('_placeholder')
 
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
+    // Runs before thumbnail extraction because HEVC/DJI rotation metadata causes
+    // frame extraction to return 0 frames on the original file.
     let playbackStoragePath: string | null = null
     const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && mode !== 'thumbnail' && replicateToken
 
@@ -420,6 +414,55 @@ export const processUpload = inngest.createFunction(
 
     // ── Update: Transcode Done ──
     await reportStatus('transcribed-media')
+
+    // ── Step 2c: Thumbnail extraction (server-side fallback) ──
+    // Client-side canvas capture fails for HEVC/H.265 (most DJI, modern iPhone) and audio files.
+    // We run this AFTER transcode-playback so we have a clean H.264 source to extract from.
+    if (!hasThumbnail && replicateToken) {
+      await reportStatus('generating-thumbnail')
+
+      // Use the transcoded H.264 file if available, else fall back to original
+      const thumbSourcePath = playbackStoragePath || upload.storage_path
+      const thumbSignedUrl = await step.run('thumbnail-sign-url', async () => {
+        console.log(`[${Date.now()}] [thumbnail] Signing URL for ${thumbSourcePath}`)
+        return presignDownloadUrl(thumbSourcePath, 1800).catch(() => null)
+      })
+
+      if (thumbSignedUrl) {
+        try {
+          console.log(`[${Date.now()}] [thumbnail] Starting Replicate frame extraction...`)
+          const output = await runReplicateAsync(
+            step,
+            'thumbnail-extract',
+            replicateToken,
+            'fofr/toolkit',
+            { task: 'extract_video_thumbnails', input_file: thumbSignedUrl, fps: 0.5 }
+          )
+          // extract_video_thumbnails returns an array of frame URLs — take the first
+          const frameUrl = Array.isArray(output) ? (output[0] ? String(output[0]) : null) : extractReplicateUrl(output)
+          if (frameUrl && frameUrl.startsWith('http')) {
+            await step.run('thumbnail-upload', async () => {
+              console.log(`[${Date.now()}] [thumbnail] Uploading frame to R2...`)
+              const imgBuf = Buffer.from(await (await fetch(frameUrl)).arrayBuffer())
+              const path = `${user_id}/thumbnails/${video_upload_id}.jpg`
+              await uploadBuffer(path, imgBuf, 'image/jpeg')
+              await admin.from('video_uploads').update({ thumbnail_url: path }).eq('id', video_upload_id)
+              console.log(`[${Date.now()}] [thumbnail] Success: ${path}`)
+            })
+          } else {
+            console.warn(`[${Date.now()}] [thumbnail] No frame URL in Replicate output`)
+          }
+        } catch (err: any) {
+          console.error(`[${Date.now()}] [thumbnail] Failed:`, err?.message)
+        }
+      }
+    }
+
+    // If we only needed a thumbnail, stop here
+    if (mode === 'thumbnail') {
+      await reportStatus('processed')
+      return { status: 'thumbnail_fixed', video_upload_id }
+    }
 
     // ── Step 3: Transcribe ──
     let transcription: any = null
