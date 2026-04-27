@@ -86,7 +86,7 @@ export const backfillRecordedAt = inngest.createFunction(
     const uploads = await step.run('fetch-null-date-uploads', async () => {
       const { data, error } = await admin
         .from('video_uploads')
-        .select('id, file_name, storage_path, mime_type, meta')
+        .select('id, file_name, storage_path, mime_type, meta, created_at')
         .eq('user_id', user_id)
         .is('recorded_at', null)
         .order('created_at', { ascending: false })
@@ -126,6 +126,13 @@ export const backfillRecordedAt = inngest.createFunction(
           if (!recordedAt) {
             recordedAt = inferDateFromFilename(upload.file_name)
             if (recordedAt) source = 'filename-inference'
+          }
+
+          // Last resort: use upload created_at so the video appears in the
+          // timeline at roughly the right time rather than being undated.
+          if (!recordedAt && (upload as any).created_at) {
+            recordedAt = (upload as any).created_at
+            source = 'created_at-fallback'
           }
 
           if (recordedAt) {
