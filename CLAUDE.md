@@ -117,7 +117,7 @@ src/
 |---|---|
 | Framework | Next.js 15 App Router |
 | Runtime | Cloudflare Edge — `export const runtime = 'edge'` on every route + page |
-| Hosting | Vercel |
+| Hosting | Cloudflare Pages (NOT Vercel) — logs visible in Cloudflare dashboard |
 | Database | Supabase (Postgres + RLS) |
 | Storage | Supabase Storage (videos) + Cloudflare R2 |
 | Uploads | Multipart direct to R2 via presigned URLs |
