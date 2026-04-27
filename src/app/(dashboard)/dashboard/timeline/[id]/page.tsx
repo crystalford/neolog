@@ -367,7 +367,15 @@ export default function TimelineDetailPage() {
           {a.reflections && (
             <section>
               <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-tertiary)] mb-2">Reflections</p>
-              <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">{a.reflections}</p>
+              {typeof a.reflections === 'string' ? (
+                <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">{a.reflections}</p>
+              ) : (
+                <div className="space-y-2">
+                  {(a.reflections as any).observation && <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">{(a.reflections as any).observation}</p>}
+                  {(a.reflections as any).challenge && <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">{(a.reflections as any).challenge}</p>}
+                  {(a.reflections as any).encouragement && <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">{(a.reflections as any).encouragement}</p>}
+                </div>
+              )}
             </section>
           )}
 

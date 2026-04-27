@@ -239,6 +239,7 @@ export default function SystemPage() {
   const [formats, setFormats] = useState<any[]>([])
   const [reprocessing, setReprocessing] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{ updated: number; skipped: number } | null>(null)
   const [fixingThumbnails, setFixingThumbnails] = useState(false)
   const [thumbProgress, setThumbProgress] = useState<{ done: number; total: number; failed: number } | null>(null)
   const [pipelineStatus, setPipelineStatus] = useState<{
@@ -649,7 +650,7 @@ export default function SystemPage() {
                 padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
               }}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
                     Backfill recording dates
                     {pipelineStatus && pipelineStatus.nullDates > 0 && (
@@ -659,17 +660,26 @@ export default function SystemPage() {
                     )}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
-                    Re-extracts recorded_at from MP4 metadata and filenames for uploads showing "Today". Up to 200 at a time.
+                    Extracts dates from MP4 metadata (head + tail for DJI files) and filenames. Falls back to upload date. Runs directly — no queue.
                   </div>
+                  {backfillResult && (
+                    <div style={{ marginTop: 8, fontSize: 10, color: C.green, letterSpacing: 1 }}>
+                      {backfillResult.updated} updated{backfillResult.skipped > 0 ? ` · ${backfillResult.skipped} skipped` : ''}
+                    </div>
+                  )}
                 </div>
                 <Btn small onClick={async () => {
                   setBackfilling(true)
+                  setBackfillResult(null)
                   try {
-                    await fetch('/api/system/backfill-dates', { method: 'POST' })
+                    const res = await fetch('/api/system/run-date-backfill', { method: 'POST' })
+                    const data = await res.json()
+                    setBackfillResult({ updated: data.updated ?? 0, skipped: data.skipped ?? 0 })
+                    fetchPipelineStatus()
                   } catch { /* silent */ }
                   setBackfilling(false)
                 }}>
-                  {backfilling ? 'QUEUING…' : 'RUN'}
+                  {backfilling ? 'RUNNING…' : 'RUN'}
                 </Btn>
               </div>
             </div>
