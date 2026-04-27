@@ -148,7 +148,11 @@ async function runMultipartUpload(
     body: JSON.stringify({ fileName: file.name, fileSize: file.size, mimeType: file.type }),
     signal,
   })
-  if (!initRes.ok) throw new Error(`Initiate failed: ${initRes.status}`)
+  if (!initRes.ok) {
+    const body = await initRes.json().catch(() => null)
+    const detail = body?.detail || body?.error || `${initRes.status}`
+    throw new Error(`Initiate failed: ${detail}`)
+  }
   const { uploadId, key, partUrls, totalParts } = await initRes.json()
 
   // Step 2: Upload each part directly to R2
