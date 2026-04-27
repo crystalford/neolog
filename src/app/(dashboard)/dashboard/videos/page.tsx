@@ -156,15 +156,25 @@ function isStuck(upload: any): boolean {
 // Core multipart upload — direct browser → R2 using presigned URLs
 
 function extractRecordedAt(file: File): string | null {
-  // DJI: DJI_YYYYMMDDHHMMSS_NNNN.MP4 or DJI_YYYYMMDD_HHMMSS_NNNN.MP4 (underscore between date and time)
-  const dji = file.name.match(/DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/)
+  const name = file.name
+  // DJI: DJI_YYYYMMDDHHMMSS_NNNN.MP4 or DJI_YYYYMMDD_HHMMSS_NNNN.MP4
+  const dji = name.match(/DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/)
   if (dji) return `${dji[1]}-${dji[2]}-${dji[3]}T${dji[4]}:${dji[5]}:${dji[6]}`
   // iPhone: IMG_YYYYMMDD_HHMMSS or IMG_YYYY-MM-DD-HH-MM-SS
-  const iphone = file.name.match(/IMG_(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})/)
+  const iphone = name.match(/IMG_(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})/)
   if (iphone) return `${iphone[1]}-${iphone[2]}-${iphone[3]}T${iphone[4]}:${iphone[5]}:${iphone[6]}`
   // GoPro: GH/GX/GO YYMMDD files
-  const gopro = file.name.match(/G[HXO]\d+_(\d{2})(\d{2})(\d{2})/)
+  const gopro = name.match(/G[HXO]\d+_(\d{2})(\d{2})(\d{2})/)
   if (gopro) return `20${gopro[1]}-${gopro[2]}-${gopro[3]}T00:00:00`
+  // ISO-like date+time: YYYY-MM-DD HH-MM-SS, YYYY-MM-DD_HH-MM-SS, YYYY-MM-DD HH:MM:SS
+  const isoDateTime = name.match(/(\d{4})-(\d{2})-(\d{2})[\s_T](\d{2})[-:](\d{2})[-:](\d{2})/)
+  if (isoDateTime) return `${isoDateTime[1]}-${isoDateTime[2]}-${isoDateTime[3]}T${isoDateTime[4]}:${isoDateTime[5]}:${isoDateTime[6]}`
+  // Voice Memo / Recording: "Voice Memo 2026-04-27" or "Recording 2026-04-15"
+  const voiceMemo = name.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (voiceMemo) return `${voiceMemo[1]}-${voiceMemo[2]}-${voiceMemo[3]}T00:00:00`
+  // Concatenated: YYYYMMDD_HHMMSS or YYYYMMDDHHMMSS
+  const concat = name.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/)
+  if (concat) return `${concat[1]}-${concat[2]}-${concat[3]}T${concat[4]}:${concat[5]}:${concat[6]}`
   // No reliable filename pattern — let the backend extract from video metadata
   return null
 }

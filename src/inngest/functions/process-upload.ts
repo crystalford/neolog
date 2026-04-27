@@ -300,19 +300,27 @@ export const processUpload = inngest.createFunction(
         }
       }
 
-      // 3. Filename inference (PXL_20240128_..., etc.)
-      const dateRegexes = [
-        /(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/,
-        /(\d{4})-(\d{2})-(\d{2})/,
-        /(\d{4})(\d{2})(\d{2})/,
+      // 3. Filename inference — ordered most-specific first
+      // Each entry: [regex, formatter] where formatter maps match groups → ISO string
+      const datePatterns: [RegExp, (m: RegExpMatchArray) => string][] = [
+        // YYYY-MM-DD HH:MM:SS / YYYY-MM-DD_HH-MM-SS / YYYY-MM-DDTHH-MM-SS
+        [/(\d{4})-(\d{2})-(\d{2})[\s_T](\d{2})[-:](\d{2})[-:](\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
+        // YYYYMMDD_HHMMSS (PXL, DJI concatenated, etc.)
+        [/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
+        // YYYYMMDDHHMMSS (concatenated no separator)
+        [/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
+        // YYYY-MM-DD (Voice Memo 2026-04-27, Recording 2026-04-27, etc.)
+        [/(\d{4})-(\d{2})-(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T00:00:00Z`],
+        // YYYYMMDD (8-digit date only)
+        [/(\d{4})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T00:00:00Z`],
       ]
-      for (const regex of dateRegexes) {
+      for (const [regex, fmt] of datePatterns) {
         const m = upload.file_name.match(regex)
         if (m) {
-          const [, y, mo, d, hh, mm, ss] = m
-          const dStr = hh ? `${y}-${mo}-${d}T${hh}:${mm}:${ss}Z` : `${y}-${mo}-${d}T00:00:00Z`
+          const dStr = fmt(m)
           const date = new Date(dStr)
-          if (!isNaN(date.getTime())) {
+          const yr = date.getUTCFullYear()
+          if (!isNaN(date.getTime()) && yr >= 1990 && yr <= new Date().getUTCFullYear() + 1) {
             return { recorded_at: date.toISOString(), found_key: 'filename-inference' }
           }
         }
@@ -704,11 +712,6 @@ export const processUpload = inngest.createFunction(
       const analysis = analysisResult.analysis
       const recordedAt = metadata.recorded_at
       
-      const { data: existing } = await admin.from('log_entries').select('id').eq('source_upload_id', video_upload_id).maybeSingle()
-      if (existing) {
-        return
-      }
-
       // ── Build log entry body ──────────────────────────────────────────────
       // Lead with key_win (the session pull-quote), then first-person summary
       const bodyParts: string[] = []
@@ -754,7 +757,7 @@ export const processUpload = inngest.createFunction(
         return clean || new Date(metadata.recorded_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       })()
 
-      await admin.from('log_entries').insert({
+      const entryPayload = {
         user_id,
         entry_type: 'session',
         title: aiTitle || fileTitle,
@@ -774,7 +777,10 @@ export const processUpload = inngest.createFunction(
           reflections: analysis.reflections,
           questions: analysis.questions
         }
-      })
+      }
+
+      await admin.from('log_entries')
+        .upsert(entryPayload, { onConflict: 'source_upload_id' })
 
     })
 
@@ -918,6 +924,7 @@ export const processUpload = inngest.createFunction(
       }
     })
 
+    await reportStatus('processed')
     return { status: 'success', video_upload_id }
   }
 )

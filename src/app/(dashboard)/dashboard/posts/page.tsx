@@ -232,11 +232,25 @@ export default function PostsPage() {
             <div style={{ fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
           </div>
         ) : candidates.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
             <div style={{ fontSize: 11, color: C.textDimmer, letterSpacing: 2 }}>NO POSTS YET</div>
-            <div style={{ fontSize: 10, color: C.textDimmer }}>
-              Posts are generated from your uploads. Upload a vlog to get started.
+            <div style={{ fontSize: 10, color: C.textDimmer, textAlign: 'center', maxWidth: 360, lineHeight: 1.7 }}>
+              Posts are generated automatically when a session is analyzed. If you have processed uploads with no posts, try reanalyzing them from the Videos page.
             </div>
+            <button
+              onClick={() => router.push('/dashboard/videos')}
+              style={{
+                marginTop: 4,
+                background: 'none',
+                border: `1px solid ${C.borderBright}`,
+                color: C.textSecond,
+                fontSize: 9, letterSpacing: 2,
+                padding: '6px 16px',
+                cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              GO TO VIDEOS
+            </button>
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

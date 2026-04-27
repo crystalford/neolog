@@ -195,6 +195,8 @@ export default function SystemPage() {
   const [promptVersions, setPromptVersions] = useState<any[]>([])
   const [customFields, setCustomFields] = useState<any[]>([])
   const [formats, setFormats] = useState<any[]>([])
+  const [reprocessing, setReprocessing] = useState(false)
+  const [reprocessResult, setReprocessResult] = useState<string | null>(null)
   const [addingFormat, setAddingFormat] = useState(false)
   const [newFormat, setNewFormat] = useState({ name: '', instruction: '' })
 
@@ -369,6 +371,45 @@ export default function SystemPage() {
                 <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>{label}</span>
               </div>
             ))}
+          </div>
+
+          {/* Maintenance */}
+          <div style={{ marginTop: 36 }}>
+            <Label>MAINTENANCE</Label>
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>Reprocess stuck uploads</div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Restarts uploads stuck at saving-results, error, or uploaded (idle &gt;5 min). Up to 50 at a time.
+                  </div>
+                  {reprocessResult && (
+                    <div style={{ fontSize: 10, color: C.green, marginTop: 6 }}>{reprocessResult}</div>
+                  )}
+                </div>
+                <Btn small onClick={async () => {
+                  setReprocessing(true)
+                  setReprocessResult(null)
+                  try {
+                    const res = await fetch('/api/system/reprocess-stuck', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.reprocessed === 0) {
+                      setReprocessResult('No stuck uploads found.')
+                    } else {
+                      setReprocessResult(`Restarted ${data.reprocessed} upload${data.reprocessed === 1 ? '' : 's'}.`)
+                    }
+                  } catch {
+                    setReprocessResult('Request failed.')
+                  }
+                  setReprocessing(false)
+                }}>
+                  {reprocessing ? 'RUNNING…' : 'RUN'}
+                </Btn>
+              </div>
+            </div>
           </div>
 
           {/* Custom extraction fields */}
