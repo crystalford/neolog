@@ -184,7 +184,8 @@ export const processUpload = inngest.createFunction(
       }
 
       const mode = event.data.mode || 'full'
-      if (upload.status === 'processed' && mode !== 'full') {
+      // Allow 'full' (reanalyze) and 'thumbnail' (fix-thumbnails) to run on already-processed uploads.
+      if (upload.status === 'processed' && mode !== 'full' && mode !== 'thumbnail') {
         return { skip: true as const, upload }
       }
 
@@ -240,13 +241,22 @@ export const processUpload = inngest.createFunction(
     await reportStatus('starting')
 
     // ── Step 2: Extract audio ──
+    // Only needed for transcribe step; skip in thumbnail mode since we exit before transcribe.
     const { upload } = activeContext
-    await reportStatus('extracting-audio')
+    const earlyMode = event.data.mode || 'full'
 
     let audioPath: { path: string, extracted: boolean, isDirectUrl?: boolean } = { path: upload.storage_path, extracted: false }
 
-    const shouldExtractAudio = isVideoMimeType(upload.mime_type) || upload.mime_type.startsWith('audio/')
+    // Skip audio extraction in thumbnail mode (we exit before transcribe) and in
+    // resume mode when transcript already exists (we'll reuse it instead of re-transcribing).
+    const transcriptAlreadyExists = !!upload.transcript
+    const shouldExtractAudio =
+      (isVideoMimeType(upload.mime_type) || upload.mime_type.startsWith('audio/')) &&
+      earlyMode !== 'thumbnail' &&
+      !(earlyMode === 'resume' && transcriptAlreadyExists)
     const replicateToken = process.env.REPLICATE_API_TOKEN
+
+    if (shouldExtractAudio) await reportStatus('extracting-audio')
 
     if (shouldExtractAudio && replicateToken) {
       const storageSignedUrl = await step.run('extract-audio-sign-url', async () => {
@@ -278,8 +288,12 @@ export const processUpload = inngest.createFunction(
     }
 
     // ── Step 2b: Extract Metadata (recording date) ──
-    await reportStatus('extracting-metadata')
-    const metadata = await step.run('extract-metadata', async () => {
+    // Skip in thumbnail/resume mode when recorded_at already exists.
+    const skipMetadata = (earlyMode === 'thumbnail' || earlyMode === 'resume') && upload.recorded_at
+    if (!skipMetadata) await reportStatus('extracting-metadata')
+    const metadata = skipMetadata
+      ? { recorded_at: upload.recorded_at, found_key: 'pre-existing' }
+      : await step.run('extract-metadata', async () => {
       const { upload } = activeContext
 
       // 1. Trust frontend recorded_at if provided (set from camera filename patterns)
@@ -333,30 +347,29 @@ export const processUpload = inngest.createFunction(
       }
     })
 
-    // ── Update: Metadata Pulled ──
-    await reportStatus('metadata-extracted')
+    if (!skipMetadata) {
+      await reportStatus('metadata-extracted')
 
-    // ── Step 2b-bis: Apply Metadata to DB ──
-    await step.run('apply-metadata', async () => {
-      console.log(`[${Date.now()}] [apply-metadata] Applying to database...`);
-      const { upload } = activeContext
-      const updateData: any = {
-        meta: {
-          ...(upload.meta || {}),
-          recorded_at_source: metadata.found_key,
+      await step.run('apply-metadata', async () => {
+        console.log(`[${Date.now()}] [apply-metadata] Applying to database...`);
+        const { upload } = activeContext
+        const updateData: any = {
+          meta: {
+            ...(upload.meta || {}),
+            recorded_at_source: metadata.found_key,
+          }
         }
-      }
-      
-      // Only update recorded_at if we have a valid, non-null date to apply
-      if (metadata.recorded_at) {
-        updateData.recorded_at = metadata.recorded_at
-      }
 
-      await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
-      console.log(`[${Date.now()}] [apply-metadata] Success`);
-    })
+        if (metadata.recorded_at) {
+          updateData.recorded_at = metadata.recorded_at
+        }
 
-    const mode = event.data.mode || 'full'
+        await admin!.from('video_uploads').update(updateData).eq('id', video_upload_id)
+        console.log(`[${Date.now()}] [apply-metadata] Success`);
+      })
+    }
+
+    const mode = earlyMode
     const hasThumbnail = upload.thumbnail_url &&
       !upload.thumbnail_url.startsWith('data:image/svg') &&
       !(upload.thumbnail_url as string).includes('_placeholder')
@@ -364,8 +377,9 @@ export const processUpload = inngest.createFunction(
     // ── Step 2d: Transcode to H.264 for browser-compatible playback ──
     // Runs before thumbnail extraction because HEVC/DJI rotation metadata causes
     // frame extraction to return 0 frames on the original file.
-    let playbackStoragePath: string | null = null
-    const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && mode !== 'thumbnail' && replicateToken
+    // Skip if a playback file already exists in DB (from a previous run).
+    let playbackStoragePath: string | null = (upload as any).playback_path || null
+    const shouldTranscode = isVideoMimeType(upload.mime_type) && upload.mime_type !== 'video/mp4' && mode !== 'thumbnail' && replicateToken && !playbackStoragePath
 
     if (shouldTranscode) {
       await reportStatus('transcoding-video')
@@ -467,8 +481,8 @@ export const processUpload = inngest.createFunction(
     // ── Step 3: Transcribe ──
     let transcription: any = null
 
-    if (mode === 'thumbnail' && upload.transcript) {
-      console.log(`[${Date.now()}] [transcribe] Skipping (thumbnail mode and already exists)`);
+    if ((mode === 'thumbnail' || mode === 'resume') && upload.transcript) {
+      console.log(`[${Date.now()}] [transcribe] Reusing existing transcript (${mode} mode)`);
       transcription = { text: upload.transcript, language: upload.analysis?.language || 'en', segments: (upload as any).transcript_segments || [], skipped: true }
     } else if (upload.mime_type === 'text/plain') {
       const fileRes = await step.run('transcribe-text-read', async () => {
@@ -553,7 +567,7 @@ export const processUpload = inngest.createFunction(
     // Smart Skip: If we already have analysis and just need a thumbnail
     if (mode === 'thumbnail' && (upload as any).analysis) {
       console.log(`[${Date.now()}] [analyze] Skipping (thumbnail mode and already exists)`);
-      
+
       // CRITICAL: Ensure we still mark as processed in the database
       await step.run('finalize-thumbnail-mode', async () => {
         await admin.from('video_uploads').update({
@@ -563,13 +577,26 @@ export const processUpload = inngest.createFunction(
         }).eq('id', video_upload_id)
       })
 
-      analysisResult = { 
-        analysis: (upload as any).analysis, 
+      analysisResult = {
+        analysis: (upload as any).analysis,
         modelUsed: (upload as any).analysis_model || 'skipped',
         tags: (upload as any).tags || [],
         clips: (upload as any).generated_clips || [],
         posts: (upload as any).generated_posts || [],
-        skipped: true 
+        skipped: true
+      }
+    } else if (mode === 'resume' && (upload as any).analysis) {
+      // Resume mode: reuse cached Claude analysis, but continue running downstream
+      // steps (entities, voice profile, log entry, post candidates) since those are
+      // typically what got stuck.
+      console.log(`[${Date.now()}] [analyze] Reusing existing analysis (resume mode)`);
+      analysisResult = {
+        analysis: (upload as any).analysis,
+        modelUsed: (upload as any).analysis_model || 'reused',
+        tags: (upload as any).tags || [],
+        clips: (upload as any).generated_clips || [],
+        posts: (upload as any).generated_posts || [],
+        skipped: true,
       }
     } else if (transcription) {
       // ── Step 4: Run Analysis ──

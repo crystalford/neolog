@@ -33,11 +33,14 @@ export async function POST() {
       return NextResponse.json({ reprocessed: 0, message: 'No stuck uploads found' })
     }
 
+    // Use 'resume' mode: reuses existing transcript+analysis when present so we
+    // don't pay for Whisper+Claude again on uploads that just got stuck at
+    // saving-results. Saves ~$0.15/upload when transcript+analysis already exist.
     await Promise.all(
       stuck.map(u =>
         inngest.send({
           name: 'video-upload/process',
-          data: { video_upload_id: u.id, user_id: u.user_id, mode: 'full' },
+          data: { video_upload_id: u.id, user_id: u.user_id, mode: 'resume' },
         }).catch(e => console.error('Inngest send failed for', u.id, e))
       )
     )
