@@ -75,3 +75,32 @@ export const postToX = async (content: string) => {
 export const decryptIntegrationKey = (encryptedKey: string, iv: string) => {
   return null
 }
+
+type SupabaseLike = { from: (table: string) => any }
+
+/**
+ * Look up a user's API key for the given provider from the integration_keys table.
+ */
+export const getActiveIntegrationKeyWithClient = async (
+  supabase: SupabaseLike,
+  userId: string,
+  provider: string,
+): Promise<string | null> => {
+  const { data } = await supabase
+    .from('integration_keys')
+    .select('key_value')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .eq('is_active', true)
+    .maybeSingle()
+  return data?.key_value ?? null
+}
+
+export const getActiveIntegrationKey = async (
+  userId: string,
+  provider: string,
+): Promise<string | null> => {
+  const { createClient } = await import('@/lib/supabase/server')
+  const supabase = createClient()
+  return getActiveIntegrationKeyWithClient(supabase, userId, provider)
+}

@@ -111,35 +111,113 @@ function formatDate(ts: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+const PROCESSING_STATUSES = new Set([
+  'uploaded', 'starting', 'extracting-audio', 'generating-thumbnail',
+  'extracting-metadata', 'metadata-extracted', 'transcoding-video',
+  'transcribing-media', 'transcribed-media', 'analyzing', 'processing', 'transcribing',
+])
+
 function statusColor(status: string) {
-  switch (status) {
-    case 'processed':
-    case 'ready':    return C.green
-    case 'error':    return C.red
-    case 'processing':
-    case 'transcribing':
-    case 'analyzing': return C.blue
-    default:         return C.textDim
-  }
+  if (status === 'processed' || status === 'ready') return C.green
+  if (status === 'error') return C.red
+  if (PROCESSING_STATUSES.has(status)) return C.blue
+  return C.textDim
 }
 
 function statusLabel(status: string) {
   switch (status) {
-    case 'processed': return 'READY'
-    case 'processing': return 'PROCESSING'
-    case 'transcribing': return 'TRANSCRIBING'
-    case 'analyzing': return 'ANALYZING'
-    case 'error': return 'ERROR'
-    case 'uploading': return 'UPLOADING'
-    default: return status.toUpperCase()
+    case 'processed':            return 'READY'
+    case 'uploaded':             return 'QUEUED'
+    case 'starting':             return 'STARTING'
+    case 'extracting-audio':     return 'EXTRACTING AUDIO'
+    case 'generating-thumbnail': return 'GENERATING THUMBNAIL'
+    case 'extracting-metadata':  return 'READING METADATA'
+    case 'metadata-extracted':   return 'TRANSCRIBING'
+    case 'transcoding-video':    return 'TRANSCODING'
+    case 'transcribing-media':   return 'TRANSCRIBING'
+    case 'transcribed-media':    return 'ANALYZING'
+    case 'analyzing-media':      return 'ANALYZING'
+    case 'analyzing':            return 'ANALYZING'
+    case 'processing':           return 'PROCESSING'
+    case 'transcribing':         return 'TRANSCRIBING'
+    case 'error':                return 'ERROR'
+    default:                     return status.toUpperCase()
   }
 }
 
+function isStuck(upload: any): boolean {
+  if (!upload.updated_at) return false
+  const age = Date.now() - new Date(upload.updated_at).getTime()
+  if (upload.status === 'uploaded') return age > 5 * 60 * 1000
+  if (PROCESSING_STATUSES.has(upload.status)) return age > 20 * 60 * 1000
+  return false
+}
+
 // Core multipart upload — direct browser → R2 using presigned URLs
+
+function extractRecordedAt(file: File): string | null {
+  const name = file.name
+  // DJI: DJI_YYYYMMDDHHMMSS_NNNN.MP4 or DJI_YYYYMMDD_HHMMSS_NNNN.MP4
+  const dji = name.match(/DJI_(\d{4})(\d{2})(\d{2})_?(\d{2})(\d{2})(\d{2})/)
+  if (dji) return `${dji[1]}-${dji[2]}-${dji[3]}T${dji[4]}:${dji[5]}:${dji[6]}`
+  // iPhone: IMG_YYYYMMDD_HHMMSS or IMG_YYYY-MM-DD-HH-MM-SS
+  const iphone = name.match(/IMG_(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})[-_]?(\d{2})/)
+  if (iphone) return `${iphone[1]}-${iphone[2]}-${iphone[3]}T${iphone[4]}:${iphone[5]}:${iphone[6]}`
+  // GoPro: GH/GX/GO YYMMDD files
+  const gopro = name.match(/G[HXO]\d+_(\d{2})(\d{2})(\d{2})/)
+  if (gopro) return `20${gopro[1]}-${gopro[2]}-${gopro[3]}T00:00:00`
+  // ISO-like date+time: YYYY-MM-DD HH-MM-SS, YYYY-MM-DD_HH-MM-SS, YYYY-MM-DD HH:MM:SS
+  const isoDateTime = name.match(/(\d{4})-(\d{2})-(\d{2})[\s_T](\d{2})[-:](\d{2})[-:](\d{2})/)
+  if (isoDateTime) return `${isoDateTime[1]}-${isoDateTime[2]}-${isoDateTime[3]}T${isoDateTime[4]}:${isoDateTime[5]}:${isoDateTime[6]}`
+  // Voice Memo / Recording: "Voice Memo 2026-04-27" or "Recording 2026-04-15"
+  const voiceMemo = name.match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (voiceMemo) return `${voiceMemo[1]}-${voiceMemo[2]}-${voiceMemo[3]}T00:00:00`
+  // Concatenated: YYYYMMDD_HHMMSS or YYYYMMDDHHMMSS
+  const concat = name.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/)
+  if (concat) return `${concat[1]}-${concat[2]}-${concat[3]}T${concat[4]}:${concat[5]}:${concat[6]}`
+  // No reliable filename pattern — let the backend extract from video metadata
+  return null
+}
+
+// Capture a JPEG thumbnail from the video file in the browser (instant, no server round-trip).
+// Returns a data: URL or null if the browser can't decode the video (e.g. HEVC on Chrome).
+function captureVideoThumbnail(file: File): Promise<string | null> {
+  if (!file.type.startsWith('video/')) return Promise.resolve(null)
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+    const timeout = setTimeout(() => { URL.revokeObjectURL(url); resolve(null) }, 15000)
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, video.duration * 0.05)
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const canvas = document.createElement('canvas')
+        const aspect = video.videoHeight > 0 ? video.videoHeight / video.videoWidth : 9 / 16
+        canvas.width = 320
+        canvas.height = Math.round(320 * aspect) || 180
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      } catch {
+        URL.revokeObjectURL(url)
+        resolve(null)
+      }
+    }
+    video.onerror = () => { clearTimeout(timeout); URL.revokeObjectURL(url); resolve(null) }
+    video.src = url
+  })
+}
+
 async function runMultipartUpload(
   file: File,
   onProgress: (pct: number) => void,
   signal: AbortSignal,
+  thumbnailPromise: Promise<string | null>,
 ): Promise<{ key: string }> {
   // Step 1: Initiate and get presigned part URLs
   const initRes = await fetch('/api/upload/initiate', {
@@ -182,10 +260,16 @@ async function runMultipartUpload(
     body: JSON.stringify({ uploadId, key, parts }),
     signal,
   })
-  if (!completeRes.ok) throw new Error(`Complete failed: ${completeRes.status}`)
+  if (!completeRes.ok) {
+    const body = await completeRes.json().catch(() => null)
+    const detail = body?.detail || body?.error || `${completeRes.status}`
+    throw new Error(`Complete failed: ${detail}`)
+  }
   onProgress(95)
 
   // Step 4: Register with Supabase + trigger Inngest pipeline
+  // Thumbnail should be ready by now (captured in parallel with the upload)
+  const thumbnail = await thumbnailPromise
   const regRes = await fetch('/api/video-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -194,6 +278,8 @@ async function runMultipartUpload(
       file_name: file.name,
       file_size_bytes: file.size,
       mime_type: file.type,
+      recorded_at: extractRecordedAt(file),
+      thumbnail_url: thumbnail ?? undefined,
     }),
     signal,
   })
@@ -228,7 +314,7 @@ export default function VideosPage() {
   // Poll while any uploads are processing
   useEffect(() => {
     const hasProcessing = uploads.some(u =>
-      ['processing', 'transcribing', 'analyzing', 'uploading'].includes(u.status)
+      u.status === 'uploaded' || PROCESSING_STATUSES.has(u.status)
     )
     if (!hasProcessing) return
     const t = setInterval(fetchUploads, 8000)
@@ -250,10 +336,14 @@ export default function VideosPage() {
 
       setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'uploading' } : j))
 
+      // Start thumbnail capture immediately in parallel — usually finishes well before upload
+      const thumbnailPromise = captureVideoThumbnail(job.file)
+
       runMultipartUpload(
         job.file,
         pct => setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: pct } : j)),
         abort.signal,
+        thumbnailPromise,
       )
         .then(() => {
           setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'done', progress: 100 } : j))
@@ -397,7 +487,8 @@ export default function VideosPage() {
               <VideoRow
                 key={v.id}
                 upload={v}
-                onOpenStudio={() => router.push('/dashboard/studio')}
+                onOpenStudio={() => router.push(`/dashboard/studio?v=${v.id}`)}
+                onOpenDetail={() => router.push(`/dashboard/timeline/${v.id}`)}
                 onDelete={() => handleDelete(v.id)}
                 onReanalyzed={fetchUploads}
               />
@@ -412,37 +503,61 @@ export default function VideosPage() {
 function VideoRow({
   upload,
   onOpenStudio,
+  onOpenDetail,
   onDelete,
   onReanalyzed,
 }: {
   upload: any
   onOpenStudio: () => void
+  onOpenDetail: () => void
   onDelete: () => void
   onReanalyzed: () => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [reanalyzing, setReanalyzing] = useState(false)
-  const [reanalyzeFeedback, setReanalyzeFeedback] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
   const isReady = upload.status === 'processed' || upload.status === 'ready'
-  const isProcessing = ['processing', 'transcribing', 'analyzing', 'uploading'].includes(upload.status)
+  const isProcessing = PROCESSING_STATUSES.has(upload.status)
+  const stuck = isStuck(upload)
   const title = upload.analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ') ?? 'Untitled'
+
+  const showFeedback = (msg: string, ms = 5000) => {
+    setFeedback(msg)
+    setTimeout(() => setFeedback(null), ms)
+  }
 
   const handleReanalyze = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setReanalyzing(true)
-    setReanalyzeFeedback(null)
+    setFeedback(null)
     try {
       const res = await fetch(`/api/video-upload/${upload.id}/reanalyze`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Reanalysis failed')
-      setReanalyzeFeedback(data.message ?? 'Done')
+      showFeedback(data.message ?? 'Done')
       onReanalyzed()
-      setTimeout(() => setReanalyzeFeedback(null), 4000)
     } catch (e: any) {
-      setReanalyzeFeedback(e.message)
-      setTimeout(() => setReanalyzeFeedback(null), 4000)
+      showFeedback(e.message)
     } finally {
       setReanalyzing(false)
+    }
+  }
+
+  const handleRetry = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRetrying(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/video-upload/${upload.id}/retry`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Retry failed')
+      showFeedback('Queued for processing')
+      onReanalyzed()
+    } catch (e: any) {
+      showFeedback(e.message)
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -459,13 +574,17 @@ function VideoRow({
       }}
     >
       {/* Thumbnail */}
-      <div style={{
-        width: 72, height: 44, flexShrink: 0,
-        background: C.bgRaised,
-        border: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
-      }}>
+      <div
+        onClick={isReady ? onOpenDetail : undefined}
+        style={{
+          width: 72, height: 44, flexShrink: 0,
+          background: C.bgRaised,
+          border: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
+          cursor: isReady ? 'pointer' : 'default',
+        }}
+      >
         {upload.thumbnail_url ? (
           <img
             src={upload.thumbnail_url}
@@ -478,10 +597,14 @@ function VideoRow({
       </div>
 
       {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={isReady ? onOpenDetail : undefined}
+        style={{ flex: 1, minWidth: 0, cursor: isReady ? 'pointer' : 'default' }}
+      >
         <div style={{
-          fontSize: 12, color: C.textPrimary, marginBottom: 3,
+          fontSize: 12, color: hovered && isReady ? C.amberBright : C.textPrimary, marginBottom: 3,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          transition: 'color 0.12s',
         }}>
           {title}
         </div>
@@ -494,39 +617,53 @@ function VideoRow({
       </div>
 
       {/* Status + actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <span style={{
-          display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
-          background: statusColor(upload.status),
-          animation: isProcessing ? 'pulse 2s ease-in-out infinite' : 'none',
-          flexShrink: 0,
-        }} />
-        {!isReady && (
-          <Tag color={statusColor(upload.status)}>{statusLabel(upload.status)}</Tag>
-        )}
-        {reanalyzeFeedback && (
-          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, maxWidth: 180 }}>{reanalyzeFeedback}</div>
-        )}
-        {isReady && !reanalyzeFeedback && (
-          <>
-            <Btn small onClick={onOpenStudio}>STUDIO</Btn>
-            {hovered && (
-              <Btn small onClick={handleReanalyze}>
-                {reanalyzing ? '…' : 'REANALYZE'}
-              </Btn>
-            )}
-          </>
-        )}
-        {hovered && (
-          <button
-            onClick={e => { e.stopPropagation(); onDelete() }}
-            style={{
-              background: 'none', border: 'none',
-              color: C.textDimmer, cursor: 'pointer', fontSize: 12, padding: '2px 4px',
-            }}
-          >
-            ✕
-          </button>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+            background: stuck ? C.amberDim : statusColor(upload.status),
+            animation: isProcessing && !stuck ? 'pulse 2s ease-in-out infinite' : 'none',
+            flexShrink: 0,
+          }} />
+          {!isReady && (
+            <Tag color={stuck ? C.amberDim : statusColor(upload.status)}>
+              {stuck ? 'STUCK' : statusLabel(upload.status)}
+            </Tag>
+          )}
+          {feedback && (
+            <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 0.5, maxWidth: 200 }}>{feedback}</div>
+          )}
+          {isReady && !feedback && (
+            <>
+              <Btn small onClick={onOpenStudio}>STUDIO</Btn>
+              {hovered && (
+                <Btn small onClick={handleReanalyze}>
+                  {reanalyzing ? '…' : 'REANALYZE'}
+                </Btn>
+              )}
+            </>
+          )}
+          {(upload.status === 'error' || stuck) && hovered && !feedback && (
+            <Btn small onClick={handleRetry}>
+              {retrying ? '…' : 'RETRY'}
+            </Btn>
+          )}
+          {hovered && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete() }}
+              style={{
+                background: 'none', border: 'none',
+                color: C.textDimmer, cursor: 'pointer', fontSize: 12, padding: '2px 4px',
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {upload.status === 'error' && upload.error_message && (
+          <div style={{ fontSize: 9, color: C.red, letterSpacing: 0.5, maxWidth: 260, textAlign: 'right' }}>
+            {upload.error_message}
+          </div>
         )}
       </div>
     </div>

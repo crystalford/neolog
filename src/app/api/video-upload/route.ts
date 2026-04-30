@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         file_size_bytes,
         mime_type,
         storage_path,
-        storage_provider: 'supabase',
+        storage_provider: 'r2',
         status: 'uploaded',
         recorded_at: recorded_at || null,
         ...(session_id ? { session_id } : {}),
@@ -143,6 +143,63 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DELETE: Remove a video upload (DB row + R2 storage objects)
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    const { data: upload, error: fetchErr } = await supabase
+      .from('video_uploads')
+      .select('id, user_id, storage_path, playback_path, thumbnail_url, storage_provider')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (fetchErr || !upload) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Best-effort storage cleanup (don't fail the delete if R2 cleanup fails)
+    if (upload.storage_provider === 'r2') {
+      const { deleteR2Object } = await import('@/lib/storage/r2')
+      const keys = [upload.storage_path, upload.playback_path].filter(Boolean) as string[]
+      // Only delete thumbnail if it's a stored object key, not a data: URL
+      if (upload.thumbnail_url && !upload.thumbnail_url.startsWith('data:') && !upload.thumbnail_url.startsWith('http')) {
+        keys.push(upload.thumbnail_url)
+      }
+      await Promise.all(keys.map(k => deleteR2Object(k).catch(e => console.error('R2 delete failed:', k, e))))
+    } else if (upload.storage_provider === 'supabase' && upload.storage_path) {
+      await supabase.storage.from('videos').remove([upload.storage_path]).catch(() => null)
+    }
+
+    // Delete dependent rows that don't cascade automatically
+    await supabase.from('transcript_words').delete().eq('video_upload_id', id).eq('user_id', userId)
+    await supabase.from('entity_mentions').delete().eq('video_upload_id', id).eq('user_id', userId)
+    await supabase.from('post_candidates').delete().eq('user_id', userId).eq('session_id', id)
+
+    const { error: delErr } = await supabase
+      .from('video_uploads')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (delErr) {
+      console.error('DB delete error:', delErr)
+      return NextResponse.json({ error: 'Delete failed', details: delErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    console.error('Delete handler error:', e)
+    return NextResponse.json({ error: e?.message || 'Delete failed' }, { status: 500 })
+  }
+}
+
 // GET: List user's video uploads
 export async function GET(request: NextRequest) {
   try {
@@ -163,7 +220,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('video_uploads')
-      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path, playback_path, storage_provider')
+      .select('id, file_name, file_size_bytes, mime_type, duration_seconds, status, tags, error_message, source_deleted, processed_at, recorded_at, created_at, updated_at, thumbnail_url, storage_path, playback_path, storage_provider, analysis')
       .eq('user_id', userId)
       .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })

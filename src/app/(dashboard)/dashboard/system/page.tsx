@@ -2,7 +2,7 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const C = {
@@ -152,6 +152,48 @@ OUTPUT: Valid JSON array only. [{format_name, text}]`,
   },
 }
 
+// Loads a video URL into a hidden element, seeks to ~5%, and grabs a JPEG
+// frame as a data URL. Returns null if the browser can't decode it.
+async function captureFrameFromUrl(url: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.crossOrigin = 'anonymous'
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+
+    const cleanup = () => {
+      video.removeAttribute('src')
+      video.load()
+    }
+    const timeout = setTimeout(() => { cleanup(); resolve(null) }, 30000)
+
+    video.onloadedmetadata = () => {
+      const target = video.duration > 2 ? video.duration * 0.05 : 0.1
+      try { video.currentTime = Math.min(target, Math.max(0.1, video.duration - 0.1)) }
+      catch { /* some browsers fire seeked from load */ }
+    }
+    video.onseeked = () => {
+      clearTimeout(timeout)
+      try {
+        const canvas = document.createElement('canvas')
+        const aspect = video.videoHeight > 0 ? video.videoHeight / video.videoWidth : 9 / 16
+        canvas.width = 320
+        canvas.height = Math.round(320 * aspect) || 180
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82)
+        cleanup()
+        resolve(dataUrl)
+      } catch {
+        cleanup()
+        resolve(null)
+      }
+    }
+    video.onerror = () => { clearTimeout(timeout); cleanup(); resolve(null) }
+    video.src = url
+  })
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -195,6 +237,26 @@ export default function SystemPage() {
   const [promptVersions, setPromptVersions] = useState<any[]>([])
   const [customFields, setCustomFields] = useState<any[]>([])
   const [formats, setFormats] = useState<any[]>([])
+  const [reprocessing, setReprocessing] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{
+    ok: boolean
+    status?: number
+    message?: string
+    updated?: number
+    skipped?: number
+    total?: number
+    summary?: { totalUploads: number; nullRecordedAt: number; emptyRecordedAt: number; truthyRecordedAt: number }
+  } | null>(null)
+  const [fixingThumbnails, setFixingThumbnails] = useState(false)
+  const [thumbProgress, setThumbProgress] = useState<{ done: number; total: number; failed: number } | null>(null)
+  const [pipelineStatus, setPipelineStatus] = useState<{
+    total: number; done: number; inProgress: number; queued: number; failed: number;
+    nullDates: number; missingThumbnails: number; estimatedMinutes: number;
+    counts: Record<string, number>;
+  } | null>(null)
+  const [lastRefresh, setLastRefresh] = useState<number | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [addingFormat, setAddingFormat] = useState(false)
   const [newFormat, setNewFormat] = useState({ name: '', instruction: '' })
 
@@ -232,6 +294,22 @@ export default function SystemPage() {
       setFormats(fmts ?? [])
     }
     load()
+  }, [])
+
+  const fetchPipelineStatus = async () => {
+    try {
+      const res = await fetch('/api/system/pipeline-status')
+      if (!res.ok) return
+      const data = await res.json()
+      setPipelineStatus(data)
+      setLastRefresh(Date.now())
+    } catch { /* silent */ }
+  }
+
+  useEffect(() => {
+    fetchPipelineStatus()
+    pollRef.current = setInterval(fetchPipelineStatus, 4000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
   const startEdit = () => {
@@ -369,6 +447,272 @@ export default function SystemPage() {
                 <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>{label}</span>
               </div>
             ))}
+          </div>
+
+          {/* Maintenance */}
+          <div style={{ marginTop: 36 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <Label>MAINTENANCE</Label>
+              {lastRefresh && (
+                <span style={{ fontSize: 9, color: C.textDimmer, letterSpacing: 1 }}>
+                  LIVE · UPDATES EVERY 4S
+                </span>
+              )}
+            </div>
+
+            {/* Pipeline status panel */}
+            {pipelineStatus && (
+              <div style={{
+                padding: '16px', background: C.bgRaised, border: `1px solid ${C.border}`,
+                marginBottom: 10,
+              }}>
+                <div style={{ fontSize: 9, color: C.amberDim, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+                  PIPELINE STATUS
+                </div>
+
+                {/* Main progress bar */}
+                {pipelineStatus.total > 0 && (() => {
+                  const pct = Math.round((pipelineStatus.done / pipelineStatus.total) * 100)
+                  return (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 10, color: C.textPrimary }}>
+                          {pipelineStatus.done} of {pipelineStatus.total} processed
+                        </span>
+                        <span style={{ fontSize: 10, color: pct === 100 ? C.green : C.amber }}>
+                          {pct}%
+                        </span>
+                      </div>
+                      <div style={{ height: 4, background: C.border, borderRadius: 2 }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          width: `${pct}%`,
+                          background: pct === 100 ? C.green : C.amber,
+                          transition: 'width 0.4s ease',
+                        }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Per-status breakdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                  {[
+                    { key: 'processed', label: 'done', color: C.green },
+                    { key: 'transcribing', label: 'transcribing', color: C.blue },
+                    { key: 'analyzing', label: 'analyzing', color: C.amber },
+                    { key: 'saving-results', label: 'saving results', color: C.amber },
+                    { key: 'extracting-audio', label: 'extracting audio', color: C.blue },
+                    { key: 'transcoding-video', label: 'transcoding', color: C.blue },
+                    { key: 'generating-thumbnail', label: 'thumbnail', color: C.blue },
+                    { key: 'uploaded', label: 'queued', color: C.textDim },
+                    { key: 'error', label: 'error', color: C.red },
+                  ].filter(({ key }) => (pipelineStatus.counts[key] || 0) > 0).map(({ key, label, color }) => {
+                    const count = pipelineStatus.counts[key] || 0
+                    const pct = pipelineStatus.total > 0 ? (count / pipelineStatus.total) * 100 : 0
+                    return (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 80, fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: 'uppercase', flexShrink: 0 }}>
+                          {label}
+                        </div>
+                        <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 1 }}>
+                          <div style={{ height: '100%', borderRadius: 1, width: `${pct}%`, background: color }} />
+                        </div>
+                        <div style={{ width: 24, fontSize: 10, color, textAlign: 'right', flexShrink: 0 }}>
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Footer stats */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {pipelineStatus.inProgress > 0 && (
+                    <span style={{ fontSize: 9, color: C.amber, letterSpacing: 1 }}>
+                      ● {pipelineStatus.inProgress} PROCESSING
+                    </span>
+                  )}
+                  {pipelineStatus.queued > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.queued} QUEUED
+                    </span>
+                  )}
+                  {pipelineStatus.failed > 0 && (
+                    <span style={{ fontSize: 9, color: C.red, letterSpacing: 1 }}>
+                      {pipelineStatus.failed} FAILED
+                    </span>
+                  )}
+                  {pipelineStatus.estimatedMinutes > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      ~{pipelineStatus.estimatedMinutes < 60
+                        ? `${pipelineStatus.estimatedMinutes}m remaining`
+                        : `${Math.round(pipelineStatus.estimatedMinutes / 60)}h remaining`}
+                    </span>
+                  )}
+                  {pipelineStatus.nullDates > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.nullDates} DATES MISSING
+                    </span>
+                  )}
+                  {pipelineStatus.missingThumbnails > 0 && (
+                    <span style={{ fontSize: 9, color: C.textDim, letterSpacing: 1 }}>
+                      {pipelineStatus.missingThumbnails} THUMBNAILS MISSING
+                    </span>
+                  )}
+                  {pipelineStatus.inProgress === 0 && pipelineStatus.queued === 0 && pipelineStatus.failed === 0 && (
+                    <span style={{ fontSize: 9, color: C.green, letterSpacing: 1 }}>
+                      ✓ ALL CAUGHT UP
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Reprocess */}
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>Reprocess stuck uploads</div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Restarts uploads stuck at saving-results, error, or uploaded (idle &gt;5 min). Runs 2 at a time — watch the status above.
+                  </div>
+                </div>
+                <Btn small onClick={async () => {
+                  setReprocessing(true)
+                  try {
+                    await fetch('/api/system/reprocess-stuck', { method: 'POST' })
+                    fetchPipelineStatus()
+                  } catch { /* silent */ }
+                  setReprocessing(false)
+                }}>
+                  {reprocessing ? 'RUNNING…' : 'RUN'}
+                </Btn>
+              </div>
+
+              {/* Generate thumbnails (client-side, no Replicate) */}
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
+                    Generate missing thumbnails
+                    {pipelineStatus && pipelineStatus.missingThumbnails > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: 9, color: C.amberDim, letterSpacing: 1 }}>
+                        {pipelineStatus.missingThumbnails} MISSING
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Captures a frame from each video in your browser. No Replicate, no rate limits, free. Keep this tab open while it runs.
+                  </div>
+                  {thumbProgress && (
+                    <div style={{ marginTop: 8, fontSize: 10, color: C.amber, letterSpacing: 1 }}>
+                      {thumbProgress.done} / {thumbProgress.total} done
+                      {thumbProgress.failed > 0 && (
+                        <span style={{ marginLeft: 8, color: C.red }}>· {thumbProgress.failed} skipped</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Btn small onClick={async () => {
+                  if (fixingThumbnails) return
+                  setFixingThumbnails(true)
+                  setThumbProgress({ done: 0, total: 0, failed: 0 })
+                  try {
+                    const res = await fetch('/api/system/list-missing-thumbnails')
+                    if (!res.ok) throw new Error(`list failed: ${res.status}`)
+                    const { items } = await res.json() as { items: Array<{ id: string; url: string }> }
+                    setThumbProgress({ done: 0, total: items.length, failed: 0 })
+                    let done = 0, failed = 0
+                    for (const item of items) {
+                      try {
+                        const dataUrl = await captureFrameFromUrl(item.url)
+                        if (!dataUrl) { failed++; setThumbProgress({ done, total: items.length, failed }); continue }
+                        const saveRes = await fetch('/api/video-upload/save-thumbnail', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ video_upload_id: item.id, data_url: dataUrl }),
+                        })
+                        if (!saveRes.ok) failed++
+                        else done++
+                      } catch {
+                        failed++
+                      }
+                      setThumbProgress({ done, total: items.length, failed })
+                    }
+                    fetchPipelineStatus()
+                  } catch { /* silent */ }
+                  setFixingThumbnails(false)
+                }}>
+                  {fixingThumbnails ? 'CAPTURING…' : 'RUN'}
+                </Btn>
+              </div>
+
+              {/* Backfill dates */}
+              <div style={{
+                padding: '14px 16px', background: C.bgSurface, border: `1px solid ${C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: C.textPrimary, marginBottom: 4 }}>
+                    Backfill recording dates
+                    {pipelineStatus && pipelineStatus.nullDates > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: 9, color: C.amberDim, letterSpacing: 1 }}>
+                        {pipelineStatus.nullDates} MISSING
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, lineHeight: 1.6 }}>
+                    Extracts dates from MP4 metadata (head + tail for DJI files) and filenames. Falls back to upload date. Runs directly — no queue.
+                  </div>
+                  {backfillResult && (
+                    <div style={{ marginTop: 8, fontSize: 10, letterSpacing: 1, lineHeight: 1.6 }}>
+                      <div style={{ color: backfillResult.ok ? C.green : C.red }}>
+                        {backfillResult.ok
+                          ? `${backfillResult.updated ?? 0} updated · ${backfillResult.skipped ?? 0} skipped${typeof backfillResult.total === 'number' ? ` · ${backfillResult.total} matched` : ''}`
+                          : `HTTP ${backfillResult.status ?? '?'} — ${backfillResult.message ?? 'unknown error'}`}
+                      </div>
+                      {backfillResult.summary && (
+                        <div style={{ color: C.textDim, marginTop: 2 }}>
+                          {backfillResult.summary.totalUploads} total · {backfillResult.summary.nullRecordedAt} null · {backfillResult.summary.emptyRecordedAt} empty · {backfillResult.summary.truthyRecordedAt} dated
+                        </div>
+                      )}
+                      {backfillResult.message && backfillResult.ok && (
+                        <div style={{ color: C.textDim, marginTop: 2 }}>{backfillResult.message}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Btn small onClick={async () => {
+                  setBackfilling(true)
+                  setBackfillResult(null)
+                  try {
+                    const res = await fetch('/api/system/run-date-backfill', { method: 'POST' })
+                    const body = await res.json().catch(() => ({}))
+                    setBackfillResult({
+                      ok: res.ok,
+                      status: res.status,
+                      message: body.error || body.note,
+                      updated: body.updated,
+                      skipped: body.skipped,
+                      total: body.total,
+                      summary: body.summary,
+                    })
+                    fetchPipelineStatus()
+                  } catch (e: any) {
+                    setBackfillResult({ ok: false, message: e?.message || 'Network error' })
+                  }
+                  setBackfilling(false)
+                }}>
+                  {backfilling ? 'RUNNING…' : 'RUN'}
+                </Btn>
+              </div>
+            </div>
           </div>
 
           {/* Custom extraction fields */}

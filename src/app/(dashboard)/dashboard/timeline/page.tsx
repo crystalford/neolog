@@ -86,12 +86,20 @@ export default function TimelinePage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [pageNum, setPageNum] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
   const PAGE_SIZE = 10
 
   // For transcript view: load all uploads oldest→newest
   const [transcriptUploads, setTranscriptUploads] = useState<VideoUpload[]>([])
   const [transcriptLoading, setTranscriptLoading] = useState(false)
   const [transcriptLoaded, setTranscriptLoaded] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -102,7 +110,7 @@ export default function TimelinePage() {
         .select('*')
         .eq('user_id', session.user.id)
         .not('status', 'eq', 'uploading')
-        .order('recorded_at', { ascending: false, nullsFirst: false })
+        .order('recorded_at', { ascending: false, nullsFirst: true })
         .order('created_at', { ascending: false })
         .range(0, PAGE_SIZE - 1)
       setUploads((data ?? []) as VideoUpload[])
@@ -142,7 +150,7 @@ export default function TimelinePage() {
       .select('*')
       .eq('user_id', session.user.id)
       .not('status', 'eq', 'uploading')
-      .order('recorded_at', { ascending: false, nullsFirst: false })
+      .order('recorded_at', { ascending: false, nullsFirst: true })
       .order('created_at', { ascending: false })
       .range(nextPage * PAGE_SIZE, (nextPage + 1) * PAGE_SIZE - 1)
     setUploads(prev => [...prev, ...((data ?? []) as VideoUpload[])])
@@ -152,18 +160,18 @@ export default function TimelinePage() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{
-        padding: '22px 40px 18px',
+        padding: isMobile ? '14px 16px 12px' : '22px 40px 18px',
         borderBottom: `1px solid ${C.border}`,
-        display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: C.textPrimary }}>
             Timeline
           </div>
           <div style={{ fontSize: 10, color: C.textDim, marginTop: 3, letterSpacing: 1 }}>
             {viewMode === 'transcript'
-              ? `Full transcript record · ${transcriptUploads.length} sessions`
-              : `Your living record · ${uploads.length} sessions loaded`}
+              ? `${transcriptUploads.length} sessions`
+              : `${uploads.length} sessions`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 2 }}>
@@ -172,11 +180,12 @@ export default function TimelinePage() {
               background: viewMode === m ? C.amberGlow : 'none',
               border: `1px solid ${viewMode === m ? C.amber : C.border}`,
               color: viewMode === m ? C.amberBright : C.textDim,
-              fontSize: 9, letterSpacing: 2, padding: '5px 12px',
+              fontSize: 9, letterSpacing: isMobile ? 1 : 2,
+              padding: isMobile ? '5px 8px' : '5px 12px',
               transition: 'all 0.12s', textTransform: 'uppercase',
               cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
             }}>
-              {m}
+              {isMobile ? m.slice(0, 4) : m}
             </button>
           ))}
         </div>
@@ -184,7 +193,7 @@ export default function TimelinePage() {
 
       {/* ── Transcript view: continuous document ─────────────────────────── */}
       {viewMode === 'transcript' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 80px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0 16px 80px' : '0 40px 80px' }}>
           {transcriptLoading ? (
             <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING TRANSCRIPTS…</div>
           ) : transcriptUploads.length === 0 ? (
@@ -201,7 +210,7 @@ export default function TimelinePage() {
 
       {/* ── Analysis + Combined views: paginated cards ───────────────────── */}
       {viewMode !== 'transcript' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 40px 60px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0 12px 60px' : '0 40px 60px' }}>
           {loading ? (
             <div style={{ padding: '48px 0', fontSize: 10, color: C.textDimmer, letterSpacing: 2 }}>LOADING…</div>
           ) : uploads.length === 0 ? (
@@ -218,6 +227,7 @@ export default function TimelinePage() {
                 onToggle={() => setExpanded(expanded === upload.id ? null : upload.id)}
                 onOpenStudio={() => router.push('/dashboard/studio')}
                 showConnector={i < uploads.length - 1}
+                isMobile={isMobile}
               />
             ))
           )}
@@ -325,7 +335,7 @@ function TranscriptBlock({ upload, index }: { upload: VideoUpload; index: number
 // ─── Analysis entry: collapsible card ────────────────────────────────────────
 
 function TimelineEntry({
-  upload, viewMode, isExpanded, onToggle, onOpenStudio, showConnector,
+  upload, viewMode, isExpanded, onToggle, onOpenStudio, showConnector, isMobile,
 }: {
   upload: VideoUpload
   viewMode: ViewMode
@@ -333,6 +343,7 @@ function TimelineEntry({
   onToggle: () => void
   onOpenStudio: () => void
   showConnector: boolean
+  isMobile: boolean
 }) {
   const analysis = upload.analysis as VideoAnalysis | null
   const ts = upload.recorded_at ?? upload.created_at
@@ -353,11 +364,12 @@ function TimelineEntry({
       <div style={{ border: `1px solid ${isExpanded ? C.borderBright : C.border}`, background: C.bgSurface }}>
         {/* Header row */}
         <div onClick={onToggle} style={{
-          padding: '16px 20px', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 14,
+          padding: isMobile ? '12px 14px' : '16px 20px', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 14,
         }}>
           <div style={{
-            width: 72, height: 44, background: C.bgRaised, border: `1px solid ${C.border}`,
+            width: isMobile ? 56 : 72, height: isMobile ? 36 : 44,
+            background: C.bgRaised, border: `1px solid ${C.border}`,
             flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
           }}>
@@ -367,20 +379,26 @@ function TimelineEntry({
               <span style={{ fontSize: 14, color: C.textDimmer }}>▶</span>
             )}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 600, color: C.textPrimary, marginBottom: 3 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontFamily: "'Syne', sans-serif", fontSize: isMobile ? 13 : 14,
+              fontWeight: 600, color: C.textPrimary, marginBottom: 3,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
               {analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '') ?? 'Untitled'}
             </div>
-            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {formatDuration(upload.duration_seconds) && <span>{formatDuration(upload.duration_seconds)}</span>}
               {analysis?.mood && <span style={{ color: C.amberDim }}>{analysis.mood}</span>}
-              {analysis?.energy_level && <span>{analysis.energy_level} energy</span>}
+              {!isMobile && analysis?.energy_level && <span>{analysis.energy_level} energy</span>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {ideaCount > 0 && <Tag color={C.amber}>{ideaCount} IDEAS</Tag>}
-            {upload.status === 'processing' && <Tag color={C.blue}>PROCESSING</Tag>}
-          </div>
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              {ideaCount > 0 && <Tag color={C.amber}>{ideaCount} IDEAS</Tag>}
+              {upload.status === 'processing' && <Tag color={C.blue}>PROCESSING</Tag>}
+            </div>
+          )}
           <div style={{ color: C.textDim, fontSize: 12, flexShrink: 0 }}>{isExpanded ? '▲' : '▼'}</div>
         </div>
 
@@ -389,7 +407,7 @@ function TimelineEntry({
           <div style={{ borderTop: `1px solid ${C.border}` }}>
             {/* Analysis section */}
             {analysis && (
-              <div style={{ padding: '18px 20px' }}>
+              <div style={{ padding: isMobile ? '14px 14px' : '18px 20px' }}>
                 {analysis.key_win && (
                   <div style={{ marginBottom: 18 }}>
                     <Label>KEY WIN</Label>
@@ -398,7 +416,7 @@ function TimelineEntry({
                     </div>
                   </div>
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 18, marginBottom: 16 }}>
                   {analysis.content_ideas && analysis.content_ideas.length > 0 && (
                     <div>
                       <Label>IDEAS SURFACED</Label>
