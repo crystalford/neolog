@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neolog — Attachment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* === neolog.css (inlined) === */
+/* =====================================================
+   NEOLOG — Design System
+   v1 — extracted from Studio prototype
+   ===================================================== */
+
+/* =========================================
+   TOKENS — colors, type, spacing
+   ========================================= */
+:root {
+  /* Surface */
+  --ink:        #100d09;
+  --ink-1:      #14110d;
+  --ink-2:      #1a1611;
+  --ink-3:      #221d16;
+  --ink-4:      #2a231a;
+
+  --line:       #221d16;
+  --line-warm:  #2f2820;
+  --line-bright:#403729;
+
+  /* Type */
+  --bone:       #ece4d2;
+  --bone-1:     #c8bea9;
+  --bone-2:     #a89c84;
+  --bone-3:     #7a7160;
+  --bone-4:     #54493a;
+  --bone-5:     #2e2820;
+
+  /* Topic territories */
+  --t-brass:    #d18847;
+  --t-terra:    #c66042;
+  --t-ochre:    #b48b3c;
+  --t-rose:     #b56676;
+  --t-plum:     #8662a8;
+  --t-violet:   #6e6cb8;
+  --t-steel:    #4d8aa8;
+  --t-teal:     #4d9988;
+  --t-sage:     #7a9a6a;
+  --t-moss:     #5e7d5e;
+
+  /* System signal — bone (no color) */
+  --sig:        #ece4d2;
+  --sig-soft:   rgba(236,228,210,0.10);
+  --sig-glow:   rgba(236,228,210,0.30);
+
+  /* State semantics */
+  --state-ok:   #7a9a6a;
+  --state-warn: #d18847;
+  --state-err:  #c66042;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: #050402;
+  color: var(--bone);
+  font-family: 'Geist', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01" on;
+  min-height: 100vh;
+}
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+button { font-family: inherit; cursor: pointer; }
+
+/* =========================================
+   STAGE — page wrapper around the phone
+   ========================================= */
+.stage {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 800px 500px at 60% 10%, rgba(196,138,74,0.04) 0%, transparent 55%),
+    radial-gradient(ellipse 600px 700px at 20% 90%, rgba(74,96,108,0.025) 0%, transparent 55%),
+    #050402;
+  padding: 32px 16px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+.stage-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: #5a5240;
+  text-transform: uppercase;
+  text-align: center;
+}
+.stage-label .name {
+  display: block;
+  margin-top: 4px;
+  font-family: 'Geist', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  color: #c89a5e;
+  text-transform: none;
+  letter-spacing: 0.2px;
+}
+
+/* =========================================
+   PAGE NAV — links between pages
+   ========================================= */
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 600px;
+}
+.page-nav a {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--bone-3);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--line-warm);
+  border-radius: 100px;
+  transition: all 0.2s;
+}
+.page-nav a:hover { color: var(--bone-1); border-color: var(--line-bright); }
+.page-nav a.current {
+  color: var(--bone);
+  border-color: var(--bone-3);
+  background: rgba(236,228,210,0.04);
+}
+
+/* =========================================
+   PHONE FRAME
+   ========================================= */
+.phone {
+  width: 390px;
+  max-width: 100%;
+  height: 844px;
+  background: var(--ink-1);
+  border-radius: 48px;
+  border: 9px solid #14110a;
+  box-shadow:
+    0 0 0 2px #050402,
+    0 36px 80px rgba(0,0,0,0.7),
+    0 0 120px rgba(196,138,74,0.04);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.phone::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 124px;
+  height: 30px;
+  background: #050402;
+  border-radius: 0 0 20px 20px;
+  z-index: 200;
+}
+.phone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 35% at 50% 0%, rgba(217,154,82,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 110%, rgba(0,0,0,0.5) 0%, transparent 60%);
+  z-index: 0;
+}
+
+/* =========================================
+   STATUS BAR (iOS)
+   ========================================= */
+.statusbar {
+  height: 50px;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 30px 6px;
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bone);
+  position: relative;
+  z-index: 5;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.statusbar .right {
+  margin-left: auto;
+  display: flex;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--bone-1);
+  align-items: center;
+}
+.bars {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 10px;
+}
+.bars span {
+  width: 3px;
+  background: var(--bone);
+  border-radius: 1px;
+}
+.bars span:nth-child(1) { height: 3px; }
+.bars span:nth-child(2) { height: 5px; }
+.bars span:nth-child(3) { height: 7px; }
+.bars span:nth-child(4) { height: 10px; }
+.bars span.dim { background: var(--bone-4); }
+
+/* =========================================
+   CROWN — wordmark + meta
+   ========================================= */
+.crown {
+  padding: 8px 28px 0;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.aperture {
+  width: 22px;
+  height: 22px;
+  position: relative;
+  flex-shrink: 0;
+}
+.aperture svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.aperture-svg, .stratum-svg, .filament-svg { display: none !important; }
+body[data-logo="aperture"] .aperture-svg { display: block !important; }
+body[data-logo="stratum"] .stratum-svg { display: block !important; }
+body[data-logo="filament"] .filament-svg { display: block !important; }
+
+.wordmark {
+  font-family: 'Geist', sans-serif;
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.4px;
+  color: var(--bone);
+  line-height: 1;
+}
+.crown .meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  color: var(--bone-3);
+  text-transform: uppercase;
+  text-align: right;
+  line-height: 1.4;
+}
+.crown .meta .day { color: var(--bone-2); }
+
+/* =========================================
+   BODY — scroll container
+   ========================================= */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  z-index: 2;
+  padding-bottom: 130px;
+  scrollbar-width: none;
+}
+.body::-webkit-scrollbar { display: none; }
+
+/* =========================================
+   PAGE HEADER (hero) — page-specific intro
+   ========================================= */
+.hero {
+  padding: 32px 28px 16px;
+}
+.hero .crumb {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3.5px;
+  color: var(--bone-3);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero .crumb::before {
+  content: '';
+  width: 18px;
+  height: 1px;
+  background: var(--bone-4);
+}
+.hero h1 {
+  font-family: 'Geist', sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.6px;
+  color: var(--bone);
+  margin-bottom: 12px;
+}
+.hero h1 .alive { color: var(--sig); }
+.hero .lead {
+  font-family: 'Geist', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--bone-2);
+  max-width: 320px;
+}
+
+/* =========================================
+   FILTER PILLS
+   ========================================= */
+.filters {
+  padding: 18px 28px 18px;
+  display: flex;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--line-warm);
+  border-radius: 100px;
+  color: var(--bone-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  background: transparent;
+}
+.chip:hover { color: var(--bone-2); border-color: var(--line-bright); }
+.chip.active {
+  color: var(--bone);
+  border-color: var(--bone-3);
+  background: rgba(236,228,210,0.04);
+}
+.chip .num { font-size: 9px; color: var(--bone-3); font-weight: 500; }
+.chip.active .num { color: var(--sig); }
+
+/* =========================================
+   CARDS — base type
+   ========================================= */
+.card {
+  --topic: var(--bone-3);
+  --topic-glow: rgba(122,113,96,0.06);
+  position: relative;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.3s, background 0.3s;
+  cursor: pointer;
+}
+.card:hover { border-color: var(--line-warm); background: var(--ink-3); }
+.card.has-topic::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 24px;
+  bottom: 24px;
+  width: 2px;
+  background: var(--topic);
+  opacity: 0.9;
+  border-radius: 0 2px 2px 0;
+}
+.card.has-topic::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 60% 50% at 0% 0%, var(--topic-glow) 0%, transparent 65%);
+  opacity: 0.6;
+}
+
+/* =========================================
+   LIVE DRAWER
+   ========================================= */
+.live {
+  position: absolute;
+  bottom: 100px;
+  left: 16px;
+  right: 16px;
+  background: rgba(16,13,9,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--line-warm);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--sig);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--sig-glow);
+  flex-shrink: 0;
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.live-text {
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  color: var(--bone-2);
+}
+.live-text strong { color: var(--bone); font-weight: 500; }
+.live-arrow {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--sig);
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* =========================================
+   BOTTOM DOCK
+   ========================================= */
+.dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(16,13,9,0.7) 30%, var(--ink-1) 70%);
+  padding: 22px 0 28px;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  z-index: 5;
+}
+.dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--bone-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-weight: 500;
+  position: relative;
+  transition: color 0.2s;
+  text-decoration: none;
+}
+.dock-btn .ico {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dock-btn svg {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dock-btn.active { color: var(--bone); }
+.dock-btn.active::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 1px;
+  background: var(--sig);
+  box-shadow: 0 0 6px var(--sig-glow);
+}
+
+/* =========================================
+   PAGE-LOAD REVEAL
+   ========================================= */
+.reveal { opacity: 0; transform: translateY(8px); animation: reveal 0.6s ease forwards; }
+.reveal.d1 { animation-delay: 0.05s; }
+.reveal.d2 { animation-delay: 0.12s; }
+.reveal.d3 { animation-delay: 0.20s; }
+.reveal.d4 { animation-delay: 0.28s; }
+.reveal.d5 { animation-delay: 0.36s; }
+.reveal.d6 { animation-delay: 0.44s; }
+.reveal.d7 { animation-delay: 0.52s; }
+.reveal.d8 { animation-delay: 0.60s; }
+@keyframes reveal {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   UTILITIES
+   ========================================= */
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.divider {
+  height: 1px;
+  background: var(--line);
+  margin: 16px 0;
+}
+.kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--bone-3);
+  font-weight: 500;
+}
+
+</style>
+<style>
+  .back-link {
+    padding: 12px 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--bone-3);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .back-link:hover { color: var(--bone-1); }
+  .back-link::before { content: '←'; }
+
+  .att-preview {
+    margin: 14px 16px 0;
+    aspect-ratio: 8.5/11;
+    max-height: 360px;
+    background: linear-gradient(180deg, var(--ink-2) 0%, var(--ink-1) 100%);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .att-preview .doc-mock {
+    width: 70%;
+    height: 88%;
+    background: var(--ink-3);
+    border: 1px solid var(--line-warm);
+    border-radius: 4px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .att-preview .line {
+    height: 4px;
+    background: var(--line-warm);
+    border-radius: 2px;
+  }
+  .att-preview .line.h { height: 7px; background: var(--bone-4); width: 60%; margin-bottom: 6px; }
+  .att-preview .line.s { width: 92%; }
+  .att-preview .line.m { width: 78%; }
+  .att-preview .line.short { width: 45%; margin-bottom: 8px; }
+  .att-preview .ext-flag {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--bone);
+    background: rgba(0,0,0,0.7);
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: 1px solid var(--bone-3);
+  }
+  .att-preview .open-btn {
+    position: absolute;
+    bottom: 14px;
+    right: 14px;
+    padding: 7px 13px;
+    background: rgba(20,17,13,0.92);
+    border: 1px solid var(--line-bright);
+    color: var(--bone);
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+
+  .att-head {
+    padding: 18px 24px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .att-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.6px;
+    color: var(--bone-3);
+    margin-bottom: 10px;
+  }
+  .att-head h1 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 500;
+    font-size: 22px;
+    line-height: 1.2;
+    letter-spacing: -0.4px;
+    color: var(--bone);
+    margin-bottom: 6px;
+  }
+  .att-head .filename {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--bone-3);
+  }
+
+  .section-h {
+    padding: 20px 24px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--bone-3);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-h::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+  /* Attached-to */
+  .attached-to-card {
+    margin: 0 24px;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+  }
+  .attached-to-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    background: var(--topic);
+    border-radius: 0 2px 2px 0;
+  }
+  .attached-to-card:hover { border-color: var(--line-warm); }
+  .attached-to-card .info { flex: 1; padding-left: 8px; }
+  .attached-to-card .kind-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--topic);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .attached-to-card .name {
+    font-family: 'Geist', sans-serif;
+    font-size: 14px;
+    color: var(--bone);
+    font-weight: 500;
+  }
+  .attached-to-card .arrow { color: var(--bone-3); }
+
+  /* Tag cloud — for kind / source / etc */
+  .tag-cloud {
+    padding: 0 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    background: var(--ink-2);
+    border: 1px solid var(--line-warm);
+    border-radius: 100px;
+    padding: 5px 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--bone-2);
+  }
+  .tag .key { color: var(--bone-3); margin-right: 5px; }
+
+  /* Notes */
+  .notes-pane { padding: 0 24px; }
+  .notes-input {
+    width: 100%;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--bone);
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 70px;
+    resize: vertical;
+  }
+  .notes-input:focus { outline: none; border-color: var(--bone-3); }
+
+  /* Extracted-text preview */
+  .extract-preview {
+    margin: 0 24px;
+    padding: 14px 16px;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--bone-2);
+    max-height: 200px;
+    overflow: auto;
+  }
+  .extract-preview p {
+    margin: 0 0 10px;
+  }
+  .extract-preview p:last-child { margin: 0; }
+
+  .acts-row {
+    padding: 16px 24px 24px;
+    display: flex;
+    gap: 8px;
+  }
+  .row-btn {
+    flex: 1;
+    padding: 12px;
+    background: var(--ink-2);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    color: var(--bone-1);
+    font-family: 'Geist', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .row-btn:hover { color: var(--bone); border-color: var(--line-warm); }
+  .row-btn.danger { color: var(--state-err); }
+</style>
+</head>
+<body data-logo="aperture">
+<div class="stage">
+
+  <div class="page-nav">
+    <a href="index.html">All pages</a>
+    <a href="timeline.html" class="cur">Timeline</a>
+    <a href="studio.html">Studio</a>
+    <a href="graph.html">Graph</a>
+    <a href="projects.html">Projects</a>
+    <a href="settings.html">Settings</a>
+    <a href="landing.html">Landing</a>
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="right"><span>5G</span><span class="bars"><span></span><span></span><span></span><span class="dim"></span></span></span>
+    </div>
+
+    <div class="crown">
+      <div class="logo reveal d1">
+        <div class="aperture">
+          <svg class="aperture-svg" viewBox="0 0 22 22" fill="none">
+            <circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="11" cy="11" r="5" fill="currentColor"/>
+            <path d="M 11 6 L 11 11 L 16 11 A 5 5 0 0 0 11 6 Z" fill="#1a1611"/>
+          </svg>
+          <svg class="stratum-svg" viewBox="0 0 22 22" fill="none">
+            <line x1="3" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="3" y1="10" x2="19" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+            <line x1="3" y1="14" x2="19" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
+            <line x1="3" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.25"/>
+          </svg>
+          <svg class="filament-svg" viewBox="0 0 22 22" fill="none">
+            <path d="M 3 11 Q 7 4, 11 11 T 19 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+            <circle cx="3" cy="11" r="1.8" fill="currentColor"/>
+            <circle cx="19" cy="11" r="1.8" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="wordmark">neolog</div>
+      </div>
+      <div class="meta reveal d2"><div class="day">Apr 29</div><div>9:41 PM</div></div>
+    </div>
+
+    <div class="body">
+
+      <a class="back-link" href="timeline.html">Timeline</a>
+
+      <div class="att-preview">
+        <span class="ext-flag">PDF</span>
+        <div class="doc-mock">
+          <div class="line h"></div>
+          <div class="line short"></div>
+          <div class="line s"></div>
+          <div class="line m"></div>
+          <div class="line s"></div>
+          <div class="line m"></div>
+          <div class="line s"></div>
+          <div class="line short"></div>
+          <div class="line s"></div>
+          <div class="line m"></div>
+          <div class="line s"></div>
+          <div class="line m"></div>
+          <div class="line s"></div>
+        </div>
+        <button class="open-btn">Open</button>
+      </div>
+
+      <div class="att-head">
+        <div class="att-meta">
+          <span>Attachment</span>
+          <span>·</span>
+          <span>Apr 18 · 11:22 AM</span>
+          <span>·</span>
+          <span>Uploaded from Mac</span>
+        </div>
+        <h1>Algorithmic Listening</h1>
+        <div class="filename">anil-dash-algorithmic-listening-2018.pdf · 2.4 MB · 18 pages</div>
+      </div>
+
+      <div class="section-h">Attached to</div>
+      <div class="attached-to-card" style="--topic: var(--t-terra);" onclick="window.location.href='cluster.html'">
+        <div class="info">
+          <div class="kind-label">Cluster</div>
+          <div class="name">Recommender systems — concept essay</div>
+        </div>
+        <span class="arrow">→</span>
+      </div>
+
+      <div class="section-h">Properties</div>
+      <div class="tag-cloud">
+        <span class="tag"><span class="key">kind</span>PDF</span>
+        <span class="tag"><span class="key">size</span>2.4 MB</span>
+        <span class="tag"><span class="key">pages</span>18</span>
+        <span class="tag"><span class="key">source</span>upload</span>
+        <span class="tag"><span class="key">extracted text</span>yes</span>
+      </div>
+
+      <div class="section-h">Operator notes</div>
+      <div class="notes-pane">
+        <textarea class="notes-input">Anil Dash on Spotify's Discover Weekly — early critique of the same revealed-vs-stated preference dynamic. Use for the parallel beat in the recommender essay. Also the "engagement-cache" framing predates mine by years.</textarea>
+      </div>
+
+      <div class="section-h">Extracted text — first page</div>
+      <div class="extract-preview">
+        <p>The promise of personalization was always that the algorithm would learn what you wanted and give it to you. The reality, six years into the streaming era, is something stranger: the algorithm has learned what keeps you on the platform, and that's what it gives you.</p>
+        <p>These are not the same thing.</p>
+        <p>Spotify's Discover Weekly is celebrated as the canonical success story of recommender personalization. Listen long enough, however, and the cracks show. The system has learned not what you love but what won't make you skip. The optimization function is engagement; the framing is taste...</p>
+      </div>
+
+      <div class="acts-row">
+        <button class="row-btn">Re-attach</button>
+        <button class="row-btn">Download</button>
+        <button class="row-btn danger">Delete</button>
+      </div>
+
+    </div>
+
+    
+
+    <nav class="dock">
+      <a href="timeline.html" class="dock-btn active"><span class="ico"><svg width="20" height="20" viewBox="0 0 20 20"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="14" x2="17" y2="14"/><circle cx="6" cy="6" r="1.2" fill="currentColor"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="13" cy="14" r="1.2" fill="currentColor"/></svg></span><span>Timeline</span></a>
+      <a href="studio.html" class="dock-btn"><span class="ico"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 3 L17 10 L10 17 L3 10 Z"/></svg></span><span>Studio</span></a>
+      <a href="graph.html" class="dock-btn"><span class="ico"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="5" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/><circle cx="5" cy="14" r="1.8"/><circle cx="15" cy="14" r="1.8"/><circle cx="10" cy="10" r="2.2"/><line x1="6.5" y1="7" x2="8.5" y2="9"/><line x1="13.5" y1="7" x2="11.5" y2="9"/><line x1="6.5" y1="13" x2="8.5" y2="11"/><line x1="13.5" y1="13" x2="11.5" y2="11"/></svg></span><span>Graph</span></a>
+      <a href="projects.html" class="dock-btn"><span class="ico"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="3" rx="0.5"/><rect x="3" y="9" width="14" height="3" rx="0.5"/><rect x="3" y="14" width="14" height="3" rx="0.5"/></svg></span><span>Projects</span></a>
+      <a href="settings.html" class="dock-btn"><span class="ico"><svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.5"/><path d="M10 4 L10 6 M10 14 L10 16 M4 10 L6 10 M14 10 L16 10 M5.5 5.5 L7 7 M13 13 L14.5 14.5 M5.5 14.5 L7 13 M13 7 L14.5 5.5"/></svg></span><span>Settings</span></a>
+    </nav>
+  </div>
+</div>
+<script>
+  const logos = ['aperture', 'stratum', 'filament'];
+  const stored = sessionStorage.getItem('neolog-logo');
+  const choice = stored || logos[Math.floor(Math.random() * logos.length)];
+  if (!stored) sessionStorage.setItem('neolog-logo', choice);
+  document.body.setAttribute('data-logo', choice);
+</script>
+</body>
+</html>

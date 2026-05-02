@@ -151,6 +151,7 @@ neolog-app/                        — prototype gallery (22 HTML files, CSS inl
   clip.html                        — clip preview / trim / ship
   article.html                     — long-form drafting view
   broll.html                       — B-roll asset detail
+  attachment.html                  — reference material detail (PDF / screenshot / article)
   vlog.html                        — single vlog detail
   materialize.html                 — production setup
   project.html                     — single project detail (creative_work)
