@@ -16,9 +16,10 @@
 --   * Soft delete via `deleted_at TEXT NULL` on operator-facing tables.
 --   * Indexes listed per table.
 --   * Foreign keys are declared; cascade behavior follows the spec.
-
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
+--
+-- Note: PRAGMA statements are NOT included. D1's remote execute path returns
+-- `not authorized: SQLITE_AUTH` on any PRAGMA. D1 has foreign keys enabled
+-- by default; journal_mode is managed by Cloudflare.
 
 -- =============================================================================
 -- 1. Operator identity
