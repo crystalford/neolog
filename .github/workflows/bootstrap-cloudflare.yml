@@ -89,9 +89,10 @@ jobs:
 
       - name: Install pnpm deps (just wrangler — full install later if needed)
         run: |
-          # Use npx so we don't need a package install just for wrangler.
-          # If the project's package.json already has wrangler, that takes precedence.
-          npx -y wrangler@latest --version
+          # Pin wrangler 4.x — Cloudflare Containers ([[containers]] array form)
+          # requires v4. v3 rejects it with "containers should be an object".
+          npm install -g wrangler@4
+          wrangler --version
 
       - name: Create or confirm D1 database
         id: d1
@@ -143,17 +144,17 @@ jobs:
           # Generate drop statements from schema.sql tables
           tables=$(grep -oE "CREATE TABLE [a-z_]+" db/schema.sql | awk '{print $3}')
           drop_sql=$(for t in $tables; do echo "DROP TABLE IF EXISTS $t;"; done | tr '\n' ' ')
-          npx wrangler d1 execute "$D1_NAME" --remote --command "$drop_sql"
+          wrangler d1 execute "$D1_NAME" --remote --command "$drop_sql"
 
       - name: Apply schema
         run: |
           set -e
-          npx wrangler d1 execute "$D1_NAME" --remote --file db/schema.sql
+          wrangler d1 execute "$D1_NAME" --remote --file db/schema.sql
 
       - name: Seed initial prompts (if seed file exists)
         run: |
           if [ -f db/seed.sql ]; then
-            npx wrangler d1 execute "$D1_NAME" --remote --file db/seed.sql
+            wrangler d1 execute "$D1_NAME" --remote --file db/seed.sql
           else
             echo "(no db/seed.sql yet — skipping)"
           fi
@@ -260,7 +261,7 @@ jobs:
           set -e
           cd workers/ffmpeg
           echo "Deploying neolog-ffmpeg Container Worker..."
-          npx wrangler deploy
+          wrangler deploy
 
       - name: Deploy process-upload Workflow (workers/process-upload)
         if: hashFiles('workers/process-upload/wrangler.toml') != ''
@@ -271,14 +272,14 @@ jobs:
           set -e
           cd workers/process-upload
           echo "Deploying neolog-process-upload Workflow..."
-          npx wrangler deploy
+          wrangler deploy
           # Push secrets the workflow needs at runtime
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
-            echo "$R2_ACCESS_KEY_ID" | npx wrangler secret put R2_ACCESS_KEY_ID
-            echo "$R2_SECRET_ACCESS_KEY" | npx wrangler secret put R2_SECRET_ACCESS_KEY
+            echo "$R2_ACCESS_KEY_ID" | wrangler secret put R2_ACCESS_KEY_ID
+            echo "$R2_SECRET_ACCESS_KEY" | wrangler secret put R2_SECRET_ACCESS_KEY
           fi
           if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
+            echo "$ANTHROPIC_API_KEY" | wrangler secret put ANTHROPIC_API_KEY
           fi
 
       - name: Set Pages project Worker secrets
@@ -290,12 +291,12 @@ jobs:
           set -e
           # Anthropic — runtime only, not used during bootstrap itself.
           if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "$ANTHROPIC_API_KEY" | npx wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT" || \
+            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT" || \
               echo "(Pages project does not exist yet — secret push deferred to next run.)"
           fi
           if [ -n "$R2_ACCESS_KEY_ID" ]; then
-            echo "$R2_ACCESS_KEY_ID" | npx wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT" || true
-            echo "$R2_SECRET_ACCESS_KEY" | npx wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT" || true
+            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT" || true
+            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT" || true
           fi
 
       - name: Build + deploy Pages project
@@ -304,7 +305,7 @@ jobs:
           set -e
           # next-on-pages builds the Next.js app to a Workers-runtime bundle
           npx @cloudflare/next-on-pages
-          npx wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
+          wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
 
       - name: Summary
         run: |
