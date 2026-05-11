@@ -250,10 +250,13 @@ jobs:
           cd workers/process-upload
           echo "Deploying neolog-process-upload Workflow..."
           npx wrangler deploy
-          # Push R2 presign secrets so the workflow can read from R2 via S3 API
+          # Push secrets the workflow needs at runtime
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
             echo "$R2_ACCESS_KEY_ID" | npx wrangler secret put R2_ACCESS_KEY_ID
             echo "$R2_SECRET_ACCESS_KEY" | npx wrangler secret put R2_SECRET_ACCESS_KEY
+          fi
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
           fi
 
       - name: Set Pages project Worker secrets

@@ -34,12 +34,19 @@
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import type { D1Database, R2Bucket, Ai, Fetcher } from '@cloudflare/workers-types'
+import {
+  extractThreads,
+  extractClipCandidates,
+  extractCreativeElements,
+  extractEntities,
+} from '../../../src/lib/extract'
 
 interface Env {
   DB: D1Database
   VIDEOS: R2Bucket
   AI: Ai
   FFMPEG: Fetcher
+  ANTHROPIC_API_KEY: string
   CLOUDFLARE_ACCOUNT_ID: string
   R2_BUCKET_NAME: string
   R2_ACCESS_KEY_ID?: string
@@ -240,11 +247,74 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       )
     }
 
-    // ── Step 7: mark complete ────────────────────────────────────────────────
-    await step.do('mark-complete', async () => reportStatus('complete'))
+    // ── Step 7: mark extracting ──────────────────────────────────────────────
+    await step.do('mark-extracting', async () => reportStatus('extracting'))
 
-    // TODO: dispatch the three extraction passes (analytical / creative /
-    // clip-candidate). Lands in workers/extract-* in the next commit.
+    // Reload the transcript text — it was written in the transcribe step but
+    // we need a fresh read since the Workflow may resume here from a retry.
+    const transcriptRow = await step.do('reload-transcript', async () => {
+      const row = await this.env.DB.prepare(
+        'SELECT transcript_text FROM vlogs WHERE id = ?',
+      ).bind(vlog_id).first<{ transcript_text: string | null }>()
+      return row
+    })
+
+    if (transcriptRow?.transcript_text && transcriptRow.transcript_text.length > 20) {
+      const extractCtx = {
+        vlog_id,
+        operator_id,
+        transcript_text: transcriptRow.transcript_text,
+      }
+
+      // ── Step 8: analytical pass → threads ────────────────────────────────
+      await step.do(
+        'extract-threads',
+        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
+        async () => {
+          const result = await extractThreads(this.env, extractCtx)
+          console.log(`[extract-threads] inserted=${result.inserted} rejected_voice=${result.rejected}`)
+          return result
+        },
+      )
+
+      // ── Step 9: clip-candidate pass → clip_candidates ────────────────────
+      await step.do(
+        'extract-clip-candidates',
+        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
+        async () => {
+          const result = await extractClipCandidates(this.env, extractCtx)
+          console.log(`[extract-clip-candidates] inserted=${result.inserted}`)
+          return result
+        },
+      )
+
+      // ── Step 10: creative-mode pass → creative_elements (often 0) ────────
+      await step.do(
+        'extract-creative-elements',
+        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
+        async () => {
+          const result = await extractCreativeElements(this.env, extractCtx)
+          console.log(`[extract-creative-elements] inserted=${result.inserted}`)
+          return result
+        },
+      )
+
+      // ── Step 11: entity extraction → entities + entity_mentions ──────────
+      await step.do(
+        'extract-entities',
+        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
+        async () => {
+          const result = await extractEntities(this.env, extractCtx)
+          console.log(`[extract-entities] entities=${result.entitiesUpserted} mentions=${result.mentionsInserted}`)
+          return result
+        },
+      )
+    } else {
+      console.log(`[process-upload] no transcript text for vlog ${vlog_id} — skipping extraction passes`)
+    }
+
+    // ── Final: mark complete ─────────────────────────────────────────────────
+    await step.do('mark-complete', async () => reportStatus('complete'))
 
     return { vlog_id, status: 'complete' }
   }

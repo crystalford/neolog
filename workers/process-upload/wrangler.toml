@@ -48,6 +48,7 @@ R2_BUCKET_NAME = "neolog-videos"
 # Secrets (set via wrangler secret put):
 #   R2_ACCESS_KEY_ID
 #   R2_SECRET_ACCESS_KEY
+#   ANTHROPIC_API_KEY      — Claude calls for the four extraction passes
 
 [observability]
 enabled = true
