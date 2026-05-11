@@ -188,12 +188,33 @@ export default function TimelineDetailPage() {
         </h1>
         <p className="text-[11px] font-mono text-[var(--text-tertiary)] mt-1">
           {format(recordedDate, 'h:mm a')}
-          {upload.status !== 'processed' && (
+          {upload.status !== 'processed' && upload.status !== 'archived' && (
             <span className="ml-3 text-[var(--accent)] animate-pulse">
               {upload.status === 'error' ? '· Error' : '· Processing…'}
             </span>
           )}
+          {upload.status === 'archived' && (
+            <span className="ml-3 text-[var(--text-tertiary)]">· Archived — not yet transcribed</span>
+          )}
         </p>
+        {upload.status === 'archived' && (
+          <button
+            onClick={async () => {
+              const res = await fetch(`/api/video-upload/${id}/process`, { method: 'POST' })
+              if (res.ok) {
+                // Optimistically reflect transition; loadData refresh will follow
+                setUpload({ ...upload, status: 'uploaded' } as VideoUpload)
+                setTimeout(loadData, 1500)
+              } else {
+                const body = await res.json().catch(() => null)
+                alert(body?.error || 'Failed to queue processing')
+              }
+            }}
+            className="mt-3 px-3 py-1.5 text-[10px] font-mono uppercase tracking-[0.15em] text-[var(--accent)] border border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors"
+          >
+            Process now → transcribe + analyze
+          </button>
+        )}
       </div>
 
       {/* Video / Audio Player */}

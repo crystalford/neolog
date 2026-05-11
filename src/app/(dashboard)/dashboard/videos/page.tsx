@@ -33,6 +33,7 @@ type UploadJob = {
   status: 'pending' | 'uploading' | 'completing' | 'done' | 'error'
   progress: number
   error?: string
+  archive?: boolean
 }
 
 function Tag({ children, color = C.amber }: { children: React.ReactNode; color?: string }) {
@@ -119,6 +120,7 @@ const PROCESSING_STATUSES = new Set([
 
 function statusColor(status: string) {
   if (status === 'processed' || status === 'ready') return C.green
+  if (status === 'archived') return C.textSecond
   if (status === 'error') return C.red
   if (PROCESSING_STATUSES.has(status)) return C.blue
   return C.textDim
@@ -127,6 +129,7 @@ function statusColor(status: string) {
 function statusLabel(status: string) {
   switch (status) {
     case 'processed':            return 'READY'
+    case 'archived':             return 'ARCHIVED'
     case 'uploaded':             return 'QUEUED'
     case 'starting':             return 'STARTING'
     case 'extracting-audio':     return 'EXTRACTING AUDIO'
@@ -218,6 +221,7 @@ async function runMultipartUpload(
   onProgress: (pct: number) => void,
   signal: AbortSignal,
   thumbnailPromise: Promise<string | null>,
+  archive: boolean = false,
 ): Promise<{ key: string }> {
   // Step 1: Initiate and get presigned part URLs
   const initRes = await fetch('/api/upload/initiate', {
@@ -280,6 +284,7 @@ async function runMultipartUpload(
       mime_type: file.type,
       recorded_at: extractRecordedAt(file),
       thumbnail_url: thumbnail ?? undefined,
+      archive: archive || undefined,
     }),
     signal,
   })
@@ -295,6 +300,10 @@ export default function VideosPage() {
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState<UploadJob[]>([])
   const [dragActive, setDragActive] = useState(false)
+  // Archive mode: skip auto-transcribe/analyze. Locked pipeline (transcode +
+  // thumbnail + recorded_at) still runs. Operator triggers transcription +
+  // extraction later per-vlog from the vlog detail page.
+  const [archiveMode, setArchiveMode] = useState(false)
   const abortRefs = useRef<Map<string, AbortController>>(new Map())
 
   const fetchUploads = useCallback(async () => {
@@ -322,11 +331,15 @@ export default function VideosPage() {
   }, [uploads, fetchUploads])
 
   const startJobs = useCallback((files: File[]) => {
+    // Capture archive flag at job creation time so toggling mid-upload
+    // doesn't change in-flight jobs.
+    const archive = archiveMode
     const newJobs: UploadJob[] = files.map(f => ({
       id: crypto.randomUUID(),
       file: f,
       status: 'pending',
       progress: 0,
+      archive,
     }))
     setJobs(prev => [...prev, ...newJobs])
 
@@ -344,6 +357,7 @@ export default function VideosPage() {
         pct => setJobs(prev => prev.map(j => j.id === job.id ? { ...j, progress: pct } : j)),
         abort.signal,
         thumbnailPromise,
+        job.archive,
       )
         .then(() => {
           setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'done', progress: 100 } : j))
@@ -357,7 +371,7 @@ export default function VideosPage() {
           abortRefs.current.delete(job.id)
         })
     })
-  }, [fetchUploads])
+  }, [fetchUploads, archiveMode])
 
   const handleFiles = (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter(f => f.type.startsWith('video/') || f.type.startsWith('audio/'))
@@ -391,6 +405,31 @@ export default function VideosPage() {
             {uploads.length} sessions · {totalMins} minutes total
           </div>
         </div>
+        <label
+          title="Skip auto-transcribe and auto-analyze. Just store the file with thumbnail + recording date. Process per-vlog later from the vlog detail page."
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 10,
+            letterSpacing: 1,
+            color: archiveMode ? C.amber : C.textDim,
+            cursor: 'pointer',
+            padding: '6px 10px',
+            border: `1px solid ${archiveMode ? C.amberDim : C.border}`,
+            background: archiveMode ? C.amberGlow : 'transparent',
+            transition: 'all 0.15s',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={archiveMode}
+            onChange={e => setArchiveMode(e.target.checked)}
+            style={{ accentColor: C.amber, cursor: 'pointer' }}
+          />
+          ARCHIVE ONLY
+        </label>
         <Btn primary onClick={() => document.getElementById('file-input-main')?.click()}>
           + UPLOAD
         </Btn>
@@ -431,7 +470,11 @@ export default function VideosPage() {
         <div style={{ fontSize: 18, color: C.textDim }}>↑</div>
         <div>
           <div style={{ fontSize: 12, color: C.textSecond, marginBottom: 2 }}>Drop videos here</div>
-          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1 }}>Multipart upload · up to 5 GB · MP4, MOV, WEBM</div>
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1 }}>
+            {archiveMode
+              ? 'ARCHIVE ONLY · thumbnail + date only, no transcribe, no analyze'
+              : 'Multipart upload · up to 5 GB · MP4, MOV, WEBM'}
+          </div>
         </div>
       </div>
 
@@ -517,7 +560,8 @@ function VideoRow({
   const [reanalyzing, setReanalyzing] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
-  const isReady = upload.status === 'processed' || upload.status === 'ready'
+  // Archived counts as navigable — user clicks through to the Process now button.
+  const isReady = upload.status === 'processed' || upload.status === 'ready' || upload.status === 'archived'
   const isProcessing = PROCESSING_STATUSES.has(upload.status)
   const stuck = isStuck(upload)
   const title = upload.analysis?.title ?? upload.file_name?.replace(/\.[^.]+$/, '').replace(/[_\-]+/g, ' ') ?? 'Untitled'

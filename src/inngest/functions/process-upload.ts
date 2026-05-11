@@ -332,12 +332,13 @@ export const processUpload = inngest.createFunction(
 
     let audioPath: { path: string, extracted: boolean, isDirectUrl?: boolean } = { path: upload.storage_path, extracted: false }
 
-    // Skip audio extraction in thumbnail mode (we exit before transcribe) and in
-    // resume mode when transcript already exists (we'll reuse it instead of re-transcribing).
+    // Skip audio extraction in thumbnail / archive modes (we exit before transcribe)
+    // and in resume mode when transcript already exists (we reuse it instead).
     const transcriptAlreadyExists = !!upload.transcript
     const shouldExtractAudio =
       (isVideoMimeType(upload.mime_type) || upload.mime_type.startsWith('audio/')) &&
       earlyMode !== 'thumbnail' &&
+      earlyMode !== 'archive' &&
       !(earlyMode === 'resume' && transcriptAlreadyExists)
     const replicateToken = process.env.REPLICATE_API_TOKEN
 
@@ -520,6 +521,15 @@ export const processUpload = inngest.createFunction(
     if (mode === 'thumbnail') {
       await reportStatus('processed')
       return { status: 'thumbnail_noop', video_upload_id }
+    }
+
+    // Archive mode: locked pipeline only (transcode + recorded_at). Stop here.
+    // The operator triggers transcription + analysis later via the "Process now"
+    // action on the vlog detail page. This unblocks bulk-uploading a backlog
+    // without spending on AI calls.
+    if (mode === 'archive') {
+      await reportStatus('archived')
+      return { status: 'archived', video_upload_id }
     }
 
     // ── Step 3: Transcribe ──

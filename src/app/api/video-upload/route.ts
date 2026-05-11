@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at, force, thumbnail_url } = body
-    console.log(`[API] Received upload registration for ${file_name}. recorded_at: ${recorded_at}`);
+    const { storage_path, file_name, file_size_bytes, mime_type, session_id, recorded_at, force, thumbnail_url, archive } = body
+    console.log(`[API] Received upload registration for ${file_name}. recorded_at: ${recorded_at}, archive: ${!!archive}`);
 
     if (!storage_path || !file_name || !file_size_bytes || !mime_type) {
       finalErrorMessage = 'Missing required fields: storage_path, file_name, file_size_bytes, mime_type'
@@ -104,11 +104,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: finalErrorMessage, details: dbError }, { status: 500 })
     }
 
-    // Trigger Inngest processing pipeline
+    // Trigger Inngest processing pipeline. Archive mode runs only the locked
+    // pipeline (transcode + thumbnail + recorded_at) and stops — operator
+    // triggers transcription + analysis later per-vlog.
     try {
       await inngest.send({
         name: 'video-upload/process',
-        data: { video_upload_id: record.id, user_id: userId },
+        data: {
+          video_upload_id: record.id,
+          user_id: userId,
+          ...(archive ? { mode: 'archive' as const } : {}),
+        },
       })
     } catch (inngestError) {
       console.error('Inngest event failed:', inngestError)
