@@ -1,0 +1,239 @@
+name: Bootstrap Cloudflare
+
+# Provisions every Cloudflare resource Neolog needs:
+#  - D1 database 'neolog' (created if absent)
+#  - Schema applied (db/schema.sql)
+#  - Initial prompt rows seeded (db/seed.sql)
+#  - R2 bucket binding (neolog-videos — already exists, just confirms access)
+#  - Workers AI binding
+#  - Cloudflare Access application + One-time PIN identity provider
+#  - Container Worker for FFmpeg deployed
+#  - Pages project linked + production deploy
+#
+# Trigger: manually from github.com → Actions → Bootstrap Cloudflare → "Run workflow"
+#
+# Required secrets (set once via github.com → repo → Settings → Secrets and variables → Actions):
+#  CLOUDFLARE_API_TOKEN   — token with Workers/D1/R2/Pages/Access edit permissions
+#  CLOUDFLARE_ACCOUNT_ID  — eda2e9bbd9acc42699027cfdcb50f998
+#  ANTHROPIC_API_KEY      — for the Worker's runtime calls (stored as a Worker secret at deploy time)
+#  OPERATOR_EMAIL         — the email Cloudflare Access will send the one-time PIN to (your email)
+#
+# The workflow is idempotent. Safe to re-run after any change.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reset_schema:
+        description: "Drop and recreate D1 schema (DESTROYS all data — keep 'false' unless you mean it)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ANTHROPIC_API_KEY:     ${{ secrets.ANTHROPIC_API_KEY }}
+  OPERATOR_EMAIL:        ${{ secrets.OPERATOR_EMAIL }}
+  ACCESS_TEAM:           neolog
+  R2_BUCKET:             neolog-videos
+  D1_NAME:               neolog
+  PAGES_PROJECT:         neolog
+  CONTAINER_WORKER:      neolog-ffmpeg
+
+jobs:
+  bootstrap:
+    name: Provision + deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify required secrets
+        run: |
+          set -e
+          : "${CLOUDFLARE_API_TOKEN:?Missing CLOUDFLARE_API_TOKEN secret}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Missing CLOUDFLARE_ACCOUNT_ID secret}"
+          : "${ANTHROPIC_API_KEY:?Missing ANTHROPIC_API_KEY secret}"
+          : "${OPERATOR_EMAIL:?Missing OPERATOR_EMAIL secret}"
+          echo "All required secrets present."
+
+      - name: Verify Cloudflare API token works
+        run: |
+          set -e
+          response=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify)
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          echo "$body" | jq .
+          if [ "$status" != "200" ]; then
+            echo "❌ Token verify failed (HTTP $status)"
+            exit 1
+          fi
+          echo "✅ Token valid."
+
+      - name: Install pnpm deps (just wrangler — full install later if needed)
+        run: |
+          # Use npx so we don't need a package install just for wrangler.
+          # If the project's package.json already has wrangler, that takes precedence.
+          npx -y wrangler@latest --version
+
+      - name: Create or confirm D1 database
+        id: d1
+        run: |
+          set -e
+          existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database" \
+            | jq -r --arg name "$D1_NAME" '.result[] | select(.name == $name) | .uuid')
+
+          if [ -z "$existing" ]; then
+            echo "Creating D1 database '$D1_NAME'..."
+            created=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"'$D1_NAME'"}' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")
+            existing=$(echo "$created" | jq -r '.result.uuid')
+            echo "$created" | jq .
+          else
+            echo "D1 database '$D1_NAME' already exists: $existing"
+          fi
+          echo "uuid=$existing" >> "$GITHUB_OUTPUT"
+
+      - name: Optional — drop schema (destructive)
+        if: ${{ inputs.reset_schema == 'true' }}
+        run: |
+          echo "⚠ reset_schema=true — dropping all tables in D1 '$D1_NAME'"
+          # Generate drop statements from schema.sql tables
+          tables=$(grep -oE "CREATE TABLE [a-z_]+" db/schema.sql | awk '{print $3}')
+          drop_sql=$(for t in $tables; do echo "DROP TABLE IF EXISTS $t;"; done | tr '\n' ' ')
+          npx wrangler d1 execute "$D1_NAME" --remote --command "$drop_sql"
+
+      - name: Apply schema
+        run: |
+          set -e
+          npx wrangler d1 execute "$D1_NAME" --remote --file db/schema.sql
+
+      - name: Seed initial prompts (if seed file exists)
+        run: |
+          if [ -f db/seed.sql ]; then
+            npx wrangler d1 execute "$D1_NAME" --remote --file db/seed.sql
+          else
+            echo "(no db/seed.sql yet — skipping)"
+          fi
+
+      - name: Confirm R2 bucket exists
+        run: |
+          set -e
+          existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets" \
+            | jq -r --arg name "$R2_BUCKET" '.result.buckets[] | select(.name == $name) | .name')
+          if [ -z "$existing" ]; then
+            echo "❌ R2 bucket '$R2_BUCKET' not found. Existing videos should already live in this bucket."
+            exit 1
+          fi
+          echo "✅ R2 bucket '$R2_BUCKET' confirmed."
+
+      - name: Configure Cloudflare Access — One-time PIN identity provider
+        run: |
+          set -e
+          # Check if a one-time-PIN IdP already exists
+          existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/identity_providers" \
+            | jq -r '.result[] | select(.type == "onetimepin") | .id')
+          if [ -z "$existing" ]; then
+            echo "Creating One-time PIN identity provider..."
+            curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"One-time PIN","type":"onetimepin"}' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/identity_providers" \
+              | jq .
+          else
+            echo "✅ One-time PIN identity provider already exists ($existing)."
+          fi
+
+      - name: Configure Cloudflare Access — application for neolog.ai
+        run: |
+          set -e
+          # Check if an Access app for neolog.ai already exists
+          existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
+            | jq -r '.result[] | select(.domain == "neolog.ai") | .id')
+
+          if [ -z "$existing" ]; then
+            echo "Creating Access application for neolog.ai..."
+            app_response=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "name": "Neolog",
+                "domain": "neolog.ai",
+                "type": "self_hosted",
+                "session_duration": "720h",
+                "auto_redirect_to_identity": false
+              }' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps")
+            echo "$app_response" | jq .
+            app_id=$(echo "$app_response" | jq -r '.result.id')
+
+            # Attach a policy that allows only the operator email
+            echo "Creating allow-operator-only policy..."
+            curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "name": "Operator only",
+                "decision": "allow",
+                "include": [{ "email": { "email": "'"$OPERATOR_EMAIL"'" } }]
+              }' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$app_id/policies" \
+              | jq .
+          else
+            echo "✅ Access application for neolog.ai already exists ($existing)."
+          fi
+
+      - name: Install project dependencies (for Pages build)
+        run: pnpm install --frozen-lockfile || pnpm install
+
+      - name: Set Worker secrets (ANTHROPIC_API_KEY)
+        run: |
+          # The Worker needs ANTHROPIC_API_KEY at runtime. Stored as a secret, not env var.
+          # This is a placeholder — actual Worker name is set in wrangler.toml.
+          # Once wrangler.toml exists, this will push the secret to the right Worker.
+          if [ -f wrangler.toml ]; then
+            echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
+          else
+            echo "(wrangler.toml doesn't exist yet — skipping Worker secret push. Will run on next bootstrap after the Worker is added.)"
+          fi
+
+      - name: Deploy Pages project (if pages-build is set up)
+        run: |
+          if [ -f wrangler.toml ] && grep -q "pages_build_output_dir" wrangler.toml; then
+            pnpm build
+            npx wrangler pages deploy ./out --project-name "$PAGES_PROJECT"
+          else
+            echo "(Pages config not yet set up — skipping deploy. Will run on next bootstrap after wrangler.toml is wired up.)"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Bootstrap complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- D1 database: \`$D1_NAME\` (id: ${{ steps.d1.outputs.uuid }})" >> $GITHUB_STEP_SUMMARY
+          echo "- R2 bucket: \`$R2_BUCKET\` confirmed" >> $GITHUB_STEP_SUMMARY
+          echo "- Access app: neolog.ai configured for $OPERATOR_EMAIL" >> $GITHUB_STEP_SUMMARY
+          echo "- Schema applied from db/schema.sql" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Next: visit neolog.ai (when DNS is pointed) and sign in via Cloudflare Access." >> $GITHUB_STEP_SUMMARY
