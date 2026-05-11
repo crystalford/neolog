@@ -25,7 +25,7 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "neolog"
-# database_id = "<filled-in-after-bootstrap-run>"
+database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
 
 # ─── R2: video storage ──────────────────────────────────────────────────────
 [[r2_buckets]]

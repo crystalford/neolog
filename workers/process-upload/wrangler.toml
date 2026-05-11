@@ -27,7 +27,7 @@ class_name = "ProcessUploadWorkflow"
 [[d1_databases]]
 binding = "DB"
 database_name = "neolog"
-# database_id filled after bootstrap run
+database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
 
 [[r2_buckets]]
 binding = "VIDEOS"
