@@ -320,6 +320,16 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   }
 }
 
+// Stub fetch handler — required so wrangler bundles this as ES Module format
+// (Workflows imports `cloudflare:workers`, which only resolves in ES Module
+// format). This Worker is invoked via the PROCESS_UPLOAD_WORKFLOW binding from
+// the main app Worker, never via HTTP, so the handler just returns 404.
+export default {
+  async fetch(): Promise<Response> {
+    return new Response('Not found', { status: 404 })
+  },
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function bufferToBase64(bytes: Uint8Array): string {
