@@ -320,12 +320,44 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   }
 }
 
-// Stub fetch handler — required so wrangler bundles this as ES Module format
-// (Workflows imports `cloudflare:workers`, which only resolves in ES Module
-// format). This Worker is invoked via the PROCESS_UPLOAD_WORKFLOW binding from
-// the main app Worker, never via HTTP, so the handler just returns 404.
+// Default fetch handler — exposes a /dispatch endpoint that creates a new
+// workflow instance. The main Pages app calls this via a Service binding
+// (Pages projects don't yet support [[workflows]] in wrangler.toml, so we
+// fan in through fetch instead). Anything else returns 404.
+//
+// Service binding caller pattern:
+//   await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+//     method: 'POST',
+//     body: JSON.stringify({ vlog_id, operator_id }),
+//   })
+interface DispatchEnv extends Env {
+  PROCESS_UPLOAD_WORKFLOW: any
+}
+
 export default {
-  async fetch(): Promise<Response> {
+  async fetch(req: Request, env: DispatchEnv): Promise<Response> {
+    const url = new URL(req.url)
+    if (req.method === 'POST' && url.pathname === '/dispatch') {
+      const body = await req.json().catch(() => null) as { vlog_id?: string; operator_id?: string } | null
+      if (!body?.vlog_id || !body?.operator_id) {
+        return new Response(JSON.stringify({ error: 'vlog_id and operator_id required' }), {
+          status: 400, headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      try {
+        const instance = await env.PROCESS_UPLOAD_WORKFLOW.create({
+          id: `process-upload-${body.vlog_id}-${Date.now()}`,
+          params: { vlog_id: body.vlog_id, operator_id: body.operator_id },
+        })
+        return new Response(JSON.stringify({ ok: true, instance_id: instance.id }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        })
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500, headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    }
     return new Response('Not found', { status: 404 })
   },
 }

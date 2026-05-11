@@ -30,7 +30,9 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends R2Env {
   DB: D1Database
-  PROCESS_UPLOAD_WORKFLOW?: any
+  // Service binding to the neolog-process-upload Worker (see process route for
+  // why we don't use a direct workflow binding from Pages).
+  PROCESS_UPLOAD?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
@@ -108,12 +110,17 @@ export async function POST(req: NextRequest) {
   // Trigger the post-upload Workflow when not in archive mode.
   // Archive uploads stay in 'archived' status until the operator hits
   // "Process now" on the vlog detail page (which calls /api/v2/vlogs/[id]/process).
-  if (!body.archive && env.PROCESS_UPLOAD_WORKFLOW) {
+  if (!body.archive && env.PROCESS_UPLOAD) {
     try {
-      await env.PROCESS_UPLOAD_WORKFLOW.create({
-        id: `process-upload-${id}-${Date.now()}`,
-        params: { vlog_id: id, operator_id: operator.id },
+      const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_id: id, operator_id: operator.id }),
       })
+      if (!res.ok) {
+        const err = await res.text()
+        throw new Error(`dispatch failed (${res.status}): ${err.slice(0, 500)}`)
+      }
     } catch (err: any) {
       // Surface the dispatch failure on the row but don't fail the create —
       // the operator can retry via /api/v2/vlogs/[id]/process.
