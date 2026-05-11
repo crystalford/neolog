@@ -6,6 +6,18 @@ The graph is the artifact. Productions are downstream.
 
 ---
 
+## ⚠️ Operator environment — do not assume an IDE
+
+The operator uses the **Claude Code desktop app on Windows**, not VS Code, not a terminal, not an IDE. This means:
+
+- **The Claude Code session IS the operator's runtime.** When you run a bash command, you're running it on their machine. Treat this session as the deployment environment.
+- **Never tell the operator to "open a terminal," "run a command locally," "pull the branch on your machine," or "edit a file in your editor."** They don't have any of those tools. You do all of that for them from this session.
+- The operator can paste values in chat, click in browser dashboards, and toggle settings inside the Claude Code app. That's it. Anything else, you handle.
+- Network access to external APIs (Cloudflare etc.) is controlled in Claude app: **Settings → Capabilities → "Allow network egress" + "Domain allowlist."** Required domains for this project: `*.cloudflare.com`, `*.cloudflareaccess.com`, `*.workers.dev`, `*.r2.cloudflarestorage.com`.
+- The Cloudflare-side bootstrap (D1, Workers, Access, Containers, deploy) all runs from THIS session via `wrangler`, not from "the operator's machine." There is no separate machine.
+
+---
+
 ## ⚠️ Locked architectural decisions — do not relitigate
 
 These are settled. Read this section before proposing alternatives.
