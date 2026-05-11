@@ -16,6 +16,8 @@
 --   * Soft delete via `deleted_at TEXT NULL` on operator-facing tables.
 --   * Indexes listed per table.
 --   * Foreign keys are declared; cascade behavior follows the spec.
+--   * Every CREATE statement uses IF NOT EXISTS so re-running the schema
+--     against a partially-applied D1 is safe and idempotent.
 --
 -- Note: PRAGMA statements are NOT included. D1's remote execute path returns
 -- `not authorized: SQLITE_AUTH` on any PRAGMA. D1 has foreign keys enabled
@@ -25,33 +27,29 @@
 -- 1. Operator identity
 -- =============================================================================
 
--- Single operator (this is a single-tenant app). Row keyed by Cloudflare Access
--- email. Reference corpus for the "Operator default" voice profile auto-populated
--- from threads after extraction has run.
-CREATE TABLE operator (
-  id                        TEXT PRIMARY KEY,                  -- ULID at insert time
-  email                     TEXT UNIQUE NOT NULL,              -- from Cloudflare Access JWT
+CREATE TABLE IF NOT EXISTS operator (
+  id                        TEXT PRIMARY KEY,
+  email                     TEXT UNIQUE NOT NULL,
   display_name              TEXT,
-  handle                    TEXT UNIQUE,                       -- for future public profile at neolog.ai/{handle}
+  handle                    TEXT UNIQUE,
   bio                       TEXT,
-  background                TEXT,                              -- identity context fed to ideator
-  current_focus             TEXT,                              -- what they're actively working on
+  background                TEXT,
+  current_focus             TEXT,
   tz                        TEXT DEFAULT 'America/Toronto',
-  default_voice_profile_id  TEXT,                              -- → voice_profiles.id (set after voice profile exists)
-  public_share_enabled      INTEGER NOT NULL DEFAULT 0,        -- 0/1; gates /{handle} public URL
+  default_voice_profile_id  TEXT,
+  public_share_enabled      INTEGER NOT NULL DEFAULT 0,
   created_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_operator_email ON operator(email);
+CREATE INDEX IF NOT EXISTS idx_operator_email ON operator(email);
 
--- Voice profiles. "Operator default" only in initial scope; characters added later.
-CREATE TABLE voice_profiles (
+CREATE TABLE IF NOT EXISTS voice_profiles (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
-  name                     TEXT NOT NULL,                       -- "Operator default" / character names later
+  name                     TEXT NOT NULL,
   kind                     TEXT NOT NULL CHECK (kind IN ('operator', 'character', 'external_reference')),
   description              TEXT,
-  reference_texts          TEXT,                                -- JSON array of reference text snippets
+  reference_texts          TEXT,
   cadence_notes            TEXT,
   register_notes           TEXT,
   vocabulary_preferences   TEXT,
@@ -60,14 +58,14 @@ CREATE TABLE voice_profiles (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_voice_profiles_operator ON voice_profiles(operator_id);
-CREATE INDEX idx_voice_profiles_default ON voice_profiles(operator_id, is_default);
+CREATE INDEX IF NOT EXISTS idx_voice_profiles_operator ON voice_profiles(operator_id);
+CREATE INDEX IF NOT EXISTS idx_voice_profiles_default ON voice_profiles(operator_id, is_default);
 
 -- =============================================================================
 -- 2. Capture substrate
 -- =============================================================================
 
-CREATE TABLE vlogs (
+CREATE TABLE IF NOT EXISTS vlogs (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   r2_key                   TEXT NOT NULL,
@@ -90,12 +88,12 @@ CREATE TABLE vlogs (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_vlogs_operator ON vlogs(operator_id);
-CREATE INDEX idx_vlogs_recorded_at ON vlogs(recorded_at DESC);
-CREATE INDEX idx_vlogs_pipeline_status ON vlogs(pipeline_status);
-CREATE INDEX idx_vlogs_r2_key ON vlogs(r2_key);
+CREATE INDEX IF NOT EXISTS idx_vlogs_operator ON vlogs(operator_id);
+CREATE INDEX IF NOT EXISTS idx_vlogs_recorded_at ON vlogs(recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vlogs_pipeline_status ON vlogs(pipeline_status);
+CREATE INDEX IF NOT EXISTS idx_vlogs_r2_key ON vlogs(r2_key);
 
-CREATE TABLE transcript_words (
+CREATE TABLE IF NOT EXISTS transcript_words (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
   vlog_id                  TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
@@ -106,10 +104,10 @@ CREATE TABLE transcript_words (
   speaker                  TEXT,
   UNIQUE(vlog_id, word_index)
 );
-CREATE INDEX idx_transcript_words_vlog ON transcript_words(vlog_id);
-CREATE INDEX idx_transcript_words_vlog_time ON transcript_words(vlog_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_transcript_words_vlog ON transcript_words(vlog_id);
+CREATE INDEX IF NOT EXISTS idx_transcript_words_vlog_time ON transcript_words(vlog_id, start_time);
 
-CREATE TABLE broll_assets (
+CREATE TABLE IF NOT EXISTS broll_assets (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   r2_key                   TEXT NOT NULL,
@@ -128,10 +126,10 @@ CREATE TABLE broll_assets (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_broll_operator ON broll_assets(operator_id);
-CREATE INDEX idx_broll_signature ON broll_assets(operator_id, is_signature);
+CREATE INDEX IF NOT EXISTS idx_broll_operator ON broll_assets(operator_id);
+CREATE INDEX IF NOT EXISTS idx_broll_signature ON broll_assets(operator_id, is_signature);
 
-CREATE TABLE attachments (
+CREATE TABLE IF NOT EXISTS attachments (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   r2_key                   TEXT NOT NULL,
@@ -148,14 +146,14 @@ CREATE TABLE attachments (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_attachments_operator ON attachments(operator_id);
-CREATE INDEX idx_attachments_attached_to ON attachments(attached_to_kind, attached_to_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_operator ON attachments(operator_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_attached_to ON attachments(attached_to_kind, attached_to_id);
 
 -- =============================================================================
 -- 3. Extraction outputs — graph nodes
 -- =============================================================================
 
-CREATE TABLE threads (
+CREATE TABLE IF NOT EXISTS threads (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
@@ -175,13 +173,13 @@ CREATE TABLE threads (
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_threads_operator ON threads(operator_id);
-CREATE INDEX idx_threads_vlog ON threads(vlog_id);
-CREATE INDEX idx_threads_abstracted_topic ON threads(abstracted_topic);
-CREATE INDEX idx_threads_strength ON threads(operator_id, strength DESC);
-CREATE INDEX idx_threads_cluster ON threads(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_threads_operator ON threads(operator_id);
+CREATE INDEX IF NOT EXISTS idx_threads_vlog ON threads(vlog_id);
+CREATE INDEX IF NOT EXISTS idx_threads_abstracted_topic ON threads(abstracted_topic);
+CREATE INDEX IF NOT EXISTS idx_threads_strength ON threads(operator_id, strength DESC);
+CREATE INDEX IF NOT EXISTS idx_threads_cluster ON threads(cluster_id);
 
-CREATE TABLE creative_elements (
+CREATE TABLE IF NOT EXISTS creative_elements (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
@@ -196,12 +194,12 @@ CREATE TABLE creative_elements (
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_creative_operator ON creative_elements(operator_id);
-CREATE INDEX idx_creative_vlog ON creative_elements(vlog_id);
-CREATE INDEX idx_creative_project ON creative_elements(project_id);
-CREATE INDEX idx_creative_type ON creative_elements(element_type);
+CREATE INDEX IF NOT EXISTS idx_creative_operator ON creative_elements(operator_id);
+CREATE INDEX IF NOT EXISTS idx_creative_vlog ON creative_elements(vlog_id);
+CREATE INDEX IF NOT EXISTS idx_creative_project ON creative_elements(project_id);
+CREATE INDEX IF NOT EXISTS idx_creative_type ON creative_elements(element_type);
 
-CREATE TABLE clip_candidates (
+CREATE TABLE IF NOT EXISTS clip_candidates (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
@@ -220,11 +218,11 @@ CREATE TABLE clip_candidates (
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_clip_operator ON clip_candidates(operator_id);
-CREATE INDEX idx_clip_vlog ON clip_candidates(vlog_id);
-CREATE INDEX idx_clip_status ON clip_candidates(operator_id, status);
+CREATE INDEX IF NOT EXISTS idx_clip_operator ON clip_candidates(operator_id);
+CREATE INDEX IF NOT EXISTS idx_clip_vlog ON clip_candidates(vlog_id);
+CREATE INDEX IF NOT EXISTS idx_clip_status ON clip_candidates(operator_id, status);
 
-CREATE TABLE entities (
+CREATE TABLE IF NOT EXISTS entities (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
@@ -238,11 +236,11 @@ CREATE TABLE entities (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_entities_operator ON entities(operator_id);
-CREATE INDEX idx_entities_type ON entities(operator_id, entity_type);
-CREATE INDEX idx_entities_name ON entities(operator_id, name);
+CREATE INDEX IF NOT EXISTS idx_entities_operator ON entities(operator_id);
+CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(operator_id, entity_type);
+CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(operator_id, name);
 
-CREATE TABLE entity_mentions (
+CREATE TABLE IF NOT EXISTS entity_mentions (
   id                       TEXT PRIMARY KEY,
   entity_id                TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
@@ -253,14 +251,14 @@ CREATE TABLE entity_mentions (
   confidence               REAL,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_mentions_entity ON entity_mentions(entity_id);
-CREATE INDEX idx_mentions_source ON entity_mentions(source_kind, source_id);
+CREATE INDEX IF NOT EXISTS idx_mentions_entity ON entity_mentions(entity_id);
+CREATE INDEX IF NOT EXISTS idx_mentions_source ON entity_mentions(source_kind, source_id);
 
 -- =============================================================================
 -- 4. Connection graph + clusters
 -- =============================================================================
 
-CREATE TABLE thread_connections (
+CREATE TABLE IF NOT EXISTS thread_connections (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   thread_a_id              TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
@@ -271,10 +269,10 @@ CREATE TABLE thread_connections (
   UNIQUE(thread_a_id, thread_b_id),
   CHECK (thread_a_id < thread_b_id)
 );
-CREATE INDEX idx_thread_connections_a ON thread_connections(thread_a_id);
-CREATE INDEX idx_thread_connections_b ON thread_connections(thread_b_id);
+CREATE INDEX IF NOT EXISTS idx_thread_connections_a ON thread_connections(thread_a_id);
+CREATE INDEX IF NOT EXISTS idx_thread_connections_b ON thread_connections(thread_b_id);
 
-CREATE TABLE clusters (
+CREATE TABLE IF NOT EXISTS clusters (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   topic                       TEXT NOT NULL,
@@ -296,21 +294,21 @@ CREATE TABLE clusters (
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_clusters_operator ON clusters(operator_id);
-CREATE INDEX idx_clusters_state ON clusters(operator_id, state);
-CREATE INDEX idx_clusters_abstracted_topic ON clusters(abstracted_topic);
-CREATE INDEX idx_clusters_parent ON clusters(parent_cluster_id);
+CREATE INDEX IF NOT EXISTS idx_clusters_operator ON clusters(operator_id);
+CREATE INDEX IF NOT EXISTS idx_clusters_state ON clusters(operator_id, state);
+CREATE INDEX IF NOT EXISTS idx_clusters_abstracted_topic ON clusters(abstracted_topic);
+CREATE INDEX IF NOT EXISTS idx_clusters_parent ON clusters(parent_cluster_id);
 
-CREATE TABLE cluster_threads (
+CREATE TABLE IF NOT EXISTS cluster_threads (
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
   thread_id                TEXT NOT NULL REFERENCES threads(id),
   role                     TEXT CHECK (role IN ('core','supporting','tangent','voice_anchor')),
   added_at                 TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (cluster_id, thread_id)
 );
-CREATE INDEX idx_cluster_threads_thread ON cluster_threads(thread_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_threads_thread ON cluster_threads(thread_id);
 
-CREATE TABLE cluster_insights (
+CREATE TABLE IF NOT EXISTS cluster_insights (
   id                       TEXT PRIMARY KEY,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
   kind                     TEXT NOT NULL CHECK (kind IN ('name','framework','parallel','counter_position','evidence','gap_question')),
@@ -323,10 +321,10 @@ CREATE TABLE cluster_insights (
   surfaced_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_cluster_insights_cluster ON cluster_insights(cluster_id);
-CREATE INDEX idx_cluster_insights_bounce ON cluster_insights(bounce_run_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_insights_cluster ON cluster_insights(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_insights_bounce ON cluster_insights(bounce_run_id);
 
-CREATE TABLE bounce_runs (
+CREATE TABLE IF NOT EXISTS bounce_runs (
   id                       TEXT PRIMARY KEY,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
   mode                     TEXT NOT NULL CHECK (mode IN ('default','forensic')),
@@ -337,13 +335,13 @@ CREATE TABLE bounce_runs (
   error                    TEXT,
   cost_usd                 REAL
 );
-CREATE INDEX idx_bounce_runs_cluster ON bounce_runs(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_bounce_runs_cluster ON bounce_runs(cluster_id);
 
 -- =============================================================================
 -- 5. Macro-clusters
 -- =============================================================================
 
-CREATE TABLE macro_clusters (
+CREATE TABLE IF NOT EXISTS macro_clusters (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   kind                     TEXT NOT NULL CHECK (kind IN ('synthesis','retroactive_umbrella','missing_essay','cross_domain')),
@@ -354,10 +352,10 @@ CREATE TABLE macro_clusters (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_macro_clusters_operator ON macro_clusters(operator_id);
-CREATE INDEX idx_macro_clusters_state ON macro_clusters(state);
+CREATE INDEX IF NOT EXISTS idx_macro_clusters_operator ON macro_clusters(operator_id);
+CREATE INDEX IF NOT EXISTS idx_macro_clusters_state ON macro_clusters(state);
 
-CREATE TABLE macro_cluster_members (
+CREATE TABLE IF NOT EXISTS macro_cluster_members (
   macro_cluster_id         TEXT NOT NULL REFERENCES macro_clusters(id) ON DELETE CASCADE,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id),
   role                     TEXT,
@@ -368,7 +366,7 @@ CREATE TABLE macro_cluster_members (
 -- 6. Productions
 -- =============================================================================
 
-CREATE TABLE productions (
+CREATE TABLE IF NOT EXISTS productions (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   production_type          TEXT NOT NULL CHECK (production_type IN ('video_essay','article','x_post','x_thread','clip','creative_work')),
@@ -396,12 +394,12 @@ CREATE TABLE productions (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_productions_operator ON productions(operator_id);
-CREATE INDEX idx_productions_source ON productions(source_kind, source_id);
-CREATE INDEX idx_productions_state ON productions(operator_id, state);
-CREATE INDEX idx_productions_type ON productions(production_type);
+CREATE INDEX IF NOT EXISTS idx_productions_operator ON productions(operator_id);
+CREATE INDEX IF NOT EXISTS idx_productions_source ON productions(source_kind, source_id);
+CREATE INDEX IF NOT EXISTS idx_productions_state ON productions(operator_id, state);
+CREATE INDEX IF NOT EXISTS idx_productions_type ON productions(production_type);
 
-CREATE TABLE production_beats (
+CREATE TABLE IF NOT EXISTS production_beats (
   id                       TEXT PRIMARY KEY,
   production_id            TEXT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
   beat_index               INTEGER NOT NULL,
@@ -416,9 +414,9 @@ CREATE TABLE production_beats (
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(production_id, beat_index)
 );
-CREATE INDEX idx_production_beats_production ON production_beats(production_id);
+CREATE INDEX IF NOT EXISTS idx_production_beats_production ON production_beats(production_id);
 
-CREATE TABLE production_visual_assets (
+CREATE TABLE IF NOT EXISTS production_visual_assets (
   id                       TEXT PRIMARY KEY,
   production_id            TEXT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
   beat_id                  TEXT REFERENCES production_beats(id) ON DELETE CASCADE,
@@ -431,10 +429,10 @@ CREATE TABLE production_visual_assets (
   parent_anchor_id         TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_production_visuals_production ON production_visual_assets(production_id);
-CREATE INDEX idx_production_visuals_beat ON production_visual_assets(beat_id);
+CREATE INDEX IF NOT EXISTS idx_production_visuals_production ON production_visual_assets(production_id);
+CREATE INDEX IF NOT EXISTS idx_production_visuals_beat ON production_visual_assets(beat_id);
 
-CREATE TABLE motifs (
+CREATE TABLE IF NOT EXISTS motifs (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
@@ -444,9 +442,9 @@ CREATE TABLE motifs (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_motifs_operator ON motifs(operator_id);
+CREATE INDEX IF NOT EXISTS idx_motifs_operator ON motifs(operator_id);
 
-CREATE TABLE production_motifs (
+CREATE TABLE IF NOT EXISTS production_motifs (
   production_id            TEXT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
   motif_id                 TEXT NOT NULL REFERENCES motifs(id) ON DELETE CASCADE,
   PRIMARY KEY (production_id, motif_id)
@@ -456,7 +454,7 @@ CREATE TABLE production_motifs (
 -- 7. Projects (creative_work containers)
 -- =============================================================================
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
@@ -470,10 +468,10 @@ CREATE TABLE projects (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_projects_operator ON projects(operator_id);
-CREATE INDEX idx_projects_state ON projects(operator_id, state);
+CREATE INDEX IF NOT EXISTS idx_projects_operator ON projects(operator_id);
+CREATE INDEX IF NOT EXISTS idx_projects_state ON projects(operator_id, state);
 
-CREATE TABLE characters (
+CREATE TABLE IF NOT EXISTS characters (
   id                       TEXT PRIMARY KEY,
   project_id               TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
@@ -483,13 +481,13 @@ CREATE TABLE characters (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_characters_project ON characters(project_id);
+CREATE INDEX IF NOT EXISTS idx_characters_project ON characters(project_id);
 
 -- =============================================================================
 -- 8. Surfaced cards
 -- =============================================================================
 
-CREATE TABLE surfaced_cards (
+CREATE TABLE IF NOT EXISTS surfaced_cards (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   subtype                  TEXT NOT NULL CHECK (subtype IN ('cluster_ready','adjacent_insight','gap_question','new_evidence','auto_link')),
@@ -502,15 +500,15 @@ CREATE TABLE surfaced_cards (
   dismissed_at             TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_surfaced_operator ON surfaced_cards(operator_id);
-CREATE INDEX idx_surfaced_at ON surfaced_cards(operator_id, surfaced_at DESC);
-CREATE INDEX idx_surfaced_subtype ON surfaced_cards(subtype);
+CREATE INDEX IF NOT EXISTS idx_surfaced_operator ON surfaced_cards(operator_id);
+CREATE INDEX IF NOT EXISTS idx_surfaced_at ON surfaced_cards(operator_id, surfaced_at DESC);
+CREATE INDEX IF NOT EXISTS idx_surfaced_subtype ON surfaced_cards(subtype);
 
 -- =============================================================================
 -- 9. Posts
 -- =============================================================================
 
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   kind                     TEXT NOT NULL CHECK (kind IN ('x_post','x_thread')),
@@ -529,15 +527,15 @@ CREATE TABLE posts (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_posts_operator ON posts(operator_id);
-CREATE INDEX idx_posts_state ON posts(operator_id, state);
-CREATE INDEX idx_posts_parent_production ON posts(parent_production_id);
+CREATE INDEX IF NOT EXISTS idx_posts_operator ON posts(operator_id);
+CREATE INDEX IF NOT EXISTS idx_posts_state ON posts(operator_id, state);
+CREATE INDEX IF NOT EXISTS idx_posts_parent_production ON posts(parent_production_id);
 
 -- =============================================================================
 -- 10. System / pipelines / audit
 -- =============================================================================
 
-CREATE TABLE prompts (
+CREATE TABLE IF NOT EXISTS prompts (
   id                       TEXT PRIMARY KEY,
   name                     TEXT NOT NULL,
   version                  TEXT NOT NULL,
@@ -549,9 +547,9 @@ CREATE TABLE prompts (
   created_by               TEXT,
   UNIQUE(name, version)
 );
-CREATE INDEX idx_prompts_active ON prompts(name, is_active);
+CREATE INDEX IF NOT EXISTS idx_prompts_active ON prompts(name, is_active);
 
-CREATE TABLE extraction_runs (
+CREATE TABLE IF NOT EXISTS extraction_runs (
   id                       TEXT PRIMARY KEY,
   vlog_id                  TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
   pass                     TEXT NOT NULL CHECK (pass IN ('analytical','creative_mode','clip_candidate','entity')),
@@ -563,10 +561,10 @@ CREATE TABLE extraction_runs (
   model                    TEXT,
   cost_usd                 REAL
 );
-CREATE INDEX idx_extraction_runs_vlog ON extraction_runs(vlog_id);
-CREATE INDEX idx_extraction_runs_pass ON extraction_runs(pass);
+CREATE INDEX IF NOT EXISTS idx_extraction_runs_vlog ON extraction_runs(vlog_id);
+CREATE INDEX IF NOT EXISTS idx_extraction_runs_pass ON extraction_runs(pass);
 
-CREATE TABLE pipeline_jobs (
+CREATE TABLE IF NOT EXISTS pipeline_jobs (
   id                       TEXT PRIMARY KEY,
   workflow_id              TEXT,
   job_kind                 TEXT NOT NULL,
@@ -579,6 +577,6 @@ CREATE TABLE pipeline_jobs (
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_pipeline_jobs_state ON pipeline_jobs(state);
-CREATE INDEX idx_pipeline_jobs_kind ON pipeline_jobs(job_kind);
-CREATE INDEX idx_pipeline_jobs_workflow ON pipeline_jobs(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_state ON pipeline_jobs(state);
+CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_kind ON pipeline_jobs(job_kind);
+CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_workflow ON pipeline_jobs(workflow_id);
