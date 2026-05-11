@@ -44,6 +44,16 @@ binding = "AI"
 binding = "FFMPEG"
 service = "neolog-ffmpeg"
 
+# ─── Workflow binding for the post-upload pipeline ─────────────────────────
+# The Workflow itself is deployed from workers/process-upload. The main app
+# dispatches it via env.PROCESS_UPLOAD_WORKFLOW.create(...) after a vlog row
+# is registered (and the row is not in archive mode).
+[[workflows]]
+binding = "PROCESS_UPLOAD_WORKFLOW"
+name = "process-upload"
+class_name = "ProcessUploadWorkflow"
+script_name = "neolog-process-upload"
+
 # ─── Environment variables (non-secret) ─────────────────────────────────────
 [vars]
 NEOLOG_ENVIRONMENT = "production"
