@@ -114,6 +114,28 @@ jobs:
           fi
           echo "uuid=$existing" >> "$GITHUB_OUTPUT"
 
+      - name: Populate database_id in wrangler.toml files
+        run: |
+          set -e
+          UUID="${{ steps.d1.outputs.uuid }}"
+          echo "Stamping database_id = $UUID into wrangler.toml files..."
+          # Replace any commented-out '# database_id' placeholder with the real id.
+          # If the file already has a real assignment, replace it too (idempotent).
+          stamp() {
+            local f="$1"
+            [ -f "$f" ] || return 0
+            if grep -qE "^[[:space:]]*#?[[:space:]]*database_id" "$f"; then
+              sed -i "s|^[[:space:]]*#\?[[:space:]]*database_id.*|database_id = \"$UUID\"|" "$f"
+            else
+              # No line present at all — insert one after database_name = "neolog"
+              sed -i "/database_name = \"neolog\"/a database_id = \"$UUID\"" "$f"
+            fi
+            echo "--- $f (d1 section) ---"
+            grep -A 4 "d1_databases" "$f" || true
+          }
+          stamp wrangler.toml
+          stamp workers/process-upload/wrangler.toml
+
       - name: Optional — drop schema (destructive)
         if: ${{ inputs.reset_schema == 'true' }}
         run: |
