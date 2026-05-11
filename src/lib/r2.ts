@@ -15,7 +15,7 @@
  * client-side with the AWS SigV4 algorithm.
  */
 
-import type { R2Bucket } from '@cloudflare/workers-types'
+import type { R2Bucket, R2ObjectBody } from '@cloudflare/workers-types'
 
 export interface R2Env {
   VIDEOS: R2Bucket
@@ -43,7 +43,7 @@ export async function putObject(
   body: ReadableStream | ArrayBuffer | Uint8Array,
   options?: { httpMetadata?: { contentType?: string } },
 ): Promise<void> {
-  await env.VIDEOS.put(key, body, options)
+  await env.VIDEOS.put(key, body as any, options as any)
 }
 
 /**

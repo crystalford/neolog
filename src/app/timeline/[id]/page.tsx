@@ -69,7 +69,7 @@ export default function VlogDetailPage() {
         if (res.status === 404) throw new Error('Vlog not found')
         throw new Error(`HTTP ${res.status}`)
       }
-      const data = await res.json()
+      const data = await res.json() as { vlog: Vlog; video_url: string | null; threads: Thread[] }
       setVlog(data.vlog)
       setVideoUrl(data.video_url)
       setThreads(data.threads || [])
@@ -96,7 +96,7 @@ export default function VlogDetailPage() {
     try {
       const res = await fetch(`/api/v2/vlogs/${id}/process`, { method: 'POST' })
       if (!res.ok) {
-        const body = await res.json().catch(() => null)
+        const body = await res.json().catch(() => null) as { error?: string } | null
         throw new Error(body?.error || `HTTP ${res.status}`)
       }
       await loadData()

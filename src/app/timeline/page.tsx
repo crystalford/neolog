@@ -83,7 +83,7 @@ export default function TimelinePage() {
       try {
         const res = await fetch('/api/v2/vlogs?limit=200')
         if (!res.ok) throw new Error(`fetch vlogs: HTTP ${res.status}`)
-        const data = await res.json()
+        const data = await res.json() as { vlogs: Vlog[] }
         if (!cancelled) {
           setVlogs(data.vlogs || [])
           setLoading(false)

@@ -119,7 +119,13 @@ export default function CapturePage() {
         signal: abort.signal,
       })
       if (!initRes.ok) throw new Error(`Initiate failed: HTTP ${initRes.status}`)
-      const { uploadId, key, partUrls, totalParts, partSize } = await initRes.json()
+      const { uploadId, key, partUrls, totalParts, partSize } = await initRes.json() as {
+        uploadId: string
+        key: string
+        partUrls: string[]
+        totalParts: number
+        partSize: number
+      }
 
       // 2. Upload parts
       updateJob(job.id, { status: 'uploading', progress: 5 })
@@ -167,7 +173,7 @@ export default function CapturePage() {
         signal: abort.signal,
       })
       if (!registerRes.ok) {
-        const errBody = await registerRes.json().catch(() => null)
+        const errBody = await registerRes.json().catch(() => null) as { error?: string } | null
         throw new Error(errBody?.error || `Register failed: HTTP ${registerRes.status}`)
       }
 
