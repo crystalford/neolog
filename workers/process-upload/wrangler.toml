@@ -1,0 +1,54 @@
+# Cloudflare Workflow: process-upload
+#
+# Async pipeline that runs after a vlog row is created in D1. Replaces the
+# previous Inngest function. Same step-based model — each step has its own
+# retry policy and is durably checkpointed.
+#
+# Bindings:
+#   DB        — D1 database 'neolog' (read + update vlogs / transcript_words)
+#   VIDEOS    — R2 bucket 'neolog-videos' (read input, write transcoded output)
+#   AI        — Workers AI for Whisper transcription
+#   FFMPEG    — Service binding to the neolog-ffmpeg Container Worker
+#
+# Dispatched by the API route /api/v2/vlogs/[id]/process AND directly when a
+# non-archive vlog is registered via /api/v2/vlogs (POST).
+
+name = "neolog-process-upload"
+main = "src/workflow.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "eda2e9bbd9acc42699027cfdcb50f998"
+
+[[workflows]]
+binding = "PROCESS_UPLOAD_WORKFLOW"
+name = "process-upload"
+class_name = "ProcessUploadWorkflow"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neolog"
+# database_id filled after bootstrap run
+
+[[r2_buckets]]
+binding = "VIDEOS"
+bucket_name = "neolog-videos"
+
+[ai]
+binding = "AI"
+
+[[services]]
+binding = "FFMPEG"
+service = "neolog-ffmpeg"
+
+# Presigning needs the account ID + R2 access key + secret
+[vars]
+CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
+R2_BUCKET_NAME = "neolog-videos"
+
+# Secrets (set via wrangler secret put):
+#   R2_ACCESS_KEY_ID
+#   R2_SECRET_ACCESS_KEY
+#   ANTHROPIC_API_KEY      — Claude calls for the four extraction passes
+
+[observability]
+enabled = true

@@ -1,113 +1,118 @@
 # Neolog
 
-## What it is
+A personal life graph and creative production system. The operator vlogs in real conditions and the system refracts those vlogs into threads, clusters, and multi-output productions (video essays, articles, X posts and threads, video clips).
 
-A life log and content production system. You record yourself talking — brain dumps, vlogs, voice notes — and Neolog turns that into:
-- A permanent searchable record of your thinking
-- An accumulating intelligence layer (entities, ideas, patterns, energy)
-- Edited video cut from your best moments
-- Scripts written from your content, recorded in chunks with a teleprompter system
-- Social posts surfaced automatically
-
-Open to users. Not just a personal tool.
-
-The legacy writing platform layer (posts, publications, newsletters, ActivityPub) exists in the codebase. Do not build in it, do not delete it.
+The graph is the artifact. Productions are downstream.
 
 ---
 
-## What's working right now
+## ⚠️ Operator environment — do not assume an IDE
 
-**Upload pipeline** — multipart upload → Inngest: extract audio (Replicate FFmpeg) → transcribe (Whisper) → analyze (Claude claude-sonnet-4-6) → extract entities → create post candidates → populate marinating ideas
+The operator uses the **Claude Code desktop app on Windows**, not VS Code, not a terminal, not an IDE. This means:
 
-**Intelligence layer (Brain)** — 6-region view at `/dashboard/brain`: Memory, Executive, Emotional, Pattern, Marinating, Conflict. Entities accumulate across sessions. Synthesize Graph button triggers cross-session synthesis. Entity detail pages at `/dashboard/entities/[id]`.
-
-**Studio pipeline** — sessions → debrief → style → script → record (teleprompter, beat by beat) → produce → review. Full pipeline: script via Claude (`produce-studio-video.ts`) → operator records each beat (`RecordScreen.tsx`) → audio assembled via Replicate FFmpeg (`assemble-studio-audio.ts`) → Flux image per segment (`generate-segment-visuals.ts`) → images + audio composited to MP4 (`compose-studio-video.ts`).
-
-**Posts** — post candidates auto-created from analysis (quotes, opinions, observations). X publishing wired at `/api/posts/publish`. Requires X OAuth connected in Settings.
-
-**Videos page** — library, reanalyze on hover, live processing status polling.
-
-**Settings** — API keys (Anthropic, OpenAI, Replicate, ElevenLabs), X OAuth, R2 storage, profile.
-
-**Homepage** — public landing page with terminal animation, product sections, amber aesthetic.
+- **The Claude Code session IS the operator's runtime.** When you run a bash command, you're running it on their machine. Treat this session as the deployment environment.
+- **Never tell the operator to "open a terminal," "run a command locally," "pull the branch on your machine," or "edit a file in your editor."** They don't have any of those tools. You do all of that for them from this session.
+- The operator can paste values in chat, click in browser dashboards, and toggle settings inside the Claude Code app. That's it. Anything else, you handle.
+- Network access to external APIs (Cloudflare etc.) is controlled in Claude app: **Settings → Capabilities → "Allow network egress" + "Domain allowlist."** Required domains for this project: `*.cloudflare.com`, `*.cloudflareaccess.com`, `*.workers.dev`, `*.r2.cloudflarestorage.com`.
+- The Cloudflare-side bootstrap (D1, Workers, Access, Containers, deploy) all runs from THIS session via `wrangler`, not from "the operator's machine." There is no separate machine.
 
 ---
 
-## What we're building next
+## ⚠️ Locked architectural decisions — do not relitigate
 
-### 1. Auto-edit from vlogs ✅ (built — `/dashboard/edit`)
-AI selects best transcript moments → Replicate FFmpeg assembles the MP4. Claude picks timestamps, user reviews plan, then assembles.
+These are settled. Read this section before proposing alternatives.
 
-### 2. Teleprompter / chunk recording + visual production ✅ (built)
-Script → operator records each beat → audio stitched → Flux images per segment → composited to MP4.
-Full production pipeline status flow: `queued → running → scripted → assembling → generating-visuals → composing → done`
+### Two vendors total: Cloudflare + Anthropic
 
-### 3. Production quality tiers
+| Vendor | What it provides |
+|---|---|
+| **Cloudflare** | Pages (hosting), R2 (video storage), D1 (database), Workers (backend), Workflows (async jobs), Queues, Workers AI (Whisper transcription), Access (auth), Containers (FFmpeg) |
+| **Anthropic** | Claude (extraction, scripting, coherence-check) |
 
-Current implementation is lo-fi: Flux Schnell still images + FFmpeg composition. Next tiers to build:
+**Explicitly removed:** Supabase, Inngest, Groq, Replicate, OpenAI fallback, ElevenLabs, fal.ai, AssemblyAI. Do not reintroduce.
 
-| Tier | Visuals | What needs building |
-|------|---------|---------------------|
-| **Lo-fi** ✅ | Flux Schnell stills + static frames | Done |
-| **Mid** | Flux images + short Kling clip on key segments | Kling API integration per segment |
-| **Hi-fi** | Full Kling/Runway video per segment | Per-segment video gen + longer timeouts |
+### Operator + project identity
 
-Cost estimate before commit: `productions.estimated_cost_cents` + `productions.user_approved_cost` in DB schema, not yet wired in UI.
-Tier picker UI not yet built — currently always runs lo-fi path.
+- **Custom domain:** `neolog.ai`
+- **GitHub repo:** `crystalford/neolog`
+- **Cloudflare Account ID:** `eda2e9bbd9acc42699027cfdcb50f998`
+- **Cloudflare Access team:** `neolog` (sign-in at `neolog.cloudflareaccess.com`)
+- **R2 bucket:** `neolog-videos` (contains 11.67 GB of vlogs — the only data that must be preserved)
+- **Single operator** (not multi-tenant). No multi-user logic, no team features.
+
+### Data philosophy
+
+- **Videos in R2 are the only thing preserved across rebuilds.** All other state (DB rows, configs, environments) is rebuildable.
+- The old Supabase user_id prefix (`b2df4f26-6dd8-421d-bb3d-db777086079b/`) in R2 stays in place. New code reads videos from wherever they exist in the bucket — no migration, no renaming.
+- Re-extraction of old vlogs is opt-in per vlog, never bulk.
+
+### Operator product decisions
+
+- **Voice profile:** "Operator default" only. No "Crystal Ford" profile, no character profiles in initial scope. Reference corpus auto-populated from the operator's longest 10 thread `key_quotes`. No hand-written cadence/register notes — iterate from output.
+- **Production tier:** Lo-Fi only. No Hi-Fi unlock until operator asks.
+- **Auth:** Cloudflare Access with one-time PIN to operator's email. No signup flow, no public account creation.
+- **Upload archive mode:** uploads can land in `archived` status that skips auto-transcribe/analyze. Operator triggers processing per-vlog from the vlog detail page.
 
 ---
 
-## What is NOT a priority
+## ⚠️ DO NOT CHANGE — Thumbnail pipeline
 
-- Character / Avatar / LoRA training — files exist, do not build further, not in nav
-- Voice clone — Inngest stub exists, do not build further
-- HeyGen / Synthesia — API routes exist, do not build further
-- Legacy writing platform — exists, do not touch
+Transcode HEVC → H.264 **before** thumbnail extraction. DJI Mimo HEVC vertical videos have rotation metadata that causes frame extraction to return 0 frames; the transcode strips it. Do not swap these steps.
+
+Thumbnails stored as `data:image/jpeg;base64,...` directly in the database — bypasses signed URL expiry.
+
+The new architecture moves this from Replicate to Cloudflare Container Workers running FFmpeg, but the algorithm and ordering are identical. Locked references survive the rewrite.
+
+## ⚠️ DO NOT CHANGE — Recording date pipeline
+
+Three-tier fallback for `recorded_at`: pre-extracted date → MP4 mvhd atom → filename pattern → upload time. The mvhd extraction uses MP4 epoch offset 2082844800 with v0/v1 branch handling.
+
+This logic ports to the new Workflow but the algorithm is identical.
+
+## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
+
+These are documentary / short film / video essay productions. **Never add captions, subtitles, or text overlays to video output.** No burned-in text, no SRT files, no caption tracks, no lower thirds. The visual track is purely cinematic. The audio carries the narration.
 
 ---
 
-## Codebase structure
+## The five surfaces (target architecture)
 
-```
-src/
-  app/
-    (auth)/                  — login, signup, reset password
-    (dashboard)/
-      layout.tsx             — sidebar nav, auth guard
-      dashboard/
-        page.tsx             — home: key_win hero, stats, recent sessions, posts
-        videos/              — video library + upload + reanalyze
-        timeline/            — continuous transcript view + search
-        timeline/[id]/       — session detail
-        posts/               — social queue + X publish
-        studio/              — production pipeline (PRIMARY)
-        brain/               — 6-region intelligence view
-        entities/            — redirects to brain
-        entities/[id]/       — entity detail: mentions, context, related
-        settings/            — API keys, profile, storage
-        system/              — API health check
-        character/           — portrait corpus (deprioritized, not in main nav)
-    api/
-      debrief/               — streaming Claude debrief chat
-      studio/produce/        — creates script + production, fires Inngest
-      studio/production-status/ — polls status + returns script segments
-      posts/publish/         — publishes post_candidate to X
-      video-upload/          — upload registration, list, reanalyze, thumbnails
-      synthesize-graph/      — triggers synthesize-user-graph Inngest
-      social/x/              — X OAuth + publish
-      entities/              — entity CRUD + graph
-  inngest/
-    functions/
-      process-upload.ts         — main pipeline
-      produce-studio-video.ts   — script generation via Claude
-      synthesize-user-graph.ts  — cross-session intelligence synthesis
-      assemble-clip.ts          — FFmpeg video assembly (used for auto-edit)
-      [others]                  — legacy, don't touch
-  lib/
-    video-analysis.ts    — AI analysis prompt + entity extraction
-    ai-provider.ts       — resolves per-user API keys
-    supabase/            — client, server, admin clients
-```
+Dock has five entries: **Timeline · Studio · Graph · Projects · Settings**. Capture is a global floating affordance above the dock. There is no Home page — the app opens directly into Timeline.
+
+| Surface | Path | What it is |
+|---|---|---|
+| Timeline | `/timeline` | Single chronological feed of heterogeneous cards (Vlog, Thread, Post, Clip, Article, B-roll, Attachment, Project update, Surfaced) sorted by `recorded_at`. Filterable via pill row. |
+| Studio | `/studio` | Cluster detail = deliberate-work mode. Reached from `Surfaced · Cluster ready` cards on Timeline. |
+| Graph | `/graph` | Direct navigable view of the substrate. Nodes colored by topic territory. |
+| Projects | `/projects` | Long-form creative_work containers (Pack Rats etc). Different rhythm from the rest. |
+| Settings | `/settings` | Operator profile, voice profiles, API keys, integrations, storage. |
+
+Old paths (`/dashboard/*`) and old pages (Home, Posts, Edit, Brain, Sessions, Synthesis, Inventory, Queue, Log, Ingest, Uploads) are deleted in the rebuild. Do not reintroduce.
+
+---
+
+## The three extraction passes
+
+Every ingested vlog runs three parallel passes after transcription, plus entity extraction:
+
+| Pass | Output table | Model | Purpose |
+|---|---|---|---|
+| Analytical | `threads` | claude-sonnet-4-6 | Atomic units: topic / take / key_quotes / questions_raised / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | claude-sonnet-4-6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | claude-sonnet-4-6 | Delivery moments where the operator nailed a segment cleanly |
+| Entity | `entities` / `entity_mentions` | claude-sonnet-4-6 | People, places, projects, tools, concepts, themes, references |
+
+Every extraction call loads its prompt from the `prompts` table by `(name, is_active=true)`. Every output row carries the `extraction_prompt_version` it was produced under. **Iterate prompts on incoming vlogs as they arrive** — no gold set, no batch re-runs. When a take is sanitized or a topic boundary is wrong, the operator flags it in Timeline; the prompt updates as a new `prompts.version` row.
+
+**Voice preservation hard rule:** each thread's `take` and at least one `key_quote` must contain a verbatim 4+ word substring from the source transcript. Failed runs log and skip the write — do not corrupt the table with sanitized voice.
+
+---
+
+## Riff detection
+
+The clustering engine's primary job is recognizing **riffs** as they form — runs of 3 to 20 vlogs over a short timeframe all circling the same underlying thing from different angles. Auto-link is enabled day one with a conservative confidence threshold (starts at 0.85 cosine on embeddings or strict abstracted_topic equality, operator-tunable in Settings). Every auto-link emits a `Surfaced · Auto-link` card with manual unlink. Transparency comes from these cards, not from gated approval.
+
+A future agent who tries to make clustering "smarter" by surfacing hidden cross-thread connections before solving riff-recognition is solving the wrong problem. Riff-first, cross-riff second.
 
 ---
 
@@ -116,112 +121,110 @@ src/
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 App Router |
-| Runtime | Cloudflare Edge — `export const runtime = 'edge'` on every route + page |
-| Hosting | Cloudflare Pages (NOT Vercel) — logs visible in Cloudflare dashboard |
-| Package manager | **pnpm** (NOT npm) — Cloudflare build uses `pnpm install --frozen-lockfile`. Do not generate `package-lock.json`. |
-| Database | Supabase (Postgres + RLS) |
-| Storage | Supabase Storage (videos) + Cloudflare R2 |
+| Runtime | Cloudflare Workers / Pages Functions |
+| Hosting | Cloudflare Pages |
+| Package manager | **pnpm** — Cloudflare build uses `pnpm install --frozen-lockfile` |
+| Database | Cloudflare D1 (SQLite) |
+| Video storage | Cloudflare R2 (bucket: `neolog-videos`) |
 | Uploads | Multipart direct to R2 via presigned URLs |
-| Async jobs | Inngest |
-| Transcription | OpenAI Whisper (whisper-1) |
-| AI | Claude claude-sonnet-4-6 — use this for everything new |
-| Video processing | Replicate FFmpeg (fofr/toolkit) |
-| Auth | Supabase Auth |
-| Styling | Inline styles with `C` color object — no Tailwind, no CSS variables |
+| Async jobs | Cloudflare Workflows |
+| Transcription | Cloudflare Workers AI Whisper |
+| AI | Claude `claude-sonnet-4-6` (extraction + ideation); `claude-haiku-4-5` (cheap classification + coherence-check) |
+| Video processing | Cloudflare Container Workers running FFmpeg |
+| Auth | Cloudflare Access (one-time PIN to operator email) |
+| Styling | Inline styles importing tokens from `src/lib/design.ts` |
 
 ---
 
-## Design system
+## Design system — bone/ink/Geist + topic territories
 
-Dark amber terminal aesthetic. Every page uses this exact `C` object:
+Cinematic warm dark. Bone-on-ink. Geist body, JetBrains Mono for metadata only.
+
+**Tokens live in `src/lib/design.ts`.** Import from there; do not redefine inline.
 
 ```typescript
-const C = {
-  bg:           '#070706',
-  bgSurface:    '#0e0d0b',
-  bgRaised:     '#141210',
-  border:       '#1e1b16',
-  borderBright: '#2c2820',
-  amber:        '#C8902A',
-  amberDim:     '#7a5618',
-  amberBright:  '#E8A840',
-  amberGlow:    'rgba(200,144,42,0.09)',
-  textPrimary:  '#EDE3CC',
-  textSecond:   '#9A8E78',
-  textDim:      '#5A5040',
-  textDimmer:   '#2e2820',
-  green:        '#4A8A60',
-  blue:         '#4870A8',
-  red:          '#8A4040',
-}
+import { INK, BONE, TOPIC, STATE, FONT_BODY, FONT_MONO } from '@/lib/design'
 ```
 
-- Font: `'JetBrains Mono', monospace` everywhere
-- Headlines: `'Syne', sans-serif` fontWeight 700–800
-- Labels: `fontSize: 9, letterSpacing: 3, textTransform: 'uppercase'`
-- Active nav: `borderLeft: '2px solid amber'` + `amberGlow` background
-- Never use Tailwind or CSS variables
+Ten topic territory colors: brass, terra, ochre, rose, plum, violet, steel, teal, sage, moss. Three rotating logo marks per session: Aperture, Stratum, Filament.
 
 ---
 
-## Key env vars
+## Database (Cloudflare D1)
 
-```
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-INNGEST_EVENT_KEY
-INNGEST_SIGNING_KEY
-REPLICATE_API_TOKEN       — audio extraction + video assembly
-X_CLIENT_ID               — X OAuth
-X_CLIENT_SECRET
-```
+Single schema, written fresh in `db/schema.sql` from the filament-update spec. No legacy tables. No `_v2` suffixes (nothing to coexist with).
 
-Users supply Anthropic/OpenAI/ElevenLabs/Replicate keys via Settings → API. Resolved per-user at runtime.
+Active tables: `operator`, `vlogs`, `transcript_words`, `threads`, `creative_elements`, `clip_candidates`, `entities`, `entity_mentions`, `thread_connections`, `clusters`, `cluster_threads`, `cluster_insights`, `bounce_runs`, `macro_clusters`, `macro_cluster_members`, `productions`, `production_beats`, `production_visual_assets`, `motifs`, `production_motifs`, `projects`, `characters`, `surfaced_cards`, `posts`, `extraction_runs`, `prompts`, `pipeline_jobs`, `broll_assets`, `attachments`, `voice_profiles`.
+
+**No RLS** — D1 doesn't have it. Single-operator app, every query filters implicitly by operator identity from Cloudflare Access JWT.
 
 ---
 
-## Database — key tables
+## Key env vars (in `.env.local`, plus Cloudflare Worker secrets)
 
-| Table | Purpose |
-|---|---|
-| `video_uploads` | Every upload + transcript + analysis JSON |
-| `entities` | Accumulated concepts (projects, people, goals, ideas) |
-| `entity_mentions` | Each time an entity appears in a specific upload |
-| `style_cards` | Visual identity cards |
-| `idea_cards` | Content ideas from debrief |
-| `marinating_ideas` | Ideas accumulating across sessions |
-| `scripts` | Generated script JSON (segments: narration + visual_direction + duration) |
-| `productions` | Video production tracking (queued/running/done/error) |
-| `post_candidates` | Social posts ready for review |
-| `integration_keys` | Per-user API keys |
-| `social_integrations` | X OAuth tokens |
-| `profiles` | User profiles |
-| `posts` | Legacy — do not remove |
-| `publications` | Legacy — do not remove |
+```
+# Cloudflare bootstrap (one-time, then revoke)
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID="eda2e9bbd9acc42699027cfdcb50f998"
+CLOUDFLARE_ACCESS_TEAM="neolog"
+CLOUDFLARE_R2_BUCKET="neolog-videos"
+
+# Anthropic — the only third-party API key the running app needs
+ANTHROPIC_API_KEY
+
+# Set as Worker secrets via `wrangler secret put` at deploy time, not in .env.local at runtime
+```
+
+---
+
+## Inngest events → Cloudflare Workflows
+
+All async work runs as Workflows. Workflow IDs:
+
+- `process-upload` — transcribe + extract pipeline
+- `extract-threads`, `extract-clip-candidates`, `extract-creative-elements` — three parallel extraction passes
+- `cluster-auto-link`, `cluster-cultivate`, `cluster-bounce` — clustering + bounce
+- `production-start`, `production-coherence-check`, `production-assemble-audio`, `production-generate-visuals`, `production-compose` — production engine
+- `vision-tag-broll`, `extract-attachment-text` — capture-side
+- `macro-cluster-synthesize`, `measure-production-performance` — meta-synthesis + perf
 
 ---
 
 ## Rules for Claude
 
-- **Always update this document** when a feature is built, a decision is made, or priorities change. Do it in the same commit.
-- Use `claude-sonnet-4-6` for all new AI features
-- `export const runtime = 'edge'` on every route and page — non-negotiable
-- Never hardcode API keys — always resolve per-user via `lib/ai-provider.ts`
-- Never use Tailwind or CSS variables — inline styles with `C` object only
-- Never route file uploads through API routes (Vercel 4.5MB limit)
-- The `_archived/` directories exist — do not link them in nav, do not delete them
-
-## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
-
-These are documentary / short film / video essay productions. **Never add captions, subtitles, or text overlays to video output.** No burned-in text, no SRT files, no caption tracks, no lower thirds. The visual track is purely cinematic — images, motion, cuts. The audio carries the narration. Do not propose or build caption features.
+- **Always update this document** when a feature is built, a decision is made, or priorities change. Same commit.
+- Two vendors only: Cloudflare and Anthropic. Refuse to reintroduce Supabase / Inngest / Replicate / etc. — say so explicitly if the operator asks.
+- Use `claude-sonnet-4-6` for AI features that do real work; `claude-haiku-4-5` for cheap classification and coherence-check.
+- `export const runtime = 'edge'` on every Next.js route + page.
+- Never hardcode API keys — Anthropic key is a Worker secret; resolved via `env.ANTHROPIC_API_KEY` in Workers.
+- New pages: import design tokens from `src/lib/design.ts`. Inline styles only.
+- Never route file uploads through API routes (large files go direct to R2 via presigned URLs).
+- Do not preserve the 49-field extraction schema. The thread-based replacement is the only forward path.
+- Do not sanitize voice in extraction outputs. Profanity, hesitations, fragmentary phrasings stay. The hard 4-word verbatim check enforces this.
+- Do not generate scripts from thread takes only — the ideator must receive full source vlog transcripts alongside the cluster object.
+- Do not put the operator at the center of video essay scripts. The operator's vlogs identified the topic; the script is *about* the topic, not about the operator's experience of it.
+- Do not auto-publish without operator review. Publish surface is operator-gated.
+- Do not introduce camera-on production paths in current scope. Future product.
+- Do not build the tier picker UI until operator asks — Lo-Fi only.
+- Do not bulk re-extract old vlogs. Re-extraction is opt-in per vlog.
+- Do not propose pg_dump / RLS / Supabase patterns — they don't exist here anymore.
 
 ---
 
-## ⚠️ DO NOT CHANGE — Thumbnail pipeline
+## What the operator runs (one command after I push)
 
-`fofr/toolkit` on Replicate accepts only `task`, `input_file`, `fps`. No `ffmpeg_command`.
+```
+git pull
+pnpm run bootstrap
+```
 
-`transcode-playback` runs **before** `extract-thumbnail` in `process-upload.ts`. This is intentional — DJI Mimo HEVC vertical videos have rotation metadata that causes frame extraction to return 0 frames. Transcoding to H.264 first strips it. Do not swap these steps.
+That script handles every Cloudflare provisioning step (D1, Workers, Container, Access, deploy). It reads credentials from `.env.local`, runs wrangler commands in order, and streams progress. It is idempotent — safe to re-run.
 
-Thumbnails stored as `data:image/jpeg;base64,...` directly in `video_uploads.thumbnail_url` — bypasses signed URL expiry.
+The operator's role is: paste credentials into `.env.local` once, run `pnpm run bootstrap` once, then sign in via Cloudflare Access. That's it.
+
+---
+
+## Help
+
+- /help: Get help with using Claude Code
+- To give feedback, users should report the issue at https://github.com/anthropics/claude-code/issues

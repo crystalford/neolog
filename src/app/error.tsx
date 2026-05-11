@@ -1,50 +1,30 @@
 'use client'
-
 export const runtime = 'edge'
 
 import { useEffect } from 'react'
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { INK, BONE, STATE, FONT_BODY, FONT_MONO } from '@/lib/design'
 
-export default function Error({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
-  useEffect(() => {
-    // Log error to console in development
-    console.error('Application error:', error)
-  }, [error])
-
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { console.error(error) }, [error])
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="text-center max-w-md">
-        <div className="w-20 h-20 rounded-2xl bg-[var(--error)]/10 flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle size={40} className="text-[var(--error)]" />
+    <div style={{
+      minHeight: '100vh', background: INK.bg, color: BONE.bone,
+      fontFamily: FONT_BODY, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }}>
+      <div style={{ maxWidth: 480 }}>
+        <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: 3, color: STATE.err, textTransform: 'uppercase', marginBottom: 12 }}>
+          Error
         </div>
-        
-        <h1 className="font-display text-4xl mb-3">Something went wrong</h1>
-        <p className="text-[var(--text-secondary)] mb-8">
-          An unexpected error occurred. Our team has been notified.
-        </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <button onClick={reset} className="btn btn-primary w-full sm:w-auto">
-            <RefreshCw size={16} />
-            Try Again
-          </button>
-          <a href="/" className="btn btn-secondary w-full sm:w-auto">
-            <Home size={16} />
-            Go Home
-          </a>
-        </div>
-
-        {error.digest && (
-          <p className="mt-8 text-xs text-[var(--text-tertiary)]">
-            Error ID: {error.digest}
-          </p>
-        )}
+        <p style={{ fontSize: 14, color: BONE.bone1, marginBottom: 20 }}>{error.message}</p>
+        <button
+          onClick={reset}
+          style={{
+            fontFamily: FONT_MONO, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase',
+            padding: '8px 16px', background: 'transparent', color: BONE.bone, border: `1px solid ${BONE.bone3}`, cursor: 'pointer',
+          }}
+        >
+          Retry
+        </button>
       </div>
     </div>
   )

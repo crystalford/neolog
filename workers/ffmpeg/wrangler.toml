@@ -1,0 +1,40 @@
+# Cloudflare Container Worker config for the Neolog FFmpeg service.
+#
+# This Worker hosts the Dockerized ffmpeg HTTP server defined in ./Dockerfile.
+# Deployed via: wrangler deploy (run from this directory, OR from repo root
+# with -c workers/ffmpeg/wrangler.toml).
+#
+# The main app Worker references this Container Worker via a Service Binding
+# (defined in the root wrangler.toml). When the main Worker calls
+# env.FFMPEG.fetch(...), Cloudflare routes the request to a container
+# instance that's spun up on demand.
+
+name = "neolog-ffmpeg"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "eda2e9bbd9acc42699027cfdcb50f998"
+
+# Container definition — the Worker manages a pool of these.
+[[containers]]
+class_name = "FfmpegContainer"
+image = "./Dockerfile"
+max_instances = 5
+instance_type = "standard"
+# Containers shut down after this many seconds of inactivity (60s default).
+# ffmpeg jobs run shorter than that; bump if you see cold-start churn.
+# instance_idle_timeout_ms = 60000
+
+# Required by Cloudflare Containers: a Durable Object that fronts the
+# container lifecycle.
+[[durable_objects.bindings]]
+name = "FFMPEG_CONTAINER"
+class_name = "FfmpegContainer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["FfmpegContainer"]
+
+# Observability — logs visible in dashboard
+[observability]
+enabled = true
