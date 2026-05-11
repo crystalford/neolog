@@ -16,9 +16,10 @@
 --   * Soft delete via `deleted_at TEXT NULL` on operator-facing tables.
 --   * Indexes listed per table.
 --   * Foreign keys are declared; cascade behavior follows the spec.
-
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
+--
+-- Note: PRAGMA statements are NOT included. D1's remote execute path returns
+-- `not authorized: SQLITE_AUTH` on any PRAGMA. D1 has foreign keys enabled
+-- by default; journal_mode is managed by Cloudflare.
 
 -- =============================================================================
 -- 1. Operator identity
@@ -66,29 +67,23 @@ CREATE INDEX idx_voice_profiles_default ON voice_profiles(operator_id, is_defaul
 -- 2. Capture substrate
 -- =============================================================================
 
--- The vlog as a stored object plus its derived fields.
--- r2_key is the path in the neolog-videos R2 bucket where the original file lives.
--- The locked thumbnail + recorded_at logic populates thumbnail_url (data URI)
--- and recorded_at (with recorded_at_source attribution).
 CREATE TABLE vlogs (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
-  r2_key                   TEXT NOT NULL,                       -- path in R2 (existing UUID-prefixed paths preserved)
+  r2_key                   TEXT NOT NULL,
   original_filename        TEXT,
   file_size_bytes          INTEGER,
   mime_type                TEXT,
   duration_seconds         REAL,
-  recorded_at              TEXT,                                -- ISO 8601 UTC, from mvhd / filename / upload_time
+  recorded_at              TEXT,
   recorded_at_source       TEXT CHECK (recorded_at_source IN ('pre_extracted','mvhd','filename','upload_time_default','manual')),
   uploaded_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  thumbnail_url            TEXT,                                -- data:image/jpeg;base64,... (LOCKED format)
-  transcoded_r2_key        TEXT,                                -- H.264 transcode of HEVC sources for browser playback
-  transcript_text          TEXT,                                -- full plain-text transcript
+  thumbnail_url            TEXT,
+  transcoded_r2_key        TEXT,
+  transcript_text          TEXT,
   transcript_provider      TEXT CHECK (transcript_provider IN ('workers_ai_whisper','manual')),
   transcript_completed_at  TEXT,
-  pipeline_status          TEXT NOT NULL DEFAULT 'uploaded' CHECK (pipeline_status IN (
-    'uploaded','transcoding','transcribing','extracting','complete','archived','failed'
-  )),
+  pipeline_status          TEXT NOT NULL DEFAULT 'uploaded' CHECK (pipeline_status IN ('uploaded','transcoding','transcribing','extracting','complete','archived','failed')),
   pipeline_error           TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
   deleted_at               TEXT,
@@ -100,23 +95,20 @@ CREATE INDEX idx_vlogs_recorded_at ON vlogs(recorded_at DESC);
 CREATE INDEX idx_vlogs_pipeline_status ON vlogs(pipeline_status);
 CREATE INDEX idx_vlogs_r2_key ON vlogs(r2_key);
 
--- Word-level timestamps from Workers AI Whisper.
--- transcript_span computation on threads / clip_candidates derives from this table.
 CREATE TABLE transcript_words (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
   vlog_id                  TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   word                     TEXT NOT NULL,
-  start_time               REAL NOT NULL,                       -- seconds from start of audio
+  start_time               REAL NOT NULL,
   end_time                 REAL NOT NULL,
   word_index               INTEGER NOT NULL,
-  speaker                  TEXT,                                -- for multi-speaker; usually null
+  speaker                  TEXT,
   UNIQUE(vlog_id, word_index)
 );
 CREATE INDEX idx_transcript_words_vlog ON transcript_words(vlog_id);
 CREATE INDEX idx_transcript_words_vlog_time ON transcript_words(vlog_id, start_time);
 
--- B-roll asset library. Visual-tagged but NOT transcribed.
 CREATE TABLE broll_assets (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
@@ -127,9 +119,9 @@ CREATE TABLE broll_assets (
   recorded_at              TEXT,
   source                   TEXT CHECK (source IN ('record_app','upload')),
   thumbnail_url            TEXT,
-  auto_tags                TEXT,                                -- JSON: {subject, location, mood, motion, time_of_day, lighting, color_palette, weather, season}
+  auto_tags                TEXT,
   operator_notes           TEXT,
-  is_signature             INTEGER NOT NULL DEFAULT 0,          -- flagged as recurring motif
+  is_signature             INTEGER NOT NULL DEFAULT 0,
   usage_count              INTEGER NOT NULL DEFAULT 0,
   vision_tagged_at         TEXT,
   deleted_at               TEXT,
@@ -139,7 +131,6 @@ CREATE TABLE broll_assets (
 CREATE INDEX idx_broll_operator ON broll_assets(operator_id);
 CREATE INDEX idx_broll_signature ON broll_assets(operator_id, is_signature);
 
--- Reference attachments: PDFs, screenshots, articles, documents attached to clusters/projects.
 CREATE TABLE attachments (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
@@ -148,7 +139,7 @@ CREATE TABLE attachments (
   file_size_bytes          INTEGER,
   mime_type                TEXT,
   kind                     TEXT CHECK (kind IN ('pdf','image','screenshot','article','document')),
-  extracted_text           TEXT,                                -- OCR / PDF text for search
+  extracted_text           TEXT,
   recorded_at              TEXT,
   uploaded_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   attached_to_kind         TEXT CHECK (attached_to_kind IN ('cluster','project') OR attached_to_kind IS NULL),
@@ -164,26 +155,22 @@ CREATE INDEX idx_attachments_attached_to ON attachments(attached_to_kind, attach
 -- 3. Extraction outputs — graph nodes
 -- =============================================================================
 
--- The thread is the atomic unit. Most vlogs produce 1–3 threads.
--- Voice preservation hard rule: take + at least one key_quote must contain a
--- verbatim 4+ word substring from the source transcript. Enforced in code,
--- not schema — failed runs do NOT write.
 CREATE TABLE threads (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
-  topic                       TEXT NOT NULL,                    -- system-generated one-line topic
-  take                        TEXT,                             -- operator's position; NULL if descriptive only
-  key_quotes                  TEXT,                             -- JSON array of {text, start_time, end_time}
-  questions_raised            TEXT,                             -- JSON array of strings
+  topic                       TEXT NOT NULL,
+  take                        TEXT,
+  key_quotes                  TEXT,
+  questions_raised            TEXT,
   register                    TEXT CHECK (register IN ('riff','observation','argument','story','aside','question')),
   strength                    INTEGER CHECK (strength BETWEEN 1 AND 5),
   transcript_span_start       REAL,
   transcript_span_end         REAL,
-  abstracted_topic            TEXT,                             -- for cross-vlog clustering
-  extraction_prompt_version   TEXT NOT NULL,                    -- → prompts table (name + version)
+  abstracted_topic            TEXT,
+  extraction_prompt_version   TEXT NOT NULL,
   extracted_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  cluster_id                  TEXT,                             -- → clusters.id if auto-linked
+  cluster_id                  TEXT,
   deleted_at                  TEXT,
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -194,15 +181,12 @@ CREATE INDEX idx_threads_abstracted_topic ON threads(abstracted_topic);
 CREATE INDEX idx_threads_strength ON threads(operator_id, strength DESC);
 CREATE INDEX idx_threads_cluster ON threads(cluster_id);
 
--- Creative-mode pass output: fictional/creative material for projects.
 CREATE TABLE creative_elements (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
-  project_id                  TEXT,                             -- → projects.id (nullable; assigned during cultivation)
-  element_type                TEXT NOT NULL CHECK (element_type IN (
-    'character_beat','scene_fragment','dialogue','theme','setting','tonal_reference','plot_fragment'
-  )),
+  project_id                  TEXT,
+  element_type                TEXT NOT NULL CHECK (element_type IN ('character_beat','scene_fragment','dialogue','theme','setting','tonal_reference','plot_fragment')),
   content                     TEXT NOT NULL,
   register                    TEXT,
   transcript_span_start       REAL,
@@ -217,20 +201,19 @@ CREATE INDEX idx_creative_vlog ON creative_elements(vlog_id);
 CREATE INDEX idx_creative_project ON creative_elements(project_id);
 CREATE INDEX idx_creative_type ON creative_elements(element_type);
 
--- Clip-candidate pass output: delivery moments where the operator nailed a segment.
 CREATE TABLE clip_candidates (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   vlog_id                     TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
   start_time                  REAL NOT NULL,
   end_time                    REAL NOT NULL,
-  headline                    TEXT NOT NULL,                    -- 5-8 word summary
+  headline                    TEXT NOT NULL,
   quote                       TEXT,
-  why_clippable               TEXT,                             -- JSON array of signals: ['delivery_clean','take_landed','self_contained','energy_right']
+  why_clippable               TEXT,
   status                      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','published','skipped')),
-  published_to                TEXT,                             -- JSON {platform, url, published_at}
+  published_to                TEXT,
   published_clip_r2_key       TEXT,
-  engagement                  TEXT,                             -- JSON {views, reposts, replies, likes}
+  engagement                  TEXT,
   visibility                  TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
   extraction_prompt_version   TEXT NOT NULL,
   deleted_at                  TEXT,
@@ -241,13 +224,12 @@ CREATE INDEX idx_clip_operator ON clip_candidates(operator_id);
 CREATE INDEX idx_clip_vlog ON clip_candidates(vlog_id);
 CREATE INDEX idx_clip_status ON clip_candidates(operator_id, status);
 
--- Entities: people, places, projects, tools, concepts, themes, references.
 CREATE TABLE entities (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
   entity_type              TEXT NOT NULL CHECK (entity_type IN ('person','place','project','tool','concept','theme','reference')),
-  aliases                  TEXT,                                -- JSON array of alternate names for dedup
+  aliases                  TEXT,
   notes                    TEXT,
   mention_count            INTEGER NOT NULL DEFAULT 0,
   first_mentioned_at       TEXT,
@@ -260,17 +242,15 @@ CREATE INDEX idx_entities_operator ON entities(operator_id);
 CREATE INDEX idx_entities_type ON entities(operator_id, entity_type);
 CREATE INDEX idx_entities_name ON entities(operator_id, name);
 
--- Entity mentions: polymorphic over (vlog, thread, creative_element, cluster, production).
--- Application code enforces source_id points at the right table.
 CREATE TABLE entity_mentions (
   id                       TEXT PRIMARY KEY,
   entity_id                TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   source_kind              TEXT NOT NULL CHECK (source_kind IN ('vlog','thread','creative_element','cluster','production')),
   source_id                TEXT NOT NULL,
-  mention_text             TEXT,                                -- actual phrase used
-  mention_time             REAL,                                -- seconds offset in vlog if applicable
-  confidence               REAL,                                -- 0-1 from extraction
+  mention_text             TEXT,
+  mention_time             REAL,
+  confidence               REAL,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_mentions_entity ON entity_mentions(entity_id);
@@ -280,14 +260,13 @@ CREATE INDEX idx_mentions_source ON entity_mentions(source_kind, source_id);
 -- 4. Connection graph + clusters
 -- =============================================================================
 
--- Undirected edges between threads. Enforce thread_a_id < thread_b_id at insert time.
 CREATE TABLE thread_connections (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   thread_a_id              TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   thread_b_id              TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   connection_type          TEXT NOT NULL CHECK (connection_type IN ('abstracted_topic_match','entity_overlap','temporal_adjacency','operator_manual')),
-  strength                 REAL NOT NULL,                       -- 0-1
+  strength                 REAL NOT NULL,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(thread_a_id, thread_b_id),
   CHECK (thread_a_id < thread_b_id)
@@ -295,27 +274,24 @@ CREATE TABLE thread_connections (
 CREATE INDEX idx_thread_connections_a ON thread_connections(thread_a_id);
 CREATE INDEX idx_thread_connections_b ON thread_connections(thread_b_id);
 
--- Clusters: thread accumulations that ripen into production candidates.
 CREATE TABLE clusters (
   id                          TEXT PRIMARY KEY,
   operator_id                 TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   topic                       TEXT NOT NULL,
   take                        TEXT,
   abstracted_topic            TEXT,
-  state                       TEXT NOT NULL DEFAULT 'forming' CHECK (state IN (
-    'forming','surfaced','ripening','hold_for_more','ready','materialized','produced','archived'
-  )),
+  state                       TEXT NOT NULL DEFAULT 'forming' CHECK (state IN ('forming','surfaced','ripening','hold_for_more','ready','materialized','produced','archived')),
   state_changed_at            TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  ripeness_score              INTEGER DEFAULT 0,                -- 0-100 composite
+  ripeness_score              INTEGER DEFAULT 0,
   form                        TEXT CHECK (form IN ('concept_essay','manifesto_rant','reflection','cultural_criticism','probe','aphoristic_probe','forensic') OR form IS NULL),
   length_magnitude            TEXT CHECK (length_magnitude IN ('single','short','mid','extended') OR length_magnitude IS NULL),
-  verbatim_ratio_target       REAL,                             -- per-form default, operator-overridable
+  verbatim_ratio_target       REAL,
   bounce_required             INTEGER NOT NULL DEFAULT 0,
   forensic_mode_activated     INTEGER NOT NULL DEFAULT 0,
-  parent_cluster_id           TEXT,                             -- for follow-up clusters
+  parent_cluster_id           TEXT,
   last_viewed_at              TEXT,
-  gap_question                TEXT,                             -- system-surfaced gap prompt
-  topic_color                 TEXT,                             -- one of the ten territory colors; assigned at formation
+  gap_question                TEXT,
+  topic_color                 TEXT,
   deleted_at                  TEXT,
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -325,7 +301,6 @@ CREATE INDEX idx_clusters_state ON clusters(operator_id, state);
 CREATE INDEX idx_clusters_abstracted_topic ON clusters(abstracted_topic);
 CREATE INDEX idx_clusters_parent ON clusters(parent_cluster_id);
 
--- Many-to-many: clusters ↔ threads
 CREATE TABLE cluster_threads (
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
   thread_id                TEXT NOT NULL REFERENCES threads(id),
@@ -335,7 +310,6 @@ CREATE TABLE cluster_threads (
 );
 CREATE INDEX idx_cluster_threads_thread ON cluster_threads(thread_id);
 
--- Adjacent insights from bounce, stored on the cluster.
 CREATE TABLE cluster_insights (
   id                       TEXT PRIMARY KEY,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
@@ -344,15 +318,14 @@ CREATE TABLE cluster_insights (
   body                     TEXT NOT NULL,
   source_url               TEXT,
   source_label             TEXT,
-  bounce_run_id            TEXT,                                -- → bounce_runs.id
-  surfaced                 INTEGER NOT NULL DEFAULT 1,          -- whether to show as Surfaced card
+  bounce_run_id            TEXT,
+  surfaced                 INTEGER NOT NULL DEFAULT 1,
   surfaced_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_cluster_insights_cluster ON cluster_insights(cluster_id);
 CREATE INDEX idx_cluster_insights_bounce ON cluster_insights(bounce_run_id);
 
--- Bounce execution tracking per cluster.
 CREATE TABLE bounce_runs (
   id                       TEXT PRIMARY KEY,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
@@ -360,14 +333,14 @@ CREATE TABLE bounce_runs (
   prompt_version           TEXT NOT NULL,
   started_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   completed_at             TEXT,
-  provider                 TEXT,                                -- 'claude' / 'claude_with_search'
+  provider                 TEXT,
   error                    TEXT,
   cost_usd                 REAL
 );
 CREATE INDEX idx_bounce_runs_cluster ON bounce_runs(cluster_id);
 
 -- =============================================================================
--- 5. Macro-clusters (meta-synthesis layer)
+-- 5. Macro-clusters
 -- =============================================================================
 
 CREATE TABLE macro_clusters (
@@ -376,9 +349,7 @@ CREATE TABLE macro_clusters (
   kind                     TEXT NOT NULL CHECK (kind IN ('synthesis','retroactive_umbrella','missing_essay','cross_domain')),
   topic                    TEXT NOT NULL,
   take                     TEXT,
-  state                    TEXT NOT NULL DEFAULT 'forming' CHECK (state IN (
-    'forming','surfaced','ripening','hold_for_more','ready','materialized','produced','archived'
-  )),
+  state                    TEXT NOT NULL DEFAULT 'forming' CHECK (state IN ('forming','surfaced','ripening','hold_for_more','ready','materialized','produced','archived')),
   state_changed_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -389,7 +360,7 @@ CREATE INDEX idx_macro_clusters_state ON macro_clusters(state);
 CREATE TABLE macro_cluster_members (
   macro_cluster_id         TEXT NOT NULL REFERENCES macro_clusters(id) ON DELETE CASCADE,
   cluster_id               TEXT NOT NULL REFERENCES clusters(id),
-  role                     TEXT,                                -- how this cluster contributes
+  role                     TEXT,
   PRIMARY KEY (macro_cluster_id, cluster_id)
 );
 
@@ -403,26 +374,24 @@ CREATE TABLE productions (
   production_type          TEXT NOT NULL CHECK (production_type IN ('video_essay','article','x_post','x_thread','clip','creative_work')),
   source_kind              TEXT NOT NULL CHECK (source_kind IN ('cluster','macro_cluster','project','thread','clip_candidate')),
   source_id                TEXT NOT NULL,
-  state                    TEXT NOT NULL DEFAULT 'materializing' CHECK (state IN (
-    'materializing','script_ready','recording','producing','produced','published','archived'
-  )),
+  state                    TEXT NOT NULL DEFAULT 'materializing' CHECK (state IN ('materializing','script_ready','recording','producing','produced','published','archived')),
   state_changed_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   voice_profile_id         TEXT REFERENCES voice_profiles(id),
-  form                     TEXT,                                -- inherited from cluster
+  form                     TEXT,
   length_magnitude         TEXT,
   forensic_mode            INTEGER NOT NULL DEFAULT 0,
-  tier                     TEXT NOT NULL DEFAULT 'lo_fi' CHECK (tier IN ('lo_fi')),  -- Lo-Fi only initially; Hi-Fi added later
+  tier                     TEXT NOT NULL DEFAULT 'lo_fi' CHECK (tier IN ('lo_fi')),
   script_text              TEXT,
   script_version           INTEGER NOT NULL DEFAULT 1,
-  output_r2_key            TEXT,                                -- final video file or article markdown
-  output_metadata          TEXT,                                -- JSON
-  published_to             TEXT,                                -- JSON {platform, url, published_at}
-  engagement               TEXT,                                -- JSON
+  output_r2_key            TEXT,
+  output_metadata          TEXT,
+  published_to             TEXT,
+  engagement               TEXT,
   produced_at              TEXT,
   prompt_version           TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
-  estimated_cost_cents     INTEGER,                             -- present but unused until tier picker exists
-  user_approved_cost       INTEGER,                             -- present but unused until tier picker exists
+  estimated_cost_cents     INTEGER,
+  user_approved_cost       INTEGER,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -432,42 +401,39 @@ CREATE INDEX idx_productions_source ON productions(source_kind, source_id);
 CREATE INDEX idx_productions_state ON productions(operator_id, state);
 CREATE INDEX idx_productions_type ON productions(production_type);
 
--- For video_essay productions: beat-level decomposition.
 CREATE TABLE production_beats (
   id                       TEXT PRIMARY KEY,
   production_id            TEXT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
   beat_index               INTEGER NOT NULL,
   beat_text                TEXT NOT NULL,
-  cue                      TEXT,                                -- small mono note above beat
-  audio_r2_key             TEXT,                                -- recorded audio for this beat
+  cue                      TEXT,
+  audio_r2_key             TEXT,
   take_number              INTEGER NOT NULL DEFAULT 1,
-  superseded_takes         TEXT,                                -- JSON array of prior take audio keys
+  superseded_takes         TEXT,
   recorded_at              TEXT,
-  visual_treatment         TEXT,                                -- JSON spec for the per-beat visual sequence
+  visual_treatment         TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(production_id, beat_index)
 );
 CREATE INDEX idx_production_beats_production ON production_beats(production_id);
 
--- Per-beat visual assets: generated images/clips, B-roll refs, archival.
 CREATE TABLE production_visual_assets (
   id                       TEXT PRIMARY KEY,
   production_id            TEXT NOT NULL REFERENCES productions(id) ON DELETE CASCADE,
   beat_id                  TEXT REFERENCES production_beats(id) ON DELETE CASCADE,
-  shot_index               INTEGER,                             -- position within the beat's visual sequence
+  shot_index               INTEGER,
   asset_kind               TEXT NOT NULL CHECK (asset_kind IN ('broll_ref','archival','generated_image','generated_clip')),
   broll_asset_id           TEXT REFERENCES broll_assets(id),
-  prompt                   TEXT,                                -- for generated assets
-  r2_key                   TEXT,                                -- for generated/archival
-  is_diegetic_anchor       INTEGER NOT NULL DEFAULT 0,          -- the wide shot in the sequence
-  parent_anchor_id         TEXT,                                -- shots in sequence reference the anchor
+  prompt                   TEXT,
+  r2_key                   TEXT,
+  is_diegetic_anchor       INTEGER NOT NULL DEFAULT 0,
+  parent_anchor_id         TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_production_visuals_production ON production_visual_assets(production_id);
 CREATE INDEX idx_production_visuals_beat ON production_visual_assets(beat_id);
 
--- Motifs: recurring visual / phrasal / structural elements across productions.
 CREATE TABLE motifs (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
@@ -493,12 +459,12 @@ CREATE TABLE production_motifs (
 CREATE TABLE projects (
   id                       TEXT PRIMARY KEY,
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
-  name                     TEXT NOT NULL,                       -- "Pack Rats", "The Mechanical Bride"
+  name                     TEXT NOT NULL,
   tagline                  TEXT,
   blurb                    TEXT,
   state                    TEXT NOT NULL DEFAULT 'developing' CHECK (state IN ('developing','materializing','produced','dormant')),
-  themes                   TEXT,                                -- JSON array of theme strings
-  mood_references          TEXT,                                -- JSON array of {kind, label, url}
+  themes                   TEXT,
+  mood_references          TEXT,
   last_activity_at         TEXT,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -511,16 +477,16 @@ CREATE TABLE characters (
   id                       TEXT PRIMARY KEY,
   project_id               TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name                     TEXT NOT NULL,
-  role                     TEXT,                                -- "Lead", "Supporting", "Posthumous"
+  role                     TEXT,
   description              TEXT,
-  voice_profile_id         TEXT REFERENCES voice_profiles(id), -- kind='character'
+  voice_profile_id         TEXT REFERENCES voice_profiles(id),
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_characters_project ON characters(project_id);
 
 -- =============================================================================
--- 8. Surfaced cards — system-generated Timeline cards
+-- 8. Surfaced cards
 -- =============================================================================
 
 CREATE TABLE surfaced_cards (
@@ -528,9 +494,9 @@ CREATE TABLE surfaced_cards (
   operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
   subtype                  TEXT NOT NULL CHECK (subtype IN ('cluster_ready','adjacent_insight','gap_question','new_evidence','auto_link')),
   body                     TEXT NOT NULL,
-  body_html                TEXT,                                -- rich rendering with bolding
-  topic_color              TEXT,                                -- hex code for left-rule (from cluster's topic_color)
-  refs                     TEXT,                                -- JSON array of {kind, id, label}
+  body_html                TEXT,
+  topic_color              TEXT,
+  refs                     TEXT,
   surfaced_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   read_at                  TEXT,
   dismissed_at             TEXT,
@@ -541,7 +507,7 @@ CREATE INDEX idx_surfaced_at ON surfaced_cards(operator_id, surfaced_at DESC);
 CREATE INDEX idx_surfaced_subtype ON surfaced_cards(subtype);
 
 -- =============================================================================
--- 9. Posts (x_post / x_thread surfaced on Timeline as Post cards)
+-- 9. Posts
 -- =============================================================================
 
 CREATE TABLE posts (
@@ -550,15 +516,15 @@ CREATE TABLE posts (
   kind                     TEXT NOT NULL CHECK (kind IN ('x_post','x_thread')),
   source_kind              TEXT NOT NULL CHECK (source_kind IN ('thread','cluster','production','manual')),
   source_id                TEXT,
-  is_companion_drop        INTEGER NOT NULL DEFAULT 0,          -- tied to a parent production
+  is_companion_drop        INTEGER NOT NULL DEFAULT 0,
   parent_production_id     TEXT REFERENCES productions(id),
-  body                     TEXT,                                -- for x_post; first post for x_thread
-  thread_steps             TEXT,                                -- JSON array of {index, text} for x_thread
+  body                     TEXT,
+  thread_steps             TEXT,
   character_count          INTEGER,
   state                    TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','scheduled','published','skipped')),
-  published_to             TEXT,                                -- JSON {platform, url, published_at}
-  engagement               TEXT,                                -- JSON
-  auto_archive_at          TEXT,                                -- 14-day default
+  published_to             TEXT,
+  engagement               TEXT,
+  auto_archive_at          TEXT,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -571,13 +537,12 @@ CREATE INDEX idx_posts_parent_production ON posts(parent_production_id);
 -- 10. System / pipelines / audit
 -- =============================================================================
 
--- Versioned prompt library. Loaded by name + is_active=1.
 CREATE TABLE prompts (
   id                       TEXT PRIMARY KEY,
-  name                     TEXT NOT NULL,                       -- 'thread_extraction', 'cluster_bounce', 'ideator_video_essay'
-  version                  TEXT NOT NULL,                       -- 'v1', 'v2', etc.
-  body                     TEXT NOT NULL,                       -- the prompt template
-  model                    TEXT NOT NULL,                       -- 'claude-sonnet-4-6'
+  name                     TEXT NOT NULL,
+  version                  TEXT NOT NULL,
+  body                     TEXT NOT NULL,
+  model                    TEXT NOT NULL,
   is_active                INTEGER NOT NULL DEFAULT 1,
   notes                    TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -586,7 +551,6 @@ CREATE TABLE prompts (
 );
 CREATE INDEX idx_prompts_active ON prompts(name, is_active);
 
--- Extraction audit trail.
 CREATE TABLE extraction_runs (
   id                       TEXT PRIMARY KEY,
   vlog_id                  TEXT NOT NULL REFERENCES vlogs(id) ON DELETE CASCADE,
@@ -602,13 +566,11 @@ CREATE TABLE extraction_runs (
 CREATE INDEX idx_extraction_runs_vlog ON extraction_runs(vlog_id);
 CREATE INDEX idx_extraction_runs_pass ON extraction_runs(pass);
 
--- Workflow execution tracking — replicated for audit even though Cloudflare Workflows
--- has its own state. This is the operator-visible status surface.
 CREATE TABLE pipeline_jobs (
   id                       TEXT PRIMARY KEY,
-  workflow_id              TEXT,                                -- from Cloudflare Workflows
-  job_kind                 TEXT NOT NULL,                       -- 'process_upload', 'extract_threads', 'bounce', 'produce', etc.
-  payload                  TEXT,                                -- JSON
+  workflow_id              TEXT,
+  job_kind                 TEXT NOT NULL,
+  payload                  TEXT,
   state                    TEXT NOT NULL DEFAULT 'queued' CHECK (state IN ('queued','running','complete','failed')),
   started_at               TEXT,
   completed_at             TEXT,
@@ -620,8 +582,3 @@ CREATE TABLE pipeline_jobs (
 CREATE INDEX idx_pipeline_jobs_state ON pipeline_jobs(state);
 CREATE INDEX idx_pipeline_jobs_kind ON pipeline_jobs(job_kind);
 CREATE INDEX idx_pipeline_jobs_workflow ON pipeline_jobs(workflow_id);
-
--- =============================================================================
--- Seed: initial prompts (placeholders — real bodies inserted by db/seed.sql)
--- =============================================================================
--- Initial prompts are seeded by db/seed.sql so this schema file stays pure DDL.
