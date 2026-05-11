@@ -14,7 +14,6 @@
 name = "neolog"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
-account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 
 # Pages build output (used by @opennextjs/cloudflare adapter — see package.json)
 pages_build_output_dir = ".vercel/output/static"
@@ -45,14 +44,15 @@ binding = "FFMPEG"
 service = "neolog-ffmpeg"
 
 # ─── Workflow binding for the post-upload pipeline ─────────────────────────
-# The Workflow itself is deployed from workers/process-upload. The main app
-# dispatches it via env.PROCESS_UPLOAD_WORKFLOW.create(...) after a vlog row
-# is registered (and the row is not in archive mode).
-[[workflows]]
-binding = "PROCESS_UPLOAD_WORKFLOW"
-name = "process-upload"
-class_name = "ProcessUploadWorkflow"
-script_name = "neolog-process-upload"
+# NOTE: Pages projects do NOT yet support [[workflows]] in wrangler.toml.
+# After the Pages project is deployed, add the binding via the dashboard:
+#   Cloudflare dashboard → Pages → neolog → Settings → Functions → Bindings
+#   → Workflow → Add binding
+#     Variable name: PROCESS_UPLOAD_WORKFLOW
+#     Workflow:      process-upload   (deployed from workers/process-upload)
+#
+# The API route /api/v2/vlogs/[id]/process uses env.PROCESS_UPLOAD_WORKFLOW
+# to dispatch the pipeline.
 
 # ─── Environment variables (non-secret) ─────────────────────────────────────
 [vars]
