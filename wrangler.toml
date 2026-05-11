@@ -1,0 +1,61 @@
+# Cloudflare configuration for the Neolog Next.js app.
+#
+# Deploy targets:
+#   - Cloudflare Pages (Next.js frontend + API routes)
+#   - Bindings to: D1, R2, Workers AI, the FFmpeg Container Worker (via service
+#     binding), and Cloudflare Access (auth happens at edge before the request
+#     hits the app — no app-side wiring beyond reading the JWT claims header).
+#
+# The Pages project is named "neolog". The custom domain is neolog.ai.
+#
+# After this file exists in the repo, the bootstrap workflow's deploy step
+# will populate the Pages project and push the build artifacts.
+
+name = "neolog"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "eda2e9bbd9acc42699027cfdcb50f998"
+
+# Pages build output (used by @opennextjs/cloudflare adapter — see package.json)
+pages_build_output_dir = ".vercel/output/static"
+
+# ─── D1: relational database (SQLite) ───────────────────────────────────────
+# database_id is filled in after the bootstrap workflow creates the DB.
+# The bootstrap output prints the UUID; we copy it here in the same PR that
+# adds the first data-layer code to make it official.
+[[d1_databases]]
+binding = "DB"
+database_name = "neolog"
+# database_id = "<filled-in-after-bootstrap-run>"
+
+# ─── R2: video storage ──────────────────────────────────────────────────────
+[[r2_buckets]]
+binding = "VIDEOS"
+bucket_name = "neolog-videos"
+
+# ─── Workers AI: Whisper transcription, optional vision tagging ────────────
+[ai]
+binding = "AI"
+
+# ─── Service binding to the FFmpeg Container Worker ────────────────────────
+# Deployed separately from workers/ffmpeg. Once deployed, the main app calls
+# env.FFMPEG.fetch(...) and Cloudflare routes to the container.
+[[services]]
+binding = "FFMPEG"
+service = "neolog-ffmpeg"
+
+# ─── Environment variables (non-secret) ─────────────────────────────────────
+[vars]
+NEOLOG_ENVIRONMENT = "production"
+CLOUDFLARE_ACCESS_TEAM = "neolog"
+CLOUDFLARE_ACCESS_AUD = ""   # filled in after Access app is created
+R2_BUCKET_NAME = "neolog-videos"
+
+# ─── Secrets (set via wrangler secret put or in Pages dashboard) ────────────
+# ANTHROPIC_API_KEY — Claude calls for extraction / scripting / coherence-check
+# CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY — for presigning
+#   R2 URLs the browser uploads to (multipart) and the FFmpeg container reads from
+
+# ─── Observability ──────────────────────────────────────────────────────────
+[observability]
+enabled = true
