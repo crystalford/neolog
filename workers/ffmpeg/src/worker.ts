@@ -14,10 +14,7 @@
  * Called from the main app via Service Binding: env.FFMPEG.fetch(...)
  */
 
-// @ts-expect-error — Container is provided by the Cloudflare Workers runtime
-// when the Containers feature is enabled. Types are still preview as of
-// 2026-05; ignore the missing module declaration so the build still passes.
-import { Container } from 'cloudflare:containers'
+import { Container } from '@cloudflare/containers'
 
 // Use `any` for the base class so TypeScript doesn't complain about override
 // modifiers and DurableObjectBranded constraints while Container types are

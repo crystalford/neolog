@@ -20,7 +20,7 @@ account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 class_name = "FfmpegContainer"
 image = "./Dockerfile"
 max_instances = 5
-instance_type = "standard"
+instance_type = "standard-1"
 # Containers shut down after this many seconds of inactivity (60s default).
 # ffmpeg jobs run shorter than that; bump if you see cold-start churn.
 # instance_idle_timeout_ms = 60000

@@ -260,6 +260,8 @@ jobs:
         run: |
           set -e
           cd workers/ffmpeg
+          # @cloudflare/containers must be resolvable for wrangler bundle.
+          npm install --no-audit --no-fund
           echo "Deploying neolog-ffmpeg Container Worker..."
           wrangler deploy
 

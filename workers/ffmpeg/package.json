@@ -4,5 +4,8 @@
   "version": "0.0.1",
   "description": "Cloudflare Container Worker running ffmpeg for Neolog video pipeline",
   "type": "module",
-  "main": "server.js"
+  "main": "server.js",
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.42"
+  }
 }
