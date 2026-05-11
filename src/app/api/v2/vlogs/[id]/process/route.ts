@@ -21,8 +21,11 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
   DB: D1Database
-  // Workflow binding — declared in wrangler.toml as PROCESS_UPLOAD_WORKFLOW
-  PROCESS_UPLOAD_WORKFLOW?: any
+  // Service binding to the neolog-process-upload Worker. We can't bind the
+  // workflow directly from Pages (Pages config doesn't yet support
+  // [[workflows]]), so we fetch the worker's /dispatch endpoint instead and
+  // it creates the workflow instance.
+  PROCESS_UPLOAD?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
@@ -59,17 +62,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     params.id,
   )
 
-  // Dispatch the Workflow. If the binding isn't present (local dev without
-  // workflows configured) we still return ok — the operator can re-trigger
-  // once the Workflow is deployed.
-  if (env.PROCESS_UPLOAD_WORKFLOW) {
+  // Dispatch the Workflow via the service binding to neolog-process-upload.
+  if (env.PROCESS_UPLOAD) {
     try {
-      await env.PROCESS_UPLOAD_WORKFLOW.create({
-        id: `process-upload-${params.id}-${Date.now()}`,
-        params: { vlog_id: params.id, operator_id: operator.id },
+      const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_id: params.id, operator_id: operator.id }),
       })
+      if (!res.ok) {
+        const err = await res.text()
+        throw new Error(`dispatch failed (${res.status}): ${err.slice(0, 500)}`)
+      }
     } catch (err: any) {
-      // Don't fail the request — surface the error in the row instead
       await run(
         db,
         `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -79,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Workflow dispatch failed', details: err.message }, { status: 500 })
     }
   } else {
-    console.warn('[vlogs/[id]/process] PROCESS_UPLOAD_WORKFLOW binding missing; status reset only')
+    console.warn('[vlogs/[id]/process] PROCESS_UPLOAD binding missing; status reset only')
   }
 
   return NextResponse.json({ ok: true })
