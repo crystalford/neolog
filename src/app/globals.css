@@ -1266,6 +1266,95 @@ input, textarea, select { font-family: inherit; }
 .detail-back { font-size: 12px; color: var(--bone-3); display: inline-block; padding: 16px 24px 0; }
 .detail-back:hover { color: var(--bone-1); }
 
+/* ─── Uploads / Library — gallery grid ────────────────────────────────── */
+.gallery {
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.tile {
+  position: relative;
+  aspect-ratio: 16/10;
+  background: linear-gradient(135deg, var(--ink-2), var(--ink));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: border-color 0.2s, transform 0.2s;
+  background-size: cover;
+  background-position: center;
+}
+.tile:hover { border-color: var(--line-bright); transform: translateY(-1px); }
+.tile .tile-foot {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 10px 12px 8px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.75) 70%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tile .tile-foot .name {
+  font-size: 12px;
+  color: var(--bone);
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.tile .tile-foot .dur {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--bone-1);
+  background: rgba(0,0,0,0.6);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.tile .tile-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--bone-1);
+  background: rgba(0,0,0,0.55);
+  padding: 3px 7px;
+  border-radius: 3px;
+  backdrop-filter: blur(8px);
+}
+.tile .tile-badge.archived { color: var(--state-warn); }
+.tile .tile-badge.error { color: var(--state-err); }
+.tile .tile-badge.processing { color: var(--sig); }
+
+/* Header above gallery: small inline meta */
+.gallery-summary {
+  padding: 4px 24px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--bone-3);
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.gallery-summary .n { color: var(--bone-1); font-weight: 500; }
+
 /* Empty / loading / error rows on Timeline */
 .empty-row {
   padding: 64px 28px;

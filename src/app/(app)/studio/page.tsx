@@ -82,6 +82,21 @@ export default function StudioPage() {
             ? 'The system has been working alongside you. When a cluster turns Ready, you take it to the production engine.'
             : "Clusters form once three or more threads share a topic. Drop in a few vlogs and the system will start cultivating."}
         </p>
+        <div className="reveal d4" style={{ marginTop: 16 }}>
+          <a href="/library" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            border: '1px solid var(--line-warm)',
+            borderRadius: 100,
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 9,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+            color: 'var(--bone-2)',
+          }}>View finished library →</a>
+        </div>
       </section>
 
       {clusters.length > 0 && (
