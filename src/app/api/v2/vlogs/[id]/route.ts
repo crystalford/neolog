@@ -85,15 +85,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     transcript_span_start: number | null
     transcript_span_end: number | null
     extracted_at: string
+    key_quotes: string | null
+    abstracted_topic: string | null
   }>(
     db,
     `SELECT id, topic, take, register, strength,
-            transcript_span_start, transcript_span_end, extracted_at
+            transcript_span_start, transcript_span_end, extracted_at,
+            key_quotes, abstracted_topic
        FROM threads
       WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL
-      ORDER BY transcript_span_start ASC NULLS LAST, extracted_at ASC`,
+      ORDER BY transcript_span_start ASC, extracted_at ASC`,
     params.id, operator.id,
   )
 
-  return NextResponse.json({ vlog, video_url: videoUrl, threads })
+  return NextResponse.json({
+    vlog: { ...vlog, playback_url: videoUrl },
+    video_url: videoUrl,
+    threads,
+  })
 }

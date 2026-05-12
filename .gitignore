@@ -40,3 +40,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+
+# Prototype reference HTML — extracted from operator-supplied zip, kept locally
+# for porting but not committed (700KB of unused-at-runtime markup).
+prototypes/
