@@ -27,7 +27,7 @@ export default function GraphPage() {
   useEffect(() => {
     fetch('/api/v2/graph/stats', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { thread_count: 0, cluster_count: 0, entity_count: 0, has_data: false })
-      .then(setData)
+      .then((d: any) => setData(d))
       .catch(() => setData({ thread_count: 0, cluster_count: 0, entity_count: 0, has_data: false }))
   }, [])
 
