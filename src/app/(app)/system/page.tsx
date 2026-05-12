@@ -23,7 +23,7 @@ export default function SystemPage() {
   useEffect(() => {
     fetch('/api/v2/system/status', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(setStatus)
+      .then((d: any) => setStatus(d))
       .catch(() => {})
   }, [])
 
