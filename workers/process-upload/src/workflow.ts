@@ -59,6 +59,7 @@ interface Params {
   tier?: 'free' | 'premium' | 'max'  // extraction provider tier — defaults to 'free' (Workers AI Llama)
   passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]  // when set, re-run only these passes
   thumbnail_only?: boolean  // when true, runs transcode+thumbnail only, skips transcribe + all extractions
+  extract_thumb_only?: boolean  // when true, JUST extracts a thumbnail. Skips transcode for H.264 sources (1-2 sec). Falls through to locked transcode-then-thumb for HEVC. No transcribe, no extractions.
 }
 
 const MP4_EPOCH_OFFSET_SEC = 2082844800 // seconds between 1904-01-01 and 1970-01-01
@@ -99,6 +100,56 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     }
 
     const isVideo = vlog.mime_type.startsWith('video/')
+    const mimeLower = (vlog.mime_type || '').toLowerCase()
+    const filenameLower = (vlog.original_filename || '').toLowerCase()
+    const looksHevc =
+      /hevc|hev1|hvc1|x265/.test(mimeLower) ||
+      mimeLower === 'video/quicktime' ||
+      filenameLower.endsWith('.mov')
+
+    // ── extract_thumb_only fast path ────────────────────────────────────────
+    // Generate just a thumbnail. For H.264 sources, skip transcode entirely
+    // (FFmpeg /extract-thumb works directly on H.264 in ~1-2 sec). For HEVC,
+    // fall through to the locked transcode-then-thumb chain — but DO NOT run
+    // transcribe or extractions after.
+    if (event.payload.extract_thumb_only && isVideo) {
+      if (!vlog.thumbnail_url) {
+        if (!looksHevc) {
+          // Fast path: direct extract-thumb against the original
+          await step.do(
+            'extract-thumb-fast',
+            { retries: { limit: 2, delay: '10 seconds' }, timeout: '2 minutes' },
+            async () => {
+              const inputUrl = await presignR2Get(this.env, vlog.r2_key, 600)
+              const ffResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_url: inputUrl, t: 1.0 }),
+              })
+              if (!ffResp.ok) {
+                throw new Error(`ffmpeg thumbnail failed (${ffResp.status}): ${(await ffResp.text()).slice(0, 300)}`)
+              }
+              const jpegBytes = new Uint8Array(await ffResp.arrayBuffer())
+              const dataUri = `data:image/jpeg;base64,${bufferToBase64(jpegBytes)}`
+              // Sticky: only write if no thumbnail exists. Prevents zombie
+              // batch workflows from later overwriting an operator-generated thumb.
+              await this.env.DB.prepare(
+                `UPDATE vlogs SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
+                  WHERE id = ? AND thumbnail_url IS NULL`,
+              ).bind(dataUri, vlog_id).run()
+            },
+          )
+          await step.do('mark-archived-after-fast-thumb', async () => reportStatus('archived'))
+          return { vlog_id, status: 'thumbnail_fast_complete' }
+        }
+        // looksHevc: fall through to the regular transcode-then-thumb path
+        // below. We still skip transcribe + extractions via the same
+        // thumbnail_only short-circuit later.
+      } else {
+        // Already has a thumbnail; nothing to do.
+        return { vlog_id, status: 'thumbnail_already_present' }
+      }
+    }
 
     // ── Step 2: transcode to H.264 (LOCKED — must precede thumbnail) ────────
     let transcodedKey = vlog.transcoded_r2_key
@@ -152,11 +203,21 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
           const jpegBytes = new Uint8Array(await ffmpegResp.arrayBuffer())
           const b64 = bufferToBase64(jpegBytes)
           const dataUri = `data:image/jpeg;base64,${b64}`
+          // Sticky write — only set if thumbnail_url is still null. Protects
+          // operator-generated fast-path thumbnails from being overwritten by
+          // a zombie workflow that finishes later with a transcoded-source frame.
           await this.env.DB.prepare(
-            `UPDATE vlogs SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE vlogs SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND thumbnail_url IS NULL`,
           ).bind(dataUri, vlog_id).run()
         },
       )
+    }
+
+    // For extract_thumb_only HEVC path, stop here — we wanted ONLY a thumbnail.
+    if (event.payload.extract_thumb_only) {
+      await step.do('mark-archived-after-thumb-extract', async () => reportStatus('archived'))
+      return { vlog_id, status: 'thumbnail_complete' }
     }
 
     // ── Step 4: extract recorded_at (LOCKED three-tier fallback) ────────────
@@ -354,6 +415,7 @@ export default {
         tier?: 'free' | 'premium' | 'max';
         passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
         thumbnail_only?: boolean;
+        extract_thumb_only?: boolean;
       } | null
       if (!body?.vlog_id || !body?.operator_id) {
         return new Response(JSON.stringify({ error: 'vlog_id and operator_id required' }), {
@@ -369,6 +431,7 @@ export default {
             tier: body.tier ?? 'free',
             passes: body.passes,
             thumbnail_only: body.thumbnail_only === true,
+            extract_thumb_only: body.extract_thumb_only === true,
           },
         })
         return new Response(JSON.stringify({ ok: true, instance_id: instance.id }), {

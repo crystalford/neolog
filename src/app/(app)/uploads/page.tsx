@@ -7,7 +7,7 @@
  */
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface UploadRow {
   id: string
@@ -17,6 +17,8 @@ interface UploadRow {
   duration_seconds: number | null
   recorded_at: string | null
   thumbnail_url: string | null
+  playback_url: string | null
+  has_transcode: boolean
   pipeline_status: string
   uploaded_at: string
 }
@@ -45,7 +47,7 @@ export default function UploadsPage() {
   const [thumbImporting, setThumbImporting] = useState(false)
   const [thumbResult, setThumbResult] = useState<{ imported: number; supabase_rows_scanned: number; skipped_already_set_or_no_d1_match: number; error?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
-  const [regenResult, setRegenResult] = useState<{ dispatched?: number; failed?: number; message?: string; error?: string } | null>(null)
+  const [regenResult, setRegenResult] = useState<{ reset?: number; message?: string; error?: string } | null>(null)
 
   const regenerateThumbnails = async () => {
     setRegenerating(true)
@@ -63,6 +65,7 @@ export default function UploadsPage() {
         setRegenResult({ error: data.error || `HTTP ${r.status}` })
       } else {
         setRegenResult(data)
+        load()  // Refresh tiles so reset rows flip badge immediately
       }
     } catch (e: any) {
       setRegenResult({ error: String(e.message || e) })
@@ -172,14 +175,9 @@ export default function UploadsPage() {
           onClick={regenerateThumbnails}
           disabled={regenerating}
           style={adminPillStyle(regenerating)}
+          title="Resets rows stuck on 'transcoding' back to 'archived'. The in-flight workflows continue on Cloudflare's side."
         >
-          {regenerating ? 'Dispatching…' : 'Regenerate thumbnails (FFmpeg)'}
-        </button>
-        <button
-          onClick={() => setShowSupabaseForm(s => !s)}
-          style={{ ...adminPillStyle(false), fontSize: 8, color: 'var(--bone-3)' }}
-        >
-          {showSupabaseForm ? 'Hide' : 'Or pull from Supabase'}
+          {regenerating ? 'Resetting…' : 'Reset stuck transcoding rows'}
         </button>
       </div>
 
@@ -326,17 +324,146 @@ export default function UploadsPage() {
 
       <div className="gallery reveal d5">
         {filtered.map(v => (
-          <a key={v.id} href={`/timeline/${v.id}`} className="tile" style={v.thumbnail_url ? { backgroundImage: `url(${v.thumbnail_url})` } : undefined}>
-            <span className={`tile-badge ${badgeKindFor(v.pipeline_status)}`}>{v.pipeline_status}</span>
-            <div className="tile-foot">
-              <span className="name">{deriveTitle(v.original_filename)}</span>
-              {v.duration_seconds != null && <span className="dur">{fmtDur(v.duration_seconds)}</span>}
-            </div>
-          </a>
+          <TileVideoPoster key={v.id} v={v} />
         ))}
       </div>
     </main>
   )
+}
+
+/**
+ * TileVideoPoster — single gallery tile.
+ *
+ * Render priority (best-effort to avoid placeholder):
+ *   1. thumbnail_url (data URI from old pipeline) — cheapest, always works
+ *   2. <video preload="metadata"> with playback_url — browser pulls just enough
+ *      bytes (~50-200 KB via HTTP Range) to paint the first frame as poster.
+ *      Only used when the source is browser-renderable (H.264 in MP4, or any
+ *      vlog that has a transcoded fallback).
+ *   3. Placeholder — for HEVC/.mov sources without a transcode (Chrome/Firefox
+ *      can't decode HEVC), or when no playback_url is available.
+ *
+ * The <video> uses IntersectionObserver to defer the Range request until the
+ * tile actually scrolls into view, capping bandwidth to viewport-visible tiles.
+ */
+function TileVideoPoster({ v }: { v: UploadRow }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const containerRef = useRef<HTMLAnchorElement | null>(null)
+  const [visible, setVisible] = useState(false)
+  const [errored, setErrored] = useState(false)
+
+  // Lazy-load: only set preload="metadata" once the tile scrolls into view.
+  useEffect(() => {
+    if (!containerRef.current) return
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return
+    }
+    const obs = new IntersectionObserver(
+      entries => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setVisible(true)
+            obs.disconnect()
+            break
+          }
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    obs.observe(containerRef.current)
+    return () => obs.disconnect()
+  }, [])
+
+  // Some keyframes are black; nudging past t=0 usually gets a real frame.
+  const onLoadedMetadata = () => {
+    const el = videoRef.current
+    if (!el) return
+    try {
+      if (Number.isFinite(el.duration) && el.duration > 0.5) {
+        el.currentTime = Math.min(0.5, el.duration / 2)
+      }
+    } catch {}
+  }
+
+  const renderable = isBrowserRenderable(v)
+  const showVideo = !v.thumbnail_url && v.playback_url && renderable && !errored
+
+  return (
+    <a
+      ref={containerRef}
+      href={`/timeline/${v.id}`}
+      className="tile"
+      style={v.thumbnail_url ? { backgroundImage: `url(${v.thumbnail_url})` } : undefined}
+    >
+      {showVideo && (
+        <video
+          ref={videoRef}
+          src={visible ? (v.playback_url || undefined) : undefined}
+          preload={visible ? 'metadata' : 'none'}
+          muted
+          playsInline
+          onLoadedMetadata={onLoadedMetadata}
+          onError={() => setErrored(true)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            pointerEvents: 'none',
+            background: 'transparent',
+          }}
+        />
+      )}
+
+      {!v.thumbnail_url && !showVideo && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--bone-4)',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+          }}
+        >
+          {errored ? 'preview unavailable' : 'no preview'}
+        </div>
+      )}
+
+      <span className={`tile-badge ${badgeKindFor(v.pipeline_status)}`}>{v.pipeline_status}</span>
+      <div className="tile-foot">
+        <span className="name">{deriveTitle(v.original_filename)}</span>
+        {v.duration_seconds != null && <span className="dur">{fmtDur(v.duration_seconds)}</span>}
+      </div>
+    </a>
+  )
+}
+
+/**
+ * isBrowserRenderable — Layer 3 HEVC gate.
+ * Returns true if the browser can play this video's source as a <video>:
+ *   - any vlog with has_transcode=true (Cloudflare transcoded it to H.264)
+ *   - any vlog with mime_type=video/mp4 (most likely H.264 from iPhone)
+ *   - falls back to false for HEVC / hev1 / hvc1 / .mov-without-transcode
+ *     since Chrome/Firefox don't decode HEVC.
+ */
+function isBrowserRenderable(v: UploadRow): boolean {
+  if (v.has_transcode) return true
+  const mime = (v.mime_type || '').toLowerCase()
+  if (/hevc|hev1|hvc1|x265/.test(mime)) return false
+  if (mime === 'video/mp4' || mime === 'video/webm') return true
+  // QuickTime/.mov is often HEVC — assume not renderable without transcode
+  const filename = (v.original_filename || '').toLowerCase()
+  if (filename.endsWith('.mov')) return false
+  // Other audio/video types: try and see (errored state handles failure)
+  return mime.startsWith('video/')
 }
 
 function badgeKindFor(s: string): 'archived' | 'error' | 'processing' | '' {

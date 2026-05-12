@@ -118,6 +118,16 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         <div className="error-row" style={{ marginBottom: 16 }}>Pipeline error: {vlog.pipeline_error}</div>
       )}
 
+      {!vlog.thumbnail_url && (
+        <div className="section">
+          <div className="label">Thumbnail</div>
+          <p style={{ fontSize: 13, color: 'var(--bone-2)', marginBottom: 12 }}>
+            No thumbnail yet. For H.264 sources this generates in ~1-2 sec. For HEVC it requires a transcode first (~10 min).
+          </p>
+          <GenerateThumbnailButton vlogId={params.id} onDone={load} />
+        </div>
+      )}
+
       <div className="section">
         <div className="label">Re-extract</div>
         <p style={{ fontSize: 13, color: 'var(--bone-2)', marginBottom: 12 }}>
@@ -209,6 +219,40 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function GenerateThumbnailButton({ vlogId, onDone }: { vlogId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const trigger = async () => {
+    setBusy(true)
+    setMsg(null)
+    try {
+      const r = await fetch(`/api/v2/vlogs/${vlogId}/thumbnail`, { method: 'POST', credentials: 'include' })
+      const data: any = await r.json().catch(() => ({}))
+      if (!r.ok && r.status !== 202) {
+        setMsg(`Failed: ${data.error || `HTTP ${r.status}`}`)
+        return
+      }
+      setMsg(data.message || 'Dispatched.')
+      // For the fast path the thumbnail lands within 1-2 sec; poll briefly.
+      if (!data.will_transcode) {
+        setTimeout(onDone, 2500)
+      }
+    } catch (e: any) {
+      setMsg(`Failed: ${e.message || String(e)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div>
+      <button onClick={trigger} disabled={busy} className="action-btn">
+        {busy ? 'Generating…' : 'Generate thumbnail'}
+      </button>
+      {msg && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--bone-3)' }}>{msg}</div>}
     </div>
   )
 }
