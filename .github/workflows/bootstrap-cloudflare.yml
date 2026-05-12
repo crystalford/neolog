@@ -151,6 +151,16 @@ jobs:
           set -e
           wrangler d1 execute "$D1_NAME" --remote --file db/schema.sql
 
+      - name: Apply migrations (idempotent ALTERs)
+        run: |
+          # db/migrations.sql contains ALTER statements. SQLite doesn't have
+          # IF NOT EXISTS on ALTER, so re-runs will fail on already-applied
+          # columns — that's fine, we ignore the error.
+          if [ -f db/migrations.sql ]; then
+            wrangler d1 execute "$D1_NAME" --remote --file db/migrations.sql || \
+              echo "(some migrations failed — expected on re-runs if columns already exist)"
+          fi
+
       - name: Seed initial prompts (if seed file exists)
         run: |
           if [ -f db/seed.sql ]; then
@@ -170,6 +180,39 @@ jobs:
             exit 1
           fi
           echo "✅ R2 bucket '$R2_BUCKET' confirmed."
+
+      - name: Configure R2 bucket CORS
+        run: |
+          set -e
+          # Apply CORS rules so the browser can PUT multipart parts directly
+          # to R2 presigned URLs from neolog.ai. Without this, the preflight
+          # OPTIONS request 404s and uploads fail with "Failed to fetch".
+          # Also allow the .pages.dev preview origin so preview deploys upload.
+          response=$(curl -s -w "\n%{http_code}" -X PUT \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$R2_BUCKET/cors" \
+            -d '{
+              "rules": [
+                {
+                  "allowed": {
+                    "origins": ["https://neolog.ai", "https://*.neolog.pages.dev"],
+                    "methods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+                    "headers": ["*"]
+                  },
+                  "exposeHeaders": ["ETag", "Content-Length", "Content-Type"],
+                  "maxAgeSeconds": 3600
+                }
+              ]
+            }')
+          body=$(echo "$response" | sed '$d')
+          status=$(echo "$response" | tail -n1)
+          if [ "$status" != "200" ]; then
+            echo "❌ R2 CORS update failed (HTTP $status):"
+            echo "$body"
+            exit 1
+          fi
+          echo "✅ R2 CORS applied for neolog.ai + *.neolog.pages.dev"
 
       - name: Configure Cloudflare Access — One-time PIN identity provider
         run: |

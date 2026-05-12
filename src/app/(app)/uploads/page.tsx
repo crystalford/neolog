@@ -7,7 +7,7 @@
  */
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface UploadRow {
   id: string
@@ -17,8 +17,6 @@ interface UploadRow {
   duration_seconds: number | null
   recorded_at: string | null
   thumbnail_url: string | null
-  playback_url: string | null
-  has_transcode: boolean
   pipeline_status: string
   uploaded_at: string
 }
@@ -332,78 +330,31 @@ export default function UploadsPage() {
 }
 
 /**
- * TileVideoPoster — single gallery tile.
+ * TileVideoPoster — single gallery tile, using an <img> for thumbnail.
  *
- * Render priority (best-effort to avoid placeholder):
- *   1. thumbnail_url (data URI from old pipeline) — cheapest, always works
- *   2. <video preload="metadata"> with playback_url — browser pulls just enough
- *      bytes (~50-200 KB via HTTP Range) to paint the first frame as poster.
- *      Only used when the source is browser-renderable (H.264 in MP4, or any
- *      vlog that has a transcoded fallback).
- *   3. Placeholder — for HEVC/.mov sources without a transcode (Chrome/Firefox
- *      can't decode HEVC), or when no playback_url is available.
+ * Render priority:
+ *   1. thumbnail_url (server-provided: legacy data URI OR presigned R2 jpg) —
+ *      rendered as <img loading="lazy">. Native browser lazy-load handles
+ *      viewport visibility with zero JS — basically free per tile.
+ *   2. Placeholder ("no preview") for vlogs that haven't been processed yet
+ *      or that errored.
  *
- * The <video> uses IntersectionObserver to defer the Range request until the
- * tile actually scrolls into view, capping bandwidth to viewport-visible tiles.
+ * Previous version used <video preload="metadata"> per tile for first-frame
+ * poster. That approach (even with IntersectionObserver) maintains decoder
+ * state, GPU, audio context per element — ~150-200ms work × 173 tiles =
+ * unresponsive UI. Static <img> is what video archives have always used.
  */
 function TileVideoPoster({ v }: { v: UploadRow }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const containerRef = useRef<HTMLAnchorElement | null>(null)
-  const [visible, setVisible] = useState(false)
   const [errored, setErrored] = useState(false)
-
-  // Lazy-load: only set preload="metadata" once the tile scrolls into view.
-  useEffect(() => {
-    if (!containerRef.current) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
-    const obs = new IntersectionObserver(
-      entries => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            setVisible(true)
-            obs.disconnect()
-            break
-          }
-        }
-      },
-      { rootMargin: '200px' },
-    )
-    obs.observe(containerRef.current)
-    return () => obs.disconnect()
-  }, [])
-
-  // Some keyframes are black; nudging past t=0 usually gets a real frame.
-  const onLoadedMetadata = () => {
-    const el = videoRef.current
-    if (!el) return
-    try {
-      if (Number.isFinite(el.duration) && el.duration > 0.5) {
-        el.currentTime = Math.min(0.5, el.duration / 2)
-      }
-    } catch {}
-  }
-
-  const renderable = isBrowserRenderable(v)
-  const showVideo = !v.thumbnail_url && v.playback_url && renderable && !errored
-
+  const src = !errored ? v.thumbnail_url : null
   return (
-    <a
-      ref={containerRef}
-      href={`/timeline/${v.id}`}
-      className="tile"
-      style={v.thumbnail_url ? { backgroundImage: `url(${v.thumbnail_url})` } : undefined}
-    >
-      {showVideo && (
-        <video
-          ref={videoRef}
-          src={visible ? (v.playback_url || undefined) : undefined}
-          preload={visible ? 'metadata' : 'none'}
-          muted
-          playsInline
-          onLoadedMetadata={onLoadedMetadata}
+    <a href={`/timeline/${v.id}`} className="tile">
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
           onError={() => setErrored(true)}
           style={{
             position: 'absolute',
@@ -415,9 +366,7 @@ function TileVideoPoster({ v }: { v: UploadRow }) {
             background: 'transparent',
           }}
         />
-      )}
-
-      {!v.thumbnail_url && !showVideo && (
+      ) : (
         <div
           aria-hidden
           style={{
@@ -433,10 +382,9 @@ function TileVideoPoster({ v }: { v: UploadRow }) {
             textTransform: 'uppercase',
           }}
         >
-          {errored ? 'preview unavailable' : 'no preview'}
+          no preview
         </div>
       )}
-
       <span className={`tile-badge ${badgeKindFor(v.pipeline_status)}`}>{v.pipeline_status}</span>
       <div className="tile-foot">
         <span className="name">{deriveTitle(v.original_filename)}</span>
@@ -444,26 +392,6 @@ function TileVideoPoster({ v }: { v: UploadRow }) {
       </div>
     </a>
   )
-}
-
-/**
- * isBrowserRenderable — Layer 3 HEVC gate.
- * Returns true if the browser can play this video's source as a <video>:
- *   - any vlog with has_transcode=true (Cloudflare transcoded it to H.264)
- *   - any vlog with mime_type=video/mp4 (most likely H.264 from iPhone)
- *   - falls back to false for HEVC / hev1 / hvc1 / .mov-without-transcode
- *     since Chrome/Firefox don't decode HEVC.
- */
-function isBrowserRenderable(v: UploadRow): boolean {
-  if (v.has_transcode) return true
-  const mime = (v.mime_type || '').toLowerCase()
-  if (/hevc|hev1|hvc1|x265/.test(mime)) return false
-  if (mime === 'video/mp4' || mime === 'video/webm') return true
-  // QuickTime/.mov is often HEVC — assume not renderable without transcode
-  const filename = (v.original_filename || '').toLowerCase()
-  if (filename.endsWith('.mov')) return false
-  // Other audio/video types: try and see (errored state handles failure)
-  return mime.startsWith('video/')
 }
 
 function badgeKindFor(s: string): 'archived' | 'error' | 'processing' | '' {

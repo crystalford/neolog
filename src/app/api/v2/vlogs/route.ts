@@ -158,8 +158,8 @@ export async function GET(req: NextRequest) {
 
   let sql = `
     SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
-           recorded_at, recorded_at_source, uploaded_at, thumbnail_url, r2_key,
-           transcoded_r2_key,
+           recorded_at, recorded_at_source, uploaded_at, thumbnail_url, thumbnail_r2_key,
+           r2_key, transcoded_r2_key,
            pipeline_status, pipeline_error, visibility, transcript_text IS NOT NULL AS has_transcript,
            created_at, updated_at
     FROM vlogs
@@ -189,6 +189,7 @@ export async function GET(req: NextRequest) {
     recorded_at_source: string | null
     uploaded_at: string
     thumbnail_url: string | null
+    thumbnail_r2_key: string | null
     r2_key: string
     transcoded_r2_key: string | null
     pipeline_status: string
@@ -199,28 +200,29 @@ export async function GET(req: NextRequest) {
     updated_at: string
   }>(db, sql, ...binds)
 
-  // Sign 6-hour playback URLs for tiles. Browser uses the first frame of
-  // the video as the visible poster via <video preload="metadata">.
+  // Resolve thumbnail URLs. Three possible states per row:
+  //   - r.thumbnail_url is a "data:image/jpeg;base64,..." URI (legacy from
+  //     the old data-URI workflow). Return as-is.
+  //   - r.thumbnail_r2_key is set (new workflow path). Presign 24-hour R2
+  //     GET URL. Browser caches the JPEG via HTTP cache for the TTL.
+  //   - Neither is set. Return null; tile shows "no preview" placeholder.
   // Presigning is CPU-only (HMAC), no I/O, so doing N of them is cheap.
-  // Skip vlogs that already have a thumbnail_url (data: URI) to save bytes.
-  // 6h TTL gives generous headroom for tabs left open; tile errors swap
-  // to placeholder if a URL expires before being fetched.
   const vlogsWithUrls = await Promise.all(
     rows.map(async r => {
-      let playback_url: string | null = null
-      if (!r.thumbnail_url) {
-        const playbackKey = r.transcoded_r2_key || r.r2_key
+      let thumbnail_url: string | null = null
+      if (r.thumbnail_url) {
+        // Legacy data URI — preserved verbatim
+        thumbnail_url = r.thumbnail_url
+      } else if (r.thumbnail_r2_key) {
         try {
-          playback_url = await presignGetUrl(env, playbackKey, 21600)
+          thumbnail_url = await presignGetUrl(env, r.thumbnail_r2_key, 24 * 3600)
         } catch {
           // presigning needs R2_ACCESS_KEY_ID/SECRET — leave null if absent
         }
       }
-      // Don't ship r2_key or transcoded_r2_key to client; do ship a flag
-      // so the tile knows whether a browser-friendly H.264 fallback exists.
-      const has_transcode = !!r.transcoded_r2_key
-      const { r2_key: _omit1, transcoded_r2_key: _omit2, ...safe } = r
-      return { ...safe, playback_url, has_transcode }
+      // Strip internal R2 keys from client response.
+      const { r2_key: _omit1, transcoded_r2_key: _omit2, thumbnail_r2_key: _omit3, ...safe } = r
+      return { ...safe, thumbnail_url }
     }),
   )
 
