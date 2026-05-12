@@ -57,28 +57,42 @@ export default function UploadsPage() {
   const importSupabaseThumbnails = async () => {
     setThumbImporting(true)
     setThumbResult(null)
+    let offset = 0
+    let totalImported = 0
+    let totalScanned = 0
+    let totalSkipped = 0
+
     try {
-      const r = await fetch('/api/v2/admin/import-supabase-thumbnails', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim() }),
-      })
-      const text = await r.text()
-      let data: any = null
-      try { data = JSON.parse(text) }
-      catch {
-        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: `Server returned non-JSON (HTTP ${r.status}). First chars: ${text.slice(0, 160)}` })
-        return
+      while (true) {
+        const r = await fetch('/api/v2/admin/import-supabase-thumbnails', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim(), offset }),
+        })
+        const text = await r.text()
+        let data: any = null
+        try { data = JSON.parse(text) }
+        catch {
+          setThumbResult({ imported: totalImported, supabase_rows_scanned: totalScanned, skipped_already_set_or_no_d1_match: totalSkipped, error: `Server returned non-JSON (HTTP ${r.status}) at offset ${offset}. First chars: ${text.slice(0, 160)}` })
+          return
+        }
+        if (!r.ok) {
+          setThumbResult({ imported: totalImported, supabase_rows_scanned: totalScanned, skipped_already_set_or_no_d1_match: totalSkipped, error: data?.error || `HTTP ${r.status} at offset ${offset}` })
+          return
+        }
+        totalImported += data.imported || 0
+        totalScanned += data.page_rows || 0
+        totalSkipped += data.skipped_already_set || 0
+        // Show interim progress
+        setThumbResult({ imported: totalImported, supabase_rows_scanned: totalScanned, skipped_already_set_or_no_d1_match: totalSkipped })
+        if (data.done) break
+        offset = data.next_offset
+        if (offset > 5000) break  // safety stop
       }
-      if (!r.ok) {
-        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: data?.error || `HTTP ${r.status}` })
-      } else {
-        setThumbResult(data)
-        load()
-      }
+      load()
     } catch (e: any) {
-      setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: String(e.message || e) })
+      setThumbResult({ imported: totalImported, supabase_rows_scanned: totalScanned, skipped_already_set_or_no_d1_match: totalSkipped, error: String(e.message || e) })
     } finally {
       setThumbImporting(false)
     }
