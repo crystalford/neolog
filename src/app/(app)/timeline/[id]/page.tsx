@@ -229,23 +229,51 @@ function GenerateThumbnailButton({ vlogId, onDone }: { vlogId: string; onDone: (
   const trigger = async () => {
     setBusy(true)
     setMsg(null)
+    let r: Response
+    let data: any
     try {
-      const r = await fetch(`/api/v2/vlogs/${vlogId}/thumbnail`, { method: 'POST', credentials: 'include' })
-      const data: any = await r.json().catch(() => ({}))
-      if (!r.ok && r.status !== 202) {
-        setMsg(`Failed: ${data.error || `HTTP ${r.status}`}`)
-        return
-      }
-      setMsg(data.message || 'Dispatched.')
-      // For the fast path the thumbnail lands within 1-2 sec; poll briefly.
-      if (!data.will_transcode) {
-        setTimeout(onDone, 2500)
-      }
+      r = await fetch(`/api/v2/vlogs/${vlogId}/thumbnail`, { method: 'POST', credentials: 'include' })
+      data = await r.json().catch(() => ({}))
     } catch (e: any) {
       setMsg(`Failed: ${e.message || String(e)}`)
-    } finally {
       setBusy(false)
+      return
     }
+    if (r.status === 200 && data.thumbnail_url) {
+      setMsg('Thumbnail ready.')
+      onDone()
+      setBusy(false)
+      return
+    }
+    if (r.status === 202) {
+      // HEVC fallback — workflow dispatched. Poll for completion (max 15 min).
+      setMsg(data.message || 'Transcoding — checking back…')
+      let attempts = 0
+      const maxAttempts = 90
+      const poll = async () => {
+        attempts++
+        if (attempts > maxAttempts) {
+          setMsg('Still transcoding after 15 min. Refresh the page later.')
+          setBusy(false)
+          return
+        }
+        try {
+          const pr = await fetch(`/api/v2/vlogs/${vlogId}`, { credentials: 'include' })
+          const pdata: any = await pr.json().catch(() => ({}))
+          if (pdata?.vlog?.thumbnail_url) {
+            setMsg('Thumbnail ready.')
+            onDone()
+            setBusy(false)
+            return
+          }
+        } catch {}
+        setTimeout(poll, 10_000)
+      }
+      setTimeout(poll, 10_000)
+      return
+    }
+    setMsg(`Failed: ${data?.error || `HTTP ${r.status}`}`)
+    setBusy(false)
   }
   return (
     <div>
