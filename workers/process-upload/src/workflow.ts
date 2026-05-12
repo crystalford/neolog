@@ -58,6 +58,7 @@ interface Params {
   operator_id: string
   tier?: 'free' | 'premium' | 'max'  // extraction provider tier — defaults to 'free' (Workers AI Llama)
   passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]  // when set, re-run only these passes
+  thumbnail_only?: boolean  // when true, runs transcode+thumbnail only, skips transcribe + all extractions
 }
 
 const MP4_EPOCH_OFFSET_SEC = 2082844800 // seconds between 1904-01-01 and 1970-01-01
@@ -66,6 +67,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const { vlog_id, operator_id } = event.payload
     const tier: 'free' | 'premium' | 'max' = event.payload.tier ?? 'free'
+    const thumbnailOnly = event.payload.thumbnail_only === true
     const passesToRun = new Set(event.payload.passes ?? ['threads', 'clip_candidates', 'creative_elements', 'entities'])
 
     // ── Step 1: load context ─────────────────────────────────────────────────
@@ -185,6 +187,18 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
           ).bind(recorded, source, vlog_id).run()
         }
       })
+    }
+
+    // Short-circuit for thumbnail-only batch (used by the /uploads bulk
+    // thumbnail regeneration). Transcode + thumbnail + recorded_at already ran;
+    // we skip transcribe + extraction and mark the row archived again.
+    if (thumbnailOnly) {
+      await step.do('mark-thumbnail-only-complete', async () => {
+        await this.env.DB.prepare(
+          `UPDATE vlogs SET pipeline_status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        ).bind(vlog_id).run()
+      })
+      return { vlog_id, status: 'thumbnail_only_complete' }
     }
 
     // ── Step 5 & 6: transcribe ──────────────────────────────────────────────
@@ -339,6 +353,7 @@ export default {
         vlog_id?: string; operator_id?: string;
         tier?: 'free' | 'premium' | 'max';
         passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
+        thumbnail_only?: boolean;
       } | null
       if (!body?.vlog_id || !body?.operator_id) {
         return new Response(JSON.stringify({ error: 'vlog_id and operator_id required' }), {
@@ -353,6 +368,7 @@ export default {
             operator_id: body.operator_id,
             tier: body.tier ?? 'free',
             passes: body.passes,
+            thumbnail_only: body.thumbnail_only === true,
           },
         })
         return new Response(JSON.stringify({ ok: true, instance_id: instance.id }), {
