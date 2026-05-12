@@ -39,6 +39,11 @@ export default function UploadsPage() {
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ inserted: number; skipped_existing: number; total_objects_scanned: number } | null>(null)
+  const [showSupabaseForm, setShowSupabaseForm] = useState(false)
+  const [supabaseUrl, setSupabaseUrl] = useState('')
+  const [supabaseKey, setSupabaseKey] = useState('')
+  const [thumbImporting, setThumbImporting] = useState(false)
+  const [thumbResult, setThumbResult] = useState<{ imported: number; supabase_rows_scanned: number; skipped_already_set_or_no_d1_match: number; error?: string } | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -48,6 +53,30 @@ export default function UploadsPage() {
       .catch(() => setLoading(false))
   }
   useEffect(load, [])
+
+  const importSupabaseThumbnails = async () => {
+    setThumbImporting(true)
+    setThumbResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/import-supabase-thumbnails', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim() }),
+      })
+      const data = await r.json()
+      if (!r.ok) {
+        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: data.error || `HTTP ${r.status}` })
+      } else {
+        setThumbResult(data)
+        load()
+      }
+    } catch (e: any) {
+      setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: String(e.message || e) })
+    } finally {
+      setThumbImporting(false)
+    }
+  }
 
   const importFromR2 = async () => {
     setImporting(true)
@@ -89,23 +118,87 @@ export default function UploadsPage() {
         <button
           onClick={importFromR2}
           disabled={importing}
-          style={{
-            marginLeft: 'auto',
-            padding: '6px 12px',
-            border: '1px solid var(--line-bright)',
-            borderRadius: 100,
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 9,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            color: 'var(--bone-1)',
-            background: 'rgba(236,228,210,0.04)',
-            cursor: importing ? 'wait' : 'pointer',
-          }}
+          style={adminPillStyle(importing)}
         >
           {importing ? 'Scanning R2…' : 'Import from R2'}
         </button>
+        <button
+          onClick={() => setShowSupabaseForm(s => !s)}
+          style={adminPillStyle(false)}
+        >
+          {showSupabaseForm ? 'Hide thumbnail import' : 'Pull thumbnails from Supabase'}
+        </button>
       </div>
+
+      {showSupabaseForm && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '16px 18px',
+          background: 'var(--ink-2)',
+          border: '1px solid var(--line)',
+          borderRadius: 12,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}>
+          <div style={{ fontSize: 13, color: 'var(--bone-1)', lineHeight: 1.55 }}>
+            Paste your <strong style={{ color: 'var(--bone)' }}>paused Supabase</strong> credentials. We'll read
+            the old <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--bone)' }}>video_uploads.thumbnail_url</code> column and copy each thumbnail into the matching D1 vlog by R2 key. Read-only on Supabase — nothing is written there.
+          </div>
+          <input
+            type="text"
+            placeholder="https://your-project.supabase.co"
+            value={supabaseUrl}
+            onChange={e => setSupabaseUrl(e.target.value)}
+            style={inputStyle}
+          />
+          <input
+            type="password"
+            placeholder="service_role key (Supabase → Settings → API)"
+            value={supabaseKey}
+            onChange={e => setSupabaseKey(e.target.value)}
+            style={inputStyle}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={importSupabaseThumbnails}
+              disabled={!supabaseUrl.trim() || !supabaseKey.trim() || thumbImporting}
+              style={{
+                padding: '10px 18px',
+                border: '1px solid var(--bone-3)',
+                background: 'rgba(236,228,210,0.04)',
+                color: 'var(--bone)',
+                borderRadius: 100,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: thumbImporting ? 'wait' : 'pointer',
+              }}>{thumbImporting ? 'Pulling…' : 'Pull thumbnails'}</button>
+            <span style={{ fontSize: 11, color: 'var(--bone-3)' }}>The key is never persisted — used in-memory for this request only.</span>
+          </div>
+        </div>
+      )}
+
+      {thumbResult && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: thumbResult.error ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${thumbResult.error ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {thumbResult.error ? (
+            <>Pull failed: {thumbResult.error}</>
+          ) : (
+            <>
+              Scanned <strong>{thumbResult.supabase_rows_scanned}</strong> Supabase rows ·
+              copied <strong>{thumbResult.imported}</strong> thumbnail{thumbResult.imported === 1 ? '' : 's'} ·
+              skipped <strong>{thumbResult.skipped_already_set_or_no_d1_match}</strong>.
+            </>
+          )}
+        </div>
+      )}
 
       {importResult && (
         <div className="reveal d4" style={{
@@ -182,6 +275,32 @@ function fmtDur(s: number): string {
   const sec = Math.floor(s % 60)
   return `${m}:${String(sec).padStart(2, '0')}`
 }
+function adminPillStyle(busy: boolean): React.CSSProperties {
+  return {
+    marginLeft: 'auto',
+    padding: '6px 12px',
+    border: '1px solid var(--line-bright)',
+    borderRadius: 100,
+    fontFamily: 'JetBrains Mono, monospace',
+    fontSize: 9,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: 'var(--bone-1)',
+    background: 'rgba(236,228,210,0.04)',
+    cursor: busy ? 'wait' : 'pointer',
+  }
+}
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--ink-1)',
+  border: '1px solid var(--line-warm)',
+  borderRadius: 8,
+  padding: '10px 12px',
+  fontSize: 13,
+  color: 'var(--bone)',
+  fontFamily: 'JetBrains Mono, monospace',
+}
+
 function deriveTitle(filename: string | null): string {
   if (!filename) return 'Untitled'
   return filename
