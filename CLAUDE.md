@@ -59,7 +59,7 @@ These are settled. Read this section before proposing alternatives.
 
 Transcode HEVC → H.264 **before** thumbnail extraction. DJI Mimo HEVC vertical videos have rotation metadata that causes frame extraction to return 0 frames; the transcode strips it. Do not swap these steps.
 
-Thumbnails stored as `data:image/jpeg;base64,...` directly in the database — bypasses signed URL expiry.
+Thumbnails are written as static JPEGs to R2 at `{operator_id}/thumbs/{vlog_id}.jpg`, with the key stored in `vlogs.thumbnail_r2_key`. The API presigns 24-hour GET URLs and the client renders them as `<img loading="lazy">`. Browser handles caching via HTTP cache. (Reversed the prior data-URI lock — see commit `[hash]` for rationale: 17 MB API responses + per-tile decoder pressure on /uploads made data URIs worse than the signed-URL-expiry they were avoiding. The legacy `thumbnail_url` data-URI column is still read by the API for backward compat with old rows; no migration of those rows.)
 
 The new architecture moves this from Replicate to Cloudflare Container Workers running FFmpeg, but the algorithm and ordering are identical. Locked references survive the rewrite.
 

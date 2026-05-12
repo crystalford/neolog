@@ -92,7 +92,22 @@ export default function CapturePage() {
         const start = i * PART_SIZE
         const end = Math.min(start + PART_SIZE, file.size)
         const blob = file.slice(start, end)
-        const resp = await fetch(partUrls[i], { method: 'PUT', body: blob })
+        // 5-min timeout per part — stalled connections fail fast instead of
+        // hanging forever, which the browser eventually surfaces as a
+        // generic "Failed to fetch".
+        const ctrl = new AbortController()
+        const timeoutId = setTimeout(() => ctrl.abort(), 5 * 60 * 1000)
+        let resp: Response
+        try {
+          resp = await fetch(partUrls[i], { method: 'PUT', body: blob, signal: ctrl.signal })
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            throw new Error(`part ${partNumber} timed out after 5 min`)
+          }
+          throw new Error(`part ${partNumber} network error: ${err?.message || String(err)}`)
+        } finally {
+          clearTimeout(timeoutId)
+        }
         if (!resp.ok) throw new Error(`part ${partNumber} failed (${resp.status})`)
         const etag = resp.headers.get('ETag')?.replace(/"/g, '') || ''
         etags.push({ partNumber, etag })

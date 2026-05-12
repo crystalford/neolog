@@ -75,7 +75,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     const vlog = await step.do('fetch-context', async () => {
       const row = await this.env.DB.prepare(
         `SELECT id, operator_id, r2_key, original_filename, mime_type, recorded_at,
-                transcoded_r2_key, thumbnail_url, transcript_text, pipeline_status
+                transcoded_r2_key, thumbnail_url, thumbnail_r2_key, transcript_text, pipeline_status
            FROM vlogs WHERE id = ? AND operator_id = ?`,
       ).bind(vlog_id, operator_id).first<{
         id: string
@@ -86,6 +86,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         recorded_at: string | null
         transcoded_r2_key: string | null
         thumbnail_url: string | null
+        thumbnail_r2_key: string | null
         transcript_text: string | null
         pipeline_status: string
       }>()
@@ -130,13 +131,16 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
                 throw new Error(`ffmpeg thumbnail failed (${ffResp.status}): ${(await ffResp.text()).slice(0, 300)}`)
               }
               const jpegBytes = new Uint8Array(await ffResp.arrayBuffer())
-              const dataUri = `data:image/jpeg;base64,${bufferToBase64(jpegBytes)}`
-              // Sticky: only write if no thumbnail exists. Prevents zombie
-              // batch workflows from later overwriting an operator-generated thumb.
+              const thumbKey = `${operator_id}/thumbs/${vlog_id}.jpg`
+              await this.env.VIDEOS.put(thumbKey, jpegBytes, {
+                httpMetadata: { contentType: 'image/jpeg' },
+              })
+              // Sticky: only write if no R2 thumbnail key yet AND no legacy
+              // data-URI thumbnail. Prevents zombies from clobbering.
               await this.env.DB.prepare(
-                `UPDATE vlogs SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
-                  WHERE id = ? AND thumbnail_url IS NULL`,
-              ).bind(dataUri, vlog_id).run()
+                `UPDATE vlogs SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+                  WHERE id = ? AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
+              ).bind(thumbKey, vlog_id).run()
             },
           )
           await step.do('mark-archived-after-fast-thumb', async () => reportStatus('archived'))
@@ -182,8 +186,14 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       )
     }
 
-    // ── Step 3: extract thumbnail (LOCKED format: data: URI in DB) ──────────
-    if (!vlog.thumbnail_url && (isVideo || vlog.mime_type === 'video/mp4')) {
+    // ── Step 3: extract thumbnail (LOCKED ordering: transcode-then-extract
+    //    for DJI HEVC verticals). Output now lands in R2 as a static JPEG
+    //    instead of a base64 data URI in D1 — much smaller D1 payload, the
+    //    browser can lazy-load + cache the image. Operator-set CLAUDE.md
+    //    lock was relaxed: the cost of data URIs (17 MB API responses,
+    //    decoder pressure on /uploads) outweighed the signed-URL-expiry
+    //    cost it was mitigating. ──────────────────────────────────────────
+    if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && (isVideo || vlog.mime_type === 'video/mp4')) {
       await step.do(
         'extract-thumbnail',
         { retries: { limit: 2, delay: '15 seconds' }, timeout: '5 minutes' },
@@ -201,15 +211,17 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             throw new Error(`ffmpeg thumbnail failed (${ffmpegResp.status}): ${err.slice(0, 500)}`)
           }
           const jpegBytes = new Uint8Array(await ffmpegResp.arrayBuffer())
-          const b64 = bufferToBase64(jpegBytes)
-          const dataUri = `data:image/jpeg;base64,${b64}`
-          // Sticky write — only set if thumbnail_url is still null. Protects
-          // operator-generated fast-path thumbnails from being overwritten by
-          // a zombie workflow that finishes later with a transcoded-source frame.
+          const thumbKey = `${operator_id}/thumbs/${vlog_id}.jpg`
+          await this.env.VIDEOS.put(thumbKey, jpegBytes, {
+            httpMetadata: { contentType: 'image/jpeg' },
+          })
+          // Sticky write — only set if no thumbnail exists at all. Protects
+          // operator-generated thumbnails from being overwritten by zombie
+          // workflows finishing later.
           await this.env.DB.prepare(
-            `UPDATE vlogs SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
-              WHERE id = ? AND thumbnail_url IS NULL`,
-          ).bind(dataUri, vlog_id).run()
+            `UPDATE vlogs SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
+          ).bind(thumbKey, vlog_id).run()
         },
       )
     }

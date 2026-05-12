@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS vlogs (
   recorded_at_source       TEXT CHECK (recorded_at_source IN ('pre_extracted','mvhd','filename','upload_time_default','manual')),
   uploaded_at              TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   thumbnail_url            TEXT,
+  thumbnail_r2_key         TEXT,
   transcoded_r2_key        TEXT,
   transcript_text          TEXT,
   transcript_provider      TEXT CHECK (transcript_provider IN ('workers_ai_whisper','manual')),
