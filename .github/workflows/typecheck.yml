@@ -1,0 +1,49 @@
+name: Type check
+
+# Runs Next.js + TypeScript build validation on every push to any branch and
+# every PR. Mirrors what Cloudflare Pages does during deploy, so we catch
+# type errors before they reach the Pages build queue.
+#
+# Just runs `pnpm install` + `next build --no-lint` (which type-checks but
+# skips ESLint). If this is green, the Pages deploy will be too.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['main']
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: tsc + next build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type check (no emit)
+        run: pnpm exec tsc --noEmit
+
+      - name: Next.js build (catches Next-specific type errors)
+        run: pnpm exec next build --no-lint
+        env:
+          # Stub values so build doesn't bail looking for real ones — type-check
+          # only, not a real deploy.
+          NEXT_PUBLIC_DEPLOY_ENV: ci

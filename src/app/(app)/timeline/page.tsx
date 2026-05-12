@@ -98,9 +98,10 @@ export default function TimelinePage() {
   const days: DayGroup[] = useMemo(() => {
     const buckets = new Map<string, TimelineCardData[]>()
     for (const c of filtered) {
-      const t = ('recorded_at' in c && c.recorded_at) ||
-                ('posted_at' in c && c.posted_at) ||
-                c.created_at
+      const t: string = ('recorded_at' in c && c.recorded_at) ||
+                        ('posted_at' in c && c.posted_at) ||
+                        ('created_at' in c && c.created_at) ||
+                        new Date().toISOString()
       const key = dayBucketKey(t)
       const arr = buckets.get(key) || []
       arr.push(c)
