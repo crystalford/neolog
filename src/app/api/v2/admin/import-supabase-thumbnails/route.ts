@@ -113,8 +113,10 @@ async function handle(req: NextRequest) {
   let skippedAlreadySet = 0
   let supabaseRowsScanned = 0
 
-  // Paginate via PostgREST Range header
-  const PAGE = 200
+  // Small page size — thumbnails are base64 JPEGs (50-200 KB each); larger
+  // pages risk blowing Worker memory or response budget. 25 keeps each
+  // page <5 MB even for high-quality thumbs.
+  const PAGE = 25
   let from = 0
   while (true) {
     const url = `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}?select=${encodeURIComponent(keyCol)},${encodeURIComponent(thumbCol)}&${encodeURIComponent(thumbCol)}=not.is.null`
@@ -162,22 +164,28 @@ async function handle(req: NextRequest) {
     if (!Array.isArray(rows) || rows.length === 0) break
     supabaseRowsScanned += rows.length
 
+    // Batch the UPDATEs. D1's batch API runs them in a single transaction,
+    // saves subrequest budget, and gives us per-statement results.
+    const statements: any[] = []
     for (const row of rows) {
       const r2Key = row[keyCol] as string | null
       const thumb = row[thumbCol] as string | null
       if (!r2Key || !thumb) { skippedNoMatch++; continue }
-
-      // UPDATE only if the D1 vlog row exists for this operator AND its
-      // thumbnail_url is null. The WHERE clause makes this idempotent.
-      const result: any = await env.DB.prepare(
-        `UPDATE vlogs
-            SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE r2_key = ? AND operator_id = ? AND thumbnail_url IS NULL AND deleted_at IS NULL`,
-      ).bind(thumb, r2Key, operator.id).run()
-
-      const changes = result?.meta?.changes ?? result?.changes ?? 0
-      if (changes > 0) imported++
-      else skippedAlreadySet++
+      statements.push(
+        env.DB.prepare(
+          `UPDATE vlogs
+              SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE r2_key = ? AND operator_id = ? AND thumbnail_url IS NULL AND deleted_at IS NULL`,
+        ).bind(thumb, r2Key, operator.id),
+      )
+    }
+    if (statements.length > 0) {
+      const results: any[] = await env.DB.batch(statements)
+      for (const r of results) {
+        const changes = r?.meta?.changes ?? r?.changes ?? 0
+        if (changes > 0) imported++
+        else skippedAlreadySet++
+      }
     }
 
     if (rows.length < PAGE) break
