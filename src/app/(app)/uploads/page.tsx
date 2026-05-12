@@ -46,7 +46,7 @@ export default function UploadsPage() {
   const [thumbImporting, setThumbImporting] = useState(false)
   const [thumbResult, setThumbResult] = useState<{ imported: number; supabase_rows_scanned: number; skipped_already_set_or_no_d1_match: number; error?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
-  const [regenResult, setRegenResult] = useState<{ dispatched?: number; failed?: number; message?: string; error?: string } | null>(null)
+  const [regenResult, setRegenResult] = useState<{ reset?: number; message?: string; error?: string } | null>(null)
 
   const regenerateThumbnails = async () => {
     setRegenerating(true)
@@ -64,6 +64,7 @@ export default function UploadsPage() {
         setRegenResult({ error: data.error || `HTTP ${r.status}` })
       } else {
         setRegenResult(data)
+        load()  // Refresh tiles so reset rows flip badge immediately
       }
     } catch (e: any) {
       setRegenResult({ error: String(e.message || e) })
@@ -173,14 +174,9 @@ export default function UploadsPage() {
           onClick={regenerateThumbnails}
           disabled={regenerating}
           style={adminPillStyle(regenerating)}
+          title="Resets rows stuck on 'transcoding' back to 'archived'. The in-flight workflows continue on Cloudflare's side."
         >
-          {regenerating ? 'Dispatching…' : 'Regenerate thumbnails (FFmpeg)'}
-        </button>
-        <button
-          onClick={() => setShowSupabaseForm(s => !s)}
-          style={{ ...adminPillStyle(false), fontSize: 8, color: 'var(--bone-3)' }}
-        >
-          {showSupabaseForm ? 'Hide' : 'Or pull from Supabase'}
+          {regenerating ? 'Resetting…' : 'Reset stuck transcoding rows'}
         </button>
       </div>
 
