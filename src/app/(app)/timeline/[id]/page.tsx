@@ -54,7 +54,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     try {
       const r = await fetch(`/api/v2/vlogs/${params.id}`, { credentials: 'include' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const data = await r.json()
+      const data: any = await r.json()
       setVlog(data.vlog)
       setThreads(data.threads || [])
     } catch (e: any) {

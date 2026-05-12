@@ -49,7 +49,7 @@ export default function UploadsPage() {
     setLoading(true)
     fetch('/api/v2/vlogs?limit=500', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { vlogs: [] })
-      .then(d => { setVlogs(d.vlogs || []); setLoading(false) })
+      .then((d: any) => { setVlogs(d.vlogs || []); setLoading(false) })
       .catch(() => setLoading(false))
   }
   useEffect(load, [])
@@ -64,7 +64,7 @@ export default function UploadsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim() }),
       })
-      const data = await r.json()
+      const data: any = await r.json()
       if (!r.ok) {
         setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: data.error || `HTTP ${r.status}` })
       } else {
@@ -84,7 +84,7 @@ export default function UploadsPage() {
     try {
       const r = await fetch('/api/v2/admin/import-r2', { method: 'POST', credentials: 'include' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const data = await r.json()
+      const data: any = await r.json()
       setImportResult(data)
       load()
     } catch (e: any) {

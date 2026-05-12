@@ -49,7 +49,7 @@ export default function StudioPage() {
   useEffect(() => {
     fetch('/api/v2/clusters', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { clusters: [] })
-      .then(d => { setClusters(d.clusters || []); setLoading(false) })
+      .then((d: any) => { setClusters(d.clusters || []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 

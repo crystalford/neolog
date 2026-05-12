@@ -27,8 +27,8 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     fetch(`/api/v2/clusters/${params.id}`, { credentials: 'include' })
-      .then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => setC(d.cluster))
+      .then(async (r: any) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((d: any) => setC(d.cluster))
       .catch(e => setError(String(e.message || e)))
   }, [params.id])
 

@@ -31,7 +31,7 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
   useEffect(() => {
     fetch(`/api/v2/clusters/${params.id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : { cluster: null })
-      .then(d => setCluster(d.cluster))
+      .then((d: any) => setCluster(d.cluster))
       .catch(() => {})
   }, [params.id])
 
