@@ -42,7 +42,7 @@ export default function CapturePage() {
   useEffect(() => {
     fetch('/api/v2/threads/recent', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { threads: [] })
-      .then((d: { threads?: ThreadPreview[] }) => setRecent(d.threads || []))
+      .then((d: any) => setRecent(d.threads || []))
       .catch(() => {})
   }, [])
 
