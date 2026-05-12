@@ -16,13 +16,15 @@
  * write to the threads table. This is enforced per CLAUDE.md.
  */
 
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, Ai } from '@cloudflare/workers-types'
 import { run, batch, findOne } from './d1'
 import { ulid } from './ulid'
-import { callClaude, loadPrompt, parseClaudeJson } from './anthropic'
+import { loadPrompt } from './anthropic'
+import { callLlm, parseLlmJson, type Tier, type Pass } from './llm'
 
 export interface ExtractEnv {
   DB: D1Database
+  AI: Ai
   ANTHROPIC_API_KEY: string
 }
 
@@ -30,6 +32,7 @@ interface VlogContext {
   vlog_id: string
   operator_id: string
   transcript_text: string
+  tier: Tier  // free | premium | max — picked per-vlog by the operator
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -75,9 +78,13 @@ async function recordExtractionRun(
 }
 
 function estimateCost(inputTokens: number, outputTokens: number, model: string): number {
-  // claude-sonnet-4-6 pricing (subject to change):
-  //   $3 / Mtok input, $15 / Mtok output
-  // claude-haiku-4-5: $1 / Mtok in, $5 / Mtok out
+  // Anthropic pricing (subject to change):
+  //   claude-sonnet-4-6: $3 / Mtok in, $15 / Mtok out
+  //   claude-haiku-4-5:  $1 / Mtok in, $5  / Mtok out
+  // Workers AI Llama 3.3 70B: $0.06 / Mtok in, $0.25 / Mtok out
+  if (/llama/i.test(model)) {
+    return (inputTokens / 1_000_000) * 0.06 + (outputTokens / 1_000_000) * 0.25
+  }
   const isHaiku = /haiku/i.test(model)
   const inPerMtok = isHaiku ? 1.0 : 3.0
   const outPerMtok = isHaiku ? 5.0 : 15.0
@@ -89,12 +96,11 @@ function estimateCost(inputTokens: number, outputTokens: number, model: string):
 export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise<{ inserted: number; rejected: number }> {
   const prompt = await loadPrompt(env.DB, 'thread_extraction')
 
-  let claudeResp
+  let llmResp
   try {
-    claudeResp = await callClaude(env, {
-      model: prompt.model,
+    llmResp = await callLlm(env, ctx.tier, 'threads', {
       system: prompt.body,
-      messages: [{ role: 'user', content: `Transcript:\n\n${ctx.transcript_text}` }],
+      user: `Transcript:\n\n${ctx.transcript_text}`,
       maxTokens: 8192,
       expectJson: true,
     })
@@ -105,9 +111,9 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
 
   let parsed: { threads?: any[] }
   try {
-    parsed = parseClaudeJson(claudeResp.text)
+    parsed = parseLlmJson(llmResp.text)
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, prompt.model, 0, err.message, estimateCost(claudeResp.inputTokens, claudeResp.outputTokens, claudeResp.model))
+    await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, llmResp.model, 0, err.message, estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model))
     throw err
   }
 
@@ -161,8 +167,8 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
     await batch(env.DB, inserts)
   }
 
-  const cost = estimateCost(claudeResp.inputTokens, claudeResp.outputTokens, claudeResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, prompt.model, inserts.length, null, cost)
+  const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
+  await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, llmResp.model, inserts.length, null, cost)
 
   return { inserted: inserts.length, rejected }
 }
@@ -172,12 +178,11 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
 export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): Promise<{ inserted: number }> {
   const prompt = await loadPrompt(env.DB, 'clip_candidate_extraction')
 
-  let claudeResp
+  let llmResp
   try {
-    claudeResp = await callClaude(env, {
-      model: prompt.model,
+    llmResp = await callLlm(env, ctx.tier, 'clip_candidates', {
       system: prompt.body,
-      messages: [{ role: 'user', content: `Transcript:\n\n${ctx.transcript_text}` }],
+      user: `Transcript:\n\n${ctx.transcript_text}`,
       maxTokens: 4096,
       expectJson: true,
     })
@@ -186,7 +191,7 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
     throw err
   }
 
-  const parsed = parseClaudeJson<{ clip_candidates?: any[] }>(claudeResp.text)
+  const parsed = parseLlmJson<{ clip_candidates?: any[] }>(llmResp.text)
   const candidates = Array.isArray(parsed.clip_candidates) ? parsed.clip_candidates : []
 
   const inserts = candidates
@@ -209,8 +214,8 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
     }))
 
   if (inserts.length > 0) await batch(env.DB, inserts)
-  const cost = estimateCost(claudeResp.inputTokens, claudeResp.outputTokens, claudeResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'clip_candidate', prompt.version, prompt.model, inserts.length, null, cost)
+  const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
+  await recordExtractionRun(env.DB, ctx.vlog_id, 'clip_candidate', prompt.version, llmResp.model, inserts.length, null, cost)
   return { inserted: inserts.length }
 }
 
@@ -219,12 +224,11 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
 export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext): Promise<{ inserted: number }> {
   const prompt = await loadPrompt(env.DB, 'creative_extraction')
 
-  let claudeResp
+  let llmResp
   try {
-    claudeResp = await callClaude(env, {
-      model: prompt.model,
+    llmResp = await callLlm(env, ctx.tier, 'creative_elements', {
       system: prompt.body,
-      messages: [{ role: 'user', content: `Transcript:\n\n${ctx.transcript_text}` }],
+      user: `Transcript:\n\n${ctx.transcript_text}`,
       maxTokens: 4096,
       expectJson: true,
     })
@@ -233,7 +237,7 @@ export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext)
     throw err
   }
 
-  const parsed = parseClaudeJson<{ creative_elements?: any[] }>(claudeResp.text)
+  const parsed = parseLlmJson<{ creative_elements?: any[] }>(llmResp.text)
   const elements = Array.isArray(parsed.creative_elements) ? parsed.creative_elements : []
 
   const VALID_TYPES = new Set(['character_beat','scene_fragment','dialogue','theme','setting','tonal_reference','plot_fragment'])
@@ -255,8 +259,8 @@ export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext)
     }))
 
   if (inserts.length > 0) await batch(env.DB, inserts)
-  const cost = estimateCost(claudeResp.inputTokens, claudeResp.outputTokens, claudeResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'creative_mode', prompt.version, prompt.model, inserts.length, null, cost)
+  const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
+  await recordExtractionRun(env.DB, ctx.vlog_id, 'creative_mode', prompt.version, llmResp.model, inserts.length, null, cost)
   return { inserted: inserts.length }
 }
 
@@ -265,12 +269,11 @@ export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext)
 export async function extractEntities(env: ExtractEnv, ctx: VlogContext): Promise<{ entitiesUpserted: number; mentionsInserted: number }> {
   const prompt = await loadPrompt(env.DB, 'entity_extraction')
 
-  let claudeResp
+  let llmResp
   try {
-    claudeResp = await callClaude(env, {
-      model: prompt.model,
+    llmResp = await callLlm(env, ctx.tier, 'entities', {
       system: prompt.body,
-      messages: [{ role: 'user', content: `Transcript:\n\n${ctx.transcript_text}` }],
+      user: `Transcript:\n\n${ctx.transcript_text}`,
       maxTokens: 4096,
       expectJson: true,
     })
@@ -279,7 +282,7 @@ export async function extractEntities(env: ExtractEnv, ctx: VlogContext): Promis
     throw err
   }
 
-  const parsed = parseClaudeJson<{ entities?: any[] }>(claudeResp.text)
+  const parsed = parseLlmJson<{ entities?: any[] }>(llmResp.text)
   const entitiesIn = Array.isArray(parsed.entities) ? parsed.entities : []
 
   const VALID_ENTITY_TYPES = new Set(['person','place','project','tool','concept','theme','reference'])
@@ -339,7 +342,7 @@ export async function extractEntities(env: ExtractEnv, ctx: VlogContext): Promis
     )
   }
 
-  const cost = estimateCost(claudeResp.inputTokens, claudeResp.outputTokens, claudeResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'entity', prompt.version, prompt.model, entitiesIn.length, null, cost)
+  const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
+  await recordExtractionRun(env.DB, ctx.vlog_id, 'entity', prompt.version, llmResp.model, entitiesIn.length, null, cost)
   return { entitiesUpserted, mentionsInserted }
 }

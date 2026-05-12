@@ -42,6 +42,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     throw e
   }
 
+  // tier picks the LLM provider for the extraction passes (free=Llama, premium=Sonnet for
+  // threads/creative, max=Sonnet for all). passes is an optional subset for per-pass re-runs.
+  const body = await req.json().catch(() => null) as {
+    tier?: 'free' | 'premium' | 'max';
+    passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
+  } | null
+  const tier = body?.tier ?? 'free'
+  const passes = body?.passes
+
   const db = getDb(env)
   const vlog = await findOne<{ id: string; pipeline_status: string }>(
     db,
@@ -68,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_id: params.id, operator_id: operator.id }),
+        body: JSON.stringify({ vlog_id: params.id, operator_id: operator.id, tier, passes }),
       })
       if (!res.ok) {
         const err = await res.text()
