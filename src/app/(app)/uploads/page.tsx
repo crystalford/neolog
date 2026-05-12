@@ -145,20 +145,28 @@ export default function UploadsPage() {
             Paste your <strong style={{ color: 'var(--bone)' }}>paused Supabase</strong> credentials. We'll read
             the old <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--bone)' }}>video_uploads.thumbnail_url</code> column and copy each thumbnail into the matching D1 vlog by R2 key. Read-only on Supabase — nothing is written there.
           </div>
-          <input
-            type="text"
-            placeholder="https://your-project.supabase.co"
-            value={supabaseUrl}
-            onChange={e => setSupabaseUrl(e.target.value)}
-            style={inputStyle}
-          />
-          <input
-            type="password"
-            placeholder="service_role key (Supabase → Settings → API)"
-            value={supabaseKey}
-            onChange={e => setSupabaseKey(e.target.value)}
-            style={inputStyle}
-          />
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--bone-3)' }}>Project URL</span>
+            <input
+              type="text"
+              placeholder="https://abcdefghij.supabase.co"
+              value={supabaseUrl}
+              onChange={e => setSupabaseUrl(e.target.value)}
+              style={inputStyle}
+            />
+            <span style={{ fontSize: 11, color: 'var(--bone-4)' }}>Dashboard → Project → Settings → API → "Project URL"</span>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--bone-3)' }}>service_role key</span>
+            <input
+              type="password"
+              placeholder="eyJhbGciOiJIUzI1NiIs… (long JWT, not your login password)"
+              value={supabaseKey}
+              onChange={e => setSupabaseKey(e.target.value)}
+              style={inputStyle}
+            />
+            <span style={{ fontSize: 11, color: 'var(--bone-4)' }}>Same page → Project API keys → row labeled <strong style={{ color: 'var(--bone-2)' }}>service_role</strong> → Reveal</span>
+          </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={importSupabaseThumbnails}
