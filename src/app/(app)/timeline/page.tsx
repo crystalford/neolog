@@ -141,7 +141,26 @@ export default function TimelinePage() {
         </div>
       )}
 
-      {error && (
+      {error && error.includes('401') && (
+        <div className="empty-row reveal d5">
+          <h3>Sign in to see your timeline</h3>
+          <p>Cloudflare Access protects this domain. Hit the button below to get a one-time PIN to your operator email.</p>
+          <div style={{ marginTop: 16 }}>
+            <a href="/signin" style={{
+              padding: '10px 20px',
+              borderRadius: 100,
+              border: '1px solid var(--bone-3)',
+              background: 'rgba(236,228,210,0.06)',
+              color: 'var(--bone)',
+              fontSize: 14,
+              fontWeight: 500,
+              display: 'inline-block',
+            }}>Sign in →</a>
+          </div>
+        </div>
+      )}
+
+      {error && !error.includes('401') && (
         <div className="error-row reveal d5">Error: {error}</div>
       )}
 
