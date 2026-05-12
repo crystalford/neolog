@@ -32,6 +32,22 @@ import type { D1Database } from '@cloudflare/workers-types'
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req)
+  } catch (err: any) {
+    // Catch-all so we never bubble out to Cloudflare's HTML 502 page —
+    // any unhandled exception returns a JSON error the client can render.
+    return NextResponse.json(
+      {
+        error: `Import crashed: ${err?.message || String(err)}`,
+        stack: err?.stack ? String(err.stack).slice(0, 800) : null,
+      },
+      { status: 500 },
+    )
+  }
+}
+
+async function handle(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -51,6 +67,44 @@ export async function POST(req: NextRequest) {
   const tableName = body.table_name || 'video_uploads'
   const keyCol = body.key_column || 'r2_key'
   const thumbCol = body.thumbnail_column || 'thumbnail_url'
+
+  // Validate URL shape. Must be a Supabase project URL, not the dashboard
+  // URL (https://supabase.com/dashboard/project/...) which would 404 with HTML.
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(body.supabase_url)
+  } catch {
+    return NextResponse.json(
+      { error: `Invalid URL: "${body.supabase_url}". Expected https://xxxxxxxxxxxx.supabase.co` },
+      { status: 400 },
+    )
+  }
+  if (!/\.supabase\.(co|in)$/.test(parsedUrl.hostname)) {
+    return NextResponse.json(
+      {
+        error: `URL doesn't look like a Supabase project URL (host: ${parsedUrl.hostname}). ` +
+               `Expected something like https://xxxxxxxxxxxx.supabase.co — find it at Supabase Dashboard → Project → Settings → API → "Project URL".`,
+      },
+      { status: 400 },
+    )
+  }
+  if (parsedUrl.pathname && parsedUrl.pathname !== '/' && parsedUrl.pathname !== '') {
+    return NextResponse.json(
+      { error: `URL has a path (${parsedUrl.pathname}). Use just the bare project URL: ${parsedUrl.protocol}//${parsedUrl.hostname}` },
+      { status: 400 },
+    )
+  }
+  // Validate the key looks like a JWT (three base64url segments separated by dots).
+  const keyParts = body.service_role_key.split('.')
+  if (keyParts.length !== 3 || keyParts[0].length < 10) {
+    return NextResponse.json(
+      {
+        error: `Key doesn't look like a Supabase service_role JWT (expected 3 dot-separated segments). ` +
+               `Find it at Supabase Dashboard → Project → Settings → API → Project API keys → service_role → Reveal.`,
+      },
+      { status: 400 },
+    )
+  }
 
   const baseUrl = body.supabase_url.replace(/\/+$/, '')
 
