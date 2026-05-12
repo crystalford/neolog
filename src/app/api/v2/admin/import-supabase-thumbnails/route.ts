@@ -107,96 +107,103 @@ async function handle(req: NextRequest) {
   }
 
   const baseUrl = body.supabase_url.replace(/\/+$/, '')
+  const offset = Math.max(0, Number((body as any).offset ?? 0) | 0)
+  const PAGE = 10  // very small — each row can be 100+ KB of base64 JPEG
 
-  let imported = 0
-  let skippedNoMatch = 0
-  let skippedAlreadySet = 0
-  let supabaseRowsScanned = 0
-
-  // Small page size — thumbnails are base64 JPEGs (50-200 KB each); larger
-  // pages risk blowing Worker memory or response budget. 25 keeps each
-  // page <5 MB even for high-quality thumbs.
-  const PAGE = 25
-  let from = 0
-  while (true) {
-    const url = `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}?select=${encodeURIComponent(keyCol)},${encodeURIComponent(thumbCol)}&${encodeURIComponent(thumbCol)}=not.is.null`
-    const res = await fetch(url, {
+  // ── Fetch one page from Supabase with explicit timeout ─────────────────
+  const url = `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}?select=${encodeURIComponent(keyCol)},${encodeURIComponent(thumbCol)}&${encodeURIComponent(thumbCol)}=not.is.null&order=${encodeURIComponent(keyCol)}.asc`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15_000)
+  let res: Response
+  try {
+    res = await fetch(url, {
       headers: {
         apikey: body.service_role_key,
         Authorization: `Bearer ${body.service_role_key}`,
-        Range: `${from}-${from + PAGE - 1}`,
-        Prefer: 'count=exact',
+        Range: `${offset}-${offset + PAGE - 1}`,
       },
+      signal: controller.signal,
     })
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      return NextResponse.json(
-        { error: `Supabase responded ${res.status}: ${errText.slice(0, 400)}` },
-        { status: 502 },
-      )
-    }
-
-    // Supabase paused projects return HTML 200, not JSON. Detect and surface
-    // a friendly error instead of letting JSON.parse blow up.
-    const contentType = res.headers.get('content-type') || ''
-    if (!contentType.includes('json')) {
-      const sample = (await res.text().catch(() => '')).slice(0, 200)
-      const looksPaused = /paused|restored|inactive/i.test(sample) || sample.startsWith('<')
-      return NextResponse.json(
-        {
-          error: looksPaused
-            ? 'Supabase project appears to be paused. Restore it from the Supabase dashboard, then retry.'
-            : `Supabase returned non-JSON (content-type: ${contentType}). First 200 chars: ${sample}`,
-        },
-        { status: 502 },
-      )
-    }
-
-    let rows: Record<string, unknown>[]
-    try {
-      rows = await res.json() as Record<string, unknown>[]
-    } catch (err: any) {
-      return NextResponse.json(
-        { error: `Supabase returned malformed JSON: ${err.message}` },
-        { status: 502 },
-      )
-    }
-    if (!Array.isArray(rows) || rows.length === 0) break
-    supabaseRowsScanned += rows.length
-
-    // Batch the UPDATEs. D1's batch API runs them in a single transaction,
-    // saves subrequest budget, and gives us per-statement results.
-    const statements: any[] = []
-    for (const row of rows) {
-      const r2Key = row[keyCol] as string | null
-      const thumb = row[thumbCol] as string | null
-      if (!r2Key || !thumb) { skippedNoMatch++; continue }
-      statements.push(
-        env.DB.prepare(
-          `UPDATE vlogs
-              SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE r2_key = ? AND operator_id = ? AND thumbnail_url IS NULL AND deleted_at IS NULL`,
-        ).bind(thumb, r2Key, operator.id),
-      )
-    }
-    if (statements.length > 0) {
-      const results: any[] = await env.DB.batch(statements)
-      for (const r of results) {
-        const changes = r?.meta?.changes ?? r?.changes ?? 0
-        if (changes > 0) imported++
-        else skippedAlreadySet++
-      }
-    }
-
-    if (rows.length < PAGE) break
-    from += PAGE
+  } catch (err: any) {
+    clearTimeout(timeout)
+    return NextResponse.json(
+      { error: `Supabase fetch failed: ${err?.message || String(err)}` },
+      { status: 502 },
+    )
   }
+  clearTimeout(timeout)
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    return NextResponse.json(
+      { error: `Supabase responded ${res.status}: ${errText.slice(0, 400)}` },
+      { status: 502 },
+    )
+  }
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('json')) {
+    const sample = (await res.text().catch(() => '')).slice(0, 200)
+    return NextResponse.json(
+      { error: `Supabase returned non-JSON (content-type: ${contentType}). First 200 chars: ${sample}` },
+      { status: 502 },
+    )
+  }
+
+  // Read Content-Range header to know total count
+  const contentRange = res.headers.get('content-range') || ''
+  const totalMatch = /\/(\d+|\*)$/.exec(contentRange)
+  const total = totalMatch && totalMatch[1] !== '*' ? Number(totalMatch[1]) : null
+
+  let rows: Record<string, unknown>[]
+  try {
+    rows = await res.json() as Record<string, unknown>[]
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: `Supabase returned malformed JSON: ${err.message}` },
+      { status: 502 },
+    )
+  }
+  if (!Array.isArray(rows)) rows = []
+
+  // ── Batch D1 UPDATEs ───────────────────────────────────────────────────
+  let imported = 0
+  let skippedNoMatch = 0
+  let skippedAlreadySet = 0
+
+  const statements: any[] = []
+  for (const row of rows) {
+    const r2Key = row[keyCol] as string | null
+    const thumb = row[thumbCol] as string | null
+    if (!r2Key || !thumb) { skippedNoMatch++; continue }
+    statements.push(
+      env.DB.prepare(
+        `UPDATE vlogs
+            SET thumbnail_url = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE r2_key = ? AND operator_id = ? AND thumbnail_url IS NULL AND deleted_at IS NULL`,
+      ).bind(thumb, r2Key, operator.id),
+    )
+  }
+  if (statements.length > 0) {
+    const results: any[] = await env.DB.batch(statements)
+    for (const r of results) {
+      const changes = r?.meta?.changes ?? r?.changes ?? 0
+      if (changes > 0) imported++
+      else skippedAlreadySet++
+    }
+  }
+
+  const nextOffset = offset + rows.length
+  const done = rows.length < PAGE
 
   return NextResponse.json({
     ok: true,
-    supabase_rows_scanned: supabaseRowsScanned,
+    page_rows: rows.length,
     imported,
-    skipped_already_set_or_no_d1_match: skippedAlreadySet,
+    skipped_already_set: skippedAlreadySet,
     skipped_no_match: skippedNoMatch,
+    offset,
+    next_offset: nextOffset,
+    total,
+    done,
   })
 }
