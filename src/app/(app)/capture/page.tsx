@@ -289,17 +289,28 @@ export default function CapturePage() {
 }
 
 function inferDateFromFilename(name: string): string | null {
+  // Keep in sync with PATTERNS in src/lib/recorded-at.ts. The server-side
+  // fallback covers any patterns the client misses, but matching here too
+  // means the API can stamp recorded_at_source='pre_extracted' without an
+  // extra mvhd round-trip.
   const patterns: [RegExp, (m: RegExpMatchArray) => string][] = [
     [/(\d{4})-(\d{2})-(\d{2})[\s_T](\d{2})[-:](\d{2})[-:](\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
     [/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
+    [/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
+    // 14 consecutive digits — DJI Mimo (`DJI_20260401110554_0055_D.MP4`)
+    [/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`],
     [/(\d{4})-(\d{2})-(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T00:00:00Z`],
+    [/(\d{4})(\d{2})(\d{2})/, m => `${m[1]}-${m[2]}-${m[3]}T00:00:00Z`],
   ]
   for (const [re, fmt] of patterns) {
     const m = name.match(re)
     if (m) {
       const dStr = fmt(m)
       const d = new Date(dStr)
-      if (!isNaN(d.getTime())) return d.toISOString()
+      const yr = d.getUTCFullYear()
+      if (!isNaN(d.getTime()) && yr >= 1990 && yr <= new Date().getUTCFullYear() + 1) {
+        return d.toISOString()
+      }
     }
   }
   return null

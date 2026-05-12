@@ -25,6 +25,7 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
 import { deleteObject, presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { deriveRecordedAt } from '@/lib/recorded-at'
 import { ulid } from '@/lib/ulid'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -95,7 +96,17 @@ export async function POST(req: NextRequest) {
 
   const id = ulid()
   const pipelineStatus = body.archive ? 'archived' : 'uploaded'
-  const recordedAtSource = body.recorded_at ? 'pre_extracted' : null
+
+  // Backdate at the API edge — runs the locked 4-tier fallback synchronously
+  // before workflow dispatch, so a downstream workflow failure can never cost
+  // us the recorded_at. The workflow keeps its own extract-recorded-at step as
+  // a safety net for archived imports / cases where the API tiers all miss.
+  const derived = await deriveRecordedAt({
+    clientRecordedAt: body.recorded_at ?? null,
+    filename: body.original_filename,
+    r2Key: body.r2_key,
+    env,
+  })
 
   await run(
     db,
@@ -104,32 +115,45 @@ export async function POST(req: NextRequest) {
        recorded_at, recorded_at_source, thumbnail_url, pipeline_status
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, operator.id, body.r2_key, body.original_filename, body.file_size_bytes, body.mime_type,
-    body.recorded_at ?? null, recordedAtSource, body.thumbnail_url ?? null, pipelineStatus,
+    derived.recorded_at, derived.recorded_at_source, body.thumbnail_url ?? null, pipelineStatus,
   )
 
   // Trigger the post-upload Workflow when not in archive mode.
   // Archive uploads stay in 'archived' status until the operator hits
   // "Process now" on the vlog detail page (which calls /api/v2/vlogs/[id]/process).
-  if (!body.archive && env.PROCESS_UPLOAD) {
-    try {
-      const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_id: id, operator_id: operator.id }),
-      })
-      if (!res.ok) {
-        const err = await res.text()
-        throw new Error(`dispatch failed (${res.status}): ${err.slice(0, 500)}`)
-      }
-    } catch (err: any) {
-      // Surface the dispatch failure on the row but don't fail the create —
-      // the operator can retry via /api/v2/vlogs/[id]/process.
+  if (!body.archive) {
+    if (!env.PROCESS_UPLOAD) {
+      // The PROCESS_UPLOAD service binding is not attached to this Pages
+      // project. The bootstrap workflow wires it via Cloudflare API; if the
+      // operator sees this error the bootstrap step "Wire Pages project
+      // bindings" likely failed or was skipped. Re-run `pnpm run bootstrap`.
       await run(
         db,
         `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        `Workflow dispatch failed: ${err.message}`,
+        'PROCESS_UPLOAD service binding missing on Pages project — re-run bootstrap.',
         id,
       )
+    } else {
+      try {
+        const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vlog_id: id, operator_id: operator.id }),
+        })
+        if (!res.ok) {
+          const err = await res.text()
+          throw new Error(`dispatch failed (${res.status}): ${err.slice(0, 500)}`)
+        }
+      } catch (err: any) {
+        // Surface the dispatch failure on the row but don't fail the create —
+        // the operator can retry via /api/v2/vlogs/[id]/process.
+        await run(
+          db,
+          `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          `Workflow dispatch failed: ${err.message}`,
+          id,
+        )
+      }
     }
   }
 

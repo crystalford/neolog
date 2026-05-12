@@ -327,6 +327,100 @@ jobs:
             echo "$ANTHROPIC_API_KEY" | wrangler secret put ANTHROPIC_API_KEY
           fi
 
+      - name: Wire Pages project bindings (D1, R2, AI, services)
+        if: hashFiles('wrangler.toml') != ''
+        env:
+          D1_UUID: ${{ steps.d1.outputs.uuid }}
+        run: |
+          set -e
+          # The @cloudflare/next-on-pages adapter does NOT read [[services]] /
+          # [[d1_databases]] / [[r2_buckets]] from the root wrangler.toml. Pages
+          # projects under that adapter take their bindings from the project's
+          # deployment_configs, which we set here via the Cloudflare API.
+          #
+          # Without this step the Pages-deployed app silently runs with
+          # env.PROCESS_UPLOAD === undefined, env.FFMPEG === undefined, etc. The
+          # `/api/v2/vlogs` POST then skips workflow dispatch — no thumbnail, no
+          # backdating, no transcribe, no extract.
+          #
+          # Idempotent: re-running rewrites the same config.
+
+          PROJECT_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT"
+
+          # Build the deployment_configs.production body.
+          read -r -d '' CONFIG_BODY <<JSON || true
+          {
+            "deployment_configs": {
+              "production": {
+                "compatibility_date": "2026-05-01",
+                "compatibility_flags": ["nodejs_compat"],
+                "d1_databases": {
+                  "DB": {"id": "$D1_UUID"}
+                },
+                "r2_buckets": {
+                  "VIDEOS": {"name": "$R2_BUCKET"}
+                },
+                "ai_bindings": {
+                  "AI": {}
+                },
+                "services": {
+                  "FFMPEG": {"service": "$CONTAINER_WORKER", "environment": "production"},
+                  "PROCESS_UPLOAD": {"service": "neolog-process-upload", "environment": "production"}
+                }
+              }
+            }
+          }
+          JSON
+
+          # Check whether the Pages project already exists.
+          status=$(curl -s -o /tmp/pages_get.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "$PROJECT_URL")
+
+          if [ "$status" = "404" ]; then
+            # Project does not exist yet — create it WITH bindings inline so the
+            # very first deploy already has the wire-up. The production_branch
+            # is required by the create endpoint; deployments target it later.
+            echo "Pages project '$PAGES_PROJECT' does not exist — creating with bindings..."
+            create_body=$(jq -n \
+              --arg name "$PAGES_PROJECT" \
+              --argjson cfg "$CONFIG_BODY" \
+              '{name: $name, production_branch: "main"} + $cfg')
+            create_resp=$(curl -s -w "\n%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$create_body" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
+            create_status=$(echo "$create_resp" | tail -n1)
+            create_json=$(echo "$create_resp" | sed '$d')
+            if [ "$create_status" != "200" ] && [ "$create_status" != "201" ]; then
+              echo "❌ Pages project create failed (HTTP $create_status):"
+              echo "$create_json" | jq . || echo "$create_json"
+              exit 1
+            fi
+            echo "✅ Pages project created with bindings."
+          else
+            # Project exists — PATCH bindings into deployment_configs.production.
+            echo "Pages project '$PAGES_PROJECT' exists — patching bindings..."
+            patch_resp=$(curl -s -w "\n%{http_code}" \
+              -X PATCH \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$CONFIG_BODY" \
+              "$PROJECT_URL")
+            patch_status=$(echo "$patch_resp" | tail -n1)
+            patch_json=$(echo "$patch_resp" | sed '$d')
+            if [ "$patch_status" != "200" ]; then
+              echo "❌ Pages project PATCH failed (HTTP $patch_status):"
+              echo "$patch_json" | jq . || echo "$patch_json"
+              exit 1
+            fi
+            # Surface the bindings the API now reports so we can verify in logs.
+            echo "✅ Pages project bindings updated. Current config:"
+            echo "$patch_json" | jq '.result.deployment_configs.production | {d1_databases, r2_buckets, ai_bindings, services}' || true
+          fi
+
       - name: Set Pages project Worker secrets
         if: hashFiles('wrangler.toml') != ''
         env:
@@ -334,20 +428,20 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
           set -e
-          # Anthropic — runtime only, not used during bootstrap itself.
+          # The bindings step above guarantees the Pages project exists, so
+          # these secret pushes always have a target.
           if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT" || \
-              echo "(Pages project does not exist yet — secret push deferred to next run.)"
+            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT"
           fi
           if [ -n "$R2_ACCESS_KEY_ID" ]; then
-            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT" || true
-            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT" || true
+            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT"
+            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT"
           fi
-          # Also push CLOUDFLARE_ACCOUNT_ID — the R2 SigV4 presigner needs it
-          # to construct the host (${ACCOUNT_ID}.r2.cloudflarestorage.com).
-          # Without it, video presigning fails silently → no playback.
+          # CLOUDFLARE_ACCOUNT_ID — the R2 SigV4 presigner needs it to construct
+          # the host (${ACCOUNT_ID}.r2.cloudflarestorage.com). Without it, video
+          # presigning fails silently → no playback.
           if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT" || true
+            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT"
           fi
 
       - name: Build + deploy Pages project

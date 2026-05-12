@@ -65,9 +65,30 @@ The new architecture moves this from Replicate to Cloudflare Container Workers r
 
 ## ⚠️ DO NOT CHANGE — Recording date pipeline
 
-Three-tier fallback for `recorded_at`: pre-extracted date → MP4 mvhd atom → filename pattern → upload time. The mvhd extraction uses MP4 epoch offset 2082844800 with v0/v1 branch handling.
+Four-tier fallback for `recorded_at`: pre-extracted date (client filename inference) → MP4 mvhd atom → server-side filename regex → upload time. The mvhd extraction uses MP4 epoch offset 2082844800 with v0/v1 branch handling.
 
-This logic ports to the new Workflow but the algorithm is identical.
+The shared implementation lives in `src/lib/recorded-at.ts` and runs **synchronously inside the registration API** (`src/app/api/v2/vlogs/route.ts` POST) so the row is INSERTed with `recorded_at` + `recorded_at_source` already set — independent of any downstream workflow failure. The post-upload workflow keeps `extract-recorded-at` as a safety net for archived imports.
+
+Filename regex must cover at minimum these patterns (server-side, in order):
+- `YYYY-MM-DDTHH:MM:SS` / `YYYY-MM-DD_HH-MM-SS`
+- `YYYYMMDD_HHMMSS`
+- `YYYYMMDDTHHMMSS` (ISO compact)
+- `YYYYMMDDHHMMSS` (14 consecutive digits — DJI Mimo: `DJI_20260401110554_0055_D.MP4`)
+- `YYYY-MM-DD`
+- `YYYYMMDD`
+
+## ⚠️ DO NOT CHANGE — Workflow resilience
+
+Each post-upload step (transcode, thumbnail, recorded_at, transcribe, the four extraction passes) runs inside a `softStep()` wrapper in `workers/process-upload/src/workflow.ts`. The wrapper:
+- Catches retry-exhausted failures and records them in `vlogs.extraction_outcomes` JSON instead of aborting the workflow.
+- Lets every feature stand on its own — a flaky transcode no longer takes thumbnail + recorded_at + transcribe + extract down with it.
+- Keeps the existing `step.do` retry behaviour intact (each step still gets 2-3 retries before giving up).
+
+The `extraction_outcomes` column is the source of truth for "what worked, what failed" — read it from D1 instead of scrolling the Cloudflare dashboard.
+
+## ⚠️ DO NOT CHANGE — Pages project bindings
+
+The `@cloudflare/next-on-pages` adapter does **not** read `[[services]]` / `[[d1_databases]]` / `[[r2_buckets]]` from the root `wrangler.toml`. Pages projects under that adapter take their bindings from the project's `deployment_configs`, which the bootstrap workflow sets via the Cloudflare REST API (`.github/workflows/bootstrap-cloudflare.yml` → step "Wire Pages project bindings"). Without that step, `env.PROCESS_UPLOAD` and `env.FFMPEG` are undefined on the deployed app and the post-upload workflow never dispatches.
 
 ## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
 
