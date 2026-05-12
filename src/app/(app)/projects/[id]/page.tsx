@@ -22,8 +22,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     fetch(`/api/v2/projects/${params.id}`, { credentials: 'include' })
-      .then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => setP(d.project))
+      .then(async (r: any) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((d: any) => setP(d.project))
       .catch(e => setError(String(e.message || e)))
   }, [params.id])
 

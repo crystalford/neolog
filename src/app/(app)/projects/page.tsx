@@ -28,7 +28,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetch('/api/v2/projects', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { projects: [] })
-      .then(d => { setProjects(d.projects || []); setLoading(false) })
+      .then((d: any) => { setProjects(d.projects || []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 

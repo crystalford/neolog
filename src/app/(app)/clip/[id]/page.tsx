@@ -22,7 +22,7 @@ export default function ClipDetailPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     fetch(`/api/v2/clips/${params.id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : { clip: null })
-      .then(d => setC(d.clip))
+      .then((d: any) => setC(d.clip))
       .catch(() => {})
   }, [params.id])
 

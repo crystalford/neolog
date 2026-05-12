@@ -39,7 +39,7 @@ export default function LibraryPage() {
   useEffect(() => {
     fetch('/api/v2/library', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { productions: [] })
-      .then(d => { setProductions(d.productions || []); setLoading(false) })
+      .then((d: any) => { setProductions(d.productions || []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 

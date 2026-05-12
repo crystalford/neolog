@@ -42,7 +42,7 @@ export default function CapturePage() {
   useEffect(() => {
     fetch('/api/v2/threads/recent', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { threads: [] })
-      .then(d => setRecent(d.threads || []))
+      .then((d: { threads?: ThreadPreview[] }) => setRecent(d.threads || []))
       .catch(() => {})
   }, [])
 
@@ -126,7 +126,7 @@ export default function CapturePage() {
         }),
       })
       if (reg.status === 409) {
-        const dup = await reg.json()
+        const dup: any = await reg.json()
         setStatus(null)
         setError(`Already uploaded (existing id ${dup.existing_id})`)
         return

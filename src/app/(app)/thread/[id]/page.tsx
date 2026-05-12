@@ -29,11 +29,11 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     fetch(`/api/v2/threads/${params.id}`, { credentials: 'include' })
-      .then(async r => {
+      .then(async (r: any) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then(d => setT(d.thread))
+      .then((d: any) => setT(d.thread))
       .catch(e => setError(String(e.message || e)))
   }, [params.id])
 

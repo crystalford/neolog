@@ -72,7 +72,7 @@ export default function TimelinePage() {
     setLoading(true)
     setError(null)
     fetch('/api/v2/timeline', { credentials: 'include' })
-      .then(async r => {
+      .then(async (r: any) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
