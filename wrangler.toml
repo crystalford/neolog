@@ -43,16 +43,14 @@ binding = "AI"
 binding = "FFMPEG"
 service = "neolog-ffmpeg"
 
-# ─── Workflow binding for the post-upload pipeline ─────────────────────────
-# NOTE: Pages projects do NOT yet support [[workflows]] in wrangler.toml.
-# After the Pages project is deployed, add the binding via the dashboard:
-#   Cloudflare dashboard → Pages → neolog → Settings → Functions → Bindings
-#   → Workflow → Add binding
-#     Variable name: PROCESS_UPLOAD_WORKFLOW
-#     Workflow:      process-upload   (deployed from workers/process-upload)
-#
-# The API route /api/v2/vlogs/[id]/process uses env.PROCESS_UPLOAD_WORKFLOW
-# to dispatch the pipeline.
+# ─── Service binding to the process-upload Workflow Worker ─────────────────
+# Pages projects can't bind workflows directly, so we use a Service binding
+# to the workflow worker and its POST /dispatch endpoint creates the workflow
+# instance. The main app calls env.PROCESS_UPLOAD.fetch('/dispatch', ...)
+# to kick off transcribe + extraction pipelines.
+[[services]]
+binding = "PROCESS_UPLOAD"
+service = "neolog-process-upload"
 
 # ─── Environment variables (non-secret) ─────────────────────────────────────
 [vars]
