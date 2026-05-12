@@ -86,7 +86,10 @@ async function handle(req: NextRequest) {
 
   const body = await req.json().catch(() => ({})) as { cursor?: string; chunk_size?: number }
   const cursor = body.cursor || ''
-  const chunkSize = Math.max(1, Math.min(8, body.chunk_size ?? 4))
+  // Default chunk size 2: stays well under Cloudflare's ~30s edge timeout
+  // even when each row takes the full FFmpeg budget. Operator can lower to 1
+  // via the client if needed.
+  const chunkSize = Math.max(1, Math.min(8, body.chunk_size ?? 2))
 
   const db = getDb(env)
 
@@ -161,23 +164,28 @@ async function processRow(
     return dispatchWorkflow(env, operatorId, row.id)
   }
 
-  // Sync path: direct FFmpeg call on best available source
+  // Sync path: direct FFmpeg call on best available source, bounded to 20s
+  // so a slow row can't push the chunk past Cloudflare's edge timeout.
   if (!env.FFMPEG) {
     return { vlog_id: row.id, ok: false, method: 'failed', error: 'FFMPEG binding missing' }
   }
   const sourceKey = row.transcoded_r2_key || row.r2_key
+  const ffmpegCtl = new AbortController()
+  const ffmpegTimeout = setTimeout(() => ffmpegCtl.abort(), 20_000)
   try {
     const presigned = await presignGetUrl(env, sourceKey, 600)
     const resp = await env.FFMPEG.fetch('https://internal/extract-thumb', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ input_url: presigned, t: 1.0 }),
-    })
+      signal: ffmpegCtl.signal,
+    } as RequestInit)
     if (!resp.ok) {
-      // Falling back to async for any FFmpeg failure
+      clearTimeout(ffmpegTimeout)
       return dispatchWorkflow(env, operatorId, row.id, `ffmpeg ${resp.status}`)
     }
     const bytes = new Uint8Array(await resp.arrayBuffer())
+    clearTimeout(ffmpegTimeout)
     if (bytes.byteLength < MIN_JPEG_BYTES) {
       return dispatchWorkflow(env, operatorId, row.id, `tiny jpeg (${bytes.byteLength}B)`)
     }
@@ -195,7 +203,11 @@ async function processRow(
     )
     return { vlog_id: row.id, ok: true, method: 'direct', bytes: bytes.byteLength }
   } catch (err: any) {
-    return dispatchWorkflow(env, operatorId, row.id, `sync error: ${err?.message || String(err)}`)
+    clearTimeout(ffmpegTimeout)
+    const reason = err?.name === 'AbortError'
+      ? 'ffmpeg timeout (>20s)'
+      : `sync error: ${err?.message || String(err)}`
+    return dispatchWorkflow(env, operatorId, row.id, reason)
   }
 }
 

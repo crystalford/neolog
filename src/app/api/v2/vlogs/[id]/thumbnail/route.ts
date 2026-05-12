@@ -94,15 +94,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (canTrySync) {
     const sourceKey = vlog.transcoded_r2_key || vlog.r2_key
+    const ctl = new AbortController()
+    const timeoutId = setTimeout(() => ctl.abort(), 22_000)
     try {
       const presigned = await presignGetUrl(env, sourceKey, 600)
       const resp = await env.FFMPEG!.fetch('https://internal/extract-thumb', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input_url: presigned, t: 1.0 }),
-      })
+        signal: ctl.signal,
+      } as RequestInit)
       if (resp.ok) {
         const bytes = new Uint8Array(await resp.arrayBuffer())
+        clearTimeout(timeoutId)
         if (bytes.byteLength >= MIN_JPEG_BYTES) {
           const thumbKey = `${operator.id}/thumbs/${params.id}.jpg`
           await putObject(env, thumbKey, bytes, {
@@ -127,9 +131,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         }
         // <MIN_JPEG_BYTES → fall through to async
       }
+      clearTimeout(timeoutId)
       // !resp.ok → fall through to async
     } catch {
-      // Network / binding failure → fall through to async
+      clearTimeout(timeoutId)
+      // Network / binding / timeout → fall through to async
     }
   }
 
