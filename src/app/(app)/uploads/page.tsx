@@ -44,6 +44,32 @@ export default function UploadsPage() {
   const [supabaseKey, setSupabaseKey] = useState('')
   const [thumbImporting, setThumbImporting] = useState(false)
   const [thumbResult, setThumbResult] = useState<{ imported: number; supabase_rows_scanned: number; skipped_already_set_or_no_d1_match: number; error?: string } | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenResult, setRegenResult] = useState<{ dispatched?: number; failed?: number; message?: string; error?: string } | null>(null)
+
+  const regenerateThumbnails = async () => {
+    setRegenerating(true)
+    setRegenResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/regenerate-thumbnails', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const text = await r.text()
+      let data: any
+      try { data = JSON.parse(text) }
+      catch { data = { error: text.slice(0, 200) } }
+      if (!r.ok) {
+        setRegenResult({ error: data.error || `HTTP ${r.status}` })
+      } else {
+        setRegenResult(data)
+      }
+    } catch (e: any) {
+      setRegenResult({ error: String(e.message || e) })
+    } finally {
+      setRegenerating(false)
+    }
+  }
 
   const load = () => {
     setLoading(true)
@@ -143,12 +169,33 @@ export default function UploadsPage() {
           {importing ? 'Scanning R2…' : 'Import from R2'}
         </button>
         <button
-          onClick={() => setShowSupabaseForm(s => !s)}
-          style={adminPillStyle(false)}
+          onClick={regenerateThumbnails}
+          disabled={regenerating}
+          style={adminPillStyle(regenerating)}
         >
-          {showSupabaseForm ? 'Hide thumbnail import' : 'Pull thumbnails from Supabase'}
+          {regenerating ? 'Dispatching…' : 'Regenerate thumbnails (FFmpeg)'}
+        </button>
+        <button
+          onClick={() => setShowSupabaseForm(s => !s)}
+          style={{ ...adminPillStyle(false), fontSize: 8, color: 'var(--bone-3)' }}
+        >
+          {showSupabaseForm ? 'Hide' : 'Or pull from Supabase'}
         </button>
       </div>
+
+      {regenResult && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: regenResult.error ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${regenResult.error ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {regenResult.error ? <>Failed: {regenResult.error}</> : <>{regenResult.message}</>}
+        </div>
+      )}
 
       {showSupabaseForm && (
         <div className="reveal d4" style={{
