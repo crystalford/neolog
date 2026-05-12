@@ -42,14 +42,40 @@ export interface Operator {
 }
 
 /**
- * Read the authenticated email from the incoming request.
- * Returns null when no email is present (request is anonymous / mis-routed).
+ * Read the authenticated email from the incoming request. Tries, in order:
+ *
+ *   1. Cf-Access-Authenticated-User-Email header (set when the Access app
+ *      is configured to forward identity headers).
+ *   2. CF_Authorization cookie — parse the JWT payload and read `.email`.
+ *      Set by Access for any authenticated session, even when header
+ *      forwarding isn't on. This is the path Cloudflare Pages projects
+ *      actually take.
+ *   3. NEOLOG_DEV_OPERATOR_EMAIL env var (local dev only).
+ *
+ * Returns null when none of these yield an email.
  */
 export function readEmail(request: Request, env: { NEOLOG_DEV_OPERATOR_EMAIL?: string }): string | null {
   const fromHeader = request.headers.get(HEADER_EMAIL)
   if (fromHeader) return fromHeader.toLowerCase()
-  // Local-dev fallback. Production never hits this branch because the Access
-  // policy guarantees the header is present.
+
+  // Parse CF_Authorization JWT cookie. Cloudflare gates the request before
+  // it reaches us, so we don't re-verify the signature — we just decode the
+  // payload (base64url) and trust the email claim.
+  const cookie = request.headers.get('cookie') || ''
+  const match = /CF_Authorization=([^;]+)/.exec(cookie)
+  if (match) {
+    try {
+      const payload = match[1].split('.')[1]
+      const decoded = JSON.parse(
+        atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
+      ) as { email?: string }
+      if (decoded.email) return decoded.email.toLowerCase()
+    } catch {
+      // Malformed cookie — fall through to dev/env fallback.
+    }
+  }
+
+  // Local-dev fallback.
   if (env.NEOLOG_DEV_OPERATOR_EMAIL) return env.NEOLOG_DEV_OPERATOR_EMAIL.toLowerCase()
   return null
 }
