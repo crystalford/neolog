@@ -17,6 +17,7 @@ interface UploadRow {
   duration_seconds: number | null
   recorded_at: string | null
   thumbnail_url: string | null
+  playback_url: string | null
   pipeline_status: string
   uploaded_at: string
 }
