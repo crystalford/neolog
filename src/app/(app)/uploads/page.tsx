@@ -37,13 +37,33 @@ export default function UploadsPage() {
   const [vlogs, setVlogs] = useState<UploadRow[]>([])
   const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped_existing: number; total_objects_scanned: number } | null>(null)
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true)
     fetch('/api/v2/vlogs?limit=500', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { vlogs: [] })
       .then(d => { setVlogs(d.vlogs || []); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }
+  useEffect(load, [])
+
+  const importFromR2 = async () => {
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/import-r2', { method: 'POST', credentials: 'include' })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data = await r.json()
+      setImportResult(data)
+      load()
+    } catch (e: any) {
+      setImportResult({ inserted: -1, skipped_existing: 0, total_objects_scanned: 0 })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     if (filter === 'all') return vlogs
@@ -66,7 +86,51 @@ export default function UploadsPage() {
         <span><span className="n">{totalGb}</span> GB in R2</span>
         <span><span className="n">{vlogs.filter(v => v.pipeline_status === 'complete').length}</span> complete</span>
         <span><span className="n">{vlogs.filter(v => v.pipeline_status === 'archived').length}</span> archived</span>
+        <button
+          onClick={importFromR2}
+          disabled={importing}
+          style={{
+            marginLeft: 'auto',
+            padding: '6px 12px',
+            border: '1px solid var(--line-bright)',
+            borderRadius: 100,
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 9,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+            color: 'var(--bone-1)',
+            background: 'rgba(236,228,210,0.04)',
+            cursor: importing ? 'wait' : 'pointer',
+          }}
+        >
+          {importing ? 'Scanning R2…' : 'Import from R2'}
+        </button>
       </div>
+
+      {importResult && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: importResult.inserted < 0 ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${importResult.inserted < 0 ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {importResult.inserted < 0 ? (
+            <>Import failed — check the worker logs.</>
+          ) : (
+            <>
+              Scanned <strong>{importResult.total_objects_scanned}</strong> R2 objects ·
+              imported <strong>{importResult.inserted}</strong> new vlog{importResult.inserted === 1 ? '' : 's'} ·
+              skipped <strong>{importResult.skipped_existing}</strong> already in D1.
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--bone-3)' }}>
+                All imports land as <em>archived</em> (no auto-extract). Click any vlog → Re-extract to process.
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="filter-bar reveal d4" style={{ padding: '0 24px 16px' }}>
         {FILTERS.map(f => {
