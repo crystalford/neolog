@@ -79,7 +79,32 @@ export async function POST(req: NextRequest) {
         { status: 502 },
       )
     }
-    const rows = await res.json() as Record<string, unknown>[]
+
+    // Supabase paused projects return HTML 200, not JSON. Detect and surface
+    // a friendly error instead of letting JSON.parse blow up.
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('json')) {
+      const sample = (await res.text().catch(() => '')).slice(0, 200)
+      const looksPaused = /paused|restored|inactive/i.test(sample) || sample.startsWith('<')
+      return NextResponse.json(
+        {
+          error: looksPaused
+            ? 'Supabase project appears to be paused. Restore it from the Supabase dashboard, then retry.'
+            : `Supabase returned non-JSON (content-type: ${contentType}). First 200 chars: ${sample}`,
+        },
+        { status: 502 },
+      )
+    }
+
+    let rows: Record<string, unknown>[]
+    try {
+      rows = await res.json() as Record<string, unknown>[]
+    } catch (err: any) {
+      return NextResponse.json(
+        { error: `Supabase returned malformed JSON: ${err.message}` },
+        { status: 502 },
+      )
+    }
     if (!Array.isArray(rows) || rows.length === 0) break
     supabaseRowsScanned += rows.length
 

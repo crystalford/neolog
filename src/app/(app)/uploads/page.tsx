@@ -64,9 +64,15 @@ export default function UploadsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim() }),
       })
-      const data: any = await r.json()
+      const text = await r.text()
+      let data: any = null
+      try { data = JSON.parse(text) }
+      catch {
+        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: `Server returned non-JSON (HTTP ${r.status}). First chars: ${text.slice(0, 160)}` })
+        return
+      }
       if (!r.ok) {
-        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: data.error || `HTTP ${r.status}` })
+        setThumbResult({ imported: 0, supabase_rows_scanned: 0, skipped_already_set_or_no_d1_match: 0, error: data?.error || `HTTP ${r.status}` })
       } else {
         setThumbResult(data)
         load()
