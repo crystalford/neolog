@@ -242,16 +242,17 @@ All async work runs as Workflows. Workflow IDs:
 
 ---
 
-## What the operator runs (one command after I push)
+## What the operator does after I push
 
-```
-git pull
-pnpm run bootstrap
-```
+**The operator does NOT have a terminal.** They're on the Claude Code Windows app. There is no `git pull`, no `pnpm run bootstrap`, no local wrangler. Anything that needs to run on a real machine runs on **GitHub Actions** — specifically `.github/workflows/bootstrap-cloudflare.yml`.
 
-That script handles every Cloudflare provisioning step (D1, Workers, Container, Access, deploy). It reads credentials from `.env.local`, runs wrangler commands in order, and streams progress. It is idempotent — safe to re-run.
+The bootstrap workflow:
+- Auto-triggers on every push to `main`
+- Can be manually re-run from the GitHub Actions tab (https://github.com/crystalford/neolog/actions → "Bootstrap Cloudflare" → "Run workflow")
+- Reads credentials from GitHub repo secrets (already configured — see `docs/CREDENTIALS.md`)
+- Provisions D1, R2, Workers, Workflows, Container, Access, Pages bindings, and deploys — idempotent, safe to re-run
 
-The operator's role is: paste credentials into `.env.local` once, run `pnpm run bootstrap` once, then sign in via Cloudflare Access. That's it.
+The operator's role after a push: wait for the Actions run to finish (or manually re-trigger if I didn't push a code change), then sign in via Cloudflare Access. That's it. Never tell them to run anything locally.
 
 ---
 
