@@ -148,6 +148,21 @@ export default function CapturePage() {
         <div className="crumb reveal d2">Drop it in</div>
         <h1 className="reveal d3">Capture</h1>
         <p className="lead reveal d4">A vlog, a B-roll clip, an attachment. The pipeline transcribes, extracts threads, finds clips, and surfaces what's worth materializing.</p>
+        <div className="reveal d4" style={{ marginTop: 16 }}>
+          <a href="/uploads" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            border: '1px solid var(--line-warm)',
+            borderRadius: 100,
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 9,
+            letterSpacing: 1.5,
+            textTransform: 'uppercase',
+            color: 'var(--bone-2)',
+          }}>View uploads archive →</a>
+        </div>
       </section>
 
       <div className="mode-row reveal d4">
