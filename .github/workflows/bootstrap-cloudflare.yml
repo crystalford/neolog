@@ -300,6 +300,12 @@ jobs:
             echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT" || true
             echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT" || true
           fi
+          # Also push CLOUDFLARE_ACCOUNT_ID — the R2 SigV4 presigner needs it
+          # to construct the host (${ACCOUNT_ID}.r2.cloudflarestorage.com).
+          # Without it, video presigning fails silently → no playback.
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT" || true
+          fi
 
       - name: Build + deploy Pages project
         if: hashFiles('wrangler.toml') != '' && hashFiles('next.config.js') != ''
