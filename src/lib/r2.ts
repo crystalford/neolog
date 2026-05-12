@@ -176,7 +176,11 @@ async function presign(
     ['X-Amz-SignedHeaders', 'host'],
     ...Object.entries(extraQuery),
   ]
-  queryEntries.sort(([a], [b]) => a.localeCompare(b))
+  // AWS SigV4 requires the canonical query to be sorted by BYTE ORDER, not
+  // locale. localeCompare puts lowercase keys (partNumber, uploadId) in the
+  // wrong position relative to "X-Amz-*" keys under English locale rules,
+  // which makes R2's recomputed signature disagree with ours → 403 Forbidden.
+  queryEntries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
   const canonicalQuery = queryEntries
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&')

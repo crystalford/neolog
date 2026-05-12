@@ -166,6 +166,10 @@ Active tables: `operator`, `vlogs`, `transcript_words`, `threads`, `creative_ele
 
 ---
 
+## Credentials are documented in `docs/CREDENTIALS.md`
+
+**Do not ask the operator to "verify" or "re-add" R2 keys, API tokens, account IDs, or any other credential without first reading `docs/CREDENTIALS.md`.** Every credential listed there is confirmed working and propagated to the right places by the bootstrap workflow. When something fails: debug code first, credentials last.
+
 ## Key env vars (in `.env.local`, plus Cloudflare Worker secrets)
 
 ```
