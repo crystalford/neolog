@@ -93,14 +93,20 @@ Old paths (`/dashboard/*`) and old pages (Home, Posts, Edit, Brain, Sessions, Sy
 
 ## The three extraction passes
 
-Every ingested vlog runs three parallel passes after transcription, plus entity extraction:
+Every ingested vlog runs three parallel passes after transcription, plus entity extraction. The **tier** (set per vlog from the vlog detail page, default `free`) picks the LLM provider for each pass:
 
-| Pass | Output table | Model | Purpose |
-|---|---|---|---|
-| Analytical | `threads` | claude-sonnet-4-6 | Atomic units: topic / take / key_quotes / questions_raised / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | claude-sonnet-4-6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | claude-sonnet-4-6 | Delivery moments where the operator nailed a segment cleanly |
-| Entity | `entities` / `entity_mentions` | claude-sonnet-4-6 | People, places, projects, tools, concepts, themes, references |
+| Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
+|---|---|---|---|---|---|
+| Analytical | `threads` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+
+**Cost per 20-min vlog:** `free` ~$0.003 · `premium` ~$0.08 · `max` ~$0.15. The vlog detail page shows the estimate before any re-run.
+
+**Per-pass re-extract** is supported — the API accepts `passes: ['threads']` (or any subset) so the operator only pays for the pass they're iterating on. Other passes' rows stay intact.
+
+**Transcription** is always Workers AI Whisper (whisper-large-v3-turbo) — essentially free at single-operator scale (~$0.005 per 20-min vlog). A future per-vlog Claude transcription override will live on the same vlog detail page for cases where Whisper struggles (heavy accent, music underneath, etc).
 
 Every extraction call loads its prompt from the `prompts` table by `(name, is_active=true)`. Every output row carries the `extraction_prompt_version` it was produced under. **Iterate prompts on incoming vlogs as they arrive** — no gold set, no batch re-runs. When a take is sanitized or a topic boundary is wrong, the operator flags it in Timeline; the prompt updates as a new `prompts.version` row.
 

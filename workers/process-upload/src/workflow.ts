@@ -56,6 +56,8 @@ interface Env {
 interface Params {
   vlog_id: string
   operator_id: string
+  tier?: 'free' | 'premium' | 'max'  // extraction provider tier — defaults to 'free' (Workers AI Llama)
+  passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]  // when set, re-run only these passes
 }
 
 const MP4_EPOCH_OFFSET_SEC = 2082844800 // seconds between 1904-01-01 and 1970-01-01
@@ -63,6 +65,8 @@ const MP4_EPOCH_OFFSET_SEC = 2082844800 // seconds between 1904-01-01 and 1970-0
 export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const { vlog_id, operator_id } = event.payload
+    const tier: 'free' | 'premium' | 'max' = event.payload.tier ?? 'free'
+    const passesToRun = new Set(event.payload.passes ?? ['threads', 'clip_candidates', 'creative_elements', 'entities'])
 
     // ── Step 1: load context ─────────────────────────────────────────────────
     const vlog = await step.do('fetch-context', async () => {
@@ -264,51 +268,44 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         vlog_id,
         operator_id,
         transcript_text: transcriptRow.transcript_text,
+        tier,
       }
 
-      // ── Step 8: analytical pass → threads ────────────────────────────────
-      await step.do(
-        'extract-threads',
-        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
-        async () => {
+      // Each pass runs only if it's in the passes set. This lets the operator
+      // re-run a single pass (e.g. just threads after iterating the prompt)
+      // without paying for the others.
+
+      if (passesToRun.has('threads')) {
+        await step.do('extract-threads', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractThreads(this.env, extractCtx)
-          console.log(`[extract-threads] inserted=${result.inserted} rejected_voice=${result.rejected}`)
+          console.log(`[extract-threads] tier=${tier} inserted=${result.inserted} rejected_voice=${result.rejected}`)
           return result
-        },
-      )
+        })
+      }
 
-      // ── Step 9: clip-candidate pass → clip_candidates ────────────────────
-      await step.do(
-        'extract-clip-candidates',
-        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
-        async () => {
+      if (passesToRun.has('clip_candidates')) {
+        await step.do('extract-clip-candidates', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractClipCandidates(this.env, extractCtx)
-          console.log(`[extract-clip-candidates] inserted=${result.inserted}`)
+          console.log(`[extract-clip-candidates] tier=${tier} inserted=${result.inserted}`)
           return result
-        },
-      )
+        })
+      }
 
-      // ── Step 10: creative-mode pass → creative_elements (often 0) ────────
-      await step.do(
-        'extract-creative-elements',
-        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
-        async () => {
+      if (passesToRun.has('creative_elements')) {
+        await step.do('extract-creative-elements', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractCreativeElements(this.env, extractCtx)
-          console.log(`[extract-creative-elements] inserted=${result.inserted}`)
+          console.log(`[extract-creative-elements] tier=${tier} inserted=${result.inserted}`)
           return result
-        },
-      )
+        })
+      }
 
-      // ── Step 11: entity extraction → entities + entity_mentions ──────────
-      await step.do(
-        'extract-entities',
-        { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' },
-        async () => {
+      if (passesToRun.has('entities')) {
+        await step.do('extract-entities', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractEntities(this.env, extractCtx)
-          console.log(`[extract-entities] entities=${result.entitiesUpserted} mentions=${result.mentionsInserted}`)
+          console.log(`[extract-entities] tier=${tier} entities=${result.entitiesUpserted} mentions=${result.mentionsInserted}`)
           return result
-        },
-      )
+        })
+      }
     } else {
       console.log(`[process-upload] no transcript text for vlog ${vlog_id} — skipping extraction passes`)
     }
@@ -338,7 +335,11 @@ export default {
   async fetch(req: Request, env: DispatchEnv): Promise<Response> {
     const url = new URL(req.url)
     if (req.method === 'POST' && url.pathname === '/dispatch') {
-      const body = await req.json().catch(() => null) as { vlog_id?: string; operator_id?: string } | null
+      const body = await req.json().catch(() => null) as {
+        vlog_id?: string; operator_id?: string;
+        tier?: 'free' | 'premium' | 'max';
+        passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
+      } | null
       if (!body?.vlog_id || !body?.operator_id) {
         return new Response(JSON.stringify({ error: 'vlog_id and operator_id required' }), {
           status: 400, headers: { 'Content-Type': 'application/json' },
@@ -347,7 +348,12 @@ export default {
       try {
         const instance = await env.PROCESS_UPLOAD_WORKFLOW.create({
           id: `process-upload-${body.vlog_id}-${Date.now()}`,
-          params: { vlog_id: body.vlog_id, operator_id: body.operator_id },
+          params: {
+            vlog_id: body.vlog_id,
+            operator_id: body.operator_id,
+            tier: body.tier ?? 'free',
+            passes: body.passes,
+          },
         })
         return new Response(JSON.stringify({ ok: true, instance_id: instance.id }), {
           status: 200, headers: { 'Content-Type': 'application/json' },

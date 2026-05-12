@@ -36,6 +36,18 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [tier, setTier] = useState<'free' | 'premium' | 'max'>('free')
+  const [passes, setPasses] = useState<Set<'threads' | 'clip_candidates' | 'creative_elements' | 'entities'>>(
+    new Set(['threads', 'clip_candidates', 'creative_elements', 'entities']),
+  )
+
+  const COST: Record<'free' | 'premium' | 'max', Record<string, number>> = {
+    free:    { threads: 0.0006, clip_candidates: 0.0006, creative_elements: 0.0006, entities: 0.0006 },
+    premium: { threads: 0.040,  clip_candidates: 0.0006, creative_elements: 0.040,  entities: 0.0006 },
+    max:     { threads: 0.040,  clip_candidates: 0.040,  creative_elements: 0.040,  entities: 0.040 },
+  }
+  const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[tier][p] ?? 0), 0)
+  const fmtCost = (n: number) => n < 0.01 ? '<$0.01' : `$${n.toFixed(n < 1 ? 2 : 2)}`
 
   const load = async () => {
     setError(null)
@@ -55,7 +67,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const triggerProcess = async () => {
     setProcessing(true)
     try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/process`, { method: 'POST', credentials: 'include' })
+      const r = await fetch(`/api/v2/vlogs/${params.id}/process`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier, passes: Array.from(passes) }),
+      })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       await load()
     } catch (e: any) {
@@ -101,11 +118,68 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         <div className="error-row" style={{ marginBottom: 16 }}>Pipeline error: {vlog.pipeline_error}</div>
       )}
 
-      {(status === 'archived' || status === 'error' || status === 'failed') && (
-        <button onClick={triggerProcess} disabled={processing} className="action-btn">
-          {processing ? 'Dispatching…' : 'Process now'}
+      <div className="section">
+        <div className="label">Re-extract</div>
+        <p style={{ fontSize: 13, color: 'var(--bone-2)', marginBottom: 12 }}>
+          Pick the tier and which passes to re-run. Workers AI Llama is essentially free; Claude Sonnet is higher quality where voice nuance matters.
+        </p>
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {([
+            ['free',    'Free',    'Llama 70B'],
+            ['premium', 'Premium', 'Sonnet for threads + creative'],
+            ['max',     'Max',     'Sonnet for all 4'],
+          ] as const).map(([k, label, sub]) => (
+            <button
+              key={k}
+              onClick={() => setTier(k)}
+              className={`fchip ${tier === k ? 'active' : ''}`}
+              style={{ padding: '8px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
+              title={sub}
+            >{label}</button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+          {(['threads', 'clip_candidates', 'creative_elements', 'entities'] as const).map(p => {
+            const on = passes.has(p)
+            const labelMap = { threads: 'Threads', clip_candidates: 'Clips', creative_elements: 'Creative', entities: 'Entities' }
+            return (
+              <button
+                key={p}
+                onClick={() => {
+                  const next = new Set(passes)
+                  on ? next.delete(p) : next.add(p)
+                  setPasses(next)
+                }}
+                className={`fchip ${on ? 'active' : ''}`}
+              >
+                {labelMap[p]} <span className="num">{fmtCost(COST[tier][p])}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '12px 16px',
+          background: 'var(--ink-2)',
+          border: '1px solid var(--line)',
+          borderRadius: 12,
+          marginBottom: 16,
+        }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1.5, color: 'var(--bone-3)' }}>
+            ESTIMATED COST
+          </div>
+          <div style={{ fontWeight: 500, color: 'var(--bone)' }}>{fmtCost(estCost)}</div>
+        </div>
+
+        <button onClick={triggerProcess} disabled={processing || passes.size === 0} className="action-btn">
+          {processing ? 'Dispatching…' : `Re-extract · ${fmtCost(estCost)}`}
         </button>
-      )}
+      </div>
 
       {vlog.transcript_text && (
         <div className="section">
