@@ -2,19 +2,21 @@
  * LLM router — three tiers for extraction, transcription, and any other AI
  * work. The operator picks the tier per vlog (or sets a default in Settings).
  *
- *   free    → Workers AI Llama 4 Scout for everything. ~$0.011/vlog.
- *             (Multimodal MoE, 131K context, cheap and native vision —
- *             future-proofs ingesting images/PDFs into extraction passes.)
- *   premium → Claude Sonnet 4.6 for threads + creative, Scout for clips +
- *             entities. Best balance of quality and cost. ~$0.09/vlog.
+ *   free    → Workers AI Kimi K2.6 for all four passes. ~$0.04/vlog.
+ *             (1T MoE / 32B active, 262K context, vision, agentic-tuned —
+ *             closest-to-Claude voice. Worth the ~4× cost over Scout for
+ *             threads + creative_elements where voice/register nuance
+ *             matters most.)
+ *   premium → Claude Sonnet 4.6 for threads + creative, Kimi for clips +
+ *             entities. Best balance of quality and cost. ~$0.10/vlog.
  *   max     → Claude Sonnet 4.6 for all 4 passes. ~$0.17/vlog.
  *
  * Cost numbers are estimates for a ~20-min vlog at current pricing. Adjust
  * COST_TABLE when models or pricing change.
  *
- * Three Workers AI models are available via the chat picker:
- *   - LLAMA_4_SCOUT  cheapest, multimodal, MoE 17B active, 131K ctx
- *   - KIMI_K2_6      best agentic/chat voice, 32B active of 1T MoE, 262K ctx
+ * Three Workers AI models are available via the chat picker + Settings:
+ *   - KIMI_K2_6      best agentic/chat voice, 32B active of 1T MoE, 262K ctx (default)
+ *   - LLAMA_4_SCOUT  cheapest, multimodal, MoE 17B active, 131K ctx (speed/cost option)
  *   - LLAMA_70B      fallback dense model, no vision
  *
  * Anthropic endpoint: api.anthropic.com/v1/messages with env.ANTHROPIC_API_KEY
@@ -29,7 +31,7 @@ export type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entiti
 const LLAMA_4_SCOUT = '@cf/meta/llama-4-scout-17b-16e-instruct'
 const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'  // kept as a fallback
-const WORKERS_AI_MODEL = LLAMA_4_SCOUT  // default Workers AI model for extraction
+const WORKERS_AI_MODEL = KIMI_K2_6  // default Workers AI model for extraction
 const CLAUDE_SONNET = 'claude-sonnet-4-6'
 
 export const CHAT_MODELS = {
@@ -69,20 +71,20 @@ export function modelFor(tier: Tier, pass: Pass): { provider: 'workers_ai' | 'cl
  * ~2000 tokens out per pass.
  */
 const COST_PER_VLOG: Record<Tier, Record<Pass, number>> = {
-  // Workers AI Llama 4 Scout: $0.27/M input, $0.85/M output
-  // 4000 input + 2000 output tokens per pass = ~$0.003/pass
+  // Workers AI Kimi K2.6: ~$0.74/M input, ~$3.50/M output
+  // 4000 input + 2000 output tokens per pass = ~$0.01/pass
   free: {
-    threads:           0.003,
-    clip_candidates:   0.003,
-    creative_elements: 0.003,
-    entities:          0.003,
+    threads:           0.01,
+    clip_candidates:   0.01,
+    creative_elements: 0.01,
+    entities:          0.01,
   },
-  // Premium: Sonnet for threads + creative, Scout for clips + entities
+  // Premium: Sonnet for threads + creative, Kimi for clips + entities
   premium: {
     threads:           0.042,   // 4000 input @ $3/M + 2000 output @ $15/M
-    clip_candidates:   0.003,
+    clip_candidates:   0.01,
     creative_elements: 0.042,
-    entities:          0.003,
+    entities:          0.01,
   },
   // Max: Sonnet for all 4
   max: {

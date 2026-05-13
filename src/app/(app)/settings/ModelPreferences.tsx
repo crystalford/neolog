@@ -14,8 +14,8 @@ const CHAT_OPTIONS = [
 ] as const
 
 const TIER_OPTIONS = [
-  { key: 'free',    label: 'Free',    sub: 'Llama 4 Scout for all 4 passes · ~$0.011/vlog' },
-  { key: 'premium', label: 'Premium', sub: 'Sonnet for threads + creative, Scout for the rest · ~$0.09/vlog' },
+  { key: 'free',    label: 'Free',    sub: 'Kimi K2.6 for all 4 passes · ~$0.04/vlog' },
+  { key: 'premium', label: 'Premium', sub: 'Sonnet for threads + creative, Kimi for the rest · ~$0.10/vlog' },
   { key: 'max',     label: 'Max',     sub: 'Sonnet for all 4 passes · ~$0.17/vlog' },
 ] as const
 

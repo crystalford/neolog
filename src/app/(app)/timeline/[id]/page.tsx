@@ -41,11 +41,11 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     new Set(['threads', 'clip_candidates', 'creative_elements', 'entities']),
   )
 
-  // Llama 4 Scout (free tier): ~$0.003/pass. Sonnet (premium/max): ~$0.042/pass.
+  // Kimi K2.6 (free tier): ~$0.01/pass. Sonnet (premium/max): ~$0.042/pass.
   // Numbers mirror src/lib/llm.ts COST_PER_VLOG — keep them in sync.
   const COST: Record<'free' | 'premium' | 'max', Record<string, number>> = {
-    free:    { threads: 0.003, clip_candidates: 0.003, creative_elements: 0.003, entities: 0.003 },
-    premium: { threads: 0.042, clip_candidates: 0.003, creative_elements: 0.042, entities: 0.003 },
+    free:    { threads: 0.01,  clip_candidates: 0.01,  creative_elements: 0.01,  entities: 0.01 },
+    premium: { threads: 0.042, clip_candidates: 0.01,  creative_elements: 0.042, entities: 0.01 },
     max:     { threads: 0.042, clip_candidates: 0.042, creative_elements: 0.042, entities: 0.042 },
   }
   const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[tier][p] ?? 0), 0)
@@ -149,8 +149,8 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {([
-            ['free',    'Free',    'Llama 4 Scout for all 4 (Workers AI)'],
-            ['premium', 'Premium', 'Sonnet for threads + creative, Scout for the rest'],
+            ['free',    'Free',    'Kimi K2.6 for all 4 (Workers AI)'],
+            ['premium', 'Premium', 'Sonnet for threads + creative, Kimi for the rest'],
             ['max',     'Max',     'Sonnet for all 4'],
           ] as const).map(([k, label, sub]) => (
             <button

@@ -78,14 +78,23 @@ async function recordExtractionRun(
 }
 
 function estimateCost(inputTokens: number, outputTokens: number, model: string): number {
-  // Anthropic pricing (subject to change):
-  //   claude-sonnet-4-6: $3 / Mtok in, $15 / Mtok out
-  //   claude-haiku-4-5:  $1 / Mtok in, $5  / Mtok out
-  // Workers AI Llama 3.3 70B: $0.06 / Mtok in, $0.25 / Mtok out
-  if (/llama/i.test(model)) {
+  // Pricing (subject to change):
+  //   claude-sonnet-4-6:       $3.00 / Mtok in, $15.00 / Mtok out
+  //   claude-haiku-4-5:        $1.00 / Mtok in,  $5.00 / Mtok out
+  //   kimi-k2.6 (Workers AI):  $0.74 / Mtok in,  $3.50 / Mtok out
+  //   llama-4-scout (WAI):     $0.27 / Mtok in,  $0.85 / Mtok out
+  //   llama-3.3-70b (WAI):     $0.06 / Mtok in,  $0.25 / Mtok out
+  const m = model.toLowerCase()
+  if (m.includes('kimi')) {
+    return (inputTokens / 1_000_000) * 0.74 + (outputTokens / 1_000_000) * 3.50
+  }
+  if (m.includes('llama-4-scout') || m.includes('llama-4')) {
+    return (inputTokens / 1_000_000) * 0.27 + (outputTokens / 1_000_000) * 0.85
+  }
+  if (m.includes('llama')) {
     return (inputTokens / 1_000_000) * 0.06 + (outputTokens / 1_000_000) * 0.25
   }
-  const isHaiku = /haiku/i.test(model)
+  const isHaiku = m.includes('haiku')
   const inPerMtok = isHaiku ? 1.0 : 3.0
   const outPerMtok = isHaiku ? 5.0 : 15.0
   return (inputTokens / 1_000_000) * inPerMtok + (outputTokens / 1_000_000) * outPerMtok
