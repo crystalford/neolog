@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS vlogs (
   transcript_completed_at  TEXT,
   pipeline_status          TEXT NOT NULL DEFAULT 'uploaded' CHECK (pipeline_status IN ('uploaded','transcoding','transcribing','extracting','complete','archived','failed')),
   pipeline_error           TEXT,
+  extraction_outcomes      TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

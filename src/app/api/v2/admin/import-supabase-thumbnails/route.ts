@@ -68,6 +68,11 @@ async function handle(req: NextRequest) {
   const keyCol = body.key_column || 'r2_key'
   const thumbCol = body.thumbnail_column || 'thumbnail_url'
 
+  // ── Probe mode: validate URL/key in a single 1-row fetch and return total ─
+  // Used as a pre-flight by the UI so the operator gets a clean reason instead
+  // of starting a multi-page loop that fails halfway.
+  const probeMode = req.nextUrl.searchParams.get('mode') === 'probe'
+
   // Validate URL shape. Must be a Supabase project URL, not the dashboard
   // URL (https://supabase.com/dashboard/project/...) which would 404 with HTML.
   let parsedUrl: URL
@@ -109,6 +114,50 @@ async function handle(req: NextRequest) {
   const baseUrl = body.supabase_url.replace(/\/+$/, '')
   const offset = Math.max(0, Number((body as any).offset ?? 0) | 0)
   const PAGE = 10  // very small — each row can be 100+ KB of base64 JPEG
+
+  // ── Probe: fetch one row + count, return cleanly. No D1 writes. ──────────
+  if (probeMode) {
+    const probeUrl = `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}?select=${encodeURIComponent(keyCol)}&${encodeURIComponent(thumbCol)}=not.is.null&limit=1`
+    const probeCtl = new AbortController()
+    const probeTimeout = setTimeout(() => probeCtl.abort(), 10_000)
+    try {
+      const pres = await fetch(probeUrl, {
+        headers: {
+          apikey: body.service_role_key,
+          Authorization: `Bearer ${body.service_role_key}`,
+          Prefer: 'count=exact',
+          Range: '0-0',
+        },
+        signal: probeCtl.signal,
+      })
+      clearTimeout(probeTimeout)
+      if (!pres.ok) {
+        const errText = await pres.text().catch(() => '')
+        return NextResponse.json({
+          ok: false,
+          reason: `Supabase responded ${pres.status} — ${errText.slice(0, 300) || pres.statusText || 'no body'}`,
+        })
+      }
+      const ct = pres.headers.get('content-type') || ''
+      if (!ct.includes('json')) {
+        const sample = (await pres.text().catch(() => '')).slice(0, 200)
+        return NextResponse.json({
+          ok: false,
+          reason: `Non-JSON response (content-type: ${ct}). First chars: ${sample}. Project is likely paused or URL is wrong.`,
+        })
+      }
+      const cr = pres.headers.get('content-range') || ''
+      const m = /\/(\d+|\*)$/.exec(cr)
+      const total = m && m[1] !== '*' ? Number(m[1]) : null
+      return NextResponse.json({ ok: true, total })
+    } catch (err: any) {
+      clearTimeout(probeTimeout)
+      return NextResponse.json({
+        ok: false,
+        reason: `Connection failed: ${err?.message || String(err)}`,
+      })
+    }
+  }
 
   // ── Fetch one page from Supabase with explicit timeout ─────────────────
   const url = `${baseUrl}/rest/v1/${encodeURIComponent(tableName)}?select=${encodeURIComponent(keyCol)},${encodeURIComponent(thumbCol)}&${encodeURIComponent(thumbCol)}=not.is.null&order=${encodeURIComponent(keyCol)}.asc`

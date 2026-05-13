@@ -41,10 +41,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     new Set(['threads', 'clip_candidates', 'creative_elements', 'entities']),
   )
 
+  // Kimi K2.6 (free tier): ~$0.01/pass. Sonnet (premium/max): ~$0.042/pass.
+  // Numbers mirror src/lib/llm.ts COST_PER_VLOG — keep them in sync.
   const COST: Record<'free' | 'premium' | 'max', Record<string, number>> = {
-    free:    { threads: 0.0006, clip_candidates: 0.0006, creative_elements: 0.0006, entities: 0.0006 },
-    premium: { threads: 0.040,  clip_candidates: 0.0006, creative_elements: 0.040,  entities: 0.0006 },
-    max:     { threads: 0.040,  clip_candidates: 0.040,  creative_elements: 0.040,  entities: 0.040 },
+    free:    { threads: 0.01,  clip_candidates: 0.01,  creative_elements: 0.01,  entities: 0.01 },
+    premium: { threads: 0.042, clip_candidates: 0.01,  creative_elements: 0.042, entities: 0.01 },
+    max:     { threads: 0.042, clip_candidates: 0.042, creative_elements: 0.042, entities: 0.042 },
   }
   const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[tier][p] ?? 0), 0)
   const fmtCost = (n: number) => n < 0.01 ? '<$0.01' : `$${n.toFixed(n < 1 ? 2 : 2)}`
@@ -63,6 +65,17 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   }
 
   useEffect(() => { load() }, [params.id])
+
+  // Pick up operator's preferred default tier (set in /settings).
+  useEffect(() => {
+    fetch('/api/v2/settings', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => {
+        const t = d?.settings?.extraction_default_tier
+        if (t === 'free' || t === 'premium' || t === 'max') setTier(t)
+      })
+      .catch(() => {})
+  }, [])
 
   const triggerProcess = async () => {
     setProcessing(true)
@@ -136,8 +149,8 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {([
-            ['free',    'Free',    'Llama 70B'],
-            ['premium', 'Premium', 'Sonnet for threads + creative'],
+            ['free',    'Free',    'Kimi K2.6 for all 4 (Workers AI)'],
+            ['premium', 'Premium', 'Sonnet for threads + creative, Kimi for the rest'],
             ['max',     'Max',     'Sonnet for all 4'],
           ] as const).map(([k, label, sub]) => (
             <button
@@ -229,23 +242,51 @@ function GenerateThumbnailButton({ vlogId, onDone }: { vlogId: string; onDone: (
   const trigger = async () => {
     setBusy(true)
     setMsg(null)
+    let r: Response
+    let data: any
     try {
-      const r = await fetch(`/api/v2/vlogs/${vlogId}/thumbnail`, { method: 'POST', credentials: 'include' })
-      const data: any = await r.json().catch(() => ({}))
-      if (!r.ok && r.status !== 202) {
-        setMsg(`Failed: ${data.error || `HTTP ${r.status}`}`)
-        return
-      }
-      setMsg(data.message || 'Dispatched.')
-      // For the fast path the thumbnail lands within 1-2 sec; poll briefly.
-      if (!data.will_transcode) {
-        setTimeout(onDone, 2500)
-      }
+      r = await fetch(`/api/v2/vlogs/${vlogId}/thumbnail`, { method: 'POST', credentials: 'include' })
+      data = await r.json().catch(() => ({}))
     } catch (e: any) {
       setMsg(`Failed: ${e.message || String(e)}`)
-    } finally {
       setBusy(false)
+      return
     }
+    if (r.status === 200 && data.thumbnail_url) {
+      setMsg('Thumbnail ready.')
+      onDone()
+      setBusy(false)
+      return
+    }
+    if (r.status === 202) {
+      // HEVC fallback — workflow dispatched. Poll for completion (max 15 min).
+      setMsg(data.message || 'Transcoding — checking back…')
+      let attempts = 0
+      const maxAttempts = 90
+      const poll = async () => {
+        attempts++
+        if (attempts > maxAttempts) {
+          setMsg('Still transcoding after 15 min. Refresh the page later.')
+          setBusy(false)
+          return
+        }
+        try {
+          const pr = await fetch(`/api/v2/vlogs/${vlogId}`, { credentials: 'include' })
+          const pdata: any = await pr.json().catch(() => ({}))
+          if (pdata?.vlog?.thumbnail_url) {
+            setMsg('Thumbnail ready.')
+            onDone()
+            setBusy(false)
+            return
+          }
+        } catch {}
+        setTimeout(poll, 10_000)
+      }
+      setTimeout(poll, 10_000)
+      return
+    }
+    setMsg(`Failed: ${data?.error || `HTTP ${r.status}`}`)
+    setBusy(false)
   }
   return (
     <div>

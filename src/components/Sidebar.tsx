@@ -31,6 +31,15 @@ const ENTRIES = [
     svg: <svg width="18" height="18" viewBox="0 0 20 20"><path d="M10 3 L17 10 L10 17 L3 10 Z" /></svg>,
   },
   {
+    href: '/chat',
+    label: 'Chat',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 20 20">
+        <path d="M3 5 a2 2 0 0 1 2 -2 h10 a2 2 0 0 1 2 2 v7 a2 2 0 0 1 -2 2 h-6 l-3 3 v-3 h-1 a2 2 0 0 1 -2 -2 z" />
+      </svg>
+    ),
+  },
+  {
     href: '/graph',
     label: 'Graph',
     svg: (

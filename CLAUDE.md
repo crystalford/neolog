@@ -65,9 +65,30 @@ The new architecture moves this from Replicate to Cloudflare Container Workers r
 
 ## ⚠️ DO NOT CHANGE — Recording date pipeline
 
-Three-tier fallback for `recorded_at`: pre-extracted date → MP4 mvhd atom → filename pattern → upload time. The mvhd extraction uses MP4 epoch offset 2082844800 with v0/v1 branch handling.
+Four-tier fallback for `recorded_at`: pre-extracted date (client filename inference) → MP4 mvhd atom → server-side filename regex → upload time. The mvhd extraction uses MP4 epoch offset 2082844800 with v0/v1 branch handling.
 
-This logic ports to the new Workflow but the algorithm is identical.
+The shared implementation lives in `src/lib/recorded-at.ts` and runs **synchronously inside the registration API** (`src/app/api/v2/vlogs/route.ts` POST) so the row is INSERTed with `recorded_at` + `recorded_at_source` already set — independent of any downstream workflow failure. The post-upload workflow keeps `extract-recorded-at` as a safety net for archived imports.
+
+Filename regex must cover at minimum these patterns (server-side, in order):
+- `YYYY-MM-DDTHH:MM:SS` / `YYYY-MM-DD_HH-MM-SS`
+- `YYYYMMDD_HHMMSS`
+- `YYYYMMDDTHHMMSS` (ISO compact)
+- `YYYYMMDDHHMMSS` (14 consecutive digits — DJI Mimo: `DJI_20260401110554_0055_D.MP4`)
+- `YYYY-MM-DD`
+- `YYYYMMDD`
+
+## ⚠️ DO NOT CHANGE — Workflow resilience
+
+Each post-upload step (transcode, thumbnail, recorded_at, transcribe, the four extraction passes) runs inside a `softStep()` wrapper in `workers/process-upload/src/workflow.ts`. The wrapper:
+- Catches retry-exhausted failures and records them in `vlogs.extraction_outcomes` JSON instead of aborting the workflow.
+- Lets every feature stand on its own — a flaky transcode no longer takes thumbnail + recorded_at + transcribe + extract down with it.
+- Keeps the existing `step.do` retry behaviour intact (each step still gets 2-3 retries before giving up).
+
+The `extraction_outcomes` column is the source of truth for "what worked, what failed" — read it from D1 instead of scrolling the Cloudflare dashboard.
+
+## ⚠️ DO NOT CHANGE — Pages project bindings
+
+The `@cloudflare/next-on-pages` adapter does **not** read `[[services]]` / `[[d1_databases]]` / `[[r2_buckets]]` from the root `wrangler.toml`. Pages projects under that adapter take their bindings from the project's `deployment_configs`, which the bootstrap workflow sets via the Cloudflare REST API (`.github/workflows/bootstrap-cloudflare.yml` → step "Wire Pages project bindings"). Without that step, `env.PROCESS_UPLOAD` and `env.FFMPEG` are undefined on the deployed app and the post-upload workflow never dispatches.
 
 ## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
 
@@ -79,10 +100,13 @@ These are documentary / short film / video essay productions. **Never add captio
 
 Dock has five entries: **Timeline · Studio · Graph · Projects · Settings**. Capture is a global floating affordance above the dock. There is no Home page — the app opens directly into Timeline.
 
+Chat is a sixth surface, accessible from the desktop sidebar (not the mobile dock). It's the in-app assistant — Kimi K2.6 on Workers AI by default, Claude Sonnet 4.6 as an opt-in `max` toggle.
+
 | Surface | Path | What it is |
 |---|---|---|
 | Timeline | `/timeline` | Single chronological feed of heterogeneous cards (Vlog, Thread, Post, Clip, Article, B-roll, Attachment, Project update, Surfaced) sorted by `recorded_at`. Filterable via pill row. |
 | Studio | `/studio` | Cluster detail = deliberate-work mode. Reached from `Surfaced · Cluster ready` cards on Timeline. |
+| Chat | `/chat` | In-app assistant with tool use. Searches the corpus, drafts posts, saves notes, ingests images / pasted docs. Kimi K2.6 default, Sonnet opt-in. |
 | Graph | `/graph` | Direct navigable view of the substrate. Nodes colored by topic territory. |
 | Projects | `/projects` | Long-form creative_work containers (Pack Rats etc). Different rhythm from the rest. |
 | Settings | `/settings` | Operator profile, voice profiles, API keys, integrations, storage. |
@@ -97,12 +121,17 @@ Every ingested vlog runs three parallel passes after transcription, plus entity 
 
 | Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
 |---|---|---|---|---|---|
-| Analytical | `threads` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
-| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+| Analytical | `threads` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
 
-**Cost per 20-min vlog:** `free` ~$0.003 · `premium` ~$0.08 · `max` ~$0.15. The vlog detail page shows the estimate before any re-run.
+**Cost per 20-min vlog:** `free` ~$0.04 · `premium` ~$0.10 · `max` ~$0.17. The vlog detail page shows the estimate before any re-run.
+
+**Workers AI model options** (operator chooses in Settings):
+- `@cf/moonshotai/kimi-k2.6` — **default**. Closest-to-Claude voice. 1T MoE / 32B active, 262K context, agentic-tuned. Used for extraction + chat by default. ~5× Scout cost but the right call for voice-sensitive passes (threads + creative_elements).
+- `@cf/meta/llama-4-scout-17b-16e-instruct` — cheaper, faster, multimodal (text + image native), MoE 17B active, 131K context. Lower quality on writing/voice tasks. Picker option only.
+- `@cf/meta/llama-3.3-70b-instruct-fp8-fast` — dense fallback model. No vision. Exported as `LLAMA_70B` in `src/lib/llm.ts`.
 
 **Per-pass re-extract** is supported — the API accepts `passes: ['threads']` (or any subset) so the operator only pays for the pass they're iterating on. Other passes' rows stay intact.
 
@@ -135,7 +164,8 @@ A future agent who tries to make clustering "smarter" by surfacing hidden cross-
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows |
 | Transcription | Cloudflare Workers AI Whisper |
-| AI | Claude `claude-sonnet-4-6` (extraction + ideation); `claude-haiku-4-5` (cheap classification + coherence-check) |
+| AI (chat) | **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) on Workers AI by default — the closest-to-Claude voice + agentic-tuned + multimodal. **Llama 4 Scout** and Claude `claude-sonnet-4-6` are picker options. Three-way model picker in the chat header. Default model is operator-configurable in Settings. |
+| AI (extraction) | Kimi K2.6 on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. Default tier is operator-configurable in Settings. |
 | Video processing | Cloudflare Container Workers running FFmpeg |
 | Auth | Cloudflare Access (one-time PIN to operator email) |
 | Styling | Inline styles importing tokens from `src/lib/design.ts` |
@@ -221,16 +251,17 @@ All async work runs as Workflows. Workflow IDs:
 
 ---
 
-## What the operator runs (one command after I push)
+## What the operator does after I push
 
-```
-git pull
-pnpm run bootstrap
-```
+**The operator does NOT have a terminal.** They're on the Claude Code Windows app. There is no `git pull`, no `pnpm run bootstrap`, no local wrangler. Anything that needs to run on a real machine runs on **GitHub Actions** — specifically `.github/workflows/bootstrap-cloudflare.yml`.
 
-That script handles every Cloudflare provisioning step (D1, Workers, Container, Access, deploy). It reads credentials from `.env.local`, runs wrangler commands in order, and streams progress. It is idempotent — safe to re-run.
+The bootstrap workflow:
+- Auto-triggers on every push to `main`
+- Can be manually re-run from the GitHub Actions tab (https://github.com/crystalford/neolog/actions → "Bootstrap Cloudflare" → "Run workflow")
+- Reads credentials from GitHub repo secrets (already configured — see `docs/CREDENTIALS.md`)
+- Provisions D1, R2, Workers, Workflows, Container, Access, Pages bindings, and deploys — idempotent, safe to re-run
 
-The operator's role is: paste credentials into `.env.local` once, run `pnpm run bootstrap` once, then sign in via Cloudflare Access. That's it.
+The operator's role after a push: wait for the Actions run to finish (or manually re-trigger if I didn't push a code change), then sign in via Cloudflare Access. That's it. Never tell them to run anything locally.
 
 ---
 

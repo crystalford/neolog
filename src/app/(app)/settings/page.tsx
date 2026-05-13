@@ -11,6 +11,7 @@ import { getDb, findOne } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 import { headers } from 'next/headers'
+import { ModelPreferences } from './ModelPreferences'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -91,9 +92,13 @@ export default async function SettingsPage() {
           <Row k="Timezone" v={operator.tz} arrow />
         </Section>
 
+        <Section title="AI models">
+          <ModelPreferences />
+        </Section>
+
         <Section title="API keys">
-          <Row k="Anthropic" sub="claude-sonnet-4-6 (extraction) · claude-haiku-4-5 (cheap)" badge="Active" arrow />
-          <Row k="Workers AI" sub="whisper-large-v3-turbo · transcription" badge="Active" arrow />
+          <Row k="Anthropic" sub="claude-sonnet-4-6 (max tier + chat 'claude' option)" badge="Active" arrow />
+          <Row k="Workers AI" sub="Llama 4 Scout · Kimi K2.6 · Whisper · all native" badge="Active" arrow />
         </Section>
 
         <Section title="Integrations">

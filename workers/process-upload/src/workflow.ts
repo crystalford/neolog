@@ -100,6 +100,45 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       ).bind(status, vlog_id).run()
     }
 
+    // Per-step outcomes. Written to vlogs.extraction_outcomes JSON at the end
+    // so the operator can see exactly what worked/failed without scrolling
+    // Cloudflare dashboards. Rebuilt from scratch on workflow resume — that's
+    // fine because each step.do replays from its durable checkpoint.
+    const outcomes: Record<string, { ok: boolean; ms?: number; error?: string; [k: string]: unknown }> = {}
+    const recordOutcome = async (name: string, payload: typeof outcomes[string]) => {
+      outcomes[name] = payload
+      try {
+        await this.env.DB.prepare(
+          `UPDATE vlogs SET extraction_outcomes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        ).bind(JSON.stringify(outcomes), vlog_id).run()
+      } catch {
+        // best-effort; the in-memory copy is the source of truth for THIS run
+      }
+    }
+    // softStep wraps step.do so that when retries exhaust, the failure is
+    // recorded in `outcomes` but does NOT abort the workflow. Each feature
+    // stands on its own — a flaky transcode can no longer take thumbnail,
+    // recorded_at, transcribe, or extraction passes down with it.
+    const softStep = async <T>(
+      name: string,
+      opts: any,
+      fn: () => Promise<T>,
+    ): Promise<T | null> => {
+      const t0 = Date.now()
+      try {
+        const result = opts
+          ? await (step as any).do(name, opts, fn)
+          : await (step as any).do(name, fn)
+        await recordOutcome(name, { ok: true, ms: Date.now() - t0 })
+        return result as T
+      } catch (e: any) {
+        const msg = String(e?.message ?? e).slice(0, 500)
+        console.warn(`[softStep:${name}] failed: ${msg}`)
+        await recordOutcome(name, { ok: false, ms: Date.now() - t0, error: msg })
+        return null
+      }
+    }
+
     const isVideo = vlog.mime_type.startsWith('video/')
     const mimeLower = (vlog.mime_type || '').toLowerCase()
     const filenameLower = (vlog.original_filename || '').toLowerCase()
@@ -155,12 +194,14 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       }
     }
 
-    // ── Step 2: transcode to H.264 (LOCKED — must precede thumbnail) ────────
+    // ── Step 2: transcode to H.264 (LOCKED — must precede thumbnail for HEVC) ──
+    // Wrapped in softStep so a transcode failure (OOM on huge files, etc.) no
+    // longer aborts the workflow. Thumbnail + transcribe + extract still run.
     let transcodedKey = vlog.transcoded_r2_key
     if (isVideo && !transcodedKey) {
       await step.do('mark-transcoding', async () => reportStatus('transcoding'))
 
-      transcodedKey = await step.do(
+      transcodedKey = await softStep(
         'transcode-h264',
         { retries: { limit: 3, delay: '30 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
         async () => {
@@ -194,11 +235,14 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     //    decoder pressure on /uploads) outweighed the signed-URL-expiry
     //    cost it was mitigating. ──────────────────────────────────────────
     if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && (isVideo || vlog.mime_type === 'video/mp4')) {
-      await step.do(
+      await softStep(
         'extract-thumbnail',
         { retries: { limit: 2, delay: '15 seconds' }, timeout: '5 minutes' },
         async () => {
-          // Extract from the transcoded file when available (rotation metadata stripped)
+          // Extract from the transcoded file when available (rotation metadata
+          // stripped). If transcode failed (transcodedKey === null), fall back
+          // to the original — most H.264 sources and many HEVC sources still
+          // produce a usable frame this way.
           const sourceKey = transcodedKey || vlog.r2_key
           const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
           const ffmpegResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb', {
@@ -211,6 +255,12 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             throw new Error(`ffmpeg thumbnail failed (${ffmpegResp.status}): ${err.slice(0, 500)}`)
           }
           const jpegBytes = new Uint8Array(await ffmpegResp.arrayBuffer())
+          if (jpegBytes.byteLength < 1024) {
+            // Defends against the historic DJI HEVC vertical bug where ffmpeg
+            // returns 0 bytes due to rotation metadata. Treated as a failure
+            // so the outcome JSON shows what happened.
+            throw new Error(`thumbnail JPEG suspiciously small: ${jpegBytes.byteLength} bytes (source=${sourceKey})`)
+          }
           const thumbKey = `${operator_id}/thumbs/${vlog_id}.jpg`
           await this.env.VIDEOS.put(thumbKey, jpegBytes, {
             httpMetadata: { contentType: 'image/jpeg' },
@@ -222,6 +272,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             `UPDATE vlogs SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
               WHERE id = ? AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
           ).bind(thumbKey, vlog_id).run()
+          return { source: transcodedKey ? 'transcoded' : 'original', bytes: jpegBytes.byteLength }
         },
       )
     }
@@ -233,8 +284,11 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     }
 
     // ── Step 4: extract recorded_at (LOCKED three-tier fallback) ────────────
+    // The API route also runs this synchronously at INSERT time via the shared
+    // src/lib/recorded-at.ts module. This step stays as a safety net for
+    // archived imports / cases where the API tiers all missed.
     if (!vlog.recorded_at && isVideo) {
-      await step.do('extract-recorded-at', async () => {
+      await softStep('extract-recorded-at', null, async () => {
         // Tier 1: already set (pre-extracted from client) → handled by the `if` above
         // Tier 2: mvhd atom
         let recorded: string | null = null
@@ -259,6 +313,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             `UPDATE vlogs SET recorded_at = ?, recorded_at_source = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
           ).bind(recorded, source, vlog_id).run()
         }
+        return { tier: source, value: recorded }
       })
     }
 
@@ -278,7 +333,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     if (!vlog.transcript_text) {
       await step.do('mark-transcribing', async () => reportStatus('transcribing'))
 
-      await step.do(
+      await softStep(
         'transcribe',
         { retries: { limit: 2, delay: '30 seconds' }, timeout: '15 minutes' },
         async () => {
@@ -363,7 +418,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       // without paying for the others.
 
       if (passesToRun.has('threads')) {
-        await step.do('extract-threads', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
+        await softStep('extract-threads', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractThreads(this.env, extractCtx)
           console.log(`[extract-threads] tier=${tier} inserted=${result.inserted} rejected_voice=${result.rejected}`)
           return result
@@ -371,7 +426,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       }
 
       if (passesToRun.has('clip_candidates')) {
-        await step.do('extract-clip-candidates', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
+        await softStep('extract-clip-candidates', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractClipCandidates(this.env, extractCtx)
           console.log(`[extract-clip-candidates] tier=${tier} inserted=${result.inserted}`)
           return result
@@ -379,7 +434,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       }
 
       if (passesToRun.has('creative_elements')) {
-        await step.do('extract-creative-elements', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
+        await softStep('extract-creative-elements', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractCreativeElements(this.env, extractCtx)
           console.log(`[extract-creative-elements] tier=${tier} inserted=${result.inserted}`)
           return result
@@ -387,7 +442,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       }
 
       if (passesToRun.has('entities')) {
-        await step.do('extract-entities', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
+        await softStep('extract-entities', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
           const result = await extractEntities(this.env, extractCtx)
           console.log(`[extract-entities] tier=${tier} entities=${result.entitiesUpserted} mentions=${result.mentionsInserted}`)
           return result

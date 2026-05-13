@@ -45,6 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     operator_id: string
     r2_key: string
     transcoded_r2_key: string | null
+    thumbnail_r2_key: string | null
     original_filename: string
     file_size_bytes: number
     mime_type: string
@@ -76,6 +77,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
   }
 
+  // Resolve thumbnail — same three-state contract as the list endpoint
+  // (src/app/api/v2/vlogs/route.ts): R2 key > legacy data URI > null.
+  let thumbnailUrl: string | null = null
+  if (vlog.thumbnail_r2_key) {
+    try {
+      thumbnailUrl = await presignGetUrl(env, vlog.thumbnail_r2_key, 24 * 3600)
+    } catch (err: any) {
+      console.warn(`[vlogs/[id]] thumbnail presign failed: ${err?.message}`)
+    }
+  } else if (vlog.thumbnail_url) {
+    thumbnailUrl = vlog.thumbnail_url
+  }
+
   const threads = await findMany<{
     id: string
     topic: string
@@ -98,8 +112,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     params.id, operator.id,
   )
 
+  // Strip internal R2 keys before sending to the client.
+  const {
+    r2_key: _r2,
+    transcoded_r2_key: _tr2,
+    thumbnail_r2_key: _thumbr2,
+    ...safeVlog
+  } = vlog
   return NextResponse.json({
-    vlog: { ...vlog, playback_url: videoUrl },
+    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl },
     video_url: videoUrl,
     threads,
   })

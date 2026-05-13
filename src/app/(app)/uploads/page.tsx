@@ -46,6 +46,33 @@ export default function UploadsPage() {
   const [thumbResult, setThumbResult] = useState<{ imported: number; supabase_rows_scanned: number; skipped_already_set_or_no_d1_match: number; error?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenResult, setRegenResult] = useState<{ reset?: number; message?: string; error?: string } | null>(null)
+  // Path C — batch fix-thumbnails
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [batchStopFlag, setBatchStopFlag] = useState(false)
+  const [batchCursor, setBatchCursor] = useState<string>('')
+  const [batchStats, setBatchStats] = useState<{
+    direct: number
+    mini_transcode: number
+    queued: number
+    failed: number
+    remaining: number | null
+    lastError?: string
+  } | null>(null)
+  // Path A — supabase probe
+  const [probing, setProbing] = useState(false)
+  const [probeResult, setProbeResult] = useState<{ ok: boolean; total?: number | null; reason?: string } | null>(null)
+  // Part B — backfill recorded_at
+  const [backfillRunning, setBackfillRunning] = useState(false)
+  const [backfillStopFlag, setBackfillStopFlag] = useState(false)
+  const [backfillCursor, setBackfillCursor] = useState('')
+  const [backfillStats, setBackfillStats] = useState<{
+    mvhd: number
+    filename: number
+    upload_time_default: number
+    failed: number
+    remaining: number | null
+    lastError?: string
+  } | null>(null)
 
   const regenerateThumbnails = async () => {
     setRegenerating(true)
@@ -125,6 +152,149 @@ export default function UploadsPage() {
     }
   }
 
+  // Path C — runs the batch endpoint in a client loop. Each iteration
+  // requests CHUNK_SIZE rows; server processes them 4-way in parallel and
+  // returns under Cloudflare's 30s edge timeout. Stop button just flips a
+  // ref-style flag the loop checks between requests.
+  const runBatch = async (resume: boolean = false) => {
+    if (batchRunning) return
+    setBatchRunning(true)
+    setBatchStopFlag(false)
+    if (!resume) {
+      setBatchCursor('')
+      setBatchStats({ direct: 0, mini_transcode: 0, queued: 0, failed: 0, remaining: null })
+    }
+    let cursor = resume ? batchCursor : ''
+    let direct = batchStats?.direct ?? 0
+    let miniTranscode = batchStats?.mini_transcode ?? 0
+    let queued = batchStats?.queued ?? 0
+    let failed = batchStats?.failed ?? 0
+    try {
+      // Safety stop: bail after 500 iterations (~2000 vlogs max).
+      for (let i = 0; i < 500; i++) {
+        if (batchStopFlag) break
+        const r = await fetch('/api/v2/admin/fix-thumbnails-batch', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor, chunk_size: 4 }),
+        })
+        const text = await r.text()
+        let data: any
+        try { data = JSON.parse(text) }
+        catch {
+          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
+          break
+        }
+        if (!r.ok) {
+          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
+          break
+        }
+        for (const p of (data.processed as any[]) || []) {
+          if (p.method === 'direct') direct++
+          else if (p.method === 'mini_transcode') miniTranscode++
+          else if (p.method === 'queued') queued++
+          else failed++
+        }
+        setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: data.remaining ?? null })
+        if (data.done || !data.next_cursor) {
+          setBatchCursor('')
+          break
+        }
+        cursor = data.next_cursor
+        setBatchCursor(cursor)
+      }
+      load()
+    } catch (e: any) {
+      setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: String(e?.message || e) })
+    } finally {
+      setBatchRunning(false)
+    }
+  }
+
+  // Part B — backfill recorded_at via mvhd for archived vlogs that imported
+  // with no date (or upload_time_default fallback).
+  const runBackfill = async (resume: boolean = false) => {
+    if (backfillRunning) return
+    setBackfillRunning(true)
+    setBackfillStopFlag(false)
+    if (!resume) {
+      setBackfillCursor('')
+      setBackfillStats({ mvhd: 0, filename: 0, upload_time_default: 0, failed: 0, remaining: null })
+    }
+    let cursor = resume ? backfillCursor : ''
+    let mvhd = backfillStats?.mvhd ?? 0
+    let filename = backfillStats?.filename ?? 0
+    let uploadDefault = backfillStats?.upload_time_default ?? 0
+    let failed = backfillStats?.failed ?? 0
+    try {
+      for (let i = 0; i < 500; i++) {
+        if (backfillStopFlag) break
+        const r = await fetch('/api/v2/admin/backfill-recorded-at', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor, chunk_size: 5 }),
+        })
+        const text = await r.text()
+        let data: any
+        try { data = JSON.parse(text) } catch {
+          setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
+          break
+        }
+        if (!r.ok) {
+          setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
+          break
+        }
+        for (const p of (data.processed as any[]) || []) {
+          if (p.source === 'mvhd') mvhd++
+          else if (p.source === 'filename') filename++
+          else if (p.source === 'upload_time_default') uploadDefault++
+          else if (!p.ok) failed++
+        }
+        setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: data.remaining ?? null })
+        if (data.done || !data.next_cursor) {
+          setBackfillCursor('')
+          break
+        }
+        cursor = data.next_cursor
+        setBackfillCursor(cursor)
+      }
+      load()
+    } catch (e: any) {
+      setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: String(e?.message || e) })
+    } finally {
+      setBackfillRunning(false)
+    }
+  }
+
+  // Path A — pre-flight probe before kicking off the import loop. Validates
+  // URL + key in one fast HEAD-style request so the operator gets a clean
+  // reason (or a row count) immediately instead of opaque retries.
+  const probeSupabase = async () => {
+    if (!supabaseUrl.trim() || !supabaseKey.trim()) return
+    setProbing(true)
+    setProbeResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/import-supabase-thumbnails?mode=probe', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supabase_url: supabaseUrl.trim(), service_role_key: supabaseKey.trim() }),
+      })
+      const data: any = await r.json().catch(() => ({}))
+      if (r.ok && data.ok) {
+        setProbeResult({ ok: true, total: data.total })
+      } else {
+        setProbeResult({ ok: false, reason: data.error || data.reason || `HTTP ${r.status}` })
+      }
+    } catch (e: any) {
+      setProbeResult({ ok: false, reason: String(e?.message || e) })
+    } finally {
+      setProbing(false)
+    }
+  }
+
   const importFromR2 = async () => {
     setImporting(true)
     setImportResult(null)
@@ -148,6 +318,7 @@ export default function UploadsPage() {
 
   const totalBytes = vlogs.reduce((s, v) => s + (v.file_size_bytes ?? 0), 0)
   const totalGb = (totalBytes / 1_000_000_000).toFixed(2)
+  const missingThumbs = vlogs.filter(v => !v.thumbnail_url).length
 
   return (
     <main>
@@ -177,7 +348,112 @@ export default function UploadsPage() {
         >
           {regenerating ? 'Resetting…' : 'Reset stuck transcoding rows'}
         </button>
+        <button
+          onClick={() => runBatch(false)}
+          disabled={batchRunning || missingThumbs === 0}
+          style={adminPillStyle(batchRunning)}
+          title="Generate thumbnails directly from R2 videos using FFmpeg. H.264 done in ~2s each; HEVC dispatched to background workflow."
+        >
+          {batchRunning ? 'Fixing thumbnails…' : `Fix all thumbnails (${missingThumbs})`}
+        </button>
+        {batchRunning && (
+          <button
+            onClick={() => setBatchStopFlag(true)}
+            style={adminPillStyle(false)}
+            title="Stop after current chunk completes."
+          >
+            Stop
+          </button>
+        )}
+        {!batchRunning && batchCursor && (
+          <button
+            onClick={() => runBatch(true)}
+            style={adminPillStyle(false)}
+            title="Resume from where the batch stopped."
+          >
+            Continue
+          </button>
+        )}
+        <button
+          onClick={() => runBackfill(false)}
+          disabled={backfillRunning}
+          style={adminPillStyle(backfillRunning)}
+          title="For archived vlogs whose filename had no date, read the MP4 mvhd atom (first 2 MB) to find the real recording date. Vlogs move to their correct timeline position."
+        >
+          {backfillRunning ? 'Backfilling dates…' : 'Backfill recorded dates'}
+        </button>
+        {backfillRunning && (
+          <button onClick={() => setBackfillStopFlag(true)} style={adminPillStyle(false)}>
+            Stop
+          </button>
+        )}
+        {!backfillRunning && backfillCursor && (
+          <button onClick={() => runBackfill(true)} style={adminPillStyle(false)}>
+            Continue
+          </button>
+        )}
+        <button
+          onClick={() => setShowSupabaseForm(s => !s)}
+          style={adminPillStyle(false)}
+          title="Last-try recovery of legacy thumbnails from the old Supabase project (if you still have the credentials)."
+        >
+          {showSupabaseForm ? 'Hide Supabase' : 'Pull from Supabase'}
+        </button>
       </div>
+
+      {backfillStats && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: backfillStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${backfillStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {backfillStats.lastError ? (
+            <>Backfill error: {backfillStats.lastError}</>
+          ) : (
+            <>
+              mvhd: <strong>{backfillStats.mvhd}</strong> ·
+              filename: <strong>{backfillStats.filename}</strong> ·
+              upload-time-default: <strong>{backfillStats.upload_time_default}</strong> ·
+              Failed: <strong>{backfillStats.failed}</strong>
+              {backfillStats.remaining != null && <> · Remaining: <strong>{backfillStats.remaining}</strong></>}
+              {backfillRunning && <> · running…</>}
+              {!backfillRunning && backfillCursor && <> · paused (Continue to resume)</>}
+              {!backfillRunning && !backfillCursor && (backfillStats.mvhd + backfillStats.filename + backfillStats.upload_time_default) > 0 && <> · done</>}
+            </>
+          )}
+        </div>
+      )}
+
+      {batchStats && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: batchStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {batchStats.lastError ? (
+            <>Batch error: {batchStats.lastError}</>
+          ) : (
+            <>
+              Direct: <strong>{batchStats.direct}</strong> ·
+              Mini-transcode: <strong>{batchStats.mini_transcode}</strong> ·
+              Queued (full transcode): <strong>{batchStats.queued}</strong> ·
+              Failed: <strong>{batchStats.failed}</strong>
+              {batchStats.remaining != null && <> · Remaining: <strong>{batchStats.remaining}</strong></>}
+              {batchRunning && <> · running…</>}
+              {!batchRunning && batchCursor && <> · paused (Continue to resume)</>}
+              {!batchRunning && !batchCursor && batchStats.direct + batchStats.mini_transcode + batchStats.queued > 0 && <> · done</>}
+            </>
+          )}
+        </div>
+      )}
 
       {regenResult && (
         <div className="reveal d4" style={{
@@ -230,10 +506,23 @@ export default function UploadsPage() {
             />
             <span style={{ fontSize: 11, color: 'var(--bone-4)' }}>Same page → Project API keys → row labeled <strong style={{ color: 'var(--bone-2)' }}>service_role</strong> → Reveal</span>
           </label>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={probeSupabase}
+              disabled={!supabaseUrl.trim() || !supabaseKey.trim() || probing || thumbImporting}
+              style={{
+                padding: '10px 18px',
+                border: '1px solid var(--line-warm)',
+                background: 'rgba(236,228,210,0.02)',
+                color: 'var(--bone-1)',
+                borderRadius: 100,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: probing ? 'wait' : 'pointer',
+              }}>{probing ? 'Probing…' : '1. Probe'}</button>
             <button
               onClick={importSupabaseThumbnails}
-              disabled={!supabaseUrl.trim() || !supabaseKey.trim() || thumbImporting}
+              disabled={!supabaseUrl.trim() || !supabaseKey.trim() || thumbImporting || (probeResult != null && !probeResult.ok)}
               style={{
                 padding: '10px 18px',
                 border: '1px solid var(--bone-3)',
@@ -243,9 +532,20 @@ export default function UploadsPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: thumbImporting ? 'wait' : 'pointer',
-              }}>{thumbImporting ? 'Pulling…' : 'Pull thumbnails'}</button>
-            <span style={{ fontSize: 11, color: 'var(--bone-3)' }}>The key is never persisted — used in-memory for this request only.</span>
+              }}>{thumbImporting ? 'Pulling…' : '2. Pull thumbnails'}</button>
+            <span style={{ fontSize: 11, color: 'var(--bone-3)' }}>The key is never persisted — used in-memory only.</span>
           </div>
+          {probeResult && (
+            <div style={{
+              fontSize: 12,
+              color: probeResult.ok ? 'var(--bone-1)' : 'var(--state-err)',
+              padding: '8px 0 0',
+            }}>
+              {probeResult.ok
+                ? <>Connection OK{probeResult.total != null ? ` · ${probeResult.total} thumbnail rows found` : ''} — click Pull thumbnails.</>
+                : <>Probe failed: {probeResult.reason}</>}
+            </div>
+          )}
         </div>
       )}
 
