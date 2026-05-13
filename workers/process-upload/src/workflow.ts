@@ -125,16 +125,22 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       fn: () => Promise<T>,
     ): Promise<T | null> => {
       const t0 = Date.now()
+      const startedAt = new Date().toISOString()
+      // Mark as running BEFORE we kick off the step so the UI can show a
+      // "started X seconds ago" indicator. Without this, the operator only
+      // sees the result row after the step completes — which on a 5-min
+      // HEVC transcode means the UI looks stuck for 5 minutes.
+      await recordOutcome(name, { ok: false, status: 'running', started_at: startedAt, ms: 0 } as any)
       try {
         const result = opts
           ? await (step as any).do(name, opts, fn)
           : await (step as any).do(name, fn)
-        await recordOutcome(name, { ok: true, ms: Date.now() - t0 })
+        await recordOutcome(name, { ok: true, status: 'done', started_at: startedAt, ms: Date.now() - t0 } as any)
         return result as T
       } catch (e: any) {
         const msg = String(e?.message ?? e).slice(0, 500)
         console.warn(`[softStep:${name}] failed: ${msg}`)
-        await recordOutcome(name, { ok: false, ms: Date.now() - t0, error: msg })
+        await recordOutcome(name, { ok: false, status: 'failed', started_at: startedAt, ms: Date.now() - t0, error: msg } as any)
         return null
       }
     }

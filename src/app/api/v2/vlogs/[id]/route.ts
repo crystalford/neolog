@@ -58,6 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     transcript_provider: string | null
     pipeline_status: string
     pipeline_error: string | null
+    extraction_outcomes: string | null
     visibility: string
     created_at: string
     updated_at: string
