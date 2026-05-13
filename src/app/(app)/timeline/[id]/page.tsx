@@ -380,13 +380,31 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail }) {
     return null
   }
 
-  // Parse extraction_outcomes JSON — produced by the post-upload Workflow's
-  // softStep wrapper. Shape: { thumbnail:{ok,method,ms}, transcode:{ok,ms},
-  // recorded_at:{ok,tier}, transcribe:{ok,ms}, threads:{ok,count}, ... }
-  let outcomes: Record<string, { ok: boolean; ms?: number; method?: string; tier?: string; count?: number; error?: string }> = {}
+  // Per-step outcomes from the workflow's softStep wrapper. Shape per step:
+  //   { ok, status?: 'running'|'done'|'failed', started_at?, ms?, method?,
+  //     tier?, count?, error? }
+  let outcomes: Record<string, {
+    ok: boolean
+    status?: 'running' | 'done' | 'failed'
+    started_at?: string
+    ms?: number
+    method?: string
+    tier?: string
+    count?: number
+    error?: string
+  }> = {}
   try { if (vlog.extraction_outcomes) outcomes = JSON.parse(vlog.extraction_outcomes) } catch {}
 
-  // Order matches the workflow's pipeline order.
+  // Determine which steps the workflow will SKIP because state is already
+  // present (guards live in workers/process-upload/src/workflow.ts — keep
+  // in sync). Skipped steps show as ✓ (already done) instead of pending (·).
+  const alreadyDone: Record<string, string | null> = {
+    thumbnail:    vlog.thumbnail_url ? 'data URI present' : null,  // r2_key also implies done but we can't see it from client
+    recorded_at:  vlog.recorded_at ? vlog.recorded_at_source || 'already set' : null,
+    transcode:    null,  // can't tell from client (transcoded_r2_key isn't exposed)
+    transcribe:   vlog.transcript_text ? 'transcript present' : null,
+  }
+
   const STEPS: { key: string; label: string; model?: string }[] = [
     { key: 'thumbnail',         label: 'Thumbnail extraction', model: 'FFmpeg' },
     { key: 'recorded_at',       label: 'Recorded date',         model: 'mvhd / filename' },
@@ -436,17 +454,19 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {STEPS.map(step => {
           const o = outcomes[step.key]
-          const done = o != null
-          const ok = done && o.ok
-          const failed = done && !o.ok
-          // Crude "in-progress" inference: not done yet, and the workflow is
-          // currently in a status that maps to one of these steps.
-          const running =
-            !done && inFlight && (
-              (status === 'transcoding' && (step.key === 'transcode' || step.key === 'thumbnail' || step.key === 'recorded_at')) ||
-              (status === 'transcribing' && step.key === 'transcribe') ||
-              (status === 'extracting' && (step.key === 'threads' || step.key === 'clip_candidates' || step.key === 'creative_elements' || step.key === 'entities'))
-            )
+          // Three precise states from the workflow itself:
+          //   o.status === 'running' → step is actively executing
+          //   o.status === 'done'    → step completed successfully
+          //   o.status === 'failed'  → step exhausted retries
+          //   (no entry)             → either not started yet OR skipped because
+          //                             pre-state already satisfied
+          const running = o?.status === 'running' || (o?.ok === false && o?.status === undefined && o?.ms === 0)
+          const done = o?.status === 'done' || (o?.ok === true && !running)
+          const failed = o?.status === 'failed' || (o?.ok === false && o?.error != null)
+          const skippedAlreadyDone = !o && alreadyDone[step.key] != null
+          const elapsedSec = running && o?.started_at
+            ? Math.max(0, Math.floor((Date.now() - new Date(o.started_at).getTime()) / 1000))
+            : null
           return (
             <div key={step.key} style={{
               display: 'flex',
@@ -454,15 +474,15 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail }) {
               gap: 10,
               padding: '4px 0',
               fontSize: 12,
-              color: ok ? 'var(--bone-1)' : failed ? 'var(--bone-2)' : running ? 'var(--bone)' : 'var(--bone-4)',
+              color: done || skippedAlreadyDone ? 'var(--bone-1)' : failed ? 'var(--bone-2)' : running ? 'var(--bone)' : 'var(--bone-4)',
             }}>
               <span style={{
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: 11,
                 width: 22,
-                color: ok ? 'var(--state-ok, #7a9a6a)' : failed ? 'var(--state-err)' : running ? 'var(--state-info, #6b9aa9)' : 'var(--bone-4)',
+                color: done || skippedAlreadyDone ? 'var(--state-ok, #7a9a6a)' : failed ? 'var(--state-err)' : running ? 'var(--state-info, #6b9aa9)' : 'var(--bone-4)',
               }}>
-                {ok ? '✓' : failed ? '✗' : running ? '⋯' : '·'}
+                {done ? '✓' : skippedAlreadyDone ? '✓' : failed ? '✗' : running ? '⋯' : '·'}
               </span>
               <span style={{ flex: 1 }}>{step.label}</span>
               {step.model && (
@@ -470,13 +490,24 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail }) {
                   {step.model}
                 </span>
               )}
-              {o && (
+              {/* Trailing detail */}
+              {running && elapsedSec != null && (
+                <span style={{ fontSize: 10, color: 'var(--state-info, #6b9aa9)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  running {elapsedSec}s
+                </span>
+              )}
+              {!running && o && (
                 <span style={{ fontSize: 10, color: failed ? 'var(--state-err)' : 'var(--bone-3)', fontFamily: 'JetBrains Mono, monospace' }}>
                   {failed ? (o.error ? o.error.slice(0, 40) : 'failed') :
                    o.method ? o.method :
                    o.tier ? o.tier :
                    o.count != null ? `${o.count}` :
                    o.ms != null ? `${(o.ms / 1000).toFixed(1)}s` : 'ok'}
+                </span>
+              )}
+              {!o && skippedAlreadyDone && (
+                <span style={{ fontSize: 10, color: 'var(--bone-3)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  already done · skipped
                 </span>
               )}
             </div>
@@ -497,6 +528,41 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail }) {
         }}>
           {vlog.pipeline_error}
         </div>
+      )}
+
+      {/* Raw extraction_outcomes JSON for forensics — collapsed by default */}
+      {vlog.extraction_outcomes && (
+        <details style={{ marginTop: 12 }}>
+          <summary style={{
+            fontSize: 10,
+            color: 'var(--bone-4)',
+            fontFamily: 'JetBrains Mono, monospace',
+            letterSpacing: 1,
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+          }}>
+            View raw workflow log
+          </summary>
+          <pre style={{
+            marginTop: 8,
+            padding: '10px 12px',
+            background: 'var(--ink-1)',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            fontSize: 10,
+            lineHeight: 1.5,
+            color: 'var(--bone-2)',
+            fontFamily: 'JetBrains Mono, monospace',
+            whiteSpace: 'pre-wrap',
+            overflow: 'auto',
+            maxHeight: 280,
+          }}>
+            {(() => {
+              try { return JSON.stringify(JSON.parse(vlog.extraction_outcomes), null, 2) }
+              catch { return vlog.extraction_outcomes }
+            })()}
+          </pre>
+        </details>
       )}
     </div>
   )
