@@ -41,10 +41,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     new Set(['threads', 'clip_candidates', 'creative_elements', 'entities']),
   )
 
+  // Kimi K2.6 (free tier): ~$0.01/pass. Sonnet (premium/max): ~$0.04/pass.
+  // Numbers mirror src/lib/llm.ts COST_PER_VLOG — keep them in sync.
   const COST: Record<'free' | 'premium' | 'max', Record<string, number>> = {
-    free:    { threads: 0.0006, clip_candidates: 0.0006, creative_elements: 0.0006, entities: 0.0006 },
-    premium: { threads: 0.040,  clip_candidates: 0.0006, creative_elements: 0.040,  entities: 0.0006 },
-    max:     { threads: 0.040,  clip_candidates: 0.040,  creative_elements: 0.040,  entities: 0.040 },
+    free:    { threads: 0.01, clip_candidates: 0.01,  creative_elements: 0.01, entities: 0.01 },
+    premium: { threads: 0.04, clip_candidates: 0.01,  creative_elements: 0.04, entities: 0.01 },
+    max:     { threads: 0.04, clip_candidates: 0.04,  creative_elements: 0.04, entities: 0.04 },
   }
   const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[tier][p] ?? 0), 0)
   const fmtCost = (n: number) => n < 0.01 ? '<$0.01' : `$${n.toFixed(n < 1 ? 2 : 2)}`
@@ -136,8 +138,8 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {([
-            ['free',    'Free',    'Llama 70B'],
-            ['premium', 'Premium', 'Sonnet for threads + creative'],
+            ['free',    'Free',    'Kimi K2.6 for all 4'],
+            ['premium', 'Premium', 'Sonnet for threads + creative, Kimi for the rest'],
             ['max',     'Max',     'Sonnet for all 4'],
           ] as const).map(([k, label, sub]) => (
             <button

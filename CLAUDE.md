@@ -121,12 +121,12 @@ Every ingested vlog runs three parallel passes after transcription, plus entity 
 
 | Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
 |---|---|---|---|---|---|
-| Analytical | `threads` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
-| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+| Analytical | `threads` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
 
-**Cost per 20-min vlog:** `free` ~$0.003 · `premium` ~$0.08 · `max` ~$0.15. The vlog detail page shows the estimate before any re-run.
+**Cost per 20-min vlog:** `free` ~$0.04 · `premium` ~$0.10 · `max` ~$0.15. The vlog detail page shows the estimate before any re-run. Llama 3.3 70B is still available via `LLAMA_70B` in `src/lib/llm.ts` if a specific call ever needs the cheaper option, but the default Workers AI model is Kimi — Llama needed too much hand-tuning to feel natural out of the box.
 
 **Per-pass re-extract** is supported — the API accepts `passes: ['threads']` (or any subset) so the operator only pays for the pass they're iterating on. Other passes' rows stay intact.
 

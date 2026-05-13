@@ -2,16 +2,21 @@
  * LLM router — three tiers for extraction, transcription, and any other AI
  * work. The operator picks the tier per vlog (or sets a default in Settings).
  *
- *   free    → Workers AI Llama 3.3 70B for everything. ~$0.003/vlog.
- *   premium → Claude Sonnet 4.6 for threads + creative, Llama for clips +
- *             entities. Best balance of quality and cost. ~$0.08/vlog.
+ *   free    → Workers AI Kimi K2.6 for everything. ~$0.04/vlog.
+ *   premium → Claude Sonnet 4.6 for threads + creative, Kimi for clips +
+ *             entities. Best balance of quality and cost. ~$0.10/vlog.
  *   max     → Claude Sonnet 4.6 for all 4 passes. ~$0.15/vlog.
  *
  * Cost numbers are estimates for a ~20-min vlog at current pricing. Adjust
  * COST_TABLE when models or pricing change.
  *
- * Workers AI endpoint: env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', ...)
+ * Workers AI endpoint: env.AI.run('@cf/moonshotai/kimi-k2.6', ...)
  * Anthropic endpoint: api.anthropic.com/v1/messages with env.ANTHROPIC_API_KEY
+ *
+ * Llama 3.3 70B is still callable via LLAMA_70B for future cost-sensitive
+ * use (cheap classification, coherence-check), but the default free tier
+ * uses Kimi K2.6 — the operator found Llama needed too much hand-tuning
+ * to feel natural out of the box.
  */
 
 import type { Ai } from '@cloudflare/workers-types'
@@ -20,8 +25,9 @@ import { callClaude, parseClaudeJson } from './anthropic'
 export type Tier = 'free' | 'premium' | 'max'
 export type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entities'
 
-const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
+const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'  // kept as a fallback
+const WORKERS_AI_MODEL = KIMI_K2_6  // default Workers AI model for extraction
 const CLAUDE_SONNET = 'claude-sonnet-4-6'
 
 export const CHAT_MODELS = {
@@ -57,19 +63,20 @@ export function modelFor(tier: Tier, pass: Pass): { provider: 'workers_ai' | 'cl
  * ~2000 tokens out per pass.
  */
 const COST_PER_VLOG: Record<Tier, Record<Pass, number>> = {
-  // Workers AI Llama 70B: $0.06/M input, $0.25/M output
+  // Workers AI Kimi K2.6: ~$0.74/M input, ~$3.50/M output
+  // 4000 input + 2000 output tokens per pass = ~$0.01/pass
   free: {
-    threads:           0.0006,  // 4000 input + 2000 output tokens
-    clip_candidates:   0.0006,
-    creative_elements: 0.0006,
-    entities:          0.0006,
+    threads:           0.01,
+    clip_candidates:   0.01,
+    creative_elements: 0.01,
+    entities:          0.01,
   },
-  // Premium: Sonnet for threads + creative, Llama for clips + entities
+  // Premium: Sonnet for threads + creative, Kimi for clips + entities
   premium: {
     threads:           0.040,   // 4000 input @ $3/M + 2000 output @ $15/M
-    clip_candidates:   0.0006,
+    clip_candidates:   0.01,
     creative_elements: 0.040,
-    entities:          0.0006,
+    entities:          0.01,
   },
   // Max: Sonnet for all 4
   max: {
@@ -133,7 +140,8 @@ export async function callLlm(
     }
   }
 
-  // Workers AI path. Llama 3.3 70B expects chat-style messages.
+  // Workers AI path. Kimi K2.6 (OpenAI-style) and Llama (response field) both
+  // route here; we extract the text from whichever shape the model returned.
   const userMsg = args.expectJson
     ? args.user + '\n\nReturn ONLY valid JSON. No prose, no markdown fences.'
     : args.user
@@ -144,7 +152,11 @@ export async function callLlm(
     ],
     max_tokens: args.maxTokens ?? 4096,
   })
-  const text = stripJsonFences(String(result?.response ?? ''))
+  const rawText =
+    result?.choices?.[0]?.message?.content ??
+    result?.response ??
+    ''
+  const text = stripJsonFences(String(rawText))
   return {
     text,
     inputTokens: result?.usage?.prompt_tokens ?? 0,
