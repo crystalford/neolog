@@ -121,12 +121,17 @@ Every ingested vlog runs three parallel passes after transcription, plus entity 
 
 | Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
 |---|---|---|---|---|---|
-| Analytical | `threads` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
-| Entity | `entities` / `entity_mentions` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+| Analytical | `threads` | Llama 4 Scout | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Llama 4 Scout | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Llama 4 Scout | Llama 4 Scout | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Llama 4 Scout | Llama 4 Scout | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
 
-**Cost per 20-min vlog:** `free` ~$0.04 · `premium` ~$0.10 · `max` ~$0.15. The vlog detail page shows the estimate before any re-run. Llama 3.3 70B is still available via `LLAMA_70B` in `src/lib/llm.ts` if a specific call ever needs the cheaper option, but the default Workers AI model is Kimi — Llama needed too much hand-tuning to feel natural out of the box.
+**Cost per 20-min vlog:** `free` ~$0.011 · `premium` ~$0.09 · `max` ~$0.17. The vlog detail page shows the estimate before any re-run.
+
+**Workers AI model options** (operator chooses in Settings):
+- `@cf/meta/llama-4-scout-17b-16e-instruct` — default. Cheapest, multimodal (text + image native), MoE 17B active, 131K context.
+- `@cf/moonshotai/kimi-k2.6` — closest-to-Claude voice. 1T MoE / 32B active, 262K context, agentic-tuned. ~5× cost of Scout.
+- `@cf/meta/llama-3.3-70b-instruct-fp8-fast` — fallback dense model. No vision. Exported as `LLAMA_70B` in `src/lib/llm.ts`.
 
 **Per-pass re-extract** is supported — the API accepts `passes: ['threads']` (or any subset) so the operator only pays for the pass they're iterating on. Other passes' rows stay intact.
 
@@ -159,8 +164,8 @@ A future agent who tries to make clustering "smarter" by surfacing hidden cross-
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows |
 | Transcription | Cloudflare Workers AI Whisper |
-| AI (chat) | **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) on Workers AI by default; Claude `claude-sonnet-4-6` as `max` opt-in. Kimi has tool use + vision + 256K context. |
-| AI (extraction) | Llama 3.3 70B on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. |
+| AI (chat) | **Llama 4 Scout** (`@cf/meta/llama-4-scout-17b-16e-instruct`) on Workers AI by default; **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) and Claude `claude-sonnet-4-6` are picker options. Three-way model picker in the chat header. Default model is operator-configurable in Settings. |
+| AI (extraction) | Llama 4 Scout on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. Default tier is operator-configurable in Settings. |
 | Video processing | Cloudflare Container Workers running FFmpeg |
 | Auth | Cloudflare Access (one-time PIN to operator email) |
 | Styling | Inline styles importing tokens from `src/lib/design.ts` |

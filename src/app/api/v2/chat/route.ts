@@ -32,6 +32,7 @@ import {
   type ChatContentPart,
 } from '@/lib/llm'
 import { availableTools, runTool, TOOL_LIMIT } from '@/lib/chat-tools'
+import { getSetting, SETTING_KEYS } from '@/lib/operator-settings'
 import type { Ai, D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -80,8 +81,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'message required' }, { status: 400 })
   }
 
-  const model: ChatModelKey = body.model === 'claude' ? 'claude' : 'kimi'
   const db = getDb(env)
+
+  // Resolve model: explicit request value > operator default > 'scout'.
+  let model: ChatModelKey
+  if (body.model === 'scout' || body.model === 'kimi' || body.model === 'claude') {
+    model = body.model
+  } else {
+    const pref = await getSetting(db, operator.id, SETTING_KEYS.CHAT_DEFAULT_MODEL)
+    model = (pref === 'kimi' || pref === 'claude' || pref === 'scout') ? pref : 'scout'
+  }
 
   // ── Resolve / create thread ───────────────────────────────────────────────
   let threadId = body.thread_id

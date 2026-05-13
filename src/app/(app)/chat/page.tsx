@@ -40,13 +40,19 @@ interface PendingAttachment {
   text_body?: string | null
 }
 
+const MODEL_LABELS: Record<'scout' | 'kimi' | 'claude', { label: string; sub: string }> = {
+  scout:  { label: 'Llama 4 Scout', sub: 'cheap + multimodal (Workers AI)' },
+  kimi:   { label: 'Kimi K2.6',     sub: 'closest-to-Claude voice (Workers AI)' },
+  claude: { label: 'Sonnet (max)',  sub: 'premium, uses Anthropic API' },
+}
+
 export default function ChatPage() {
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<MessageRow[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [model, setModel] = useState<'kimi' | 'claude'>('kimi')
+  const [model, setModel] = useState<'scout' | 'kimi' | 'claude'>('scout')
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -68,13 +74,22 @@ export default function ChatPage() {
       if (!r.ok) return
       const data: any = await r.json()
       setMessages(data.messages || [])
-      if (data.thread?.model === 'claude' || data.thread?.model === 'kimi') {
-        setModel(data.thread.model)
-      }
+      const m = data.thread?.model
+      if (m === 'claude' || m === 'kimi' || m === 'scout') setModel(m)
     } catch {}
   }
 
-  useEffect(() => { loadThreads() }, [])
+  useEffect(() => {
+    loadThreads()
+    // Load operator's default chat model preference
+    fetch('/api/v2/settings', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => {
+        const m = d?.settings?.chat_default_model
+        if (m === 'scout' || m === 'kimi' || m === 'claude') setModel(m)
+      })
+      .catch(() => {})
+  }, [])
   useEffect(() => {
     if (activeThreadId) loadMessages(activeThreadId)
     else setMessages([])
@@ -196,8 +211,9 @@ export default function ChatPage() {
         <div className="crumb reveal d2">Assistant</div>
         <h1 className="reveal d3">Chat</h1>
         <p className="lead reveal d4">
-          Kimi K2.6 on Workers AI (free). Tools: search the corpus, draft posts, save notes.
-          Toggle <strong>Sonnet</strong> for premium analysis.
+          Default: <strong>Llama 4 Scout</strong> on Workers AI (cheap, multimodal). Switch to{' '}
+          <strong>Kimi K2.6</strong> for closer-to-Claude voice or <strong>Sonnet</strong> for premium.
+          Default model is operator-configurable in Settings.
         </p>
       </section>
 
@@ -301,14 +317,15 @@ export default function ChatPage() {
             color: 'var(--bone-3)',
           }}>
             <span>Model:</span>
-            {(['kimi', 'claude'] as const).map(m => (
+            {(['scout', 'kimi', 'claude'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => setModel(m)}
                 className={`fchip ${model === m ? 'active' : ''}`}
                 style={{ padding: '4px 10px', fontSize: 11 }}
+                title={MODEL_LABELS[m].sub}
               >
-                {m === 'kimi' ? 'Kimi K2.6' : 'Sonnet (max)'}
+                {MODEL_LABELS[m].label}
               </button>
             ))}
             <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: 'var(--bone-4)' }}>

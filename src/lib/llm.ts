@@ -2,21 +2,22 @@
  * LLM router — three tiers for extraction, transcription, and any other AI
  * work. The operator picks the tier per vlog (or sets a default in Settings).
  *
- *   free    → Workers AI Kimi K2.6 for everything. ~$0.04/vlog.
- *   premium → Claude Sonnet 4.6 for threads + creative, Kimi for clips +
- *             entities. Best balance of quality and cost. ~$0.10/vlog.
- *   max     → Claude Sonnet 4.6 for all 4 passes. ~$0.15/vlog.
+ *   free    → Workers AI Llama 4 Scout for everything. ~$0.011/vlog.
+ *             (Multimodal MoE, 131K context, cheap and native vision —
+ *             future-proofs ingesting images/PDFs into extraction passes.)
+ *   premium → Claude Sonnet 4.6 for threads + creative, Scout for clips +
+ *             entities. Best balance of quality and cost. ~$0.09/vlog.
+ *   max     → Claude Sonnet 4.6 for all 4 passes. ~$0.17/vlog.
  *
  * Cost numbers are estimates for a ~20-min vlog at current pricing. Adjust
  * COST_TABLE when models or pricing change.
  *
- * Workers AI endpoint: env.AI.run('@cf/moonshotai/kimi-k2.6', ...)
- * Anthropic endpoint: api.anthropic.com/v1/messages with env.ANTHROPIC_API_KEY
+ * Three Workers AI models are available via the chat picker:
+ *   - LLAMA_4_SCOUT  cheapest, multimodal, MoE 17B active, 131K ctx
+ *   - KIMI_K2_6      best agentic/chat voice, 32B active of 1T MoE, 262K ctx
+ *   - LLAMA_70B      fallback dense model, no vision
  *
- * Llama 3.3 70B is still callable via LLAMA_70B for future cost-sensitive
- * use (cheap classification, coherence-check), but the default free tier
- * uses Kimi K2.6 — the operator found Llama needed too much hand-tuning
- * to feel natural out of the box.
+ * Anthropic endpoint: api.anthropic.com/v1/messages with env.ANTHROPIC_API_KEY
  */
 
 import type { Ai } from '@cloudflare/workers-types'
@@ -25,17 +26,22 @@ import { callClaude, parseClaudeJson } from './anthropic'
 export type Tier = 'free' | 'premium' | 'max'
 export type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entities'
 
+const LLAMA_4_SCOUT = '@cf/meta/llama-4-scout-17b-16e-instruct'
 const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'  // kept as a fallback
-const WORKERS_AI_MODEL = KIMI_K2_6  // default Workers AI model for extraction
+const WORKERS_AI_MODEL = LLAMA_4_SCOUT  // default Workers AI model for extraction
 const CLAUDE_SONNET = 'claude-sonnet-4-6'
 
 export const CHAT_MODELS = {
+  SCOUT: LLAMA_4_SCOUT,
   KIMI: KIMI_K2_6,
   CLAUDE: CLAUDE_SONNET,
 } as const
 
-export type ChatModelKey = 'kimi' | 'claude'
+// 'scout' = Llama 4 Scout on Workers AI (cheapest, multimodal)
+// 'kimi'  = Kimi K2.6 on Workers AI (closest-to-Claude voice)
+// 'claude' = Anthropic Sonnet 4.6 (premium, third-party billing)
+export type ChatModelKey = 'scout' | 'kimi' | 'claude'
 
 /**
  * Route a pass to the right provider based on tier.
@@ -63,27 +69,27 @@ export function modelFor(tier: Tier, pass: Pass): { provider: 'workers_ai' | 'cl
  * ~2000 tokens out per pass.
  */
 const COST_PER_VLOG: Record<Tier, Record<Pass, number>> = {
-  // Workers AI Kimi K2.6: ~$0.74/M input, ~$3.50/M output
-  // 4000 input + 2000 output tokens per pass = ~$0.01/pass
+  // Workers AI Llama 4 Scout: $0.27/M input, $0.85/M output
+  // 4000 input + 2000 output tokens per pass = ~$0.003/pass
   free: {
-    threads:           0.01,
-    clip_candidates:   0.01,
-    creative_elements: 0.01,
-    entities:          0.01,
+    threads:           0.003,
+    clip_candidates:   0.003,
+    creative_elements: 0.003,
+    entities:          0.003,
   },
-  // Premium: Sonnet for threads + creative, Kimi for clips + entities
+  // Premium: Sonnet for threads + creative, Scout for clips + entities
   premium: {
-    threads:           0.040,   // 4000 input @ $3/M + 2000 output @ $15/M
-    clip_candidates:   0.01,
-    creative_elements: 0.040,
-    entities:          0.01,
+    threads:           0.042,   // 4000 input @ $3/M + 2000 output @ $15/M
+    clip_candidates:   0.003,
+    creative_elements: 0.042,
+    entities:          0.003,
   },
   // Max: Sonnet for all 4
   max: {
-    threads:           0.040,
-    clip_candidates:   0.040,
-    creative_elements: 0.040,
-    entities:          0.040,
+    threads:           0.042,
+    clip_candidates:   0.042,
+    creative_elements: 0.042,
+    entities:          0.042,
   },
 }
 
@@ -254,13 +260,17 @@ export async function callChat(
   if (args.model === 'claude') {
     return callClaudeChat(env, args)
   }
-  return callKimiChat(env, args)
+  // 'scout' and 'kimi' both go through the OpenAI-compatible Workers AI path —
+  // same response shape, just different model id.
+  const workersModel = args.model === 'scout' ? LLAMA_4_SCOUT : KIMI_K2_6
+  return callWorkersAiChat(env, workersModel, args)
 }
 
-// ─── Kimi K2.6 (OpenAI-compatible chat completions on Workers AI) ───────────
+// ─── Workers AI chat (OpenAI-compatible — Kimi K2.6 + Llama 4 Scout share it) ─
 
-async function callKimiChat(
+async function callWorkersAiChat(
   env: { AI: Ai },
+  modelId: string,
   args: {
     system?: string
     messages: ChatMessage[]
@@ -282,7 +292,7 @@ async function callKimiChat(
   if (args.temperature != null) body.temperature = args.temperature
   if (tools && tools.length) body.tools = tools
 
-  const result: any = await env.AI.run(KIMI_K2_6 as any, body)
+  const result: any = await env.AI.run(modelId as any, body)
   // Workers AI normalizes OpenAI-style responses; tool_calls live on
   // result.choices?.[0]?.message?.tool_calls when present, otherwise the model
   // returns text only.
@@ -302,7 +312,7 @@ async function callKimiChat(
     inputTokens: result?.usage?.prompt_tokens ?? 0,
     outputTokens: result?.usage?.completion_tokens ?? 0,
     provider: 'workers_ai',
-    model: KIMI_K2_6,
+    model: modelId,
     stopReason: choice?.finish_reason ?? null,
   }
 }

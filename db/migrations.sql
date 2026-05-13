@@ -72,3 +72,17 @@ CREATE TABLE IF NOT EXISTS chat_attachments (
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_chat_attachments_thread ON chat_attachments(thread_id, created_at);
+
+-- 2026-05-13: operator_settings — key/value preferences readable from both
+-- the client (Settings UI) and the server (extraction passes, chat endpoint).
+-- Known keys:
+--   chat_default_model      'scout' | 'kimi' | 'claude'   (chatbot default)
+--   extraction_workers_model '@cf/...'                    (free-tier backbone)
+--   extraction_default_tier 'free' | 'premium' | 'max'    (auto-process tier)
+CREATE TABLE IF NOT EXISTS operator_settings (
+  operator_id TEXT NOT NULL,
+  key         TEXT NOT NULL,
+  value       TEXT,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (operator_id, key)
+);
