@@ -76,11 +76,33 @@ export async function deriveRecordedAt(input: DeriveInput): Promise<DeriveResult
 
 // ─── mvhd extraction ────────────────────────────────────────────────────────
 
+/**
+ * Read the MP4 mvhd creation time. Tries first 2MB (fast-start layout, where
+ * moov is at the top) AND last 2MB (non-fast-start, common on iPhone exports
+ * where moov is appended after mdat). Two Range requests, total ≤4MB.
+ */
 async function readMp4CreationTime(signedUrl: string): Promise<string | null> {
-  const res = await fetch(signedUrl, { headers: { Range: 'bytes=0-2097151' } })
-  if (!res.ok && res.status !== 206) return null
-  const buf = new Uint8Array(await res.arrayBuffer())
-  return walkAtoms(buf, 'moov', moov => walkAtoms(moov, 'mvhd', readMvhdDate))
+  // Tier 1: fast-start layout — moov near the beginning.
+  try {
+    const head = await fetch(signedUrl, { headers: { Range: 'bytes=0-2097151' } })
+    if (head.ok || head.status === 206) {
+      const buf = new Uint8Array(await head.arrayBuffer())
+      const r = walkAtoms(buf, 'moov', moov => walkAtoms(moov, 'mvhd', readMvhdDate))
+      if (r) return r
+    }
+  } catch { /* fall through to tail probe */ }
+
+  // Tier 2: non-fast-start layout — moov at the end of the file. The
+  // "bytes=-N" syntax asks for the last N bytes. Apple's tooling defaults
+  // to this layout, which is why iPhone .mp4 / .mov exports usually need it.
+  try {
+    const tail = await fetch(signedUrl, { headers: { Range: 'bytes=-2097151' } })
+    if (tail.ok || tail.status === 206) {
+      const buf = new Uint8Array(await tail.arrayBuffer())
+      return walkAtoms(buf, 'moov', moov => walkAtoms(moov, 'mvhd', readMvhdDate))
+    }
+  } catch { /* fall through */ }
+  return null
 }
 
 function walkAtoms(
