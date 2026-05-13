@@ -300,8 +300,19 @@ async function handle(req: NextRequest) {
     console.warn('[timeline] surfaced block failed:', blockErrors.surfaced)
   }
 
-  // Sort the whole union by timestamp desc
+  // Sort the whole union by timestamp desc. Vlogs whose recorded_at_source
+  // isn't a real source (mvhd / filename / pre_extracted) get demoted to the
+  // bottom — they don't have a meaningful chronological position so they
+  // shouldn't pretend to be from "yesterday".
+  const isRealSource = (s: unknown): boolean =>
+    s === 'pre_extracted' || s === 'mvhd' || s === 'filename'
+  const isReal = (c: TimelineCard): boolean =>
+    c.type !== 'vlog' || isRealSource(c.recorded_at_source)
   cards.sort((a, b) => {
+    const aReal = isReal(a)
+    const bReal = isReal(b)
+    if (aReal && !bReal) return -1
+    if (!aReal && bReal) return 1
     const ta = (a.recorded_at as string) || (a.posted_at as string) || (a.created_at as string) || ''
     const tb = (b.recorded_at as string) || (b.posted_at as string) || (b.created_at as string) || ''
     return tb.localeCompare(ta)

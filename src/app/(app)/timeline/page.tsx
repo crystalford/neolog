@@ -97,7 +97,20 @@ export default function TimelinePage() {
 
   const days: DayGroup[] = useMemo(() => {
     const buckets = new Map<string, TimelineCardData[]>()
+    const UNKNOWN_KEY = '__unknown_date__'
     for (const c of filtered) {
+      // Vlogs whose recorded_at_source is upload_time_default / null have no
+      // real recording date — bucket them separately so they don't pollute
+      // "yesterday" or wherever their upload time happens to be.
+      const isVlog = c.type === 'vlog'
+      const src = isVlog ? (c as any).recorded_at_source : null
+      const realSrc = src === 'pre_extracted' || src === 'mvhd' || src === 'filename'
+      if (isVlog && !realSrc) {
+        const arr = buckets.get(UNKNOWN_KEY) || []
+        arr.push(c)
+        buckets.set(UNKNOWN_KEY, arr)
+        continue
+      }
       const t: string = ('recorded_at' in c && c.recorded_at) ||
                         ('posted_at' in c && c.posted_at) ||
                         ('created_at' in c && c.created_at) ||
@@ -107,12 +120,19 @@ export default function TimelinePage() {
       arr.push(c)
       buckets.set(key, arr)
     }
-    return Array.from(buckets.entries())
+    // Sort: real dates DESC, then the unknown bucket pinned to the bottom.
+    const realDays = Array.from(buckets.entries())
+      .filter(([k]) => k !== UNKNOWN_KEY)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([key, cards]) => {
         const { label, date } = dayLabel(key)
         return { label, date, cards }
       })
+    const unknown = buckets.get(UNKNOWN_KEY)
+    if (unknown && unknown.length > 0) {
+      realDays.push({ label: 'Date unknown', date: `${unknown.length} item${unknown.length === 1 ? '' : 's'}`, cards: unknown })
+    }
+    return realDays
   }, [filtered])
 
   return (
