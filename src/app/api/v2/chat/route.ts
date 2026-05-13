@@ -83,13 +83,13 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
-  // Resolve model: explicit request value > operator default > 'scout'.
+  // Resolve model: explicit request value > operator default > 'kimi'.
   let model: ChatModelKey
   if (body.model === 'scout' || body.model === 'kimi' || body.model === 'claude') {
     model = body.model
   } else {
     const pref = await getSetting(db, operator.id, SETTING_KEYS.CHAT_DEFAULT_MODEL)
-    model = (pref === 'kimi' || pref === 'claude' || pref === 'scout') ? pref : 'scout'
+    model = (pref === 'kimi' || pref === 'claude' || pref === 'scout') ? pref : 'kimi'
   }
 
   // ── Resolve / create thread ───────────────────────────────────────────────

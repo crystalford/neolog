@@ -8,8 +8,8 @@
 import { useEffect, useState } from 'react'
 
 const CHAT_OPTIONS = [
-  { key: 'scout',  label: 'Llama 4 Scout',  sub: 'Workers AI · cheap, multimodal · ~$0.002/turn' },
-  { key: 'kimi',   label: 'Kimi K2.6',      sub: 'Workers AI · closest-to-Claude voice · ~$0.01/turn' },
+  { key: 'kimi',   label: 'Kimi K2.6',      sub: 'Workers AI · closest-to-Claude voice · ~$0.01/turn (Recommended)' },
+  { key: 'scout',  label: 'Llama 4 Scout',  sub: 'Workers AI · cheap + fast, lower quality · ~$0.002/turn' },
   { key: 'claude', label: 'Claude Sonnet 4.6', sub: 'Anthropic · premium · ~$0.05/turn' },
 ] as const
 
@@ -23,7 +23,7 @@ type ChatModel = typeof CHAT_OPTIONS[number]['key']
 type Tier = typeof TIER_OPTIONS[number]['key']
 
 export function ModelPreferences() {
-  const [chatModel, setChatModel] = useState<ChatModel>('scout')
+  const [chatModel, setChatModel] = useState<ChatModel>('kimi')
   const [tier, setTier] = useState<Tier>('free')
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)

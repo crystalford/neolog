@@ -52,7 +52,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<MessageRow[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [model, setModel] = useState<'scout' | 'kimi' | 'claude'>('scout')
+  const [model, setModel] = useState<'scout' | 'kimi' | 'claude'>('kimi')
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -211,9 +211,10 @@ export default function ChatPage() {
         <div className="crumb reveal d2">Assistant</div>
         <h1 className="reveal d3">Chat</h1>
         <p className="lead reveal d4">
-          Default: <strong>Llama 4 Scout</strong> on Workers AI (cheap, multimodal). Switch to{' '}
-          <strong>Kimi K2.6</strong> for closer-to-Claude voice or <strong>Sonnet</strong> for premium.
-          Default model is operator-configurable in Settings.
+          Default: <strong>Kimi K2.6</strong> on Workers AI &mdash; the closest-to-Claude voice we
+          can host natively. <strong>Llama 4 Scout</strong> is faster and cheaper but lower
+          quality. <strong>Sonnet</strong> is the paid premium. Default is operator-configurable in
+          Settings.
         </p>
       </section>
 

@@ -164,7 +164,7 @@ A future agent who tries to make clustering "smarter" by surfacing hidden cross-
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows |
 | Transcription | Cloudflare Workers AI Whisper |
-| AI (chat) | **Llama 4 Scout** (`@cf/meta/llama-4-scout-17b-16e-instruct`) on Workers AI by default; **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) and Claude `claude-sonnet-4-6` are picker options. Three-way model picker in the chat header. Default model is operator-configurable in Settings. |
+| AI (chat) | **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) on Workers AI by default — the closest-to-Claude voice + agentic-tuned + multimodal. **Llama 4 Scout** and Claude `claude-sonnet-4-6` are picker options. Three-way model picker in the chat header. Default model is operator-configurable in Settings. |
 | AI (extraction) | Llama 4 Scout on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. Default tier is operator-configurable in Settings. |
 | Video processing | Cloudflare Container Workers running FFmpeg |
 | Auth | Cloudflare Access (one-time PIN to operator email) |
