@@ -10,9 +10,11 @@ name: Bootstrap Cloudflare
 #  - Container Worker for FFmpeg deployed
 #  - Pages project linked + production deploy
 #
-# Trigger: automatically on every push to main, OR manually from
-# github.com → Actions → Bootstrap Cloudflare → "Run workflow" (e.g. to use
-# the reset_schema toggle).
+# Trigger: manual only. From github.com → Actions → Bootstrap Cloudflare →
+# "Run workflow". This workflow runs heavy provisioning (D1 schema, container
+# worker rebuild, Pages binding patch, Access policy) so it only fires when
+# infra actually changes. The fast deploy.yml workflow handles every push to
+# main — about 60-90s for a code-only change vs ~5 min for full bootstrap.
 #
 # Required secrets (set once via github.com → repo → Settings → Secrets and variables → Actions):
 #  CLOUDFLARE_API_TOKEN   — token with Workers/D1/R2/Pages/Access edit permissions
@@ -23,8 +25,6 @@ name: Bootstrap Cloudflare
 # The workflow is idempotent. Safe to re-run after any change.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reset_schema:

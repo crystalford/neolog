@@ -18,9 +18,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { presignGetUrl, type R2Env } from '@/lib/r2'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env {
+interface Env extends R2Env {
   DB: D1Database
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
@@ -64,6 +65,9 @@ async function handle(req: NextRequest) {
   const blockErrors: Record<string, string> = {}
 
   // ── Vlogs ────────────────────────────────────────────────────────────────
+  // SELECT vlogs + their thread/clip counts in 3 queries total instead of
+  // N+1 (which was 175 queries for 174 vlogs). Then presign all thumbnail
+  // R2 keys in parallel.
   try {
     const vlogs = await findMany<{
       id: string
@@ -74,52 +78,71 @@ async function handle(req: NextRequest) {
       recorded_at: string | null
       recorded_at_source: string | null
       thumbnail_url: string | null
+      thumbnail_r2_key: string | null
       pipeline_status: string
       uploaded_at: string
       transcript_text: string | null
     }>(
       db,
       `SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
-              recorded_at, recorded_at_source, thumbnail_url, pipeline_status,
-              uploaded_at, transcript_text
+              recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key,
+              pipeline_status, uploaded_at, transcript_text
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY recorded_at DESC, uploaded_at DESC
         LIMIT 200`,
       operator.id,
     )
-    for (const v of vlogs) {
-      let threadCount = 0
-      let clipCount = 0
-      try {
-        const counts = await findMany<{ k: string; n: number }>(
-          db,
-          `SELECT 'thread' AS k, COUNT(*) AS n FROM threads WHERE vlog_id = ?
-           UNION ALL
-           SELECT 'clip' AS k, COUNT(*) AS n FROM clip_candidates WHERE vlog_id = ?`,
-          v.id, v.id,
-        )
-        threadCount = counts.find(c => c.k === 'thread')?.n ?? 0
-        clipCount = counts.find(c => c.k === 'clip')?.n ?? 0
-      } catch { /* leave counts at 0 */ }
-      const wordCount = v.transcript_text ? v.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
-      cards.push({
-        id: v.id,
-        type: 'vlog',
-        recorded_at: v.recorded_at || v.uploaded_at,
-        recorded_at_source: v.recorded_at_source ?? (v.recorded_at ? null : 'upload_time_default'),
-        title: deriveVlogTitle(v.original_filename),
-        thumbnail_url: v.thumbnail_url,
-        duration_seconds: v.duration_seconds,
-        file_size_bytes: v.file_size_bytes,
-        mime_type: v.mime_type,
-        thread_count: threadCount,
-        clip_count: clipCount,
-        transcript_word_count: wordCount,
-        visibility: 'private',
-        pipeline_status: v.pipeline_status,
-      })
-    }
+
+    // Batched counts — two grouped queries instead of N round-trips.
+    const threadCountRows = await findMany<{ vlog_id: string; n: number }>(
+      db,
+      `SELECT vlog_id, COUNT(*) AS n
+         FROM threads
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY vlog_id`,
+      operator.id,
+    )
+    const clipCountRows = await findMany<{ vlog_id: string; n: number }>(
+      db,
+      `SELECT vlog_id, COUNT(*) AS n
+         FROM clip_candidates
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY vlog_id`,
+      operator.id,
+    )
+    const threadCounts = new Map(threadCountRows.map(r => [r.vlog_id, r.n]))
+    const clipCounts = new Map(clipCountRows.map(r => [r.vlog_id, r.n]))
+
+    // Resolve thumbnails in parallel. Same three-state contract as the list
+    // endpoint: R2 key (presigned) > legacy data URI > null.
+    const vlogCards = await Promise.all(
+      vlogs.map(async v => {
+        let thumbnailUrl: string | null = v.thumbnail_url
+        if (!thumbnailUrl && v.thumbnail_r2_key) {
+          try { thumbnailUrl = await presignGetUrl(env, v.thumbnail_r2_key, 24 * 3600) }
+          catch { /* presign needs R2 keys — leave null */ }
+        }
+        const wordCount = v.transcript_text ? v.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
+        return {
+          id: v.id,
+          type: 'vlog' as const,
+          recorded_at: v.recorded_at || v.uploaded_at,
+          recorded_at_source: v.recorded_at_source ?? (v.recorded_at ? null : 'upload_time_default'),
+          title: deriveVlogTitle(v.original_filename),
+          thumbnail_url: thumbnailUrl,
+          duration_seconds: v.duration_seconds,
+          file_size_bytes: v.file_size_bytes,
+          mime_type: v.mime_type,
+          thread_count: threadCounts.get(v.id) ?? 0,
+          clip_count: clipCounts.get(v.id) ?? 0,
+          transcript_word_count: wordCount,
+          visibility: 'private',
+          pipeline_status: v.pipeline_status,
+        }
+      }),
+    )
+    for (const c of vlogCards) cards.push(c)
   } catch (err: any) {
     blockErrors.vlogs = err?.message || String(err)
     console.warn('[timeline] vlog block failed:', blockErrors.vlogs)

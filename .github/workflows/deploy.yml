@@ -1,0 +1,68 @@
+name: Fast deploy to Pages
+
+# Fast path: just build the Next.js app with next-on-pages + push to Cloudflare
+# Pages. Skips D1 schema apply, container worker rebuild, Pages binding patch,
+# Access app config — all of which are handled by `bootstrap-cloudflare.yml`
+# (workflow_dispatch only) when infra actually changes.
+#
+# This is what runs on every push to main. Total wall time ~60-90s.
+#
+# Trigger:
+#   - push to main (auto)
+#   - workflow_dispatch (manual, e.g. to redeploy current main)
+#
+# Required secrets (already configured for bootstrap-cloudflare.yml — same set):
+#   CLOUDFLARE_API_TOKEN
+#   CLOUDFLARE_ACCOUNT_ID
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PAGES_PROJECT: neolog
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install wrangler
+        run: pnpm add -g wrangler@4
+
+      - name: Build with next-on-pages
+        run: npx @cloudflare/next-on-pages
+
+      - name: Deploy to Cloudflare Pages
+        run: wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Fast deploy"
+            echo ""
+            echo "Project: \`$PAGES_PROJECT\`"
+            echo "Result: ${{ job.status }}"
+            echo ""
+            echo "For infra changes (D1 schema, container worker, Pages bindings, Access policy):"
+            echo "run the **Bootstrap Cloudflare** workflow manually from the Actions tab."
+          } >> "$GITHUB_STEP_SUMMARY"
