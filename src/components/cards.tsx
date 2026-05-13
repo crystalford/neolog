@@ -78,6 +78,7 @@ export interface VlogCardData {
   id: string
   type: 'vlog'
   recorded_at: string
+  recorded_at_source?: 'pre_extracted' | 'mvhd' | 'filename' | 'upload_time_default' | null
   title: string
   thumbnail_url?: string | null
   duration_seconds?: number | null
@@ -101,13 +102,20 @@ export function VlogCard({ v }: { v: VlogCardData }) {
     : v.thread_count !== undefined
       ? `${v.thread_count} threads${v.clip_count ? `, ${v.clip_count} clips` : ''}`
       : 'Processing…'
+  // Real recorded date if we have any source other than upload_time_default —
+  // otherwise we're showing the upload time as a fallback. Label accordingly.
+  const isRealRecorded =
+    v.recorded_at_source === 'pre_extracted' ||
+    v.recorded_at_source === 'mvhd' ||
+    v.recorded_at_source === 'filename'
+  const datePrefix = isRealRecorded ? 'Recorded' : 'Uploaded'
   return (
     <a href={`/timeline/${v.id}`} className="tcard vlog has-topic" style={topicVars('#7a7160')}>
       <div className="t-meta">
         <span className="type-tag">Vlog</span>
         <span className="sep">·</span>
         <span className="status">{status}</span>
-        <span className="time">{timeLabel(v.recorded_at)}</span>
+        <span className="time">{datePrefix} · {timeLabel(v.recorded_at)}</span>
         <VisibilityIcon kind={v.visibility ?? 'private'} />
       </div>
       <div className="vlog-row">

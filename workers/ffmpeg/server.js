@@ -9,8 +9,12 @@
  * stateless — no R2 credentials inside, no disk persistence beyond /tmp.
  *
  * Endpoints:
- *   POST /transcode-h264   { input_url }                  -> mp4 (H.264 + AAC)
- *   POST /extract-thumb    { input_url, t? }              -> jpg (binary body)
+ *   POST /transcode-h264               { input_url }              -> mp4 (H.264+AAC)
+ *   POST /extract-thumb                { input_url, t? }          -> jpg
+ *   POST /extract-thumb-mini-transcode { input_url, t? }          -> jpg
+ *       Mini-transcode fallback for HEVC verticals where /extract-thumb returns
+ *       0 bytes due to malformed rotation metadata. Decodes only 2 seconds of
+ *       input into H.264 then grabs one frame. ~5s instead of ~5-10min.
  *   POST /extract-audio    { input_url }                  -> mp3
  *   POST /trim             { input_url, start_s, end_s }  -> trimmed mp4
  *   POST /concat           { input_urls: string[] }       -> concatenated mp4
@@ -27,8 +31,9 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { mkdtempSync, createReadStream, statSync, rmSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { mkdtempSync, createReadStream, createWriteStream, statSync, rmSync } from 'node:fs'
+import { pipeline } from 'node:stream/promises'
+import { Readable } from 'node:stream'
 import { join } from 'node:path'
 
 const PORT = parseInt(process.env.PORT || '8080', 10)
@@ -48,8 +53,12 @@ async function readJsonBody(req) {
 }
 
 /**
- * Download a URL to a temp file. Returns the temp file path.
- * Throws if the fetch fails or exceeds maxBytes (defaults to 4 GB).
+ * Stream a URL to a temp file on disk. Returns the temp file path.
+ *
+ * Previously used Buffer.from(await resp.arrayBuffer()) which loads the entire
+ * file into RAM — fatal on the standard-1 container (256 MB) for 100MB+ HEVC
+ * verticals. Streaming via pipeline() keeps peak memory at a small constant
+ * regardless of file size.
  */
 async function downloadToTmp(url, label, maxBytes = 4 * 1024 * 1024 * 1024) {
   const tmp = mkdtempSync(join(tmpdir(), `neolog-ffmpeg-${label}-`))
@@ -58,8 +67,10 @@ async function downloadToTmp(url, label, maxBytes = 4 * 1024 * 1024 * 1024) {
   if (!resp.ok) throw new Error(`Fetch ${label} failed: HTTP ${resp.status}`)
   const len = parseInt(resp.headers.get('content-length') || '0', 10)
   if (len && len > maxBytes) throw new Error(`Input too large: ${len} > ${maxBytes}`)
-  const buf = Buffer.from(await resp.arrayBuffer())
-  await writeFile(tmpFile, buf)
+  if (!resp.body) throw new Error(`Fetch ${label} returned empty body`)
+  // resp.body is a web ReadableStream; convert to a Node Readable for pipeline.
+  const nodeReadable = Readable.fromWeb(resp.body)
+  await pipeline(nodeReadable, createWriteStream(tmpFile))
   return { dir: tmp, file: tmpFile }
 }
 
@@ -129,8 +140,14 @@ async function transcodeH264(body, res) {
 
 // ─── endpoint: /extract-thumb ────────────────────────────────────────────────
 // Extracts a single JPEG frame at time t (seconds). Default t=1.0 to skip
-// black opening frames common in phone-shot video. Returns raw JPEG binary;
-// the main Worker base64-encodes for the data: URL stored in D1.
+// black opening frames common in phone-shot video. Returns raw JPEG binary.
+//
+// Flags chosen for HEVC vertical compatibility:
+//   -noautorotate         ignore rotation tag (DJI Mimo's tag corrupts
+//                         the filter graph and returns 0 frames)
+//   -vsync 0              let ffmpeg pick the frame ts without dropping
+//   -c:v mjpeg            force re-encode through ffmpeg's decoder, which
+//                         normalizes weird HEVC stream quirks
 async function extractThumb(body, res) {
   const { input_url, t } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
@@ -141,11 +158,52 @@ async function extractThumb(body, res) {
   try {
     await runFfmpeg([
       '-y',
+      '-noautorotate',
       '-ss', String(seekTime),     // seek BEFORE -i for speed
       '-i', inputFile,
       '-frames:v', '1',
+      '-vsync', '0',
       '-vf', 'scale=320:-2',       // 320 wide, aspect preserved
+      '-c:v', 'mjpeg',
       '-q:v', '4',                 // ~JPEG quality 0.82-ish
+      outFile,
+    ], outFile)
+    streamFile(res, outFile, 'image/jpeg')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, err.message)
+  }
+}
+
+// ─── endpoint: /extract-thumb-mini-transcode ─────────────────────────────────
+// Fallback when /extract-thumb returns 0 bytes / fails on HEVC verticals with
+// malformed rotation metadata. Mini-transcodes just 2 seconds of input to
+// H.264 (in-memory), grabs one frame from THAT. Bypasses the full 5-10 min
+// transcode by capping decoded duration at 2 seconds.
+//
+// Runs in ~5 seconds instead of ~5-10 minutes, with peak memory <100MB
+// regardless of source file size.
+async function extractThumbMiniTranscode(body, res) {
+  const { input_url, t } = body
+  if (!input_url) return jsonError(res, 400, 'input_url required')
+  const seekTime = typeof t === 'number' && t >= 0 ? t : 1.0
+
+  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-mini-in')
+  const outFile = join(dir, 'frame.jpg')
+  try {
+    await runFfmpeg([
+      '-y',
+      '-noautorotate',
+      '-ss', String(seekTime),
+      '-i', inputFile,
+      '-t', '2',                   // only decode 2 seconds
+      '-c:v', 'libx264',           // mini-transcode normalizes rotation
+      '-preset', 'ultrafast',      // CPU-cheap
+      '-an',                       // strip audio
+      '-frames:v', '1',
+      '-vf', 'scale=320:-2',
+      '-q:v', '4',
       outFile,
     ], outFile)
     streamFile(res, outFile, 'image/jpeg')
@@ -289,6 +347,7 @@ async function concat(body, res) {
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
+  '/extract-thumb-mini-transcode': extractThumbMiniTranscode,
   '/extract-audio':  extractAudio,
   '/trim':           trim,
   '/concat':         concat,

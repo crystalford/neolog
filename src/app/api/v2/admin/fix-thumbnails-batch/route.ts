@@ -55,7 +55,7 @@ interface VlogRow {
 interface ProcessResult {
   vlog_id: string
   ok: boolean
-  method?: 'direct' | 'queued' | 'failed'
+  method?: 'direct' | 'mini_transcode' | 'queued' | 'failed'
   bytes?: number
   error?: string
 }
@@ -134,7 +134,7 @@ async function handle(req: NextRequest) {
   const nextCursor = rows[rows.length - 1].id
   // 'remaining' was computed before this batch ran — subtract what we just
   // successfully wrote so the UI shows accurate progress.
-  const succeeded = processed.filter(p => p.method === 'direct').length
+  const succeeded = processed.filter(p => p.method === 'direct' || p.method === 'mini_transcode').length
   const newRemaining = Math.max(0, remaining - succeeded)
 
   return NextResponse.json({
@@ -151,64 +151,96 @@ async function processRow(
   operatorId: string,
   row: VlogRow,
 ): Promise<ProcessResult> {
-  const mime = (row.mime_type || '').toLowerCase()
-  const filename = (row.original_filename || '').toLowerCase()
-  const isHevc =
-    /hevc|hev1|hvc1|x265/.test(mime) ||
-    mime === 'video/quicktime' ||
-    filename.endsWith('.mov')
-  const hasTranscode = !!row.transcoded_r2_key
-
-  // HEVC without transcode → straight to async workflow, don't waste a sync attempt
-  if (isHevc && !hasTranscode) {
-    return dispatchWorkflow(env, operatorId, row.id)
-  }
-
-  // Sync path: direct FFmpeg call on best available source, bounded to 20s
-  // so a slow row can't push the chunk past Cloudflare's edge timeout.
   if (!env.FFMPEG) {
     return { vlog_id: row.id, ok: false, method: 'failed', error: 'FFMPEG binding missing' }
   }
+
   const sourceKey = row.transcoded_r2_key || row.r2_key
-  const ffmpegCtl = new AbortController()
-  const ffmpegTimeout = setTimeout(() => ffmpegCtl.abort(), 20_000)
+
+  // Tier 1: direct /extract-thumb (with -noautorotate). Fast path for every
+  // renderable source — H.264 always works here, HEVC works for most rotation
+  // metadata variants now that the flag is set on the FFmpeg side.
+  const t1 = await tryExtract(env, sourceKey, '/extract-thumb', 20_000)
+  if (t1.ok && t1.bytes) {
+    return await persistThumb(env, db, operatorId, row.id, t1.bytes, 'direct')
+  }
+
+  // Tier 2: /extract-thumb-mini-transcode — 2-sec H.264 transcode then frame.
+  // Catches HEVC verticals with malformed rotation tags that tier 1 still
+  // returns 0 bytes on. ~5 sec, low memory.
+  const t2 = await tryExtract(env, sourceKey, '/extract-thumb-mini-transcode', 20_000)
+  if (t2.ok && t2.bytes) {
+    return await persistThumb(env, db, operatorId, row.id, t2.bytes, 'mini_transcode')
+  }
+
+  // Tier 3: dispatch full transcode-then-thumb workflow (last resort, ~5-10min)
+  const reason = `tier1=${t1.reason}; tier2=${t2.reason}`
+  return dispatchWorkflow(env, operatorId, row.id, reason)
+}
+
+interface ExtractAttempt {
+  ok: boolean
+  bytes?: Uint8Array
+  reason: string
+}
+
+async function tryExtract(
+  env: Env,
+  sourceKey: string,
+  endpoint: string,
+  timeoutMs: number,
+): Promise<ExtractAttempt> {
+  const ctl = new AbortController()
+  const timeout = setTimeout(() => ctl.abort(), timeoutMs)
   try {
     const presigned = await presignGetUrl(env, sourceKey, 600)
-    const resp = await env.FFMPEG.fetch('https://internal/extract-thumb', {
+    const resp = await env.FFMPEG!.fetch(`https://internal${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ input_url: presigned, t: 1.0 }),
-      signal: ffmpegCtl.signal,
+      signal: ctl.signal,
     } as RequestInit)
     if (!resp.ok) {
-      clearTimeout(ffmpegTimeout)
-      return dispatchWorkflow(env, operatorId, row.id, `ffmpeg ${resp.status}`)
+      clearTimeout(timeout)
+      const errText = await resp.text().catch(() => '')
+      return { ok: false, reason: `${endpoint} ${resp.status}: ${errText.slice(0, 200)}` }
     }
     const bytes = new Uint8Array(await resp.arrayBuffer())
-    clearTimeout(ffmpegTimeout)
+    clearTimeout(timeout)
     if (bytes.byteLength < MIN_JPEG_BYTES) {
-      return dispatchWorkflow(env, operatorId, row.id, `tiny jpeg (${bytes.byteLength}B)`)
+      return { ok: false, reason: `${endpoint} tiny jpeg (${bytes.byteLength}B)` }
     }
-    const thumbKey = `${operatorId}/thumbs/${row.id}.jpg`
-    await putObject(env, thumbKey, bytes, {
-      httpMetadata: { contentType: 'image/jpeg' },
-    })
-    await run(
-      db,
-      `UPDATE vlogs
-          SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ? AND operator_id = ?
-          AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
-      thumbKey, row.id, operatorId,
-    )
-    return { vlog_id: row.id, ok: true, method: 'direct', bytes: bytes.byteLength }
+    return { ok: true, bytes, reason: 'ok' }
   } catch (err: any) {
-    clearTimeout(ffmpegTimeout)
+    clearTimeout(timeout)
     const reason = err?.name === 'AbortError'
-      ? 'ffmpeg timeout (>20s)'
-      : `sync error: ${err?.message || String(err)}`
-    return dispatchWorkflow(env, operatorId, row.id, reason)
+      ? `${endpoint} timeout (>${Math.round(timeoutMs / 1000)}s)`
+      : `${endpoint} error: ${err?.message || String(err)}`
+    return { ok: false, reason }
   }
+}
+
+async function persistThumb(
+  env: Env,
+  db: D1Database,
+  operatorId: string,
+  vlogId: string,
+  bytes: Uint8Array,
+  method: 'direct' | 'mini_transcode',
+): Promise<ProcessResult> {
+  const thumbKey = `${operatorId}/thumbs/${vlogId}.jpg`
+  await putObject(env, thumbKey, bytes, {
+    httpMetadata: { contentType: 'image/jpeg' },
+  })
+  await run(
+    db,
+    `UPDATE vlogs
+        SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND operator_id = ?
+        AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
+    thumbKey, vlogId, operatorId,
+  )
+  return { vlog_id: vlogId, ok: true, method: method as any, bytes: bytes.byteLength }
 }
 
 async function dispatchWorkflow(

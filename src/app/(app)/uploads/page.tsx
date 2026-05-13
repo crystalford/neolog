@@ -52,6 +52,7 @@ export default function UploadsPage() {
   const [batchCursor, setBatchCursor] = useState<string>('')
   const [batchStats, setBatchStats] = useState<{
     direct: number
+    mini_transcode: number
     queued: number
     failed: number
     remaining: number | null
@@ -60,6 +61,18 @@ export default function UploadsPage() {
   // Path A — supabase probe
   const [probing, setProbing] = useState(false)
   const [probeResult, setProbeResult] = useState<{ ok: boolean; total?: number | null; reason?: string } | null>(null)
+  // Part B — backfill recorded_at
+  const [backfillRunning, setBackfillRunning] = useState(false)
+  const [backfillStopFlag, setBackfillStopFlag] = useState(false)
+  const [backfillCursor, setBackfillCursor] = useState('')
+  const [backfillStats, setBackfillStats] = useState<{
+    mvhd: number
+    filename: number
+    upload_time_default: number
+    failed: number
+    remaining: number | null
+    lastError?: string
+  } | null>(null)
 
   const regenerateThumbnails = async () => {
     setRegenerating(true)
@@ -149,10 +162,11 @@ export default function UploadsPage() {
     setBatchStopFlag(false)
     if (!resume) {
       setBatchCursor('')
-      setBatchStats({ direct: 0, queued: 0, failed: 0, remaining: null })
+      setBatchStats({ direct: 0, mini_transcode: 0, queued: 0, failed: 0, remaining: null })
     }
     let cursor = resume ? batchCursor : ''
     let direct = batchStats?.direct ?? 0
+    let miniTranscode = batchStats?.mini_transcode ?? 0
     let queued = batchStats?.queued ?? 0
     let failed = batchStats?.failed ?? 0
     try {
@@ -169,19 +183,20 @@ export default function UploadsPage() {
         let data: any
         try { data = JSON.parse(text) }
         catch {
-          setBatchStats({ direct, queued, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
+          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
           break
         }
         if (!r.ok) {
-          setBatchStats({ direct, queued, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
+          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
           break
         }
         for (const p of (data.processed as any[]) || []) {
           if (p.method === 'direct') direct++
+          else if (p.method === 'mini_transcode') miniTranscode++
           else if (p.method === 'queued') queued++
           else failed++
         }
-        setBatchStats({ direct, queued, failed, remaining: data.remaining ?? null })
+        setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: data.remaining ?? null })
         if (data.done || !data.next_cursor) {
           setBatchCursor('')
           break
@@ -191,9 +206,65 @@ export default function UploadsPage() {
       }
       load()
     } catch (e: any) {
-      setBatchStats({ direct, queued, failed, remaining: null, lastError: String(e?.message || e) })
+      setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: String(e?.message || e) })
     } finally {
       setBatchRunning(false)
+    }
+  }
+
+  // Part B — backfill recorded_at via mvhd for archived vlogs that imported
+  // with no date (or upload_time_default fallback).
+  const runBackfill = async (resume: boolean = false) => {
+    if (backfillRunning) return
+    setBackfillRunning(true)
+    setBackfillStopFlag(false)
+    if (!resume) {
+      setBackfillCursor('')
+      setBackfillStats({ mvhd: 0, filename: 0, upload_time_default: 0, failed: 0, remaining: null })
+    }
+    let cursor = resume ? backfillCursor : ''
+    let mvhd = backfillStats?.mvhd ?? 0
+    let filename = backfillStats?.filename ?? 0
+    let uploadDefault = backfillStats?.upload_time_default ?? 0
+    let failed = backfillStats?.failed ?? 0
+    try {
+      for (let i = 0; i < 500; i++) {
+        if (backfillStopFlag) break
+        const r = await fetch('/api/v2/admin/backfill-recorded-at', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor, chunk_size: 5 }),
+        })
+        const text = await r.text()
+        let data: any
+        try { data = JSON.parse(text) } catch {
+          setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
+          break
+        }
+        if (!r.ok) {
+          setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
+          break
+        }
+        for (const p of (data.processed as any[]) || []) {
+          if (p.source === 'mvhd') mvhd++
+          else if (p.source === 'filename') filename++
+          else if (p.source === 'upload_time_default') uploadDefault++
+          else if (!p.ok) failed++
+        }
+        setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: data.remaining ?? null })
+        if (data.done || !data.next_cursor) {
+          setBackfillCursor('')
+          break
+        }
+        cursor = data.next_cursor
+        setBackfillCursor(cursor)
+      }
+      load()
+    } catch (e: any) {
+      setBackfillStats({ mvhd, filename, upload_time_default: uploadDefault, failed, remaining: null, lastError: String(e?.message || e) })
+    } finally {
+      setBackfillRunning(false)
     }
   }
 
@@ -304,6 +375,24 @@ export default function UploadsPage() {
           </button>
         )}
         <button
+          onClick={() => runBackfill(false)}
+          disabled={backfillRunning}
+          style={adminPillStyle(backfillRunning)}
+          title="For archived vlogs whose filename had no date, read the MP4 mvhd atom (first 2 MB) to find the real recording date. Vlogs move to their correct timeline position."
+        >
+          {backfillRunning ? 'Backfilling dates…' : 'Backfill recorded dates'}
+        </button>
+        {backfillRunning && (
+          <button onClick={() => setBackfillStopFlag(true)} style={adminPillStyle(false)}>
+            Stop
+          </button>
+        )}
+        {!backfillRunning && backfillCursor && (
+          <button onClick={() => runBackfill(true)} style={adminPillStyle(false)}>
+            Continue
+          </button>
+        )}
+        <button
           onClick={() => setShowSupabaseForm(s => !s)}
           style={adminPillStyle(false)}
           title="Last-try recovery of legacy thumbnails from the old Supabase project (if you still have the credentials)."
@@ -311,6 +400,33 @@ export default function UploadsPage() {
           {showSupabaseForm ? 'Hide Supabase' : 'Pull from Supabase'}
         </button>
       </div>
+
+      {backfillStats && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: backfillStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+          border: `1px solid ${backfillStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          {backfillStats.lastError ? (
+            <>Backfill error: {backfillStats.lastError}</>
+          ) : (
+            <>
+              mvhd: <strong>{backfillStats.mvhd}</strong> ·
+              filename: <strong>{backfillStats.filename}</strong> ·
+              upload-time-default: <strong>{backfillStats.upload_time_default}</strong> ·
+              Failed: <strong>{backfillStats.failed}</strong>
+              {backfillStats.remaining != null && <> · Remaining: <strong>{backfillStats.remaining}</strong></>}
+              {backfillRunning && <> · running…</>}
+              {!backfillRunning && backfillCursor && <> · paused (Continue to resume)</>}
+              {!backfillRunning && !backfillCursor && (backfillStats.mvhd + backfillStats.filename + backfillStats.upload_time_default) > 0 && <> · done</>}
+            </>
+          )}
+        </div>
+      )}
 
       {batchStats && (
         <div className="reveal d4" style={{
@@ -327,12 +443,13 @@ export default function UploadsPage() {
           ) : (
             <>
               Direct: <strong>{batchStats.direct}</strong> ·
-              Queued for transcode: <strong>{batchStats.queued}</strong> ·
+              Mini-transcode: <strong>{batchStats.mini_transcode}</strong> ·
+              Queued (full transcode): <strong>{batchStats.queued}</strong> ·
               Failed: <strong>{batchStats.failed}</strong>
               {batchStats.remaining != null && <> · Remaining: <strong>{batchStats.remaining}</strong></>}
               {batchRunning && <> · running…</>}
               {!batchRunning && batchCursor && <> · paused (Continue to resume)</>}
-              {!batchRunning && !batchCursor && batchStats.direct + batchStats.queued > 0 && <> · done</>}
+              {!batchRunning && !batchCursor && batchStats.direct + batchStats.mini_transcode + batchStats.queued > 0 && <> · done</>}
             </>
           )}
         </div>

@@ -3,10 +3,13 @@
  *
  * Returns the heterogeneous Timeline feed: vlogs, threads, clip_candidates,
  * posts, surfaced_cards, articles (productions of form 'article'). Sorted by
- * each row's relevant timestamp, descending. Caller can filter by `type` via
- * query param but default returns all types — the client filters too.
+ * each row's relevant timestamp, descending.
  *
- * Each row is shaped into the TimelineCardData union the client expects.
+ * Resilience: each block's SELECT is wrapped in its own try/catch so one bad
+ * table (missing column, malformed JSON, etc.) doesn't 500 the whole page.
+ * The handler is also wrapped in a top-level try/catch that returns JSON with
+ * the actual error message instead of an opaque 500 — saves us from "Error:
+ * HTTP 500" with no diagnostic.
  */
 
 export const runtime = 'edge'
@@ -29,6 +32,22 @@ interface TimelineCard {
 }
 
 export async function GET(req: NextRequest) {
+  try {
+    return await handle(req)
+  } catch (err: any) {
+    // Top-level safety net so the client gets diagnostic info instead of an
+    // opaque 500. Keeps stack trace short to avoid 4MB response cap.
+    return NextResponse.json(
+      {
+        error: `Timeline failed: ${err?.message || String(err)}`,
+        stack: err?.stack ? String(err.stack).slice(0, 800) : null,
+      },
+      { status: 500 },
+    )
+  }
+}
+
+async function handle(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   let operator
   try {
@@ -42,188 +61,220 @@ export async function GET(req: NextRequest) {
 
   const db = getDb(env)
   const cards: TimelineCard[] = []
+  const blockErrors: Record<string, string> = {}
 
   // ── Vlogs ────────────────────────────────────────────────────────────────
-  const vlogs = await findMany<{
-    id: string
-    original_filename: string | null
-    file_size_bytes: number | null
-    mime_type: string | null
-    duration_seconds: number | null
-    recorded_at: string | null
-    thumbnail_url: string | null
-    pipeline_status: string
-    uploaded_at: string
-    transcript_text: string | null
-  }>(
-    db,
-    `SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
-            recorded_at, thumbnail_url, pipeline_status, uploaded_at, transcript_text
-       FROM vlogs
-      WHERE operator_id = ? AND deleted_at IS NULL
-      ORDER BY recorded_at DESC, uploaded_at DESC
-      LIMIT 200`,
-    operator.id,
-  )
-  for (const v of vlogs) {
-    // Count threads + clips for this vlog
-    const counts = await findMany<{ k: string; n: number }>(
+  try {
+    const vlogs = await findMany<{
+      id: string
+      original_filename: string | null
+      file_size_bytes: number | null
+      mime_type: string | null
+      duration_seconds: number | null
+      recorded_at: string | null
+      recorded_at_source: string | null
+      thumbnail_url: string | null
+      pipeline_status: string
+      uploaded_at: string
+      transcript_text: string | null
+    }>(
       db,
-      `SELECT 'thread' AS k, COUNT(*) AS n FROM threads WHERE vlog_id = ?
-       UNION ALL
-       SELECT 'clip' AS k, COUNT(*) AS n FROM clip_candidates WHERE vlog_id = ?`,
-      v.id, v.id,
+      `SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
+              recorded_at, recorded_at_source, thumbnail_url, pipeline_status,
+              uploaded_at, transcript_text
+         FROM vlogs
+        WHERE operator_id = ? AND deleted_at IS NULL
+        ORDER BY recorded_at DESC, uploaded_at DESC
+        LIMIT 200`,
+      operator.id,
     )
-    const threadCount = counts.find(c => c.k === 'thread')?.n ?? 0
-    const clipCount = counts.find(c => c.k === 'clip')?.n ?? 0
-    const wordCount = v.transcript_text ? v.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
-    cards.push({
-      id: v.id,
-      type: 'vlog',
-      recorded_at: v.recorded_at || v.uploaded_at,
-      title: deriveVlogTitle(v.original_filename),
-      thumbnail_url: v.thumbnail_url,
-      duration_seconds: v.duration_seconds,
-      file_size_bytes: v.file_size_bytes,
-      mime_type: v.mime_type,
-      thread_count: threadCount,
-      clip_count: clipCount,
-      transcript_word_count: wordCount,
-      visibility: 'private',
-      pipeline_status: v.pipeline_status,
-    })
+    for (const v of vlogs) {
+      let threadCount = 0
+      let clipCount = 0
+      try {
+        const counts = await findMany<{ k: string; n: number }>(
+          db,
+          `SELECT 'thread' AS k, COUNT(*) AS n FROM threads WHERE vlog_id = ?
+           UNION ALL
+           SELECT 'clip' AS k, COUNT(*) AS n FROM clip_candidates WHERE vlog_id = ?`,
+          v.id, v.id,
+        )
+        threadCount = counts.find(c => c.k === 'thread')?.n ?? 0
+        clipCount = counts.find(c => c.k === 'clip')?.n ?? 0
+      } catch { /* leave counts at 0 */ }
+      const wordCount = v.transcript_text ? v.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
+      cards.push({
+        id: v.id,
+        type: 'vlog',
+        recorded_at: v.recorded_at || v.uploaded_at,
+        recorded_at_source: v.recorded_at_source ?? (v.recorded_at ? null : 'upload_time_default'),
+        title: deriveVlogTitle(v.original_filename),
+        thumbnail_url: v.thumbnail_url,
+        duration_seconds: v.duration_seconds,
+        file_size_bytes: v.file_size_bytes,
+        mime_type: v.mime_type,
+        thread_count: threadCount,
+        clip_count: clipCount,
+        transcript_word_count: wordCount,
+        visibility: 'private',
+        pipeline_status: v.pipeline_status,
+      })
+    }
+  } catch (err: any) {
+    blockErrors.vlogs = err?.message || String(err)
+    console.warn('[timeline] vlog block failed:', blockErrors.vlogs)
   }
 
   // ── Threads ──────────────────────────────────────────────────────────────
-  const threads = await findMany<{
-    id: string
-    topic: string
-    take: string | null
-    key_quotes: string | null
-    strength: number | null
-    abstracted_topic: string | null
-    extracted_at: string
-    vlog_id: string
-    transcript_span_start: number | null
-    vlog_filename: string | null
-  }>(
-    db,
-    `SELECT t.id, t.topic, t.take, t.key_quotes, t.strength, t.abstracted_topic, t.extracted_at,
-            t.vlog_id, t.transcript_span_start, v.original_filename AS vlog_filename
-       FROM threads t
-       JOIN vlogs v ON v.id = t.vlog_id
-      WHERE t.operator_id = ?
-      ORDER BY t.extracted_at DESC
-      LIMIT 200`,
-    operator.id,
-  )
-  for (const t of threads) {
-    const keyQuote = parseFirstQuote(t.key_quotes)
-    cards.push({
-      id: t.id,
-      type: 'thread',
-      created_at: t.extracted_at,
-      topic: t.abstracted_topic || t.topic,
-      abstracted_topic: t.abstracted_topic ?? undefined,
-      take: t.take || '(no take extracted)',
-      key_quote: keyQuote,
-      strength: t.strength ?? 3,
-      visibility: 'private',
-      source_vlog_title: deriveVlogTitle(t.vlog_filename),
-      source_timecode: t.transcript_span_start != null
-        ? `${Math.floor(t.transcript_span_start / 60)}:${String(Math.floor(t.transcript_span_start % 60)).padStart(2, '0')}`
-        : undefined,
-    })
+  try {
+    const threads = await findMany<{
+      id: string
+      topic: string
+      take: string | null
+      key_quotes: string | null
+      strength: number | null
+      abstracted_topic: string | null
+      extracted_at: string
+      vlog_id: string
+      transcript_span_start: number | null
+      vlog_filename: string | null
+    }>(
+      db,
+      `SELECT t.id, t.topic, t.take, t.key_quotes, t.strength, t.abstracted_topic, t.extracted_at,
+              t.vlog_id, t.transcript_span_start, v.original_filename AS vlog_filename
+         FROM threads t
+         JOIN vlogs v ON v.id = t.vlog_id
+        WHERE t.operator_id = ?
+        ORDER BY t.extracted_at DESC
+        LIMIT 200`,
+      operator.id,
+    )
+    for (const t of threads) {
+      const keyQuote = parseFirstQuote(t.key_quotes)
+      cards.push({
+        id: t.id,
+        type: 'thread',
+        created_at: t.extracted_at,
+        topic: t.abstracted_topic || t.topic,
+        abstracted_topic: t.abstracted_topic ?? undefined,
+        take: t.take || '(no take extracted)',
+        key_quote: keyQuote,
+        strength: t.strength ?? 3,
+        visibility: 'private',
+        source_vlog_title: deriveVlogTitle(t.vlog_filename),
+        source_timecode: t.transcript_span_start != null
+          ? `${Math.floor(t.transcript_span_start / 60)}:${String(Math.floor(t.transcript_span_start % 60)).padStart(2, '0')}`
+          : undefined,
+      })
+    }
+  } catch (err: any) {
+    blockErrors.threads = err?.message || String(err)
+    console.warn('[timeline] thread block failed:', blockErrors.threads)
   }
 
   // ── Clip candidates ──────────────────────────────────────────────────────
-  const clips = await findMany<{
-    id: string
-    start_time: number
-    end_time: number
-    headline: string
-    quote: string | null
-    status: string
-    extracted_at: string
-  }>(
-    db,
-    `SELECT id, start_time, end_time, headline, quote, status, extracted_at
-       FROM clip_candidates
-      WHERE operator_id = ?
-      ORDER BY extracted_at DESC
-      LIMIT 200`,
-    operator.id,
-  )
-  for (const c of clips) {
-    cards.push({
-      id: c.id,
-      type: 'clip',
-      created_at: c.extracted_at,
-      status: c.status === 'published' ? 'published' : 'candidate',
-      start_seconds: c.start_time,
-      end_seconds: c.end_time,
-      quote: c.quote || c.headline,
-    })
+  try {
+    const clips = await findMany<{
+      id: string
+      start_time: number
+      end_time: number
+      headline: string
+      quote: string | null
+      status: string
+      extracted_at: string
+    }>(
+      db,
+      `SELECT id, start_time, end_time, headline, quote, status, extracted_at
+         FROM clip_candidates
+        WHERE operator_id = ?
+        ORDER BY extracted_at DESC
+        LIMIT 200`,
+      operator.id,
+    )
+    for (const c of clips) {
+      cards.push({
+        id: c.id,
+        type: 'clip',
+        created_at: c.extracted_at,
+        status: c.status === 'published' ? 'published' : 'candidate',
+        start_seconds: c.start_time,
+        end_seconds: c.end_time,
+        quote: c.quote || c.headline,
+      })
+    }
+  } catch (err: any) {
+    blockErrors.clips = err?.message || String(err)
+    console.warn('[timeline] clip block failed:', blockErrors.clips)
   }
 
   // ── Posts ────────────────────────────────────────────────────────────────
-  const posts = await findMany<{
-    id: string
-    kind: string
-    body: string | null
-    state: string
-    published_to: string | null
-    engagement: string | null
-    created_at: string
-  }>(
-    db,
-    `SELECT id, kind, body, state, published_to, engagement, created_at
-       FROM posts
-      WHERE operator_id = ? AND state = 'published'
-      ORDER BY created_at DESC
-      LIMIT 100`,
-    operator.id,
-  )
-  for (const p of posts) {
-    const eng = safeJson<{ views?: number; reposts?: number; replies?: number }>(p.engagement) || {}
-    cards.push({
-      id: p.id,
-      type: 'post',
-      posted_at: p.created_at,
-      platform: p.published_to || 'X',
-      text: p.body || '',
-      views: eng.views,
-      reposts: eng.reposts,
-      replies: eng.replies,
-    })
+  try {
+    const posts = await findMany<{
+      id: string
+      kind: string
+      body: string | null
+      state: string
+      published_to: string | null
+      engagement: string | null
+      created_at: string
+    }>(
+      db,
+      `SELECT id, kind, body, state, published_to, engagement, created_at
+         FROM posts
+        WHERE operator_id = ? AND state = 'published'
+        ORDER BY created_at DESC
+        LIMIT 100`,
+      operator.id,
+    )
+    for (const p of posts) {
+      const eng = safeJson<{ views?: number; reposts?: number; replies?: number }>(p.engagement) || {}
+      cards.push({
+        id: p.id,
+        type: 'post',
+        posted_at: p.created_at,
+        platform: p.published_to || 'X',
+        text: p.body || '',
+        views: eng.views,
+        reposts: eng.reposts,
+        replies: eng.replies,
+      })
+    }
+  } catch (err: any) {
+    blockErrors.posts = err?.message || String(err)
+    console.warn('[timeline] post block failed:', blockErrors.posts)
   }
 
   // ── Surfaced cards ───────────────────────────────────────────────────────
-  const surfaced = await findMany<{
-    id: string
-    subtype: string
-    body: string
-    body_html: string | null
-    topic_color: string | null
-    surfaced_at: string
-  }>(
-    db,
-    `SELECT id, subtype, body, body_html, topic_color, surfaced_at
-       FROM surfaced_cards
-      WHERE operator_id = ? AND dismissed_at IS NULL
-      ORDER BY surfaced_at DESC
-      LIMIT 50`,
-    operator.id,
-  )
-  for (const s of surfaced) {
-    cards.push({
-      id: s.id,
-      type: 'surfaced',
-      created_at: s.surfaced_at,
-      kind: s.subtype as 'cluster_ready' | 'adjacent_insight' | 'gap_question' | 'auto_link',
-      body: s.body_html || s.body,
-      topic: s.topic_color || undefined,
-    })
+  try {
+    const surfaced = await findMany<{
+      id: string
+      subtype: string
+      body: string
+      body_html: string | null
+      topic_color: string | null
+      surfaced_at: string
+    }>(
+      db,
+      `SELECT id, subtype, body, body_html, topic_color, surfaced_at
+         FROM surfaced_cards
+        WHERE operator_id = ? AND dismissed_at IS NULL
+        ORDER BY surfaced_at DESC
+        LIMIT 50`,
+      operator.id,
+    )
+    for (const s of surfaced) {
+      cards.push({
+        id: s.id,
+        type: 'surfaced',
+        created_at: s.surfaced_at,
+        kind: s.subtype as 'cluster_ready' | 'adjacent_insight' | 'gap_question' | 'auto_link',
+        body: s.body_html || s.body,
+        topic: s.topic_color || undefined,
+      })
+    }
+  } catch (err: any) {
+    blockErrors.surfaced = err?.message || String(err)
+    console.warn('[timeline] surfaced block failed:', blockErrors.surfaced)
   }
 
   // Sort the whole union by timestamp desc
@@ -233,7 +284,6 @@ export async function GET(req: NextRequest) {
     return tb.localeCompare(ta)
   })
 
-  // Counts per type (for filter pills)
   const counts = {
     all: cards.length,
     vlog: cards.filter(c => c.type === 'vlog').length,
@@ -246,7 +296,11 @@ export async function GET(req: NextRequest) {
     surfaced: cards.filter(c => c.type === 'surfaced').length,
   }
 
-  return NextResponse.json({ cards, counts })
+  const response: any = { cards, counts }
+  if (Object.keys(blockErrors).length > 0) {
+    response.block_errors = blockErrors  // surfaced for the client / debugging
+  }
+  return NextResponse.json(response)
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

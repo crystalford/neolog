@@ -10,7 +10,9 @@ name: Bootstrap Cloudflare
 #  - Container Worker for FFmpeg deployed
 #  - Pages project linked + production deploy
 #
-# Trigger: manually from github.com → Actions → Bootstrap Cloudflare → "Run workflow"
+# Trigger: automatically on every push to main, OR manually from
+# github.com → Actions → Bootstrap Cloudflare → "Run workflow" (e.g. to use
+# the reset_schema toggle).
 #
 # Required secrets (set once via github.com → repo → Settings → Secrets and variables → Actions):
 #  CLOUDFLARE_API_TOKEN   — token with Workers/D1/R2/Pages/Access edit permissions
@@ -21,6 +23,8 @@ name: Bootstrap Cloudflare
 # The workflow is idempotent. Safe to re-run after any change.
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       reset_schema:

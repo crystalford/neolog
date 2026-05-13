@@ -86,56 +86,61 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     filename.endsWith('.mov')
   const hasTranscode = !!vlog.transcoded_r2_key
 
-  // ── SYNC BRANCH ─────────────────────────────────────────────────────────
-  // Try direct ffmpeg on the best available source (transcoded if present,
-  // else original) UNLESS it's HEVC without a transcode — that's the known
-  // failure case where direct extract returns 0 frames.
-  const canTrySync = env.FFMPEG && (!isHevc || hasTranscode)
-
-  if (canTrySync) {
+  // ── SYNC BRANCHES ───────────────────────────────────────────────────────
+  // Tier 1: /extract-thumb (direct, -noautorotate handles most HEVC rotations)
+  // Tier 2: /extract-thumb-mini-transcode (2-sec re-encode, catches HEVC
+  //         verticals where tier 1 still returns <1KB)
+  // Tier 3 (async): dispatch the workflow's full transcode chain
+  //
+  // We try BOTH sync tiers for any vlog with an FFMPEG binding, including
+  // HEVC without transcode — direct often succeeds now that -noautorotate
+  // is set on the FFmpeg side.
+  if (env.FFMPEG) {
     const sourceKey = vlog.transcoded_r2_key || vlog.r2_key
-    const ctl = new AbortController()
-    const timeoutId = setTimeout(() => ctl.abort(), 22_000)
-    try {
-      const presigned = await presignGetUrl(env, sourceKey, 600)
-      const resp = await env.FFMPEG!.fetch('https://internal/extract-thumb', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_url: presigned, t: 1.0 }),
-        signal: ctl.signal,
-      } as RequestInit)
-      if (resp.ok) {
+
+    for (const endpoint of ['/extract-thumb', '/extract-thumb-mini-transcode'] as const) {
+      const ctl = new AbortController()
+      const timeoutId = setTimeout(() => ctl.abort(), 22_000)
+      try {
+        const presigned = await presignGetUrl(env, sourceKey, 600)
+        const resp = await env.FFMPEG.fetch(`https://internal${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input_url: presigned, t: 1.0 }),
+          signal: ctl.signal,
+        } as RequestInit)
+        if (!resp.ok) {
+          clearTimeout(timeoutId)
+          continue  // try next tier
+        }
         const bytes = new Uint8Array(await resp.arrayBuffer())
         clearTimeout(timeoutId)
-        if (bytes.byteLength >= MIN_JPEG_BYTES) {
-          const thumbKey = `${operator.id}/thumbs/${params.id}.jpg`
-          await putObject(env, thumbKey, bytes, {
-            httpMetadata: { contentType: 'image/jpeg' },
-          })
-          // Sticky update: only set if no thumbnail was set in the meantime.
-          await run(
-            db,
-            `UPDATE vlogs
-                SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
-              WHERE id = ? AND operator_id = ?
-                AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
-            thumbKey, params.id, operator.id,
-          )
-          const thumbnailUrl = await presignGetUrl(env, thumbKey, 24 * 3600)
-          return NextResponse.json({
-            ok: true,
-            method: 'direct',
-            bytes: bytes.byteLength,
-            thumbnail_url: thumbnailUrl,
-          })
+        if (bytes.byteLength < MIN_JPEG_BYTES) {
+          continue  // try next tier
         }
-        // <MIN_JPEG_BYTES → fall through to async
+        const thumbKey = `${operator.id}/thumbs/${params.id}.jpg`
+        await putObject(env, thumbKey, bytes, {
+          httpMetadata: { contentType: 'image/jpeg' },
+        })
+        await run(
+          db,
+          `UPDATE vlogs
+              SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND operator_id = ?
+              AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
+          thumbKey, params.id, operator.id,
+        )
+        const thumbnailUrl = await presignGetUrl(env, thumbKey, 24 * 3600)
+        return NextResponse.json({
+          ok: true,
+          method: endpoint === '/extract-thumb' ? 'direct' : 'mini_transcode',
+          bytes: bytes.byteLength,
+          thumbnail_url: thumbnailUrl,
+        })
+      } catch {
+        clearTimeout(timeoutId)
+        // network / timeout — try next tier
       }
-      clearTimeout(timeoutId)
-      // !resp.ok → fall through to async
-    } catch {
-      clearTimeout(timeoutId)
-      // Network / binding / timeout → fall through to async
     }
   }
 
