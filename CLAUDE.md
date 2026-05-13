@@ -100,10 +100,13 @@ These are documentary / short film / video essay productions. **Never add captio
 
 Dock has five entries: **Timeline · Studio · Graph · Projects · Settings**. Capture is a global floating affordance above the dock. There is no Home page — the app opens directly into Timeline.
 
+Chat is a sixth surface, accessible from the desktop sidebar (not the mobile dock). It's the in-app assistant — Kimi K2.6 on Workers AI by default, Claude Sonnet 4.6 as an opt-in `max` toggle.
+
 | Surface | Path | What it is |
 |---|---|---|
 | Timeline | `/timeline` | Single chronological feed of heterogeneous cards (Vlog, Thread, Post, Clip, Article, B-roll, Attachment, Project update, Surfaced) sorted by `recorded_at`. Filterable via pill row. |
 | Studio | `/studio` | Cluster detail = deliberate-work mode. Reached from `Surfaced · Cluster ready` cards on Timeline. |
+| Chat | `/chat` | In-app assistant with tool use. Searches the corpus, drafts posts, saves notes, ingests images / pasted docs. Kimi K2.6 default, Sonnet opt-in. |
 | Graph | `/graph` | Direct navigable view of the substrate. Nodes colored by topic territory. |
 | Projects | `/projects` | Long-form creative_work containers (Pack Rats etc). Different rhythm from the rest. |
 | Settings | `/settings` | Operator profile, voice profiles, API keys, integrations, storage. |
@@ -156,7 +159,8 @@ A future agent who tries to make clustering "smarter" by surfacing hidden cross-
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows |
 | Transcription | Cloudflare Workers AI Whisper |
-| AI | Claude `claude-sonnet-4-6` (extraction + ideation); `claude-haiku-4-5` (cheap classification + coherence-check) |
+| AI (chat) | **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) on Workers AI by default; Claude `claude-sonnet-4-6` as `max` opt-in. Kimi has tool use + vision + 256K context. |
+| AI (extraction) | Llama 3.3 70B on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. |
 | Video processing | Cloudflare Container Workers running FFmpeg |
 | Auth | Cloudflare Access (one-time PIN to operator email) |
 | Styling | Inline styles importing tokens from `src/lib/design.ts` |

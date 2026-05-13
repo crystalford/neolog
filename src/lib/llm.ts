@@ -21,7 +21,15 @@ export type Tier = 'free' | 'premium' | 'max'
 export type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entities'
 
 const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
 const CLAUDE_SONNET = 'claude-sonnet-4-6'
+
+export const CHAT_MODELS = {
+  KIMI: KIMI_K2_6,
+  CLAUDE: CLAUDE_SONNET,
+} as const
+
+export type ChatModelKey = 'kimi' | 'claude'
 
 /**
  * Route a pass to the right provider based on tier.
@@ -166,3 +174,273 @@ function stripJsonFences(text: string): string {
 
 // Re-export so callers can keep using one import.
 export { parseClaudeJson }
+
+// ─── Chat / agent surface ───────────────────────────────────────────────────
+// Used by /api/v2/chat. Supports tool calls (function calling) and vision via
+// either Kimi K2.6 on Workers AI (default, free-ish) or Claude Sonnet (opt-in,
+// premium). Behaviour is normalized so the caller doesn't care which provider
+// answered — every message arrives as { role, content[], tool_calls? }.
+
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool'
+
+export interface ChatImageRef {
+  type: 'image_url'
+  image_url: { url: string }
+}
+
+export interface ChatTextPart { type: 'text'; text: string }
+
+export type ChatContentPart = ChatTextPart | ChatImageRef
+
+export interface ChatMessage {
+  role: ChatRole
+  content: string | ChatContentPart[]
+  tool_call_id?: string
+  tool_calls?: ChatToolCall[]
+  name?: string
+}
+
+export interface ChatToolDef {
+  name: string
+  description: string
+  parameters: Record<string, unknown>  // JSON Schema
+}
+
+export interface ChatToolCall {
+  id: string
+  name: string
+  arguments: Record<string, unknown>
+}
+
+export interface ChatResponse {
+  text: string
+  tool_calls: ChatToolCall[]
+  inputTokens: number
+  outputTokens: number
+  provider: 'workers_ai' | 'claude'
+  model: string
+  stopReason: string | null
+}
+
+/**
+ * Single-turn chat completion with optional tool use + vision.
+ *
+ * Caller is responsible for the multi-turn tool loop (execute tool, append
+ * result as role='tool', call again). This function does ONE round-trip.
+ */
+export async function callChat(
+  env: { AI: Ai; ANTHROPIC_API_KEY: string },
+  args: {
+    model: ChatModelKey
+    system?: string
+    messages: ChatMessage[]
+    tools?: ChatToolDef[]
+    maxTokens?: number
+    temperature?: number
+  },
+): Promise<ChatResponse> {
+  if (args.model === 'claude') {
+    return callClaudeChat(env, args)
+  }
+  return callKimiChat(env, args)
+}
+
+// ─── Kimi K2.6 (OpenAI-compatible chat completions on Workers AI) ───────────
+
+async function callKimiChat(
+  env: { AI: Ai },
+  args: {
+    system?: string
+    messages: ChatMessage[]
+    tools?: ChatToolDef[]
+    maxTokens?: number
+    temperature?: number
+  },
+): Promise<ChatResponse> {
+  const openAiMessages = toOpenAiMessages(args.system, args.messages)
+  const tools = args.tools?.map(t => ({
+    type: 'function' as const,
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }))
+
+  const body: any = {
+    messages: openAiMessages,
+    max_tokens: args.maxTokens ?? 4096,
+  }
+  if (args.temperature != null) body.temperature = args.temperature
+  if (tools && tools.length) body.tools = tools
+
+  const result: any = await env.AI.run(KIMI_K2_6 as any, body)
+  // Workers AI normalizes OpenAI-style responses; tool_calls live on
+  // result.choices?.[0]?.message?.tool_calls when present, otherwise the model
+  // returns text only.
+  const choice = Array.isArray(result?.choices) ? result.choices[0] : null
+  const msg = choice?.message ?? null
+  const text = String(msg?.content ?? result?.response ?? '')
+  const rawToolCalls = Array.isArray(msg?.tool_calls) ? msg.tool_calls : []
+  const toolCalls: ChatToolCall[] = rawToolCalls.map((tc: any, i: number) => ({
+    id: tc.id ?? `call_${i}`,
+    name: tc.function?.name ?? tc.name ?? '',
+    arguments: parseToolArgs(tc.function?.arguments ?? tc.arguments ?? '{}'),
+  }))
+
+  return {
+    text,
+    tool_calls: toolCalls,
+    inputTokens: result?.usage?.prompt_tokens ?? 0,
+    outputTokens: result?.usage?.completion_tokens ?? 0,
+    provider: 'workers_ai',
+    model: KIMI_K2_6,
+    stopReason: choice?.finish_reason ?? null,
+  }
+}
+
+function toOpenAiMessages(system: string | undefined, messages: ChatMessage[]): any[] {
+  const out: any[] = []
+  if (system) out.push({ role: 'system', content: system })
+  for (const m of messages) {
+    if (m.role === 'tool') {
+      out.push({ role: 'tool', tool_call_id: m.tool_call_id, content: stringContent(m.content), name: m.name })
+      continue
+    }
+    if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length) {
+      out.push({
+        role: 'assistant',
+        content: stringContent(m.content) || null,
+        tool_calls: m.tool_calls.map(tc => ({
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+        })),
+      })
+      continue
+    }
+    // user / assistant — content can be string or multimodal parts.
+    if (typeof m.content === 'string') {
+      out.push({ role: m.role, content: m.content })
+    } else {
+      // OpenAI multimodal: [{type:'text',text}, {type:'image_url',image_url:{url}}]
+      out.push({ role: m.role, content: m.content })
+    }
+  }
+  return out
+}
+
+function stringContent(content: string | ChatContentPart[]): string {
+  if (typeof content === 'string') return content
+  return content
+    .filter((p): p is ChatTextPart => p.type === 'text')
+    .map(p => p.text)
+    .join('')
+}
+
+function parseToolArgs(raw: any): Record<string, unknown> {
+  if (typeof raw === 'object' && raw !== null) return raw
+  if (typeof raw !== 'string') return {}
+  try { return JSON.parse(raw) }
+  catch { return {} }
+}
+
+// ─── Claude chat (Sonnet 4.6) with tool use ─────────────────────────────────
+
+async function callClaudeChat(
+  env: { ANTHROPIC_API_KEY: string },
+  args: {
+    system?: string
+    messages: ChatMessage[]
+    tools?: ChatToolDef[]
+    maxTokens?: number
+    temperature?: number
+  },
+): Promise<ChatResponse> {
+  if (!env.ANTHROPIC_API_KEY) {
+    throw new Error('ANTHROPIC_API_KEY not set — required for max-tier chat. Set the secret on Pages or pick Kimi.')
+  }
+
+  const claudeMessages = toClaudeMessages(args.messages)
+  const claudeTools = args.tools?.map(t => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters,
+  }))
+
+  const body: any = {
+    model: CLAUDE_SONNET,
+    max_tokens: args.maxTokens ?? 4096,
+    messages: claudeMessages,
+  }
+  if (args.system) body.system = args.system
+  if (claudeTools && claudeTools.length) body.tools = claudeTools
+  if (args.temperature != null) body.temperature = args.temperature
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`Claude API ${res.status}: ${errText.slice(0, 800)}`)
+  }
+  const data: any = await res.json()
+  const blocks = Array.isArray(data.content) ? data.content : []
+  const text = blocks
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+    .join('')
+  const toolCalls: ChatToolCall[] = blocks
+    .filter((b: any) => b.type === 'tool_use')
+    .map((b: any) => ({
+      id: b.id,
+      name: b.name,
+      arguments: typeof b.input === 'object' && b.input !== null ? b.input : {},
+    }))
+  return {
+    text,
+    tool_calls: toolCalls,
+    inputTokens: data.usage?.input_tokens ?? 0,
+    outputTokens: data.usage?.output_tokens ?? 0,
+    provider: 'claude',
+    model: data.model ?? CLAUDE_SONNET,
+    stopReason: data.stop_reason ?? null,
+  }
+}
+
+function toClaudeMessages(messages: ChatMessage[]): any[] {
+  return messages.map(m => {
+    if (m.role === 'tool') {
+      return {
+        role: 'user',
+        content: [{
+          type: 'tool_result',
+          tool_use_id: m.tool_call_id,
+          content: stringContent(m.content),
+        }],
+      }
+    }
+    if (m.role === 'assistant' && m.tool_calls && m.tool_calls.length) {
+      const blocks: any[] = []
+      const textPart = stringContent(m.content)
+      if (textPart) blocks.push({ type: 'text', text: textPart })
+      for (const tc of m.tool_calls) {
+        blocks.push({ type: 'tool_use', id: tc.id, name: tc.name, input: tc.arguments })
+      }
+      return { role: 'assistant', content: blocks }
+    }
+    if (typeof m.content === 'string') {
+      return { role: m.role, content: m.content }
+    }
+    // Multimodal — convert OpenAI-style image_url into Claude image blocks.
+    const blocks = m.content.map((p): any => {
+      if (p.type === 'text') return { type: 'text', text: p.text }
+      // Claude accepts data:image/jpeg;base64,... via source.type='base64' OR
+      // a URL via source.type='url'. We pass URL through verbatim.
+      return { type: 'image', source: { type: 'url', url: p.image_url.url } }
+    })
+    return { role: m.role, content: blocks }
+  })
+}
