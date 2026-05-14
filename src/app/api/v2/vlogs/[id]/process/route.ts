@@ -63,11 +63,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ ok: true, already_complete: true })
   }
 
-  // Reset status; the Workflow's first step will move it to 'transcoding'
+  // Reset status + clear stale extraction_outcomes so the new workflow
+  // starts from a clean slate. Without clearing outcomes, the UI would
+  // see leftover "running" entries from the prior (dead) workflow.
   await run(
     db,
     `UPDATE vlogs SET pipeline_status = 'uploaded', pipeline_error = NULL,
-       updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+       extraction_outcomes = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     params.id,
   )
 

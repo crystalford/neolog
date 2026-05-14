@@ -70,6 +70,12 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     const tier: 'free' | 'premium' | 'max' = event.payload.tier ?? 'free'
     const thumbnailOnly = event.payload.thumbnail_only === true
     const passesToRun = new Set(event.payload.passes ?? ['threads', 'clip_candidates', 'creative_elements', 'entities'])
+    // Re-extract dispatch (from /api/v2/vlogs/[id]/process) explicitly sets
+    // `passes`. Fresh uploads from /api/v2/vlogs POST do not. When this is a
+    // re-extract, skip the setup steps (transcode / thumbnail / recorded_at)
+    // entirely — they're only useful for first-time processing. The LLM
+    // passes read transcript_text, not the video file.
+    const isReExtract = event.payload.passes != null && event.payload.passes.length > 0
 
     // ── Step 1: load context ─────────────────────────────────────────────────
     const vlog = await step.do('fetch-context', async () => {
@@ -204,7 +210,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // Wrapped in softStep so a transcode failure (OOM on huge files, etc.) no
     // longer aborts the workflow. Thumbnail + transcribe + extract still run.
     let transcodedKey = vlog.transcoded_r2_key
-    if (isVideo && !transcodedKey) {
+    if (isVideo && !transcodedKey && !isReExtract) {
       await step.do('mark-transcoding', async () => reportStatus('transcoding'))
 
       transcodedKey = await softStep(
@@ -240,7 +246,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     //    lock was relaxed: the cost of data URIs (17 MB API responses,
     //    decoder pressure on /uploads) outweighed the signed-URL-expiry
     //    cost it was mitigating. ──────────────────────────────────────────
-    if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && (isVideo || vlog.mime_type === 'video/mp4')) {
+    if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && !isReExtract && (isVideo || vlog.mime_type === 'video/mp4')) {
       await softStep(
         'extract-thumbnail',
         { retries: { limit: 2, delay: '15 seconds' }, timeout: '5 minutes' },
@@ -293,7 +299,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // The API route also runs this synchronously at INSERT time via the shared
     // src/lib/recorded-at.ts module. This step stays as a safety net for
     // archived imports / cases where the API tiers all missed.
-    if (!vlog.recorded_at && isVideo) {
+    if (!vlog.recorded_at && isVideo && !isReExtract) {
       await softStep('extract-recorded-at', null, async () => {
         // Tier 1: already set (pre-extracted from client) → handled by the `if` above
         // Tier 2: mvhd atom
