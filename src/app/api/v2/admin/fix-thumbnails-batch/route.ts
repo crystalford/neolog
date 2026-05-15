@@ -58,6 +58,8 @@ interface ProcessResult {
   method?: 'direct' | 'mini_transcode' | 'queued' | 'failed'
   bytes?: number
   error?: string
+  thumbnail_url?: string  // presigned 24h GET so the UI can render the image inline
+  filename?: string       // echoed so client doesn't need to look it up
 }
 
 export async function POST(req: NextRequest) {
@@ -84,12 +86,17 @@ async function handle(req: NextRequest) {
     throw e
   }
 
-  const body = await req.json().catch(() => ({})) as { cursor?: string; chunk_size?: number }
+  const body = await req.json().catch(() => ({})) as {
+    cursor?: string
+    chunk_size?: number
+    vlog_ids?: string[]  // explicit list mode — process exactly these rows in order
+  }
   const cursor = body.cursor || ''
   // Default chunk size 2: stays well under Cloudflare's ~30s edge timeout
   // even when each row takes the full FFmpeg budget. Operator can lower to 1
   // via the client if needed.
   const chunkSize = Math.max(1, Math.min(8, body.chunk_size ?? 2))
+  const explicitIds = Array.isArray(body.vlog_ids) ? body.vlog_ids.slice(0, chunkSize) : null
 
   const db = getDb(env)
 
@@ -103,20 +110,40 @@ async function handle(req: NextRequest) {
   ).bind(operator.id).first<{ c: number }>()
   const remaining = remainingResult?.c ?? 0
 
-  // Fetch the next chunk after the cursor.
-  const rows = await findMany<VlogRow>(
-    db,
-    `SELECT id, mime_type, original_filename, r2_key, transcoded_r2_key
-       FROM vlogs
-      WHERE operator_id = ?
-        AND thumbnail_url IS NULL
-        AND thumbnail_r2_key IS NULL
-        AND deleted_at IS NULL
-        AND id > ?
-      ORDER BY id ASC
-      LIMIT ?`,
-    operator.id, cursor, chunkSize,
-  )
+  // Either: explicit vlog_ids mode (client controls order) or cursor mode.
+  let rows: VlogRow[]
+  if (explicitIds && explicitIds.length > 0) {
+    const placeholders = explicitIds.map(() => '?').join(',')
+    rows = await findMany<VlogRow>(
+      db,
+      `SELECT id, mime_type, original_filename, r2_key, transcoded_r2_key
+         FROM vlogs
+        WHERE operator_id = ?
+          AND deleted_at IS NULL
+          AND thumbnail_url IS NULL
+          AND thumbnail_r2_key IS NULL
+          AND id IN (${placeholders})`,
+      operator.id, ...explicitIds,
+    )
+    // Re-sort to match the order client requested (DB doesn't guarantee IN
+    // clause order). Operator sees their list processed top-to-bottom.
+    const idx = new Map(explicitIds.map((id, i) => [id, i]))
+    rows.sort((a, b) => (idx.get(a.id) ?? 999) - (idx.get(b.id) ?? 999))
+  } else {
+    rows = await findMany<VlogRow>(
+      db,
+      `SELECT id, mime_type, original_filename, r2_key, transcoded_r2_key
+         FROM vlogs
+        WHERE operator_id = ?
+          AND thumbnail_url IS NULL
+          AND thumbnail_r2_key IS NULL
+          AND deleted_at IS NULL
+          AND id > ?
+        ORDER BY id ASC
+        LIMIT ?`,
+      operator.id, cursor, chunkSize,
+    )
+  }
 
   if (rows.length === 0) {
     return NextResponse.json({
@@ -128,7 +155,11 @@ async function handle(req: NextRequest) {
   }
 
   const processed: ProcessResult[] = await Promise.all(
-    rows.map(row => processRow(env, db, operator.id, row)),
+    rows.map(async row => {
+      const result = await processRow(env, db, operator.id, row)
+      // Echo filename so the client can display the row even before re-fetching
+      return { ...result, filename: row.original_filename || undefined }
+    }),
   )
 
   const nextCursor = rows[rows.length - 1].id
@@ -240,7 +271,17 @@ async function persistThumb(
         AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
     thumbKey, vlogId, operatorId,
   )
-  return { vlog_id: vlogId, ok: true, method: method as any, bytes: bytes.byteLength }
+  // Presign 24h URL so the client can render the new thumbnail inline
+  // immediately. Tile shows the image right after the row completes.
+  let thumbnailUrl: string | undefined
+  try { thumbnailUrl = await presignGetUrl(env, thumbKey, 24 * 3600) } catch {}
+  return {
+    vlog_id: vlogId,
+    ok: true,
+    method: method as any,
+    bytes: bytes.byteLength,
+    thumbnail_url: thumbnailUrl,
+  }
 }
 
 async function dispatchWorkflow(
