@@ -1,0 +1,96 @@
+name: Deploy workers
+
+# Auto-deploy the FFmpeg container worker and the process-upload workflow
+# worker on push to main when their files change. Closes the gap between
+# deploy.yml (Pages only) and bootstrap-cloudflare.yml (manual full infra).
+#
+# Why this exists: before this workflow, code changes to workers/* only
+# reached production when the operator manually ran "Bootstrap Cloudflare".
+# That meant fixes pushed to main sat dormant — including the thumbnail
+# improvements that should have unblocked the "Fix all thumbnails" feature.
+#
+# Triggers:
+#   - push to main with changes under workers/**
+#   - workflow_dispatch (manual)
+#
+# Both jobs always run when the workflow triggers. wrangler deploy is
+# idempotent and fast for unchanged code (~30s), so over-deploying is
+# cheap. Keeps the workflow simple.
+#
+# Required secrets (same set bootstrap-cloudflare.yml uses):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/**'
+      - '.github/workflows/deploy-workers.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install wrangler
+        run: pnpm add -g wrangler@4
+      - name: Deploy FFmpeg container worker
+        if: hashFiles('workers/ffmpeg/wrangler.toml') != ''
+        run: |
+          cd workers/ffmpeg
+          wrangler deploy
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## FFmpeg container worker"
+            echo ""
+            echo "Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-process-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install wrangler
+        run: pnpm add -g wrangler@4
+      - name: Deploy process-upload workflow worker
+        if: hashFiles('workers/process-upload/wrangler.toml') != ''
+        run: |
+          cd workers/process-upload
+          wrangler deploy
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## process-upload workflow worker"
+            echo ""
+            echo "Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

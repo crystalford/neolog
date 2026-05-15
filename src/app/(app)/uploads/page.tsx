@@ -273,6 +273,7 @@ export default function UploadsPage() {
           } else if (p.method === 'queued') {
             row.status = 'queued_for_transcode'
             row.method = 'queued'
+            row.error = p.error  // diagnostic: WHY did the fast tiers fail?
             queuedDispatched++
           } else {
             row.status = 'failed'
@@ -865,61 +866,96 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
     row.status === "queued" ? "queued" :
     row.status === "processing" ? "processing…" :
     row.status === "done" ? `done · ${row.method === "mini_transcode" ? "mini-transcode" : "direct"}${row.ms ? ` · ${(row.ms/1000).toFixed(1)}s` : ""}` :
-    row.status === "queued_for_transcode" ? "queued for transcode (background)" :
-    `failed: ${row.error || "unknown"}`
+    row.status === "queued_for_transcode" ? "queued for full transcode (background)" :
+    `failed: ${(row.error || "unknown").slice(0, 80)}`
+  // Show verbatim FFmpeg / network error in a collapsible block when we have one
+  // AND the row didn't succeed via fast path. Lets the operator paste the
+  // actual error string back to me instead of "it just failed".
+  const hasDiagnostic = (row.status === "failed" || row.status === "queued_for_transcode") && !!row.error
   return (
     <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      padding: "8px 14px",
       borderBottom: "1px solid var(--line-dim, rgba(236,228,210,0.04))",
       background: row.status === "processing" ? "rgba(107,154,169,0.04)" : "transparent",
     }}>
       <div style={{
-        width: 56, height: 32,
-        background: row.thumbnail_url ? `url(${row.thumbnail_url}) center/cover` : "var(--ink-1)",
-        border: "1px solid var(--line-warm)",
-        borderRadius: 4,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "8px 14px",
       }}>
-        {!row.thumbnail_url && (
-          <span style={{
+        <div style={{
+          width: 56, height: 32,
+          background: row.thumbnail_url ? `url(${row.thumbnail_url}) center/cover` : "var(--ink-1)",
+          border: "1px solid var(--line-warm)",
+          borderRadius: 4,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+        }}>
+          {!row.thumbnail_url && (
+            <span style={{
+              fontFamily: "JetBrains Mono, monospace",
+              fontSize: 9,
+              color: statusColor,
+            }}>
+              {row.status === "processing" ? "⋯" : row.status === "failed" ? "✗" : row.status === "queued_for_transcode" ? "⏳" : "·"}
+            </span>
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 12,
+            color: "var(--bone-1)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}>{row.filename}</div>
+          <div style={{
+            fontSize: 10,
+            color: statusColor,
+            fontFamily: "JetBrains Mono, monospace",
+            marginTop: 2,
+          }}>{statusLabel}</div>
+        </div>
+        <a
+          href={`/timeline/${row.vlog_id}`}
+          style={{
+            fontSize: 10,
+            color: "var(--bone-3)",
+            fontFamily: "JetBrains Mono, monospace",
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            textDecoration: "none",
+          }}
+        >Open →</a>
+      </div>
+      {hasDiagnostic && (
+        <details style={{ padding: "0 14px 8px" }}>
+          <summary style={{
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 9,
-            color: statusColor,
+            color: "var(--bone-4)",
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            cursor: "pointer",
+            paddingLeft: 68,
           }}>
-            {row.status === "processing" ? "⋯" : row.status === "failed" ? "✗" : row.status === "queued_for_transcode" ? "⏳" : "·"}
-          </span>
-        )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 12,
-          color: "var(--bone-1)",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}>{row.filename}</div>
-        <div style={{
-          fontSize: 10,
-          color: statusColor,
-          fontFamily: "JetBrains Mono, monospace",
-          marginTop: 2,
-        }}>{statusLabel}</div>
-      </div>
-      <a
-        href={`/timeline/${row.vlog_id}`}
-        style={{
-          fontSize: 10,
-          color: "var(--bone-3)",
-          fontFamily: "JetBrains Mono, monospace",
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          textDecoration: "none",
-        }}
-      >Open →</a>
+            Diagnostic
+          </summary>
+          <pre style={{
+            margin: "6px 0 0 68px",
+            padding: "6px 8px",
+            background: "var(--ink-1)",
+            border: "1px solid var(--line-warm)",
+            borderRadius: 4,
+            fontSize: 10,
+            lineHeight: 1.5,
+            color: "var(--bone-2)",
+            fontFamily: "JetBrains Mono, monospace",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}>{row.error}</pre>
+        </details>
+      )}
     </div>
   )
 }
