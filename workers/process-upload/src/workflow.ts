@@ -206,9 +206,76 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       }
     }
 
-    // ── Step 2: transcode to H.264 (LOCKED — must precede thumbnail for HEVC) ──
-    // Wrapped in softStep so a transcode failure (OOM on huge files, etc.) no
-    // longer aborts the workflow. Thumbnail + transcribe + extract still run.
+    // ── Step 2: extract thumbnail FAST PATH ─────────────────────────────────
+    // Was previously gated behind a slow transcode (the original "LOCKED HEVC
+    // transcode-then-thumb" rule, which existed because the old /extract-thumb
+    // returned 0 frames on DJI Mimo HEVC verticals due to rotation metadata).
+    // That rule is now obsolete: /extract-thumb has -noautorotate, and the
+    // new /extract-thumb-mini-transcode fallback handles the rare files where
+    // direct extract still misses. Thumbnail now lands in 2-5 seconds for
+    // fresh uploads instead of waiting on a 5-10min transcode.
+    //
+    // Cascade:
+    //   tier 1 — /extract-thumb on original (direct, -noautorotate)
+    //   tier 2 — /extract-thumb-mini-transcode on original (2-sec mini transcode)
+    //   tier 3 — (later) /extract-thumb on transcoded output, after the slow
+    //            transcode step completes. Only triggered if 1+2 both failed.
+    if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && !isReExtract && (isVideo || vlog.mime_type === 'video/mp4')) {
+      await softStep(
+        'extract-thumbnail',
+        { retries: { limit: 1, delay: '10 seconds' }, timeout: '90 seconds' },
+        async () => {
+          const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
+          let bytes: Uint8Array | null = null
+          let method: 'direct' | 'mini_transcode' = 'direct'
+          // Tier 1 — direct
+          try {
+            const r = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ input_url: inputUrl, t: 1.0 }),
+            })
+            if (r.ok) {
+              const buf = new Uint8Array(await r.arrayBuffer())
+              if (buf.byteLength >= 1024) bytes = buf
+            }
+          } catch { /* try mini-transcode */ }
+          // Tier 2 — mini-transcode (2-sec H.264 reencode, then grab one frame)
+          if (!bytes) {
+            try {
+              const r = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb-mini-transcode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_url: inputUrl, t: 1.0 }),
+              })
+              if (r.ok) {
+                const buf = new Uint8Array(await r.arrayBuffer())
+                if (buf.byteLength >= 1024) { bytes = buf; method = 'mini_transcode' }
+              }
+            } catch { /* fall through; tier 3 may catch in a later step */ }
+          }
+          if (!bytes) {
+            throw new Error('both direct and mini-transcode tiers produced no usable JPEG')
+          }
+          const thumbKey = `${operator_id}/thumbs/${vlog_id}.jpg`
+          await this.env.VIDEOS.put(thumbKey, bytes, {
+            httpMetadata: { contentType: 'image/jpeg' },
+          })
+          await this.env.DB.prepare(
+            `UPDATE vlogs SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ? AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
+          ).bind(thumbKey, vlog_id).run()
+          return { method, bytes: bytes.byteLength }
+        },
+      )
+    }
+
+    // ── Step 3: transcode to H.264 (for browser playback) ───────────────────
+    // No longer blocks the thumbnail. The transcoded MP4 is used by the
+    // detail page's <video> tag so non-Safari browsers can play HEVC sources.
+    // If this step fails, the operator can still re-trigger transcode via
+    // the vlog detail page; the existing thumbnail + transcript remain
+    // intact.
     let transcodedKey = vlog.transcoded_r2_key
     if (isVideo && !transcodedKey && !isReExtract) {
       await step.do('mark-transcoding', async () => reportStatus('transcoding'))
@@ -239,52 +306,33 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       )
     }
 
-    // ── Step 3: extract thumbnail (LOCKED ordering: transcode-then-extract
-    //    for DJI HEVC verticals). Output now lands in R2 as a static JPEG
-    //    instead of a base64 data URI in D1 — much smaller D1 payload, the
-    //    browser can lazy-load + cache the image. Operator-set CLAUDE.md
-    //    lock was relaxed: the cost of data URIs (17 MB API responses,
-    //    decoder pressure on /uploads) outweighed the signed-URL-expiry
-    //    cost it was mitigating. ──────────────────────────────────────────
-    if (!vlog.thumbnail_url && !vlog.thumbnail_r2_key && !isReExtract && (isVideo || vlog.mime_type === 'video/mp4')) {
+    // ── Step 3b: thumbnail tier 3 — try once more from transcoded output ────
+    // Only runs if the fast thumbnail extract (step 2) failed AND transcode
+    // succeeded. Rare path — covers files where rotation metadata is so
+    // mangled that even mini-transcode produces a black frame.
+    const thumbOutcome = (outcomes as any)['extract-thumbnail']
+    const thumbFailed = thumbOutcome && thumbOutcome.ok === false && thumbOutcome.status === 'failed'
+    if (thumbFailed && transcodedKey && !vlog.thumbnail_r2_key && !vlog.thumbnail_url) {
       await softStep(
-        'extract-thumbnail',
-        { retries: { limit: 2, delay: '15 seconds' }, timeout: '5 minutes' },
+        'extract-thumbnail-from-transcoded',
+        { retries: { limit: 1 }, timeout: '60 seconds' },
         async () => {
-          // Extract from the transcoded file when available (rotation metadata
-          // stripped). If transcode failed (transcodedKey === null), fall back
-          // to the original — most H.264 sources and many HEVC sources still
-          // produce a usable frame this way.
-          const sourceKey = transcodedKey || vlog.r2_key
-          const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
-          const ffmpegResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb', {
+          const inputUrl = await presignR2Get(this.env, transcodedKey!, 3600)
+          const r = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-thumb', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ input_url: inputUrl, t: 1.0 }),
           })
-          if (!ffmpegResp.ok) {
-            const err = await ffmpegResp.text()
-            throw new Error(`ffmpeg thumbnail failed (${ffmpegResp.status}): ${err.slice(0, 500)}`)
-          }
-          const jpegBytes = new Uint8Array(await ffmpegResp.arrayBuffer())
-          if (jpegBytes.byteLength < 1024) {
-            // Defends against the historic DJI HEVC vertical bug where ffmpeg
-            // returns 0 bytes due to rotation metadata. Treated as a failure
-            // so the outcome JSON shows what happened.
-            throw new Error(`thumbnail JPEG suspiciously small: ${jpegBytes.byteLength} bytes (source=${sourceKey})`)
-          }
+          if (!r.ok) throw new Error(`tier-3 thumb HTTP ${r.status}`)
+          const buf = new Uint8Array(await r.arrayBuffer())
+          if (buf.byteLength < 1024) throw new Error(`tier-3 jpeg suspiciously small: ${buf.byteLength}B`)
           const thumbKey = `${operator_id}/thumbs/${vlog_id}.jpg`
-          await this.env.VIDEOS.put(thumbKey, jpegBytes, {
-            httpMetadata: { contentType: 'image/jpeg' },
-          })
-          // Sticky write — only set if no thumbnail exists at all. Protects
-          // operator-generated thumbnails from being overwritten by zombie
-          // workflows finishing later.
+          await this.env.VIDEOS.put(thumbKey, buf, { httpMetadata: { contentType: 'image/jpeg' } })
           await this.env.DB.prepare(
             `UPDATE vlogs SET thumbnail_r2_key = ?, updated_at = CURRENT_TIMESTAMP
               WHERE id = ? AND thumbnail_r2_key IS NULL AND thumbnail_url IS NULL`,
           ).bind(thumbKey, vlog_id).run()
-          return { source: transcodedKey ? 'transcoded' : 'original', bytes: jpegBytes.byteLength }
+          return { method: 'transcoded_fallback', bytes: buf.byteLength }
         },
       )
     }

@@ -55,13 +55,19 @@ These are settled. Read this section before proposing alternatives.
 
 ---
 
-## ⚠️ DO NOT CHANGE — Thumbnail pipeline
+## ⚠️ Thumbnail pipeline — locks reversed, fast cascade now standard
 
-Transcode HEVC → H.264 **before** thumbnail extraction. DJI Mimo HEVC vertical videos have rotation metadata that causes frame extraction to return 0 frames; the transcode strips it. Do not swap these steps.
+Earlier rule was "transcode HEVC → H.264 **before** thumbnail extraction" because the old `/extract-thumb` returned 0 frames on DJI Mimo HEVC verticals due to rotation metadata. **That rule is reversed:** thumbnail extraction now runs FIRST (before transcode) using a three-tier cascade:
 
-Thumbnails are written as static JPEGs to R2 at `{operator_id}/thumbs/{vlog_id}.jpg`, with the key stored in `vlogs.thumbnail_r2_key`. The API presigns 24-hour GET URLs and the client renders them as `<img loading="lazy">`. Browser handles caching via HTTP cache. (Reversed the prior data-URI lock — see commit `[hash]` for rationale: 17 MB API responses + per-tile decoder pressure on /uploads made data URIs worse than the signed-URL-expiry they were avoiding. The legacy `thumbnail_url` data-URI column is still read by the API for backward compat with old rows; no migration of those rows.)
+1. `/extract-thumb` direct with `-noautorotate` flag (~1-2 sec, works on most HEVC originals)
+2. `/extract-thumb-mini-transcode` — 2-second H.264 re-encode then grab one frame (~5 sec, catches the rare files where rotation metadata still confuses ffmpeg)
+3. After transcode completes, retry `/extract-thumb` on the transcoded output (only triggered if 1+2 both failed — extremely rare)
 
-The new architecture moves this from Replicate to Cloudflare Container Workers running FFmpeg, but the algorithm and ordering are identical. Locked references survive the rewrite.
+Total time on a fresh upload: ~2-5 seconds for thumbnail, even on HEVC vertical. The slow `transcode-h264` step still runs (for browser playback of HEVC sources) but no longer blocks thumbnail.
+
+Thumbnails are written as static JPEGs to R2 at `{operator_id}/thumbs/{vlog_id}.jpg`, with the key stored in `vlogs.thumbnail_r2_key`. The API presigns 24-hour GET URLs and the client renders them as `<img loading="lazy">`. Browser handles caching via HTTP cache. (Also reversed the prior data-URI lock: 17 MB API responses + per-tile decoder pressure on /uploads made data URIs worse than the signed-URL-expiry they were avoiding. The legacy `thumbnail_url` data-URI column is still read by the API for backward compat with old rows; no migration of those rows.)
+
+The new architecture moves this from Replicate to Cloudflare Container Workers running FFmpeg.
 
 ## ⚠️ DO NOT CHANGE — Recording date pipeline
 

@@ -23,6 +23,17 @@ interface UploadRow {
 
 type Filter = 'all' | 'uploaded' | 'transcribing' | 'extracting' | 'complete' | 'archived' | 'failed'
 
+interface ThumbRow {
+  vlog_id: string
+  filename: string
+  status: 'queued' | 'processing' | 'done' | 'queued_for_transcode' | 'failed'
+  method?: 'direct' | 'mini_transcode' | 'queued'
+  thumbnail_url?: string
+  error?: string
+  started_at?: number
+  ms?: number
+}
+
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'complete', label: 'Complete' },
@@ -58,6 +69,11 @@ export default function UploadsPage() {
     remaining: number | null
     lastError?: string
   } | null>(null)
+  // Live per-row status for the thumbnail fix queue. Pre-populated when the
+  // operator clicks "Fix all thumbnails" so they see exactly what's queued
+  // and watch each row tick from queued → processing → done (with the actual
+  // thumbnail rendering inline).
+  const [thumbQueue, setThumbQueue] = useState<ThumbRow[] | null>(null)
   // Path A — supabase probe
   const [probing, setProbing] = useState(false)
   const [probeResult, setProbeResult] = useState<{ ok: boolean; total?: number | null; reason?: string } | null>(null)
@@ -152,61 +168,126 @@ export default function UploadsPage() {
     }
   }
 
-  // Path C — runs the batch endpoint in a client loop. Each iteration
-  // requests CHUNK_SIZE rows; server processes them 4-way in parallel and
-  // returns under Cloudflare's 30s edge timeout. Stop button just flips a
-  // ref-style flag the loop checks between requests.
+  // Build the queue from the current vlogs list (only those missing thumbs)
+  // and process it in chunks of 2. Each chunk sends explicit vlog_ids so
+  // the server processes them in the order the operator sees on screen.
+  // Per-row state updates as results arrive — operator watches each row
+  // tick from queued → processing → done with the actual thumbnail rendered
+  // inline.
   const runBatch = async (resume: boolean = false) => {
     if (batchRunning) return
     setBatchRunning(true)
     setBatchStopFlag(false)
-    if (!resume) {
-      setBatchCursor('')
-      setBatchStats({ direct: 0, mini_transcode: 0, queued: 0, failed: 0, remaining: null })
+
+    // Pre-build the queue from current vlogs state. Filter to those missing
+    // thumbnails AND not already in a non-queued state from a previous run.
+    const candidates = vlogs.filter(v => !v.thumbnail_url)
+    const queue: ThumbRow[] = (resume && thumbQueue)
+      ? thumbQueue.map(r => r.status === 'failed' ? { ...r, status: 'queued' as const } : r)
+      : candidates.map(v => ({
+          vlog_id: v.id,
+          filename: v.original_filename || '(untitled)',
+          status: 'queued' as const,
+        }))
+
+    if (queue.length === 0) {
+      setBatchRunning(false)
+      return
     }
-    let cursor = resume ? batchCursor : ''
-    let direct = batchStats?.direct ?? 0
-    let miniTranscode = batchStats?.mini_transcode ?? 0
-    let queued = batchStats?.queued ?? 0
-    let failed = batchStats?.failed ?? 0
+    setThumbQueue(queue)
+    setBatchStats({ direct: 0, mini_transcode: 0, queued: 0, failed: 0, remaining: queue.length })
+
+    const CHUNK = 2
+    let direct = 0, miniTranscode = 0, queuedDispatched = 0, failed = 0
+    // Mutable local copy so we can update as we go
+    const localQueue = [...queue]
+
     try {
-      // Safety stop: bail after 500 iterations (~2000 vlogs max).
-      for (let i = 0; i < 500; i++) {
+      for (let i = 0; i < localQueue.length; i += CHUNK) {
         if (batchStopFlag) break
-        const r = await fetch('/api/v2/admin/fix-thumbnails-batch', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cursor, chunk_size: 4 }),
-        })
-        const text = await r.text()
-        let data: any
-        try { data = JSON.parse(text) }
-        catch {
-          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: `Server returned non-JSON (HTTP ${r.status}): ${text.slice(0, 160)}` })
-          break
+        // Find the next batch of still-queued rows
+        const batch = localQueue.slice(i, i + CHUNK).filter(r => r.status === 'queued')
+        if (batch.length === 0) continue
+        const ids = batch.map(r => r.vlog_id)
+
+        // Mark them as processing in the UI
+        for (const r of batch) r.status = 'processing'
+        for (const r of batch) r.started_at = Date.now()
+        setThumbQueue([...localQueue])
+
+        // Send the chunk
+        let data: any = null
+        try {
+          const r = await fetch('/api/v2/admin/fix-thumbnails-batch', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vlog_ids: ids, chunk_size: CHUNK }),
+          })
+          const text = await r.text()
+          try { data = JSON.parse(text) } catch {
+            setBatchStats(prev => prev && { ...prev, lastError: `Non-JSON HTTP ${r.status}: ${text.slice(0, 160)}` })
+            // Roll back — mark these as failed
+            for (const row of batch) {
+              row.status = 'failed'
+              row.error = `chunk failed (HTTP ${r.status})`
+              row.ms = Date.now() - (row.started_at ?? Date.now())
+            }
+            setThumbQueue([...localQueue])
+            failed += batch.length
+            setBatchStats(prev => prev && { ...prev, failed, remaining: localQueue.filter(x => x.status === 'queued' || x.status === 'processing').length })
+            continue
+          }
+          if (!r.ok) {
+            for (const row of batch) {
+              row.status = 'failed'
+              row.error = data?.error || `HTTP ${r.status}`
+              row.ms = Date.now() - (row.started_at ?? Date.now())
+            }
+            setThumbQueue([...localQueue])
+            failed += batch.length
+            setBatchStats(prev => prev && { ...prev, failed, lastError: data?.error || `HTTP ${r.status}` })
+            continue
+          }
+        } catch (err: any) {
+          for (const row of batch) {
+            row.status = 'failed'
+            row.error = err?.message || String(err)
+            row.ms = Date.now() - (row.started_at ?? Date.now())
+          }
+          setThumbQueue([...localQueue])
+          failed += batch.length
+          continue
         }
-        if (!r.ok) {
-          setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: data?.error || `HTTP ${r.status}` })
-          break
-        }
+
+        // Apply per-row results
         for (const p of (data.processed as any[]) || []) {
-          if (p.method === 'direct') direct++
-          else if (p.method === 'mini_transcode') miniTranscode++
-          else if (p.method === 'queued') queued++
-          else failed++
+          const row = localQueue.find(r => r.vlog_id === p.vlog_id)
+          if (!row) continue
+          row.ms = Date.now() - (row.started_at ?? Date.now())
+          if (p.method === 'direct' || p.method === 'mini_transcode') {
+            row.status = 'done'
+            row.method = p.method
+            row.thumbnail_url = p.thumbnail_url
+            if (p.method === 'direct') direct++; else miniTranscode++
+          } else if (p.method === 'queued') {
+            row.status = 'queued_for_transcode'
+            row.method = 'queued'
+            queuedDispatched++
+          } else {
+            row.status = 'failed'
+            row.error = p.error || 'unknown'
+            failed++
+          }
         }
-        setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: data.remaining ?? null })
-        if (data.done || !data.next_cursor) {
-          setBatchCursor('')
-          break
-        }
-        cursor = data.next_cursor
-        setBatchCursor(cursor)
+        setThumbQueue([...localQueue])
+        const remaining = localQueue.filter(r => r.status === 'queued' || r.status === 'processing').length
+        setBatchStats({ direct, mini_transcode: miniTranscode, queued: queuedDispatched, failed, remaining })
       }
+      // Refresh the master vlog list so /uploads tiles also pick up new thumbs
       load()
     } catch (e: any) {
-      setBatchStats({ direct, mini_transcode: miniTranscode, queued, failed, remaining: null, lastError: String(e?.message || e) })
+      setBatchStats(prev => prev && { ...prev, lastError: String(e?.message || e) })
     } finally {
       setBatchRunning(false)
     }
@@ -428,29 +509,61 @@ export default function UploadsPage() {
         </div>
       )}
 
-      {batchStats && (
-        <div className="reveal d4" style={{
-          margin: '0 24px 16px',
-          padding: '12px 16px',
-          background: batchStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-          border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
-          borderRadius: 12,
-          fontSize: 13,
-          color: 'var(--bone-1)',
-        }}>
-          {batchStats.lastError ? (
-            <>Batch error: {batchStats.lastError}</>
-          ) : (
-            <>
-              Direct: <strong>{batchStats.direct}</strong> ·
-              Mini-transcode: <strong>{batchStats.mini_transcode}</strong> ·
-              Queued (full transcode): <strong>{batchStats.queued}</strong> ·
-              Failed: <strong>{batchStats.failed}</strong>
-              {batchStats.remaining != null && <> · Remaining: <strong>{batchStats.remaining}</strong></>}
-              {batchRunning && <> · running…</>}
-              {!batchRunning && batchCursor && <> · paused (Continue to resume)</>}
-              {!batchRunning && !batchCursor && batchStats.direct + batchStats.mini_transcode + batchStats.queued > 0 && <> · done</>}
-            </>
+      {batchStats && thumbQueue && thumbQueue.length > 0 && (
+        <div className="reveal d4" style={{ margin: '0 24px 16px' }}>
+          {/* Summary header */}
+          <div style={{
+            padding: '12px 16px',
+            background: batchStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
+            border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+            borderRadius: '12px 12px 0 0',
+            borderBottom: 'none',
+            fontSize: 13,
+            color: 'var(--bone-1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}>
+            <strong>Fixing thumbnails</strong>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--bone-2)' }}>
+              {batchStats.direct + batchStats.mini_transcode + batchStats.queued + batchStats.failed} / {thumbQueue.length}
+            </span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--bone-3)', letterSpacing: 1 }}>
+              · {batchStats.direct} DIRECT · {batchStats.mini_transcode} MINI · {batchStats.queued} QUEUED · {batchStats.failed} FAILED
+            </span>
+            {batchRunning && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--state-info, #6b9aa9)' }}>running…</span>}
+            {!batchRunning && batchStats.remaining === 0 && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--state-ok, #7a9a6a)' }}>complete</span>}
+          </div>
+          {/* Progress bar */}
+          <div style={{
+            height: 4,
+            background: 'var(--ink-1)',
+            borderLeft: '1px solid var(--line)',
+            borderRight: '1px solid var(--line)',
+          }}>
+            <div style={{
+              height: '100%',
+              width: `${(((batchStats.direct + batchStats.mini_transcode + batchStats.queued + batchStats.failed) / thumbQueue.length) * 100).toFixed(1)}%`,
+              background: 'var(--bone-3)',
+              transition: 'width 0.3s',
+            }} />
+          </div>
+          {/* Per-row queue list */}
+          <div style={{
+            maxHeight: 360,
+            overflowY: 'auto',
+            background: 'var(--ink-2)',
+            border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+            borderTop: 'none',
+            borderRadius: '0 0 12px 12px',
+          }}>
+            {thumbQueue.map(row => <ThumbQueueRow key={row.vlog_id} row={row} />)}
+          </div>
+          {batchStats.lastError && (
+            <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--state-err)', fontFamily: 'JetBrains Mono, monospace' }}>
+              {batchStats.lastError}
+            </div>
           )}
         </div>
       )}
@@ -738,4 +851,75 @@ function deriveTitle(filename: string | null): string {
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim() || 'Untitled'
+}
+
+// ─── Thumbnail-fix queue row ─────────────────────────────────────────────────
+function ThumbQueueRow({ row }: { row: ThumbRow }) {
+  const statusColor =
+    row.status === "done" ? "var(--state-ok, #7a9a6a)" :
+    row.status === "failed" ? "var(--state-err)" :
+    row.status === "processing" ? "var(--state-info, #6b9aa9)" :
+    row.status === "queued_for_transcode" ? "var(--bone-3)" :
+    "var(--bone-4)"
+  const statusLabel =
+    row.status === "queued" ? "queued" :
+    row.status === "processing" ? "processing…" :
+    row.status === "done" ? `done · ${row.method === "mini_transcode" ? "mini-transcode" : "direct"}${row.ms ? ` · ${(row.ms/1000).toFixed(1)}s` : ""}` :
+    row.status === "queued_for_transcode" ? "queued for transcode (background)" :
+    `failed: ${row.error || "unknown"}`
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "8px 14px",
+      borderBottom: "1px solid var(--line-dim, rgba(236,228,210,0.04))",
+      background: row.status === "processing" ? "rgba(107,154,169,0.04)" : "transparent",
+    }}>
+      <div style={{
+        width: 56, height: 32,
+        background: row.thumbnail_url ? `url(${row.thumbnail_url}) center/cover` : "var(--ink-1)",
+        border: "1px solid var(--line-warm)",
+        borderRadius: 4,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0,
+      }}>
+        {!row.thumbnail_url && (
+          <span style={{
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: 9,
+            color: statusColor,
+          }}>
+            {row.status === "processing" ? "⋯" : row.status === "failed" ? "✗" : row.status === "queued_for_transcode" ? "⏳" : "·"}
+          </span>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 12,
+          color: "var(--bone-1)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}>{row.filename}</div>
+        <div style={{
+          fontSize: 10,
+          color: statusColor,
+          fontFamily: "JetBrains Mono, monospace",
+          marginTop: 2,
+        }}>{statusLabel}</div>
+      </div>
+      <a
+        href={`/timeline/${row.vlog_id}`}
+        style={{
+          fontSize: 10,
+          color: "var(--bone-3)",
+          fontFamily: "JetBrains Mono, monospace",
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          textDecoration: "none",
+        }}
+      >Open →</a>
+    </div>
+  )
 }
