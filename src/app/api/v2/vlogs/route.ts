@@ -23,7 +23,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
-import { deleteObject, presignGetUrl, type R2Env } from '@/lib/r2'
+import { deleteObject, presignGetUrl, putObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { deriveRecordedAt } from '@/lib/recorded-at'
 import { ulid } from '@/lib/ulid'
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
         mime_type?: string
         recorded_at?: string | null
         thumbnail_url?: string | null
+        thumbnail_blob_base64?: string | null  // browser-captured JPEG, written to R2 inline
         archive?: boolean
       }
     | null
@@ -108,14 +109,31 @@ export async function POST(req: NextRequest) {
     env,
   })
 
+  // Browser-captured thumbnail rides along inline. Decode the base64 and
+  // write to R2 at the standard thumb key. Fail open — if the decode is
+  // garbage or the R2 put errors, the workflow's thumbnail step takes over.
+  let thumbnailR2Key: string | null = null
+  if (body.thumbnail_blob_base64 && typeof body.thumbnail_blob_base64 === 'string') {
+    try {
+      const bin = base64ToBytes(body.thumbnail_blob_base64)
+      if (bin.byteLength >= 1024) {
+        const key = `${operator.id}/thumbs/${id}.jpg`
+        await putObject(env, key, bin, { httpMetadata: { contentType: 'image/jpeg' } })
+        thumbnailR2Key = key
+      }
+    } catch {
+      // ignore — workflow fallback handles it
+    }
+  }
+
   await run(
     db,
     `INSERT INTO vlogs (
        id, operator_id, r2_key, original_filename, file_size_bytes, mime_type,
-       recorded_at, recorded_at_source, thumbnail_url, pipeline_status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key, pipeline_status
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, operator.id, body.r2_key, body.original_filename, body.file_size_bytes, body.mime_type,
-    derived.recorded_at, derived.recorded_at_source, body.thumbnail_url ?? null, pipelineStatus,
+    derived.recorded_at, derived.recorded_at_source, body.thumbnail_url ?? null, thumbnailR2Key, pipelineStatus,
   )
 
   // Trigger the post-upload Workflow when not in archive mode.
@@ -288,4 +306,23 @@ export async function DELETE(req: NextRequest) {
   await Promise.all(keysToDelete.map(k => deleteObject(env, k).catch(() => null)))
 
   return NextResponse.json({ ok: true })
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Decode a base64-encoded payload to a Uint8Array. Tolerant of the optional
+ * "data:image/jpeg;base64," prefix and of whitespace inside the string.
+ * Returns an empty array on garbage input (caller treats <1KB result as fail).
+ */
+function base64ToBytes(b64: string): Uint8Array {
+  const cleaned = b64.replace(/^data:[^,]*,/, '').replace(/\s+/g, '')
+  try {
+    const bin = atob(cleaned)
+    const out = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+    return out
+  } catch {
+    return new Uint8Array(0)
+  }
 }

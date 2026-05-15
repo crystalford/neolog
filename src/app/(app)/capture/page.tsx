@@ -524,7 +524,21 @@ async function processOne(
     return
   }
 
-  // 5. Register vlog row
+  // 5. Capture a thumbnail in the browser. The browser already decodes the
+  // video to play it — grabbing a single frame is ~100ms with native APIs and
+  // requires zero server infrastructure. We try this BEFORE registering so
+  // the resulting JPEG can ride along in the register call. If the browser
+  // can't decode this particular file (extremely rare for normal video
+  // formats on Chrome/Edge/Safari), we silently skip and the server-side
+  // workflow falls back to FFmpeg as before.
+  let thumbnailBase64: string | null = null
+  try {
+    thumbnailBase64 = await captureThumbnail(file, 5000)
+  } catch {
+    // ignore — server-side fallback will handle it
+  }
+
+  // 6. Register vlog row
   update(id, { status: 'registering' })
   const recordedAt = inferDateFromFilename(file.name)
   try {
@@ -539,6 +553,7 @@ async function processOne(
         mime_type: file.type || 'application/octet-stream',
         recorded_at: recordedAt,
         archive,
+        thumbnail_blob_base64: thumbnailBase64,
       }),
     })
     if (r.status === 409) {
@@ -552,6 +567,79 @@ async function processOne(
   } catch (err: any) {
     update(id, { status: 'failed', error: err?.message || String(err) })
   }
+}
+
+/**
+ * Browser-side thumbnail capture. Creates a hidden <video>, seeks ~1-2s in,
+ * draws the frame to a canvas, and returns a base64-encoded JPEG.
+ *
+ * Resolves to null if anything goes wrong — the browser can't decode this
+ * codec, the file is corrupt, the seek never fires, the toBlob fails. The
+ * caller skips silently and the server-side workflow takes over.
+ *
+ * Output target is ~320px wide; JPEG quality 0.82. Typical size 15-30 KB,
+ * which fits comfortably in a JSON body to the register endpoint.
+ */
+async function captureThumbnail(file: File, timeoutMs: number): Promise<string | null> {
+  return new Promise<string | null>(resolve => {
+    let settled = false
+    const video = document.createElement('video')
+    const url = URL.createObjectURL(file)
+    const finish = (result: string | null) => {
+      if (settled) return
+      settled = true
+      try { URL.revokeObjectURL(url) } catch {}
+      try { video.remove() } catch {}
+      resolve(result)
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs)
+    video.muted = true
+    video.playsInline = true
+    video.preload = 'auto'
+    video.crossOrigin = 'anonymous'
+    video.style.position = 'absolute'
+    video.style.left = '-99999px'
+    video.src = url
+    video.addEventListener('error', () => { clearTimeout(timer); finish(null) })
+    video.addEventListener('loadeddata', () => {
+      const dur = video.duration
+      // Skip the typical black opening frame. Cap at 2s so short clips work.
+      const seekTo = Math.min(Math.max(dur * 0.1, 0.5), 2.0)
+      const seekHandler = () => {
+        video.removeEventListener('seeked', seekHandler)
+        try {
+          const targetW = 320
+          const ratio = video.videoWidth > 0 ? video.videoHeight / video.videoWidth : 9 / 16
+          const targetH = Math.max(1, Math.round(targetW * ratio))
+          const canvas = document.createElement('canvas')
+          canvas.width = targetW
+          canvas.height = targetH
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { clearTimeout(timer); finish(null); return }
+          ctx.drawImage(video, 0, 0, targetW, targetH)
+          canvas.toBlob(blob => {
+            if (!blob) { clearTimeout(timer); finish(null); return }
+            const reader = new FileReader()
+            reader.onload = () => {
+              clearTimeout(timer)
+              const result = String(reader.result || '')
+              // strip the "data:image/jpeg;base64," prefix; server gets pure base64
+              const i = result.indexOf(',')
+              finish(i >= 0 ? result.slice(i + 1) : null)
+            }
+            reader.onerror = () => { clearTimeout(timer); finish(null) }
+            reader.readAsDataURL(blob)
+          }, 'image/jpeg', 0.82)
+        } catch {
+          clearTimeout(timer)
+          finish(null)
+        }
+      }
+      video.addEventListener('seeked', seekHandler)
+      try { video.currentTime = seekTo } catch { clearTimeout(timer); finish(null) }
+    })
+    document.body.appendChild(video)
+  })
 }
 
 async function uploadPartWithRetry(url: string, blob: Blob, partNumber: number): Promise<string> {
