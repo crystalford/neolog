@@ -31,7 +31,7 @@
 import http from 'node:http'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { mkdtempSync, createReadStream, createWriteStream, statSync, rmSync } from 'node:fs'
+import { mkdtempSync, createReadStream, createWriteStream, statSync, rmSync, readdirSync } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { join } from 'node:path'
@@ -55,24 +55,59 @@ async function readJsonBody(req) {
 /**
  * Stream a URL to a temp file on disk. Returns the temp file path.
  *
- * Previously used Buffer.from(await resp.arrayBuffer()) which loads the entire
- * file into RAM — fatal on the standard-1 container (256 MB) for 100MB+ HEVC
- * verticals. Streaming via pipeline() keeps peak memory at a small constant
+ * For thumbnail use: a `rangeBytes` argument tells us to fetch ONLY the first
+ * N bytes via HTTP Range. Most camera-recorded MP4s are fast-start (moov at
+ * the front), so the first 200 MB has the header + plenty of frames for a
+ * thumbnail at t=1. Avoids downloading 9 GB just to grab one frame.
+ *
+ * If the upstream throws (file too large, network error, etc.) the temp dir
+ * we created is cleaned up before re-throwing — leaks here are what
+ * eventually fill /tmp and trigger ENOSPC across all subsequent requests.
+ *
+ * Previously used Buffer.from(await resp.arrayBuffer()) which loaded the
+ * entire file into RAM — fatal on the standard-1 container (256 MB) for big
+ * files. Streaming via pipeline() keeps peak memory at a small constant
  * regardless of file size.
  */
-async function downloadToTmp(url, label, maxBytes = 4 * 1024 * 1024 * 1024) {
+async function downloadToTmp(url, label, opts = {}) {
+  const maxBytes = opts.maxBytes ?? 4 * 1024 * 1024 * 1024
+  const rangeBytes = opts.rangeBytes ?? null
   const tmp = mkdtempSync(join(tmpdir(), `neolog-ffmpeg-${label}-`))
-  const tmpFile = join(tmp, 'input')
-  const resp = await fetch(url)
-  if (!resp.ok) throw new Error(`Fetch ${label} failed: HTTP ${resp.status}`)
-  const len = parseInt(resp.headers.get('content-length') || '0', 10)
-  if (len && len > maxBytes) throw new Error(`Input too large: ${len} > ${maxBytes}`)
-  if (!resp.body) throw new Error(`Fetch ${label} returned empty body`)
-  // resp.body is a web ReadableStream; convert to a Node Readable for pipeline.
-  const nodeReadable = Readable.fromWeb(resp.body)
-  await pipeline(nodeReadable, createWriteStream(tmpFile))
-  return { dir: tmp, file: tmpFile }
+  try {
+    const tmpFile = join(tmp, 'input')
+    const headers = rangeBytes ? { Range: `bytes=0-${rangeBytes - 1}` } : undefined
+    const resp = await fetch(url, headers ? { headers } : undefined)
+    if (!resp.ok && resp.status !== 206) {
+      throw new Error(`Fetch ${label} failed: HTTP ${resp.status}`)
+    }
+    const len = parseInt(resp.headers.get('content-length') || '0', 10)
+    if (!rangeBytes && len && len > maxBytes) {
+      throw new Error(`Input too large: ${len} > ${maxBytes} (use rangeBytes for partial fetch)`)
+    }
+    if (!resp.body) throw new Error(`Fetch ${label} returned empty body`)
+    const nodeReadable = Readable.fromWeb(resp.body)
+    await pipeline(nodeReadable, createWriteStream(tmpFile))
+    return { dir: tmp, file: tmpFile }
+  } catch (err) {
+    // Don't leak the temp dir on failure — that's what fills /tmp and
+    // turns the next request into ENOSPC.
+    cleanup(tmp)
+    throw err
+  }
 }
+
+// One-shot sweep on container start: drop any neolog-ffmpeg-* dirs left over
+// from a prior crash / OOM. Without this, restart inherits the leak.
+function sweepStaleTmpDirs() {
+  try {
+    for (const name of readdirSync(tmpdir())) {
+      if (name.startsWith('neolog-ffmpeg-')) {
+        try { rmSync(join(tmpdir(), name), { recursive: true, force: true }) } catch {}
+      }
+    }
+  } catch {}
+}
+sweepStaleTmpDirs()
 
 /**
  * Spawn ffmpeg with the given args. Resolves with the output file path
@@ -175,7 +210,12 @@ async function extractThumb(body, res) {
   if (!input_url) return jsonError(res, 400, 'input_url required')
   const seekTime = typeof t === 'number' && t >= 0 ? t : 1.0
 
-  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-in')
+  // Only fetch the first 200 MB — plenty for the moov atom + frames near the
+  // start. Avoids downloading 9 GB camera files just to grab one frame.
+  // R2 supports byte-range responses on presigned URLs.
+  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-in', {
+    rangeBytes: 200 * 1024 * 1024,
+  })
   const outFile = join(dir, 'frame.jpg')
   try {
     const stderr = await runFfmpegCapture([
@@ -209,7 +249,10 @@ async function extractThumbMiniTranscode(body, res) {
   if (!input_url) return jsonError(res, 400, 'input_url required')
   const seekTime = typeof t === 'number' && t >= 0 ? t : 1.0
 
-  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-mini-in')
+  // Same 200 MB partial fetch as /extract-thumb — see comment there.
+  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-mini-in', {
+    rangeBytes: 200 * 1024 * 1024,
+  })
   const outFile = join(dir, 'frame.jpg')
   try {
     const stderr = await runFfmpegCapture([

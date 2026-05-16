@@ -191,7 +191,12 @@ async function processRow(
   // Tier 1: direct /extract-thumb (with -noautorotate). Fast path for every
   // renderable source — H.264 always works here, HEVC works for most rotation
   // metadata variants now that the flag is set on the FFmpeg side.
-  const t1 = await tryExtract(env, sourceKey, '/extract-thumb', 20_000)
+  // Per-row budget tight to fit both tiers + R2 put + D1 update under the
+  // ~30s Cloudflare edge timeout. Worst case (both tiers run sequentially):
+  // tier1 12s + tier2 14s = 26s. With chunk_size=2 in parallel, the chunk
+  // request stays comfortably under 30s. The 200 MB Range fetch in the
+  // FFmpeg container keeps even 9 GB source files bounded.
+  const t1 = await tryExtract(env, sourceKey, '/extract-thumb', 12_000)
   if (t1.ok && t1.bytes) {
     return await persistThumb(env, db, operatorId, row.id, t1.bytes, 'direct')
   }
@@ -199,7 +204,7 @@ async function processRow(
   // Tier 2: /extract-thumb-mini-transcode — 2-sec H.264 transcode then frame.
   // Catches HEVC verticals with malformed rotation tags that tier 1 still
   // returns 0 bytes on. ~5 sec, low memory.
-  const t2 = await tryExtract(env, sourceKey, '/extract-thumb-mini-transcode', 20_000)
+  const t2 = await tryExtract(env, sourceKey, '/extract-thumb-mini-transcode', 14_000)
   if (t2.ok && t2.bytes) {
     return await persistThumb(env, db, operatorId, row.id, t2.bytes, 'mini_transcode')
   }
