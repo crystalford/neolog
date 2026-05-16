@@ -192,92 +192,153 @@ async function transcodeH264(body, res) {
 }
 
 // ─── endpoint: /extract-thumb ────────────────────────────────────────────────
-// Extracts a single JPEG frame at time t (seconds). Default t=1.0 to skip
-// black opening frames common in phone-shot video. Returns raw JPEG binary.
+// Streams the R2 fetch directly to ffmpeg's stdin. No temp file, no size
+// cap, no Range guesswork. ffmpeg reads the moov atom + first few frames,
+// outputs a JPEG, and exits. The R2 connection closes naturally when ffmpeg
+// closes its stdin.
 //
-// Minimal proven flag set — same as `ffmpeg -i input.mp4 -ss 1 -vframes 1
-// thumb.jpg` you'd run by hand. Earlier experiments with -noautorotate,
-// -vsync 0, and -c:v mjpeg combined to produce 0-byte output on normal
-// horizontal HEVC files, so they're gone. ffmpeg's auto-rotation works
-// correctly for almost every modern source — the original DJI Mimo
-// vertical bug was specific to one quirky export and is handled by the
-// mini-transcode fallback path.
+// Why streaming:
+//   - Earlier "fetch first 200MB then run ffmpeg on disk file" approach broke
+//     for many files: a truncated MP4 triggered ffmpeg exit 183 with only
+//     the banner in stderr (cryptic non-decode error).
+//   - Disk-based approach also leaked /tmp on errors → ENOSPC cascade.
+//   - Streaming sidesteps both: zero disk, zero size cap, zero Range guess.
 //
-// Also verifies output size server-side so we can return the actual stderr
-// when ffmpeg "succeeds" but produces nothing usable.
+// Constraint: requires fast-start MP4 (moov at the front of the file). All
+// modern camera-recorded files are fast-start. Edited / re-encoded files
+// may not be — those fall to /extract-thumb-mini-transcode.
 async function extractThumb(body, res) {
   const { input_url, t } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
   const seekTime = typeof t === 'number' && t >= 0 ? t : 1.0
-
-  // Only fetch the first 200 MB — plenty for the moov atom + frames near the
-  // start. Avoids downloading 9 GB camera files just to grab one frame.
-  // R2 supports byte-range responses on presigned URLs.
-  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-in', {
-    rangeBytes: 200 * 1024 * 1024,
-  })
-  const outFile = join(dir, 'frame.jpg')
-  try {
-    const stderr = await runFfmpegCapture([
-      '-y',
-      '-ss', String(seekTime),     // seek BEFORE -i for speed
-      '-i', inputFile,
-      '-frames:v', '1',
-      '-vf', 'scale=320:-2',       // 320 wide, aspect preserved
-      '-q:v', '4',                 // ~JPEG quality 0.82-ish
-      outFile,
-    ])
-    const size = statSync(outFile).size
-    if (size < 1024) {
-      throw new Error(`output too small (${size} bytes). ffmpeg stderr: ${stderr.slice(-1500)}`)
-    }
-    streamFile(res, outFile, 'image/jpeg')
-    res.on('close', () => cleanup(dir))
-  } catch (err) {
-    cleanup(dir)
-    jsonError(res, 500, err.message)
-  }
+  await streamingExtract(input_url, seekTime, res, /*miniTranscode*/ false)
 }
 
 // ─── endpoint: /extract-thumb-mini-transcode ─────────────────────────────────
-// Fallback when /extract-thumb produces a usable JPEG. Re-encodes a tiny
-// window of input through libx264 first, which normalizes any decoder quirks
-// (rotation metadata, weird HEVC variants) that confused the direct path.
-// Runs in ~5 seconds with low peak memory.
+// Fallback: same streaming approach but routes the input through libx264
+// re-encode for 2 seconds, then grabs one frame. Catches the rare case
+// where the direct decode path can't grok the source codec.
 async function extractThumbMiniTranscode(body, res) {
   const { input_url, t } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
   const seekTime = typeof t === 'number' && t >= 0 ? t : 1.0
+  await streamingExtract(input_url, seekTime, res, /*miniTranscode*/ true)
+}
 
-  // Same 200 MB partial fetch as /extract-thumb — see comment there.
-  const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-mini-in', {
-    rangeBytes: 200 * 1024 * 1024,
-  })
-  const outFile = join(dir, 'frame.jpg')
-  try {
-    const stderr = await runFfmpegCapture([
-      '-y',
-      '-ss', String(seekTime),
-      '-i', inputFile,
-      '-t', '2',                   // only decode 2 seconds
-      '-c:v', 'libx264',           // mini-transcode normalizes the decoder side
-      '-preset', 'ultrafast',
-      '-an',                       // strip audio
-      '-frames:v', '1',
-      '-vf', 'scale=320:-2',
-      '-q:v', '4',
-      outFile,
-    ])
-    const size = statSync(outFile).size
-    if (size < 1024) {
-      throw new Error(`output too small (${size} bytes). ffmpeg stderr: ${stderr.slice(-1500)}`)
+/**
+ * Shared streaming extraction. Pipes a fetch response into ffmpeg's stdin
+ * and collects the JPEG bytes from stdout. Hard 20s timeout. Returns the
+ * JPEG to the HTTP response, or 500 with stderr on failure.
+ */
+async function streamingExtract(inputUrl, seekTime, res, miniTranscode) {
+  const args = miniTranscode
+    ? [
+        '-y',
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-i', 'pipe:0',
+        '-t', '4',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-an',
+        '-vf', 'scale=320:-2',
+        '-frames:v', '1',
+        '-q:v', '4',
+        '-f', 'image2',
+        '-vcodec', 'mjpeg',
+        'pipe:1',
+      ]
+    : [
+        '-y',
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-i', 'pipe:0',
+        '-ss', String(seekTime),
+        '-frames:v', '1',
+        '-vf', 'scale=320:-2',
+        '-q:v', '4',
+        '-f', 'image2',
+        '-vcodec', 'mjpeg',
+        'pipe:1',
+      ]
+
+  return new Promise(resolve => {
+    const proc = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] })
+    const out = []
+    let outSize = 0
+    let stderr = ''
+    let resolved = false
+    const finish = () => {
+      if (resolved) return
+      resolved = true
+      resolve()
     }
-    streamFile(res, outFile, 'image/jpeg')
-    res.on('close', () => cleanup(dir))
-  } catch (err) {
-    cleanup(dir)
-    jsonError(res, 500, err.message)
-  }
+    proc.stdout.on('data', chunk => { out.push(chunk); outSize += chunk.length })
+    proc.stderr.on('data', chunk => { stderr += chunk.toString() })
+    // Ignore EPIPE when ffmpeg closes stdin after reading enough
+    proc.stdin.on('error', () => {})
+
+    // Hard timeout — kill ffmpeg if it hasn't produced output in 20s
+    const killTimer = setTimeout(() => {
+      try { proc.kill('SIGKILL') } catch {}
+    }, 20_000)
+
+    proc.on('exit', (code, signal) => {
+      clearTimeout(killTimer)
+      if (outSize >= 1024) {
+        res.writeHead(200, {
+          'Content-Type': 'image/jpeg',
+          'Content-Length': String(outSize),
+        })
+        for (const c of out) res.write(c)
+        res.end()
+      } else {
+        const reason = signal
+          ? `killed by ${signal} (timeout?)`
+          : `exit ${code}, output ${outSize}b`
+        const stderrShown = stderr.trim() || '(no stderr)'
+        jsonError(res, 500, `ffmpeg ${reason}. stderr: ${stderrShown.slice(0, 1500)}`)
+      }
+      finish()
+    })
+    proc.on('error', err => {
+      clearTimeout(killTimer)
+      jsonError(res, 500, `ffmpeg spawn error: ${err.message}`)
+      finish()
+    })
+
+    // Pipe the R2 fetch into ffmpeg's stdin
+    fetch(inputUrl).then(resp => {
+      if (!resp.ok && resp.status !== 206) {
+        try { proc.kill('SIGKILL') } catch {}
+        jsonError(res, 500, `R2 fetch ${resp.status}`)
+        finish()
+        return
+      }
+      if (!resp.body) {
+        try { proc.kill('SIGKILL') } catch {}
+        jsonError(res, 500, 'R2 fetch returned empty body')
+        finish()
+        return
+      }
+      const reader = Readable.fromWeb(resp.body)
+      reader.on('error', err => {
+        try { proc.kill('SIGKILL') } catch {}
+        // The error response was already prepared by the proc.on('exit') handler;
+        // if it hasn't fired yet, surface the read error.
+        if (!resolved) {
+          jsonError(res, 500, `R2 read error: ${err.message}`)
+          finish()
+        }
+      })
+      reader.pipe(proc.stdin)
+    }).catch(err => {
+      try { proc.kill('SIGKILL') } catch {}
+      jsonError(res, 500, `R2 fetch threw: ${err.message}`)
+      finish()
+    })
+  })
+}
 }
 
 // ─── endpoint: /extract-audio ────────────────────────────────────────────────
