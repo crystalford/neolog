@@ -663,6 +663,14 @@ function PipelineStatus({ vlog, onRestart }: { vlog: VlogDetail; onRestart: () =
                 {diagnostic.container.ok
                   ? <span style={{ color: 'var(--state-ok, #7a9a6a)' }}>OK · {diagnostic.container.ms}ms</span>
                   : <span style={{ color: 'var(--state-err)' }}>FAIL · {diagnostic.container.error || `HTTP ${diagnostic.container.status}`}</span>}
+                {diagnostic.container.body && (
+                  <span style={{ marginLeft: 8, color: 'var(--bone-3)', fontSize: 10 }}>
+                    build: {(() => {
+                      try { return JSON.parse(diagnostic.container.body)?.build || diagnostic.container.body.slice(0, 40) }
+                      catch { return diagnostic.container.body.slice(0, 40) }
+                    })()}
+                  </span>
+                )}
               </div>
               <div>
                 <strong>In-flight workflows:</strong> {diagnostic.in_flight.total} ·
