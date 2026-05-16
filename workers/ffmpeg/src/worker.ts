@@ -28,6 +28,25 @@ export class FfmpegContainer extends ContainerBase {
 
   onStart() { console.log('[ffmpeg-container] started') }
   onError(err: unknown) { console.error('[ffmpeg-container] error', err) }
+
+  // Override fetch so every incoming request first forces a real liveness
+  // check via startAndWaitForPorts(). The default Container.fetch() trusts a
+  // cached `this.container.running` flag that goes stale if the underlying
+  // container died while the Durable Object survived — producing the dreaded
+  // "The container is not running, consider calling start()" error from
+  // tcpPort.fetch(). startAndWaitForPorts() is idempotent (no-op when already
+  // running) and pings the actual port, so it self-heals stale state.
+  async fetch(request: Request) {
+    try {
+      await this.startAndWaitForPorts()
+    } catch (err) {
+      return new Response(
+        `ffmpeg container failed to start: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 503 },
+      )
+    }
+    return this.containerFetch(request)
+  }
 }
 
 interface Env {
