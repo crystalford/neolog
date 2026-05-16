@@ -91,6 +91,24 @@ function runFfmpeg(args, outFile) {
   })
 }
 
+/**
+ * Like runFfmpeg, but returns the full stderr text on success so the caller
+ * can include it in diagnostic output (e.g., when ffmpeg exits 0 but produces
+ * a tiny / empty output file). On non-zero exit, throws with stderr included.
+ */
+function runFfmpegCapture(args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    proc.stderr.on('data', d => { stderr += d.toString() })
+    proc.on('error', err => reject(err))
+    proc.on('exit', code => {
+      if (code === 0) resolve(stderr)
+      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-2000)}`))
+    })
+  })
+}
+
 function streamFile(res, filePath, contentType) {
   const stat = statSync(filePath)
   res.writeHead(200, {
@@ -142,12 +160,16 @@ async function transcodeH264(body, res) {
 // Extracts a single JPEG frame at time t (seconds). Default t=1.0 to skip
 // black opening frames common in phone-shot video. Returns raw JPEG binary.
 //
-// Flags chosen for HEVC vertical compatibility:
-//   -noautorotate         ignore rotation tag (DJI Mimo's tag corrupts
-//                         the filter graph and returns 0 frames)
-//   -vsync 0              let ffmpeg pick the frame ts without dropping
-//   -c:v mjpeg            force re-encode through ffmpeg's decoder, which
-//                         normalizes weird HEVC stream quirks
+// Minimal proven flag set — same as `ffmpeg -i input.mp4 -ss 1 -vframes 1
+// thumb.jpg` you'd run by hand. Earlier experiments with -noautorotate,
+// -vsync 0, and -c:v mjpeg combined to produce 0-byte output on normal
+// horizontal HEVC files, so they're gone. ffmpeg's auto-rotation works
+// correctly for almost every modern source — the original DJI Mimo
+// vertical bug was specific to one quirky export and is handled by the
+// mini-transcode fallback path.
+//
+// Also verifies output size server-side so we can return the actual stderr
+// when ffmpeg "succeeds" but produces nothing usable.
 async function extractThumb(body, res) {
   const { input_url, t } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
@@ -156,18 +178,19 @@ async function extractThumb(body, res) {
   const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-in')
   const outFile = join(dir, 'frame.jpg')
   try {
-    await runFfmpeg([
+    const stderr = await runFfmpegCapture([
       '-y',
-      '-noautorotate',
       '-ss', String(seekTime),     // seek BEFORE -i for speed
       '-i', inputFile,
       '-frames:v', '1',
-      '-vsync', '0',
       '-vf', 'scale=320:-2',       // 320 wide, aspect preserved
-      '-c:v', 'mjpeg',
       '-q:v', '4',                 // ~JPEG quality 0.82-ish
       outFile,
-    ], outFile)
+    ])
+    const size = statSync(outFile).size
+    if (size < 1024) {
+      throw new Error(`output too small (${size} bytes). ffmpeg stderr: ${stderr.slice(-1500)}`)
+    }
     streamFile(res, outFile, 'image/jpeg')
     res.on('close', () => cleanup(dir))
   } catch (err) {
@@ -177,13 +200,10 @@ async function extractThumb(body, res) {
 }
 
 // ─── endpoint: /extract-thumb-mini-transcode ─────────────────────────────────
-// Fallback when /extract-thumb returns 0 bytes / fails on HEVC verticals with
-// malformed rotation metadata. Mini-transcodes just 2 seconds of input to
-// H.264 (in-memory), grabs one frame from THAT. Bypasses the full 5-10 min
-// transcode by capping decoded duration at 2 seconds.
-//
-// Runs in ~5 seconds instead of ~5-10 minutes, with peak memory <100MB
-// regardless of source file size.
+// Fallback when /extract-thumb produces a usable JPEG. Re-encodes a tiny
+// window of input through libx264 first, which normalizes any decoder quirks
+// (rotation metadata, weird HEVC variants) that confused the direct path.
+// Runs in ~5 seconds with low peak memory.
 async function extractThumbMiniTranscode(body, res) {
   const { input_url, t } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
@@ -192,20 +212,23 @@ async function extractThumbMiniTranscode(body, res) {
   const { dir, file: inputFile } = await downloadToTmp(input_url, 'thumb-mini-in')
   const outFile = join(dir, 'frame.jpg')
   try {
-    await runFfmpeg([
+    const stderr = await runFfmpegCapture([
       '-y',
-      '-noautorotate',
       '-ss', String(seekTime),
       '-i', inputFile,
       '-t', '2',                   // only decode 2 seconds
-      '-c:v', 'libx264',           // mini-transcode normalizes rotation
-      '-preset', 'ultrafast',      // CPU-cheap
+      '-c:v', 'libx264',           // mini-transcode normalizes the decoder side
+      '-preset', 'ultrafast',
       '-an',                       // strip audio
       '-frames:v', '1',
       '-vf', 'scale=320:-2',
       '-q:v', '4',
       outFile,
-    ], outFile)
+    ])
+    const size = statSync(outFile).size
+    if (size < 1024) {
+      throw new Error(`output too small (${size} bytes). ffmpeg stderr: ${stderr.slice(-1500)}`)
+    }
     streamFile(res, outFile, 'image/jpeg')
     res.on('close', () => cleanup(dir))
   } catch (err) {

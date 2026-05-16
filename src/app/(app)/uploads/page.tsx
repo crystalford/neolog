@@ -929,7 +929,9 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
         >Open →</a>
       </div>
       {hasDiagnostic && (
-        <details style={{ padding: "0 14px 8px" }}>
+        // Auto-open so the operator sees the actual ffmpeg/network error
+        // immediately, not buried behind a click.
+        <details open style={{ padding: "0 14px 8px" }}>
           <summary style={{
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 9,
@@ -953,6 +955,8 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
             fontFamily: "JetBrains Mono, monospace",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
+            maxHeight: 200,
+            overflow: "auto",
           }}>{row.error}</pre>
         </details>
       )}
