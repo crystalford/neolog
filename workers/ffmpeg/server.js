@@ -480,10 +480,16 @@ const routes = {
   '/concat':         concat,
 }
 
+// Build identifier — bumped manually whenever the container code changes.
+// /health returns this so the operator can verify which version is live.
+// If you push a workers/ffmpeg change and /health still shows the old build,
+// deploy-workers.yml didn't actually deploy.
+const BUILD_VERSION = 'streaming-stdin-v3-2026-05-16'
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' })
-    res.end('ok')
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true, build: BUILD_VERSION }))
     return
   }
   if (req.method !== 'POST') {
