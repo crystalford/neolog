@@ -190,3 +190,69 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     { status: 202 },
   )
 }
+
+// PUT /api/v2/vlogs/[id]/thumbnail
+//
+// Accept a browser-captured JPEG (base64 in body) and store it directly in R2.
+// Routes around the FFmpeg container entirely — used by the client-side
+// "Fix thumbnails in browser" path on /uploads when the server-side cascade
+// is broken or unavailable.
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const env = getRequestContext().env as unknown as Env
+
+  let operator
+  try {
+    operator = await requireOperator(req, env)
+  } catch (e) {
+    if (e instanceof UnauthenticatedError) {
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    }
+    throw e
+  }
+
+  let body: { thumbnail_blob_base64?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const b64 = body.thumbnail_blob_base64
+  if (!b64 || typeof b64 !== 'string') {
+    return NextResponse.json({ error: 'thumbnail_blob_base64 required' }, { status: 400 })
+  }
+
+  let bytes: Uint8Array
+  try {
+    const bin = atob(b64)
+    bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  } catch {
+    return NextResponse.json({ error: 'Invalid base64' }, { status: 400 })
+  }
+  if (bytes.byteLength < MIN_JPEG_BYTES) {
+    return NextResponse.json({ error: `Thumbnail too small (${bytes.byteLength}B)` }, { status: 400 })
+  }
+
+  const db = getDb(env)
+  const vlog = await findOne<{ id: string }>(
+    db,
+    `SELECT id FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+    params.id, operator.id,
+  )
+  if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const thumbKey = `${operator.id}/thumbs/${params.id}.jpg`
+  await putObject(env, thumbKey, bytes, {
+    httpMetadata: { contentType: 'image/jpeg' },
+  })
+  await run(
+    db,
+    `UPDATE vlogs
+        SET thumbnail_r2_key = ?, thumbnail_url = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND operator_id = ?`,
+    thumbKey, params.id, operator.id,
+  )
+  const thumbnailUrl = await presignGetUrl(env, thumbKey, 24 * 3600)
+  return NextResponse.json({ ok: true, method: 'browser', bytes: bytes.byteLength, thumbnail_url: thumbnailUrl })
+}

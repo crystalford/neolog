@@ -89,6 +89,132 @@ export default function UploadsPage() {
     remaining: number | null
     lastError?: string
   } | null>(null)
+  // Browser-side thumbnail batch — sidesteps the FFmpeg container entirely.
+  // Loads each video in a hidden <video>, draws a frame to canvas, PUTs the
+  // resulting JPEG to /api/v2/vlogs/[id]/thumbnail.
+  const [browserBatchRunning, setBrowserBatchRunning] = useState(false)
+  const [browserBatchStopFlag, setBrowserBatchStopFlag] = useState(false)
+
+  // Capture a JPEG thumbnail from a video URL using the browser's decoder.
+  // Returns base64 JPEG (no data: prefix) or null if the browser can't decode.
+  const captureThumbInBrowser = (videoUrl: string, timeoutMs = 15000): Promise<string | null> => {
+    return new Promise(resolve => {
+      const video = document.createElement('video')
+      video.crossOrigin = 'anonymous'
+      video.muted = true
+      // @ts-expect-error — playsInline is a valid HTMLVideoElement property
+      video.playsInline = true
+      video.preload = 'auto'
+      let done = false
+      const finish = (result: string | null) => {
+        if (done) return
+        done = true
+        try { video.src = '' } catch {}
+        try { video.remove() } catch {}
+        resolve(result)
+      }
+      const timer = setTimeout(() => finish(null), timeoutMs)
+      video.addEventListener('error', () => { clearTimeout(timer); finish(null) })
+      video.addEventListener('loadedmetadata', () => {
+        const t = Math.min(Math.max(video.duration * 0.1, 0.5), 2.0)
+        try { video.currentTime = isFinite(t) ? t : 0.5 } catch { finish(null) }
+      })
+      video.addEventListener('seeked', () => {
+        try {
+          const w = 320
+          const ratio = video.videoHeight > 0 ? video.videoWidth / video.videoHeight : 16 / 9
+          const h = Math.round(w / ratio)
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { clearTimeout(timer); finish(null); return }
+          ctx.drawImage(video, 0, 0, w, h)
+          canvas.toBlob(blob => {
+            clearTimeout(timer)
+            if (!blob) return finish(null)
+            const reader = new FileReader()
+            reader.onload = () => {
+              const dataUri = reader.result as string
+              const comma = dataUri.indexOf(',')
+              finish(comma >= 0 ? dataUri.slice(comma + 1) : null)
+            }
+            reader.onerror = () => finish(null)
+            reader.readAsDataURL(blob)
+          }, 'image/jpeg', 0.82)
+        } catch {
+          clearTimeout(timer)
+          finish(null)
+        }
+      })
+      video.src = videoUrl
+    })
+  }
+
+  const runBrowserBatch = async () => {
+    if (browserBatchRunning) return
+    setBrowserBatchRunning(true)
+    setBrowserBatchStopFlag(false)
+    const candidates = vlogs.filter(v => !v.thumbnail_url)
+    const queue: ThumbRow[] = candidates.map(v => ({
+      vlog_id: v.id,
+      filename: v.original_filename || '(untitled)',
+      status: 'queued' as const,
+    }))
+    if (queue.length === 0) {
+      setBrowserBatchRunning(false)
+      return
+    }
+    setThumbQueue(queue)
+    const localQueue = [...queue]
+    let direct = 0, failed = 0
+    setBatchStats({ direct: 0, mini_transcode: 0, queued: 0, failed: 0, remaining: queue.length })
+    try {
+      for (let i = 0; i < localQueue.length; i++) {
+        if (browserBatchStopFlag) break
+        const row = localQueue[i]
+        row.status = 'processing'
+        row.started_at = Date.now()
+        setThumbQueue([...localQueue])
+        try {
+          const vr = await fetch(`/api/v2/vlogs/${row.vlog_id}`, { credentials: 'include' })
+          if (!vr.ok) throw new Error(`get vlog ${vr.status}`)
+          const vd = await vr.json()
+          const videoUrl: string | null = vd.video_url
+          if (!videoUrl) throw new Error('no video_url')
+          const b64 = await captureThumbInBrowser(videoUrl)
+          if (!b64) throw new Error('browser could not decode (likely HEVC)')
+          const pr = await fetch(`/api/v2/vlogs/${row.vlog_id}/thumbnail`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumbnail_blob_base64: b64 }),
+          })
+          if (!pr.ok) {
+            const text = await pr.text()
+            throw new Error(`PUT ${pr.status}: ${text.slice(0, 120)}`)
+          }
+          const pd = await pr.json()
+          row.status = 'done'
+          row.method = 'direct'
+          row.thumbnail_url = pd.thumbnail_url
+          row.ms = Date.now() - (row.started_at ?? Date.now())
+          direct++
+        } catch (err: any) {
+          row.status = 'failed'
+          row.error = err?.message || String(err)
+          row.ms = Date.now() - (row.started_at ?? Date.now())
+          failed++
+        }
+        setThumbQueue([...localQueue])
+        const remaining = localQueue.filter(r => r.status === 'queued' || r.status === 'processing').length
+        setBatchStats({ direct, mini_transcode: 0, queued: 0, failed, remaining })
+      }
+      load()
+    } finally {
+      setBrowserBatchRunning(false)
+    }
+  }
 
   const regenerateThumbnails = async () => {
     setRegenerating(true)
@@ -438,6 +564,23 @@ export default function UploadsPage() {
         >
           {batchRunning ? 'Fixing thumbnails…' : `Fix all thumbnails (${missingThumbs})`}
         </button>
+        <button
+          onClick={runBrowserBatch}
+          disabled={browserBatchRunning || batchRunning || missingThumbs === 0}
+          style={adminPillStyle(browserBatchRunning)}
+          title="Capture thumbnails in your browser (uses Chrome's decoder, no FFmpeg container). Works for any video Chrome can play."
+        >
+          {browserBatchRunning ? 'Capturing in browser…' : `Fix in browser (${missingThumbs})`}
+        </button>
+        {browserBatchRunning && (
+          <button
+            onClick={() => setBrowserBatchStopFlag(true)}
+            style={adminPillStyle(false)}
+            title="Stop after current video."
+          >
+            Stop
+          </button>
+        )}
         {batchRunning && (
           <button
             onClick={() => setBatchStopFlag(true)}
