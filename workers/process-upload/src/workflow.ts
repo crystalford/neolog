@@ -397,19 +397,38 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         'transcribe',
         { retries: { limit: 2, delay: '30 seconds' }, timeout: '15 minutes' },
         async () => {
-          // For video sources, extract audio first via ffmpeg
+          // For video sources, extract audio first via ffmpeg. The container
+          // request is wrapped in a 45s AbortController so a wedged container
+          // can't hang the workflow for 15 minutes. If ffmpeg is unhealthy
+          // we throw a descriptive error and let softStep record the failure
+          // honestly — the operator can re-run transcribe once the container
+          // is back instead of staring at "running 5s" forever.
           let audioBytes: Uint8Array
           if (isVideo) {
             const sourceKey = transcodedKey || vlog.r2_key
             const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
-            const audioResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-audio', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ input_url: inputUrl }),
-            })
+            const ctl = new AbortController()
+            const timer = setTimeout(() => ctl.abort(), 45_000)
+            let audioResp: Response
+            try {
+              audioResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_url: inputUrl }),
+                signal: ctl.signal,
+              } as RequestInit)
+            } catch (err: any) {
+              clearTimeout(timer)
+              throw new Error(
+                `ffmpeg /extract-audio fetch failed: ${err?.message || err}. ` +
+                `Container likely down — see workers/ffmpeg lifecycle. ` +
+                `Workflow not retried so re-run /process when container is healthy.`,
+              )
+            }
+            clearTimeout(timer)
             if (!audioResp.ok) {
-              const err = await audioResp.text()
-              throw new Error(`ffmpeg audio extract failed (${audioResp.status}): ${err.slice(0, 500)}`)
+              const errBody = (await audioResp.text()).slice(0, 300)
+              throw new Error(`ffmpeg /extract-audio ${audioResp.status}: ${errBody}`)
             }
             audioBytes = new Uint8Array(await audioResp.arrayBuffer())
           } else {
