@@ -31,8 +31,22 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const settings = await getAllSettings(getDb(env), operator.id)
-  return NextResponse.json({ settings })
+  try {
+    const settings = await getAllSettings(getDb(env), operator.id)
+    return NextResponse.json({ settings })
+  } catch (err: any) {
+    // operator_settings table might not exist yet on live D1 if migrations
+    // haven't fully run. Return empty settings + a hint instead of 500 so
+    // the rest of the UI still works.
+    const msg = err?.message || String(err)
+    if (/no such table.*operator_settings/i.test(msg)) {
+      return NextResponse.json({
+        settings: {},
+        warning: 'operator_settings table missing — POST /api/v2/admin/run-migrations to install.',
+      })
+    }
+    return NextResponse.json({ error: 'settings GET failed', details: msg }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

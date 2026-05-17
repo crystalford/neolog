@@ -155,14 +155,45 @@ jobs:
           set -e
           wrangler d1 execute "$D1_NAME" --remote --file db/schema.sql
 
-      - name: Apply migrations (idempotent ALTERs)
+      - name: Apply migrations (idempotent ALTERs, per-statement)
         run: |
-          # db/migrations.sql contains ALTER statements. SQLite doesn't have
-          # IF NOT EXISTS on ALTER, so re-runs will fail on already-applied
-          # columns — that's fine, we ignore the error.
+          # db/migrations.sql contains a mix of ALTERs (no IF NOT EXISTS in
+          # SQLite) and CREATE TABLE/INDEX (which do support IF NOT EXISTS).
+          # Running the whole file in one shot was fragile — if any ALTER
+          # failed because the column already existed, wrangler aborted and
+          # later CREATE TABLE statements (operator_settings etc.) never
+          # applied. Fix: split on semicolons + blank lines, execute each
+          # statement individually, ignore "already exists" / "duplicate"
+          # errors but surface real ones.
           if [ -f db/migrations.sql ]; then
-            wrangler d1 execute "$D1_NAME" --remote --file db/migrations.sql || \
-              echo "(some migrations failed — expected on re-runs if columns already exist)"
+            python3 - <<'PY'
+          import re, subprocess, os, sys
+          sql = open('db/migrations.sql').read()
+          # Strip line comments
+          sql = re.sub(r'--[^\n]*', '', sql)
+          # Split on semicolons that end a statement
+          stmts = [s.strip() for s in sql.split(';') if s.strip()]
+          d1 = os.environ['D1_NAME']
+          applied, skipped, failed = 0, 0, 0
+          for s in stmts:
+              r = subprocess.run(
+                  ['wrangler', 'd1', 'execute', d1, '--remote', '--command', s + ';'],
+                  capture_output=True, text=True,
+              )
+              if r.returncode == 0:
+                  applied += 1
+                  print(f"OK   {s[:80]}")
+              else:
+                  msg = (r.stderr + r.stdout).lower()
+                  if 'duplicate column name' in msg or 'already exists' in msg:
+                      skipped += 1
+                      print(f"SKIP {s[:80]} (already applied)")
+                  else:
+                      failed += 1
+                      print(f"FAIL {s[:80]}\n     {r.stderr.strip()[:300]}")
+          print(f"\nMigrations: applied={applied} skipped={skipped} failed={failed}")
+          sys.exit(1 if failed else 0)
+          PY
           fi
 
       - name: Seed initial prompts (if seed file exists)
