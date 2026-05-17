@@ -102,7 +102,6 @@ export default function UploadsPage() {
       const video = document.createElement('video')
       video.crossOrigin = 'anonymous'
       video.muted = true
-      // @ts-expect-error — playsInline is a valid HTMLVideoElement property
       video.playsInline = true
       video.preload = 'auto'
       let done = false
@@ -179,8 +178,8 @@ export default function UploadsPage() {
         try {
           const vr = await fetch(`/api/v2/vlogs/${row.vlog_id}`, { credentials: 'include' })
           if (!vr.ok) throw new Error(`get vlog ${vr.status}`)
-          const vd = await vr.json()
-          const videoUrl: string | null = vd.video_url
+          const vd = await vr.json() as { video_url?: string | null }
+          const videoUrl = vd.video_url ?? null
           if (!videoUrl) throw new Error('no video_url')
           const b64 = await captureThumbInBrowser(videoUrl)
           if (!b64) throw new Error('browser could not decode (likely HEVC)')
@@ -194,7 +193,7 @@ export default function UploadsPage() {
             const text = await pr.text()
             throw new Error(`PUT ${pr.status}: ${text.slice(0, 120)}`)
           }
-          const pd = await pr.json()
+          const pd = await pr.json() as { thumbnail_url?: string }
           row.status = 'done'
           row.method = 'direct'
           row.thumbnail_url = pd.thumbnail_url
