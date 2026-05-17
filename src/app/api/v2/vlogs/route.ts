@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         recorded_at?: string | null
         thumbnail_url?: string | null
         thumbnail_blob_base64?: string | null  // browser-captured JPEG, written to R2 inline
+        audio_chunks_json?: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null
         archive?: boolean
       }
     | null
@@ -126,14 +127,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Validate browser-extracted audio chunks if supplied. All chunk r2_keys
+  // must share the prefix of the source video key so we never accept a
+  // pointer to someone else's R2 object.
+  let audioChunksJson: string | null = null
+  if (Array.isArray(body.audio_chunks_json) && body.audio_chunks_json.length > 0) {
+    const expectedPrefix = body.r2_key.split('/').slice(0, 3).join('/') // operator/uploads/ulid
+    const ok = body.audio_chunks_json.every(c =>
+      typeof c?.r2_key === 'string' &&
+      c.r2_key.startsWith(`${expectedPrefix}/audio/`) &&
+      typeof c.start_sec === 'number' &&
+      typeof c.end_sec === 'number' &&
+      typeof c.bytes === 'number',
+    )
+    if (ok) {
+      audioChunksJson = JSON.stringify(body.audio_chunks_json)
+    }
+  }
+
   await run(
     db,
     `INSERT INTO vlogs (
        id, operator_id, r2_key, original_filename, file_size_bytes, mime_type,
-       recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key, pipeline_status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key, pipeline_status,
+       audio_chunks_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, operator.id, body.r2_key, body.original_filename, body.file_size_bytes, body.mime_type,
     derived.recorded_at, derived.recorded_at_source, body.thumbnail_url ?? null, thumbnailR2Key, pipelineStatus,
+    audioChunksJson,
   )
 
   // Trigger the post-upload Workflow when not in archive mode.

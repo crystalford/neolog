@@ -81,7 +81,8 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     const vlog = await step.do('fetch-context', async () => {
       const row = await this.env.DB.prepare(
         `SELECT id, operator_id, r2_key, original_filename, mime_type, recorded_at,
-                transcoded_r2_key, thumbnail_url, thumbnail_r2_key, transcript_text, pipeline_status
+                transcoded_r2_key, thumbnail_url, thumbnail_r2_key, transcript_text, pipeline_status,
+                audio_chunks_json
            FROM vlogs WHERE id = ? AND operator_id = ?`,
       ).bind(vlog_id, operator_id).first<{
         id: string
@@ -95,6 +96,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         thumbnail_r2_key: string | null
         transcript_text: string | null
         pipeline_status: string
+        audio_chunks_json: string | null
       }>()
       if (!row) throw new Error(`Vlog not found: ${vlog_id}`)
       return row
@@ -397,72 +399,86 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         'transcribe',
         { retries: { limit: 2, delay: '30 seconds' }, timeout: '15 minutes' },
         async () => {
-          // For video sources, extract audio first via ffmpeg. The container
-          // request is wrapped in a 45s AbortController so a wedged container
-          // can't hang the workflow for 15 minutes. If ffmpeg is unhealthy
-          // we throw a descriptive error and let softStep record the failure
-          // honestly — the operator can re-run transcribe once the container
-          // is back instead of staring at "running 5s" forever.
-          let audioBytes: Uint8Array
-          if (isVideo) {
-            const sourceKey = transcodedKey || vlog.r2_key
-            const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
-            const ctl = new AbortController()
-            const timer = setTimeout(() => ctl.abort(), 45_000)
-            let audioResp: Response
-            try {
-              audioResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ input_url: inputUrl }),
-                signal: ctl.signal,
-              } as RequestInit)
-            } catch (err: any) {
-              clearTimeout(timer)
-              throw new Error(
-                `ffmpeg /extract-audio fetch failed: ${err?.message || err}. ` +
-                `Container likely down — see workers/ffmpeg lifecycle. ` +
-                `Workflow not retried so re-run /process when container is healthy.`,
+          // Preferred path: browser-extracted audio chunks already in R2.
+          // Each chunk is 16 kHz mono WAV at most 5 min long — Whisper
+          // accepts these directly, well under its 25 MB request limit.
+          // We transcribe each chunk in sequence, offset word timestamps
+          // by chunk.start_sec, and stitch.
+          //
+          // Legacy ffmpeg path was retired with the Cloudflare Container
+          // Worker (couldn't reliably instantiate). If audio_chunks_json
+          // is empty, we record a clear failure outcome and the operator
+          // re-extracts in-browser from /uploads.
+          let chunks: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> = []
+          try {
+            chunks = vlog.audio_chunks_json ? JSON.parse(vlog.audio_chunks_json) : []
+          } catch {
+            chunks = []
+          }
+          if (!Array.isArray(chunks) || chunks.length === 0) {
+            // Audio-only file fallback: if the source is already audio (mp3,
+            // wav, m4a) we can pass the raw R2 bytes straight to Whisper.
+            if (!isVideo) {
+              const r2Obj = await this.env.VIDEOS.get(vlog.r2_key)
+              if (!r2Obj) throw new Error(`R2 object missing: ${vlog.r2_key}`)
+              const audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
+              const result: any = await this.env.AI.run(
+                '@cf/openai/whisper-large-v3-turbo' as any,
+                { audio: Array.from(audioBytes), task: 'transcribe' } as any,
               )
+              const transcript = result.text ?? result.transcription ?? ''
+              await this.env.DB.prepare(
+                `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
+                                  transcript_completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?`,
+              ).bind(transcript, vlog_id).run()
+              return
             }
-            clearTimeout(timer)
-            if (!audioResp.ok) {
-              const errBody = (await audioResp.text()).slice(0, 300)
-              throw new Error(`ffmpeg /extract-audio ${audioResp.status}: ${errBody}`)
-            }
-            audioBytes = new Uint8Array(await audioResp.arrayBuffer())
-          } else {
-            const r2Obj = await this.env.VIDEOS.get(vlog.r2_key)
-            if (!r2Obj) throw new Error(`R2 object missing: ${vlog.r2_key}`)
-            audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
+            throw new Error(
+              'No audio_chunks_json on row — browser-side audio extract did not run at upload. ' +
+              'Re-extract from /uploads (Extract audio in browser).',
+            )
           }
 
-          // Workers AI Whisper
-          const result: any = await this.env.AI.run(
-            '@cf/openai/whisper-large-v3-turbo' as any,
-            { audio: Array.from(audioBytes), task: 'transcribe' } as any,
-          )
+          const allWords: Array<{ word: string; start: number; end: number }> = []
+          let stitched = ''
+          for (const chunk of chunks) {
+            const obj = await this.env.VIDEOS.get(chunk.r2_key)
+            if (!obj) {
+              throw new Error(`audio chunk missing from R2: ${chunk.r2_key}`)
+            }
+            const audioBytes = new Uint8Array(await obj.arrayBuffer())
+            const result: any = await this.env.AI.run(
+              '@cf/openai/whisper-large-v3-turbo' as any,
+              { audio: Array.from(audioBytes), task: 'transcribe' } as any,
+            )
+            const text = result.text ?? result.transcription ?? ''
+            if (text) stitched = stitched ? `${stitched} ${text}` : text
+            const words: any[] = Array.isArray(result.words) ? result.words : []
+            for (const w of words) {
+              if (!w.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
+              allWords.push({
+                word: String(w.word).trim(),
+                start: w.start + chunk.start_sec,
+                end: w.end + chunk.start_sec,
+              })
+            }
+          }
 
-          const transcript = result.text ?? result.transcription ?? ''
           await this.env.DB.prepare(
             `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
                               transcript_completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
               WHERE id = ?`,
-          ).bind(transcript, vlog_id).run()
+          ).bind(stitched, vlog_id).run()
 
-          // Write word-level timestamps if Whisper returned them
-          const words: any[] = result.words || []
-          if (words.length > 0) {
-            const stmts = words
-              .filter(w => w.word && typeof w.start === 'number' && typeof w.end === 'number')
-              .map((w, idx) =>
-                this.env.DB.prepare(
-                  `INSERT INTO transcript_words (vlog_id, operator_id, word, start_time, end_time, word_index)
-                   VALUES (?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(vlog_id, word_index) DO NOTHING`,
-                ).bind(vlog_id, operator_id, String(w.word).trim(), w.start, w.end, idx),
-              )
-            // D1 batch supports many statements at once
+          if (allWords.length > 0) {
+            const stmts = allWords.map((w, idx) =>
+              this.env.DB.prepare(
+                `INSERT INTO transcript_words (vlog_id, operator_id, word, start_time, end_time, word_index)
+                  VALUES (?, ?, ?, ?, ?, ?)
+                  ON CONFLICT(vlog_id, word_index) DO NOTHING`,
+              ).bind(vlog_id, operator_id, w.word, w.start, w.end, idx),
+            )
             const CHUNK = 100
             for (let i = 0; i < stmts.length; i += CHUNK) {
               await this.env.DB.batch(stmts.slice(i, i + CHUNK))

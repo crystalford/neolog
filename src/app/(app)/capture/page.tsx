@@ -529,13 +529,64 @@ async function processOne(
   // requires zero server infrastructure. We try this BEFORE registering so
   // the resulting JPEG can ride along in the register call. If the browser
   // can't decode this particular file (extremely rare for normal video
-  // formats on Chrome/Edge/Safari), we silently skip and the server-side
-  // workflow falls back to FFmpeg as before.
+  // formats on Chrome/Edge/Safari), we silently skip — the workflow's
+  // own thumbnail step is gone now that the FFmpeg container is retired,
+  // but the operator can re-extract via the /uploads "Fix in browser" path.
   let thumbnailBase64: string | null = null
   try {
     thumbnailBase64 = await captureThumbnail(file, 5000)
   } catch {
-    // ignore — server-side fallback will handle it
+    // ignore — operator can re-extract later from /uploads
+  }
+
+  // 5b. Extract audio chunks for Whisper transcription. Replaces the
+  // server-side FFmpeg /extract-audio path which became unreliable once
+  // the Cloudflare Container Worker stopped instantiating cleanly. Each
+  // chunk is a 5-min WAV at 16 kHz mono — well under Whisper's 25 MB
+  // per-call limit. We upload chunks directly to R2 via presigned PUTs
+  // and pass the manifest in the register call.
+  //
+  // Skipped silently if the browser can't decode (very rare for MP4 with
+  // AAC audio on Chrome/Edge/Safari). The workflow's transcribe step
+  // then records a failure in extraction_outcomes and the operator can
+  // re-extract from the vlog detail page when ready.
+  let audioChunksManifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null = null
+  if ((file.type || '').startsWith('video/') || (file.type || '').startsWith('audio/')) {
+    try {
+      update(id, { status: 'finalizing', message: 'extracting audio…' })
+      const { extractAudioChunks, uploadChunkToR2 } = await import('@/lib/browser-audio')
+      const chunks = await extractAudioChunks(file, {
+        onProgress: info => {
+          if (info.phase === 'chunking' && typeof info.ratio === 'number') {
+            update(id, { message: `extracting audio… ${Math.round(info.ratio * 100)}%` })
+          }
+        },
+      })
+      const manifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> = []
+      for (let i = 0; i < chunks.length; i++) {
+        update(id, { message: `uploading audio chunk ${i + 1}/${chunks.length}` })
+        const presign = await fetch('/api/v2/upload/audio-chunk-presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key: initiate.key, chunk_index: i }),
+        })
+        if (!presign.ok) throw new Error(`audio presign ${presign.status}`)
+        const { presigned_url, r2_key } = await presign.json() as { presigned_url: string; r2_key: string }
+        await uploadChunkToR2(presigned_url, chunks[i].blob)
+        manifest.push({
+          r2_key,
+          start_sec: chunks[i].startSec,
+          end_sec: chunks[i].endSec,
+          bytes: chunks[i].bytes,
+        })
+      }
+      audioChunksManifest = manifest
+    } catch (err: any) {
+      // Don't abort the upload — register the vlog without audio chunks
+      // so the row exists and the operator can re-extract later.
+      update(id, { message: `audio extract skipped: ${err?.message || err}` })
+    }
   }
 
   // 6. Register vlog row
@@ -554,6 +605,7 @@ async function processOne(
         recorded_at: recordedAt,
         archive,
         thumbnail_blob_base64: thumbnailBase64,
+        audio_chunks_json: audioChunksManifest,
       }),
     })
     if (r.status === 409) {
