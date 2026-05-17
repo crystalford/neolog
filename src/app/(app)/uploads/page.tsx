@@ -215,28 +215,6 @@ export default function UploadsPage() {
     }
   }
 
-  const runMigrations = async () => {
-    if (!confirm('Apply pending D1 migrations (operator_settings, extraction_outcomes, etc)? Safe to re-run.')) return
-    try {
-      const r = await fetch('/api/v2/admin/run-migrations', {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const data = await r.json() as { summary?: { applied: number; skipped: number; failed: number; total: number }; results?: { name: string; status: string; error?: string }[]; error?: string; details?: string }
-      if (!r.ok) {
-        alert(`Migration run failed: ${data.error || data.details || 'unknown'}`)
-        return
-      }
-      const s = data.summary
-      const failedLines = (data.results || []).filter(x => x.status === 'failed').map(x => `${x.name}: ${x.error}`)
-      const msg = `Applied ${s?.applied}, skipped ${s?.skipped} (already present), failed ${s?.failed}` +
-        (failedLines.length ? `\n\nFailures:\n${failedLines.join('\n')}` : '')
-      alert(msg)
-    } catch (err: any) {
-      alert(`Migration call failed: ${err?.message || err}`)
-    }
-  }
-
   const regenerateThumbnails = async () => {
     setRegenerating(true)
     setRegenResult(null)
@@ -576,13 +554,6 @@ export default function UploadsPage() {
           title="Resets rows stuck on 'transcoding' back to 'archived'. The in-flight workflows continue on Cloudflare's side."
         >
           {regenerating ? 'Resetting…' : 'Reset stuck transcoding rows'}
-        </button>
-        <button
-          onClick={runMigrations}
-          style={adminPillStyle(false)}
-          title="Apply pending D1 migrations (operator_settings, extraction_outcomes, etc). Safe to re-run. Fix 500s on /settings and /process."
-        >
-          Run D1 migrations
         </button>
         <button
           onClick={() => runBatch(false)}

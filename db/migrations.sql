@@ -86,3 +86,42 @@ CREATE TABLE IF NOT EXISTS operator_settings (
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (operator_id, key)
 );
+
+-- 2026-05-17: reliability overhaul.
+-- audio_chunks_json: JSON array of {r2_key, start_sec, end_sec, bytes} written
+-- by the browser-side audio extractor at upload time. When set, the transcribe
+-- step skips FFmpeg and reads chunks straight from R2 for Whisper.
+ALTER TABLE vlogs ADD COLUMN audio_chunks_json TEXT;
+
+-- pipeline_restart_count: incremented by the auto-healing cron worker each
+-- time it re-dispatches a stuck workflow. After 3 it marks the row failed
+-- so the operator sees genuine failures, not silently-looping retries.
+ALTER TABLE vlogs ADD COLUMN pipeline_restart_count INTEGER NOT NULL DEFAULT 0;
+
+-- background_jobs: durable queue for batch backfills (fix-thumbnail,
+-- extract-audio, backfill-recorded-at). Status persists across browser
+-- refreshes — UI polls this table instead of holding state in React.
+CREATE TABLE IF NOT EXISTS background_jobs (
+  id           TEXT PRIMARY KEY,
+  kind         TEXT NOT NULL,
+  vlog_id      TEXT,
+  operator_id  TEXT NOT NULL,
+  status       TEXT CHECK(status IN ('queued','running','done','failed')) NOT NULL DEFAULT 'queued',
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  error        TEXT,
+  result_json  TEXT,
+  payload_json TEXT,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at   TIMESTAMP,
+  completed_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_operator_status ON background_jobs(operator_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_kind_status ON background_jobs(kind, status);
+
+-- schema_migrations: bookkeeping for the runtime migration runner in
+-- src/lib/migration-runner.ts. The runner SELECTs from this on Worker
+-- cold-start and applies any MIGRATIONS[] entries not present.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name       TEXT PRIMARY KEY,
+  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

@@ -36,6 +36,15 @@ export function getDb(env: { DB: D1Database }): D1Database {
       'wrangler.toml declares the d1_databases binding.'
     )
   }
+  // Fire-and-forget: ensure schema is up to date on first call per isolate.
+  // The promise is memoized inside ensureMigrationsOnce so additional calls
+  // within the same isolate are free. Awaiting would add latency to every
+  // first request after deploy; we trust the runner to surface failures via
+  // logs + the health endpoint.
+  //
+  // Lazy import to avoid a cycle if any callee of getDb is itself imported by
+  // migration-runner. (None today, but cheap insurance.)
+  void import('./migration-runner').then(m => m.ensureMigrationsOnce(env.DB))
   return env.DB
 }
 
