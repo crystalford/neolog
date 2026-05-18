@@ -28,6 +28,8 @@ import type { D1Database } from '@cloudflare/workers-types'
 interface Env {
   DB: D1Database
   PROCESS_UPLOAD?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  PIPELINE?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  HEARTBEAT_TOKEN?: string
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
@@ -76,17 +78,30 @@ export async function POST(
   )
 
   let dispatched = false
-  if (env.PROCESS_UPLOAD) {
+  if (env.PIPELINE && env.HEARTBEAT_TOKEN) {
     try {
-      const dispatchBody: Record<string, unknown> = {
-        vlog_id, operator_id: operator.id,
-      }
-      if (from === 'extract') dispatchBody.passes = ['unified']
-      if (force) dispatchBody.force = true
+      const res = await env.PIPELINE.fetch(`https://internal/reextract/${vlog_id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
+        },
+        body: JSON.stringify({ operator_id: operator.id, pointer: from, force }),
+      })
+      dispatched = res.ok
+    } catch {
+      dispatched = false
+    }
+  } else if (env.PROCESS_UPLOAD) {
+    try {
       const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dispatchBody),
+        body: JSON.stringify({
+          vlog_id, operator_id: operator.id,
+          passes: from === 'extract' ? ['unified'] : undefined,
+          force: force || undefined,
+        }),
       })
       dispatched = res.ok
     } catch {

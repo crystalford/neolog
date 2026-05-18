@@ -473,6 +473,7 @@ jobs:
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
         run: |
           set -e
           # The bindings step above guarantees the Pages project exists, so
@@ -489,6 +490,14 @@ jobs:
           # presigning fails silently → no playback.
           if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT"
+          fi
+          # HEARTBEAT_TOKEN — shared with neolog-pipeline DO worker. The
+          # Pages API routes /api/v2/vlogs (POST), /api/v2/vlogs/[id]/process,
+          # /api/v2/vlogs/[id]/audio-chunks, and /api/v2/dev/replay/[id] send
+          # this header when dispatching to PIPELINE so the DO can authenticate
+          # the call.
+          if [ -n "$HEARTBEAT_TOKEN" ]; then
+            echo "$HEARTBEAT_TOKEN" | wrangler pages secret put HEARTBEAT_TOKEN --project-name "$PAGES_PROJECT"
           fi
 
       - name: Build + deploy Pages project

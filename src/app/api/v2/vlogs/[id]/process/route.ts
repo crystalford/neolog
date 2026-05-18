@@ -26,6 +26,8 @@ interface Env {
   // [[workflows]]), so we fetch the worker's /dispatch endpoint instead and
   // it creates the workflow instance.
   PROCESS_UPLOAD?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  PIPELINE?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  HEARTBEAT_TOKEN?: string
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
@@ -88,8 +90,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       )
     }
 
-    // Dispatch the Workflow via the service binding to neolog-process-upload.
-    if (env.PROCESS_UPLOAD) {
+    // Prefer the DO pipeline. /reextract skips audio_extract + transcribe
+    // (their artifacts exist) and runs the extract step against the
+    // existing transcript. If the operator passes a passes[] subset, we
+    // honor it by falling through to the legacy workflow for now (it
+    // supports per-pass selection; the DO's extract step is unified).
+    const wantsLegacyPasses = Array.isArray(passes) && passes.length > 0 && passes.length < 4
+    const mode = tier === 'max' || tier === 'premium' ? 'premium' : 'auto'
+    if (env.PIPELINE && env.HEARTBEAT_TOKEN && !wantsLegacyPasses) {
+      try {
+        const res = await env.PIPELINE.fetch(`https://internal/reextract/${params.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
+          },
+          body: JSON.stringify({ operator_id: operator.id, mode, force: true }),
+        })
+        if (!res.ok) {
+          const err = await res.text()
+          throw new Error(`pipeline /reextract failed (${res.status}): ${err.slice(0, 400)}`)
+        }
+      } catch (err: any) {
+        await run(
+          db,
+          `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          `Pipeline /reextract failed: ${err.message}`,
+          params.id,
+        )
+        return NextResponse.json({ error: 'Pipeline dispatch failed', details: err.message }, { status: 500 })
+      }
+    } else if (env.PROCESS_UPLOAD) {
       try {
         const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
           method: 'POST',
@@ -110,7 +141,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: 'Workflow dispatch failed', details: err.message }, { status: 500 })
       }
     } else {
-      console.warn('[vlogs/[id]/process] PROCESS_UPLOAD binding missing; status reset only')
+      console.warn('[vlogs/[id]/process] Neither PIPELINE nor PROCESS_UPLOAD binding present; status reset only')
     }
 
     return NextResponse.json({ ok: true })

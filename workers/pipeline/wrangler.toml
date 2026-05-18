@@ -1,17 +1,32 @@
-# Cloudflare Worker: pipeline DO
+# Cloudflare Worker: neolog-pipeline
 #
-# Hosts VlogPipelineDO — one Durable Object instance per vlog.
+# Hosts VlogPipelineDO — one Durable Object per vlog.
 #
 # Responsibilities:
-#   1. Receive per-step events from the workflow worker / container / extractor
-#      via POST /event (HMAC-authed with HEARTBEAT_TOKEN).
-#   2. Persist events to the pipeline_events D1 table.
-#   3. Fan out events to connected browser WebSocket clients in real time.
-#   4. On WS connect, replay the last 200 events for the vlog so the UI
-#      catches up without polling.
+#   1. Drive the 3-step pipeline (audio_extract → transcribe → extract) via
+#      alarm-scheduled execution. Each step is durably checkpointed in DO
+#      storage; the DO hibernates between events to avoid billing while idle.
+#   2. Skip-if-exists guards on every step keyed on R2 artifacts + D1 state.
+#      Replay a single step (force=true) without re-running upstream work.
+#   3. Per-step retry with exponential backoff. After max attempts the row
+#      transitions to state='failed' with full untruncated error text.
+#   4. Receive container heartbeats (POST /event) and broadcast to any
+#      connected browser WebSocket on /ws/:vlog_id so the operator sees
+#      byte-level progress in real time.
 #
-# Hibernates between events via Hibernatable WebSocket API — no JS-execution
-# billing while idle, clients stay connected through eviction.
+# Bindings:
+#   DB              — D1 (vlogs, pipeline_events, extraction_runs, threads, etc)
+#   VIDEOS          — R2 (source video, audio chunks/mp3, transcripts, extractions)
+#   AI              — Workers AI (Whisper + Llama 3.3 70B fp8-fast)
+#   FFMPEG          — service binding to neolog-ffmpeg
+#
+# Secrets:
+#   HEARTBEAT_TOKEN — shared with workflow + container; gates POST /event
+#   ANTHROPIC_API_KEY — Sonnet 4.6 escalation path
+#   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY — for presigning R2 GET URLs
+#
+# Vars:
+#   CLOUDFLARE_ACCOUNT_ID, R2_BUCKET_NAME, PIPELINE_URL
 
 name = "neolog-pipeline"
 main = "src/index.ts"
@@ -24,6 +39,17 @@ binding = "DB"
 database_name = "neolog"
 database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
 
+[[r2_buckets]]
+binding = "VIDEOS"
+bucket_name = "neolog-videos"
+
+[ai]
+binding = "AI"
+
+[[services]]
+binding = "FFMPEG"
+service = "neolog-ffmpeg"
+
 [[durable_objects.bindings]]
 name = "PIPELINE_DO"
 class_name = "VlogPipelineDO"
@@ -31,6 +57,11 @@ class_name = "VlogPipelineDO"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["VlogPipelineDO"]
+
+[vars]
+CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
+R2_BUCKET_NAME = "neolog-videos"
+PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers.dev"
 
 [observability]
 enabled = true

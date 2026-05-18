@@ -34,6 +34,8 @@ interface Env extends R2Env {
   // Service binding to the neolog-process-upload Worker (see process route for
   // why we don't use a direct workflow binding from Pages).
   PROCESS_UPLOAD?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  PIPELINE?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  HEARTBEAT_TOKEN?: string
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
@@ -161,42 +163,65 @@ export async function POST(req: NextRequest) {
   // Archive uploads stay in 'archived' status until the operator hits
   // "Process now" on the vlog detail page (which calls /api/v2/vlogs/[id]/process).
   if (!body.archive) {
-    if (!env.PROCESS_UPLOAD) {
-      // The PROCESS_UPLOAD service binding is not attached to this Pages
-      // project. The bootstrap workflow wires it via Cloudflare API; if the
-      // operator sees this error the bootstrap step "Wire Pages project
-      // bindings" likely failed or was skipped. Re-run `pnpm run bootstrap`.
+    // Prefer the new DO orchestrator (neolog-pipeline). It runs the 3-step
+    // pipeline (audio_extract → transcribe → extract) with alarm-driven
+    // retries, skip-if-exists guards, and live WebSocket progress.
+    //
+    // Falls back to the legacy 13-step Workflow worker (neolog-process-upload)
+    // if the PIPELINE binding isn't present — keeps existing deploys working
+    // while the new wiring rolls out.
+    const dispatched = await dispatchPipeline(env, id, operator.id)
+    if (!dispatched.ok) {
       await run(
         db,
         `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        'PROCESS_UPLOAD service binding missing on Pages project — re-run bootstrap.',
+        dispatched.error,
         id,
       )
-    } else {
-      try {
-        const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vlog_id: id, operator_id: operator.id }),
-        })
-        if (!res.ok) {
-          const err = await res.text()
-          throw new Error(`dispatch failed (${res.status}): ${err.slice(0, 500)}`)
-        }
-      } catch (err: any) {
-        // Surface the dispatch failure on the row but don't fail the create —
-        // the operator can retry via /api/v2/vlogs/[id]/process.
-        await run(
-          db,
-          `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-          `Workflow dispatch failed: ${err.message}`,
-          id,
-        )
-      }
     }
   }
 
   return NextResponse.json({ id, pipeline_status: pipelineStatus }, { status: 201 })
+}
+
+async function dispatchPipeline(
+  env: Env,
+  vlog_id: string,
+  operator_id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (env.PIPELINE && env.HEARTBEAT_TOKEN) {
+    try {
+      const res = await env.PIPELINE.fetch(`https://internal/start/${vlog_id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
+        },
+        body: JSON.stringify({ operator_id, mode: 'auto' }),
+      })
+      if (res.ok) return { ok: true }
+      const txt = await res.text()
+      return { ok: false, error: `pipeline /start failed (${res.status}): ${txt.slice(0, 400)}` }
+    } catch (err: any) {
+      return { ok: false, error: `pipeline /start threw: ${err?.message || err}` }
+    }
+  }
+  // Legacy fallback: PROCESS_UPLOAD workflow
+  if (!env.PROCESS_UPLOAD) {
+    return { ok: false, error: 'Neither PIPELINE nor PROCESS_UPLOAD service binding is wired on this Pages project — re-run bootstrap.' }
+  }
+  try {
+    const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vlog_id, operator_id }),
+    })
+    if (res.ok) return { ok: true }
+    const txt = await res.text()
+    return { ok: false, error: `workflow dispatch failed (${res.status}): ${txt.slice(0, 400)}` }
+  } catch (err: any) {
+    return { ok: false, error: `workflow dispatch threw: ${err?.message || err}` }
+  }
 }
 
 // ─── GET: list vlogs ────────────────────────────────────────────────────────

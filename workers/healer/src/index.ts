@@ -25,6 +25,8 @@ import type {
 interface Env {
   DB: D1Database
   PROCESS_UPLOAD: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  PIPELINE?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
+  HEARTBEAT_TOKEN?: string
 }
 
 const STUCK_STATUSES = ['transcoding', 'transcribing', 'extracting'] as const
@@ -106,14 +108,28 @@ async function sweep(env: Env): Promise<{
         continue
       }
 
-      const dispatched = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_id: row.id, operator_id: row.operator_id }),
-      })
+      // Prefer the DO pipeline /heal path (re-arms its alarm), fall back
+      // to the legacy workflow dispatch for vlogs that hadn't migrated yet.
+      let dispatched: Response
+      if (env.PIPELINE && env.HEARTBEAT_TOKEN) {
+        dispatched = await env.PIPELINE.fetch(`https://internal/heal/${row.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
+          },
+          body: JSON.stringify({ vlog_id: row.id, operator_id: row.operator_id }),
+        })
+      } else {
+        dispatched = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vlog_id: row.id, operator_id: row.operator_id }),
+        })
+      }
 
       if (!dispatched.ok) {
-        result.errors.push({ id: row.id, error: `dispatch ${dispatched.status}` })
+        result.errors.push({ id: row.id, error: `heal/dispatch ${dispatched.status}` })
         continue
       }
 

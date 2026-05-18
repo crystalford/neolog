@@ -33,5 +33,10 @@ database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
 binding = "PROCESS_UPLOAD"
 service = "neolog-process-upload"
 
+# Prefer the DO pipeline; PROCESS_UPLOAD is the fallback for legacy rows.
+[[services]]
+binding = "PIPELINE"
+service = "neolog-pipeline"
+
 [observability]
 enabled = true
