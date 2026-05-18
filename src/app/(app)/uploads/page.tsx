@@ -19,6 +19,7 @@ interface UploadRow {
   thumbnail_url: string | null
   pipeline_status: string
   uploaded_at: string
+  has_transcript?: 0 | 1 | boolean
 }
 
 type Filter = 'all' | 'uploaded' | 'transcribing' | 'extracting' | 'complete' | 'archived' | 'failed'
@@ -94,6 +95,22 @@ export default function UploadsPage() {
   // resulting JPEG to /api/v2/vlogs/[id]/thumbnail.
   const [browserBatchRunning, setBrowserBatchRunning] = useState(false)
   const [browserBatchStopFlag, setBrowserBatchStopFlag] = useState(false)
+
+  // Browser-side audio extract batch — fetches each video from R2, decodes
+  // audio via Web Audio API, slices into 2-min WAV chunks, uploads each to
+  // R2 via presigned PUT, PUTs the manifest to /api/v2/vlogs/[id]/audio-chunks
+  // which re-dispatches the workflow so transcribe runs against the fresh
+  // chunks. Mirrors the thumbnail batch pattern.
+  const [audioBatchRunning, setAudioBatchRunning] = useState(false)
+  const [audioBatchStopFlag, setAudioBatchStopFlag] = useState(false)
+  const [audioBatchProgress, setAudioBatchProgress] = useState<{
+    current: number
+    total: number
+    done: number
+    failed: number
+    currentFile: string
+    currentPhase: string
+  } | null>(null)
 
   // Capture a JPEG thumbnail from a video URL using the browser's decoder.
   // Returns base64 JPEG (no data: prefix) or null if the browser can't decode.
@@ -212,6 +229,115 @@ export default function UploadsPage() {
       load()
     } finally {
       setBrowserBatchRunning(false)
+    }
+  }
+
+  const runAudioBatch = async () => {
+    if (audioBatchRunning) return
+    setAudioBatchRunning(true)
+    setAudioBatchStopFlag(false)
+
+    // Candidates: vlogs without a transcript that also lack audio chunks.
+    // The vlogs API doesn't expose audio_chunks_json on list responses, so
+    // we approximate via transcript_text absence. The PUT endpoint is
+    // idempotent — re-running on a vlog that already has chunks just
+    // overwrites them and re-dispatches the workflow.
+    const candidates = vlogs.filter(v => !v.has_transcript && v.pipeline_status !== 'archived')
+    if (candidates.length === 0) {
+      setAudioBatchRunning(false)
+      return
+    }
+
+    const { extractAudioChunks, uploadChunkToR2 } = await import('@/lib/browser-audio')
+    let done = 0
+    let failed = 0
+    setAudioBatchProgress({
+      current: 0,
+      total: candidates.length,
+      done: 0,
+      failed: 0,
+      currentFile: '',
+      currentPhase: '',
+    })
+
+    try {
+      for (let i = 0; i < candidates.length; i++) {
+        if (audioBatchStopFlag) break
+        const v = candidates[i]
+        setAudioBatchProgress({
+          current: i + 1,
+          total: candidates.length,
+          done,
+          failed,
+          currentFile: v.original_filename || '(untitled)',
+          currentPhase: 'fetching video…',
+        })
+        try {
+          const vr = await fetch(`/api/v2/vlogs/${v.id}`, { credentials: 'include' })
+          if (!vr.ok) throw new Error(`vlog fetch ${vr.status}`)
+          const vd = await vr.json() as { vlog?: { id: string }; video_url?: string | null }
+          if (!vd.video_url) throw new Error('no video_url')
+          const blobResp = await fetch(vd.video_url)
+          if (!blobResp.ok) throw new Error(`R2 fetch ${blobResp.status}`)
+          const arrayBuf = await blobResp.arrayBuffer()
+
+          setAudioBatchProgress(p => p && { ...p, currentPhase: 'decoding audio…' })
+          const chunks = await extractAudioChunks(arrayBuf, {
+            onProgress: info => {
+              if (info.phase === 'chunking' && typeof info.ratio === 'number') {
+                const ratio = info.ratio
+                setAudioBatchProgress(p => p && { ...p, currentPhase: `chunking ${Math.round(ratio * 100)}%` })
+              }
+            },
+          })
+
+          const manifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> = []
+          for (let ci = 0; ci < chunks.length; ci++) {
+            if (audioBatchStopFlag) break
+            setAudioBatchProgress(p => p && { ...p, currentPhase: `uploading chunk ${ci + 1}/${chunks.length}` })
+            const pr = await fetch(`/api/v2/vlogs/${v.id}/audio-chunk-presign`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chunk_index: ci }),
+            })
+            if (!pr.ok) throw new Error(`presign ${pr.status}`)
+            const { presigned_url, r2_key } = await pr.json() as { presigned_url: string; r2_key: string }
+            await uploadChunkToR2(presigned_url, chunks[ci].blob)
+            manifest.push({
+              r2_key,
+              start_sec: chunks[ci].startSec,
+              end_sec: chunks[ci].endSec,
+              bytes: chunks[ci].bytes,
+            })
+          }
+
+          if (audioBatchStopFlag) break
+          setAudioBatchProgress(p => p && { ...p, currentPhase: 'saving manifest…' })
+          const putR = await fetch(`/api/v2/vlogs/${v.id}/audio-chunks`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_chunks_json: manifest, reprocess: true }),
+          })
+          if (!putR.ok) throw new Error(`PUT audio-chunks ${putR.status}`)
+          done++
+        } catch (err: any) {
+          console.warn(`audio batch failed for ${v.id}:`, err?.message || err)
+          failed++
+        }
+        setAudioBatchProgress({
+          current: i + 1,
+          total: candidates.length,
+          done,
+          failed,
+          currentFile: v.original_filename || '(untitled)',
+          currentPhase: '',
+        })
+      }
+      load()
+    } finally {
+      setAudioBatchRunning(false)
     }
   }
 
@@ -548,28 +674,12 @@ export default function UploadsPage() {
           {importing ? 'Scanning R2…' : 'Import from R2'}
         </button>
         <button
-          onClick={regenerateThumbnails}
-          disabled={regenerating}
-          style={adminPillStyle(regenerating)}
-          title="Resets rows stuck on 'transcoding' back to 'archived'. The in-flight workflows continue on Cloudflare's side."
-        >
-          {regenerating ? 'Resetting…' : 'Reset stuck transcoding rows'}
-        </button>
-        <button
-          onClick={() => runBatch(false)}
-          disabled={batchRunning || missingThumbs === 0}
-          style={adminPillStyle(batchRunning)}
-          title="Generate thumbnails directly from R2 videos using FFmpeg. H.264 done in ~2s each; HEVC dispatched to background workflow."
-        >
-          {batchRunning ? 'Fixing thumbnails…' : `Fix all thumbnails (${missingThumbs})`}
-        </button>
-        <button
           onClick={runBrowserBatch}
-          disabled={browserBatchRunning || batchRunning || missingThumbs === 0}
+          disabled={browserBatchRunning || missingThumbs === 0}
           style={adminPillStyle(browserBatchRunning)}
           title="Capture thumbnails in your browser (uses Chrome's decoder, no FFmpeg container). Works for any video Chrome can play."
         >
-          {browserBatchRunning ? 'Capturing in browser…' : `Fix in browser (${missingThumbs})`}
+          {browserBatchRunning ? 'Extracting thumbnails…' : `Extract thumbnails (${missingThumbs})`}
         </button>
         {browserBatchRunning && (
           <button
@@ -580,22 +690,17 @@ export default function UploadsPage() {
             Stop
           </button>
         )}
-        {batchRunning && (
-          <button
-            onClick={() => setBatchStopFlag(true)}
-            style={adminPillStyle(false)}
-            title="Stop after current chunk completes."
-          >
+        <button
+          onClick={runAudioBatch}
+          disabled={audioBatchRunning}
+          style={adminPillStyle(audioBatchRunning)}
+          title="Extract audio in your browser, upload chunks to R2, and re-dispatch the transcribe step. Backfills vlogs missing a transcript."
+        >
+          {audioBatchRunning ? 'Extracting audio…' : `Extract audio (${vlogs.filter(v => !v.has_transcript && v.pipeline_status !== 'archived').length})`}
+        </button>
+        {audioBatchRunning && (
+          <button onClick={() => setAudioBatchStopFlag(true)} style={adminPillStyle(false)} title="Stop after current vlog.">
             Stop
-          </button>
-        )}
-        {!batchRunning && batchCursor && (
-          <button
-            onClick={() => runBatch(true)}
-            style={adminPillStyle(false)}
-            title="Resume from where the batch stopped."
-          >
-            Continue
           </button>
         )}
         <button
@@ -624,6 +729,30 @@ export default function UploadsPage() {
           {showSupabaseForm ? 'Hide Supabase' : 'Pull from Supabase'}
         </button>
       </div>
+
+      {audioBatchProgress && (
+        <div className="reveal d4" style={{
+          margin: '0 24px 16px',
+          padding: '12px 16px',
+          background: 'var(--ink-2)',
+          border: '1px solid var(--line)',
+          borderRadius: 12,
+          fontSize: 13,
+          color: 'var(--bone-1)',
+        }}>
+          audio extract: <strong>{audioBatchProgress.current}/{audioBatchProgress.total}</strong>
+          {' · '}done: <strong>{audioBatchProgress.done}</strong>
+          {' · '}failed: <strong>{audioBatchProgress.failed}</strong>
+          {audioBatchProgress.currentFile && (
+            <>
+              {' · '}<span style={{ opacity: 0.7 }}>{audioBatchProgress.currentFile}</span>
+              {audioBatchProgress.currentPhase && (
+                <> — {audioBatchProgress.currentPhase}</>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {backfillStats && (
         <div className="reveal d4" style={{

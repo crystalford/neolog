@@ -1,0 +1,37 @@
+# Cloudflare Cron Trigger: healer
+#
+# Sweeps stuck pipeline rows every 5 minutes. When a vlog has been in
+# transcoding / transcribing / extracting for > 10 minutes (workflows
+# checkpoint inside that window when healthy), we re-dispatch the
+# process-upload workflow. After 3 auto-restarts on the same row we mark
+# it failed instead of looping forever — gives the operator a clear
+# "Needs attention" signal on /uploads.
+#
+# Replaces the "Restart pipeline" + "Reset stuck transcoding rows" buttons
+# that used to ride on /uploads. Eliminates a class of "is it stuck?"
+# guessing.
+#
+# Bindings:
+#   DB              — D1 database 'neolog'
+#   PROCESS_UPLOAD  — Service binding to the workflow worker
+
+name = "neolog-healer"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "eda2e9bbd9acc42699027cfdcb50f998"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neolog"
+database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
+
+[[services]]
+binding = "PROCESS_UPLOAD"
+service = "neolog-process-upload"
+
+[observability]
+enabled = true

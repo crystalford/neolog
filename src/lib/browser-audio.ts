@@ -37,7 +37,9 @@ interface ExtractOpts {
   onProgress?: (info: { phase: 'decoding' | 'chunking'; chunkIndex?: number; totalChunks?: number; ratio?: number }) => void
 }
 
-const DEFAULT_CHUNK_SECONDS = 300 // 5 min; ≈ 9.6 MB per chunk at 16 kHz mono 16-bit
+const DEFAULT_CHUNK_SECONDS = 120 // 2 min; ≈ 3.84 MB WAV @ 16 kHz mono 16-bit
+                                  // → ~5.1 MB base64 in JSON → safely under
+                                  // Workers AI Whisper's per-request size limit.
 const TARGET_SAMPLE_RATE = 16000
 
 /**

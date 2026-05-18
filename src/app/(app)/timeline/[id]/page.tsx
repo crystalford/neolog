@@ -372,37 +372,8 @@ function GenerateThumbnailButton({ vlogId, onDone }: { vlogId: string; onDone: (
 // 'archived' (the two terminal states). Reads pipeline_status + the per-step
 // extraction_outcomes JSON. The parent component auto-polls every 5s while
 // status is in flight so this just re-renders with fresh data.
-function PipelineStatus({ vlog, onRestart }: { vlog: VlogDetail; onRestart: () => void }) {
+function PipelineStatus({ vlog }: { vlog: VlogDetail; onRestart?: () => void }) {
   const status = vlog.pipeline_status
-  const [diagnostic, setDiagnostic] = useState<{
-    container: { ok: boolean; status?: number; body?: string; error?: string; ms?: number }
-    in_flight: { transcoding: number; transcribing: number; extracting: number; uploaded: number; total: number }
-    container_max_instances: number
-    saturated: boolean
-  } | null>(null)
-  const [diagBusy, setDiagBusy] = useState(false)
-  const [restartBusy, setRestartBusy] = useState(false)
-  const runDiagnostic = async () => {
-    setDiagBusy(true)
-    try {
-      const r = await fetch('/api/v2/system/ffmpeg-status', { credentials: 'include' })
-      const d: any = await r.json().catch(() => null)
-      if (d?.container && d?.in_flight) setDiagnostic(d)
-    } catch {} finally { setDiagBusy(false) }
-  }
-  const restart = async () => {
-    if (restartBusy) return
-    setRestartBusy(true)
-    try {
-      await fetch(`/api/v2/vlogs/${vlog.id}/process`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),  // no tier/passes → fresh dispatch, full pipeline
-      })
-      onRestart()
-    } finally { setRestartBusy(false) }
-  }
   // Hide entirely when there's nothing useful to show — no processing happening
   // and no per-step outcomes recorded yet.
   if ((status === 'complete' || status === 'archived' || status === 'failed') && !vlog.extraction_outcomes) {
@@ -609,88 +580,18 @@ function PipelineStatus({ vlog, onRestart }: { vlog: VlogDetail; onRestart: () =
           alignItems: 'center',
           flexWrap: 'wrap',
         }}>
-          <button
-            onClick={restart}
-            disabled={restartBusy}
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--state-err)',
-              background: 'rgba(198,96,66,0.06)',
-              color: 'var(--state-err)',
-              borderRadius: 100,
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 10,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
-              cursor: restartBusy ? 'wait' : 'pointer',
-            }}
-          >
-            {restartBusy ? 'Restarting…' : 'Restart pipeline'}
-          </button>
-          <button
-            onClick={runDiagnostic}
-            disabled={diagBusy}
-            style={{
-              padding: '6px 12px',
-              border: '1px solid var(--line-warm)',
-              background: 'rgba(236,228,210,0.04)',
-              color: 'var(--bone-1)',
-              borderRadius: 100,
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 10,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
-              cursor: diagBusy ? 'wait' : 'pointer',
-            }}
-          >
-            {diagBusy ? 'Checking…' : 'Check FFmpeg container'}
-          </button>
-          {diagnostic && (
-            <div style={{
-              flex: '1 0 100%',
-              marginTop: 8,
-              padding: '10px 12px',
-              background: 'var(--ink-1)',
-              border: `1px solid ${diagnostic.container.ok ? 'var(--line)' : 'var(--state-err)'}`,
-              borderRadius: 8,
-              fontSize: 11,
-              fontFamily: 'JetBrains Mono, monospace',
-              color: 'var(--bone-1)',
-              lineHeight: 1.6,
-            }}>
-              <div>
-                <strong>Container:</strong>{' '}
-                {diagnostic.container.ok
-                  ? <span style={{ color: 'var(--state-ok, #7a9a6a)' }}>OK · {diagnostic.container.ms}ms</span>
-                  : <span style={{ color: 'var(--state-err)' }}>FAIL · {diagnostic.container.error || `HTTP ${diagnostic.container.status}`}</span>}
-                {diagnostic.container.body && (
-                  <span style={{ marginLeft: 8, color: 'var(--bone-3)', fontSize: 10 }}>
-                    build: {(() => {
-                      try { return JSON.parse(diagnostic.container.body)?.build || diagnostic.container.body.slice(0, 40) }
-                      catch { return diagnostic.container.body.slice(0, 40) }
-                    })()}
-                  </span>
-                )}
-              </div>
-              <div>
-                <strong>In-flight workflows:</strong> {diagnostic.in_flight.total} ·
-                transcoding: {diagnostic.in_flight.transcoding} ·
-                transcribing: {diagnostic.in_flight.transcribing} ·
-                extracting: {diagnostic.in_flight.extracting}
-              </div>
-              {diagnostic.saturated && (
-                <div style={{ marginTop: 6, color: 'var(--state-err)' }}>
-                  ⚠ Container saturated. Max {diagnostic.container_max_instances} concurrent.
-                  Other workflows are ahead in the queue — wait or kill them in Cloudflare dashboard.
-                </div>
-              )}
-              {!diagnostic.saturated && diagnostic.container.ok && (
-                <div style={{ marginTop: 6, color: 'var(--bone-3)' }}>
-                  Container OK, queue clear. If your row's still stuck, the workflow died — hit Restart pipeline.
-                </div>
-              )}
-            </div>
-          )}
+          <span style={{
+            padding: '6px 12px',
+            border: '1px solid var(--line)',
+            color: 'var(--bone-3)',
+            borderRadius: 100,
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10,
+            letterSpacing: 1.4,
+            textTransform: 'uppercase',
+          }}>
+            Auto-heal sweeps stuck rows every 5 min
+          </span>
         </div>
       )}
     </div>

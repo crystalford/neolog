@@ -362,6 +362,17 @@ jobs:
             echo "$ANTHROPIC_API_KEY" | wrangler secret put ANTHROPIC_API_KEY
           fi
 
+      - name: Deploy healer cron worker (workers/healer)
+        if: hashFiles('workers/healer/wrangler.toml') != ''
+        run: |
+          set -e
+          cd workers/healer
+          if [ -f package.json ]; then
+            npm install --no-audit --no-fund
+          fi
+          echo "Deploying neolog-healer cron worker..."
+          wrangler deploy
+
       - name: Wire Pages project bindings (D1, R2, AI, services)
         if: hashFiles('wrangler.toml') != ''
         env:

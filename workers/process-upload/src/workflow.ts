@@ -424,7 +424,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
               const audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
               const result: any = await this.env.AI.run(
                 '@cf/openai/whisper-large-v3-turbo' as any,
-                { audio: Array.from(audioBytes), task: 'transcribe' } as any,
+                { audio: audioBytes } as any,
               )
               const transcript = result.text ?? result.transcription ?? ''
               await this.env.DB.prepare(
@@ -442,19 +442,39 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
 
           const allWords: Array<{ word: string; start: number; end: number }> = []
           let stitched = ''
-          for (const chunk of chunks) {
+          for (let ci = 0; ci < chunks.length; ci++) {
+            const chunk = chunks[ci]
             const obj = await this.env.VIDEOS.get(chunk.r2_key)
             if (!obj) {
               throw new Error(`audio chunk missing from R2: ${chunk.r2_key}`)
             }
             const audioBytes = new Uint8Array(await obj.arrayBuffer())
-            const result: any = await this.env.AI.run(
-              '@cf/openai/whisper-large-v3-turbo' as any,
-              { audio: Array.from(audioBytes), task: 'transcribe' } as any,
-            )
-            const text = result.text ?? result.transcription ?? ''
+            // Workers AI Whisper accepts audio as either an array of bytes OR
+            // a raw Uint8Array buffer. Array.from() balloons a 4 MB WAV into
+            // a 12 MB JSON-serialized array which trips the per-request size
+            // limit. The Uint8Array form is binary-streamed by the AI binding
+            // — much more compact. Same trick the docs use for vision models.
+            //
+            // We also drop the `task: 'transcribe'` param: it's the default and
+            // some newer Whisper model schemas have rejected it as unknown.
+            let result: any
+            try {
+              result = await this.env.AI.run(
+                '@cf/openai/whisper-large-v3-turbo' as any,
+                { audio: audioBytes } as any,
+              )
+            } catch (err: any) {
+              // Surface the real error verbatim so extraction_outcomes shows
+              // exactly what Workers AI rejected, instead of a 40-char preview.
+              const detail = err?.message || err?.stack || String(err)
+              throw new Error(
+                `Whisper failed on chunk ${ci + 1}/${chunks.length} ` +
+                `(${chunk.bytes} bytes, ${chunk.end_sec - chunk.start_sec}s): ${detail}`,
+              )
+            }
+            const text = result?.text ?? result?.transcription ?? ''
             if (text) stitched = stitched ? `${stitched} ${text}` : text
-            const words: any[] = Array.isArray(result.words) ? result.words : []
+            const words: any[] = Array.isArray(result?.words) ? result.words : []
             for (const w of words) {
               if (!w.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
               allWords.push({
