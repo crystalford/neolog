@@ -109,6 +109,7 @@ jobs:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up pnpm
@@ -142,6 +143,9 @@ jobs:
           fi
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             echo "$ANTHROPIC_API_KEY" | wrangler secret put ANTHROPIC_API_KEY
+          fi
+          if [ -n "$HEARTBEAT_TOKEN" ]; then
+            echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
           fi
       - name: Summary
         if: always()

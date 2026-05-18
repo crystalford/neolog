@@ -411,7 +411,8 @@ jobs:
                 },
                 "services": {
                   "FFMPEG": {"service": "$CONTAINER_WORKER", "environment": "production"},
-                  "PROCESS_UPLOAD": {"service": "neolog-process-upload", "environment": "production"}
+                  "PROCESS_UPLOAD": {"service": "neolog-process-upload", "environment": "production"},
+                  "PIPELINE": {"service": "neolog-pipeline", "environment": "production"}
                 }
               }
             }

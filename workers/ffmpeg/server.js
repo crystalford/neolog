@@ -356,27 +356,150 @@ async function streamingExtract(inputUrl, seekTime, res, miniTranscode) {
 
 // ─── endpoint: /extract-audio ────────────────────────────────────────────────
 // Pulls audio out as MP3 for transcription. Whisper handles MP3 fine.
+//
+// Accepts optional heartbeat_url + heartbeat_token + vlog_id + operator_id
+// in the request body. When supplied, posts ffmpeg's -progress pipe:1 output
+// to that URL roughly once per second so the live UI shows byte/time-level
+// progress instead of a static "Video transcode ⋯" placeholder for minutes.
 async function extractAudio(body, res) {
-  const { input_url } = body
+  const { input_url, heartbeat_url, heartbeat_token, vlog_id, operator_id } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
 
   const { dir, file: inputFile } = await downloadToTmp(input_url, 'audio-in')
   const outFile = join(dir, 'audio.mp3')
+
+  const beat = makeHeartbeat({
+    url: heartbeat_url,
+    token: heartbeat_token,
+    vlog_id,
+    operator_id,
+    step: 'audio_extract',
+  })
   try {
-    await runFfmpeg([
-      '-y',
-      '-i', inputFile,
-      '-vn',
-      '-c:a', 'libmp3lame',
-      '-b:a', '128k',
-      outFile,
-    ], outFile)
+    await beat('starting', 'ffmpeg', { state: 'starting' })
+    await runFfmpegWithProgress(
+      [
+        '-y',
+        '-progress', 'pipe:1',
+        '-i', inputFile,
+        '-vn',
+        '-c:a', 'libmp3lame',
+        '-b:a', '128k',
+        outFile,
+      ],
+      beat,
+    )
+    await beat('ok', 'ffmpeg', { state: 'ok' })
     streamFile(res, outFile, 'audio/mpeg')
     res.on('close', () => cleanup(dir))
   } catch (err) {
+    await beat('error', 'ffmpeg', { state: 'error', error: err.message })
     cleanup(dir)
     jsonError(res, 500, err.message)
   }
+}
+
+/**
+ * Build a heartbeat-poster closure. If url/token/vlog_id are missing
+ * (synchronous internal calls), returns a no-op so callers don't have to
+ * branch.
+ */
+function makeHeartbeat({ url, token, vlog_id, operator_id, step }) {
+  if (!url || !token || !vlog_id || !operator_id) {
+    return async () => {}
+  }
+  const target = `${url.replace(/\/+$/, '')}/event/${vlog_id}`
+  return async (status, sub_step, detail) => {
+    try {
+      await fetch(target, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Heartbeat-Token': token,
+        },
+        body: JSON.stringify({
+          operator_id,
+          step,
+          sub_step,
+          status,
+          detail_json: JSON.stringify(detail ?? {}),
+          ts: Date.now(),
+        }),
+      })
+    } catch (err) {
+      // Heartbeats are observability; never let a failed POST break the job.
+      console.warn(`[heartbeat] ${target} failed: ${err?.message || err}`)
+    }
+  }
+}
+
+/**
+ * Run ffmpeg with -progress pipe:1 and forward progress events to the
+ * heartbeat poster ~1× per second.
+ *
+ * ffmpeg's progress output is a stream of key=value lines terminated by
+ * `progress=continue` or `progress=end`. Example:
+ *   frame=143
+ *   fps=28.5
+ *   stream_0_0_q=0.0
+ *   bitrate=128.0kbits/s
+ *   total_size=2256896
+ *   out_time_us=141312000
+ *   out_time_ms=141312
+ *   out_time=00:02:21.312000
+ *   speed=2.31x
+ *   progress=continue
+ *
+ * We parse, emit at ~1s cadence, and keep stderr accumulated for the
+ * non-zero-exit error message.
+ */
+function runFfmpegWithProgress(args, beat) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    let buf = ''
+    let pending = {}
+    let lastEmit = 0
+    const flush = async (force) => {
+      const now = Date.now()
+      if (!force && now - lastEmit < 1000) return
+      if (Object.keys(pending).length === 0) return
+      lastEmit = now
+      const out_time_us = parseInt(pending.out_time_us || pending.out_time_ms * 1000 || '0', 10)
+      const speed = pending.speed ? parseFloat(pending.speed) : null
+      await beat('running', 'ffmpeg', {
+        state: 'running',
+        time_sec: out_time_us / 1_000_000,
+        speed_x: speed,
+        total_size: pending.total_size ? parseInt(pending.total_size, 10) : null,
+        bitrate: pending.bitrate || null,
+      })
+    }
+    proc.stdout.on('data', async (d) => {
+      buf += d.toString()
+      const lines = buf.split('\n')
+      buf = lines.pop() || ''
+      for (const line of lines) {
+        const eq = line.indexOf('=')
+        if (eq < 0) continue
+        const k = line.slice(0, eq).trim()
+        const v = line.slice(eq + 1).trim()
+        if (k === 'progress') {
+          // 'continue' or 'end' → snapshot ready
+          await flush(v === 'end')
+          pending = {}
+        } else {
+          pending[k] = v
+        }
+      }
+    })
+    proc.stderr.on('data', d => { stderr += d.toString() })
+    proc.on('error', err => reject(err))
+    proc.on('exit', code => {
+      if (code === 0) resolve()
+      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-2000)}`))
+    })
+  })
 }
 
 // ─── endpoint: /trim ─────────────────────────────────────────────────────────

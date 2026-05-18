@@ -40,15 +40,27 @@ binding = "AI"
 binding = "FFMPEG"
 service = "neolog-ffmpeg"
 
+# Service binding for emitting pipeline_events into the VlogPipelineDO,
+# which both persists to D1 AND broadcasts to any connected WebSocket
+# clients watching /timeline/[id] live progress.
+[[services]]
+binding = "PIPELINE"
+service = "neolog-pipeline"
+
 # Presigning needs the account ID + R2 access key + secret
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
 R2_BUCKET_NAME = "neolog-videos"
+# Public URL of the pipeline worker — the FFmpeg container fetches this
+# directly to post per-second progress heartbeats (containers can't use
+# service bindings; they make outbound HTTPS).
+PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers.dev"
 
 # Secrets (set via wrangler secret put):
 #   R2_ACCESS_KEY_ID
 #   R2_SECRET_ACCESS_KEY
-#   ANTHROPIC_API_KEY      — Claude calls for the four extraction passes
+#   ANTHROPIC_API_KEY     — Claude calls for sonnet-4.6 escalation
+#   HEARTBEAT_TOKEN       — shared with neolog-pipeline; authenticates POST /event
 
 [observability]
 enabled = true
