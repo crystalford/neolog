@@ -703,31 +703,6 @@ export default function UploadsPage() {
             Stop
           </button>
         )}
-        <button
-          onClick={() => runBackfill(false)}
-          disabled={backfillRunning}
-          style={adminPillStyle(backfillRunning)}
-          title="For archived vlogs whose filename had no date, read the MP4 mvhd atom (first 2 MB) to find the real recording date. Vlogs move to their correct timeline position."
-        >
-          {backfillRunning ? 'Backfilling dates…' : 'Backfill recorded dates'}
-        </button>
-        {backfillRunning && (
-          <button onClick={() => setBackfillStopFlag(true)} style={adminPillStyle(false)}>
-            Stop
-          </button>
-        )}
-        {!backfillRunning && backfillCursor && (
-          <button onClick={() => runBackfill(true)} style={adminPillStyle(false)}>
-            Continue
-          </button>
-        )}
-        <button
-          onClick={() => setShowSupabaseForm(s => !s)}
-          style={adminPillStyle(false)}
-          title="Last-try recovery of legacy thumbnails from the old Supabase project (if you still have the credentials)."
-        >
-          {showSupabaseForm ? 'Hide Supabase' : 'Pull from Supabase'}
-        </button>
       </div>
 
       {audioBatchProgress && (

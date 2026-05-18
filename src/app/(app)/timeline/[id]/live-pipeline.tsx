@@ -44,12 +44,16 @@ const STEPS: { key: StepKey; label: string }[] = [
 ]
 
 interface State {
-  connected: boolean
+  // 'idle' before first WS open attempt, 'connected' after onopen,
+  // 'reconnecting' only after a drop. Avoids the "RECONNECTING…" lie
+  // that flashed when the page just loaded.
+  conn: 'idle' | 'connecting' | 'connected' | 'reconnecting'
   events: PipelineEvent[]   // append-only, max ~500 to bound memory
   expanded: Record<StepKey, boolean>
 }
 
 type Action =
+  | { type: 'connecting' }
   | { type: 'connected' }
   | { type: 'disconnected' }
   | { type: 'snapshot'; events: PipelineEvent[] }
@@ -57,15 +61,16 @@ type Action =
   | { type: 'toggle'; step: StepKey }
 
 const initial: State = {
-  connected: false,
+  conn: 'idle',
   events: [],
   expanded: { audio_extract: false, transcribe: false, extract: false },
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'connected': return { ...state, connected: true }
-    case 'disconnected': return { ...state, connected: false }
+    case 'connecting': return { ...state, conn: state.conn === 'connected' ? 'reconnecting' : 'connecting' }
+    case 'connected': return { ...state, conn: 'connected' }
+    case 'disconnected': return { ...state, conn: state.conn === 'connected' ? 'reconnecting' : state.conn }
     case 'snapshot': {
       // de-dupe by id; snapshot events from DO arrive ordered by ts ASC
       const seen = new Set(state.events.map(e => e.id).filter(x => x != null))
@@ -104,6 +109,7 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
 
     const connect = () => {
       if (!aliveRef.current) return
+      dispatch({ type: 'connecting' })
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${proto}://${location.host}/api/v2/vlogs/${vlogId}/ws`)
       wsRef.current = ws
@@ -148,15 +154,20 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
-        color: state.connected ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
+        color: state.conn === 'connected' ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
         letterSpacing: 1.2, textTransform: 'uppercase',
       }}>
         <span style={{
           width: 6, height: 6, borderRadius: '50%',
-          background: state.connected ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
+          background: state.conn === 'connected' ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
         }} />
-        {state.connected ? 'live' : 'reconnecting…'}
-        <span style={{ marginLeft: 'auto', opacity: 0.6 }}>{state.events.length} events</span>
+        {state.conn === 'connected' ? 'live'
+          : state.conn === 'connecting' ? 'connecting…'
+          : state.conn === 'reconnecting' ? 'reconnecting…'
+          : 'idle'}
+        {state.events.length > 0 && (
+          <span style={{ marginLeft: 'auto', opacity: 0.6 }}>{state.events.length} events</span>
+        )}
       </div>
       {STEPS.map(step => (
         <StepCard

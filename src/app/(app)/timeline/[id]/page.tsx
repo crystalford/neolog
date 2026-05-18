@@ -137,7 +137,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
       <h2>{deriveTitle(vlog.original_filename)}</h2>
       <div className="meta-row">
-        <span>{recorded}{vlog.recorded_at_source ? ` · ${vlog.recorded_at_source}` : ''}</span>
+        <span>{recorded}</span>
         {sizeMb && <span>{sizeMb} MB</span>}
         {vlog.mime_type && <span>{vlog.mime_type}</span>}
         <span className="status-pill">{status}</span>
@@ -158,24 +158,25 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       )}
 
       <div className="section">
-        <div className="label">Pipeline</div>
+        <div className="label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Pipeline</span>
+          <ResetPipelineButton vlogId={params.id} onReset={load} />
+        </div>
         <LivePipeline vlogId={params.id} />
       </div>
-
-      <PipelineStatus vlog={vlog} onRestart={load} />
 
       <div className="section">
         <div className="label">Re-extract</div>
         <p style={{ fontSize: 13, color: 'var(--bone-2)', marginBottom: 14 }}>
-          Run the AI passes on this vlog. Higher tier = better quality where voice nuance matters.
+          Run the unified extraction on this vlog. Auto starts cheap and escalates to Sonnet only when voice grounding fails on too many items.
         </p>
 
-        {/* Tier picker */}
+        {/* Mode picker — replaces the legacy tier picker with the new unified-extraction modes */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {([
-            ['free',    'Free',    'Kimi K2.6'],
-            ['premium', 'Premium', 'Sonnet for voice-sensitive passes'],
-            ['max',     'Max',     'Sonnet for everything'],
+            ['free',    'Auto',    'Llama 70B → Sonnet on fail'],
+            ['premium', 'Cheap',   'Llama 70B only — no escalation'],
+            ['max',     'Premium', 'Sonnet 4.6 directly'],
           ] as const).map(([k, label, sub]) => {
             const tierTotal = (['threads', 'clip_candidates', 'creative_elements', 'entities'] as const)
               .reduce((s, p) => s + COST[k][p], 0)
@@ -371,6 +372,54 @@ function GenerateThumbnailButton({ vlogId, onDone }: { vlogId: string; onDone: (
       </button>
       {msg && <div style={{ marginTop: 10, fontSize: 12, color: 'var(--bone-3)' }}>{msg}</div>}
     </div>
+  )
+}
+
+/**
+ * Reset button — wipes pipeline_events for this vlog (only the new DO
+ * orchestrator's rows; legacy workflow rows stay for history) and re-kicks
+ * the pipeline from step 0. Used when state is confusing or after iterating.
+ */
+function ResetPipelineButton({ vlogId, onReset }: { vlogId: string; onReset: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (busy) return
+    if (!confirm('Reset the pipeline for this vlog?\n\nWipes the live event log and re-runs audio extract → transcribe → extract. Steps with existing artifacts (audio chunks, transcript, extraction) are skipped automatically. No cost unless an artifact is missing.')) return
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/v2/vlogs/${vlogId}/reset`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await r.json().catch(() => ({})) as any
+      if (!r.ok || !data?.ok) {
+        alert(`Reset failed: ${data?.error || `HTTP ${r.status}`}`)
+        return
+      }
+      onReset()
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      onClick={run}
+      disabled={busy}
+      style={{
+        padding: '4px 10px',
+        fontSize: 10,
+        fontFamily: 'JetBrains Mono, monospace',
+        letterSpacing: 1.4,
+        textTransform: 'uppercase',
+        background: 'transparent',
+        border: '1px solid var(--line)',
+        borderRadius: 4,
+        color: 'var(--bone-2)',
+        cursor: busy ? 'wait' : 'pointer',
+      }}
+    >
+      {busy ? 'Resetting…' : 'Reset'}
+    </button>
   )
 }
 

@@ -176,12 +176,19 @@ export async function getEventsForVlog(
   operatorId: string,
   limit = 200,
 ): Promise<PipelineEventRow[]> {
+  // Restrict to events written by the new DO orchestrator. Legacy workflow
+  // events used overlapping step names and would otherwise show up in the
+  // /timeline/[id] live UI for already-finished vlogs.
   const rs = await db.prepare(
-    `SELECT id, vlog_id, operator_id, step, status, runtime, worker_version, request_id,
-            started_at, completed_at, duration_ms, error_full_text, detail_json
+    `SELECT id, vlog_id, operator_id, step, sub_step, status, runtime, worker_version, request_id,
+            started_at, completed_at, duration_ms, error_full_text, detail_json,
+            COALESCE(ts, CAST(strftime('%s', started_at) AS INTEGER) * 1000) AS ts,
+            COALESCE(attempt, 1) AS attempt
        FROM pipeline_events
       WHERE vlog_id = ? AND operator_id = ?
-      ORDER BY started_at DESC
+        AND step IN ('audio_extract', 'transcribe', 'extract')
+        AND (runtime = 'pipeline' OR runtime IS NULL)
+      ORDER BY ts ASC
       LIMIT ?`,
   ).bind(vlogId, operatorId, limit).all<PipelineEventRow>()
   return rs.results ?? []

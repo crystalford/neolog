@@ -220,13 +220,21 @@ async function insertEvent(db: D1Database, e: PipelineEventInsert): Promise<stri
 }
 
 async function readRecentEvents(db: D1Database, vlog_id: string, limit: number) {
+  // Filter to events from the NEW DO orchestrator (runtime='pipeline'). The
+  // legacy workflow worker (runtime='workflow') wrote events with the same
+  // step name 'transcribe' which would otherwise leak into the new 3-card
+  // UI and make a finished vlog look like it's mid-processing.
+  // ts may be NULL on rows written before that column existed; fall back
+  // to started_at (ISO string) → epoch ms.
   const res = await db.prepare(
-    `SELECT id, vlog_id, operator_id, step, sub_step, status,
+    `SELECT id, vlog_id, operator_id, step, sub_step, status, runtime,
             COALESCE(ts, CAST(strftime('%s', started_at) AS INTEGER) * 1000) AS ts,
             duration_ms, detail_json, error_full_text,
             COALESCE(attempt, 1) AS attempt
        FROM pipeline_events
       WHERE vlog_id = ?
+        AND step IN ('audio_extract', 'transcribe', 'extract')
+        AND (runtime = 'pipeline' OR runtime IS NULL)
       ORDER BY ts ASC
       LIMIT ?`,
   ).bind(vlog_id, limit).all()
