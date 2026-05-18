@@ -45,6 +45,44 @@ jobs:
           cache: pnpm
       - name: Install wrangler
         run: pnpm add -g wrangler@4
+      - name: Syntax-check Node sources before deploy
+        # Trivial guard that would have caught the syntax error in
+        # workers/ffmpeg/server.js that wedged the container for a day.
+        # node --check parses the file without executing it.
+        run: |
+          set -e
+          cd workers/ffmpeg
+          for f in $(find . -name '*.js' -not -path '*/node_modules/*'); do
+            echo "node --check $f"
+            node --check "$f"
+          done
+      - name: Container smoke test (docker build + boot + /health)
+        # Reproduces the exact failure mode we just hit: server.js crashes
+        # before binding port 8080. A failing boot here means we never push
+        # the image to Cloudflare. Adds ~60s to deploy but catches a whole
+        # class of "image deploys, instance won't start" bugs.
+        run: |
+          set -e
+          cd workers/ffmpeg
+          docker build -t neolog-ffmpeg-test .
+          docker run -d --name ff-smoke -p 18080:8080 neolog-ffmpeg-test
+          # Wait up to 15s for /health to respond
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+            if curl -fsS http://localhost:18080/health > /tmp/health.json 2>/dev/null; then
+              echo "Container healthy after ${i}s. /health:"
+              cat /tmp/health.json
+              docker logs ff-smoke
+              docker stop ff-smoke
+              docker rm ff-smoke
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Container failed to bind /health within 15s. Logs:"
+          docker logs ff-smoke
+          docker stop ff-smoke
+          docker rm ff-smoke
+          exit 1
       - name: Deploy FFmpeg container worker
         if: hashFiles('workers/ffmpeg/wrangler.toml') != ''
         run: |

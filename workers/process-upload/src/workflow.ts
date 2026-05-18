@@ -127,6 +127,38 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // recorded in `outcomes` but does NOT abort the workflow. Each feature
     // stands on its own — a flaky transcode can no longer take thumbnail,
     // recorded_at, transcribe, or extraction passes down with it.
+    //
+    // ALSO writes to the new `pipeline_events` table on every transition.
+    // pipeline_events stores the FULL untruncated error text (vs the 500-char
+    // preview in extraction_outcomes) and is what the /system page +
+    // /timeline/[id] event log read from. The old JSON column stays
+    // populated as a compatibility shim until all readers migrate.
+    const WORKER_VERSION = 'rebuild-2026-05-18'
+    const insertPipelineEvent = async (
+      name: string,
+      status: 'started' | 'ok' | 'failed',
+      durationMs: number,
+      errorFullText: string | null,
+    ) => {
+      try {
+        await this.env.DB.prepare(
+          `INSERT INTO pipeline_events
+             (id, vlog_id, operator_id, step, status, runtime, worker_version,
+              started_at, completed_at, duration_ms, error_full_text)
+           VALUES (?, ?, ?, ?, ?, 'workflow', ?,
+                   datetime('now', ?), CURRENT_TIMESTAMP, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), vlog_id, operator_id, name, status, WORKER_VERSION,
+          `-${Math.round(durationMs / 1000)} seconds`, durationMs, errorFullText,
+        ).run()
+      } catch {
+        // pipeline_events table might not exist yet on the very first cold
+        // start after deploy. Migration runner creates it but only when a
+        // Pages route is hit first. We swallow here so the workflow doesn't
+        // blow up on the bootstrap edge.
+      }
+    }
+
     const softStep = async <T>(
       name: string,
       opts: any,
@@ -134,21 +166,23 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     ): Promise<T | null> => {
       const t0 = Date.now()
       const startedAt = new Date().toISOString()
-      // Mark as running BEFORE we kick off the step so the UI can show a
-      // "started X seconds ago" indicator. Without this, the operator only
-      // sees the result row after the step completes — which on a 5-min
-      // HEVC transcode means the UI looks stuck for 5 minutes.
       await recordOutcome(name, { ok: false, status: 'running', started_at: startedAt, ms: 0 } as any)
+      await insertPipelineEvent(name, 'started', 0, null)
       try {
         const result = opts
           ? await (step as any).do(name, opts, fn)
           : await (step as any).do(name, fn)
-        await recordOutcome(name, { ok: true, status: 'done', started_at: startedAt, ms: Date.now() - t0 } as any)
+        const ms = Date.now() - t0
+        await recordOutcome(name, { ok: true, status: 'done', started_at: startedAt, ms } as any)
+        await insertPipelineEvent(name, 'ok', ms, null)
         return result as T
       } catch (e: any) {
-        const msg = String(e?.message ?? e).slice(0, 500)
-        console.warn(`[softStep:${name}] failed: ${msg}`)
-        await recordOutcome(name, { ok: false, status: 'failed', started_at: startedAt, ms: Date.now() - t0, error: msg } as any)
+        const fullMsg = e?.stack || `${e?.name || 'Error'}: ${e?.message || String(e)}`
+        const preview = String(e?.message ?? e).slice(0, 500)
+        console.warn(`[softStep:${name}] failed: ${preview}`)
+        const ms = Date.now() - t0
+        await recordOutcome(name, { ok: false, status: 'failed', started_at: startedAt, ms, error: preview } as any)
+        await insertPipelineEvent(name, 'failed', ms, fullMsg)
         return null
       }
     }

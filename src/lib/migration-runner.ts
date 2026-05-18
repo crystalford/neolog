@@ -139,6 +139,37 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-17_idx_jobs_kind_status',
     sql: `CREATE INDEX IF NOT EXISTS idx_jobs_kind_status ON background_jobs(kind, status)`,
   },
+  // ─── pipeline_events: single source of truth for "what happened to a vlog" ─
+  // Replaces the truncated extraction_outcomes JSON column. Every step of the
+  // pipeline writes a row here with full untruncated error text, timestamps,
+  // and the build version of the worker that ran it. UI and AI assistant read
+  // from this directly instead of guessing from cryptic upstream 503s.
+  {
+    name: '2026-05-18_pipeline_events',
+    sql: `CREATE TABLE IF NOT EXISTS pipeline_events (
+      id              TEXT PRIMARY KEY,
+      vlog_id         TEXT NOT NULL,
+      operator_id     TEXT NOT NULL,
+      step            TEXT NOT NULL,
+      status          TEXT NOT NULL CHECK (status IN ('started','ok','failed','skipped')),
+      runtime         TEXT,
+      worker_version  TEXT,
+      request_id      TEXT,
+      started_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at    TIMESTAMP,
+      duration_ms     INTEGER,
+      error_full_text TEXT,
+      detail_json     TEXT
+    )`,
+  },
+  {
+    name: '2026-05-18_idx_pipeline_events_vlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_events_vlog ON pipeline_events(vlog_id, started_at DESC)`,
+  },
+  {
+    name: '2026-05-18_idx_pipeline_events_operator_failed',
+    sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_events_operator_failed ON pipeline_events(operator_id, status, started_at DESC) WHERE status = 'failed'`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

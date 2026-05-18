@@ -61,23 +61,29 @@ export async function extractAudioChunks(
     ? source
     : await source.arrayBuffer()
 
-  // AudioContext.decodeAudioData mutates / detaches the input buffer in
-  // Chrome. Copy if the caller might still reference it (the typical
-  // capture-page case where the File is also being uploaded to R2 — by
-  // the time we get here that upload has read the bytes already, but
-  // copying is cheap insurance).
-  const decodeBuf = arrayBuf.slice(0)
-
   // Use an AudioContext just for the initial decode. Its sampleRate is
   // hardware-dependent (usually 44.1 or 48 kHz on Windows) — that's fine,
   // we resample per chunk.
+  //
+  // Note: decodeAudioData mutates / detaches the input buffer in Chrome.
+  // We don't copy here because (a) the caller doesn't reference it after
+  // this call in any current code path, and (b) for large videos (1 GB+)
+  // the copy was a peak-memory killer that caused the whole extract to
+  // silently fail in the catch block at the call site.
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
   let decoded: AudioBuffer
   try {
-    decoded = await ctx.decodeAudioData(decodeBuf)
-  } finally {
+    decoded = await ctx.decodeAudioData(arrayBuf)
+  } catch (err: any) {
     try { await ctx.close() } catch {}
+    throw new Error(
+      `decodeAudioData failed (${(arrayBuf.byteLength / 1_000_000).toFixed(0)} MB input): ` +
+      `${err?.message || err}. ` +
+      `Likely cause: file is too large for the browser to decode in one pass, ` +
+      `or the audio codec isn't supported. Try a shorter clip.`,
+    )
   }
+  try { await ctx.close() } catch {}
 
   const sourceDuration = decoded.duration
   const totalChunks = Math.max(1, Math.ceil(sourceDuration / chunkSeconds))

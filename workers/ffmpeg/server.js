@@ -38,6 +38,20 @@ import { join } from 'node:path'
 
 const PORT = parseInt(process.env.PORT || '8080', 10)
 
+// Fail loudly if anything below crashes before server.listen() can fire.
+// Without this, a SyntaxError or import failure produces a silent exit and
+// Cloudflare just records "container not running" with zero logs. With this
+// the cause is visible in `wrangler tail` and the dashboard logs.
+process.on('uncaughtException', err => {
+  console.error('[neolog-ffmpeg] BOOT FAILURE (uncaughtException):', err && err.stack || err)
+  process.exit(1)
+})
+process.on('unhandledRejection', (reason, p) => {
+  console.error('[neolog-ffmpeg] BOOT FAILURE (unhandledRejection):', reason)
+  process.exit(1)
+})
+console.log(`[neolog-ffmpeg] booting on port ${PORT}, node ${process.version}, pid ${process.pid}`)
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function jsonError(res, status, message) {
@@ -339,7 +353,6 @@ async function streamingExtract(inputUrl, seekTime, res, miniTranscode) {
     })
   })
 }
-}
 
 // ─── endpoint: /extract-audio ────────────────────────────────────────────────
 // Pulls audio out as MP3 for transcription. Whisper handles MP3 fine.
@@ -484,12 +497,30 @@ const routes = {
 // /health returns this so the operator can verify which version is live.
 // If you push a workers/ffmpeg change and /health still shows the old build,
 // deploy-workers.yml didn't actually deploy.
-const BUILD_VERSION = 'streaming-stdin-v3-2026-05-16'
+const BUILD_VERSION = 'rebuild-2026-05-18-brace-fix-boot-guards'
+
+const SERVER_BOOT_AT = Date.now()
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true, build: BUILD_VERSION }))
+    return
+  }
+  if (req.method === 'GET' && req.url === '/boot-info') {
+    // Upstream calls this to confirm the container's process is actually
+    // alive (not just the image deployed). Returns enough fingerprint info
+    // that we can correlate a deploy with what's running.
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      ok: true,
+      build: BUILD_VERSION,
+      pid: process.pid,
+      uptime_ms: Date.now() - SERVER_BOOT_AT,
+      node: process.version,
+      arch: process.arch,
+      platform: process.platform,
+    }))
     return
   }
   if (req.method !== 'POST') {
