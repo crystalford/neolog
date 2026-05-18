@@ -152,6 +152,35 @@ jobs:
             echo "Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  deploy-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install wrangler
+        run: pnpm add -g wrangler@4
+      - name: Deploy pipeline DO worker
+        if: hashFiles('workers/pipeline/wrangler.toml') != ''
+        run: |
+          set -e
+          cd workers/pipeline
+          if [ -f package.json ]; then npm install --no-audit --no-fund; fi
+          wrangler deploy
+          if [ -n "$HEARTBEAT_TOKEN" ]; then
+            echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
+          fi
+
   deploy-healer:
     runs-on: ubuntu-latest
     timeout-minutes: 6

@@ -6,6 +6,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import LivePipeline from './live-pipeline'
 
 interface VlogDetail {
   id: string
@@ -155,6 +156,11 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           <GenerateThumbnailButton vlogId={params.id} onDone={load} />
         </div>
       )}
+
+      <div className="section">
+        <div className="label">Pipeline</div>
+        <LivePipeline vlogId={params.id} />
+      </div>
 
       <PipelineStatus vlog={vlog} onRestart={load} />
 

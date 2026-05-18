@@ -170,6 +170,99 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-18_idx_pipeline_events_operator_failed',
     sql: `CREATE INDEX IF NOT EXISTS idx_pipeline_events_operator_failed ON pipeline_events(operator_id, status, started_at DESC) WHERE status = 'failed'`,
   },
+  // ─── pipeline_events: add columns the new DO-driven flow writes ──────────
+  // The original table had a CHECK(status IN 'started','ok','failed','skipped')
+  // constraint that's too narrow for the DO's richer status set ('starting',
+  // 'running','retrying','failed_terminal','error'). Rather than recreate the
+  // table (D1 doesn't have a clean DROP CONSTRAINT), the DO maps its rich
+  // status into one of the allowed values and stuffs the full status into
+  // detail_json.state for the UI to read.
+  {
+    name: '2026-05-18_pipeline_events_sub_step',
+    sql: `ALTER TABLE pipeline_events ADD COLUMN sub_step TEXT`,
+  },
+  {
+    name: '2026-05-18_pipeline_events_ts',
+    sql: `ALTER TABLE pipeline_events ADD COLUMN ts INTEGER`,
+  },
+  {
+    name: '2026-05-18_pipeline_events_attempt',
+    sql: `ALTER TABLE pipeline_events ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1`,
+  },
+  // ─── unified extraction runs ─────────────────────────────────────────────
+  // One row per extraction RUN (a single LLM call producing all 4 output types).
+  // The `is_active=1` row is the one whose threads/clips/creative_elements/entities
+  // rows are visible in the UI. Older runs stay around so the operator can
+  // compare what different models / prompt versions produced.
+  {
+    name: '2026-05-18_extraction_runs',
+    sql: `CREATE TABLE IF NOT EXISTS extraction_runs (
+      id              TEXT PRIMARY KEY,
+      vlog_id         TEXT NOT NULL,
+      operator_id     TEXT NOT NULL,
+      model           TEXT NOT NULL,
+      escalated_from  TEXT,
+      mode            TEXT NOT NULL,
+      r2_key          TEXT NOT NULL,
+      total_items     INTEGER NOT NULL DEFAULT 0,
+      invalid_items   INTEGER NOT NULL DEFAULT 0,
+      fail_rate       REAL NOT NULL DEFAULT 0,
+      cost_usd_input  REAL,
+      cost_usd_output REAL,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      created_at      INTEGER NOT NULL
+    )`,
+  },
+  {
+    name: '2026-05-18_idx_extraction_runs_vlog_active',
+    sql: `CREATE INDEX IF NOT EXISTS idx_extraction_runs_vlog_active ON extraction_runs(vlog_id, is_active)`,
+  },
+  // ─── vlogs.state ─ simpler state machine for the new pipeline ────────────
+  // Coexists with pipeline_status during cutover. The DO writes both for now;
+  // future commit drops pipeline_status.
+  {
+    name: '2026-05-18_vlogs_state',
+    sql: `ALTER TABLE vlogs ADD COLUMN state TEXT NOT NULL DEFAULT 'queued'`,
+  },
+  {
+    name: '2026-05-18_vlogs_state_error',
+    sql: `ALTER TABLE vlogs ADD COLUMN state_error TEXT`,
+  },
+  {
+    name: '2026-05-18_vlogs_extraction_mode',
+    sql: `ALTER TABLE vlogs ADD COLUMN extraction_mode TEXT NOT NULL DEFAULT 'auto'`,
+  },
+  {
+    name: '2026-05-18_idx_vlogs_state',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_state ON vlogs(state)`,
+  },
+  // ─── threads/clips/creative_elements: link to extraction_runs ────────────
+  // Schema additions are nullable so existing rows aren't disturbed. New
+  // unified extraction populates these; legacy extraction leaves them NULL.
+  {
+    name: '2026-05-18_threads_run_id',
+    sql: `ALTER TABLE threads ADD COLUMN run_id TEXT`,
+  },
+  {
+    name: '2026-05-18_threads_validated',
+    sql: `ALTER TABLE threads ADD COLUMN validated INTEGER NOT NULL DEFAULT 1`,
+  },
+  {
+    name: '2026-05-18_clip_candidates_run_id',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN run_id TEXT`,
+  },
+  {
+    name: '2026-05-18_clip_candidates_validated',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN validated INTEGER NOT NULL DEFAULT 1`,
+  },
+  {
+    name: '2026-05-18_creative_elements_run_id',
+    sql: `ALTER TABLE creative_elements ADD COLUMN run_id TEXT`,
+  },
+  {
+    name: '2026-05-18_creative_elements_validated',
+    sql: `ALTER TABLE creative_elements ADD COLUMN validated INTEGER NOT NULL DEFAULT 1`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

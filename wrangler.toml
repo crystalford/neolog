@@ -52,6 +52,15 @@ service = "neolog-ffmpeg"
 binding = "PROCESS_UPLOAD"
 service = "neolog-process-upload"
 
+# ─── Service binding to the pipeline DO worker ──────────────────────────────
+# The Pages /api/v2/vlogs/[id]/ws route proxies WebSocket upgrades to the
+# VlogPipelineDO hosted in this worker. The workflow + container + extractor
+# also POST per-step events to its /event/:vlog_id endpoint so live progress
+# fans out to connected browsers in real time.
+[[services]]
+binding = "PIPELINE"
+service = "neolog-pipeline"
+
 # ─── Environment variables (non-secret) ─────────────────────────────────────
 [vars]
 NEOLOG_ENVIRONMENT = "production"

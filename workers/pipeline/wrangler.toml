@@ -1,0 +1,36 @@
+# Cloudflare Worker: pipeline DO
+#
+# Hosts VlogPipelineDO — one Durable Object instance per vlog.
+#
+# Responsibilities:
+#   1. Receive per-step events from the workflow worker / container / extractor
+#      via POST /event (HMAC-authed with HEARTBEAT_TOKEN).
+#   2. Persist events to the pipeline_events D1 table.
+#   3. Fan out events to connected browser WebSocket clients in real time.
+#   4. On WS connect, replay the last 200 events for the vlog so the UI
+#      catches up without polling.
+#
+# Hibernates between events via Hibernatable WebSocket API — no JS-execution
+# billing while idle, clients stay connected through eviction.
+
+name = "neolog-pipeline"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "eda2e9bbd9acc42699027cfdcb50f998"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neolog"
+database_id = "d9db2aeb-c47b-4611-a2ba-96720939205b"
+
+[[durable_objects.bindings]]
+name = "PIPELINE_DO"
+class_name = "VlogPipelineDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["VlogPipelineDO"]
+
+[observability]
+enabled = true
