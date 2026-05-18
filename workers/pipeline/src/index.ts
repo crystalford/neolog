@@ -625,11 +625,18 @@ export class VlogPipelineDO {
   ): Promise<any> {
     const MAX = 4
     let lastErr: any
+    // Workers AI Whisper schema expects `audio: Array<number>` (JSON array of
+    // byte values). Passing a Uint8Array directly is base64-serialized by the
+    // binding into a STRING, which the model's JSON-schema validator rejects
+    // with "Type mismatch of '/audio', 'string' not in 'object'". Array.from
+    // produces a real JSON array that satisfies the schema. For our 2-min
+    // mono 16kHz chunks (~3.84 MB) the serialized array is ~9 MB — fits.
+    const audioArray = Array.from(bytes)
     for (let attempt = 1; attempt <= MAX; attempt++) {
       try {
         return await this.env.AI.run(
           '@cf/openai/whisper-large-v3-turbo' as any,
-          { audio: bytes } as any,
+          { audio: audioArray } as any,
         )
       } catch (err: any) {
         lastErr = err
@@ -640,8 +647,8 @@ export class VlogPipelineDO {
       }
     }
     throw new Error(
-      `Whisper failed on chunk ${chunkIdx + 1}/${totalChunks} after ${MAX} attempts: ` +
-      `${lastErr?.message || lastErr}`,
+      `Whisper failed on chunk ${chunkIdx + 1}/${totalChunks} after ${MAX} attempts ` +
+      `(${bytes.byteLength} bytes): ${lastErr?.message || lastErr}`,
     )
   }
 
@@ -830,7 +837,18 @@ export class VlogPipelineDO {
     detail: Record<string, unknown>,
     error_full_text: string | null = null,
   ): Promise<void> {
-    const operator_id = (await this.state.storage.get<string>('operator_id')) ?? ''
+    // Resolve operator_id by preference: DO storage (set in /start), then
+    // re-load from D1 if missing. The /events query on the Pages side filters
+    // by operator_id, so an empty/wrong value here would silently hide the
+    // event from the UI even though the row landed in D1.
+    let operator_id = (await this.state.storage.get<string>('operator_id')) ?? ''
+    if (!operator_id) {
+      const row = await this.env.DB.prepare(
+        `SELECT operator_id FROM vlogs WHERE id = ?`,
+      ).bind(vlog_id).first<{ operator_id: string }>()
+      operator_id = row?.operator_id ?? ''
+      if (operator_id) await this.state.storage.put('operator_id', operator_id)
+    }
     const event = {
       vlog_id, operator_id, step, sub_step,
       status,

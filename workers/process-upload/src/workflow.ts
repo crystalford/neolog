@@ -505,7 +505,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
               const audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
               const result: any = await this.env.AI.run(
                 '@cf/openai/whisper-large-v3-turbo' as any,
-                { audio: audioBytes } as any,
+                { audio: Array.from(audioBytes) } as any,
               )
               const transcript = result.text ?? result.transcription ?? ''
               await this.env.DB.prepare(
@@ -558,7 +558,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             })
             const result: any = await this.env.AI.run(
               '@cf/openai/whisper-large-v3-turbo' as any,
-              { audio: audioBytes } as any,
+              { audio: Array.from(audioBytes) } as any,
             )
             const transcript = result.text ?? result.transcription ?? ''
             await this.env.DB.prepare(
@@ -607,7 +607,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             try {
               result = await this.env.AI.run(
                 '@cf/openai/whisper-large-v3-turbo' as any,
-                { audio: audioBytes } as any,
+                { audio: Array.from(audioBytes) } as any,
               )
             } catch (err: any) {
               // Surface the real error verbatim so extraction_outcomes shows

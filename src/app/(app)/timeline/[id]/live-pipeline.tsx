@@ -316,15 +316,32 @@ function ProgressBar({ pct, label }: { pct: number; label?: string }) {
 }
 
 function describeSubstep(step: string, sub: string | null, d: Record<string, unknown>): string {
+  // skip_if_exists fires when an artifact (audio chunks in R2, transcript_text
+  // in D1, or an active extraction_runs row) is already present so the step's
+  // expensive work doesn't need to run. Reading it as "Waiting…" was the bug
+  // we hit on the first end-to-end test.
+  if (sub === 'skip_if_exists') {
+    const reason = d.reason as string | undefined
+    if (step === 'audio_extract') {
+      return 'Skipped: audio already on R2 (browser-extracted chunks reused)'
+    }
+    if (step === 'transcribe') return 'Skipped: transcript already exists in D1'
+    if (step === 'extract') return 'Skipped: extraction already done (use Reset → force to re-run the LLM)'
+    return `Skipped: ${reason || 'artifact exists'}`
+  }
   if (step === 'audio_extract') {
     if (sub === 'probe') return `Probed: ${d.duration_sec ?? '?'}s, codec ${d.codec ?? '?'}`
+    if (sub === 'invoke_ffmpeg') return `Calling FFmpeg container (source key: ${String(d.source_key ?? '?').split('/').pop()})`
     if (sub === 'ffmpeg') {
       const t = d.time_sec, dur = d.duration_sec, speed = d.speed_x
       if (typeof t === 'number' && typeof dur === 'number') {
         return `ffmpeg @ ${t.toFixed(1)}s / ${dur.toFixed(0)}s${typeof speed === 'number' ? ` (${speed.toFixed(2)}× realtime)` : ''}`
       }
+      if (typeof t === 'number') return `ffmpeg @ ${t.toFixed(1)}s${typeof speed === 'number' ? ` (${speed.toFixed(2)}×)` : ''}`
     }
+    if (sub === 'upload_r2') return `Uploaded ${formatBytes(Number(d.bytes ?? 0))} MP3 to R2`
     if (sub === 'upload_chunks') return `Uploading audio chunks ${d.done ?? 0}/${d.total ?? '?'} (${formatBytes(Number(d.bytes_uploaded ?? 0))})`
+    if (sub === 'audio_source') return 'Source is already audio — no extraction needed'
   }
   if (step === 'transcribe') {
     if (sub?.startsWith('chunk_')) {
