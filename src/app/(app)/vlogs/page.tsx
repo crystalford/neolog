@@ -252,6 +252,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
 
   const [ids, setIds] = useState<string[]>([])
   const [skippedInFlight, setSkippedInFlight] = useState(0)
+  const [skippedNoTranscript, setSkippedNoTranscript] = useState(0)
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   const [processed, setProcessed] = useState(0)
@@ -294,6 +295,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
       }
       setIds(d.ids ?? [])
       setSkippedInFlight(d.skipped_in_flight ?? 0)
+      setSkippedNoTranscript(d.skipped_no_transcript ?? 0)
       setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
       setPhase('ready')
     } catch (err: any) {
@@ -509,11 +511,24 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
 
         {phase === 'ready' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
               <Stat label="Will dispatch" value={ids.length} />
-              <Stat label="Skipped (in-flight)" value={skippedInFlight} />
               <Stat label="Est. cost" value={`$${estCost.toFixed(2)}`} />
             </div>
+            {(skippedInFlight > 0 || skippedNoTranscript > 0) && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
+                <Stat label="Skipped (in-flight)" value={skippedInFlight} tone="mute" />
+                <Stat label="Skipped (no transcript)" value={skippedNoTranscript} tone="mute" />
+              </div>
+            )}
+            {skippedNoTranscript > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+                {skippedNoTranscript} vlog{skippedNoTranscript === 1 ? '' : 's'} skipped because
+                {skippedNoTranscript === 1 ? ' it has' : ' they have'} no transcript yet. Bulk
+                re-extract only re-runs the LLM step against existing transcripts — transcribe
+                untranscribed vlogs from their detail page first.
+              </div>
+            )}
 
             {ids.length > 0 && (
               <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>

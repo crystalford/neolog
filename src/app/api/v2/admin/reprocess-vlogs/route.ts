@@ -95,6 +95,19 @@ export async function POST(req: NextRequest) {
   const skipInFlight = body?.skip_in_flight !== false
   const explicitIds: string[] | undefined = Array.isArray(body?.vlog_ids) ? body.vlog_ids : undefined
 
+  // Bulk MUST go through the pipeline DO. The legacy process-upload
+  // Workflow re-enters the FFmpeg /extract-audio path for any vlog
+  // without a transcript, and 150 simultaneous container cold-starts
+  // produce 503s on every vlog. If PIPELINE isn't bound on the Pages
+  // env, fail loud so the operator knows to fix the wiring instead of
+  // burning hours on a failed bulk run.
+  if (!dryRun && (!env.PIPELINE || !env.HEARTBEAT_TOKEN)) {
+    return noStore({
+      error: 'Bulk reprocess requires PIPELINE + HEARTBEAT_TOKEN bindings on the Pages env',
+      hint: 'Check Cloudflare Pages → Settings → Functions → Service bindings + Secrets. PIPELINE should point to the neolog-pipeline service; HEARTBEAT_TOKEN must match the value set on the neolog-pipeline worker.',
+    }, 503)
+  }
+
   // Non-dry-run requires explicit vlog_ids. This forces the client to
   // resolve the list via a dry-run first and own the chunking — keeps the
   // server-side iteration short.
@@ -114,30 +127,43 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
+  // Bulk re-extract is for vlogs that already have a transcript_text in D1.
+  // The operator's intent is "re-run the LLM extraction step against
+  // existing transcripts," not "first-time process archived uploads." If
+  // we don't gate on transcripts here, untranscribed vlogs fall through
+  // to the FFmpeg container's /extract-audio endpoint — and 150
+  // simultaneous container cold-starts produces 503s on every vlog.
+  // Untranscribed archived vlogs are a separate (per-vlog) flow.
+  const TRANSCRIPT_GUARD = `LENGTH(COALESCE(v.transcript_text, '')) >= 20`
+  const TRANSCRIPT_GUARD_NO_ALIAS = `LENGTH(COALESCE(transcript_text, '')) >= 20`
+
   // ── Dry run: resolve the list and return it ──────────────────────────────
   if (dryRun) {
     try {
       let ids: string[] = []
       let inFlightCount = 0
+      let noTranscriptCount = 0
 
       if (explicitIds) {
-        // Caller hand-picked. Optionally filter out in-flight.
-        if (skipInFlight && explicitIds.length > 0) {
+        // Caller hand-picked. Filter out in-flight AND untranscribed so
+        // the dispatch step can never trigger the FFmpeg container.
+        if (explicitIds.length > 0) {
           const placeholders = explicitIds.map(() => '?').join(',')
-          const rows = await findMany<{ id: string; in_flight: number }>(
+          const rows = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
             `SELECT id,
                     CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
                               AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
-                         THEN 1 ELSE 0 END AS in_flight
+                         THEN 1 ELSE 0 END AS in_flight,
+                    CASE WHEN ${TRANSCRIPT_GUARD_NO_ALIAS} THEN 1 ELSE 0 END AS has_transcript
                FROM vlogs
               WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
             operator.id, ...explicitIds,
           )
-          ids = rows.filter(r => !r.in_flight).map(r => r.id)
-          inFlightCount = rows.filter(r => !!r.in_flight).length
-        } else {
-          ids = explicitIds.slice(0, MAX_LIST_RESOLVE)
+          const inFlight = (r: { in_flight: number }) => skipInFlight && !!r.in_flight
+          ids = rows.filter(r => !inFlight(r) && r.has_transcript).map(r => r.id)
+          inFlightCount = rows.filter(r => inFlight(r)).length
+          noTranscriptCount = rows.filter(r => !inFlight(r) && !r.has_transcript).length
         }
       } else {
         // Resolve from scope. ORDER BY id keeps the list stable across
@@ -150,8 +176,10 @@ export async function POST(req: NextRequest) {
         const rows = await findMany<{ id: string }>(
           db,
           scope === 'all'
-            ? `SELECT id FROM vlogs
-                WHERE operator_id = ? AND deleted_at IS NULL ${inFlightWhere.replace(/v\./g, '')}
+            ? `SELECT id FROM vlogs v
+                WHERE operator_id = ? AND deleted_at IS NULL
+                  AND ${TRANSCRIPT_GUARD}
+                  ${inFlightWhere}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
             // "Incomplete" includes three failure modes:
@@ -167,6 +195,7 @@ export async function POST(req: NextRequest) {
                 LEFT JOIN extraction_runs r
                   ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
+                  AND ${TRANSCRIPT_GUARD}
                   AND (v.pipeline_status != 'complete'
                        OR r.id IS NULL
                        OR COALESCE(r.total_items, 0) = 0)
@@ -191,12 +220,34 @@ export async function POST(req: NextRequest) {
             inFlightCount = cnt[0]?.n ?? 0
           } catch {}
         }
+        // Count untranscribed vlogs in this scope so the operator sees
+        // why the total is smaller than the raw vlog count.
+        try {
+          const noTrans = await findMany<{ n: number }>(
+            db,
+            scope === 'all'
+              ? `SELECT COUNT(*) AS n FROM vlogs
+                  WHERE operator_id = ? AND deleted_at IS NULL
+                    AND NOT (${TRANSCRIPT_GUARD_NO_ALIAS})`
+              : `SELECT COUNT(*) AS n FROM vlogs v
+                  LEFT JOIN extraction_runs r
+                    ON r.vlog_id = v.id AND r.is_active = 1
+                  WHERE v.operator_id = ? AND v.deleted_at IS NULL
+                    AND NOT (${TRANSCRIPT_GUARD})
+                    AND (v.pipeline_status != 'complete'
+                         OR r.id IS NULL
+                         OR COALESCE(r.total_items, 0) = 0)`,
+            operator.id,
+          )
+          noTranscriptCount = noTrans[0]?.n ?? 0
+        } catch {}
       }
 
       return noStore({
         total: ids.length,
         ids,
         skipped_in_flight: inFlightCount,
+        skipped_no_transcript: noTranscriptCount,
         mode, scope,
       })
     } catch (err: any) {
@@ -214,16 +265,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Authorize: every id must belong to this operator. Also pull
-  // pipeline_status so we can skip in-flight ones.
-  let owned: { id: string; pipeline_status: string; in_flight: number }[] = []
+  // pipeline_status + transcript existence so we can skip:
+  //   - in-flight vlogs (don't double-dispatch)
+  //   - vlogs without transcripts (would force the FFmpeg audio_extract
+  //     path; 150 simultaneous container cold-starts produce 503s)
+  let owned: { id: string; pipeline_status: string; in_flight: number; has_transcript: number }[] = []
   try {
     const placeholders = ids.map(() => '?').join(',')
-    owned = await findMany<{ id: string; pipeline_status: string; in_flight: number }>(
+    owned = await findMany<{ id: string; pipeline_status: string; in_flight: number; has_transcript: number }>(
       db,
       `SELECT id, pipeline_status,
               CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
                         AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
-                   THEN 1 ELSE 0 END AS in_flight
+                   THEN 1 ELSE 0 END AS in_flight,
+              CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                   THEN 1 ELSE 0 END AS has_transcript
          FROM vlogs
         WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
       operator.id, ...ids,
@@ -237,7 +293,8 @@ export async function POST(req: NextRequest) {
 
   const ownedSet = new Set(owned.map(r => r.id))
   const inFlightSet = skipInFlight ? new Set(owned.filter(r => r.in_flight).map(r => r.id)) : new Set<string>()
-  const dispatchable = ids.filter(id => ownedSet.has(id) && !inFlightSet.has(id))
+  const noTranscriptSet = new Set(owned.filter(r => !r.has_transcript).map(r => r.id))
+  const dispatchable = ids.filter(id => ownedSet.has(id) && !inFlightSet.has(id) && !noTranscriptSet.has(id))
 
   const results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] = []
 
@@ -266,6 +323,8 @@ export async function POST(req: NextRequest) {
       results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'not_found_or_foreign' })
     } else if (inFlightSet.has(id)) {
       results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'already_running' })
+    } else if (noTranscriptSet.has(id)) {
+      results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'no_transcript' })
     }
   }
 
