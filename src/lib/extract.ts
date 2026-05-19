@@ -61,6 +61,7 @@ function hasVerbatim4Words(candidate: string, source: string): boolean {
 async function recordExtractionRun(
   db: D1Database,
   vlogId: string,
+  operatorId: string,
   pass: string,
   promptVersion: string,
   model: string,
@@ -68,13 +69,23 @@ async function recordExtractionRun(
   err: string | null,
   costUsd: number | null,
 ): Promise<void> {
+  // The legacy 4-pass extractor predates the unified extraction_runs schema.
+  // Map its fields into the v2 row shape so this code path can coexist with
+  // the unified path without 500ing on a missing column. is_active=0 since
+  // legacy rows aren't the canonical "latest extraction" for the vlog.
   await run(
     db,
-    `INSERT INTO extraction_runs (id, vlog_id, pass, prompt_version, started_at,
-       completed_at, output_count, error, model, cost_usd)
-     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
-    ulid(), vlogId, pass, promptVersion, outputCount, err, model, costUsd,
+    `INSERT INTO extraction_runs
+       (id, vlog_id, operator_id, model, escalated_from, mode, r2_key,
+        total_items, invalid_items, fail_rate, cost_usd_input, cost_usd_output,
+        is_active, created_at)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?, 0, 0, ?, 0, 0, ?)`,
+    ulid(), vlogId, operatorId, model, `legacy:${pass}`,
+    `legacy/${pass}/${promptVersion}`, outputCount, costUsd, Date.now(),
   )
+  if (err) {
+    console.warn(`[extract] legacy ${pass} failed for vlog ${vlogId}: ${err}`)
+  }
 }
 
 function estimateCost(inputTokens: number, outputTokens: number, model: string): number {
@@ -114,7 +125,7 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
       expectJson: true,
     })
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, prompt.model, 0, err.message, null)
+    await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'analytical', prompt.version, prompt.model, 0, err.message, null)
     throw err
   }
 
@@ -122,7 +133,7 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
   try {
     parsed = parseLlmJson(llmResp.text)
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, llmResp.model, 0, err.message, estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model))
+    await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'analytical', prompt.version, llmResp.model, 0, err.message, estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model))
     throw err
   }
 
@@ -177,7 +188,7 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
   }
 
   const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'analytical', prompt.version, llmResp.model, inserts.length, null, cost)
+  await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'analytical', prompt.version, llmResp.model, inserts.length, null, cost)
 
   return { inserted: inserts.length, rejected }
 }
@@ -196,7 +207,7 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
       expectJson: true,
     })
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'clip_candidate', prompt.version, prompt.model, 0, err.message, null)
+    await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'clip_candidate', prompt.version, prompt.model, 0, err.message, null)
     throw err
   }
 
@@ -224,7 +235,7 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
 
   if (inserts.length > 0) await batch(env.DB, inserts)
   const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'clip_candidate', prompt.version, llmResp.model, inserts.length, null, cost)
+  await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'clip_candidate', prompt.version, llmResp.model, inserts.length, null, cost)
   return { inserted: inserts.length }
 }
 
@@ -242,7 +253,7 @@ export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext)
       expectJson: true,
     })
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'creative_mode', prompt.version, prompt.model, 0, err.message, null)
+    await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'creative_mode', prompt.version, prompt.model, 0, err.message, null)
     throw err
   }
 
@@ -269,7 +280,7 @@ export async function extractCreativeElements(env: ExtractEnv, ctx: VlogContext)
 
   if (inserts.length > 0) await batch(env.DB, inserts)
   const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'creative_mode', prompt.version, llmResp.model, inserts.length, null, cost)
+  await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'creative_mode', prompt.version, llmResp.model, inserts.length, null, cost)
   return { inserted: inserts.length }
 }
 
@@ -287,7 +298,7 @@ export async function extractEntities(env: ExtractEnv, ctx: VlogContext): Promis
       expectJson: true,
     })
   } catch (err: any) {
-    await recordExtractionRun(env.DB, ctx.vlog_id, 'entity', prompt.version, prompt.model, 0, err.message, null)
+    await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'entity', prompt.version, prompt.model, 0, err.message, null)
     throw err
   }
 
@@ -352,6 +363,6 @@ export async function extractEntities(env: ExtractEnv, ctx: VlogContext): Promis
   }
 
   const cost = estimateCost(llmResp.inputTokens, llmResp.outputTokens, llmResp.model)
-  await recordExtractionRun(env.DB, ctx.vlog_id, 'entity', prompt.version, llmResp.model, entitiesIn.length, null, cost)
+  await recordExtractionRun(env.DB, ctx.vlog_id, ctx.operator_id, 'entity', prompt.version, llmResp.model, entitiesIn.length, null, cost)
   return { entitiesUpserted, mentionsInserted }
 }

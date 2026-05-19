@@ -769,66 +769,98 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
           // Flatten payload into existing tables. Old rows for this vlog
           // remain (with run_id NULL or pointing to an older run); the UI
           // reads run_id = active run to filter. Cheaper than re-deleting.
-          const stmts: any[] = []
-          for (const t of run.payload.threads) {
-            stmts.push(this.env.DB.prepare(
-              `INSERT INTO threads
-                 (id, operator_id, vlog_id, run_id, topic, take, key_quotes, register, validated, extracted_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-            ).bind(
-              ulid(), operator_id, vlog_id, run_id,
-              String(t.topic || '').slice(0, 200),
-              String(t.take || ''),
-              JSON.stringify(t.key_quotes ?? []),
-              String(t.register || 'observation'),
-              t.validated ?? 1,
-            ))
+          //
+          // Each kind runs as its own .batch so one bad shape per kind
+          // (e.g. an unmigrated NOT NULL column) reports loudly instead of
+          // tanking the whole run silently. persist_warnings is emitted
+          // when any kind under-persists, so LivePipeline shows the gap.
+          const promptVersion = 'unified-v1'
+          const persisted: Record<string, number> = { threads: 0, clips: 0, creative: 0, entities: 0 }
+          const expected: Record<string, number> = {
+            threads: run.payload.threads.length,
+            clips: run.payload.clips.length,
+            creative: run.payload.creative_elements.length,
+            entities: run.payload.entities.length,
           }
-          for (const c of run.payload.clips) {
-            stmts.push(this.env.DB.prepare(
-              `INSERT INTO clip_candidates
-                 (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extracted_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
-            ).bind(
-              ulid(), operator_id, vlog_id, run_id,
-              c.start_time_ms != null ? c.start_time_ms / 1000 : 0,
-              c.end_time_ms != null ? c.end_time_ms / 1000 : 0,
-              String(c.headline || '').slice(0, 200),
-              String(c.quote || ''),
-              JSON.stringify({ reason: c.why_clippable ?? '' }),
-              c.validated ?? 1,
-            ))
-          }
-          for (const e of run.payload.creative_elements) {
-            stmts.push(this.env.DB.prepare(
-              `INSERT INTO creative_elements
-                 (id, operator_id, vlog_id, run_id, element_type, content, validated, extracted_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-            ).bind(
-              ulid(), operator_id, vlog_id, run_id,
-              String(e.element_type || 'theme'),
-              String(e.content || ''),
-              e.validated ?? 1,
-            ))
-          }
-          for (const ent of run.payload.entities) {
-            stmts.push(this.env.DB.prepare(
-              `INSERT INTO entities
-                 (id, operator_id, vlog_id, run_id, name, entity_type, mention_count, first_mentioned_at, last_mentioned_at)
-               VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-            ).bind(
-              ulid(), operator_id, vlog_id, run_id,
-              String(ent.name || '').slice(0, 200),
-              String(ent.entity_type || 'concept'),
-            ))
-          }
-          const CHUNK = 50
-          for (let i = 0; i < stmts.length; i += CHUNK) {
-            try {
-              await this.env.DB.batch(stmts.slice(i, i + CHUNK))
-            } catch (err: any) {
-              console.warn(`[extract] batch insert failed (i=${i}): ${err?.message || err}`)
+
+          const runBatch = async (kind: string, stmts: any[]) => {
+            if (stmts.length === 0) return
+            const CHUNK = 50
+            for (let i = 0; i < stmts.length; i += CHUNK) {
+              const slice = stmts.slice(i, i + CHUNK)
+              try {
+                await this.env.DB.batch(slice)
+                persisted[kind] += slice.length
+              } catch (err: any) {
+                console.warn(`[extract] ${kind} batch failed at i=${i}: ${err?.message || err}`)
+                for (const stmt of slice) {
+                  try { await stmt.run(); persisted[kind] += 1 } catch (innerErr: any) {
+                    console.warn(`[extract] ${kind} single insert failed: ${innerErr?.message || innerErr}`)
+                  }
+                }
+              }
             }
+          }
+
+          await runBatch('threads', run.payload.threads.map(t => this.env.DB.prepare(
+            `INSERT INTO threads
+               (id, operator_id, vlog_id, run_id, topic, take, key_quotes, register, validated, extraction_prompt_version, extracted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          ).bind(
+            ulid(), operator_id, vlog_id, run_id,
+            String(t.topic || '').slice(0, 200),
+            String(t.take || ''),
+            JSON.stringify(t.key_quotes ?? []),
+            String(t.register || 'observation'),
+            t.validated ?? 1,
+            promptVersion,
+          )))
+
+          await runBatch('clips', run.payload.clips.map(c => this.env.DB.prepare(
+            `INSERT INTO clip_candidates
+               (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extraction_prompt_version, extracted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
+          ).bind(
+            ulid(), operator_id, vlog_id, run_id,
+            c.start_time_ms != null ? c.start_time_ms / 1000 : 0,
+            c.end_time_ms != null ? c.end_time_ms / 1000 : 0,
+            String(c.headline || '').slice(0, 200),
+            String(c.quote || ''),
+            JSON.stringify({ reason: c.why_clippable ?? '' }),
+            c.validated ?? 1,
+            promptVersion,
+          )))
+
+          await runBatch('creative', run.payload.creative_elements.map(e => this.env.DB.prepare(
+            `INSERT INTO creative_elements
+               (id, operator_id, vlog_id, run_id, element_type, content, validated, extraction_prompt_version, extracted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          ).bind(
+            ulid(), operator_id, vlog_id, run_id,
+            String(e.element_type || 'theme'),
+            String(e.content || ''),
+            e.validated ?? 1,
+            promptVersion,
+          )))
+
+          await runBatch('entities', run.payload.entities.map(ent => this.env.DB.prepare(
+            `INSERT INTO entities
+               (id, operator_id, vlog_id, run_id, name, entity_type, mention_count, first_mentioned_at, last_mentioned_at)
+             VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          ).bind(
+            ulid(), operator_id, vlog_id, run_id,
+            String(ent.name || '').slice(0, 200),
+            String(ent.entity_type || 'concept'),
+          )))
+
+          const warnings: Record<string, { expected: number; persisted: number }> = {}
+          for (const kind of Object.keys(expected)) {
+            if (persisted[kind] < expected[kind]) {
+              warnings[kind] = { expected: expected[kind], persisted: persisted[kind] }
+            }
+          }
+          if (Object.keys(warnings).length > 0) {
+            await progress('persist_warnings', { state: 'warn', run_id, warnings })
           }
 
           await progress('llm_persist', {

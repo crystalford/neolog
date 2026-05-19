@@ -45,13 +45,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       throw e
     }
 
-    // tier picks the LLM provider for the extraction passes (free=Llama, premium=Sonnet for
-    // threads/creative, max=Sonnet for all). passes is an optional subset for per-pass re-runs.
+    // mode picks the LLM stack: `cheap` = Workers AI (Llama/Kimi),
+    // `premium` = Anthropic Sonnet 4.6. Two modes only — operator collapsed
+    // the prior free/auto/max picker into this. `tier` is accepted as a
+    // legacy alias so cached client bundles don't break.
     const body = await req.json().catch(() => null) as {
-      tier?: 'free' | 'premium' | 'max';
+      mode?: 'cheap' | 'premium';
+      tier?: 'free' | 'premium' | 'max' | 'cheap' | 'auto';
       passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
     } | null
-    const tier = body?.tier ?? 'free'
+    const rawMode = body?.mode ?? body?.tier ?? 'cheap'
+    const mode: 'cheap' | 'premium' = rawMode === 'premium' || rawMode === 'max' ? 'premium' : 'cheap'
+    // Legacy callsites in this file still use `tier` for the PROCESS_UPLOAD
+    // dispatch payload; map cheap→free, premium→premium for that path.
+    const tier: 'free' | 'premium' = mode === 'premium' ? 'premium' : 'free'
     const passes = body?.passes
 
     const db = getDb(env)
@@ -96,7 +103,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // honor it by falling through to the legacy workflow for now (it
     // supports per-pass selection; the DO's extract step is unified).
     const wantsLegacyPasses = Array.isArray(passes) && passes.length > 0 && passes.length < 4
-    const mode = tier === 'max' || tier === 'premium' ? 'premium' : 'auto'
     if (env.PIPELINE && env.HEARTBEAT_TOKEN && !wantsLegacyPasses) {
       try {
         const res = await env.PIPELINE.fetch(`https://internal/reextract/${params.id}`, {

@@ -51,7 +51,7 @@ export default function ConsolePage() {
     const fetchOnce = async () => {
       try {
         const [tlRes, statsRes] = await Promise.all([
-          fetch('/api/v2/timeline?limit=20&kinds=vlog,thread,cluster,surfaced', { credentials: 'include' }),
+          fetch('/api/v2/timeline?limit=30&kinds=vlog,thread,cluster,surfaced,pipeline', { credentials: 'include' }),
           fetch('/api/v2/graph/stats', { credentials: 'include' }),
         ])
         if (cancelled) return
@@ -294,6 +294,32 @@ function rowFromTimeline(item: any): ActivityRow {
       status: 'surfaced',
       what: `Cluster surfaced. ${item.headline ?? item.abstracted_topic ?? item.name ?? '—'}`,
       href: `/cluster/${item.id}`,
+    }
+  }
+  if (kind === 'pipeline_event') {
+    const step = String(item.step ?? 'step')
+    const status = String(item.status ?? 'ok')
+    const dot: ActivityRow['dot'] = status === 'failed' ? 'err'
+      : status === 'skipped' ? 'warn'
+      : 'ok'
+    const detail = item.detail ?? {}
+    const counts = [
+      detail.threads != null ? `${detail.threads}t` : null,
+      detail.clips != null ? `${detail.clips}c` : null,
+      detail.creative_elements != null ? `${detail.creative_elements}cr` : null,
+      detail.entities != null ? `${detail.entities}e` : null,
+    ].filter(Boolean).join(' · ')
+    const model = detail.model ? ` · ${detail.model}` : ''
+    const dur = item.duration_ms ? `${Math.round(item.duration_ms / 100) / 10}s` : undefined
+    return {
+      id: item.id ?? String(tsMs),
+      ts: tsMs,
+      kind,
+      dot,
+      status: `${step} · ${status}`,
+      duration: dur,
+      what: `${step} ${status}${counts ? ` — ${counts}` : ''}${model}`,
+      href: item.vlog_id ? `/timeline/${item.vlog_id}` : undefined,
     }
   }
   return {
