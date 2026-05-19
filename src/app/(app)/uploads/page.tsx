@@ -8,6 +8,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Shell from '@/components/Shell'
 
 interface UploadRow {
   id: string
@@ -654,7 +655,7 @@ export default function UploadsPage() {
   const missingThumbs = vlogs.filter(v => !v.thumbnail_url).length
 
   return (
-    <main>
+    <Shell active="vlogs" breadcrumb={["Vlogs","Uploads (legacy)"]}><div className="pad-tight">
       <section className="hero" style={{ paddingBottom: 8 }}>
         <div className="crumb reveal d2">Raw archive</div>
         <h1 className="reveal d3">Uploads</h1>
@@ -985,7 +986,7 @@ export default function UploadsPage() {
           <TileVideoPoster key={v.id} v={v} />
         ))}
       </div>
-    </main>
+    </div></Shell>
   )
 }
 

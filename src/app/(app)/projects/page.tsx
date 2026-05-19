@@ -6,6 +6,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Shell from '@/components/Shell'
 
 interface ProjectCard {
   id: string
@@ -44,7 +45,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <main>
+    <Shell active="productions" breadcrumb={["Productions"]}><div className="pad">
       <section className="hero">
         <div className="crumb reveal d2">Creative work</div>
         <h1 className="reveal d3">Projects</h1>
@@ -110,7 +111,7 @@ export default function ProjectsPage() {
           fontWeight: 500,
         }}>+ New project</button>
       </div>
-    </main>
+    </div></Shell>
   )
 }
 

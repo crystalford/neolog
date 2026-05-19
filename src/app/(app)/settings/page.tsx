@@ -11,6 +11,7 @@ import { getDb, findOne } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 import { headers } from 'next/headers'
+import Shell from "@/components/Shell"
 import { ModelPreferences } from './ModelPreferences'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
@@ -24,12 +25,12 @@ export default async function SettingsPage() {
   catch (e) {
     if (e instanceof UnauthenticatedError) {
       return (
-        <main>
+        <Shell active="settings" breadcrumb={["Settings"]}><div className="pad">
           <section className="hero">
             <h1 className="reveal d3">Settings</h1>
             <p className="lead reveal d4">You're not signed in.</p>
           </section>
-        </main>
+        </div></Shell>
       )
     }
     throw e
@@ -43,7 +44,7 @@ export default async function SettingsPage() {
   const initials = (operator.display_name || operator.email).slice(0, 2).toUpperCase()
 
   return (
-    <main>
+    <Shell active="settings" breadcrumb={["Settings"]}><div className="pad">
       <section className="hero">
         <div className="crumb reveal d2">Settings</div>
         <h1 className="reveal d3">Yours</h1>
@@ -118,7 +119,7 @@ export default async function SettingsPage() {
           <Row k="Voice preservation hard check" v="On" sub="Each thread must contain a verbatim 4-word substring" arrow />
         </Section>
       </div>
-    </main>
+    </div></Shell>
   )
 }
 

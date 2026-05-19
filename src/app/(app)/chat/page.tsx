@@ -10,6 +10,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Shell from '@/components/Shell'
 
 interface ThreadRow {
   id: string
@@ -206,7 +207,7 @@ export default function ChatPage() {
   }
 
   return (
-    <main style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)' }}>
+    <Shell active="chat" breadcrumb={["Chat"]}><div className="pad-tight" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)" }}>
       <section className="hero" style={{ paddingBottom: 8 }}>
         <div className="crumb reveal d2">Assistant</div>
         <h1 className="reveal d3">Chat</h1>
@@ -445,7 +446,7 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-    </main>
+    </div></Shell>
   )
 }
 

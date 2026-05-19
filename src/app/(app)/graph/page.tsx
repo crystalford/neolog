@@ -10,6 +10,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Shell from '@/components/Shell'
 
 type View = 'clusters' | 'entities' | 'threads' | 'projects'
 
@@ -32,7 +33,7 @@ export default function GraphPage() {
   }, [])
 
   return (
-    <main>
+    <Shell active="graph" breadcrumb={["Graph"]}><div className="pad">
       <section className="hero" style={{ paddingBottom: 8 }}>
         <div className="crumb reveal d2">The territory</div>
         <h1 className="reveal d3">Graph</h1>
@@ -72,7 +73,7 @@ export default function GraphPage() {
           <p>The mockup above is what the territory looks like with hundreds of threads and a handful of clusters. Drop in vlogs and your real graph will replace it.</p>
         </div>
       )}
-    </main>
+    </div></Shell>
   )
 }
 

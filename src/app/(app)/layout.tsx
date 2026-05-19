@@ -1,25 +1,16 @@
 /**
- * App layout — wraps every authed surface with responsive chrome.
+ * App layout — wraps every authed surface.
  *
- * Mobile (≤1023px): Crown (logo + meta) at top, content below, floating
- * CaptureFab above bottom Dock.
- * Desktop (≥1024px): Sidebar on left with nav + capture actions, wide
- * content area to the right. Crown / dock / FAB are hidden via media query.
+ * The Console-direction design (HANDOFF.md) replaces the old mobile-first
+ * Crown + Dock + FAB chrome with a desktop Topbar + Sidebar + main + optional
+ * right rail. Every page renders its own `<Shell active="..." breadcrumb={...}>`
+ * so the layout here is intentionally thin — it just provides the
+ * authentication boundary + the html structure.
+ *
+ * Legacy pages that still wrap themselves in `<main>` directly will render
+ * un-chromed; we port them one by one.
  */
 
-import { Crown } from '@/components/Crown'
-import { Dock } from '@/components/Dock'
-import { CaptureFab } from '@/components/CaptureFab'
-import { Sidebar } from '@/components/Sidebar'
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="app-shell">
-      <Sidebar />
-      <Crown />
-      {children}
-      <CaptureFab />
-      <Dock />
-    </div>
-  )
+  return <>{children}</>
 }

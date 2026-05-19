@@ -9,6 +9,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Shell from '@/components/Shell'
 
 type State = 'ripening' | 'ready' | 'hold'
 
@@ -63,7 +64,7 @@ export default function StudioPage() {
   const ready = counts.ready
 
   return (
-    <main>
+    <Shell active="clusters" breadcrumb={["Clusters","Studio"]}><div className="pad">
       <section className="hero">
         <div className="crumb reveal d2">Living threads</div>
         <h1 className="reveal d3">
@@ -194,7 +195,7 @@ export default function StudioPage() {
           </a>
         ))}
       </div>
-    </main>
+    </div></Shell>
   )
 }
 

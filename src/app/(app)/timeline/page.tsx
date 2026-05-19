@@ -9,6 +9,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Shell from '@/components/Shell'
 import { TimelineCard, type TimelineCardData } from '@/components/cards'
 
 type Filter = 'all' | 'vlog' | 'thread' | 'post' | 'clip' | 'article' | 'broll' | 'attachment' | 'surfaced'
@@ -136,7 +137,7 @@ export default function TimelinePage() {
   }, [filtered])
 
   return (
-    <main>
+    <Shell active="vlogs" breadcrumb={["Vlogs","Timeline (legacy)"]}><div className="pad-tight">
       <section className="hero">
         <div className="crumb reveal d2">Everything, in order</div>
         <h1 className="reveal d3">Timeline</h1>
@@ -203,6 +204,6 @@ export default function TimelinePage() {
           </div>
         </div>
       ))}
-    </main>
+    </div></Shell>
   )
 }

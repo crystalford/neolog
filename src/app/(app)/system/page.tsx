@@ -5,6 +5,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Shell from '@/components/Shell'
 
 interface DependencyResult {
   ok: boolean
@@ -62,7 +63,8 @@ export default function SystemPage() {
   useEffect(load, [])
 
   return (
-    <main>
+    <Shell active="system" breadcrumb={['System']}>
+    <div className="pad">
       <section className="hero">
         <div className="crumb reveal d2">Infrastructure</div>
         <h1 className="reveal d3">System</h1>
@@ -147,7 +149,8 @@ export default function SystemPage() {
           </div>
         </section>
       )}
-    </main>
+    </div>
+    </Shell>
   )
 }
 

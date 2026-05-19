@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Shell from '@/components/Shell'
 
 type Mode = 'upload' | 'record'
 
@@ -154,7 +155,8 @@ export default function CapturePage() {
   const failedCount = entries.filter(e => e.status === 'failed').length
 
   return (
-    <div className="capture-stage">
+    <Shell active="capture" breadcrumb={['Capture']}>
+    <div className="pad capture-stage">
       <section className="hero" style={{ padding: '32px 0 16px' }}>
         <div className="crumb reveal d2">Drop them in</div>
         <h1 className="reveal d3">Capture</h1>
@@ -301,6 +303,7 @@ export default function CapturePage() {
         </div>
       )}
     </div>
+    </Shell>
   )
 }
 

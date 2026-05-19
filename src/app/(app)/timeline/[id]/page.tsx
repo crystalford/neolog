@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import LivePipeline from './live-pipeline'
+import Shell from '@/components/Shell'
 
 interface VlogDetail {
   id: string
@@ -111,17 +112,18 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
-  if (error) return <main><div className="error-row">Error: {error}</div></main>
-  if (!vlog) return <main><div className="empty-row"><p style={{ color: 'var(--bone-3)' }}>Loading…</p></div></main>
+  if (error) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Error']}><div className="pad"><div className="card" style={{ color: 'var(--err)' }}>Error: {error}</div></div></Shell>
+  if (!vlog) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Loading…']}><div className="pad"><div style={{ color: 'var(--fg-3)' }}>Loading…</div></div></Shell>
 
   const sizeMb = vlog.file_size_bytes ? (vlog.file_size_bytes / 1_000_000).toFixed(1) : null
   const recorded = vlog.recorded_at ? new Date(vlog.recorded_at).toLocaleString() : 'Unknown'
   const status = vlog.pipeline_status
   const isVideo = (vlog.mime_type || '').startsWith('video/')
 
+  const breadcrumbTail = vlog.original_filename ?? vlog.id
   return (
-    <div className="vlog-detail">
-      <a href="/timeline" style={{ fontSize: 12, color: 'var(--bone-3)', display: 'inline-block', marginBottom: 16 }}>← Timeline</a>
+    <Shell active="vlogs" breadcrumb={['Vlogs', breadcrumbTail]}>
+    <div className="pad-tight vlog-detail">
 
       <div className="vplayer">
         {vlog.playback_url && isVideo && (
@@ -310,6 +312,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
     </div>
+    </Shell>
   )
 }
 
