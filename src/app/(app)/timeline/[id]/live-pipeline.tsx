@@ -172,6 +172,8 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
       {STEPS.map(step => (
         <StepCard
           key={step.key}
+          stepKey={step.key}
+          vlogId={vlogId}
           label={step.label}
           events={eventsByStep[step.key]}
           expanded={state.expanded[step.key]}
@@ -183,11 +185,15 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
 }
 
 function StepCard({
+  stepKey,
+  vlogId,
   label,
   events,
   expanded,
   onToggle,
 }: {
+  stepKey: StepKey
+  vlogId: string
   label: string
   events: PipelineEvent[]
   expanded: boolean
@@ -216,7 +222,10 @@ function StepCard({
     <article style={cardStyle(last.status)}>
       <header style={headerRow}>
         <h3 style={titleStyle}>{label}</h3>
-        <StatusBadge status={last.status} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ForceRerunButton stepKey={stepKey} vlogId={vlogId} />
+          <StatusBadge status={last.status} />
+        </div>
       </header>
       <div style={{ fontSize: 13, color: 'var(--bone-1)', marginTop: 6 }}>
         {description}
@@ -270,6 +279,60 @@ function StepCard({
         </ol>
       )}
     </article>
+  )
+}
+
+/**
+ * Force-rerun button — pinned to each step's header. Hits
+ * /api/v2/dev/replay/[id]?from={step}&force=true which sets the DO's
+ * force flag for that step, bypassing skip-if-exists, and re-dispatches
+ * from that step. Use this when an artifact is stale or you intentionally
+ * want to re-run the work (the operator's "but I want to test re-extract
+ * audio anyway" case).
+ */
+function ForceRerunButton({ stepKey, vlogId }: { stepKey: StepKey; vlogId: string }) {
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    if (busy) return
+    const label = stepKey === 'audio_extract' ? 'Re-extract audio'
+      : stepKey === 'transcribe' ? 'Re-transcribe'
+      : 'Re-run extract'
+    if (!confirm(`${label} — force this step to run again even if its output already exists. Continue?`)) return
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/v2/dev/replay/${vlogId}?from=${stepKey}&force=true`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await r.json().catch(() => ({})) as any
+      if (!r.ok) {
+        alert(`Replay failed: ${data?.error || `HTTP ${r.status}`}`)
+        return
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      onClick={run}
+      disabled={busy}
+      title={`Force ${stepKey.replace('_', ' ')} to re-run (bypass skip-if-exists)`}
+      style={{
+        padding: '3px 8px',
+        fontSize: 10,
+        fontFamily: 'JetBrains Mono, monospace',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        background: 'transparent',
+        border: '1px solid var(--line)',
+        borderRadius: 4,
+        color: 'var(--fg-3)',
+        cursor: busy ? 'wait' : 'pointer',
+      }}
+    >
+      {busy ? '…' : 'force'}
+    </button>
   )
 }
 

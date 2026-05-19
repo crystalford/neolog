@@ -77,6 +77,37 @@ export async function POST(
     targetState, vlog_id,
   )
 
+  // When force=true, also clear the column that the legacy workflow uses
+  // to skip the step. The DO orchestrator handles force via its own flag
+  // (passed below), but the workflow worker has no per-step force concept —
+  // it skips based on column presence. So we wipe the relevant column.
+  if (force) {
+    if (from === 'audio_extract') {
+      await run(
+        db,
+        `UPDATE vlogs SET audio_chunks_json = NULL, transcript_text = NULL,
+                          transcript_completed_at = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        vlog_id,
+      )
+    } else if (from === 'transcribe') {
+      await run(
+        db,
+        `UPDATE vlogs SET transcript_text = NULL, transcript_completed_at = NULL,
+                          updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        vlog_id,
+      )
+    } else if (from === 'extract') {
+      // Mark old extraction_runs inactive so the new run is the only is_active=1
+      await run(
+        db,
+        `UPDATE extraction_runs SET is_active = 0 WHERE vlog_id = ? AND is_active = 1`,
+        vlog_id,
+      )
+    }
+  }
+
   let dispatched = false
   if (env.PIPELINE && env.HEARTBEAT_TOKEN) {
     try {
