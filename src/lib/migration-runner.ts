@@ -315,6 +315,25 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-19_vlogs_summary',
     sql: `ALTER TABLE vlogs ADD COLUMN summary TEXT`,
   },
+  // ─── entities.vlog_id / entities.run_id ─────────────────────────────────
+  // Original schema scoped entities by operator_id only (entity_mentions
+  // joined back to source). The unified extraction worker writes
+  // `entities (id, operator_id, vlog_id, run_id, ...)` directly per-vlog;
+  // without these columns the batch INSERT silently fails and the vlog
+  // detail API 500s on `WHERE vlog_id = ?`. Nullable — legacy mention-based
+  // rows stay valid with vlog_id NULL.
+  {
+    name: '2026-05-19_entities_vlog_id',
+    sql: `ALTER TABLE entities ADD COLUMN vlog_id TEXT`,
+  },
+  {
+    name: '2026-05-19_entities_run_id',
+    sql: `ALTER TABLE entities ADD COLUMN run_id TEXT`,
+  },
+  {
+    name: '2026-05-19_idx_entities_vlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entities_vlog ON entities(vlog_id)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

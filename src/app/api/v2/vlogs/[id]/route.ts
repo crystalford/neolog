@@ -92,11 +92,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     thumbnailUrl = vlog.thumbnail_url
   }
 
-  // Fetch every kind of extracted artifact in parallel. The unified-extraction
-  // run writes to all four tables with run_id; older legacy rows have
-  // run_id NULL and validated=1 by default — both shapes coexist.
+  // Fetch every kind of extracted artifact. Each query is wrapped so a
+  // schema drift on one table (e.g. an old DB where entities.vlog_id
+  // hasn't been migrated yet) can't 500 the whole detail page — the
+  // missing section just comes back empty.
+  const safe = async <T,>(label: string, q: () => Promise<T[]>): Promise<T[]> => {
+    try { return await q() } catch (err: any) {
+      console.warn(`[vlogs/[id]] ${label} failed: ${err?.message || err}`)
+      return []
+    }
+  }
+
   const [threads, clips, creative_elements, entities] = await Promise.all([
-    findMany<{
+    safe('threads', () => findMany<{
       id: string
       topic: string
       take: string | null
@@ -118,8 +126,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL
         ORDER BY transcript_span_start ASC, extracted_at ASC`,
       params.id, operator.id,
-    ),
-    findMany<{
+    )),
+    safe('clips', () => findMany<{
       id: string
       start_time: number | null
       end_time: number | null
@@ -137,8 +145,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         WHERE vlog_id = ? AND operator_id = ?
         ORDER BY start_time ASC, id ASC`,
       params.id, operator.id,
-    ),
-    findMany<{
+    )),
+    safe('creative_elements', () => findMany<{
       id: string
       element_type: string
       content: string
@@ -157,8 +165,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         WHERE vlog_id = ? AND operator_id = ?
         ORDER BY element_type ASC, extracted_at DESC`,
       params.id, operator.id,
-    ),
-    findMany<{
+    )),
+    safe('entities', () => findMany<{
       id: string
       name: string
       entity_type: string
@@ -169,9 +177,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       `SELECT id, name, entity_type, aliases, mention_count
          FROM entities
         WHERE vlog_id = ? AND operator_id = ?
-        ORDER BY mention_count DESC NULLS LAST, name ASC`,
+        ORDER BY mention_count DESC, name ASC`,
       params.id, operator.id,
-    ),
+    )),
   ])
 
   // Strip internal R2 keys before sending to the client.
