@@ -1,287 +1,322 @@
 'use client'
 
 /**
- * Console — home / dashboard.
+ * Timeline — the heterogeneous feed. Everything you've ever captured or
+ * the system has surfaced, newest first, one card per item.
  *
- * Ported from neolog-design/project/screens/console.jsx. Greeting +
- * ready-cluster surface + metric tiles + activity stream + bottom split.
+ * The Console-direction design technically folded this into the activity
+ * stream on /, but the operator wanted a dedicated feed surface that
+ * reads like an X timeline — full-bleed, card-per-item, scroll forever.
+ * So /timeline is back, in the new design language.
  *
- * Data wiring is partial in this commit — counts and activity stream are
- * fetched from existing /api/v2/* endpoints; the ready-cluster block uses
- * the first cluster with state='ready' && ripeness_score >= 70 if any.
+ * Reads from /api/v2/timeline which fans across vlogs, threads,
+ * clip_candidates, posts, surfaced_cards, etc., returning a sorted union.
  */
 
 export const runtime = 'edge'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import Shell, { LogoMark, NavIcons } from '@/components/Shell'
+import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
 
-interface CountsResp {
-  vlogs?: number
-  threads?: number
-  clusters?: number
-  vlogs_complete?: number
-  vlogs_processing?: number
-}
+type Filter = 'all' | 'vlog' | 'thread' | 'clip' | 'post' | 'surfaced'
 
-interface ActivityRow {
+interface FeedItem {
   id: string
+  kind: string
   ts: number
-  kind: string         // 'vlog' | 'thread' | 'cluster' | 'pipeline' | ...
-  dot: 'accent' | 'hot' | 'ok' | 'warn' | 'err'
-  status: string
-  duration?: string
-  what: string         // human-readable past-tense sentence
-  href?: string
+  // shape varies per kind — we destructure inside renderers
+  raw: any
 }
 
-export default function ConsolePage() {
-  const [counts, setCounts] = useState<CountsResp>({})
-  const [activity, setActivity] = useState<ActivityRow[]>([])
-  const [now, setNow] = useState<Date>(new Date())
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all',      label: 'All' },
+  { key: 'vlog',     label: 'Vlogs' },
+  { key: 'thread',   label: 'Threads' },
+  { key: 'clip',     label: 'Clips' },
+  { key: 'post',     label: 'Posts' },
+  { key: 'surfaced', label: 'Surfaced' },
+]
+
+export default function TimelinePage() {
+  const [items, setItems] = useState<FeedItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<Filter>('all')
 
   useEffect(() => {
-    setNow(new Date())
-    fetch('/api/v2/timeline?limit=20&kinds=vlog,thread,cluster,surfaced', { credentials: 'include' })
+    fetch('/api/v2/timeline?limit=200', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => {
         if (!d) return
-        const items: any[] = d.items ?? d.cards ?? []
-        setActivity(items.slice(0, 12).map(rowFromTimeline))
+        const raw: any[] = d.items ?? d.cards ?? []
+        const mapped: FeedItem[] = raw.map((it: any) => ({
+          id: it.id ?? `${it.kind ?? 'item'}-${it.ts ?? Date.now()}`,
+          kind: it.kind ?? it.type ?? 'event',
+          ts: toMs(it.ts ?? it.created_at ?? it.recorded_at ?? it.extracted_at),
+          raw: it,
+        }))
+        mapped.sort((a, b) => b.ts - a.ts)
+        setItems(mapped)
+        setLoading(false)
       })
-      .catch(() => {})
-
-    fetch('/api/v2/graph/stats', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (!d) return
-        setCounts({
-          vlogs: d.vlog_count ?? d.vlogs ?? undefined,
-          threads: d.thread_count ?? d.threads ?? undefined,
-          clusters: d.cluster_count ?? d.clusters ?? undefined,
-          vlogs_complete: d.vlog_complete_count,
-          vlogs_processing: d.vlog_processing_count,
-        })
-      })
-      .catch(() => {})
+      .catch(() => setLoading(false))
   }, [])
 
-  const dateLabel = now.toLocaleDateString('en-US', {
-    weekday: 'long', month: 'short', day: 'numeric',
-  })
-  const timeLabel = now.toLocaleTimeString('en-US', {
-    hour: 'numeric', minute: '2-digit', hour12: true,
-  })
-  const greeting = greetingFor(now)
-  const busyCount = counts.vlogs_processing ?? 0
-  const busy = busyCount > 0
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { all: 0, vlog: 0, thread: 0, clip: 0, post: 0, surfaced: 0 }
+    for (const it of items) {
+      c.all++
+      if (it.kind in c) (c as any)[it.kind]++
+    }
+    return c
+  }, [items])
+
+  const filtered = filter === 'all' ? items : items.filter(it => it.kind === filter)
+
+  // Group items by day for sticky date dividers
+  const groups: { label: string; items: FeedItem[] }[] = []
+  let currentDay = ''
+  for (const it of filtered) {
+    const day = new Date(it.ts).toDateString()
+    if (day !== currentDay) {
+      currentDay = day
+      groups.push({ label: dayLabel(it.ts), items: [] })
+    }
+    groups[groups.length - 1].items.push(it)
+  }
 
   return (
-    <Shell active="console" breadcrumb={['Console']} hot={busy ? `${busyCount} active` : 'all healthy'} busy={busy}>
-      <div className="pad">
-        {/* Greeting */}
-        <div style={{ marginBottom: 28 }}>
-          <div className="mono" style={{ fontSize: 11, letterSpacing: 0.5, color: 'var(--fg-3)', marginBottom: 10, textTransform: 'uppercase' }}>
-            {dateLabel} · {timeLabel}
+    <Shell active="timeline" breadcrumb={['Timeline']}>
+      <div className="pad-tight" style={{ maxWidth: 760, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="h1-row">
+          <div>
+            <h1>Timeline</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
+              Everything in order. Vlogs, threads, clips, posts, surfaced cards — newest first.
+            </p>
           </div>
-          <h1 style={{ fontSize: 28, marginBottom: 8 }}>{greeting}, Crystal.</h1>
-          <p style={{ fontSize: 15, color: 'var(--fg-2)', lineHeight: 1.55, maxWidth: 620 }}>
-            {busy
-              ? `${busyCount} ${busyCount === 1 ? 'vlog is' : 'vlogs are'} processing right now. Live progress is on the right of any vlog detail page.`
-              : `Nothing in flight. ${counts.vlogs ?? '—'} vlogs indexed, ${counts.threads ?? '—'} threads, ${counts.clusters ?? '—'} clusters so far.`}
-          </p>
         </div>
 
-        {/* Metric tiles */}
-        <div className="tiles">
-          <Tile label="Vlogs indexed" num={counts.vlogs_complete ?? counts.vlogs} sub={counts.vlogs ? `of ${counts.vlogs}` : undefined} delta={null} />
-          <Tile label="Threads" num={counts.threads} delta={null} />
-          <Tile label="Clusters" num={counts.clusters} delta={null} />
-          <Tile label="Processing" num={busyCount} delta={null} />
-        </div>
-
-        {/* Activity stream */}
-        <div className="tabs">
-          <a className="tab active">Recent activity<span className="n">{activity.length}</span></a>
-          <a className="tab">In pipeline<span className="n">{busyCount}</span></a>
-          <a className="tab">Failures<span className="n">0</span></a>
-        </div>
-
-        <div className="list">
-          <div className="row head" style={{ gridTemplateColumns: '14px 96px 1fr 110px 80px' }}>
-            <span/>
-            <span>When</span>
-            <span>What happened</span>
-            <span>Status</span>
-            <span style={{ textAlign: 'right' }}>Duration</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, marginBottom: 22 }}>
+          <div className="pills">
+            {FILTERS.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`filter-pill ${filter === f.key ? 'active' : ''}`}
+              >
+                {f.label} <span className="n">{counts[f.key]}</span>
+              </button>
+            ))}
           </div>
-          {activity.length === 0 ? (
-            <div className="row" style={{ gridTemplateColumns: '1fr', justifyContent: 'center', color: 'var(--fg-3)', cursor: 'default' }}>
-              No activity yet. Drop a vlog on Capture or check back after the next upload.
-            </div>
-          ) : activity.map((e) => (
-            <Link key={e.id} href={e.href ?? '#'} style={{ display: 'contents' }}>
-              <div className="row" style={{ gridTemplateColumns: '14px 96px 1fr 110px 80px' }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: dotColor(e.dot),
-                  boxShadow: (e.dot === 'hot' || e.dot === 'accent') ? `0 0 8px ${dotColor(e.dot)}` : 'none',
-                }}/>
-                <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>{shortTime(e.ts)}</span>
-                <span style={{ color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {e.what}
-                </span>
-                <span><span className={`pill ${e.dot}`}>{e.status}</span></span>
-                <span className="mono" style={{ textAlign: 'right', color: 'var(--fg-3)', fontSize: 11 }}>{e.duration ?? ''}</span>
+        </div>
+
+        {loading ? (
+          <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <div className="ico">{NavIcons.Vlogs}</div>
+            <h3>Nothing on the timeline yet</h3>
+            <p>Drop a vlog on Capture to seed it. New threads, clips, and surfaced cards land here as they're created.</p>
+            <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {groups.map((g, gi) => (
+              <div key={gi}>
+                <div className="mono" style={{
+                  fontSize: 10, color: 'var(--fg-4)',
+                  letterSpacing: 0.5, textTransform: 'uppercase',
+                  paddingBottom: 8, marginBottom: 10,
+                  borderBottom: '1px solid var(--line)',
+                }}>
+                  {g.label}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {g.items.map(it => <FeedCard key={it.id + ':' + it.ts} item={it}/>)}
+                </div>
               </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Bottom split: ask + tips */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginTop: 32 }}>
-          <div className="card">
-            <div className="card-h">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ display: 'inline-flex', color: 'var(--fg-2)' }}><LogoMark size={14}/></span>
-                <span style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500 }}>Ask the assistant</span>
-                <span className="pill mute">kimi · default</span>
-              </div>
-              <Link href="/chat" className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>open chat →</Link>
-            </div>
-            <Link href="/chat" style={{ display: 'block', background: 'var(--bg-2)', border: '1px solid var(--line-1)', borderRadius: 8, padding: '12px 14px', cursor: 'text' }}>
-              <div style={{ fontSize: 14, color: 'var(--fg-3)' }}>What was I saying about regulation last week?</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 12, fontSize: 11, color: 'var(--fg-3)' }} className="mono">
-                <span>@ mentions search · / for commands</span>
-                <span style={{ flex: 1 }}/>
-                <span>⌘↵ to send</span>
-              </div>
-            </Link>
+            ))}
           </div>
-
-          <div className="card">
-            <div className="card-h">
-              <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500 }}>Quick links</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Link href="/capture" className="btn" style={{ justifyContent: 'flex-start' }}>
-                <span className="ico">{NavIcons.Capture}</span>
-                Drop a vlog<span className="kbd" style={{ marginLeft: 'auto' }}>⌘N</span>
-              </Link>
-              <Link href="/vlogs" className="btn ghost" style={{ justifyContent: 'flex-start' }}>
-                <span className="ico">{NavIcons.Vlogs}</span>
-                Browse all vlogs
-              </Link>
-              <Link href="/system" className="btn ghost" style={{ justifyContent: 'flex-start' }}>
-                <span className="ico">{NavIcons.System}</span>
-                System health
-              </Link>
-              <Link href="/settings" className="btn ghost" style={{ justifyContent: 'flex-start' }}>
-                <span className="ico">{NavIcons.Settings}</span>
-                Settings
-              </Link>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </Shell>
   )
 }
 
-function Tile({ label, num, sub, delta }: { label: string; num?: number | string; sub?: string; delta?: string | null }) {
+function FeedCard({ item }: { item: FeedItem }) {
+  switch (item.kind) {
+    case 'vlog':     return <VlogCard r={item.raw}/>
+    case 'thread':   return <ThreadCard r={item.raw}/>
+    case 'clip':     return <ClipCard r={item.raw}/>
+    case 'post':     return <PostCard r={item.raw}/>
+    case 'surfaced': return <SurfacedCard r={item.raw}/>
+    default:         return <DefaultCard r={item.raw} kind={item.kind}/>
+  }
+}
+
+function VlogCard({ r }: { r: any }) {
+  const status = r.pipeline_status ?? 'uploaded'
+  const cls = status === 'complete' ? 'ok' : status === 'failed' ? 'err' : status === 'archived' ? 'mute' : 'hot'
+  const size = r.file_size_bytes ? `${(r.file_size_bytes / 1_000_000).toFixed(1)} MB` : ''
   return (
-    <div className="tile">
-      <div className="label">{label}</div>
-      <div className="num">
-        {num ?? '—'}
-        {sub && <span style={{ color: 'var(--fg-3)', fontSize: 16 }}> {sub}</span>}
+    <Link href={`/timeline/${r.id}`} className="card" style={{ padding: 14, display: 'block' }}>
+      <div style={{ display: 'flex', gap: 14 }}>
+        <div style={{
+          width: 140, aspectRatio: '16/10', flexShrink: 0,
+          borderRadius: 6,
+          background: r.thumbnail_url ? `center / cover no-repeat url(${r.thumbnail_url})` : 'linear-gradient(135deg, var(--bg-3), var(--bg-2))',
+          border: '1px solid var(--line)',
+          position: 'relative',
+        }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
+              <svg width="9" height="9" viewBox="0 0 16 16" fill="white"><polygon points="5,3 12,8 5,13"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Vlog</span>
+            <span className={`pill ${cls}`}>{status}</span>
+            <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.recorded_at ?? r.created_at)}</span>
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {r.original_filename ?? r.title ?? r.id}
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{size}</div>
+        </div>
       </div>
-      {delta && <div className="delta">{delta}</div>}
+    </Link>
+  )
+}
+
+function ThreadCard({ r }: { r: any }) {
+  const topic = (r.abstracted_topic ?? r.topic ?? 'misc').toLowerCase()
+  return (
+    <Link href={`/thread/${r.id}`} className="card" style={{ padding: 16, display: 'block' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <TopicDot topic={topic}/>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Thread · {r.register ?? 'observation'}</span>
+        {r.strength != null && <Pips n={r.strength}/>}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.extracted_at)}</span>
+      </div>
+      <div style={{
+        fontSize: 16, color: 'var(--fg)',
+        lineHeight: 1.5, fontStyle: 'italic',
+        paddingLeft: 12, borderLeft: '2px solid var(--bg-4)',
+      }}>
+        "{String(r.take ?? '').slice(0, 240)}"
+      </div>
+      {r.topic && (
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 10 }}>
+          {r.topic}
+        </div>
+      )}
+    </Link>
+  )
+}
+
+function ClipCard({ r }: { r: any }) {
+  const start = formatTime(Number(r.start_time ?? 0))
+  const end = formatTime(Number(r.end_time ?? 0))
+  return (
+    <Link href={`/clip/${r.id}`} className="card" style={{ padding: 14, display: 'block' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Clip</span>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{start} → {end}</span>
+        <span className={`pill ${r.status === 'published' ? 'ok' : 'mute'}`}>{r.status ?? 'pending'}</span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.extracted_at)}</span>
+      </div>
+      <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: 6 }}>
+        {r.headline ?? '—'}
+      </div>
+      {r.quote && (
+        <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5, fontStyle: 'italic' }}>
+          "{r.quote}"
+        </div>
+      )}
+    </Link>
+  )
+}
+
+function PostCard({ r }: { r: any }) {
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          {r.kind ?? 'post'} · {r.state ?? 'draft'}
+        </span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.published_at ?? r.created_at)}</span>
+      </div>
+      <div style={{ fontSize: 14, color: 'var(--fg)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        {String(r.body ?? r.title ?? '').slice(0, 320)}
+      </div>
     </div>
   )
 }
 
-function greetingFor(d: Date): string {
-  const h = d.getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
+function SurfacedCard({ r }: { r: any }) {
+  const subtype = String(r.subtype ?? r.kind ?? 'card').replace(/_/g, ' ')
+  return (
+    <Link href={r.target_url ?? '#'} className="card" style={{
+      padding: 14, display: 'block',
+      border: '1px solid var(--accent-bd)',
+      background: 'var(--bg-1)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span className="pill accent">◆ surfaced · {subtype}</span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.surfaced_at)}</span>
+      </div>
+      <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: r.body_html ? 6 : 0 }}>
+        {r.headline ?? r.title ?? '—'}
+      </div>
+      {r.body_html && (
+        <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}
+          dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
+      )}
+    </Link>
+  )
 }
 
-function shortTime(ts: number): string {
-  if (!ts) return ''
+function DefaultCard({ r, kind }: { r: any; kind: string }) {
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase' }}>{kind}</span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts)}</span>
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--fg-1)' }}>{r.title ?? r.headline ?? r.body ?? JSON.stringify(r).slice(0, 200)}</div>
+    </div>
+  )
+}
+
+function toMs(v: unknown): number {
+  if (!v) return Date.now()
+  if (typeof v === 'number') return v < 1e12 ? v * 1000 : v
+  if (typeof v === 'string') return new Date(v).getTime()
+  return Date.now()
+}
+
+function timeOfDay(v: unknown): string {
+  if (!v) return ''
+  const d = new Date(toMs(v))
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+function dayLabel(ts: number): string {
   const d = new Date(ts)
   const now = new Date()
   const dayDiff = Math.floor((now.getTime() - d.getTime()) / 86_400_000)
-  if (dayDiff === 0) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false })
-  if (dayDiff === 1) return 'Yesterday'
-  if (dayDiff < 7) return d.toLocaleDateString('en-US', { weekday: 'short' })
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (dayDiff === 0) return 'Today · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  if (dayDiff === 1) return 'Yesterday · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  if (dayDiff < 7) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 }
 
-function dotColor(d: ActivityRow['dot']): string {
-  switch (d) {
-    case 'accent': return 'var(--accent)'
-    case 'hot':    return 'var(--hot)'
-    case 'warn':   return 'var(--warn)'
-    case 'err':    return 'var(--err)'
-    case 'ok':
-    default:       return 'var(--ok)'
-  }
-}
-
-function rowFromTimeline(item: any): ActivityRow {
-  // Best-effort shape mapping. The timeline endpoint returns heterogeneous
-  // cards; we squash to a uniform { kind, dot, status, what } row.
-  const kind = item.kind ?? item.type ?? 'event'
-  const ts = item.ts ?? item.created_at ?? item.recorded_at ?? Date.now()
-  const tsMs = typeof ts === 'number' ? ts : new Date(ts).getTime()
-  if (kind === 'vlog') {
-    const status = item.pipeline_status ?? 'uploaded'
-    const dot: ActivityRow['dot'] = status === 'complete' ? 'ok'
-      : status === 'failed' ? 'err'
-      : status === 'archived' ? 'warn'
-      : 'hot'
-    return {
-      id: item.id ?? String(tsMs),
-      ts: tsMs,
-      kind,
-      dot,
-      status,
-      what: `Vlog ${status}. ${item.original_filename ?? item.title ?? item.id}`,
-      href: `/timeline/${item.id}`,
-    }
-  }
-  if (kind === 'thread') {
-    return {
-      id: item.id ?? String(tsMs),
-      ts: tsMs,
-      kind,
-      dot: 'ok',
-      status: 'ok',
-      what: `Thread written. ${item.take ? `"${String(item.take).slice(0, 120)}"` : item.topic ?? '—'}`,
-      href: `/thread/${item.id}`,
-    }
-  }
-  if (kind === 'cluster' || kind === 'surfaced') {
-    return {
-      id: item.id ?? String(tsMs),
-      ts: tsMs,
-      kind,
-      dot: 'accent',
-      status: 'surfaced',
-      what: `Cluster surfaced. ${item.headline ?? item.abstracted_topic ?? item.name ?? '—'}`,
-      href: `/cluster/${item.id}`,
-    }
-  }
-  return {
-    id: item.id ?? String(tsMs),
-    ts: tsMs,
-    kind,
-    dot: 'ok',
-    status: kind,
-    what: item.title ?? item.headline ?? item.what ?? kind,
-    href: undefined,
-  }
+function formatTime(s: number): string {
+  if (!isFinite(s) || s < 0) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
 }

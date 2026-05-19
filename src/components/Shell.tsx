@@ -27,14 +27,14 @@ export interface ShellProps {
 }
 
 type NavId =
-  | 'console' | 'vlogs' | 'threads' | 'clusters' | 'productions'
+  | 'timeline' | 'console' | 'vlogs' | 'threads' | 'clusters' | 'productions'
   | 'graph' | 'chat'
   | 'capture' | 'system' | 'settings'
 
 const NAV_BY_PATH: { match: RegExp; id: NavId }[] = [
   { match: /^\/vlogs/,       id: 'vlogs' },
-  { match: /^\/timeline/,    id: 'vlogs' },  // legacy route alias
   { match: /^\/uploads/,     id: 'vlogs' },  // legacy
+  { match: /^\/console/,     id: 'console' },
   { match: /^\/threads/,     id: 'threads' },
   { match: /^\/thread\//,    id: 'threads' },
   { match: /^\/clusters/,    id: 'clusters' },
@@ -47,7 +47,8 @@ const NAV_BY_PATH: { match: RegExp; id: NavId }[] = [
   { match: /^\/capture/,     id: 'capture' },
   { match: /^\/system/,      id: 'system' },
   { match: /^\/settings/,    id: 'settings' },
-  { match: /^\/?$/,          id: 'console' },
+  { match: /^\/timeline/,    id: 'timeline' },  // legacy /timeline path
+  { match: /^\/?$/,          id: 'timeline' },  // / is now the timeline
 ]
 
 export default function Shell({ active, breadcrumb, hot, busy, rail, rightExtra, children }: ShellProps) {
@@ -103,9 +104,10 @@ function Topbar({ breadcrumb, hot, busy, rightExtra }: { breadcrumb: string[]; h
 
 function Sidebar({ active }: { active: NavId }) {
   const operate: SidebarItem[] = [
-    { id: 'console',     label: 'Console',     href: '/',            icon: 'Console',     kbd: 'G C' },
+    { id: 'timeline',    label: 'Timeline',    href: '/',            icon: 'Threads',     kbd: 'G T' },
+    { id: 'console',     label: 'Console',     href: '/console',     icon: 'Console',     kbd: 'G C' },
     { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',       icon: 'Vlogs' },
-    { id: 'threads',     label: 'Threads',     href: '/threads',     icon: 'Threads' },
+    { id: 'threads',     label: 'Threads',     href: '/threads',     icon: 'Filter' },
     { id: 'clusters',    label: 'Clusters',    href: '/clusters',    icon: 'Clusters' },
     { id: 'productions', label: 'Productions', href: '/productions', icon: 'Productions' },
   ]
