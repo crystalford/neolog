@@ -154,11 +154,22 @@ export async function POST(req: NextRequest) {
                 WHERE operator_id = ? AND deleted_at IS NULL ${inFlightWhere.replace(/v\./g, '')}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
+            // "Incomplete" includes three failure modes:
+            //   1. Pipeline never finished (status != 'complete')
+            //   2. No active extraction_runs row at all
+            //   3. Active extraction_runs row exists but total_items=0
+            //      — this catches the silent-empty-extraction bug where
+            //      Workers AI under load returned a parseable but empty
+            //      payload. Pre-guard, those vlogs would be marked
+            //      complete; without #3, they'd be filtered out here
+            //      and never re-tried.
             : `SELECT v.id FROM vlogs v
                 LEFT JOIN extraction_runs r
                   ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
-                  AND (v.pipeline_status != 'complete' OR r.id IS NULL)
+                  AND (v.pipeline_status != 'complete'
+                       OR r.id IS NULL
+                       OR COALESCE(r.total_items, 0) = 0)
                   ${inFlightWhere}
                 ORDER BY v.id
                 LIMIT ${MAX_LIST_RESOLVE}`,

@@ -81,9 +81,30 @@ interface AiBinding {
   run: (model: string, input: any, opts?: any) => Promise<any>
 }
 
+// Shape of the LlamaGate singleton DO binding from workers/pipeline. We
+// don't import the real DurableObjectNamespace type here because this
+// file is shared between the Pages app and the worker, and Pages
+// doesn't carry the Workers DO type globally. The shape we actually
+// touch is narrower than DurableObjectNamespace anyway.
+interface LlamaGateBinding {
+  idFromName(name: string): unknown
+  get(id: unknown): {
+    fetch: (input: string | Request, init?: RequestInit) => Promise<Response>
+  }
+}
+
 export interface ExtractEnv {
   AI: AiBinding
   ANTHROPIC_API_KEY?: string
+  // Optional. When present, callLlama70B routes through the gate to
+  // enforce a global concurrency cap on Workers AI. When absent (e.g.
+  // the legacy process-upload workflow, single-vlog Pages calls
+  // without a binding), we fall back to direct env.AI.run.
+  LLAMA_GATE?: LlamaGateBinding
+  // For observability — when set, the gate logs wait/run timings
+  // against this vlog/operator in pipeline_events.
+  LLAMA_GATE_VLOG_ID?: string
+  LLAMA_GATE_OPERATOR_ID?: string
 }
 
 const SYSTEM_PROMPT = `You are an extraction engine for vlog transcripts. Output JSON only.
@@ -215,6 +236,29 @@ export async function runExtraction(
   const initialModel = mode === 'premium' ? 'sonnet-4.6' : 'llama-3.3-70b-fp8-fast'
   const first = await runOne(initialModel)
 
+  // Safety net for the "silent empty extraction" failure mode: an LLM
+  // under rate-limit pressure can return parseable JSON whose arrays
+  // are all empty. We learned this the hard way bulk-reprocessing 150
+  // vlogs at once — all marked complete, zero data persisted. For any
+  // transcript that's actually substantial (>= 500 chars), refuse to
+  // accept a zero-item extraction. Throw so the DO/workflow retries
+  // with backoff, spreading load over time.
+  const itemCount =
+    (first.payload.threads?.length ?? 0) +
+    (first.payload.clips?.length ?? 0) +
+    (first.payload.creative_elements?.length ?? 0) +
+    (first.payload.entities?.length ?? 0)
+  if (itemCount === 0 && transcript.length >= 500) {
+    await progress('llm_validate', {
+      state: 'failed', reason: 'empty_extraction',
+      model: initialModel, transcript_length: transcript.length,
+    })
+    throw new Error(
+      `extraction produced zero items for a ${transcript.length}-char transcript ` +
+      `(model=${initialModel}) — likely upstream LLM degraded under load`,
+    )
+  }
+
   // Auto-escalate if cheap pass had too many ungrounded items
   if (mode === 'auto' && first.failRate > 0.15) {
     await progress('llm_escalate', {
@@ -248,8 +292,74 @@ async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = 
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: `Transcript:\n\n${transcript}${jsonReminder ? '\n\nReturn ONLY the JSON object — no prose.' : ''}` },
   ]
-  const res: any = await env.AI.run(LLAMA_70B, { messages, max_tokens: 4096 } as any)
-  return res?.response ?? res?.text ?? ''
+
+  let res: any
+  if (env.LLAMA_GATE) {
+    // Routed path: the gate DO enforces concurrency before calling
+    // env.AI.run internally. We hold this fetch until a slot opens —
+    // that's the desired backpressure shape per CLAUDE.md ("hold the
+    // connection, we underestimate how long it takes"). The gate
+    // returns the raw env.AI.run result inside { ok, result } or an
+    // error envelope which we re-throw.
+    const stub = env.LLAMA_GATE.get(env.LLAMA_GATE.idFromName('llama-gate-singleton'))
+    let gateRes: Response
+    try {
+      gateRes = await stub.fetch('https://gate/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages,
+          max_tokens: 4096,
+          vlog_id: env.LLAMA_GATE_VLOG_ID,
+          operator_id: env.LLAMA_GATE_OPERATOR_ID,
+        }),
+      })
+    } catch (err: any) {
+      throw new Error(`LlamaGate fetch failed: ${err?.message || err}`)
+    }
+
+    let envelope: any
+    try {
+      envelope = await gateRes.json()
+    } catch (err: any) {
+      throw new Error(`LlamaGate returned non-JSON (status=${gateRes.status}): ${err?.message || err}`)
+    }
+    if (!gateRes.ok || envelope?.ok === false) {
+      throw new Error(
+        `LlamaGate upstream error (status=${gateRes.status}, wait=${envelope?.wait_ms}ms, run=${envelope?.run_ms}ms): ` +
+        `${envelope?.error || 'unknown'}`,
+      )
+    }
+    res = envelope.result
+  } else {
+    // Fallback path: direct Workers AI call. Used by the legacy
+    // process-upload Workflow which doesn't have the gate binding.
+    try {
+      res = await env.AI.run(LLAMA_70B, { messages, max_tokens: 4096 } as any)
+    } catch (err: any) {
+      // Workers AI throws an AiError on rate limits / capacity. Re-throw so
+      // the DO retries with backoff — don't swallow into "empty extraction".
+      throw new Error(`Workers AI Llama failed: ${err?.message || err}`)
+    }
+  }
+
+  if (!res) {
+    throw new Error('Workers AI Llama returned null/undefined response')
+  }
+  if (res.errors) {
+    throw new Error(`Workers AI Llama errors: ${JSON.stringify(res.errors).slice(0, 400)}`)
+  }
+  if (res.success === false) {
+    throw new Error(`Workers AI Llama success:false ${res.error ? `: ${String(res.error).slice(0, 200)}` : ''}`)
+  }
+  const text = res?.response ?? res?.text ?? ''
+  if (typeof text !== 'string' || text.length < 50) {
+    // A real extraction is multi-KB JSON. Anything under 50 chars is a
+    // truncated/degraded response — not safe to parse as "valid empty
+    // extraction." Throw so the DO retries.
+    throw new Error(`Workers AI Llama returned suspiciously short response (${text?.length ?? 0} chars): ${String(text).slice(0, 120)}`)
+  }
+  return text
 }
 
 async function callSonnet(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {
@@ -267,6 +377,9 @@ async function callSonnet(env: ExtractEnv, transcript: string, jsonReminder = fa
       ],
     },
   )
+  if (!res?.text || res.text.length < 50) {
+    throw new Error(`Sonnet returned suspiciously short response (${res?.text?.length ?? 0} chars)`)
+  }
   return res.text
 }
 
@@ -280,6 +393,22 @@ function parseExtractionJson(raw: string): ExtractionPayload {
   const last = s.lastIndexOf('}')
   if (first >= 0 && last > first) s = s.slice(first, last + 1)
   const parsed = JSON.parse(s)
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('parsed result is not an object')
+  }
+  // Detect the "shape-but-no-content" failure mode: model returned a
+  // syntactically valid JSON object but every expected array key is
+  // missing entirely. This happens when an upstream LLM returns a
+  // refusal or a tiny placeholder; treat it as a parse failure so the
+  // caller retries.
+  const hasAnyArray =
+    Array.isArray(parsed.threads) ||
+    Array.isArray(parsed.clips) ||
+    Array.isArray(parsed.creative_elements) ||
+    Array.isArray(parsed.entities)
+  if (!hasAnyArray && typeof parsed.summary !== 'string') {
+    throw new Error('parsed JSON has no expected keys (threads / clips / creative_elements / entities / summary)')
+  }
   return {
     summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 2000) : '',
     threads: Array.isArray(parsed.threads) ? parsed.threads : [],
