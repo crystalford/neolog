@@ -19,7 +19,7 @@
  *   - "View full log" disclosure with every event, untruncated
  */
 
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 
 export interface PipelineEvent {
   id?: number
