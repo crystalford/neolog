@@ -170,18 +170,19 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       <div className="section">
         <div className="label">Re-extract</div>
         <p style={{ fontSize: 13, color: 'var(--bone-2)', marginBottom: 14 }}>
-          Run the unified extraction on this vlog. Auto starts cheap and escalates to Sonnet only when voice grounding fails on too many items.
+          Run the unified extraction on this vlog. Pick the cheap model or pay for the premium one — no auto-magic fallback in between.
         </p>
 
-        {/* Mode picker — replaces the legacy tier picker with the new unified-extraction modes */}
+        {/* Mode picker — just two options: Cheap (Llama) and Premium (Sonnet) */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {([
-            ['free',    'Auto',    'Llama 70B → Sonnet on fail'],
-            ['premium', 'Cheap',   'Llama 70B only — no escalation'],
-            ['max',     'Premium', 'Sonnet 4.6 directly'],
+            ['free',    'Cheap',   'Llama 3.3 70B — fast, decent quality'],
+            ['max',     'Premium', 'Sonnet 4.6 — best voice grounding'],
           ] as const).map(([k, label, sub]) => {
-            const tierTotal = (['threads', 'clip_candidates', 'creative_elements', 'entities'] as const)
-              .reduce((s, p) => s + COST[k][p], 0)
+            // Unified extraction is one LLM call returning all 4 output types.
+            // Cheap = Llama 3.3 70B fp8-fast ~$0.01-0.02 per ~20-min vlog.
+            // Premium = Sonnet 4.6 ~$0.04-0.05 per ~20-min vlog.
+            const tierTotal = k === 'max' ? 0.05 : 0.02
             return (
               <button
                 key={k}

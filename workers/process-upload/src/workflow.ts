@@ -41,6 +41,7 @@ import {
   extractEntities,
 } from '../../../src/lib/extract'
 import { runExtraction, type ExtractionMode } from '../../../src/lib/extract-unified'
+import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
 
@@ -503,10 +504,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
               const r2Obj = await this.env.VIDEOS.get(vlog.r2_key)
               if (!r2Obj) throw new Error(`R2 object missing: ${vlog.r2_key}`)
               const audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
-              const result: any = await this.env.AI.run(
-                '@cf/openai/whisper-large-v3-turbo' as any,
-                { audio: Array.from(audioBytes) } as any,
-              )
+              const result: any = await runWhisper(this.env.AI, audioBytes)
               const transcript = result.text ?? result.transcription ?? ''
               await this.env.DB.prepare(
                 `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
@@ -521,7 +519,14 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             // heartbeats to the pipeline DO so the operator sees ffmpeg
             // making progress in real time instead of a static "running"
             // spinner for several minutes.
-            await insertPipelineEvent('transcribe', 'started', 0, null, 'ffmpeg_extract', { state: 'starting' })
+            //
+            // Emit these events under step='audio_extract' so the new
+            // /timeline/[id] UI's "Audio extract" card sees them instead
+            // of all of them folding into "Transcribe". Browser
+            // chunked-audio path skips this entire block (audio_chunks_json
+            // is non-empty); when that path runs, the DO's own audio_extract
+            // step emits a skipped event with the same step name.
+            await insertPipelineEvent('audio_extract', 'started', 0, null, 'invoke_ffmpeg', { state: 'starting' })
             const sourceKey = transcodedKey || vlog.r2_key
             const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
             const ctl = new AbortController()
@@ -553,13 +558,13 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
               throw new Error(`ffmpeg /extract-audio ${audioResp.status}: ${errBody}`)
             }
             const audioBytes = new Uint8Array(await audioResp.arrayBuffer())
-            await insertPipelineEvent('transcribe', 'ok', 0, null, 'ffmpeg_extract', {
+            await insertPipelineEvent('audio_extract', 'ok', 0, null, 'invoke_ffmpeg', {
               state: 'ok', bytes: audioBytes.byteLength,
             })
-            const result: any = await this.env.AI.run(
-              '@cf/openai/whisper-large-v3-turbo' as any,
-              { audio: Array.from(audioBytes) } as any,
-            )
+            await insertPipelineEvent('transcribe', 'started', 0, null, 'whisper_call', {
+              state: 'starting', bytes: audioBytes.byteLength,
+            })
+            const result: any = await runWhisper(this.env.AI, audioBytes)
             const transcript = result.text ?? result.transcription ?? ''
             await this.env.DB.prepare(
               `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
@@ -586,6 +591,12 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             return
           }
 
+          // Browser already chunked the audio at upload time. Emit a
+          // skipped audio_extract event so the UI shows "Skipped: audio
+          // already on R2" on the Audio extract card instead of IDLE.
+          await insertPipelineEvent('audio_extract', 'skipped', 0, null, 'skip_if_exists', {
+            reason: 'artifact_exists', chunks: chunks.length,
+          })
           const allWords: Array<{ word: string; start: number; end: number }> = []
           let stitched = ''
           for (let ci = 0; ci < chunks.length; ci++) {
@@ -605,10 +616,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             // some newer Whisper model schemas have rejected it as unknown.
             let result: any
             try {
-              result = await this.env.AI.run(
-                '@cf/openai/whisper-large-v3-turbo' as any,
-                { audio: Array.from(audioBytes) } as any,
-              )
+              result = await runWhisper(this.env.AI, audioBytes)
             } catch (err: any) {
               // Surface the real error verbatim so extraction_outcomes shows
               // exactly what Workers AI rejected, instead of a 40-char preview.

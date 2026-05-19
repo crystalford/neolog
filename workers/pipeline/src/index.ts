@@ -42,6 +42,7 @@ import type {
 } from '@cloudflare/workers-types'
 
 import { runExtraction, type ExtractionMode } from '../../../src/lib/extract-unified'
+import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 
 export interface Env {
@@ -625,21 +626,19 @@ export class VlogPipelineDO {
   ): Promise<any> {
     const MAX = 4
     let lastErr: any
-    // Workers AI Whisper schema expects `audio: Array<number>` (JSON array of
-    // byte values). Passing a Uint8Array directly is base64-serialized by the
-    // binding into a STRING, which the model's JSON-schema validator rejects
-    // with "Type mismatch of '/audio', 'string' not in 'object'". Array.from
-    // produces a real JSON array that satisfies the schema. For our 2-min
-    // mono 16kHz chunks (~3.84 MB) the serialized array is ~9 MB — fits.
-    const audioArray = Array.from(bytes)
+    // runWhisper handles the input-shape detection (object/body, array,
+    // base64) and caches the working shape per isolate. We only retry on
+    // transient failures (network, rate limit) here — schema mismatches
+    // are exhaustively tried inside runWhisper itself, so a thrown error
+    // here means we've already burned through every plausible shape.
     for (let attempt = 1; attempt <= MAX; attempt++) {
       try {
-        return await this.env.AI.run(
-          '@cf/openai/whisper-large-v3-turbo' as any,
-          { audio: audioArray } as any,
-        )
+        return await runWhisper(this.env.AI as any, bytes)
       } catch (err: any) {
         lastErr = err
+        const msg = String(err?.message ?? err ?? '')
+        // Don't retry on the all-shapes-failed error — it's terminal.
+        if (/failed across all input shapes/i.test(msg)) break
         if (attempt < MAX) {
           const wait = backoffMs(attempt)
           await new Promise(r => setTimeout(r, wait))
