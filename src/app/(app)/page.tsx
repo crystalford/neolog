@@ -151,6 +151,9 @@ function FeedCard({ item }: { item: FeedItem }) {
     case 'clip':     return <ClipCard r={item.raw}/>
     case 'post':     return <PostCard r={item.raw}/>
     case 'surfaced': return <SurfacedCard r={item.raw}/>
+    case 'creative': return <CreativeCard r={item.raw}/>
+    case 'entity':   return <EntityCard r={item.raw}/>
+    case 'pipeline_event': return <PipelineEventCard r={item.raw}/>
     default:         return <DefaultCard r={item.raw} kind={item.kind}/>
   }
 }
@@ -275,6 +278,97 @@ function SurfacedCard({ r }: { r: any }) {
         <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}
           dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
       )}
+    </Link>
+  )
+}
+
+function CreativeCard({ r }: { r: any }) {
+  const elementType = String(r.element_type ?? 'theme').replace(/_/g, ' ')
+  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
+  return (
+    <Link href={href} className="card" style={{ padding: 14, display: 'block' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Creative · {elementType}
+        </span>
+        {r.register && (
+          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{r.register}</span>
+        )}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.created_at ?? r.extracted_at)}
+        </span>
+      </div>
+      <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55, fontStyle: 'italic' }}>
+        "{String(r.content ?? '').slice(0, 320)}"
+      </div>
+    </Link>
+  )
+}
+
+const ENTITY_DOT: Record<string, string> = {
+  person:    'var(--t-rose)',
+  place:     'var(--t-sage)',
+  project:   'var(--t-brass)',
+  tool:      'var(--t-steel)',
+  concept:   'var(--t-plum)',
+  theme:     'var(--t-violet)',
+  reference: 'var(--t-teal)',
+}
+
+function EntityCard({ r }: { r: any }) {
+  const entityType = String(r.entity_type ?? 'concept')
+  const dot = ENTITY_DOT[entityType] ?? 'var(--fg-3)'
+  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
+  return (
+    <Link href={href} className="card" style={{ padding: 14, display: 'block' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }}/>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Entity · {entityType}
+        </span>
+        <span style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginLeft: 4 }}>
+          {r.name ?? '—'}
+        </span>
+        {r.mention_count != null && Number(r.mention_count) > 1 && (
+          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>
+            ×{r.mention_count}
+          </span>
+        )}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.last_mentioned_at ?? r.created_at)}
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function PipelineEventCard({ r }: { r: any }) {
+  const step = String(r.step ?? 'step')
+  const status = String(r.status ?? 'ok')
+  const cls = status === 'failed' ? 'err' : status === 'skipped' ? 'mute' : 'ok'
+  const d = r.detail ?? {}
+  const counts = [
+    d.threads != null ? `${d.threads}t` : null,
+    d.clips != null ? `${d.clips}c` : null,
+    d.creative_elements != null ? `${d.creative_elements}cr` : null,
+    d.entities != null ? `${d.entities}e` : null,
+  ].filter(Boolean).join(' · ')
+  const dur = r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : null
+  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
+  return (
+    <Link href={href} className="card" style={{ padding: '10px 14px', display: 'block', opacity: 0.85 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--fg-2)' }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Pipeline
+        </span>
+        <span className={`pill ${cls}`}>{step} · {status}</span>
+        {counts && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{counts}</span>}
+        {d.model && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{d.model}</span>}
+        {dur && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>{dur}</span>}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.created_at)}
+        </span>
+      </div>
     </Link>
   )
 }

@@ -12,7 +12,7 @@
 
 export const runtime = 'edge'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Shell, { NavIcons, TopicDot } from '@/components/Shell'
 
@@ -46,6 +46,7 @@ export default function VlogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -112,11 +113,21 @@ export default function VlogsPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={load}><span className="ico">{NavIcons.Refresh}</span>Refresh</button>
+            <button className="btn" onClick={() => setBulkOpen(true)}>
+              Re-process all
+            </button>
             <Link href="/capture" className="btn primary">
               <span className="ico">{NavIcons.Plus}</span>Add vlog<span className="kbd">N</span>
             </Link>
           </div>
         </div>
+
+        {bulkOpen && (
+          <BulkReprocessModal
+            onClose={() => setBulkOpen(false)}
+            onDone={load}
+          />
+        )}
 
         {/* Filter row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 24, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -161,6 +172,532 @@ export default function VlogsPage() {
       </div>
     </Shell>
   )
+}
+
+// ─── Bulk reprocess modal ──────────────────────────────────────────────────
+//
+// State machine (phase):
+//   idle      — picking scope/mode/chunk_size, can preview
+//   preview   — fetching dry-run list, then showing count + sample
+//   ready     — preview returned, user clicks Run
+//   running   — chunked loop in flight; cancellable
+//   done      — finished or aborted, summary shown
+//
+// Durability:
+//   - Run state is checkpointed to localStorage after every chunk so
+//     closing the modal (or even reloading the page) doesn't lose progress.
+//   - Resuming a run picks up from `processed_idx` against the original
+//     `ids` list.
+//   - Per-chunk retry: each chunk POST retries up to 3x with exponential
+//     backoff before being recorded as a failed chunk; remaining chunks
+//     keep going.
+//
+// Throughput knobs the operator can tune:
+//   - chunk_size   (default 8, range 1–25): how many ids per POST.
+//   - pause_ms     (default 800): how long to wait between chunks.
+//   These are intentionally conservative so a 150-vlog run won't spike
+//   Workers AI / Anthropic rate limits.
+
+type BulkPhase = 'idle' | 'preview' | 'ready' | 'running' | 'done'
+
+interface BulkCheckpoint {
+  version: 1
+  mode: 'cheap' | 'premium'
+  scope: 'incomplete' | 'all'
+  chunkSize: number
+  pauseMs: number
+  ids: string[]
+  processedIdx: number
+  dispatched: number
+  skipped: number
+  failed: number
+  failures: { vlog_id: string; error: string; reason?: string }[]
+  startedAt: number
+  finishedAt: number | null
+}
+
+const CHECKPOINT_KEY = 'neolog.bulkReprocess.v1'
+
+function loadCheckpoint(): BulkCheckpoint | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(CHECKPOINT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed?.version !== 1) return null
+    return parsed as BulkCheckpoint
+  } catch { return null }
+}
+
+function saveCheckpoint(cp: BulkCheckpoint) {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(cp)) } catch {}
+}
+
+function clearCheckpoint() {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.removeItem(CHECKPOINT_KEY) } catch {}
+}
+
+function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [phase, setPhase] = useState<BulkPhase>('idle')
+  const [mode, setMode] = useState<'cheap' | 'premium'>('cheap')
+  const [scope, setScope] = useState<'incomplete' | 'all'>('incomplete')
+  const [chunkSize, setChunkSize] = useState(8)
+  const [pauseMs, setPauseMs] = useState(800)
+
+  const [ids, setIds] = useState<string[]>([])
+  const [skippedInFlight, setSkippedInFlight] = useState(0)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+
+  const [processed, setProcessed] = useState(0)
+  const [dispatched, setDispatched] = useState(0)
+  const [skipped, setSkipped] = useState(0)
+  const [failed, setFailed] = useState(0)
+  const [failures, setFailures] = useState<{ vlog_id: string; error: string; reason?: string }[]>([])
+
+  // Mutable refs so the async loop reads the latest values without the
+  // closure-over-state hazard.
+  const abortRef = useRef<AbortController | null>(null)
+  const cancelledRef = useRef(false)
+  const checkpointRef = useRef<BulkCheckpoint | null>(null)
+
+  // Restore in-progress checkpoint on open.
+  useEffect(() => {
+    const cp = loadCheckpoint()
+    if (cp && cp.processedIdx < cp.ids.length && !cp.finishedAt) {
+      setMode(cp.mode); setScope(cp.scope); setChunkSize(cp.chunkSize); setPauseMs(cp.pauseMs)
+      setIds(cp.ids); setProcessed(cp.processedIdx)
+      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed); setFailures(cp.failures)
+      checkpointRef.current = cp
+      setPhase('ready') // let the user click Resume rather than auto-running
+    }
+  }, [])
+
+  const runPreview = async () => {
+    setPhase('preview'); setPreviewError(null)
+    try {
+      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope, mode, dry_run: true, skip_in_flight: true }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setPreviewError(d?.details || d?.error || `HTTP ${r.status}`)
+        setPhase('idle'); return
+      }
+      setIds(d.ids ?? [])
+      setSkippedInFlight(d.skipped_in_flight ?? 0)
+      setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
+      setPhase('ready')
+    } catch (err: any) {
+      setPreviewError(err?.message || String(err))
+      setPhase('idle')
+    }
+  }
+
+  const start = async (resume = false) => {
+    cancelledRef.current = false
+    abortRef.current = new AbortController()
+    const signal = abortRef.current.signal
+
+    const startIdx = resume ? processed : 0
+    // Snapshot the run params into a checkpoint that persists across
+    // modal close / page reload.
+    const cp: BulkCheckpoint = {
+      version: 1,
+      mode, scope, chunkSize, pauseMs,
+      ids,
+      processedIdx: startIdx,
+      dispatched: resume ? dispatched : 0,
+      skipped: resume ? skipped : 0,
+      failed: resume ? failed : 0,
+      failures: resume ? failures : [],
+      startedAt: Date.now(),
+      finishedAt: null,
+    }
+    checkpointRef.current = cp
+    saveCheckpoint(cp)
+    setProcessed(startIdx)
+    setPhase('running')
+
+    let idx = startIdx
+    while (idx < ids.length) {
+      if (cancelledRef.current) break
+
+      const chunk = ids.slice(idx, idx + chunkSize)
+      const chunkRes = await dispatchChunkWithRetry(chunk, mode, signal)
+
+      if (chunkRes === 'aborted') break
+      if (chunkRes === 'fatal') {
+        // Network gave up after retries. Mark this chunk's ids as failed
+        // (cannot tell which dispatched) and keep going so a transient
+        // outage doesn't block the rest.
+        for (const vlog_id of chunk) {
+          cp.failures.push({ vlog_id, error: 'chunk request failed after retries' })
+          cp.failed += 1
+        }
+      } else {
+        for (const r of chunkRes.results) {
+          if (r.ok) cp.dispatched += 1
+          else if (r.reason) {
+            cp.skipped += 1
+            cp.failures.push({ vlog_id: r.vlog_id, error: r.reason, reason: r.reason })
+          } else {
+            cp.failed += 1
+            cp.failures.push({ vlog_id: r.vlog_id, error: r.error || 'unknown', reason: undefined })
+          }
+        }
+      }
+
+      idx += chunk.length
+      cp.processedIdx = idx
+      saveCheckpoint(cp)
+
+      // Mirror to React state for the UI.
+      setProcessed(idx)
+      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
+      setFailures([...cp.failures])
+
+      if (idx < ids.length && !cancelledRef.current) {
+        // Short-circuit-friendly pause: if user clicks cancel during the
+        // sleep, break out within the chunk delay.
+        await sleepWithAbort(pauseMs, signal)
+      }
+    }
+
+    cp.finishedAt = Date.now()
+    saveCheckpoint(cp)
+    setPhase('done')
+    onDone()
+  }
+
+  const cancel = () => {
+    cancelledRef.current = true
+    if (abortRef.current) abortRef.current.abort()
+  }
+
+  const reset = () => {
+    cancelledRef.current = false
+    setIds([]); setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
+    clearCheckpoint()
+    checkpointRef.current = null
+    setPhase('idle')
+  }
+
+  const perVlog = mode === 'premium' ? 0.05 : 0.02
+  const estCost = ids.length * perVlog
+  const remaining = Math.max(0, ids.length - processed)
+  const pct = ids.length > 0 ? Math.round((processed / ids.length) * 100) : 0
+
+  return (
+    <div onClick={phase === 'running' ? undefined : onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 50,
+    }}>
+      <div onClick={e => e.stopPropagation()} className="card" style={{
+        padding: 20, maxWidth: 600, width: '92%', maxHeight: '85vh', overflow: 'auto',
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <h2 style={{ fontSize: 18, margin: 0 }}>Bulk re-process vlogs</h2>
+          {phase === 'running' && (
+            <span className="pill hot" style={{ marginLeft: 'auto' }}>running · {pct}%</span>
+          )}
+          {phase === 'done' && (
+            <span className={`pill ${failed > 0 ? 'err' : 'ok'}`} style={{ marginLeft: 'auto' }}>
+              {cancelledRef.current ? 'cancelled' : 'done'}
+            </span>
+          )}
+        </div>
+
+        {(phase === 'idle' || phase === 'preview') && (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: 0 }}>
+              Kicks the post-upload pipeline for each vlog. Existing transcripts are reused;
+              extraction re-runs against the current code paths. Already-running vlogs are
+              skipped automatically.
+            </p>
+
+            <div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+                Mode
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  ['cheap',   'Cheap',   'Llama 3.3 70B · ~$0.02 / vlog'],
+                  ['premium', 'Premium', 'Sonnet 4.6 · ~$0.05 / vlog'],
+                ] as const).map(([k, label, sub]) => (
+                  <button
+                    key={k}
+                    className={`fchip ${mode === k ? 'active' : ''}`}
+                    style={{ flex: 1, padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
+                    onClick={() => setMode(k)}
+                  >
+                    <span style={{ fontWeight: 500 }}>{label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+                Scope
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([
+                  ['incomplete', 'Incomplete only', 'Skips vlogs that already finished with an active extraction'],
+                  ['all',        'Everything',      'Includes already-complete vlogs (will replace their extraction)'],
+                ] as const).map(([k, label, sub]) => (
+                  <button
+                    key={k}
+                    className={`fchip ${scope === k ? 'active' : ''}`}
+                    style={{ flex: 1, padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
+                    onClick={() => setScope(k)}
+                  >
+                    <span style={{ fontWeight: 500 }}>{label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <details style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+              <summary style={{ cursor: 'pointer' }}>Advanced · throughput</summary>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
+                  Chunk size (1–25)
+                  <input type="number" min={1} max={25} value={chunkSize}
+                    onChange={e => setChunkSize(clamp(Number(e.target.value) || 1, 1, 25))}
+                    style={{ width: 80, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', color: 'var(--fg-1)' }}/>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
+                  Pause between chunks (ms)
+                  <input type="number" min={0} max={10000} step={100} value={pauseMs}
+                    onChange={e => setPauseMs(clamp(Number(e.target.value) || 0, 0, 10000))}
+                    style={{ width: 100, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', color: 'var(--fg-1)' }}/>
+                </label>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 8, lineHeight: 1.5 }}>
+                Smaller chunks + longer pauses are gentler on Workers AI rate limits.
+                Defaults (8 / 800ms) are tuned for 100+ vlog backfills.
+              </div>
+            </details>
+
+            {previewError && (
+              <div style={{ fontSize: 12, color: 'var(--err)' }}>Preview failed: {previewError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn ghost" onClick={onClose}>Cancel</button>
+              <button className="btn primary" disabled={phase === 'preview'} onClick={runPreview}>
+                {phase === 'preview' ? 'Resolving…' : 'Preview'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {phase === 'ready' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 12 }}>
+              <Stat label="Will dispatch" value={ids.length} />
+              <Stat label="Skipped (in-flight)" value={skippedInFlight} />
+              <Stat label="Est. cost" value={`$${estCost.toFixed(2)}`} />
+            </div>
+
+            {ids.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                Sample: <span className="mono">{ids.slice(0, 3).map(s => s.slice(-6)).join(', ')}{ids.length > 3 ? `, +${ids.length - 3} more` : ''}</span>
+              </div>
+            )}
+
+            {ids.length === 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
+                No vlogs to dispatch in this scope.
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+                Chunks of <b>{chunkSize}</b> with <b>{pauseMs}ms</b> pause between.
+                Estimated wall-clock: ~{estDurationLabel(ids.length, chunkSize, pauseMs)}.
+                You can cancel any time without losing progress so far.
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn ghost" onClick={reset}>Back</button>
+              <button className="btn ghost" onClick={onClose}>Close</button>
+              <button className="btn primary" disabled={ids.length === 0} onClick={() => start(processed > 0)}>
+                {processed > 0 ? `Resume (${processed}/${ids.length} done)` : `Run · ${ids.length} vlogs`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {(phase === 'running' || phase === 'done') && (
+          <>
+            <ProgressBar processed={processed} total={ids.length} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 12 }}>
+              <Stat label="Dispatched" value={dispatched} tone="ok" />
+              <Stat label="Skipped" value={skipped} tone="mute" />
+              <Stat label="Failed" value={failed} tone={failed > 0 ? 'err' : 'mute'} />
+              <Stat label="Remaining" value={remaining} />
+            </div>
+
+            {failures.length > 0 && (
+              <details style={{ fontSize: 12 }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--fg-2)' }}>
+                  {failures.length} non-success {failures.length === 1 ? 'row' : 'rows'} · click to expand
+                </summary>
+                <div style={{
+                  marginTop: 8, maxHeight: 200, overflow: 'auto',
+                  border: '1px solid var(--line)', borderRadius: 6,
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+                }}>
+                  {failures.slice(0, 100).map((f, i) => (
+                    <div key={i} style={{
+                      padding: '6px 10px',
+                      borderBottom: '1px solid var(--line)',
+                      color: f.reason ? 'var(--fg-3)' : 'var(--err)',
+                      display: 'flex', gap: 10, alignItems: 'baseline',
+                    }}>
+                      <Link href={`/timeline/${f.vlog_id}`} style={{ color: 'inherit' }}>
+                        …{f.vlog_id.slice(-10)}
+                      </Link>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {f.error}
+                      </span>
+                    </div>
+                  ))}
+                  {failures.length > 100 && (
+                    <div style={{ padding: '6px 10px', color: 'var(--fg-4)' }}>
+                      + {failures.length - 100} more…
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              {phase === 'running' && (
+                <button className="btn ghost" onClick={cancel}>Cancel</button>
+              )}
+              {phase === 'done' && (
+                <>
+                  <button className="btn ghost" onClick={reset}>Start over</button>
+                  <button className="btn primary" onClick={() => { clearCheckpoint(); onClose() }}>Close</button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n))
+}
+
+function estDurationLabel(total: number, chunk: number, pause: number): string {
+  const chunks = Math.ceil(total / chunk)
+  // Per-chunk: ~chunk*250ms RTT inside the call (the dispatch is fast)
+  // plus the pause. Rough estimate, not a contract.
+  const ms = chunks * (chunk * 250 + pause)
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`
+  const m = Math.floor(ms / 60_000); const s = Math.round((ms % 60_000) / 1000)
+  return `${m}m ${s}s`
+}
+
+function Stat({ label, value, tone }: { label: string; value: number | string; tone?: 'ok' | 'err' | 'mute' }) {
+  const color = tone === 'ok' ? 'var(--ok)' : tone === 'err' ? 'var(--err)' : tone === 'mute' ? 'var(--fg-3)' : 'var(--fg)'
+  return (
+    <div style={{
+      background: 'var(--bg-1)', border: '1px solid var(--line)',
+      borderRadius: 6, padding: '8px 10px',
+    }}>
+      <div className="mono" style={{ fontSize: 9, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 16, color, marginTop: 2 }}>{value}</div>
+    </div>
+  )
+}
+
+function ProgressBar({ processed, total }: { processed: number; total: number }) {
+  const pct = total > 0 ? (processed / total) * 100 : 0
+  return (
+    <div>
+      <div style={{
+        height: 8, background: 'var(--bg-2)', borderRadius: 4, overflow: 'hidden',
+        border: '1px solid var(--line)',
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%', background: 'var(--accent)',
+          transition: 'width 200ms ease-out',
+        }}/>
+      </div>
+      <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+        <span>{processed} / {total}</span>
+        <span>{pct.toFixed(0)}%</span>
+      </div>
+    </div>
+  )
+}
+
+async function dispatchChunkWithRetry(
+  vlog_ids: string[],
+  mode: 'cheap' | 'premium',
+  signal: AbortSignal,
+): Promise<
+  | { results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] }
+  | 'aborted'
+  | 'fatal'
+> {
+  const maxAttempts = 3
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (signal.aborted) return 'aborted'
+    try {
+      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_ids, mode, skip_in_flight: true }),
+        signal,
+      })
+      if (r.ok) {
+        const d: any = await r.json()
+        return { results: d.results ?? [] }
+      }
+      // 4xx (bad request, unauth) — fatal, don't retry.
+      if (r.status >= 400 && r.status < 500) {
+        const d: any = await r.json().catch(() => ({}))
+        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: d?.error || `HTTP ${r.status}` })) }
+      }
+      // 5xx — retry with backoff.
+    } catch (err: any) {
+      if (signal.aborted || err?.name === 'AbortError') return 'aborted'
+    }
+    if (attempt < maxAttempts) {
+      await sleepWithAbort(500 * Math.pow(2, attempt - 1), signal)
+      if (signal.aborted) return 'aborted'
+    }
+  }
+  return 'fatal'
+}
+
+function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    if (signal.aborted) return resolve()
+    const t = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve() }, ms)
+    const onAbort = () => { clearTimeout(t); resolve() }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function VlogCard({ v }: { v: VlogRow }) {
