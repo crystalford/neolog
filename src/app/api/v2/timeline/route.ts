@@ -64,6 +64,12 @@ async function handle(req: NextRequest) {
   const cards: TimelineCard[] = []
   const blockErrors: Record<string, string> = {}
 
+  // Optional kinds filter — e.g. ?kinds=vlog,thread,pipeline. Default
+  // omits noisy pipeline_events; Console opts in explicitly.
+  const url = new URL(req.url)
+  const kindsParam = url.searchParams.get('kinds')
+  const kinds = kindsParam ? kindsParam.split(',').map(s => s.trim()).filter(Boolean) : []
+
   // ── Vlogs ────────────────────────────────────────────────────────────────
   // SELECT vlogs + their thread/clip counts in 3 queries total instead of
   // N+1 (which was 175 queries for 174 vlogs). Then presign all thumbnail
@@ -372,6 +378,55 @@ async function handle(req: NextRequest) {
   } catch (err: any) {
     blockErrors.surfaced = err?.message || String(err)
     console.warn('[timeline] surfaced block failed:', blockErrors.surfaced)
+  }
+
+  // ── Pipeline events ──────────────────────────────────────────────────────
+  // Surface the worker's own step-by-step progress (extract / surface /
+  // llm_persist / persist_warnings) so the Console activity stream shows
+  // "the system did X" rows alongside vlog/thread/cluster cards. Only
+  // included when explicitly requested via ?kinds=...,pipeline so the
+  // Timeline feed doesn't get noisy.
+  if (kinds.includes('pipeline')) {
+    try {
+      const events = await findMany<{
+        id: string
+        vlog_id: string
+        step: string
+        sub_step: string | null
+        status: string
+        started_at: string
+        duration_ms: number | null
+        detail_json: string | null
+      }>(
+        db,
+        `SELECT id, vlog_id, step, sub_step, status, started_at, duration_ms, detail_json
+           FROM pipeline_events
+          WHERE operator_id = ?
+            AND step IN ('extract', 'transcribe', 'audio_extract')
+            AND status IN ('ok', 'failed', 'skipped')
+          ORDER BY started_at DESC
+          LIMIT 30`,
+        operator.id,
+      )
+      for (const ev of events) {
+        let detail: any = null
+        try { detail = ev.detail_json ? JSON.parse(ev.detail_json) : null } catch {}
+        cards.push({
+          id: `evt-${ev.id}`,
+          type: 'pipeline_event' as any,
+          created_at: ev.started_at,
+          vlog_id: ev.vlog_id,
+          step: ev.step,
+          sub_step: ev.sub_step,
+          status: ev.status,
+          duration_ms: ev.duration_ms,
+          detail,
+        } as any)
+      }
+    } catch (err: any) {
+      blockErrors.pipeline_events = err?.message || String(err)
+      console.warn('[timeline] pipeline_events block failed:', blockErrors.pipeline_events)
+    }
   }
 
   // Sort the whole union by timestamp desc. Vlogs whose recorded_at_source

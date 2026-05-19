@@ -334,6 +334,28 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-19_idx_entities_vlog',
     sql: `CREATE INDEX IF NOT EXISTS idx_entities_vlog ON entities(vlog_id)`,
   },
+  // ─── clip_candidates / creative_elements .extracted_at ───────────────────
+  // Both extraction workers INSERT an `extracted_at` value at the end of the
+  // column list. The base schema only has created_at/updated_at on these
+  // tables, so the INSERTs were silently failing inside the chunk-batch
+  // try/catch — every run reported success while persisting zero clip
+  // and creative_element rows. Defaulted so historical rows stay valid.
+  {
+    name: '2026-05-19_clip_candidates_extracted_at',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN extracted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+  },
+  {
+    name: '2026-05-19_creative_elements_extracted_at',
+    sql: `ALTER TABLE creative_elements ADD COLUMN extracted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+  },
+  // ─── vlogs.extraction_mode vocabulary cleanup ────────────────────────────
+  // Earlier the picker offered free/auto/premium/max. Operator collapsed
+  // to two: cheap | premium. Backfill stragglers so the picker never has
+  // to render an unknown chip.
+  {
+    name: '2026-05-19_extraction_mode_cheap',
+    sql: `UPDATE vlogs SET extraction_mode = 'cheap' WHERE extraction_mode IN ('auto', 'free')`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

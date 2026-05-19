@@ -72,20 +72,19 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const [entities, setEntities] = useState<EntityRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
-  const [tier, setTier] = useState<'free' | 'premium' | 'max'>('free')
+  const [mode, setMode] = useState<'cheap' | 'premium'>('cheap')
   const [passes, setPasses] = useState<Set<'threads' | 'clip_candidates' | 'creative_elements' | 'entities'>>(
     new Set(['threads', 'clip_candidates', 'creative_elements', 'entities']),
   )
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  // Kimi K2.6 (free tier): ~$0.01/pass. Sonnet (premium/max): ~$0.042/pass.
-  // Numbers mirror src/lib/llm.ts COST_PER_VLOG — keep them in sync.
-  const COST: Record<'free' | 'premium' | 'max', Record<string, number>> = {
-    free:    { threads: 0.01,  clip_candidates: 0.01,  creative_elements: 0.01,  entities: 0.01 },
-    premium: { threads: 0.042, clip_candidates: 0.01,  creative_elements: 0.042, entities: 0.01 },
-    max:     { threads: 0.042, clip_candidates: 0.042, creative_elements: 0.042, entities: 0.042 },
+  // Per-pass cost estimate for the unified extractor. Numbers mirror
+  // src/lib/llm.ts COST_PER_VLOG — keep them in sync.
+  const COST: Record<'cheap' | 'premium', Record<string, number>> = {
+    cheap:   { threads: 0.01,  clip_candidates: 0.01,  creative_elements: 0.01,  entities: 0.01 },
+    premium: { threads: 0.042, clip_candidates: 0.042, creative_elements: 0.042, entities: 0.042 },
   }
-  const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[tier][p] ?? 0), 0)
+  const estCost = Array.from(passes).reduce((sum, p) => sum + (COST[mode][p] ?? 0), 0)
   const fmtCost = (n: number) => n < 0.01 ? '<$0.01' : `$${n.toFixed(n < 1 ? 2 : 2)}`
 
   const load = async () => {
@@ -118,13 +117,15 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     return () => clearTimeout(id)
   }, [vlog?.pipeline_status, vlog?.updated_at])
 
-  // Pick up operator's preferred default tier (set in /settings).
+  // Pick up operator's preferred default mode (set in /settings).
+  // Tolerates the older `free/max` vocabulary in stored settings.
   useEffect(() => {
     fetch('/api/v2/settings', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => {
-        const t = d?.settings?.extraction_default_tier
-        if (t === 'free' || t === 'premium' || t === 'max') setTier(t)
+        const t = d?.settings?.extraction_default_tier ?? d?.settings?.extraction_default_mode
+        if (t === 'cheap' || t === 'free') setMode('cheap')
+        else if (t === 'premium' || t === 'max') setMode('premium')
       })
       .catch(() => {})
   }, [])
@@ -136,7 +137,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, passes: Array.from(passes) }),
+        body: JSON.stringify({ mode, passes: Array.from(passes) }),
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       await load()
@@ -212,18 +213,18 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {/* Mode picker — just two options: Cheap (Llama) and Premium (Sonnet) */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {([
-            ['free',    'Cheap',   'Llama 3.3 70B — fast, decent quality'],
-            ['max',     'Premium', 'Sonnet 4.6 — best voice grounding'],
+            ['cheap',   'Cheap',   'Llama 3.3 70B — fast, decent quality'],
+            ['premium', 'Premium', 'Sonnet 4.6 — best voice grounding'],
           ] as const).map(([k, label, sub]) => {
             // Unified extraction is one LLM call returning all 4 output types.
             // Cheap = Llama 3.3 70B fp8-fast ~$0.01-0.02 per ~20-min vlog.
             // Premium = Sonnet 4.6 ~$0.04-0.05 per ~20-min vlog.
-            const tierTotal = k === 'max' ? 0.05 : 0.02
+            const tierTotal = k === 'premium' ? 0.05 : 0.02
             return (
               <button
                 key={k}
-                onClick={() => setTier(k)}
-                className={`fchip ${tier === k ? 'active' : ''}`}
+                onClick={() => setMode(k)}
+                className={`fchip ${mode === k ? 'active' : ''}`}
                 style={{
                   padding: '12px 16px',
                   flexDirection: 'column',
@@ -285,8 +286,8 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 ['entities',          'Entities', 'People, places, projects, tools mentioned'],
               ] as const).map(([p, label, sub]) => {
                 const on = passes.has(p)
-                const model = MODEL_FOR_PASS(tier, p)
-                const cost = COST[tier][p]
+                const model = MODEL_FOR_PASS(mode, p)
+                const cost = COST[mode][p]
                 return (
                   <button
                     key={p}
@@ -776,12 +777,8 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail; onRestart?: () => void }) 
 // model name for the (tier, pass) pair so the UI can show which model will run
 // each pass.
 type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entities'
-function MODEL_FOR_PASS(tier: 'free' | 'premium' | 'max', pass: Pass): string {
-  if (tier === 'max') return 'Sonnet'
-  if (tier === 'premium') {
-    return (pass === 'threads' || pass === 'creative_elements') ? 'Sonnet' : 'Kimi K2.6'
-  }
-  return 'Kimi K2.6'
+function MODEL_FOR_PASS(mode: 'cheap' | 'premium', _pass: Pass): string {
+  return mode === 'premium' ? 'Sonnet' : 'Llama'
 }
 
 function deriveTitle(filename: string | null): string {

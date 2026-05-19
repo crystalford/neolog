@@ -13,6 +13,12 @@
  *   subtype = 'cluster_ready' — when this vlog's extraction makes 3+
  *                                threads share the same abstracted_topic
  *                                ("a riff has formed")
+ *   subtype = 'auto_link'     — when a thread in this run shares its
+ *                                abstracted_topic (case-insensitive) with a
+ *                                prior thread on a DIFFERENT vlog. The
+ *                                embeddings-free riff-detection variant
+ *                                from CLAUDE.md: "0.85 cosine OR strict
+ *                                abstracted_topic equality".
  *
  * The surfaced_cards table's CHECK constraint only allows the documented
  * subtypes — schema.sql line 495. Stay inside that set.
@@ -107,6 +113,57 @@ export async function surfaceFromRun(ctx: SurfaceCtx, threads: ThreadShape[]): P
       }
     } catch (err: any) {
       errors.push(`cluster_ready for ${topic}: ${err?.message || err}`)
+    }
+  }
+
+  // 3) Auto-link — for each thread in this run, find prior threads with the
+  //    same abstracted_topic on a DIFFERENT vlog. Insert one auto_link card
+  //    per pair, capped at MAX_AUTOLINKS to avoid spam on high-recurrence
+  //    topics. Dedupe by checking for any auto_link row referencing the same
+  //    pair within the past 7 days.
+  const MAX_AUTOLINKS = 3
+  let autoLinksInserted = 0
+  for (const t of threads) {
+    if (autoLinksInserted >= MAX_AUTOLINKS) break
+    const topic = (t.abstracted_topic ?? '').toLowerCase().trim()
+    if (!topic) continue
+    try {
+      const peer = await ctx.db.prepare(
+        `SELECT id, vlog_id, topic, take FROM threads
+          WHERE operator_id = ? AND LOWER(abstracted_topic) = ?
+            AND vlog_id != ? AND deleted_at IS NULL
+          ORDER BY extracted_at DESC
+          LIMIT 1`,
+      ).bind(ctx.operator_id, topic, ctx.vlog_id).first<{
+        id: string; vlog_id: string; topic: string | null; take: string | null
+      }>()
+      if (!peer) continue
+
+      const refs = JSON.stringify({
+        thread_a: t.id, thread_b: peer.id,
+        vlog_a: ctx.vlog_id, vlog_b: peer.vlog_id,
+        topic,
+      })
+      const existing = await ctx.db.prepare(
+        `SELECT 1 AS x FROM surfaced_cards
+          WHERE operator_id = ? AND subtype = 'auto_link'
+            AND refs = ?
+            AND surfaced_at > datetime('now', '-7 days')
+          LIMIT 1`,
+      ).bind(ctx.operator_id, refs).first<{ x: number }>()
+      if (existing) continue
+
+      const id = ulid()
+      const body = `Auto-link: this take on "${topic}" rhymes with an earlier take`
+      await ctx.db.prepare(
+        `INSERT INTO surfaced_cards
+           (id, operator_id, subtype, body, body_html, topic_color, refs)
+         VALUES (?, ?, 'auto_link', ?, ?, ?, ?)`,
+      ).bind(id, ctx.operator_id, body, body, topic, refs).run()
+      inserted.push(id)
+      autoLinksInserted += 1
+    } catch (err: any) {
+      errors.push(`auto_link for thread ${t.id}: ${err?.message || err}`)
     }
   }
 
