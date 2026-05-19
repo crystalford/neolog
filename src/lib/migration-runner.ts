@@ -263,6 +263,50 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-18_creative_elements_validated',
     sql: `ALTER TABLE creative_elements ADD COLUMN validated INTEGER NOT NULL DEFAULT 1`,
   },
+  // ─── extraction_runs reshape ─────────────────────────────────────────────
+  // db/schema.sql created an `extraction_runs` table with the legacy 4-pass
+  // shape (pass, prompt_version, output_count, cost_usd) and a NOT NULL CHECK
+  // on `pass`. The 2026-05-18_extraction_runs migration was a no-op against
+  // it because CREATE TABLE IF NOT EXISTS doesn't reshape existing tables —
+  // so the unified-extraction INSERTs fail with `no such column: is_active`
+  // and `pass cannot be null`.
+  //
+  // Fix: drop + recreate with the unified-extraction shape. Legacy data is
+  // discarded; in practice the table was empty (the old extract flow never
+  // got far enough to write rows in production). The threads / clip_candidates
+  // / creative_elements rows may have run_id values that now orphan; the new
+  // queries treat them as is_active = 0 (filtered out) which is fine.
+  {
+    name: '2026-05-19_drop_extraction_runs_legacy',
+    sql: `DROP TABLE IF EXISTS extraction_runs`,
+  },
+  {
+    name: '2026-05-19_extraction_runs_v2',
+    sql: `CREATE TABLE IF NOT EXISTS extraction_runs (
+      id              TEXT PRIMARY KEY,
+      vlog_id         TEXT NOT NULL,
+      operator_id     TEXT NOT NULL,
+      model           TEXT NOT NULL,
+      escalated_from  TEXT,
+      mode            TEXT NOT NULL,
+      r2_key          TEXT NOT NULL,
+      total_items     INTEGER NOT NULL DEFAULT 0,
+      invalid_items   INTEGER NOT NULL DEFAULT 0,
+      fail_rate       REAL NOT NULL DEFAULT 0,
+      cost_usd_input  REAL,
+      cost_usd_output REAL,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      created_at      INTEGER NOT NULL
+    )`,
+  },
+  {
+    name: '2026-05-19_idx_extraction_runs_vlog_v2',
+    sql: `CREATE INDEX IF NOT EXISTS idx_extraction_runs_vlog ON extraction_runs(vlog_id)`,
+  },
+  {
+    name: '2026-05-19_idx_extraction_runs_active_v2',
+    sql: `CREATE INDEX IF NOT EXISTS idx_extraction_runs_active ON extraction_runs(vlog_id, is_active)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
