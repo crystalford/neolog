@@ -499,6 +499,12 @@ jobs:
           if [ -n "$HEARTBEAT_TOKEN" ]; then
             echo "$HEARTBEAT_TOKEN" | wrangler pages secret put HEARTBEAT_TOKEN --project-name "$PAGES_PROJECT"
           fi
+          # CLOUDFLARE_API_TOKEN — used by /api/v2/dev/transcribe-test and the
+          # Whisper REST fallback path. Same token wrangler uses; just routed
+          # onto the Pages project so the runtime can call api.cloudflare.com/...
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler pages secret put CLOUDFLARE_API_TOKEN --project-name "$PAGES_PROJECT"
+          fi
 
       - name: Build + deploy Pages project
         if: hashFiles('wrangler.toml') != '' && hashFiles('next.config.js') != ''
