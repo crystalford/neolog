@@ -155,7 +155,8 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const status = vlog.pipeline_status
   const isVideo = (vlog.mime_type || '').startsWith('video/')
 
-  const breadcrumbTail = vlog.original_filename ?? vlog.id
+  const fullTitle = vlog.original_filename ?? vlog.id
+  const breadcrumbTail = fullTitle.length > 30 ? fullTitle.slice(0, 28) + '…' : fullTitle
   return (
     <Shell active="vlogs" breadcrumb={['Vlogs', breadcrumbTail]}>
     <div className="pad-tight vlog-detail">

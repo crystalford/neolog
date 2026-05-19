@@ -162,6 +162,7 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
           background: state.conn === 'connected' ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
         }} />
         {state.conn === 'connected' ? 'live'
+          : (state.conn === 'connecting' || state.conn === 'reconnecting') && state.events.length > 0 ? 'polling · 5s'
           : state.conn === 'connecting' ? 'connecting…'
           : state.conn === 'reconnecting' ? 'reconnecting…'
           : 'idle'}

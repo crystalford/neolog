@@ -27,7 +27,7 @@ export interface ShellProps {
 }
 
 type NavId =
-  | 'timeline' | 'console' | 'vlogs' | 'threads' | 'clusters' | 'productions'
+  | 'timeline' | 'console' | 'vlogs' | 'transcript' | 'threads' | 'clusters' | 'productions'
   | 'graph' | 'chat'
   | 'capture' | 'system' | 'settings'
 
@@ -47,6 +47,7 @@ const NAV_BY_PATH: { match: RegExp; id: NavId }[] = [
   { match: /^\/capture/,     id: 'capture' },
   { match: /^\/system/,      id: 'system' },
   { match: /^\/settings/,    id: 'settings' },
+  { match: /^\/transcript/,  id: 'transcript' },
   { match: /^\/timeline/,    id: 'timeline' },  // legacy /timeline path
   { match: /^\/?$/,          id: 'timeline' },  // / is now the timeline
 ]
@@ -107,6 +108,7 @@ function Sidebar({ active }: { active: NavId }) {
     { id: 'timeline',    label: 'Timeline',    href: '/',            icon: 'Threads',     kbd: 'G T' },
     { id: 'console',     label: 'Console',     href: '/console',     icon: 'Console',     kbd: 'G C' },
     { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',       icon: 'Vlogs' },
+    { id: 'transcript',  label: 'Transcript',  href: '/transcript',  icon: 'Threads',     kbd: 'G R' },
     { id: 'threads',     label: 'Threads',     href: '/threads',     icon: 'Filter' },
     { id: 'clusters',    label: 'Clusters',    href: '/clusters',    icon: 'Clusters' },
     { id: 'productions', label: 'Productions', href: '/productions', icon: 'Productions' },
