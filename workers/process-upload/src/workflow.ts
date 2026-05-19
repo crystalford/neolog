@@ -753,6 +753,18 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             run.total_items, run.invalid_items, run.fail_rate, Date.now(),
           ).run()
 
+          // Save the 60-120 word summary to vlogs.summary so it renders at
+          // the top of the detail page without needing a separate fetch.
+          if (run.payload.summary && run.payload.summary.length > 10) {
+            try {
+              await this.env.DB.prepare(
+                `UPDATE vlogs SET summary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+              ).bind(run.payload.summary, vlog_id).run()
+            } catch (err: any) {
+              console.warn('[extract] vlogs.summary write failed:', err?.message || err)
+            }
+          }
+
           // Flatten payload into existing tables. Old rows for this vlog
           // remain (with run_id NULL or pointing to an older run); the UI
           // reads run_id = active run to filter. Cheaper than re-deleting.

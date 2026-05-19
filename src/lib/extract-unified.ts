@@ -57,6 +57,11 @@ export interface ExtractedEntity {
 }
 
 export interface ExtractionPayload {
+  // 60-120 word plain-English summary of what the vlog is about. Shown at
+  // the top of /timeline/[id] so the operator gets a sense of the content
+  // without reading the full transcript or threads. Voice-grounded but not
+  // 4-gram verified (it's a paraphrase by design).
+  summary?: string
   threads: ExtractedThread[]
   clips: ExtractedClip[]
   creative_elements: ExtractedCreative[]
@@ -101,6 +106,7 @@ For every "take" / "quote" / "content":
 
 # OUTPUT SCHEMA
 {
+  "summary": "<60-120 word plain-English paragraph: what this vlog is about, in the operator's voice. May paraphrase; not subject to the verbatim 4-word rule.>",
   "threads": [
     { "topic": "<short label>",
       "take": "<verbatim 4+ word substring>",
@@ -138,7 +144,22 @@ export async function runExtraction(
   progress: ProgressHook = async () => {},
 ): Promise<ExtractionRun> {
   if (transcript.length < 50) {
-    throw new Error(`transcript too short for extraction: ${transcript.length} chars`)
+    // Soft-skip: don't fail the pipeline. Tiny clips (filler, dead air,
+    // a cough) genuinely have nothing to extract — that's a known state,
+    // not an error. Caller writes an empty payload + records the skip
+    // outcome in pipeline_events so the operator sees "Skipped: transcript
+    // too short" instead of a red stack trace.
+    await progress('llm_call', {
+      state: 'skipped', reason: 'transcript_too_short',
+      length: transcript.length, min_length: 50,
+    })
+    return {
+      model: mode === 'premium' ? 'sonnet-4.6' : 'llama-3.3-70b-fp8-fast',
+      payload: { summary: '', threads: [], clips: [], creative_elements: [], entities: [] },
+      total_items: 0,
+      invalid_items: 0,
+      fail_rate: 0,
+    }
   }
   const fourGrams = buildTranscriptFourGrams(transcript)
 
@@ -260,6 +281,7 @@ function parseExtractionJson(raw: string): ExtractionPayload {
   if (first >= 0 && last > first) s = s.slice(first, last + 1)
   const parsed = JSON.parse(s)
   return {
+    summary: typeof parsed.summary === 'string' ? parsed.summary.slice(0, 2000) : '',
     threads: Array.isArray(parsed.threads) ? parsed.threads : [],
     clips: Array.isArray(parsed.clips) ? parsed.clips : [],
     creative_elements: Array.isArray(parsed.creative_elements) ? parsed.creative_elements : [],

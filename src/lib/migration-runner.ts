@@ -307,6 +307,14 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-19_idx_extraction_runs_active_v2',
     sql: `CREATE INDEX IF NOT EXISTS idx_extraction_runs_active ON extraction_runs(vlog_id, is_active)`,
   },
+  // ─── vlogs.summary ──────────────────────────────────────────────────────
+  // 60-120 word summary produced by the unified extraction. Shown at the top
+  // of /timeline/[id] between metadata and transcript so the operator gets
+  // an instant sense of what the vlog is about without scrolling.
+  {
+    name: '2026-05-19_vlogs_summary',
+    sql: `ALTER TABLE vlogs ADD COLUMN summary TEXT`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

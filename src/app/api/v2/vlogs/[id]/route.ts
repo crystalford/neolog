@@ -56,6 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     thumbnail_url: string | null
     transcript_text: string | null
     transcript_provider: string | null
+    summary: string | null
     pipeline_status: string
     pipeline_error: string | null
     extraction_outcomes: string | null
@@ -91,27 +92,87 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     thumbnailUrl = vlog.thumbnail_url
   }
 
-  const threads = await findMany<{
-    id: string
-    topic: string
-    take: string | null
-    register: string | null
-    strength: number | null
-    transcript_span_start: number | null
-    transcript_span_end: number | null
-    extracted_at: string
-    key_quotes: string | null
-    abstracted_topic: string | null
-  }>(
-    db,
-    `SELECT id, topic, take, register, strength,
-            transcript_span_start, transcript_span_end, extracted_at,
-            key_quotes, abstracted_topic
-       FROM threads
-      WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL
-      ORDER BY transcript_span_start ASC, extracted_at ASC`,
-    params.id, operator.id,
-  )
+  // Fetch every kind of extracted artifact in parallel. The unified-extraction
+  // run writes to all four tables with run_id; older legacy rows have
+  // run_id NULL and validated=1 by default — both shapes coexist.
+  const [threads, clips, creative_elements, entities] = await Promise.all([
+    findMany<{
+      id: string
+      topic: string
+      take: string | null
+      register: string | null
+      strength: number | null
+      transcript_span_start: number | null
+      transcript_span_end: number | null
+      extracted_at: string
+      key_quotes: string | null
+      abstracted_topic: string | null
+      run_id: string | null
+      validated: number | null
+    }>(
+      db,
+      `SELECT id, topic, take, register, strength,
+              transcript_span_start, transcript_span_end, extracted_at,
+              key_quotes, abstracted_topic, run_id, validated
+         FROM threads
+        WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL
+        ORDER BY transcript_span_start ASC, extracted_at ASC`,
+      params.id, operator.id,
+    ),
+    findMany<{
+      id: string
+      start_time: number | null
+      end_time: number | null
+      headline: string
+      quote: string | null
+      why_clippable: string | null
+      status: string | null
+      run_id: string | null
+      validated: number | null
+    }>(
+      db,
+      `SELECT id, start_time, end_time, headline, quote, why_clippable, status,
+              run_id, validated
+         FROM clip_candidates
+        WHERE vlog_id = ? AND operator_id = ?
+        ORDER BY start_time ASC, id ASC`,
+      params.id, operator.id,
+    ),
+    findMany<{
+      id: string
+      element_type: string
+      content: string
+      register: string | null
+      transcript_span_start: number | null
+      transcript_span_end: number | null
+      run_id: string | null
+      validated: number | null
+      extracted_at: string
+    }>(
+      db,
+      `SELECT id, element_type, content, register,
+              transcript_span_start, transcript_span_end, run_id, validated,
+              extracted_at
+         FROM creative_elements
+        WHERE vlog_id = ? AND operator_id = ?
+        ORDER BY element_type ASC, extracted_at DESC`,
+      params.id, operator.id,
+    ),
+    findMany<{
+      id: string
+      name: string
+      entity_type: string
+      aliases: string | null
+      mention_count: number | null
+    }>(
+      db,
+      `SELECT id, name, entity_type, aliases, mention_count
+         FROM entities
+        WHERE vlog_id = ? AND operator_id = ?
+        ORDER BY mention_count DESC NULLS LAST, name ASC`,
+      params.id, operator.id,
+    ),
+  ])
 
   // Strip internal R2 keys before sending to the client.
   const {
@@ -124,5 +185,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl },
     video_url: videoUrl,
     threads,
+    clips,
+    creative_elements,
+    entities,
   })
 }

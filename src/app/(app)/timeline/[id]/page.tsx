@@ -19,10 +19,11 @@ interface VlogDetail {
   recorded_at_source: string | null
   thumbnail_url: string | null
   transcript_text: string | null
+  summary: string | null
   pipeline_status: string
   pipeline_error: string | null
   playback_url: string | null
-  extraction_outcomes: string | null  // JSON: {thumbnail, transcode, recorded_at, transcribe, threads, ...}
+  extraction_outcomes: string | null
   updated_at: string | null
 }
 
@@ -33,11 +34,42 @@ interface ThreadRow {
   key_quotes: string | null
   strength: number | null
   abstracted_topic: string | null
+  register?: string | null
+}
+
+interface ClipRow {
+  id: string
+  start_time: number | null
+  end_time: number | null
+  headline: string
+  quote: string | null
+  why_clippable: string | null
+  status: string | null
+  validated: number | null
+}
+
+interface CreativeRow {
+  id: string
+  element_type: string
+  content: string
+  register: string | null
+  validated: number | null
+}
+
+interface EntityRow {
+  id: string
+  name: string
+  entity_type: string
+  aliases: string | null
+  mention_count: number | null
 }
 
 export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const [vlog, setVlog] = useState<VlogDetail | null>(null)
   const [threads, setThreads] = useState<ThreadRow[]>([])
+  const [clips, setClips] = useState<ClipRow[]>([])
+  const [creative, setCreative] = useState<CreativeRow[]>([])
+  const [entities, setEntities] = useState<EntityRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
   const [tier, setTier] = useState<'free' | 'premium' | 'max'>('free')
@@ -64,6 +96,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       const data: any = await r.json()
       setVlog(data.vlog)
       setThreads(data.threads || [])
+      setClips(data.clips || [])
+      setCreative(data.creative_elements || [])
+      setEntities(data.entities || [])
     } catch (e: any) {
       setError(String(e.message || e))
     }
@@ -284,10 +319,89 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         )}
       </div>
 
+      {vlog.summary && (
+        <div className="section">
+          <div className="label">Summary</div>
+          <p style={{
+            fontSize: 15,
+            color: 'var(--fg-1)',
+            lineHeight: 1.6,
+            margin: 0,
+            padding: '14px 18px',
+            background: 'var(--bg-1)',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            borderLeft: '3px solid var(--accent)',
+          }}>{vlog.summary}</p>
+        </div>
+      )}
+
       {vlog.transcript_text && (
         <div className="section">
           <div className="label">Transcript</div>
           <div className="transcript">{vlog.transcript_text}</div>
+        </div>
+      )}
+
+      {clips.length > 0 && (
+        <div className="section">
+          <div className="label">{clips.length} clip{clips.length === 1 ? '' : 's'}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {clips.map(c => <ClipCardInline key={c.id} clip={c}/>)}
+          </div>
+        </div>
+      )}
+
+      {creative.length > 0 && (
+        <div className="section">
+          <div className="label">{creative.length} creative element{creative.length === 1 ? '' : 's'}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {Object.entries(groupBy(creative, c => c.element_type)).map(([type, items]) => (
+              <div key={type}>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                  {type.replace(/_/g, ' ')} <span style={{ color: 'var(--fg-4)' }}>· {items.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {items.map(it => (
+                    <div key={it.id} style={{
+                      padding: '10px 14px',
+                      background: 'var(--bg-1)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 6,
+                      fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.55,
+                    }}>"{it.content}"</div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {entities.length > 0 && (
+        <div className="section">
+          <div className="label">{entities.length} entit{entities.length === 1 ? 'y' : 'ies'}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {entities.map(e => (
+              <span key={e.id} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                background: entityTypeBg(e.entity_type),
+                border: `1px solid ${entityTypeBd(e.entity_type)}`,
+                borderRadius: 100,
+                fontSize: 12,
+                color: 'var(--fg-1)',
+              }}>
+                {e.name}
+                <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{e.entity_type}</span>
+                {typeof e.mention_count === 'number' && e.mention_count > 1 && (
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--fg-4)' }}>×{e.mention_count}</span>
+                )}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
@@ -687,3 +801,62 @@ function parseFirstQuote(raw: string | null): string | null {
   } catch {}
   return null
 }
+
+function ClipCardInline({ clip }: { clip: ClipRow }) {
+  const start = formatTimeShort(clip.start_time ?? 0)
+  const end = formatTimeShort(clip.end_time ?? 0)
+  return (
+    <div style={{
+      padding: '12px 14px',
+      background: 'var(--bg-1)',
+      border: '1px solid var(--line)',
+      borderRadius: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{start} → {end}</span>
+        <span style={{ flex: 1, fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{clip.headline}</span>
+        {clip.validated === 0 && <span className="pill warn">ungrounded</span>}
+        <span className={`pill ${clip.status === 'published' ? 'ok' : 'mute'}`}>{clip.status || 'pending'}</span>
+      </div>
+      {clip.quote && (
+        <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.55, fontStyle: 'italic' }}>
+          "{clip.quote}"
+        </div>
+      )}
+      {clip.why_clippable && (
+        <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          why: <span style={{ textTransform: 'none', color: 'var(--fg-2)' }}>{clip.why_clippable}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatTimeShort(s: number): string {
+  if (!isFinite(s) || s < 0) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+function groupBy<T, K extends string>(items: T[], keyFn: (it: T) => K): Record<K, T[]> {
+  const out = {} as Record<K, T[]>
+  for (const it of items) {
+    const k = keyFn(it)
+    if (!out[k]) out[k] = []
+    out[k].push(it)
+  }
+  return out
+}
+
+const ENTITY_COLORS: Record<string, { bg: string; bd: string }> = {
+  person:    { bg: 'rgba(167,139,250,0.10)', bd: 'rgba(167,139,250,0.30)' }, // violet
+  place:     { bg: 'rgba(96,165,250,0.10)',  bd: 'rgba(96,165,250,0.30)'  }, // sky
+  project:   { bg: 'rgba(251,146,60,0.10)',  bd: 'rgba(251,146,60,0.30)'  }, // orange
+  tool:      { bg: 'rgba(45,212,191,0.10)',  bd: 'rgba(45,212,191,0.30)'  }, // teal
+  concept:   { bg: 'rgba(52,211,153,0.10)',  bd: 'rgba(52,211,153,0.30)'  }, // emerald
+  theme:     { bg: 'rgba(244,114,182,0.10)', bd: 'rgba(244,114,182,0.30)' }, // pink
+  reference: { bg: 'rgba(251,191,36,0.10)',  bd: 'rgba(251,191,36,0.30)'  }, // amber
+}
+function entityTypeBg(t: string): string { return ENTITY_COLORS[t]?.bg ?? 'var(--bg-2)' }
+function entityTypeBd(t: string): string { return ENTITY_COLORS[t]?.bd ?? 'var(--line)' }

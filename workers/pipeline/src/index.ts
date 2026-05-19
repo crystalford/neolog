@@ -704,6 +704,17 @@ export class VlogPipelineDO {
       r2_key, run.total_items, run.invalid_items, run.fail_rate, Date.now(),
     ).run()
 
+    // Persist the 60-120 word summary so /timeline/[id] renders it inline.
+    if (run.payload.summary && run.payload.summary.length > 10) {
+      try {
+        await this.env.DB.prepare(
+          `UPDATE vlogs SET summary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        ).bind(run.payload.summary, vlog.id).run()
+      } catch (err: any) {
+        console.warn('[extract] vlogs.summary write failed:', err?.message || err)
+      }
+    }
+
     // Flatten into existing tables
     const stmts: any[] = []
     for (const t of run.payload.threads) {
