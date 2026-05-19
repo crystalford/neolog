@@ -58,6 +58,9 @@ export interface Env {
   R2_ACCESS_KEY_ID?: string
   R2_SECRET_ACCESS_KEY?: string
   PIPELINE_URL: string
+  // REST fallback for Whisper — see src/lib/whisper.ts
+  CF_AI_TOKEN?: string
+  CLOUDFLARE_API_TOKEN?: string
 }
 
 const WORKER_VERSION = 'pipeline-do-2026-05-18'
@@ -633,7 +636,7 @@ export class VlogPipelineDO {
     // here means we've already burned through every plausible shape.
     for (let attempt = 1; attempt <= MAX; attempt++) {
       try {
-        return await runWhisper(this.env.AI as any, bytes)
+        return await runWhisper(this.env as any, bytes)
       } catch (err: any) {
         lastErr = err
         const msg = String(err?.message ?? err ?? '')

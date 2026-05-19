@@ -147,6 +147,9 @@ jobs:
           if [ -n "$HEARTBEAT_TOKEN" ]; then
             echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
           fi
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler secret put CLOUDFLARE_API_TOKEN
+          fi
       - name: Summary
         if: always()
         run: |
@@ -187,6 +190,9 @@ jobs:
           if [ -n "$HEARTBEAT_TOKEN" ]; then
             echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
           fi
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler secret put CLOUDFLARE_API_TOKEN
+          fi
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
             echo "$R2_ACCESS_KEY_ID" | wrangler secret put R2_ACCESS_KEY_ID
             echo "$R2_SECRET_ACCESS_KEY" | wrangler secret put R2_SECRET_ACCESS_KEY
@@ -226,6 +232,9 @@ jobs:
           wrangler deploy
           if [ -n "$HEARTBEAT_TOKEN" ]; then
             echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
+          fi
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler secret put CLOUDFLARE_API_TOKEN
           fi
       - name: Summary
         if: always()

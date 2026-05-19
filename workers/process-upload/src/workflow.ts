@@ -63,6 +63,12 @@ interface Env {
   PIPELINE_URL?: string
   R2_ACCESS_KEY_ID?: string
   R2_SECRET_ACCESS_KEY?: string
+  // Direct Workers AI REST API token — used as the last-resort path in
+  // runWhisper when the env.AI binding's JSON encoding fails the model's
+  // schema. Same value as the wrangler/Cloudflare API token; we can reuse
+  // the deploy token here because it has Workers AI scope.
+  CF_AI_TOKEN?: string
+  CLOUDFLARE_API_TOKEN?: string
 }
 
 interface Params {
@@ -504,7 +510,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
               const r2Obj = await this.env.VIDEOS.get(vlog.r2_key)
               if (!r2Obj) throw new Error(`R2 object missing: ${vlog.r2_key}`)
               const audioBytes = new Uint8Array(await r2Obj.arrayBuffer())
-              const result: any = await runWhisper(this.env.AI, audioBytes)
+              const result: any = await runWhisper(this.env, audioBytes)
               const transcript = result.text ?? result.transcription ?? ''
               await this.env.DB.prepare(
                 `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
@@ -564,7 +570,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             await insertPipelineEvent('transcribe', 'started', 0, null, 'whisper_call', {
               state: 'starting', bytes: audioBytes.byteLength,
             })
-            const result: any = await runWhisper(this.env.AI, audioBytes)
+            const result: any = await runWhisper(this.env, audioBytes)
             const transcript = result.text ?? result.transcription ?? ''
             await this.env.DB.prepare(
               `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
@@ -616,7 +622,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             // some newer Whisper model schemas have rejected it as unknown.
             let result: any
             try {
-              result = await runWhisper(this.env.AI, audioBytes)
+              result = await runWhisper(this.env, audioBytes)
             } catch (err: any) {
               // Surface the real error verbatim so extraction_outcomes shows
               // exactly what Workers AI rejected, instead of a 40-char preview.
