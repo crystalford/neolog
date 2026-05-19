@@ -252,8 +252,22 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
 
   const [ids, setIds] = useState<string[]>([])
   const [skippedInFlight, setSkippedInFlight] = useState(0)
-  const [skippedNoTranscript, setSkippedNoTranscript] = useState(0)
+  const [transcribedCount, setTranscribedCount] = useState(0)
+  const [untranscribedCount, setUntranscribedCount] = useState(0)
   const [previewError, setPreviewError] = useState<string | null>(null)
+
+  // Diagnostic data — auto-fetched on modal open. ZERO cost.
+  const [diag, setDiag] = useState<any | null>(null)
+  const [diagError, setDiagError] = useState<string | null>(null)
+  const [diagLoading, setDiagLoading] = useState(true)
+
+  // Stuck-cleanup state
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetResult, setResetResult] = useState<string | null>(null)
+
+  // Smoke-test state
+  const [smokeBusy, setSmokeBusy] = useState(false)
+  const [smokeResult, setSmokeResult] = useState<{ ok: boolean; vlog_id?: string; message: string } | null>(null)
 
   const [processed, setProcessed] = useState(0)
   const [dispatched, setDispatched] = useState(0)
@@ -279,6 +293,97 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     }
   }, [])
 
+  // Fetch the free diagnostic on modal open.
+  const refreshDiag = async () => {
+    setDiagLoading(true); setDiagError(null)
+    try {
+      const r = await fetch('/api/v2/admin/pipeline-state', { credentials: 'include' })
+      if (!r.ok) {
+        const d: any = await r.json().catch(() => ({}))
+        throw new Error(d?.details || d?.error || `HTTP ${r.status}`)
+      }
+      setDiag(await r.json())
+    } catch (err: any) {
+      setDiagError(err?.message || String(err))
+    } finally {
+      setDiagLoading(false)
+    }
+  }
+  useEffect(() => { refreshDiag() }, [])
+
+  const runResetStuck = async () => {
+    setResetBusy(true); setResetResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/reset-stuck', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'in_flight' }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) {
+        setResetResult(`Reset failed: ${d?.details || d?.error || `HTTP ${r.status}`}`)
+      } else {
+        setResetResult(`Reset ${d.reset} stuck vlog${d.reset === 1 ? '' : 's'}.`)
+        await refreshDiag()
+      }
+    } catch (err: any) {
+      setResetResult(`Reset error: ${err?.message || err}`)
+    } finally {
+      setResetBusy(false)
+    }
+  }
+
+  const runSmokeTest = async () => {
+    if (!diag || diag.counts_for_run?.needs_full_pipeline === 0) {
+      setSmokeResult({ ok: false, message: 'No untranscribed vlog available to smoke-test.' })
+      return
+    }
+    setSmokeBusy(true); setSmokeResult(null)
+    try {
+      // Dry-run resolution to find the first untranscribed candidate.
+      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'all', mode, dry_run: true, skip_in_flight: true }),
+      })
+      const d: any = await r.json()
+      const candidates: string[] = d.ids ?? []
+      // Pick the first id we know is untranscribed (transcribed_count
+      // vs untranscribed_count tells us roughly where in the list they are
+      // but doesn't give per-id flags — we use the second response):
+      // call dispatch with a single id list and read entry='start' back.
+      if (candidates.length === 0) {
+        setSmokeResult({ ok: false, message: 'No eligible vlog found.' })
+        return
+      }
+      // The bulk endpoint dispatches per-vlog and tells us whether it
+      // routed to /start or /reextract. Send just the first candidate.
+      const dispatchRes = await fetch('/api/v2/admin/reprocess-vlogs', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_ids: [candidates[0]], mode, skip_in_flight: true }),
+      })
+      const dispatchJson: any = await dispatchRes.json()
+      if (!dispatchRes.ok || dispatchJson.dispatched === 0) {
+        setSmokeResult({
+          ok: false, vlog_id: candidates[0],
+          message: `Smoke dispatch failed: ${dispatchJson?.error || dispatchJson?.results?.[0]?.error || 'unknown'}`,
+        })
+        return
+      }
+      const entry = dispatchJson.results?.[0]?.entry
+      setSmokeResult({
+        ok: true, vlog_id: candidates[0],
+        message: `Dispatched 1 vlog via ${entry === 'start' ? '/start (full pipeline)' : '/reextract (LLM only)'}. Open the vlog detail page to watch live progress.`,
+      })
+      await refreshDiag()
+    } catch (err: any) {
+      setSmokeResult({ ok: false, message: `Smoke test error: ${err?.message || err}` })
+    } finally {
+      setSmokeBusy(false)
+    }
+  }
+
   const runPreview = async () => {
     setPhase('preview'); setPreviewError(null)
     try {
@@ -295,7 +400,8 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
       }
       setIds(d.ids ?? [])
       setSkippedInFlight(d.skipped_in_flight ?? 0)
-      setSkippedNoTranscript(d.skipped_no_transcript ?? 0)
+      setTranscribedCount(d.transcribed_count ?? 0)
+      setUntranscribedCount(d.untranscribed_count ?? 0)
       setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
       setPhase('ready')
     } catch (err: any) {
@@ -422,10 +528,29 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
 
         {(phase === 'idle' || phase === 'preview') && (
           <>
+            {/* Free diagnostic — fetched on modal open. Costs nothing. */}
+            <DiagnosticPanel
+              diag={diag}
+              loading={diagLoading}
+              error={diagError}
+              onRefresh={refreshDiag}
+              onResetStuck={runResetStuck}
+              resetBusy={resetBusy}
+              resetResult={resetResult}
+            />
+
+            {/* Smoke test — runs ONE vlog through the full pipeline. ~$0.10. */}
+            <SmokeTestRow
+              diag={diag}
+              busy={smokeBusy}
+              result={smokeResult}
+              onRun={runSmokeTest}
+            />
+
             <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: 0 }}>
-              Kicks the post-upload pipeline for each vlog. Existing transcripts are reused;
-              extraction re-runs against the current code paths. Already-running vlogs are
-              skipped automatically.
+              Bulk dispatches the right pipeline entry per vlog: untranscribed → full pipeline
+              (audio extract → transcribe → LLM extract); transcribed → LLM extract only.
+              Both paths queue through rate-limiters so external services aren't overwhelmed.
             </p>
 
             <div>
@@ -511,22 +636,28 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
 
         {phase === 'ready' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat label="Will dispatch" value={ids.length} />
-              <Stat label="Est. cost" value={`$${estCost.toFixed(2)}`} />
+            {/* Cost is split: untranscribed cost ~5x more (full pipeline:
+                FFmpeg + Whisper + LLM) vs transcribed (just LLM). */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 12 }}>
+              <Stat label="Total" value={ids.length} />
+              <Stat label="Full pipeline" value={untranscribedCount} />
+              <Stat label="Extract only" value={transcribedCount} />
             </div>
-            {(skippedInFlight > 0 || skippedNoTranscript > 0) && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
-                <Stat label="Skipped (in-flight)" value={skippedInFlight} tone="mute" />
-                <Stat label="Skipped (no transcript)" value={skippedNoTranscript} tone="mute" />
-              </div>
-            )}
-            {skippedNoTranscript > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
+              <Stat
+                label="Est. cost"
+                value={`$${(untranscribedCount * 0.10 + transcribedCount * 0.02).toFixed(2)}`}
+              />
+              <Stat label="Skipped (in-flight)" value={skippedInFlight} tone="mute" />
+            </div>
+            {untranscribedCount > 0 && (
               <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
-                {skippedNoTranscript} vlog{skippedNoTranscript === 1 ? '' : 's'} skipped because
-                {skippedNoTranscript === 1 ? ' it has' : ' they have'} no transcript yet. Bulk
-                re-extract only re-runs the LLM step against existing transcripts — transcribe
-                untranscribed vlogs from their detail page first.
+                {untranscribedCount} untranscribed vlog{untranscribedCount === 1 ? '' : 's'} will
+                run the full pipeline (FFmpeg audio extract → Whisper transcribe → LLM extract),
+                gated through FFmpegGate (max 3 concurrent) and LlamaGate (max 3 concurrent).
+                Wall-clock estimate: ~{Math.ceil(untranscribedCount / 3)} min for FFmpeg,
+                + ~{Math.ceil(untranscribedCount / 3 / 6)} min for LLM. Transcribed vlogs
+                skip straight to the LLM step.
               </div>
             )}
 
@@ -646,6 +777,133 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
         {label}
       </div>
       <div style={{ fontSize: 16, color, marginTop: 2 }}>{value}</div>
+    </div>
+  )
+}
+
+function DiagnosticPanel({
+  diag, loading, error, onRefresh, onResetStuck, resetBusy, resetResult,
+}: {
+  diag: any | null
+  loading: boolean
+  error: string | null
+  onRefresh: () => void
+  onResetStuck: () => void
+  resetBusy: boolean
+  resetResult: string | null
+}) {
+  if (loading && !diag) {
+    return (
+      <div className="card" style={{ padding: 12, fontSize: 12, color: 'var(--fg-3)' }}>
+        Loading corpus diagnostic…
+      </div>
+    )
+  }
+  if (error && !diag) {
+    return (
+      <div className="card" style={{ padding: 12, fontSize: 12, color: 'var(--err)' }}>
+        Diagnostic failed: {error}
+        <button className="btn ghost small" onClick={onRefresh} style={{ marginLeft: 8 }}>Retry</button>
+      </div>
+    )
+  }
+  if (!diag) return null
+
+  const status = diag.by_status ?? {}
+  const stuck = status.stuck_in_flight ?? 0
+  const inFlightRecent = status.in_flight_recent ?? 0
+  const cost = diag.estimated_costs?.to_complete_corpus_usd ?? 0
+
+  return (
+    <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Corpus state · {diag.total ?? 0} vlogs
+        </span>
+        <button className="btn ghost small" onClick={onRefresh} style={{ marginLeft: 'auto' }}>
+          Refresh
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 12 }}>
+        <Stat label="Complete + data" value={status.complete_with_data ?? 0} tone="ok" />
+        <Stat label="Complete + no data" value={status.complete_no_data ?? 0} tone={status.complete_no_data ? 'err' : 'mute'} />
+        <Stat label="Transcribed only" value={status.transcribed_only ?? 0} />
+        <Stat label="Untranscribed" value={status.untranscribed ?? 0} />
+        <Stat label="Stuck > 5 min" value={stuck} tone={stuck > 0 ? 'err' : 'mute'} />
+        <Stat label="Failed" value={status.failed ?? 0} tone={status.failed ? 'err' : 'mute'} />
+      </div>
+      {inFlightRecent > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+          {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
+        </div>
+      )}
+      {stuck > 0 && (
+        <div style={{
+          padding: 10, borderRadius: 6,
+          background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
+          fontSize: 12, color: 'var(--fg-1)',
+        }}>
+          <div style={{ marginBottom: 6 }}>
+            <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
+            Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
+          </div>
+          <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
+            {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck`}
+          </button>
+          {resetResult && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
+          )}
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+        To bring the whole corpus to complete + data: ~${cost.toFixed(2)} estimated cost.
+      </div>
+    </div>
+  )
+}
+
+function SmokeTestRow({
+  diag, busy, result, onRun,
+}: {
+  diag: any | null
+  busy: boolean
+  result: { ok: boolean; vlog_id?: string; message: string } | null
+  onRun: () => void
+}) {
+  const needsFull = diag?.counts_for_run?.needs_full_pipeline ?? 0
+  const disabled = !diag || (needsFull === 0 && (diag?.counts_for_run?.needs_extract_only ?? 0) === 0) || busy
+  return (
+    <div className="card" style={{
+      padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+      background: 'var(--bg-1)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Smoke test · ~$0.10
+        </span>
+        <button className="btn primary small" onClick={onRun} disabled={disabled} style={{ marginLeft: 'auto' }}>
+          {busy ? 'Dispatching…' : 'Run on 1 vlog'}
+        </button>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+        Picks one vlog from the eligible set, dispatches it through the full new gated
+        pipeline as an end-to-end sanity check. Watch its detail page; if threads / clips /
+        creative / entities show up, the bulk path is safe. If not, STOP — don't bulk.
+      </div>
+      {result && (
+        <div style={{
+          fontSize: 12,
+          color: result.ok ? 'var(--ok)' : 'var(--err)',
+          padding: 8, borderRadius: 6, background: 'var(--bg-2)',
+        }}>
+          {result.message}
+          {result.vlog_id && (
+            <Link href={`/timeline/${result.vlog_id}`} style={{ marginLeft: 8, color: 'var(--accent)' }}>
+              open vlog →
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   )
 }

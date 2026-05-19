@@ -127,58 +127,57 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
-  // Bulk re-extract is for vlogs that already have a transcript_text in D1.
-  // The operator's intent is "re-run the LLM extraction step against
-  // existing transcripts," not "first-time process archived uploads." If
-  // we don't gate on transcripts here, untranscribed vlogs fall through
-  // to the FFmpeg container's /extract-audio endpoint — and 150
-  // simultaneous container cold-starts produces 503s on every vlog.
-  // Untranscribed archived vlogs are a separate (per-vlog) flow.
-  const TRANSCRIPT_GUARD = `LENGTH(COALESCE(v.transcript_text, '')) >= 20`
-  const TRANSCRIPT_GUARD_NO_ALIAS = `LENGTH(COALESCE(transcript_text, '')) >= 20`
+  // Bulk handles BOTH transcribed and untranscribed vlogs. Per-vlog
+  // dispatch picks the right entry point on the pipeline DO:
+  //   - Transcribed   → /reextract (jumps straight to LLM extract step;
+  //                     skips audio_extract via DO's artifactExists)
+  //   - Untranscribed → /start (full pipeline: audio_extract through
+  //                     FFmpegGate → transcribe → extract through LlamaGate)
+  // Both gates serialize external service calls so 150 vlogs queue at
+  // each service's actual capacity instead of bursting it.
 
   // ── Dry run: resolve the list and return it ──────────────────────────────
   if (dryRun) {
     try {
-      let ids: string[] = []
+      let rows: { id: string; has_transcript: number }[] = []
       let inFlightCount = 0
-      let noTranscriptCount = 0
 
       if (explicitIds) {
-        // Caller hand-picked. Filter out in-flight AND untranscribed so
-        // the dispatch step can never trigger the FFmpeg container.
         if (explicitIds.length > 0) {
           const placeholders = explicitIds.map(() => '?').join(',')
-          const rows = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
+          const all = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
             `SELECT id,
                     CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
                               AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                          THEN 1 ELSE 0 END AS in_flight,
-                    CASE WHEN ${TRANSCRIPT_GUARD_NO_ALIAS} THEN 1 ELSE 0 END AS has_transcript
+                    CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                         THEN 1 ELSE 0 END AS has_transcript
                FROM vlogs
               WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
             operator.id, ...explicitIds,
           )
-          const inFlight = (r: { in_flight: number }) => skipInFlight && !!r.in_flight
-          ids = rows.filter(r => !inFlight(r) && r.has_transcript).map(r => r.id)
-          inFlightCount = rows.filter(r => inFlight(r)).length
-          noTranscriptCount = rows.filter(r => !inFlight(r) && !r.has_transcript).length
+          rows = all.filter(r => !(skipInFlight && r.in_flight))
+            .map(r => ({ id: r.id, has_transcript: r.has_transcript }))
+          inFlightCount = all.filter(r => skipInFlight && !!r.in_flight).length
         }
       } else {
-        // Resolve from scope. ORDER BY id keeps the list stable across
-        // dry-run + subsequent dispatch chunks (no surprise reordering if
-        // recorded_at changes mid-run).
+        // Scope resolution. No transcript filter — bulk handles BOTH
+        // transcribed and untranscribed vlogs by dispatching to the
+        // right DO entry point per vlog. ORDER BY id keeps the list
+        // stable across the dry-run/dispatch handoff.
         const inFlightWhere = skipInFlight
           ? `AND NOT (v.pipeline_status IN ('transcoding','transcribing','extracting')
                 AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes'))`
           : ''
-        const rows = await findMany<{ id: string }>(
+        rows = await findMany<{ id: string; has_transcript: number }>(
           db,
           scope === 'all'
-            ? `SELECT id FROM vlogs v
+            ? `SELECT id,
+                      CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                           THEN 1 ELSE 0 END AS has_transcript
+                  FROM vlogs v
                 WHERE operator_id = ? AND deleted_at IS NULL
-                  AND ${TRANSCRIPT_GUARD}
                   ${inFlightWhere}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
@@ -186,16 +185,14 @@ export async function POST(req: NextRequest) {
             //   1. Pipeline never finished (status != 'complete')
             //   2. No active extraction_runs row at all
             //   3. Active extraction_runs row exists but total_items=0
-            //      — this catches the silent-empty-extraction bug where
-            //      Workers AI under load returned a parseable but empty
-            //      payload. Pre-guard, those vlogs would be marked
-            //      complete; without #3, they'd be filtered out here
-            //      and never re-tried.
-            : `SELECT v.id FROM vlogs v
-                LEFT JOIN extraction_runs r
-                  ON r.vlog_id = v.id AND r.is_active = 1
+            //      (silent-empty extraction bug victims)
+            : `SELECT v.id AS id,
+                      CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
+                           THEN 1 ELSE 0 END AS has_transcript
+                  FROM vlogs v
+                  LEFT JOIN extraction_runs r
+                    ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
-                  AND ${TRANSCRIPT_GUARD}
                   AND (v.pipeline_status != 'complete'
                        OR r.id IS NULL
                        OR COALESCE(r.total_items, 0) = 0)
@@ -204,10 +201,8 @@ export async function POST(req: NextRequest) {
                 LIMIT ${MAX_LIST_RESOLVE}`,
           operator.id,
         )
-        ids = rows.map(r => r.id)
 
         if (skipInFlight) {
-          // Also count how many were excluded (purely informational).
           try {
             const cnt = await findMany<{ n: number }>(
               db,
@@ -220,34 +215,20 @@ export async function POST(req: NextRequest) {
             inFlightCount = cnt[0]?.n ?? 0
           } catch {}
         }
-        // Count untranscribed vlogs in this scope so the operator sees
-        // why the total is smaller than the raw vlog count.
-        try {
-          const noTrans = await findMany<{ n: number }>(
-            db,
-            scope === 'all'
-              ? `SELECT COUNT(*) AS n FROM vlogs
-                  WHERE operator_id = ? AND deleted_at IS NULL
-                    AND NOT (${TRANSCRIPT_GUARD_NO_ALIAS})`
-              : `SELECT COUNT(*) AS n FROM vlogs v
-                  LEFT JOIN extraction_runs r
-                    ON r.vlog_id = v.id AND r.is_active = 1
-                  WHERE v.operator_id = ? AND v.deleted_at IS NULL
-                    AND NOT (${TRANSCRIPT_GUARD})
-                    AND (v.pipeline_status != 'complete'
-                         OR r.id IS NULL
-                         OR COALESCE(r.total_items, 0) = 0)`,
-            operator.id,
-          )
-          noTranscriptCount = noTrans[0]?.n ?? 0
-        } catch {}
       }
+
+      const ids = rows.map(r => r.id)
+      const transcribed_ids = rows.filter(r => r.has_transcript).map(r => r.id)
+      const untranscribed_ids = rows.filter(r => !r.has_transcript).map(r => r.id)
 
       return noStore({
         total: ids.length,
         ids,
+        // Split for cost-aware UI: transcribed → /reextract (~$0.02/vlog),
+        // untranscribed → /start (~$0.10/vlog, full pipeline incl. FFmpeg).
+        transcribed_count: transcribed_ids.length,
+        untranscribed_count: untranscribed_ids.length,
         skipped_in_flight: inFlightCount,
-        skipped_no_transcript: noTranscriptCount,
         mode, scope,
       })
     } catch (err: any) {
@@ -292,11 +273,22 @@ export async function POST(req: NextRequest) {
   }
 
   const ownedSet = new Set(owned.map(r => r.id))
+  const ownedMap = new Map(owned.map(r => [r.id, r]))
   const inFlightSet = skipInFlight ? new Set(owned.filter(r => r.in_flight).map(r => r.id)) : new Set<string>()
-  const noTranscriptSet = new Set(owned.filter(r => !r.has_transcript).map(r => r.id))
-  const dispatchable = ids.filter(id => ownedSet.has(id) && !inFlightSet.has(id) && !noTranscriptSet.has(id))
+  // Note: NO transcript filter here. Untranscribed vlogs are still
+  // dispatchable — they just route to /start instead of /reextract so
+  // the DO runs audio_extract (gated through FFmpegGate) + transcribe
+  // before the LLM step.
+  const dispatchable = ids.filter(id => ownedSet.has(id) && !inFlightSet.has(id))
 
-  const results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] = []
+  const results: {
+    vlog_id: string;
+    ok: boolean;
+    backend: string;
+    error?: string;
+    reason?: string;
+    entry?: 'start' | 'reextract';
+  }[] = []
 
   // Mark all dispatchables as 'uploaded' in one D1 batch. Reduces write
   // pressure vs the prior per-vlog UPDATE pattern. Each dispatch call
@@ -323,14 +315,12 @@ export async function POST(req: NextRequest) {
       results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'not_found_or_foreign' })
     } else if (inFlightSet.has(id)) {
       results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'already_running' })
-    } else if (noTranscriptSet.has(id)) {
-      results.push({ vlog_id: id, ok: false, backend: 'none', reason: 'no_transcript' })
     }
   }
 
-  // Concurrency 2 — gentler on Workers AI / Anthropic rate limits than the
-  // earlier default of 3. The client controls overall throughput by tuning
-  // chunk_size + pause; this just smooths out the burst within one chunk.
+  // Concurrency 2 — gentle on dispatch acknowledgements. The actual
+  // service load is controlled by FFmpegGate (max 3) + LlamaGate
+  // (max 3) downstream, not by this dispatch pacing.
   const CONCURRENCY = 2
   let cursor = 0
   const worker = async () => {
@@ -339,20 +329,30 @@ export async function POST(req: NextRequest) {
       const vlog_id = dispatchable[idx]
       // Tiny stagger so DO kicks don't fire in lock-step within a chunk.
       if (idx > 0) await new Promise(r => setTimeout(r, 50 + Math.floor(Math.random() * 150)))
+
+      const ownedRow = ownedMap.get(vlog_id)
+      const hasTranscript = ownedRow ? !!ownedRow.has_transcript : false
+      // Untranscribed → /start (full pipeline through FFmpegGate +
+      // Whisper + LlamaGate). Transcribed → /reextract (fast path,
+      // skips straight to LLM step).
+      const useStart = !hasTranscript
+      const entry = useStart ? 'start' : 'reextract'
+
       try {
         const res = await dispatchPipeline(env, {
           vlog_id, operator_id: operator.id, mode,
           reset: false, // already done above in the batch
+          useStart,
         })
         results.push({
-          vlog_id,
+          vlog_id, entry,
           ok: res.ok,
           backend: res.backend,
           error: res.error,
         })
       } catch (err: any) {
         results.push({
-          vlog_id,
+          vlog_id, entry,
           ok: false,
           backend: 'none',
           error: err?.message || String(err),
@@ -365,6 +365,11 @@ export async function POST(req: NextRequest) {
   const dispatched = results.filter(r => r.ok).length
   const skipped = results.filter(r => !r.ok && r.reason).length
   const failed = results.filter(r => !r.ok && !r.reason).length
+  const dispatched_start = results.filter(r => r.ok && r.entry === 'start').length
+  const dispatched_reextract = results.filter(r => r.ok && r.entry === 'reextract').length
 
-  return noStore({ dispatched, failed, skipped, results })
+  return noStore({
+    dispatched, failed, skipped, results,
+    dispatched_start, dispatched_reextract,
+  })
 }
