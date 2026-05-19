@@ -44,6 +44,7 @@ import type {
 import { runExtraction, type ExtractionMode } from '../../../src/lib/extract-unified'
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
+import { surfaceFromRun } from '../../../src/lib/surface'
 
 export interface Env {
   DB: D1Database
@@ -784,6 +785,20 @@ export class VlogPipelineDO {
       entities: run.payload.entities.length,
       fail_rate: run.fail_rate,
     })
+
+    try {
+      const surfaceResult = await surfaceFromRun(
+        { db: this.env.DB, vlog_id: vlog.id, operator_id: vlog.operator_id, run_id },
+        run.payload.threads as any,
+      )
+      await progress('surface', {
+        state: 'ok',
+        inserted: surfaceResult.inserted,
+        errors: surfaceResult.errors.length,
+      })
+    } catch (err: any) {
+      console.warn(`[surface] failed for run ${run_id}: ${err?.message || err}`)
+    }
   }
 
   // ── DO helpers ──

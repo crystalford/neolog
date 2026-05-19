@@ -44,6 +44,7 @@ import { runExtraction, type ExtractionMode } from '../../../src/lib/extract-uni
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
+import { surfaceFromRun } from '../../../src/lib/surface'
 
 interface Env {
   DB: D1Database
@@ -840,6 +841,21 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             escalated_from: run.escalated_from ?? null,
             fail_rate: run.fail_rate,
           })
+
+          try {
+            const surfaceResult = await surfaceFromRun(
+              { db: this.env.DB, vlog_id, operator_id, run_id },
+              run.payload.threads as any,
+            )
+            await progress('surface', {
+              state: 'ok',
+              inserted: surfaceResult.inserted,
+              errors: surfaceResult.errors.length,
+            })
+          } catch (err: any) {
+            console.warn(`[surface] failed for run ${run_id}: ${err?.message || err}`)
+          }
+
           return { run_id, ...run }
         })
       }
