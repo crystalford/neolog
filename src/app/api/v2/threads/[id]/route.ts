@@ -2,7 +2,7 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb, findOne } from '@/lib/d1'
+import { getDb, findOne, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -51,6 +51,60 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     catch { return [] }
   }
 
+  // Best-effort: cluster + related threads + transcript excerpt. Each query
+  // wrapped so missing tables / column drift can't 500 the page.
+  const safe = async <T,>(label: string, q: () => Promise<T>): Promise<T | null> => {
+    try { return await q() } catch (err: any) {
+      console.warn(`[threads/[id]] ${label} failed: ${err?.message || err}`)
+      return null
+    }
+  }
+
+  const [cluster, connections, related, excerpt] = await Promise.all([
+    row.cluster_id ? safe('cluster', () => findOne<{ id: string; name: string | null; abstracted_topic: string | null }>(
+      db,
+      `SELECT id, name, abstracted_topic FROM clusters WHERE id = ? AND operator_id = ?`,
+      row.cluster_id!, operator.id,
+    )) : Promise.resolve(null),
+    safe('connections', () => findMany<{
+      thread_a_id: string; thread_b_id: string;
+      connection_type: string; confidence: number | null;
+    }>(
+      db,
+      `SELECT thread_a_id, thread_b_id, connection_type, confidence
+         FROM thread_connections
+        WHERE (thread_a_id = ? OR thread_b_id = ?)
+        LIMIT 20`,
+      params.id, params.id,
+    )),
+    // Other recent threads on the same abstracted_topic (excluding this one
+    // and the same vlog). Cheap "what else have I said about this" surface.
+    row.abstracted_topic ? safe('related', () => findMany<{
+      id: string; topic: string; take: string | null; vlog_id: string;
+      extracted_at: string;
+    }>(
+      db,
+      `SELECT id, topic, take, vlog_id, extracted_at
+         FROM threads
+        WHERE operator_id = ? AND LOWER(abstracted_topic) = LOWER(?)
+          AND id != ? AND vlog_id != ? AND deleted_at IS NULL
+        ORDER BY extracted_at DESC
+        LIMIT 6`,
+      operator.id, row.abstracted_topic, params.id, row.vlog_id,
+    )) : Promise.resolve([]),
+    // Transcript words covering the take's transcript span.
+    (row.transcript_span_start != null && row.transcript_span_end != null)
+      ? safe('excerpt', () => findMany<{ word: string; start_time: number }>(
+          db,
+          `SELECT word, start_time FROM transcript_words
+            WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+            ORDER BY word_index ASC
+            LIMIT 600`,
+          row.vlog_id, row.transcript_span_start!, row.transcript_span_end!,
+        ))
+      : Promise.resolve([]),
+  ])
+
   return NextResponse.json({
     thread: {
       id: row.id,
@@ -73,5 +127,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         thumbnail_url: row.vlog_thumbnail,
       },
     },
+    cluster,
+    connections: connections ?? [],
+    related: related ?? [],
+    transcript_excerpt: (excerpt ?? []).map(w => w.word).join(' '),
   })
 }

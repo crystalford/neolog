@@ -46,6 +46,10 @@ export default function VlogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkMode, setBulkMode] = useState<'cheap' | 'premium'>('cheap')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkResult, setBulkResult] = useState<{ dispatched: number; failed: number } | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -112,11 +116,49 @@ export default function VlogsPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={load}><span className="ico">{NavIcons.Refresh}</span>Refresh</button>
+            <button className="btn" onClick={() => { setBulkResult(null); setBulkOpen(true) }}>
+              Re-process all
+            </button>
             <Link href="/capture" className="btn primary">
               <span className="ico">{NavIcons.Plus}</span>Add vlog<span className="kbd">N</span>
             </Link>
           </div>
         </div>
+
+        {bulkOpen && (
+          <BulkReprocessModal
+            counts={counts}
+            mode={bulkMode}
+            setMode={setBulkMode}
+            busy={bulkBusy}
+            result={bulkResult}
+            onClose={() => setBulkOpen(false)}
+            onRun={async (scope) => {
+              setBulkBusy(true)
+              setBulkResult(null)
+              try {
+                const r = await fetch('/api/v2/admin/reprocess-vlogs', {
+                  method: 'POST',
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ scope, mode: bulkMode }),
+                })
+                const d: any = r.ok ? await r.json() : { error: `HTTP ${r.status}` }
+                if (!r.ok) {
+                  setBulkResult({ dispatched: 0, failed: 0 })
+                  alert(`Bulk reprocess failed: ${d?.details || d?.error || 'unknown'}`)
+                } else {
+                  setBulkResult({ dispatched: d.dispatched ?? 0, failed: d.failed ?? 0 })
+                  load()
+                }
+              } catch (err: any) {
+                alert(`Bulk reprocess error: ${err?.message || err}`)
+              } finally {
+                setBulkBusy(false)
+              }
+            }}
+          />
+        )}
 
         {/* Filter row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 24, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -160,6 +202,98 @@ export default function VlogsPage() {
         )}
       </div>
     </Shell>
+  )
+}
+
+function BulkReprocessModal({
+  counts, mode, setMode, busy, result, onClose, onRun,
+}: {
+  counts: Record<Filter, number>
+  mode: 'cheap' | 'premium'
+  setMode: (m: 'cheap' | 'premium') => void
+  busy: boolean
+  result: { dispatched: number; failed: number } | null
+  onClose: () => void
+  onRun: (scope: 'incomplete' | 'all') => void
+}) {
+  const incomplete = counts.processing + counts.failed + counts.archived
+  const all = counts.all
+  const perVlog = mode === 'premium' ? 0.05 : 0.02
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 50,
+    }}>
+      <div onClick={e => e.stopPropagation()} className="card" style={{
+        padding: 20, maxWidth: 520, width: '90%',
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <h2 style={{ fontSize: 18, margin: 0 }}>Bulk re-process vlogs</h2>
+        <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: 0 }}>
+          Kicks the post-upload pipeline for each vlog. Existing transcripts are reused;
+          extraction re-runs against the new code paths. Pick a mode:
+        </p>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          {([
+            ['cheap',   'Cheap',   'Llama — ~$0.02 / vlog'],
+            ['premium', 'Premium', 'Sonnet — ~$0.05 / vlog'],
+          ] as const).map(([k, label, sub]) => (
+            <button
+              key={k}
+              className={`fchip ${mode === k ? 'active' : ''}`}
+              style={{ flex: 1, padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
+              onClick={() => setMode(k)}
+            >
+              <span style={{ fontWeight: 500 }}>{label}</span>
+              <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{sub}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+          <button
+            className="btn"
+            disabled={busy || incomplete === 0}
+            onClick={() => onRun('incomplete')}
+            style={{ justifyContent: 'flex-start' }}
+          >
+            <span>Just incomplete</span>
+            <span className="mono" style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
+              {incomplete} vlogs · ~${(incomplete * perVlog).toFixed(2)}
+            </span>
+          </button>
+          <button
+            className="btn"
+            disabled={busy || all === 0}
+            onClick={() => onRun('all')}
+            style={{ justifyContent: 'flex-start' }}
+          >
+            <span>Everything</span>
+            <span className="mono" style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
+              {all} vlogs · ~${(all * perVlog).toFixed(2)}
+            </span>
+          </button>
+        </div>
+
+        {busy && (
+          <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+            Dispatching… the requests will continue in the background even if you close this.
+          </div>
+        )}
+
+        {result && (
+          <div style={{ fontSize: 13, color: result.failed > 0 ? 'var(--err)' : 'var(--ok)' }}>
+            Dispatched {result.dispatched} · failed {result.failed}.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <button className="btn ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
