@@ -41,31 +41,52 @@ export default function ConsolePage() {
   const [activity, setActivity] = useState<ActivityRow[]>([])
   const [now, setNow] = useState<Date>(new Date())
 
+  // Poll every 5s when something's in flight, 30s when idle. Keeps tiles +
+  // activity stream live as the pipeline writes new threads / clusters
+  // without forcing the operator to refresh.
   useEffect(() => {
     setNow(new Date())
-    fetch('/api/v2/timeline?limit=20&kinds=vlog,thread,cluster,surfaced', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (!d) return
-        const items: any[] = d.items ?? d.cards ?? []
-        setActivity(items.slice(0, 12).map(rowFromTimeline))
-      })
-      .catch(() => {})
+    let cancelled = false
 
-    fetch('/api/v2/graph/stats', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (!d) return
-        setCounts({
-          vlogs: d.vlog_count ?? d.vlogs ?? undefined,
-          threads: d.thread_count ?? d.threads ?? undefined,
-          clusters: d.cluster_count ?? d.clusters ?? undefined,
-          vlogs_complete: d.vlog_complete_count,
-          vlogs_processing: d.vlog_processing_count,
-        })
-      })
-      .catch(() => {})
-  }, [])
+    const fetchOnce = async () => {
+      try {
+        const [tlRes, statsRes] = await Promise.all([
+          fetch('/api/v2/timeline?limit=20&kinds=vlog,thread,cluster,surfaced', { credentials: 'include' }),
+          fetch('/api/v2/graph/stats', { credentials: 'include' }),
+        ])
+        if (cancelled) return
+        if (tlRes.ok) {
+          const d: any = await tlRes.json()
+          const items: any[] = d.items ?? d.cards ?? []
+          setActivity(items.slice(0, 12).map(rowFromTimeline))
+        }
+        if (statsRes.ok) {
+          const d: any = await statsRes.json()
+          setCounts({
+            vlogs: d.vlog_count ?? d.vlogs ?? undefined,
+            threads: d.thread_count ?? d.threads ?? undefined,
+            clusters: d.cluster_count ?? d.clusters ?? undefined,
+            vlogs_complete: d.vlog_complete_count,
+            vlogs_processing: d.vlog_processing_count,
+          })
+        }
+        setNow(new Date())
+      } catch {}
+    }
+
+    fetchOnce()
+    let timer: ReturnType<typeof setInterval> | null = null
+    const schedule = () => {
+      const interval = (counts.vlogs_processing ?? 0) > 0 ? 5000 : 30000
+      timer = setInterval(fetchOnce, interval)
+    }
+    schedule()
+    return () => {
+      cancelled = true
+      if (timer) clearInterval(timer)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [counts.vlogs_processing])
 
   const dateLabel = now.toLocaleDateString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric',

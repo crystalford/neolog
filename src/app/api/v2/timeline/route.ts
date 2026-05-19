@@ -267,6 +267,80 @@ async function handle(req: NextRequest) {
     console.warn('[timeline] post block failed:', blockErrors.posts)
   }
 
+  // ── Creative elements ───────────────────────────────────────────────────
+  // Recent character_beats / scene_fragments / themes / etc. from the
+  // unified extraction. Surfaced as their own feed card type so the
+  // operator sees creative output as it lands.
+  try {
+    const creative = await findMany<{
+      id: string
+      vlog_id: string
+      element_type: string
+      content: string
+      register: string | null
+      validated: number | null
+      extracted_at: string
+    }>(
+      db,
+      `SELECT id, vlog_id, element_type, content, register, validated, extracted_at
+         FROM creative_elements
+        WHERE operator_id = ?
+        ORDER BY extracted_at DESC
+        LIMIT 50`,
+      operator.id,
+    )
+    for (const c of creative) {
+      cards.push({
+        id: c.id,
+        type: 'creative',
+        created_at: c.extracted_at,
+        element_type: c.element_type,
+        content: c.content,
+        validated: c.validated,
+        vlog_id: c.vlog_id,
+      } as any)
+    }
+  } catch (err: any) {
+    blockErrors.creative = err?.message || String(err)
+    console.warn('[timeline] creative block failed:', blockErrors.creative)
+  }
+
+  // ── Entities ────────────────────────────────────────────────────────────
+  // Top-ranked entities by mention count. Shown as a different card style:
+  // not a journal entry but "the system noticed X across N vlogs."
+  try {
+    const ents = await findMany<{
+      id: string
+      vlog_id: string
+      name: string
+      entity_type: string
+      mention_count: number | null
+      last_mentioned_at: string | null
+    }>(
+      db,
+      `SELECT id, vlog_id, name, entity_type, mention_count, last_mentioned_at
+         FROM entities
+        WHERE operator_id = ?
+        ORDER BY COALESCE(last_mentioned_at, '') DESC, mention_count DESC
+        LIMIT 30`,
+      operator.id,
+    )
+    for (const e of ents) {
+      cards.push({
+        id: e.id,
+        type: 'entity',
+        created_at: e.last_mentioned_at || new Date().toISOString(),
+        name: e.name,
+        entity_type: e.entity_type,
+        mention_count: e.mention_count ?? 1,
+        vlog_id: e.vlog_id,
+      } as any)
+    }
+  } catch (err: any) {
+    blockErrors.entities = err?.message || String(err)
+    console.warn('[timeline] entity block failed:', blockErrors.entities)
+  }
+
   // ── Surfaced cards ───────────────────────────────────────────────────────
   try {
     const surfaced = await findMany<{
