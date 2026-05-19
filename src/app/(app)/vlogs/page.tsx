@@ -243,8 +243,12 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   const [phase, setPhase] = useState<BulkPhase>('idle')
   const [mode, setMode] = useState<'cheap' | 'premium'>('cheap')
   const [scope, setScope] = useState<'incomplete' | 'all'>('incomplete')
-  const [chunkSize, setChunkSize] = useState(8)
-  const [pauseMs, setPauseMs] = useState(800)
+  // Defaults tuned after a real 150-vlog backfill showed Workers AI
+  // degrading silently under burst pressure. Lower throughput plus the
+  // empty-extraction guard in extract-unified.ts means each individual
+  // call is reliable even if total wall-clock is a bit longer.
+  const [chunkSize, setChunkSize] = useState(6)
+  const [pauseMs, setPauseMs] = useState(1200)
 
   const [ids, setIds] = useState<string[]>([])
   const [skippedInFlight, setSkippedInFlight] = useState(0)
@@ -484,7 +488,9 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               </div>
               <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 8, lineHeight: 1.5 }}>
                 Smaller chunks + longer pauses are gentler on Workers AI rate limits.
-                Defaults (8 / 800ms) are tuned for 100+ vlog backfills.
+                Defaults (6 / 1200ms) are tuned conservatively after a real
+                100+ vlog backfill — bump them up if you're confident things
+                are happy.
               </div>
             </details>
 

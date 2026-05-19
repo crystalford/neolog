@@ -73,11 +73,22 @@ const STEPS: StepKey[] = ['audio_extract', 'transcribe', 'extract']
 const MAX_ATTEMPTS: Record<StepKey, number> = {
   audio_extract: 3,
   transcribe: 3,
-  extract: 2,
+  // Extract retries are higher because the failure modes are mostly
+  // transient: Workers AI rate-limit windows, Anthropic overload, the
+  // "silent empty extraction" guard catching a degraded LLM response.
+  // Backoff caps at 60s, so 5 retries = up to ~2 min of patience per
+  // vlog before marking failed_terminal. With concurrency 1-2 in bulk,
+  // that's enough to ride out most quota recovery windows.
+  extract: 5,
 }
 
 function backoffMs(attempt: number): number {
-  return Math.min(30_000, 1_000 * Math.pow(2, attempt))
+  // Exponential with a 60s ceiling and ±15% jitter so simultaneous
+  // failures (a whole bulk run hitting the same rate limit) don't
+  // re-fire in lock-step.
+  const base = Math.min(60_000, 1_000 * Math.pow(2, attempt))
+  const jitter = base * (0.85 + Math.random() * 0.30)
+  return Math.floor(jitter)
 }
 
 // ─── Host worker ────────────────────────────────────────────────────────────
