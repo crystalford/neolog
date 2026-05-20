@@ -61,6 +61,14 @@ export interface Env {
   LLAMA_GATE: DurableObjectNamespace
   // Tunable cap on in-flight Llama calls through the gate. Default 3.
   LLAMA_GATE_CONCURRENCY?: string
+  // Singleton DO that funnels FFmpeg container calls through a
+  // concurrency cap. The FFmpeg container worker has max_instances=5
+  // (workers/ffmpeg/wrangler.toml). 150 simultaneous /extract-audio
+  // calls hit startAndWaitForPorts() timeouts on instances 6+. The gate
+  // caps in-flight to FFMPEG_GATE_CONCURRENCY (default 3) with headroom
+  // for thumbnail / transcode jobs from the legacy workflow.
+  FFMPEG_GATE: DurableObjectNamespace
+  FFMPEG_GATE_CONCURRENCY?: string
   HEARTBEAT_TOKEN: string
   ANTHROPIC_API_KEY: string
   CLOUDFLARE_ACCOUNT_ID: string
@@ -524,42 +532,88 @@ export class VlogPipelineDO {
     const sourceKey = vlog.transcoded_r2_key || vlog.r2_key
     const inputUrl = await presignR2Get(this.env, sourceKey, 3600)
 
-    await this.recordEvent(vlog.id, 'audio_extract', 'running', 'invoke_ffmpeg',
-      { source_key: sourceKey })
-
-    const ctl = new AbortController()
-    const timer = setTimeout(() => ctl.abort(), 10 * 60 * 1000) // 10 min cap
-    let resp: Response
+    // Acquire a slot from FFmpegGate before hitting the container.
+    // Without this, 150 simultaneous DOs would burst the FFmpeg pool
+    // (max_instances=5 per workers/ffmpeg/wrangler.toml) and get
+    // 503 'container failed to start' on instances 6+. The gate caps
+    // in-flight to FFMPEG_GATE_CONCURRENCY (default 3) and queues the
+    // rest. Caller holds the slot for the full FFmpeg call; gate
+    // auto-releases after 15 min as crash recovery.
+    const gateStub = this.env.FFMPEG_GATE.get(
+      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-singleton')
+    )
+    const acquireStart = Date.now()
+    let gateToken: string | null = null
     try {
-      resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input_url: inputUrl,
-          heartbeat_url: this.env.PIPELINE_URL,
-          heartbeat_token: this.env.HEARTBEAT_TOKEN,
-          vlog_id: vlog.id,
-          operator_id: vlog.operator_id,
-        }),
-        signal: ctl.signal,
-      } as RequestInit)
+      const gateRes = await gateStub.fetch('https://gate/acquire', { method: 'POST' })
+      if (gateRes.ok) {
+        const env = await gateRes.json() as any
+        gateToken = env.token ?? null
+        await this.recordEvent(vlog.id, 'audio_extract', 'running', 'ffmpeg_gate_acquired',
+          { wait_ms: Date.now() - acquireStart, in_flight: env.in_flight, waiting: env.waiting })
+      } else {
+        // Gate failed but we don't want to block the pipeline entirely
+        // on the gate being unreachable. Log and proceed without it.
+        console.warn(`[stepAudioExtract] ffmpeg-gate /acquire failed: ${gateRes.status}`)
+      }
     } catch (err: any) {
-      clearTimeout(timer)
-      throw new Error(`ffmpeg /extract-audio fetch failed: ${err?.message || err}`)
-    }
-    clearTimeout(timer)
-    if (!resp.ok) {
-      const errBody = (await resp.text()).slice(0, 500)
-      throw new Error(`ffmpeg /extract-audio ${resp.status}: ${errBody}`)
+      console.warn(`[stepAudioExtract] ffmpeg-gate /acquire threw: ${err?.message || err}`)
     }
 
-    const audioBytes = new Uint8Array(await resp.arrayBuffer())
-    const r2Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
-    await this.env.VIDEOS.put(r2Key, audioBytes, {
-      httpMetadata: { contentType: 'audio/mpeg' },
-    })
-    await this.recordEvent(vlog.id, 'audio_extract', 'running', 'upload_r2',
-      { r2_key: r2Key, bytes: audioBytes.byteLength })
+    try {
+      await this.recordEvent(vlog.id, 'audio_extract', 'running', 'invoke_ffmpeg',
+        { source_key: sourceKey })
+
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), 10 * 60 * 1000) // 10 min cap
+      let resp: Response
+      try {
+        resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/extract-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input_url: inputUrl,
+            heartbeat_url: this.env.PIPELINE_URL,
+            heartbeat_token: this.env.HEARTBEAT_TOKEN,
+            vlog_id: vlog.id,
+            operator_id: vlog.operator_id,
+          }),
+          signal: ctl.signal,
+        } as RequestInit)
+      } catch (err: any) {
+        clearTimeout(timer)
+        throw new Error(`ffmpeg /extract-audio fetch failed: ${err?.message || err}`)
+      }
+      clearTimeout(timer)
+      if (!resp.ok) {
+        const errBody = (await resp.text()).slice(0, 500)
+        throw new Error(`ffmpeg /extract-audio ${resp.status}: ${errBody}`)
+      }
+
+      const audioBytes = new Uint8Array(await resp.arrayBuffer())
+      const r2Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
+      await this.env.VIDEOS.put(r2Key, audioBytes, {
+        httpMetadata: { contentType: 'audio/mpeg' },
+      })
+      await this.recordEvent(vlog.id, 'audio_extract', 'running', 'upload_r2',
+        { r2_key: r2Key, bytes: audioBytes.byteLength })
+    } finally {
+      // Release the gate slot no matter what — exception, success, or
+      // even if we never managed to acquire a token. The release endpoint
+      // tolerates a null token (just decrements the counter so the next
+      // waiter can proceed).
+      if (gateToken !== null) {
+        try {
+          await gateStub.fetch('https://gate/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: gateToken }),
+          })
+        } catch (err: any) {
+          console.warn(`[stepAudioExtract] ffmpeg-gate /release failed: ${err?.message || err}`)
+        }
+      }
+    }
   }
 
   /**
@@ -1152,6 +1206,128 @@ export class LlamaGate {
       // recordEvent is observability — never fail the LLM call because the
       // event write failed.
     }
+  }
+}
+
+// ─── FFmpegGate ────────────────────────────────────────────────────────────
+//
+// Singleton Durable Object that funnels FFmpeg container calls through an
+// in-memory concurrency cap. Solves the same problem LlamaGate solves for
+// Workers AI: too many simultaneous calls overwhelm the upstream service.
+//
+// Why a token-passing model instead of full proxy: the FFmpeg /extract-audio
+// response is the raw audio bytes (often 50MB+ for long vlogs). Tunneling
+// that through the gate DO would consume DO time and add unnecessary
+// memory pressure. Instead, callers acquire a token, make the FFmpeg call
+// themselves (going directly to env.FFMPEG.fetch), then release the token.
+//
+// Auto-release safety: a token is held forever if the caller crashes
+// between acquire and release. To recover, each acquire schedules a
+// 15-minute timeout that releases the slot if not explicitly released.
+// 15 min is well past the longest legitimate FFmpeg call (10-min cap in
+// stepAudioExtract); legitimate callers always release first.
+//
+// Hibernation: same caveat as LlamaGate. During an active bulk run, the
+// DO stays warm because requests are continuous. After 10s idle the DO
+// can hibernate, which resets in-memory state — but that's the correct
+// fresh state for the next run, since no work is in flight.
+
+const FFMPEG_GATE_DEFAULT_CONCURRENCY = 3
+const FFMPEG_GATE_TOKEN_TIMEOUT_MS = 15 * 60 * 1000
+
+export class FFmpegGate {
+  private state: DurableObjectState
+  private env: Env
+  private inFlight = 0
+  private waiters: Array<() => void> = []
+  private autoReleaseTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private maxConcurrency: number
+
+  constructor(state: DurableObjectState, env: Env) {
+    this.state = state
+    this.env = env
+    const raw = env.FFMPEG_GATE_CONCURRENCY
+    const parsed = raw ? parseInt(raw, 10) : NaN
+    this.maxConcurrency = Number.isFinite(parsed) && parsed > 0 ? parsed : FFMPEG_GATE_DEFAULT_CONCURRENCY
+  }
+
+  async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url)
+    if (url.pathname === '/stats' && req.method === 'GET') {
+      return Response.json({
+        in_flight: this.inFlight,
+        waiting: this.waiters.length,
+        max_concurrency: this.maxConcurrency,
+        worker_version: WORKER_VERSION,
+      })
+    }
+    if (req.method !== 'POST') {
+      return new Response('POST only', { status: 405 })
+    }
+
+    if (url.pathname === '/acquire') {
+      const token = await this.acquire()
+      return Response.json({
+        ok: true,
+        token,
+        in_flight: this.inFlight,
+        waiting: this.waiters.length,
+        max_concurrency: this.maxConcurrency,
+      })
+    }
+
+    if (url.pathname === '/release') {
+      const body = await req.json().catch(() => ({})) as { token?: string }
+      if (!body.token) {
+        // Tolerate missing token — the caller has lost track but we
+        // still want to decrement the counter to avoid permanent stall.
+        this.release(null)
+      } else {
+        this.release(body.token)
+      }
+      return Response.json({
+        ok: true,
+        in_flight: this.inFlight,
+        waiting: this.waiters.length,
+      })
+    }
+
+    return new Response('not found', { status: 404 })
+  }
+
+  private acquire(): Promise<string> {
+    return new Promise<string>(resolve => {
+      const grant = () => {
+        this.inFlight += 1
+        const token = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        const timer = setTimeout(() => {
+          // Caller crashed without releasing. Recover the slot.
+          console.warn(`[ffmpeg-gate] auto-releasing token ${token} after ${FFMPEG_GATE_TOKEN_TIMEOUT_MS}ms`)
+          this.release(token)
+        }, FFMPEG_GATE_TOKEN_TIMEOUT_MS)
+        this.autoReleaseTimers.set(token, timer)
+        resolve(token)
+      }
+      if (this.inFlight < this.maxConcurrency) {
+        grant()
+      } else {
+        this.waiters.push(grant)
+      }
+    })
+  }
+
+  private release(token: string | null): void {
+    if (token) {
+      const timer = this.autoReleaseTimers.get(token)
+      if (timer) {
+        clearTimeout(timer)
+        this.autoReleaseTimers.delete(token)
+      }
+    }
+    this.inFlight -= 1
+    if (this.inFlight < 0) this.inFlight = 0  // defensive
+    const next = this.waiters.shift()
+    if (next) next()
   }
 }
 

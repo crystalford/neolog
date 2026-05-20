@@ -62,6 +62,14 @@ class_name = "VlogPipelineDO"
 name = "LLAMA_GATE"
 class_name = "LlamaGate"
 
+# Singleton DO that gates FFmpeg container calls. The FFmpeg worker has
+# max_instances=5; without this gate, simultaneous bulk dispatches burst
+# the container pool and 503 on instances 6+. The pipeline DO acquires
+# a token before calling env.FFMPEG.fetch and releases it after.
+[[durable_objects.bindings]]
+name = "FFMPEG_GATE"
+class_name = "FFmpegGate"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["VlogPipelineDO"]
@@ -69,6 +77,10 @@ new_sqlite_classes = ["VlogPipelineDO"]
 [[migrations]]
 tag = "v2"
 new_classes = ["LlamaGate"]
+
+[[migrations]]
+tag = "v3"
+new_classes = ["FFmpegGate"]
 
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
@@ -79,6 +91,10 @@ PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers
 # enough to keep bulk wall-clock reasonable. Tune by setting in this
 # vars block or via wrangler secret/var override.
 LLAMA_GATE_CONCURRENCY = "3"
+# Hard cap on concurrent FFmpeg container calls. The container worker
+# has max_instances=5, so we leave 2 instances of headroom for thumbnail
+# / transcode work from the legacy workflow. Default 3.
+FFMPEG_GATE_CONCURRENCY = "3"
 
 [observability]
 enabled = true

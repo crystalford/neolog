@@ -95,6 +95,19 @@ export async function POST(req: NextRequest) {
   const skipInFlight = body?.skip_in_flight !== false
   const explicitIds: string[] | undefined = Array.isArray(body?.vlog_ids) ? body.vlog_ids : undefined
 
+  // Bulk MUST go through the pipeline DO. The legacy process-upload
+  // Workflow re-enters the FFmpeg /extract-audio path for any vlog
+  // without a transcript, and 150 simultaneous container cold-starts
+  // produce 503s on every vlog. If PIPELINE isn't bound on the Pages
+  // env, fail loud so the operator knows to fix the wiring instead of
+  // burning hours on a failed bulk run.
+  if (!dryRun && (!env.PIPELINE || !env.HEARTBEAT_TOKEN)) {
+    return noStore({
+      error: 'Bulk reprocess requires PIPELINE + HEARTBEAT_TOKEN bindings on the Pages env',
+      hint: 'Check Cloudflare Pages → Settings → Functions → Service bindings + Secrets. PIPELINE should point to the neolog-pipeline service; HEARTBEAT_TOKEN must match the value set on the neolog-pipeline worker.',
+    }, 503)
+  }
+
   // Non-dry-run requires explicit vlog_ids. This forces the client to
   // resolve the list via a dry-run first and own the chunking — keeps the
   // server-side iteration short.
@@ -114,58 +127,71 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
+  // Bulk handles BOTH transcribed and untranscribed vlogs. Per-vlog
+  // dispatch picks the right entry point on the pipeline DO:
+  //   - Transcribed   → /reextract (jumps straight to LLM extract step;
+  //                     skips audio_extract via DO's artifactExists)
+  //   - Untranscribed → /start (full pipeline: audio_extract through
+  //                     FFmpegGate → transcribe → extract through LlamaGate)
+  // Both gates serialize external service calls so 150 vlogs queue at
+  // each service's actual capacity instead of bursting it.
+
   // ── Dry run: resolve the list and return it ──────────────────────────────
   if (dryRun) {
     try {
-      let ids: string[] = []
+      let rows: { id: string; has_transcript: number }[] = []
       let inFlightCount = 0
 
       if (explicitIds) {
-        // Caller hand-picked. Optionally filter out in-flight.
-        if (skipInFlight && explicitIds.length > 0) {
+        if (explicitIds.length > 0) {
           const placeholders = explicitIds.map(() => '?').join(',')
-          const rows = await findMany<{ id: string; in_flight: number }>(
+          const all = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
             `SELECT id,
                     CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
                               AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
-                         THEN 1 ELSE 0 END AS in_flight
+                         THEN 1 ELSE 0 END AS in_flight,
+                    CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                         THEN 1 ELSE 0 END AS has_transcript
                FROM vlogs
               WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
             operator.id, ...explicitIds,
           )
-          ids = rows.filter(r => !r.in_flight).map(r => r.id)
-          inFlightCount = rows.filter(r => !!r.in_flight).length
-        } else {
-          ids = explicitIds.slice(0, MAX_LIST_RESOLVE)
+          rows = all.filter(r => !(skipInFlight && r.in_flight))
+            .map(r => ({ id: r.id, has_transcript: r.has_transcript }))
+          inFlightCount = all.filter(r => skipInFlight && !!r.in_flight).length
         }
       } else {
-        // Resolve from scope. ORDER BY id keeps the list stable across
-        // dry-run + subsequent dispatch chunks (no surprise reordering if
-        // recorded_at changes mid-run).
+        // Scope resolution. No transcript filter — bulk handles BOTH
+        // transcribed and untranscribed vlogs by dispatching to the
+        // right DO entry point per vlog. ORDER BY id keeps the list
+        // stable across the dry-run/dispatch handoff.
         const inFlightWhere = skipInFlight
           ? `AND NOT (v.pipeline_status IN ('transcoding','transcribing','extracting')
                 AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes'))`
           : ''
-        const rows = await findMany<{ id: string }>(
+        rows = await findMany<{ id: string; has_transcript: number }>(
           db,
           scope === 'all'
-            ? `SELECT id FROM vlogs
-                WHERE operator_id = ? AND deleted_at IS NULL ${inFlightWhere.replace(/v\./g, '')}
+            ? `SELECT id,
+                      CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                           THEN 1 ELSE 0 END AS has_transcript
+                  FROM vlogs v
+                WHERE operator_id = ? AND deleted_at IS NULL
+                  ${inFlightWhere}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
             // "Incomplete" includes three failure modes:
             //   1. Pipeline never finished (status != 'complete')
             //   2. No active extraction_runs row at all
             //   3. Active extraction_runs row exists but total_items=0
-            //      — this catches the silent-empty-extraction bug where
-            //      Workers AI under load returned a parseable but empty
-            //      payload. Pre-guard, those vlogs would be marked
-            //      complete; without #3, they'd be filtered out here
-            //      and never re-tried.
-            : `SELECT v.id FROM vlogs v
-                LEFT JOIN extraction_runs r
-                  ON r.vlog_id = v.id AND r.is_active = 1
+            //      (silent-empty extraction bug victims)
+            : `SELECT v.id AS id,
+                      CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
+                           THEN 1 ELSE 0 END AS has_transcript
+                  FROM vlogs v
+                  LEFT JOIN extraction_runs r
+                    ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
                   AND (v.pipeline_status != 'complete'
                        OR r.id IS NULL
@@ -175,10 +201,8 @@ export async function POST(req: NextRequest) {
                 LIMIT ${MAX_LIST_RESOLVE}`,
           operator.id,
         )
-        ids = rows.map(r => r.id)
 
         if (skipInFlight) {
-          // Also count how many were excluded (purely informational).
           try {
             const cnt = await findMany<{ n: number }>(
               db,
@@ -193,9 +217,17 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const ids = rows.map(r => r.id)
+      const transcribed_ids = rows.filter(r => r.has_transcript).map(r => r.id)
+      const untranscribed_ids = rows.filter(r => !r.has_transcript).map(r => r.id)
+
       return noStore({
         total: ids.length,
         ids,
+        // Split for cost-aware UI: transcribed → /reextract (~$0.02/vlog),
+        // untranscribed → /start (~$0.10/vlog, full pipeline incl. FFmpeg).
+        transcribed_count: transcribed_ids.length,
+        untranscribed_count: untranscribed_ids.length,
         skipped_in_flight: inFlightCount,
         mode, scope,
       })
@@ -214,16 +246,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Authorize: every id must belong to this operator. Also pull
-  // pipeline_status so we can skip in-flight ones.
-  let owned: { id: string; pipeline_status: string; in_flight: number }[] = []
+  // pipeline_status + transcript existence so we can skip:
+  //   - in-flight vlogs (don't double-dispatch)
+  //   - vlogs without transcripts (would force the FFmpeg audio_extract
+  //     path; 150 simultaneous container cold-starts produce 503s)
+  let owned: { id: string; pipeline_status: string; in_flight: number; has_transcript: number }[] = []
   try {
     const placeholders = ids.map(() => '?').join(',')
-    owned = await findMany<{ id: string; pipeline_status: string; in_flight: number }>(
+    owned = await findMany<{ id: string; pipeline_status: string; in_flight: number; has_transcript: number }>(
       db,
       `SELECT id, pipeline_status,
               CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
                         AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
-                   THEN 1 ELSE 0 END AS in_flight
+                   THEN 1 ELSE 0 END AS in_flight,
+              CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                   THEN 1 ELSE 0 END AS has_transcript
          FROM vlogs
         WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
       operator.id, ...ids,
@@ -236,10 +273,22 @@ export async function POST(req: NextRequest) {
   }
 
   const ownedSet = new Set(owned.map(r => r.id))
+  const ownedMap = new Map(owned.map(r => [r.id, r]))
   const inFlightSet = skipInFlight ? new Set(owned.filter(r => r.in_flight).map(r => r.id)) : new Set<string>()
+  // Note: NO transcript filter here. Untranscribed vlogs are still
+  // dispatchable — they just route to /start instead of /reextract so
+  // the DO runs audio_extract (gated through FFmpegGate) + transcribe
+  // before the LLM step.
   const dispatchable = ids.filter(id => ownedSet.has(id) && !inFlightSet.has(id))
 
-  const results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] = []
+  const results: {
+    vlog_id: string;
+    ok: boolean;
+    backend: string;
+    error?: string;
+    reason?: string;
+    entry?: 'start' | 'reextract';
+  }[] = []
 
   // Mark all dispatchables as 'uploaded' in one D1 batch. Reduces write
   // pressure vs the prior per-vlog UPDATE pattern. Each dispatch call
@@ -269,9 +318,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Concurrency 2 — gentler on Workers AI / Anthropic rate limits than the
-  // earlier default of 3. The client controls overall throughput by tuning
-  // chunk_size + pause; this just smooths out the burst within one chunk.
+  // Concurrency 2 — gentle on dispatch acknowledgements. The actual
+  // service load is controlled by FFmpegGate (max 3) + LlamaGate
+  // (max 3) downstream, not by this dispatch pacing.
   const CONCURRENCY = 2
   let cursor = 0
   const worker = async () => {
@@ -280,20 +329,30 @@ export async function POST(req: NextRequest) {
       const vlog_id = dispatchable[idx]
       // Tiny stagger so DO kicks don't fire in lock-step within a chunk.
       if (idx > 0) await new Promise(r => setTimeout(r, 50 + Math.floor(Math.random() * 150)))
+
+      const ownedRow = ownedMap.get(vlog_id)
+      const hasTranscript = ownedRow ? !!ownedRow.has_transcript : false
+      // Untranscribed → /start (full pipeline through FFmpegGate +
+      // Whisper + LlamaGate). Transcribed → /reextract (fast path,
+      // skips straight to LLM step).
+      const useStart = !hasTranscript
+      const entry = useStart ? 'start' : 'reextract'
+
       try {
         const res = await dispatchPipeline(env, {
           vlog_id, operator_id: operator.id, mode,
           reset: false, // already done above in the batch
+          useStart,
         })
         results.push({
-          vlog_id,
+          vlog_id, entry,
           ok: res.ok,
           backend: res.backend,
           error: res.error,
         })
       } catch (err: any) {
         results.push({
-          vlog_id,
+          vlog_id, entry,
           ok: false,
           backend: 'none',
           error: err?.message || String(err),
@@ -306,6 +365,11 @@ export async function POST(req: NextRequest) {
   const dispatched = results.filter(r => r.ok).length
   const skipped = results.filter(r => !r.ok && r.reason).length
   const failed = results.filter(r => !r.ok && !r.reason).length
+  const dispatched_start = results.filter(r => r.ok && r.entry === 'start').length
+  const dispatched_reextract = results.filter(r => r.ok && r.entry === 'reextract').length
 
-  return noStore({ dispatched, failed, skipped, results })
+  return noStore({
+    dispatched, failed, skipped, results,
+    dispatched_start, dispatched_reextract,
+  })
 }

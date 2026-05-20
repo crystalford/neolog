@@ -34,6 +34,12 @@ export interface DispatchInput {
   mode: 'cheap' | 'premium'
   passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]
   reset?: boolean
+  // When true, dispatch /start (full pipeline from audio_extract). When
+  // false/undefined, dispatch /reextract (jumps straight to the LLM
+  // extract step). Bulk reprocess sets this per-vlog based on whether
+  // the vlog has a transcript: untranscribed → useStart, transcribed →
+  // reextract (faster + cheaper).
+  useStart?: boolean
 }
 
 export interface DispatchResult {
@@ -63,8 +69,13 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
   }
 
   if (env.PIPELINE && env.HEARTBEAT_TOKEN && !wantsLegacyPasses) {
+    // Untranscribed vlogs need the full pipeline (audio_extract →
+    // transcribe → extract). Transcribed vlogs can skip straight to
+    // the extract step via /reextract. Both go through the new gated
+    // DO pipeline; neither hits the legacy process-upload Workflow.
+    const route = input.useStart ? 'start' : 'reextract'
     try {
-      const res = await env.PIPELINE.fetch(`https://internal/reextract/${vlog_id}`, {
+      const res = await env.PIPELINE.fetch(`https://internal/${route}/${vlog_id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +85,7 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
       })
       if (!res.ok) {
         const errBody = await res.text()
-        const msg = `pipeline /reextract failed (${res.status}): ${errBody.slice(0, 400)}`
+        const msg = `pipeline /${route} failed (${res.status}): ${errBody.slice(0, 400)}`
         await run(
           env.DB,
           `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -88,7 +99,7 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
       await run(
         env.DB,
         `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        `Pipeline /reextract failed: ${msg}`, vlog_id,
+        `Pipeline /${route} failed: ${msg}`, vlog_id,
       )
       return { ok: false, vlog_id, backend: 'pipeline_do', error: msg }
     }
