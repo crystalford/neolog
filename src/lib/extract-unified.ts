@@ -248,7 +248,43 @@ export async function runExtraction(
     (first.payload.clips?.length ?? 0) +
     (first.payload.creative_elements?.length ?? 0) +
     (first.payload.entities?.length ?? 0)
-  if (itemCount === 0) {
+
+  // Auto-extract fallback: if the LLM produced nothing AND the
+  // transcript has meaningful content, don't drop the content. The
+  // transcript IS the data. Preserve it as a single observation
+  // thread with the full transcript as both take and key_quote.
+  //
+  // This catches the case where Llama refuses to structure short or
+  // fragmented utterances ("We got Phil's fat dented head for eight
+  // songs!") but the operator still wants the line preserved as
+  // searchable / browsable content. Extraction is meant to interpret
+  // vlogs, not throw them away.
+  //
+  // Threshold: 30 chars minimum (anything shorter is genuinely
+  // filler / b-roll). No upper bound — even a 5000 char transcript
+  // that the LLM emptied out gets preserved as a single thread.
+  if (itemCount === 0 && transcript.trim().length >= 30) {
+    const cleaned = transcript.trim()
+    const firstWords = cleaned.split(/\s+/).slice(0, 8).join(' ')
+    const autoThread: any = {
+      topic: firstWords.length > 60 ? firstWords.slice(0, 57) + '…' : firstWords,
+      take: cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned,
+      key_quotes: [cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned],
+      questions_raised: [],
+      register: 'observation',
+      strength: 3,
+      validated: 1,
+    }
+    first.payload.threads = [autoThread]
+    first.total = 1
+    first.invalid = 0
+    first.failRate = 0
+    await progress('llm_validate', {
+      state: 'ok', reason: 'auto_extract_fallback',
+      model: initialModel, transcript_length: transcript.length,
+      note: 'LLM returned empty; preserved transcript as a single observation thread.',
+    })
+  } else if (itemCount === 0) {
     await progress('llm_validate', {
       state: 'ok', reason: 'empty_extraction_accepted',
       model: initialModel, transcript_length: transcript.length,
