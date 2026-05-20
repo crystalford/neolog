@@ -29,8 +29,10 @@ export default function ClustersPage() {
   const [clusters, setClusters] = useState<ClusterRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'all' | 'ready' | 'ripening' | 'hold' | 'materialized'>('all')
+  const [building, setBuilding] = useState(false)
+  const [lastBuild, setLastBuild] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = () => {
     fetch('/api/v2/clusters?limit=200', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => {
@@ -38,7 +40,37 @@ export default function ClustersPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }
+  useEffect(() => { load() }, [])
+
+  // Build clusters from the operator's existing threads. Idempotent —
+  // re-running backfills new threads into existing clusters and creates
+  // any new groups that have crossed the 3-thread / 2-vlog threshold
+  // since the last run. Safe to click any time.
+  const build = async () => {
+    setBuilding(true)
+    setLastBuild(null)
+    try {
+      const r = await fetch('/api/v2/admin/build-clusters', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setLastBuild(
+        `Found ${d.groups_found} group${d.groups_found === 1 ? '' : 's'}. ` +
+        `Created ${d.clusters_created} new cluster${d.clusters_created === 1 ? '' : 's'}, ` +
+        `updated ${d.clusters_updated}, added ${d.threads_added} thread${d.threads_added === 1 ? '' : 's'}.`
+      )
+      load()
+    } catch (e: any) {
+      setLastBuild(`Failed: ${e?.message || String(e)}`)
+    } finally {
+      setBuilding(false)
+    }
+  }
 
   const counts = {
     all: clusters.length,
@@ -68,8 +100,29 @@ export default function ClustersPage() {
               When threads start to circle the same idea, they form a cluster. When a cluster ripens, you materialize it into a production.
             </p>
           </div>
-          <button className="btn primary"><span className="ico">{NavIcons.Plus}</span>New cluster</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {/* Build / refresh clusters from the operator's existing
+                threads. Idempotent. Once auto-link runs on every new
+                extraction (next iteration), this button becomes a
+                manual "force a rebuild" affordance. */}
+            <button
+              className="btn"
+              onClick={build}
+              disabled={building}
+            >
+              {building ? 'Building…' : (clusters.length === 0 ? 'Build clusters from corpus' : 'Refresh clusters')}
+            </button>
+            <button className="btn primary"><span className="ico">{NavIcons.Plus}</span>New cluster</button>
+          </div>
         </div>
+
+        {lastBuild && (
+          <div style={{
+            marginTop: 12, padding: '8px 12px',
+            background: 'var(--bg-2)', border: '1px solid var(--line)',
+            borderRadius: 6, fontSize: 12, color: 'var(--fg-2)',
+          }}>{lastBuild}</div>
+        )}
 
         <div className="tabs" style={{ marginTop: 22 }}>
           <a className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All<span className="n">{counts.all}</span></a>
@@ -85,7 +138,7 @@ export default function ClustersPage() {
           <div className="empty">
             <div className="ico">{NavIcons.Clusters}</div>
             <h3>No clusters yet</h3>
-            <p>Clusters form automatically when 3+ threads converge on the same topic. Extract more vlogs to see them.</p>
+            <p>Click <strong>Build clusters from corpus</strong> above to group existing threads by abstracted_topic. Any group of 3+ threads spanning 2+ vlogs becomes a cluster.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

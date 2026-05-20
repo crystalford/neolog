@@ -202,6 +202,41 @@ export default function VlogsPage() {
                   disabled={deleting}
                   onClick={async () => {
                     const n = selected.size
+                    if (!confirm(`Mark ${n} vlog${n === 1 ? '' : 's'} as B-roll?\n\nEach one will be set to complete with no extraction, and the pipeline will stop retrying. R2 video bytes are kept (so they're available later as b-roll for editing). Reversible per-vlog via Reset.`)) return
+                    setDeleting(true)
+                    try {
+                      const r = await fetch('/api/v2/vlogs/bulk-mark-broll', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: Array.from(selected) }),
+                      })
+                      const d: any = await r.json().catch(() => ({}))
+                      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+                      setSelected(new Set())
+                      load()
+                      const failCount = d.failures ? Object.keys(d.failures).length : 0
+                      alert(`Marked ${d.marked ?? 0} vlog${d.marked === 1 ? '' : 's'} as B-roll.${failCount ? `\n\n${failCount} failed: ${Object.values(d.failures).slice(0, 3).join('; ')}` : ''}`)
+                    } catch (e: any) {
+                      alert(`Bulk mark-as-B-roll failed: ${e?.message || String(e)}`)
+                    } finally {
+                      setDeleting(false)
+                    }
+                  }}
+                  className="btn"
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--fg-1)',
+                    borderColor: 'var(--line)',
+                    background: 'var(--bg-2)',
+                  }}
+                >
+                  {deleting ? '…' : `Mark ${selected.size} as B-roll`}
+                </button>
+                <button
+                  disabled={deleting}
+                  onClick={async () => {
+                    const n = selected.size
                     if (!confirm(`Delete ${n} vlog${n === 1 ? '' : 's'} permanently?\n\nR2 video bytes will be removed and all extracted threads / clips / entities for these vlogs will be deleted. This cannot be undone.`)) return
                     if (!confirm(`Are you sure? This is permanent for all ${n} vlog${n === 1 ? '' : 's'}.`)) return
                     setDeleting(true)
