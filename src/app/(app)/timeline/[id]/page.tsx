@@ -173,6 +173,30 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
+  // Manual override: declare this vlog as b-roll. Stops all retries,
+  // marks pipeline_status=complete with the manual-broll marker.
+  // Useful for: silent footage, slow-motion, ambient takes, vlogs the
+  // operator knows have no extractable dialogue. Reversible via Reset.
+  const markAsBroll = async () => {
+    if (!confirm('Mark this vlog as B-roll? It will be flagged as silent/dialogue-less and the pipeline will stop retrying. You can undo this with "Reset" if needed.')) return
+    setProcessing(true)
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/mark-broll`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!r.ok) {
+        const d: any = await r.json().catch(() => ({}))
+        throw new Error(d?.details || d?.error || `HTTP ${r.status}`)
+      }
+      await load()
+    } catch (e: any) {
+      setError(String(e.message || e))
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   if (error) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Error']}><div className="pad"><div className="card" style={{ color: 'var(--err)' }}>Error: {error}</div></div></Shell>
   if (!vlog) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Loading…']}><div className="pad"><div style={{ color: 'var(--fg-3)' }}>Loading…</div></div></Shell>
 
@@ -294,6 +318,19 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           style={{ width: '100%' }}
         >
           {processing ? 'Dispatching…' : `Re-extract this vlog · ${fmtCost(estCost)}`}
+        </button>
+
+        {/* Manual override: mark this vlog as b-roll. For when the
+            operator knows it's silent / dialogue-less footage and the
+            pipeline keeps retrying for no reason. Reversible via the
+            Reset button up top. */}
+        <button
+          onClick={markAsBroll}
+          disabled={processing}
+          className="btn ghost"
+          style={{ width: '100%', marginTop: 8, fontSize: 12 }}
+        >
+          {processing ? '…' : 'Mark as B-roll (skip extraction — silent / no dialogue)'}
         </button>
 
         <button

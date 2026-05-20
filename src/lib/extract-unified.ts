@@ -283,7 +283,7 @@ export async function runExtraction(
   }
 }
 
-async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {
+async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = false, _retryDepth = 0): Promise<string> {
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: `Transcript:\n\n${transcript}${jsonReminder ? '\n\nReturn ONLY the JSON object — no prose.' : ''}` },
@@ -335,7 +335,16 @@ async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = 
 
   const text = res?.response ?? res?.text ?? ''
   if (typeof text !== 'string' || text.trim().length === 0) {
-    throw new Error('Workers AI Llama returned empty response')
+    // Workers AI Llama occasionally returns an empty response — appears
+    // to be a transient capacity / refusal thing. Retry up to 2 more
+    // times before giving up. Adding the jsonReminder on retry often
+    // unsticks it; small backoff to escape any rate-limit window.
+    if (_retryDepth < 2) {
+      const backoffMs = 800 * (_retryDepth + 1)
+      await new Promise(r => setTimeout(r, backoffMs))
+      return callLlama70B(env, transcript, true, _retryDepth + 1)
+    }
+    throw new Error('Workers AI Llama returned empty response after 3 attempts')
   }
   // SHAPE-AWARE VALIDATION (replaces the earlier blanket < 50 char throw).
   // The model can legitimately return `{}` (2 chars) for transcripts with
