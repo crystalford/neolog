@@ -278,7 +278,6 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   const [skipped, setSkipped] = useState(0)
   const [failed, setFailed] = useState(0)
   const [failures, setFailures] = useState<{ vlog_id: string; error: string; reason?: string }[]>([])
-  const [currentVlogIds, setCurrentVlogIds] = useState<Set<string>>(new Set())
 
   // Mutable refs so the async loop reads the latest values without the
   // closure-over-state hazard.
@@ -451,15 +450,19 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     const signal = abortRef.current.signal
 
     const startIdx = resume ? processed : 0
-    // BOUNDED PARALLEL: process CLIENT_CONCURRENCY vlogs simultaneously.
-    // The downstream FFmpegGate (cap 3) + LlamaGate (cap 3) absorb the
-    // concurrency safely — they queue calls so external services
-    // (FFmpeg container, Workers AI) never see more than their cap. The
-    // earlier serial-only run was leaving 2/3 of the gate budget idle.
-    // 3 in parallel ≈ 3x throughput with the same reliability profile.
+    // FIRE-AND-FORGET CHUNKS: dispatch CHUNK_SIZE vlogs per server call,
+    // pause CHUNK_PAUSE_MS between chunks, don't wait for them to
+    // complete. This is what the operator ranked as the BEST approach
+    // earlier — "it did a bunch" — high visible throughput, tolerant
+    // of individual vlog failures, doesn't block the queue on one
+    // slow vlog.
+    //
+    // Progress here counts DISPATCHED vlogs, not COMPLETED ones. To
+    // see actual completion progress, the operator refreshes the
+    // diagnostic panel at the top of the modal.
     const cp: BulkCheckpoint = {
       version: 1,
-      mode, scope, chunkSize: CLIENT_CONCURRENCY, pauseMs: 0,
+      mode, scope, chunkSize: CHUNK_SIZE, pauseMs: CHUNK_PAUSE_MS,
       ids,
       processedIdx: startIdx,
       dispatched: resume ? dispatched : 0,
@@ -474,75 +477,45 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     setProcessed(startIdx)
     setPhase('running')
 
-    // Worker pool pattern. Each worker pulls the next vlog from the
-    // shared cursor, processes it end-to-end (dispatch + poll), then
-    // grabs the next. Cancellation propagates via signal.aborted.
-    let cursor = startIdx
-    const inFlightIds = new Set<string>()
+    let idx = startIdx
+    while (idx < ids.length) {
+      if (cancelledRef.current || signal.aborted) break
 
-    const processOne = async (vlog_id: string): Promise<void> => {
-      inFlightIds.add(vlog_id)
-      setCurrentVlogIds(new Set(inFlightIds))
-      try {
-        const chunkRes = await dispatchChunkWithRetry([vlog_id], mode, signal)
-        if (chunkRes === 'aborted') return
+      const chunk = ids.slice(idx, idx + CHUNK_SIZE)
+      const chunkRes = await dispatchChunkWithRetry(chunk, mode, signal)
+      if (chunkRes === 'aborted') break
 
-        let dispatchOk = false
-        let dispatchReason: string | undefined
-        let dispatchError: string | undefined
-        if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
-          dispatchError = chunkRes.lastError
-        } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
-          const r = chunkRes.results[0]
-          if (r?.ok) dispatchOk = true
-          else if (r?.reason) dispatchReason = r.reason
-          else dispatchError = r?.error || 'unknown dispatch failure'
+      if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
+        for (const vlog_id of chunk) {
+          cp.failures.push({ vlog_id, error: chunkRes.lastError })
+          cp.failed += 1
         }
-
-        if (!dispatchOk) {
-          if (dispatchReason) {
+      } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
+        for (const r of chunkRes.results) {
+          if (r.ok) cp.dispatched += 1
+          else if (r.reason) {
             cp.skipped += 1
-            cp.failures.push({ vlog_id, error: dispatchReason, reason: dispatchReason })
+            cp.failures.push({ vlog_id: r.vlog_id, error: r.reason, reason: r.reason })
           } else {
             cp.failed += 1
-            cp.failures.push({ vlog_id, error: dispatchError || 'unknown' })
-          }
-        } else {
-          const completion = await pollVlogCompletion(vlog_id, signal)
-          if (completion.aborted) return
-          if (completion.ok) {
-            cp.dispatched += 1
-          } else {
-            cp.failed += 1
-            cp.failures.push({ vlog_id, error: completion.error || 'completion timed out' })
+            cp.failures.push({ vlog_id: r.vlog_id, error: r.error || 'unknown' })
           }
         }
+      }
 
-        cp.processedIdx = Math.max(cp.processedIdx, cursor)
-        saveCheckpoint(cp)
+      idx += chunk.length
+      cp.processedIdx = idx
+      saveCheckpoint(cp)
 
-        // Mirror to React state for the UI.
-        setProcessed(p => p + 1)
-        setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
-        setFailures([...cp.failures])
-      } finally {
-        inFlightIds.delete(vlog_id)
-        setCurrentVlogIds(new Set(inFlightIds))
+      setProcessed(idx)
+      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
+      setFailures([...cp.failures])
+
+      if (idx < ids.length && !cancelledRef.current) {
+        await sleepWithAbort(CHUNK_PAUSE_MS, signal)
       }
     }
 
-    const worker = async () => {
-      while (true) {
-        if (cancelledRef.current || signal.aborted) return
-        const idx = cursor++
-        if (idx >= ids.length) return
-        await processOne(ids[idx])
-      }
-    }
-
-    await Promise.all(Array.from({ length: CLIENT_CONCURRENCY }, () => worker()))
-
-    setCurrentVlogIds(new Set())
     cp.finishedAt = Date.now()
     saveCheckpoint(cp)
     setPhase('done')
@@ -667,15 +640,14 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5,
               padding: 8, background: 'var(--bg-1)', borderRadius: 4, border: '1px solid var(--line)',
             }}>
-              <b style={{ color: 'var(--fg-1)' }}>6-parallel mode with multi-LLM:</b> 6 vlogs
-              processed simultaneously, each polled independently. LLM extract calls
-              round-robin between Llama 3.3-70B and Kimi K2.6 (CLAUDE.md's preferred
-              voice-preserving model) — two separate Workers AI rate-limit pools,
-              with automatic cross-model fallback if either rate-limits. Downstream
-              gates: FFmpeg cap 3, Llama cap 3, Kimi cap 3. Per-vlog poll every 5s
-              with adaptive deadline: extends as long as updated_at keeps advancing,
-              8 min no-progress timeout, 25 min absolute. Close the modal anytime —
-              localStorage checkpoint resumes from where it stopped.
+              <b style={{ color: 'var(--fg-1)' }}>Fire-and-forget chunks of 6:</b> the modal
+              dispatches 6 vlogs per call to the server, waits 1s, then dispatches the
+              next 6. Each vlog runs through its own pipeline DO in the background — the
+              modal doesn't wait for them to complete. The downstream gates (LlamaGate
+              cap 8, FFmpegGate cap 3) absorb the burst so Workers AI / FFmpeg never get
+              overwhelmed. To see how many actually completed, refresh the corpus
+              diagnostic panel at the top. Close the modal anytime — dispatched work
+              continues; the checkpoint resumes from where it stopped.
             </div>
 
             {previewError && (
@@ -731,7 +703,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
             ) : (
               <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
                 Chunks of <b>{chunkSize}</b> with <b>{pauseMs}ms</b> pause between.
-                Estimated wall-clock at strict serial pace: {estDurationLabel(ids.length, untranscribedCount, transcribedCount)}.
+                Estimated dispatch time (modal closes once all are dispatched; actual completion runs in the background): {estDurationLabel(ids.length, untranscribedCount, transcribedCount)}.
                 You can cancel any time without losing progress so far.
               </div>
             )}
@@ -750,35 +722,22 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
           <>
             <ProgressBar processed={processed} total={ids.length} />
 
-            {phase === 'running' && currentVlogIds.size > 0 && (
+            {phase === 'running' && (
               <div style={{
                 fontSize: 12, color: 'var(--fg-2)', padding: 10,
                 background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 6,
-                display: 'flex', flexDirection: 'column', gap: 6,
+                display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                    background: 'var(--accent)', animation: 'pulse 1.5s infinite',
-                  }}/>
-                  <span>Processing {currentVlogIds.size} in parallel</span>
-                  <span style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
-                    polling every {POLL_INTERVAL_MS / 1000}s
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {Array.from(currentVlogIds).map(vid => (
-                    <Link key={vid} href={`/timeline/${vid}`} className="mono"
-                      style={{ fontSize: 11, color: 'var(--fg-1)', textDecoration: 'underline' }}>
-                      …{vid.slice(-12)}
-                    </Link>
-                  ))}
-                </div>
+                <span style={{
+                  display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--accent)', animation: 'pulse 1.5s infinite',
+                }}/>
+                <span>Dispatching in chunks of {CHUNK_SIZE} · refresh the corpus diagnostic above to see actual completion</span>
               </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat label="Complete" value={dispatched} tone="ok" />
+              <Stat label="Dispatched" value={dispatched} tone="ok" />
               <Stat label="Skipped" value={skipped} tone="mute" />
               <Stat label="Failed" value={failed} tone={failed > 0 ? 'err' : 'mute'} />
               <Stat label="Remaining" value={remaining} />
@@ -842,17 +801,15 @@ function clamp(n: number, lo: number, hi: number): number {
 
 function estDurationLabel(
   total: number,
-  untranscribed: number = 0,
-  transcribed: number = 0,
+  _untranscribed: number = 0,
+  _transcribed: number = 0,
 ): string {
-  // Bounded-parallel at CLIENT_CONCURRENCY in flight at a time.
-  // Per-vlog wall-clock: untranscribed ~4 min, transcribed ~45s.
-  // Total wall-clock ≈ (sum of work) / CLIENT_CONCURRENCY.
-  const knownSplit = untranscribed > 0 || transcribed > 0
-  const u = knownSplit ? untranscribed : Math.floor(total * 0.5)
-  const t = knownSplit ? transcribed : total - u
-  const serialMs = (u * 4 * 60 * 1000) + (t * 45 * 1000)
-  const ms = serialMs / CLIENT_CONCURRENCY
+  // Dispatch time (not completion time). Each chunk POST takes maybe
+  // 1-3 seconds + CHUNK_PAUSE_MS pause. For 233 vlogs at chunk 6 with
+  // 1s pause: ~40 chunks × 2s + 1s pause = ~2 min to dispatch them all.
+  // Background completion takes much longer — that shows in diagnostic.
+  const chunks = Math.ceil(total / CHUNK_SIZE)
+  const ms = chunks * (2000 + CHUNK_PAUSE_MS)
   if (ms < 60_000) return `~${Math.round(ms / 1000)}s`
   const m = Math.round(ms / 60_000)
   if (m < 60) return `~${m} min`
@@ -1154,105 +1111,20 @@ async function dispatchChunkWithRetry(
   return { kind: 'fatal', lastError }
 }
 
-// Number of vlogs the client processes simultaneously. Each one
-// dispatches + polls independently. The downstream rate-limiters
-// (FFmpegGate cap 3, LlamaGate cap 3, KimiGate cap 3) sum to 6
-// effective LLM slots across two separate Workers AI rate-limit
-// pools, so CLIENT_CONCURRENCY = 6 fills the LLM budget. FFmpeg is
-// still cap 3 so audio_extract serializes through that gate — but
-// that step finishes quickly relative to the LLM step, so 6 vlogs
-// can be in different stages of the pipeline simultaneously without
-// the FFmpeg bottleneck dominating.
-const CLIENT_CONCURRENCY = 6
+// Fire-and-forget chunk-of-N dispatch. The operator ranked this as
+// the best approach: high visible throughput, failures don't block
+// the queue, each vlog runs through its own pipeline DO in the
+// background. The downstream LlamaGate (cap 8) + FFmpegGate (cap 3)
+// absorb burst load so we don't overwhelm Workers AI / FFmpeg
+// container even if all 6 vlogs in a chunk hit the LLM step
+// simultaneously.
+//
+// Progress in the modal = DISPATCHED, not completed. For completion
+// progress, the operator refreshes the diagnostic panel which counts
+// vlogs by status across the whole corpus.
+const CHUNK_SIZE = 6
+const CHUNK_PAUSE_MS = 1000
 
-// Adaptive polling: extends the deadline whenever the vlog's updated_at
-// advances (= the pipeline is still doing real work). A long video that
-// legitimately takes 20 min to transcribe shouldn't get prematurely
-// abandoned — but a DO whose alarm got dropped should be caught quickly.
-// Also: when polling timeout finally hits, do one last check (the vlog
-// might have completed during the last sleep cycle).
-const POLL_INTERVAL_MS = 5000
-const POLL_BASE_TIMEOUT_MS = 25 * 60 * 1000      // 25 min absolute cap
-const POLL_NO_PROGRESS_TIMEOUT_MS = 8 * 60 * 1000 // 8 min without updated_at change → abandon
-
-async function pollVlogCompletion(
-  vlog_id: string,
-  signal: AbortSignal,
-): Promise<{ ok: boolean; error?: string; aborted?: boolean }> {
-  const start = Date.now()
-  let lastUpdatedAt: string | null = null
-  let lastProgressAt = start
-
-  while (Date.now() - start < POLL_BASE_TIMEOUT_MS) {
-    if (signal.aborted) return { ok: false, aborted: true }
-    await sleepWithAbort(POLL_INTERVAL_MS, signal)
-    if (signal.aborted) return { ok: false, aborted: true }
-    try {
-      const r = await fetch(`/api/v2/vlogs/${vlog_id}`, { credentials: 'include', signal })
-      if (!r.ok) continue
-      const d: any = await r.json()
-      const status = d?.vlog?.pipeline_status
-      const updatedAt = d?.vlog?.updated_at ?? null
-
-      if (status === 'complete') return { ok: true }
-      if (status === 'failed') {
-        return { ok: false, error: await fetchFailureReason(vlog_id, d?.vlog?.pipeline_error) }
-      }
-
-      // Progress signal: updated_at moved forward → pipeline is alive.
-      if (updatedAt && updatedAt !== lastUpdatedAt) {
-        lastUpdatedAt = updatedAt
-        lastProgressAt = Date.now()
-      }
-      // No-progress: alarm probably dropped or DO is stuck. Give up.
-      if (Date.now() - lastProgressAt > POLL_NO_PROGRESS_TIMEOUT_MS) {
-        return {
-          ok: false,
-          error: `no pipeline progress in ${POLL_NO_PROGRESS_TIMEOUT_MS / 60000} min (last status=${status})`,
-        }
-      }
-    } catch (err: any) {
-      if (signal.aborted || err?.name === 'AbortError') return { ok: false, aborted: true }
-      console.warn(`[pollVlogCompletion] ${vlog_id} fetch error:`, err?.message || err)
-    }
-  }
-  // Final check at the cap — the vlog may have just finished.
-  try {
-    const r = await fetch(`/api/v2/vlogs/${vlog_id}`, { credentials: 'include', signal })
-    if (r.ok) {
-      const d: any = await r.json()
-      const status = d?.vlog?.pipeline_status
-      if (status === 'complete') return { ok: true }
-      if (status === 'failed') {
-        return { ok: false, error: await fetchFailureReason(vlog_id, d?.vlog?.pipeline_error) }
-      }
-    }
-  } catch {}
-  return { ok: false, error: `polling timed out at the ${POLL_BASE_TIMEOUT_MS / 60000} min absolute cap` }
-}
-
-// When a vlog enters pipeline_status='failed', the bare status doesn't
-// tell the operator anything actionable. Read the most recent failed
-// pipeline_event so the bulk failure list shows e.g.
-// "[extract] Workers AI Llama failed: 429 rate limit" instead of just
-// "pipeline_status=failed".
-async function fetchFailureReason(vlog_id: string, fallback: string | null | undefined): Promise<string> {
-  try {
-    const r = await fetch(`/api/v2/vlogs/${vlog_id}/events`, { credentials: 'include' })
-    if (r.ok) {
-      const d: any = await r.json()
-      const events: any[] = d?.events ?? []
-      const lastFailure = events
-        .filter(e => e?.status === 'failed' || e?.status === 'failed_terminal')
-        .pop()
-      if (lastFailure) {
-        const detail = lastFailure.error_full_text || lastFailure.detail_json || ''
-        return `[${lastFailure.step}] ${String(detail).slice(0, 240)}`
-      }
-    }
-  } catch {}
-  return fallback || 'pipeline_status=failed (no detail)'
-}
 
 function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise(resolve => {

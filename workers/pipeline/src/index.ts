@@ -69,12 +69,6 @@ export interface Env {
   // for thumbnail / transcode jobs from the legacy workflow.
   FFMPEG_GATE: DurableObjectNamespace
   FFMPEG_GATE_CONCURRENCY?: string
-  // Second LLM gate, pointing at Workers AI Kimi K2.6. Separate
-  // rate-limit pool from Llama, so the pipeline can round-robin
-  // between them to double effective extract throughput without
-  // touching Anthropic.
-  KIMI_GATE: DurableObjectNamespace
-  KIMI_GATE_CONCURRENCY?: string
   HEARTBEAT_TOKEN: string
   ANTHROPIC_API_KEY: string
   CLOUDFLARE_ACCOUNT_ID: string
@@ -801,18 +795,14 @@ export class VlogPipelineDO {
       await this.recordEvent(vlog.id, 'extract', state, sub, payload)
     }
 
-    // The pipeline DO funnels its LLM call through both Llama and Kimi
-    // gates (round-robin per-vlog with cross-model fallback on failure).
-    // Two separate Workers AI rate-limit pools = effective 6 in-flight
-    // extracts across the fleet. CLAUDE.md actually calls out Kimi K2.6
-    // as the preferred model for voice preservation, so this isn't a
-    // quality compromise — it aligns with the documented default while
-    // also unlocking throughput.
+    // The pipeline DO funnels its Llama call through LlamaGate so that
+    // simultaneous extractions queue at the gate instead of bursting
+    // Workers AI. Operator + vlog ids ride along so the gate records
+    // wait/run timings in pipeline_events.
     const extractEnv = {
       AI: this.env.AI,
       ANTHROPIC_API_KEY: this.env.ANTHROPIC_API_KEY,
       LLAMA_GATE: this.env.LLAMA_GATE,
-      KIMI_GATE: this.env.KIMI_GATE,
       LLAMA_GATE_VLOG_ID: vlog.id,
       LLAMA_GATE_OPERATOR_ID: vlog.operator_id,
     }
@@ -1095,9 +1085,7 @@ export class VlogPipelineDO {
 // fresh state for the next run.
 
 const LLAMA_70B_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
-const KIMI_K2_6_MODEL = '@cf/moonshotai/kimi-k2.6'
-const LLAMA_GATE_DEFAULT_CONCURRENCY = 3
-const KIMI_GATE_DEFAULT_CONCURRENCY = 3
+const LLAMA_GATE_DEFAULT_CONCURRENCY = 8
 const LLAMA_GATE_SYSTEM_PROMPT_NOTE =
   'NOTE: The gate passes the full system + user messages straight through to env.AI.run. ' +
   'The src/lib/extract-unified.ts caller is responsible for building messages identical ' +
@@ -1261,155 +1249,6 @@ export class LlamaGate {
       // recordEvent is observability — never fail the LLM call because the
       // event write failed.
     }
-  }
-}
-
-// ─── KimiGate ──────────────────────────────────────────────────────────────
-//
-// Twin of LlamaGate, but targets Workers AI Kimi K2.6 instead of Llama
-// 3.3-70B. Same singleton + in-memory semaphore pattern. The point of
-// having two parallel gates is rate-limit pool separation: Cloudflare
-// tracks Workers AI quotas per-model, so Llama + Kimi can each carry 3
-// concurrent calls = 6 effective LLM slots without overwhelming either.
-// CLAUDE.md actually calls out Kimi K2.6 as the preferred extraction
-// model for voice preservation, so this isn't a quality compromise —
-// it's aligning with the documented default while also unlocking
-// throughput.
-
-export class KimiGate {
-  private state: DurableObjectState
-  private env: Env
-  private inFlight = 0
-  private waiters: Array<() => void> = []
-  private maxConcurrency: number
-
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state
-    this.env = env
-    const raw = env.KIMI_GATE_CONCURRENCY
-    const parsed = raw ? parseInt(raw, 10) : NaN
-    this.maxConcurrency = Number.isFinite(parsed) && parsed > 0 ? parsed : KIMI_GATE_DEFAULT_CONCURRENCY
-  }
-
-  async fetch(req: Request): Promise<Response> {
-    if (req.method !== 'POST') {
-      return new Response('POST only', { status: 405 })
-    }
-    const url = new URL(req.url)
-    if (url.pathname === '/stats') {
-      return Response.json({
-        in_flight: this.inFlight,
-        waiting: this.waiters.length,
-        max_concurrency: this.maxConcurrency,
-        worker_version: WORKER_VERSION,
-        model: KIMI_K2_6_MODEL,
-      })
-    }
-    if (url.pathname !== '/run') {
-      return new Response('not found', { status: 404 })
-    }
-
-    let body: LlamaGateRequest
-    try {
-      body = await req.json()
-    } catch {
-      return Response.json(
-        { ok: false, error: 'invalid JSON body', wait_ms: 0, run_ms: 0, in_flight_peak: this.inFlight } satisfies LlamaGateResponse,
-        { status: 400 },
-      )
-    }
-    if (!Array.isArray(body.messages) || body.messages.length === 0) {
-      return Response.json(
-        { ok: false, error: 'messages array required', wait_ms: 0, run_ms: 0, in_flight_peak: this.inFlight } satisfies LlamaGateResponse,
-        { status: 400 },
-      )
-    }
-
-    const acquireStart = Date.now()
-    await this.acquire()
-    const waitMs = Date.now() - acquireStart
-    const inFlightPeak = this.inFlight
-
-    const runStart = Date.now()
-    try {
-      const result: any = await this.env.AI.run(KIMI_K2_6_MODEL as any, {
-        messages: body.messages,
-        max_tokens: body.max_tokens ?? 4096,
-      } as any)
-      const runMs = Date.now() - runStart
-      this.recordEvent(body, waitMs, runMs, inFlightPeak, null).catch(() => {})
-      return Response.json({
-        ok: true,
-        result,
-        wait_ms: waitMs,
-        run_ms: runMs,
-        in_flight_peak: inFlightPeak,
-      } satisfies LlamaGateResponse)
-    } catch (err: any) {
-      const runMs = Date.now() - runStart
-      const errorMsg = err?.message || String(err)
-      this.recordEvent(body, waitMs, runMs, inFlightPeak, errorMsg).catch(() => {})
-      return Response.json({
-        ok: false,
-        error: errorMsg,
-        wait_ms: waitMs,
-        run_ms: runMs,
-        in_flight_peak: inFlightPeak,
-      } satisfies LlamaGateResponse, { status: 502 })
-    } finally {
-      this.release()
-    }
-  }
-
-  private acquire(): Promise<void> {
-    if (this.inFlight < this.maxConcurrency) {
-      this.inFlight += 1
-      return Promise.resolve()
-    }
-    return new Promise<void>(resolve => {
-      this.waiters.push(() => {
-        this.inFlight += 1
-        resolve()
-      })
-    })
-  }
-
-  private release(): void {
-    this.inFlight -= 1
-    if (this.inFlight < 0) this.inFlight = 0
-    const next = this.waiters.shift()
-    if (next) next()
-  }
-
-  private async recordEvent(
-    body: LlamaGateRequest,
-    waitMs: number,
-    runMs: number,
-    inFlightPeak: number,
-    errorMsg: string | null,
-  ): Promise<void> {
-    if (!body.vlog_id || !body.operator_id) return
-    try {
-      await insertEvent(this.env.DB, {
-        vlog_id: body.vlog_id,
-        operator_id: body.operator_id,
-        step: 'extract',
-        sub_step: 'kimi_gate',
-        status: errorMsg ? 'failed' : 'ok',
-        duration_ms: waitMs + runMs,
-        error_full_text: errorMsg,
-        detail_json: JSON.stringify({
-          wait_ms: waitMs,
-          run_ms: runMs,
-          in_flight_peak: inFlightPeak,
-          max_concurrency: this.maxConcurrency,
-          worker_version: WORKER_VERSION,
-          model: KIMI_K2_6_MODEL,
-        }),
-        attempt: 1,
-        ts: Date.now(),
-      })
-    } catch {}
   }
 }
 
