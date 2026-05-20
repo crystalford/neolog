@@ -21,6 +21,18 @@ import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
 
 type Filter = 'all' | 'vlog' | 'thread' | 'clip' | 'post' | 'surfaced'
 
+// Hash arbitrary topic strings into one of the 8 topic accent slots.
+// The same string always maps to the same color so a recurring topic
+// across vlogs reads as one visual thread without relying on a hand-
+// curated map. Falls back to --fg-3 for genuinely empty topics.
+function topicColor(topic?: string | null): string {
+  const t = (topic ?? '').trim().toLowerCase()
+  if (!t) return 'var(--fg-3)'
+  let h = 0
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
+  return `var(--t-${(h % 8) + 1})`
+}
+
 interface FeedItem {
   id: string
   kind: string
@@ -87,17 +99,30 @@ export default function TimelinePage() {
 
   return (
     <Shell active="timeline" breadcrumb={['Timeline']}>
-      <div className="pad-tight" style={{ maxWidth: 760, marginLeft: 'auto', marginRight: 'auto' }}>
-        <div className="h1-row">
-          <div>
-            <h1>Timeline</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
+      {/* Editorial reading column — slightly wider than the default
+          760 to give cards more presence; topic spines lean inward.
+          Generous vertical rhythm (32px between days, 14px between
+          cards) so the page feels like a journal, not a dashboard. */}
+      <div className="pad-tight" style={{ maxWidth: 820, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{
+            borderLeft: '3px solid var(--t-1)',
+            paddingLeft: 14,
+          }}>
+            <div className="mono" style={{
+              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+              color: 'var(--fg-4)', marginBottom: 6,
+            }}>
+              The feed
+            </div>
+            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Timeline</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
               Everything in order. Vlogs, threads, clips, posts, surfaced cards — newest first.
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 28, marginBottom: 30 }}>
           <div className="pills">
             {FILTERS.map(f => (
               <button
@@ -121,18 +146,31 @@ export default function TimelinePage() {
             <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
             {groups.map((g, gi) => (
               <div key={gi}>
-                <div className="mono" style={{
-                  fontSize: 10, color: 'var(--fg-4)',
-                  letterSpacing: 0.5, textTransform: 'uppercase',
-                  paddingBottom: 8, marginBottom: 10,
+                {/* Editorial day band — uppercase mono, hairline below,
+                    breathing room so each day reads as a chapter. */}
+                <div style={{
+                  display: 'flex', alignItems: 'baseline',
+                  paddingBottom: 10, marginBottom: 14,
                   borderBottom: '1px solid var(--line)',
                 }}>
-                  {g.label}
+                  <span className="mono" style={{
+                    fontSize: 11, color: 'var(--fg-2)',
+                    letterSpacing: 1.5, textTransform: 'uppercase',
+                    fontWeight: 500,
+                  }}>
+                    {g.label}
+                  </span>
+                  <span className="mono" style={{
+                    marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)',
+                    letterSpacing: 0.4,
+                  }}>
+                    {g.items.length} {g.items.length === 1 ? 'item' : 'items'}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {g.items.map(it => <FeedCard key={it.id + ':' + it.ts} item={it}/>)}
                 </div>
               </div>
@@ -162,9 +200,13 @@ function VlogCard({ r }: { r: any }) {
   const status = r.pipeline_status ?? 'uploaded'
   const cls = status === 'complete' ? 'ok' : status === 'failed' ? 'err' : status === 'archived' ? 'mute' : 'hot'
   const size = r.file_size_bytes ? `${(r.file_size_bytes / 1_000_000).toFixed(1)} MB` : ''
+  const color = topicColor(r.title ?? r.original_filename ?? r.id)
   return (
-    <Link href={`/timeline/${r.id}`} className="card" style={{ padding: 14, display: 'block' }}>
-      <div style={{ display: 'flex', gap: 14 }}>
+    <Link href={`/timeline/${r.id}`} className="card" style={{
+      padding: '14px 18px', display: 'block',
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <div style={{
           width: 140, aspectRatio: '16/10', flexShrink: 0,
           borderRadius: 6,
@@ -179,15 +221,30 @@ function VlogCard({ r }: { r: any }) {
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Vlog</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <span className="mono" style={{
+              fontSize: 10, color: color,
+              textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+            }}>
+              Vlog
+            </span>
             <span className={`pill ${cls}`}>{status}</span>
-            <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.recorded_at ?? r.created_at)}</span>
+            <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+              {timeOfDay(r.ts ?? r.recorded_at ?? r.created_at)}
+            </span>
           </div>
-          <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{
+            fontSize: 14, color: 'var(--fg)', fontWeight: 500,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            marginBottom: 4,
+          }}>
             {r.original_filename ?? r.title ?? r.id}
           </div>
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 4 }}>{size}</div>
+          {size && (
+            <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
+              {size}
+            </div>
+          )}
         </div>
       </div>
     </Link>
@@ -195,24 +252,40 @@ function VlogCard({ r }: { r: any }) {
 }
 
 function ThreadCard({ r }: { r: any }) {
-  const topic = (r.abstracted_topic ?? r.topic ?? 'misc').toLowerCase()
+  const topic = (r.abstracted_topic ?? r.topic ?? 'misc')
+  const color = topicColor(topic)
   return (
-    <Link href={`/thread/${r.id}`} className="card" style={{ padding: 16, display: 'block' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <TopicDot topic={topic}/>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Thread · {r.register ?? 'observation'}</span>
+    <Link href={`/thread/${r.id}`} className="card" style={{
+      padding: '18px 22px',
+      display: 'block',
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: color,
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
+          Thread · {r.register ?? 'observation'}
+        </span>
         {r.strength != null && <Pips n={r.strength}/>}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.extracted_at)}</span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.extracted_at)}
+        </span>
       </div>
+      {/* The take reads like a pull-quote — italic, large, no extra
+          left bar because the card spine IS the bar. */}
       <div style={{
-        fontSize: 16, color: 'var(--fg)',
-        lineHeight: 1.5, fontStyle: 'italic',
-        paddingLeft: 12, borderLeft: '2px solid var(--bg-4)',
+        fontSize: 17, color: 'var(--fg)',
+        lineHeight: 1.45, fontStyle: 'italic',
+        fontWeight: 400,
       }}>
-        "{String(r.take ?? '').slice(0, 240)}"
+        “{String(r.take ?? '').slice(0, 280)}”
       </div>
       {r.topic && (
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 10 }}>
+        <div className="mono" style={{
+          fontSize: 10, color: 'var(--fg-3)', marginTop: 14,
+          letterSpacing: 0.8, textTransform: 'uppercase',
+        }}>
           {r.topic}
         </div>
       )}
@@ -223,20 +296,35 @@ function ThreadCard({ r }: { r: any }) {
 function ClipCard({ r }: { r: any }) {
   const start = formatTime(Number(r.start_time ?? 0))
   const end = formatTime(Number(r.end_time ?? 0))
+  const color = topicColor(r.topic ?? r.headline ?? 'clip')
   return (
-    <Link href={`/clip/${r.id}`} className="card" style={{ padding: 14, display: 'block' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Clip</span>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{start} → {end}</span>
-        <span className={`pill ${r.status === 'published' ? 'ok' : 'mute'}`}>{r.status ?? 'pending'}</span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.extracted_at)}</span>
+    <Link href={`/clip/${r.id}`} className="card" style={{
+      padding: '16px 20px', display: 'block',
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: color,
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
+          Clip · {start} → {end}
+        </span>
+        <span className={`pill ${r.status === 'published' ? 'ok' : 'mute'}`}>{r.status ?? 'candidate'}</span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.extracted_at)}
+        </span>
       </div>
-      <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: 6 }}>
-        {r.headline ?? '—'}
-      </div>
+      {r.headline && (
+        <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: 8 }}>
+          {r.headline}
+        </div>
+      )}
       {r.quote && (
-        <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5, fontStyle: 'italic' }}>
-          "{r.quote}"
+        <div style={{
+          fontSize: 15, color: 'var(--fg-1)',
+          lineHeight: 1.5, fontStyle: 'italic',
+        }}>
+          “{r.quote}”
         </div>
       )}
     </Link>
@@ -263,19 +351,29 @@ function SurfacedCard({ r }: { r: any }) {
   const subtype = String(r.subtype ?? r.kind ?? 'card').replace(/_/g, ' ')
   return (
     <Link href={r.target_url ?? '#'} className="card" style={{
-      padding: 14, display: 'block',
-      border: '1px solid var(--accent-bd)',
+      padding: '18px 22px', display: 'block',
+      borderLeft: '3px solid var(--accent, #60a5fa)',
       background: 'var(--bg-1)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span className="pill accent">◆ surfaced · {subtype}</span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.surfaced_at)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: 'var(--accent, #60a5fa)',
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
+          ◆ Surfaced · {subtype}
+        </span>
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {timeOfDay(r.ts ?? r.surfaced_at)}
+        </span>
       </div>
-      <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: r.body_html ? 6 : 0 }}>
+      <div style={{
+        fontSize: 16, color: 'var(--fg)', fontWeight: 500,
+        marginBottom: r.body_html ? 10 : 0, lineHeight: 1.4,
+      }}>
         {r.headline ?? r.title ?? '—'}
       </div>
       {r.body_html && (
-        <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}
+        <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}
           dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
       )}
     </Link>
@@ -285,10 +383,17 @@ function SurfacedCard({ r }: { r: any }) {
 function CreativeCard({ r }: { r: any }) {
   const elementType = String(r.element_type ?? 'theme').replace(/_/g, ' ')
   const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
+  const color = topicColor(elementType)
   return (
-    <Link href={href} className="card" style={{ padding: 14, display: 'block' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+    <Link href={href} className="card" style={{
+      padding: '16px 20px', display: 'block',
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: color,
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
           Creative · {elementType}
         </span>
         {r.register && (
@@ -298,8 +403,11 @@ function CreativeCard({ r }: { r: any }) {
           {timeOfDay(r.ts ?? r.created_at ?? r.extracted_at)}
         </span>
       </div>
-      <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55, fontStyle: 'italic' }}>
-        "{String(r.content ?? '').slice(0, 320)}"
+      <div style={{
+        fontSize: 15, color: 'var(--fg-1)',
+        lineHeight: 1.55, fontStyle: 'italic',
+      }}>
+        “{String(r.content ?? '').slice(0, 320)}”
       </div>
     </Link>
   )
@@ -320,10 +428,15 @@ function EntityCard({ r }: { r: any }) {
   const dot = ENTITY_DOT[entityType] ?? 'var(--fg-3)'
   const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
   return (
-    <Link href={href} className="card" style={{ padding: 14, display: 'block' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }}/>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+    <Link href={href} className="card" style={{
+      padding: '14px 20px', display: 'block',
+      borderLeft: `3px solid ${dot}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: dot,
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
           Entity · {entityType}
         </span>
         <span style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginLeft: 4 }}>

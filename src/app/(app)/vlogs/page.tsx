@@ -110,10 +110,16 @@ export default function VlogsPage() {
   return (
     <Shell active="vlogs" breadcrumb={['Vlogs']} hot={busy ? `${counts.processing} active` : 'all healthy'} busy={busy}>
       <div className="pad-tight">
-        <div className="h1-row">
-          <div>
-            <h1>Vlogs</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
+        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{ borderLeft: '3px solid var(--t-1)', paddingLeft: 14 }}>
+            <div className="mono" style={{
+              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+              color: 'var(--fg-4)', marginBottom: 6,
+            }}>
+              Source material
+            </div>
+            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Vlogs</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
               Every recording you've brought into Neolog. {counts.all} files · {totalGb} GB on disk.
             </p>
           </div>

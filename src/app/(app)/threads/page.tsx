@@ -10,6 +10,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
+import { topicColor } from '@/lib/topic-color'
 
 interface ThreadRow {
   id: string
@@ -54,21 +55,26 @@ export default function ThreadsPage() {
 
   return (
     <Shell active="threads" breadcrumb={['Threads']}>
-      <div className="pad-tight">
-        <div className="h1-row">
-          <div>
-            <h1>Threads</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
-              Atomic takes the system has extracted. Every thread is one idea, voice-grounded, traceable to a single moment in a vlog.
+      <div className="pad-tight" style={{ maxWidth: 820, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{ borderLeft: '3px solid var(--t-2)', paddingLeft: 14 }}>
+            <div className="mono" style={{
+              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+              color: 'var(--fg-4)', marginBottom: 6,
+            }}>
+              Atomic takes
+            </div>
+            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Threads</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
+              Every thread is one idea — voice-grounded, traceable to a single moment in a vlog. The clustering engine groups them across vlogs by abstracted topic.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn"><span className="ico">{NavIcons.Filter}</span>Filters</button>
             <button className="btn"><span className="ico">{NavIcons.External}</span>Export</button>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, marginBottom: 18, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 28, marginBottom: 22, flexWrap: 'wrap' }}>
           <div className="pills">
             <button className={`filter-pill ${!topicFilter ? 'active' : ''}`} onClick={() => setTopicFilter(null)}>
               All <span className="n">{threads.length}</span>
@@ -83,38 +89,60 @@ export default function ThreadsPage() {
               </button>
             ))}
           </div>
-          <div style={{ flex: 1 }}/>
-          <button className="btn ghost small"><span className="ico">{NavIcons.Sort}</span>Newest</button>
         </div>
 
-        <div className="list">
-          <div className="row head" style={{ gridTemplateColumns: '12px 1.4fr 130px 130px 70px 90px' }}>
-            <span/><span>Take</span><span>Topic</span><span>Source</span><span>Strength</span><span>Register</span>
+        {loading ? (
+          <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <h3>No threads yet</h3>
+            <p>Run the extraction pass on a vlog with a transcript and threads will land here.</p>
           </div>
-          {loading ? (
-            <div className="row" style={{ gridTemplateColumns: '1fr', color: 'var(--fg-3)' }}>Loading…</div>
-          ) : filtered.length === 0 ? (
-            <div className="row" style={{ gridTemplateColumns: '1fr', color: 'var(--fg-3)' }}>
-              No threads yet — run the extraction pass on a vlog with a transcript.
-            </div>
-          ) : filtered.map(t => (
-            <Link key={t.id} href={`/thread/${t.id}`} style={{ display: 'contents' }}>
-              <div className="row" style={{ gridTemplateColumns: '12px 1.4fr 130px 130px 70px 90px' }}>
-                <TopicDot topic={(t.abstracted_topic ?? t.topic ?? 'misc') as string}/>
-                <span style={{ color: 'var(--fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>"{t.take}"</span>
-                <span style={{ color: 'var(--fg-2)', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {t.abstracted_topic ?? t.topic ?? '—'}
-                </span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                  {new Date(t.extracted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-                <Pips n={t.strength ?? 0}/>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t.register ?? '—'}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {filtered.map(t => <ThreadEditorialCard key={t.id} t={t}/>)}
+          </div>
+        )}
       </div>
     </Shell>
+  )
+}
+
+function ThreadEditorialCard({ t }: { t: ThreadRow }) {
+  const topic = (t.abstracted_topic ?? t.topic ?? 'misc')
+  const color = topicColor(topic)
+  return (
+    <Link href={`/thread/${t.id}`} className="card" style={{
+      padding: '18px 22px',
+      display: 'block',
+      borderLeft: `3px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span className="mono" style={{
+          fontSize: 10, color: color,
+          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+        }}>
+          Thread · {t.register ?? 'observation'}
+        </span>
+        {t.strength != null && <Pips n={t.strength}/>}
+        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
+          {new Date(t.extracted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      </div>
+      <div style={{
+        fontSize: 17, color: 'var(--fg)',
+        lineHeight: 1.45, fontStyle: 'italic',
+      }}>
+        “{String(t.take ?? '').slice(0, 320)}”
+      </div>
+      {(t.abstracted_topic || t.topic) && (
+        <div className="mono" style={{
+          fontSize: 10, color: 'var(--fg-3)', marginTop: 14,
+          letterSpacing: 0.8, textTransform: 'uppercase',
+        }}>
+          {t.abstracted_topic ?? t.topic}
+        </div>
+      )}
+    </Link>
   )
 }
