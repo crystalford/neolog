@@ -248,7 +248,43 @@ export async function runExtraction(
     (first.payload.clips?.length ?? 0) +
     (first.payload.creative_elements?.length ?? 0) +
     (first.payload.entities?.length ?? 0)
-  if (itemCount === 0) {
+
+  // Auto-extract fallback: if the LLM produced nothing AND the
+  // transcript has meaningful content, don't drop the content. The
+  // transcript IS the data. Preserve it as a single observation
+  // thread with the full transcript as both take and key_quote.
+  //
+  // This catches the case where Llama refuses to structure short or
+  // fragmented utterances ("We got Phil's fat dented head for eight
+  // songs!") but the operator still wants the line preserved as
+  // searchable / browsable content. Extraction is meant to interpret
+  // vlogs, not throw them away.
+  //
+  // Threshold: 30 chars minimum (anything shorter is genuinely
+  // filler / b-roll). No upper bound — even a 5000 char transcript
+  // that the LLM emptied out gets preserved as a single thread.
+  if (itemCount === 0 && transcript.trim().length >= 30) {
+    const cleaned = transcript.trim()
+    const firstWords = cleaned.split(/\s+/).slice(0, 8).join(' ')
+    const autoThread: any = {
+      topic: firstWords.length > 60 ? firstWords.slice(0, 57) + '…' : firstWords,
+      take: cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned,
+      key_quotes: [cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned],
+      questions_raised: [],
+      register: 'observation',
+      strength: 3,
+      validated: 1,
+    }
+    first.payload.threads = [autoThread]
+    first.total = 1
+    first.invalid = 0
+    first.failRate = 0
+    await progress('llm_validate', {
+      state: 'ok', reason: 'auto_extract_fallback',
+      model: initialModel, transcript_length: transcript.length,
+      note: 'LLM returned empty; preserved transcript as a single observation thread.',
+    })
+  } else if (itemCount === 0) {
     await progress('llm_validate', {
       state: 'ok', reason: 'empty_extraction_accepted',
       model: initialModel, transcript_length: transcript.length,
@@ -283,7 +319,7 @@ export async function runExtraction(
   }
 }
 
-async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {
+async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = false, _retryDepth = 0): Promise<string> {
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: `Transcript:\n\n${transcript}${jsonReminder ? '\n\nReturn ONLY the JSON object — no prose.' : ''}` },
@@ -335,7 +371,28 @@ async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = 
 
   const text = res?.response ?? res?.text ?? ''
   if (typeof text !== 'string' || text.trim().length === 0) {
-    throw new Error('Workers AI Llama returned empty response')
+    // Workers AI Llama occasionally returns an empty response —
+    // sometimes transient capacity, sometimes the model just decides
+    // there's nothing extractable in the given transcript (we've seen
+    // this on short / fragmentary / Whisper-mangled transcripts that
+    // are syntactically valid but semantically thin).
+    //
+    // Retry up to 2 more times with the jsonReminder prompt + backoff
+    // to escape any rate-limit window. If STILL empty after 3 total
+    // attempts, the model is consistently saying "nothing to extract"
+    // for this transcript. Treat that as a SUCCESSFUL empty extraction
+    // (b-roll, no meaningful content) instead of throwing. The vlog
+    // marks complete with total_items=0; diagnosis classifies it as
+    // b_roll automatically. Better outcome than retrying 5 more times
+    // at the DO level and marking the vlog failed.
+    if (_retryDepth < 2) {
+      const backoffMs = 800 * (_retryDepth + 1)
+      await new Promise(r => setTimeout(r, backoffMs))
+      return callLlama70B(env, transcript, true, _retryDepth + 1)
+    }
+    // Exhausted retries with empty response. Return a minimal valid
+    // JSON shape so the parser treats this as a clean empty extraction.
+    return '{"summary":"","threads":[],"clips":[],"creative_elements":[],"entities":[]}'
   }
   // SHAPE-AWARE VALIDATION (replaces the earlier blanket < 50 char throw).
   // The model can legitimately return `{}` (2 chars) for transcripts with
