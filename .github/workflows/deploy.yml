@@ -31,6 +31,10 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       PAGES_PROJECT: neolog
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +61,37 @@ jobs:
 
       - name: Deploy to Cloudflare Pages
         run: wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
+
+      - name: Push Pages secrets (idempotent)
+        # These were originally set by bootstrap-cloudflare.yml, but that
+        # workflow is workflow_dispatch only. Pushing them here on every
+        # deploy ensures the Pages runtime always has the secrets it
+        # needs — bulk dispatch (HEARTBEAT_TOKEN) + zombie termination
+        # (CLOUDFLARE_API_TOKEN). The binding-check endpoint surfaced
+        # these as missing when bulk Run returned 503 on every chunk.
+        # `wrangler pages secret put` is idempotent — overwrites silently.
+        run: |
+          set -e
+          if [ -n "$HEARTBEAT_TOKEN" ]; then
+            echo "$HEARTBEAT_TOKEN" | wrangler pages secret put HEARTBEAT_TOKEN --project-name "$PAGES_PROJECT"
+          else
+            echo "::warning::HEARTBEAT_TOKEN secret missing from GitHub repo — bulk dispatch will 503"
+          fi
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler pages secret put CLOUDFLARE_API_TOKEN --project-name "$PAGES_PROJECT"
+          else
+            echo "::warning::CLOUDFLARE_API_TOKEN missing — Workflow termination won't work"
+          fi
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT"
+          fi
+          if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
+            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT"
+            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT"
+          fi
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT"
+          fi
 
       - name: Summary
         if: always()

@@ -278,6 +278,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   const [skipped, setSkipped] = useState(0)
   const [failed, setFailed] = useState(0)
   const [failures, setFailures] = useState<{ vlog_id: string; error: string; reason?: string }[]>([])
+  const [currentVlogId, setCurrentVlogId] = useState<string | null>(null)
 
   // Mutable refs so the async loop reads the latest values without the
   // closure-over-state hazard.
@@ -450,11 +451,13 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     const signal = abortRef.current.signal
 
     const startIdx = resume ? processed : 0
-    // Snapshot the run params into a checkpoint that persists across
-    // modal close / page reload.
+    // STRICT SERIAL: one vlog at a time, dispatch → poll until terminal →
+    // next. The operator confirmed: if per-vlog re-extract works in
+    // isolation, the only way bulk can fail is if it tries to do too
+    // many at once. So we don't.
     const cp: BulkCheckpoint = {
       version: 1,
-      mode, scope, chunkSize, pauseMs,
+      mode, scope, chunkSize: 1, pauseMs: 0,
       ids,
       processedIdx: startIdx,
       dispatched: resume ? dispatched : 0,
@@ -472,33 +475,47 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     let idx = startIdx
     while (idx < ids.length) {
       if (cancelledRef.current) break
+      const vlog_id = ids[idx]
+      setCurrentVlogId(vlog_id)
 
-      const chunk = ids.slice(idx, idx + chunkSize)
-      const chunkRes = await dispatchChunkWithRetry(chunk, mode, signal)
-
+      // 1. Dispatch ONE vlog.
+      const chunkRes = await dispatchChunkWithRetry([vlog_id], mode, signal)
       if (chunkRes === 'aborted') break
-      if (chunkRes === 'fatal') {
-        // Network gave up after retries. Mark this chunk's ids as failed
-        // (cannot tell which dispatched) and keep going so a transient
-        // outage doesn't block the rest.
-        for (const vlog_id of chunk) {
-          cp.failures.push({ vlog_id, error: 'chunk request failed after retries' })
+
+      let dispatchOk = false
+      let dispatchReason: string | undefined
+      let dispatchError: string | undefined
+      if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
+        dispatchError = chunkRes.lastError
+      } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
+        const r = chunkRes.results[0]
+        if (r?.ok) dispatchOk = true
+        else if (r?.reason) dispatchReason = r.reason
+        else dispatchError = r?.error || 'unknown dispatch failure'
+      }
+
+      // 2. If dispatch failed, record + move on. If it succeeded, WAIT
+      //    for completion before moving on.
+      if (!dispatchOk) {
+        if (dispatchReason) {
+          cp.skipped += 1
+          cp.failures.push({ vlog_id, error: dispatchReason, reason: dispatchReason })
+        } else {
           cp.failed += 1
+          cp.failures.push({ vlog_id, error: dispatchError || 'unknown' })
         }
       } else {
-        for (const r of chunkRes.results) {
-          if (r.ok) cp.dispatched += 1
-          else if (r.reason) {
-            cp.skipped += 1
-            cp.failures.push({ vlog_id: r.vlog_id, error: r.reason, reason: r.reason })
-          } else {
-            cp.failed += 1
-            cp.failures.push({ vlog_id: r.vlog_id, error: r.error || 'unknown', reason: undefined })
-          }
+        const completion = await pollVlogCompletion(vlog_id, signal)
+        if (completion.aborted) break
+        if (completion.ok) {
+          cp.dispatched += 1
+        } else {
+          cp.failed += 1
+          cp.failures.push({ vlog_id, error: completion.error || 'completion timed out' })
         }
       }
 
-      idx += chunk.length
+      idx += 1
       cp.processedIdx = idx
       saveCheckpoint(cp)
 
@@ -506,14 +523,9 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
       setProcessed(idx)
       setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
       setFailures([...cp.failures])
-
-      if (idx < ids.length && !cancelledRef.current) {
-        // Short-circuit-friendly pause: if user clicks cancel during the
-        // sleep, break out within the chunk delay.
-        await sleepWithAbort(pauseMs, signal)
-      }
     }
 
+    setCurrentVlogId(null)
     cp.finishedAt = Date.now()
     saveCheckpoint(cp)
     setPhase('done')
@@ -634,29 +646,17 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               </div>
             </div>
 
-            <details style={{ fontSize: 12, color: 'var(--fg-3)' }}>
-              <summary style={{ cursor: 'pointer' }}>Advanced · throughput</summary>
-              <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
-                  Chunk size (1–25)
-                  <input type="number" min={1} max={25} value={chunkSize}
-                    onChange={e => setChunkSize(clamp(Number(e.target.value) || 1, 1, 25))}
-                    style={{ width: 80, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', color: 'var(--fg-1)' }}/>
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
-                  Pause between chunks (ms)
-                  <input type="number" min={0} max={10000} step={100} value={pauseMs}
-                    onChange={e => setPauseMs(clamp(Number(e.target.value) || 0, 0, 10000))}
-                    style={{ width: 100, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px', color: 'var(--fg-1)' }}/>
-                </label>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 8, lineHeight: 1.5 }}>
-                Smaller chunks + longer pauses are gentler on Workers AI rate limits.
-                Defaults (6 / 1200ms) are tuned conservatively after a real
-                100+ vlog backfill — bump them up if you're confident things
-                are happy.
-              </div>
-            </details>
+            <div style={{
+              fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5,
+              padding: 8, background: 'var(--bg-1)', borderRadius: 4, border: '1px solid var(--line)',
+            }}>
+              <b style={{ color: 'var(--fg-1)' }}>Strict serial mode:</b> one vlog at a time,
+              dispatch then wait for it to actually finish before moving to the next.
+              Per-vlog poll every 5s, 12-minute hard cap per vlog. This is the slowest
+              throughput but the only mode that's been proven reliable on this corpus.
+              You can close the modal and reopen — the run resumes from a localStorage
+              checkpoint.
+            </div>
 
             {previewError && (
               <div style={{ fontSize: 12, color: 'var(--err)' }}>Preview failed: {previewError}</div>
@@ -711,7 +711,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
             ) : (
               <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
                 Chunks of <b>{chunkSize}</b> with <b>{pauseMs}ms</b> pause between.
-                Estimated wall-clock: ~{estDurationLabel(ids.length, chunkSize, pauseMs)}.
+                Estimated wall-clock at strict serial pace: {estDurationLabel(ids.length, untranscribedCount, transcribedCount)}.
                 You can cancel any time without losing progress so far.
               </div>
             )}
@@ -730,8 +730,29 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
           <>
             <ProgressBar processed={processed} total={ids.length} />
 
+            {phase === 'running' && currentVlogId && (
+              <div style={{
+                fontSize: 12, color: 'var(--fg-2)', padding: 10,
+                background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 6,
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <span style={{
+                  display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--accent)', animation: 'pulse 1.5s infinite',
+                }}/>
+                <span>Processing</span>
+                <Link href={`/timeline/${currentVlogId}`} className="mono"
+                  style={{ color: 'var(--fg-1)', textDecoration: 'underline' }}>
+                  …{currentVlogId.slice(-12)}
+                </Link>
+                <span style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
+                  polling every {POLL_INTERVAL_MS / 1000}s
+                </span>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat label="Dispatched" value={dispatched} tone="ok" />
+              <Stat label="Complete" value={dispatched} tone="ok" />
               <Stat label="Skipped" value={skipped} tone="mute" />
               <Stat label="Failed" value={failed} tone={failed > 0 ? 'err' : 'mute'} />
               <Stat label="Remaining" value={remaining} />
@@ -793,14 +814,24 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
 }
 
-function estDurationLabel(total: number, chunk: number, pause: number): string {
-  const chunks = Math.ceil(total / chunk)
-  // Per-chunk: ~chunk*250ms RTT inside the call (the dispatch is fast)
-  // plus the pause. Rough estimate, not a contract.
-  const ms = chunks * (chunk * 250 + pause)
-  if (ms < 60_000) return `${Math.round(ms / 1000)}s`
-  const m = Math.floor(ms / 60_000); const s = Math.round((ms % 60_000) / 1000)
-  return `${m}m ${s}s`
+function estDurationLabel(
+  total: number,
+  untranscribed: number = 0,
+  transcribed: number = 0,
+): string {
+  // Strict serial: each vlog runs to completion before the next dispatches.
+  // Untranscribed vlogs: ~3-5 min each (audio extract + transcribe + LLM).
+  // Transcribed vlogs: ~30-60 sec each (just LLM extract).
+  // Cap the per-vlog estimate generously to avoid promising too fast.
+  const knownSplit = untranscribed > 0 || transcribed > 0
+  const u = knownSplit ? untranscribed : Math.floor(total * 0.5)
+  const t = knownSplit ? transcribed : total - u
+  const ms = (u * 4 * 60 * 1000) + (t * 45 * 1000)
+  if (ms < 60_000) return `~${Math.round(ms / 1000)}s`
+  const m = Math.round(ms / 60_000)
+  if (m < 60) return `~${m} min`
+  const h = Math.floor(m / 60); const remM = m % 60
+  return `~${h}h ${remM}m`
 }
 
 function Stat({ label, value, tone }: { label: string; value: number | string; tone?: 'ok' | 'err' | 'mute' }) {
@@ -879,48 +910,97 @@ function DiagnosticPanel({
           {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
         </div>
       )}
-      {(stuck > 0 || inFlightRecent > 0) && (
-        <div style={{
-          padding: 10, borderRadius: 6,
-          background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
-          fontSize: 12, color: 'var(--fg-1)',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          {stuck > 0 && (
-            <div>
-              <div style={{ marginBottom: 6 }}>
-                <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
-                Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
-                Does NOT stop the actual background workflows.
-              </div>
-              <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
-                {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
-              </button>
-              {resetResult && (
-                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
-              )}
-            </div>
-          )}
+
+      {/* Kill button always available — useful even when nothing is "stuck"
+          because zombies might be running with recent updated_at timestamps. */}
+      <div style={{
+        padding: 10, borderRadius: 6,
+        background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
+        fontSize: 12, color: 'var(--fg-1)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        {stuck > 0 && (
           <div>
             <div style={{ marginBottom: 6 }}>
-              <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
-              instance + Durable Object for your operator. Use this when zombie
-              workflows from a prior bulk are still spamming failures. Counts as
-              compute used but stops further work immediately.
+              <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
+              Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
+              Does NOT stop the actual background workflows.
             </div>
-            <button className="btn" onClick={onKillAll} disabled={killBusy}
-              style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
-              {killBusy ? 'Killing…' : 'Kill all running'}
+            <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
+              {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
             </button>
-            {killResult && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
+            {resetResult && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
             )}
           </div>
+        )}
+        <div>
+          <div style={{ marginBottom: 6 }}>
+            <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
+            instance + Durable Object for your operator. Use this when zombie
+            workflows from a prior bulk are still spamming failures. Counts as
+            compute used but stops further work immediately.
+          </div>
+          <button className="btn" onClick={onKillAll} disabled={killBusy}
+            style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
+            {killBusy ? 'Killing…' : 'Kill all running'}
+          </button>
+          {killResult && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
+          )}
         </div>
-      )}
+        <BindingsCheck />
+      </div>
       <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
         To bring the whole corpus to complete + data: ~${cost.toFixed(2)} estimated cost.
       </div>
+    </div>
+  )
+}
+
+function BindingsCheck() {
+  const [data, setData] = useState<any | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const run = async () => {
+    setLoading(true); setErr(null)
+    try {
+      const r = await fetch('/api/v2/admin/bindings-check', { credentials: 'include' })
+      if (!r.ok) {
+        setErr(`HTTP ${r.status}`)
+        return
+      }
+      setData(await r.json())
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <div style={{ fontSize: 11, color: 'var(--fg-3)', borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span>Binding sanity check (use this if bulk Run returns "chunk request failed"):</span>
+        <button className="btn ghost small" onClick={run} disabled={loading} style={{ marginLeft: 'auto' }}>
+          {loading ? 'Checking…' : 'Check now'}
+        </button>
+      </div>
+      {err && <div style={{ color: 'var(--err)' }}>Error: {err}</div>}
+      {data && (
+        <div style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
+          padding: 8, background: 'var(--bg-2)', borderRadius: 4,
+          whiteSpace: 'pre-wrap',
+        }}>
+          {`ready_for.bulk_dispatch:       ${data.ready_for?.bulk_dispatch ? '✅' : '❌ (PIPELINE + HEARTBEAT_TOKEN required)'}
+ready_for.terminate_workflows: ${data.ready_for?.terminate_workflows ? '✅' : '❌ (CLOUDFLARE_API_TOKEN + ACCOUNT_ID required)'}
+ready_for.terminate_dos:       ${data.ready_for?.terminate_dos ? '✅' : '❌'}
+pipeline_probe:                ${data.pipeline_probe?.reachable ? `reachable (status ${data.pipeline_probe.status})` : `❌ ${data.pipeline_probe?.error || 'unreachable'}`}
+
+services:  PIPELINE=${data.services?.PIPELINE} PROCESS_UPLOAD=${data.services?.PROCESS_UPLOAD} DB=${data.services?.DB}
+secrets:   HEARTBEAT_TOKEN=${data.secrets?.HEARTBEAT_TOKEN} CF_API_TOKEN=${data.secrets?.CLOUDFLARE_API_TOKEN} ANTHROPIC=${data.secrets?.ANTHROPIC_API_KEY}`}
+        </div>
+      )}
     </div>
   )
 }
@@ -999,9 +1079,10 @@ async function dispatchChunkWithRetry(
 ): Promise<
   | { results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] }
   | 'aborted'
-  | 'fatal'
+  | { kind: 'fatal'; lastError: string }
 > {
   const maxAttempts = 3
+  let lastError = 'unknown — request never reached the server'
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (signal.aborted) return 'aborted'
     try {
@@ -1016,21 +1097,75 @@ async function dispatchChunkWithRetry(
         const d: any = await r.json()
         return { results: d.results ?? [] }
       }
+      // Capture the actual server error message for both 4xx and 5xx.
+      // Previously 5xx errors were retried silently and we lost the
+      // upstream error; now we keep the latest one and surface it if
+      // every retry fails.
+      let serverErr = `HTTP ${r.status}`
+      try {
+        const d: any = await r.json()
+        const hint = d?.hint ? ` · ${String(d.hint).slice(0, 200)}` : ''
+        const details = d?.details ? ` · ${String(d.details).slice(0, 200)}` : ''
+        serverErr = `HTTP ${r.status}: ${d?.error || 'unknown'}${details}${hint}`
+      } catch {
+        try { serverErr = `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` } catch {}
+      }
+      lastError = serverErr
       // 4xx (bad request, unauth) — fatal, don't retry.
       if (r.status >= 400 && r.status < 500) {
-        const d: any = await r.json().catch(() => ({}))
-        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: d?.error || `HTTP ${r.status}` })) }
+        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: serverErr })) }
       }
       // 5xx — retry with backoff.
     } catch (err: any) {
       if (signal.aborted || err?.name === 'AbortError') return 'aborted'
+      lastError = `network: ${err?.message || String(err)}`
     }
     if (attempt < maxAttempts) {
       await sleepWithAbort(500 * Math.pow(2, attempt - 1), signal)
       if (signal.aborted) return 'aborted'
     }
   }
-  return 'fatal'
+  return { kind: 'fatal', lastError }
+}
+
+// Poll /api/v2/vlogs/[id] every POLL_INTERVAL_MS until pipeline_status
+// reaches a terminal value, or POLL_TIMEOUT_MS elapses, or signal is
+// aborted. This is what makes "serial" actually serial — without it,
+// dispatch returns immediately and the next vlog kicks off before this
+// one's external services (FFmpeg, Workers AI) are free.
+const POLL_INTERVAL_MS = 5000
+const POLL_TIMEOUT_MS = 12 * 60 * 1000  // 12 min per vlog hard cap
+
+async function pollVlogCompletion(
+  vlog_id: string,
+  signal: AbortSignal,
+): Promise<{ ok: boolean; error?: string; aborted?: boolean }> {
+  const start = Date.now()
+  while (Date.now() - start < POLL_TIMEOUT_MS) {
+    if (signal.aborted) return { ok: false, aborted: true }
+    await sleepWithAbort(POLL_INTERVAL_MS, signal)
+    if (signal.aborted) return { ok: false, aborted: true }
+    try {
+      const r = await fetch(`/api/v2/vlogs/${vlog_id}`, { credentials: 'include', signal })
+      if (!r.ok) {
+        // Transient — keep polling.
+        continue
+      }
+      const d: any = await r.json()
+      const status = d?.vlog?.pipeline_status
+      if (status === 'complete') return { ok: true }
+      if (status === 'failed') {
+        return { ok: false, error: d?.vlog?.pipeline_error || 'pipeline_status=failed' }
+      }
+      // 'uploaded' / 'transcoding' / 'transcribing' / 'extracting' / 'archived'
+      // are all non-terminal from the operator's perspective — keep polling.
+    } catch (err: any) {
+      if (signal.aborted || err?.name === 'AbortError') return { ok: false, aborted: true }
+      // Transient fetch error — log and continue polling.
+      console.warn(`[pollVlogCompletion] ${vlog_id} fetch error:`, err?.message || err)
+    }
+  }
+  return { ok: false, error: `polling timed out after ${POLL_TIMEOUT_MS / 60000} min` }
 }
 
 function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
