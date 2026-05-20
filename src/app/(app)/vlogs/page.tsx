@@ -315,19 +315,22 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   }
   useEffect(() => { refreshDiag() }, [])
 
-  const runResetStuck = async () => {
+  const runResetStuck = async (alsoFailed = false) => {
     setResetBusy(true); setResetResult(null)
     try {
       const r = await fetch('/api/v2/admin/reset-stuck', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: 'in_flight' }),
+        body: JSON.stringify({
+          scope: alsoFailed ? 'failed' : 'in_flight',
+          reset_restart_count: true,
+        }),
       })
       const d: any = await r.json()
       if (!r.ok) {
         setResetResult(`Reset failed: ${d?.details || d?.error || `HTTP ${r.status}`}`)
       } else {
-        setResetResult(`Reset ${d.reset} stuck vlog${d.reset === 1 ? '' : 's'}.`)
+        setResetResult(`Reset ${d.reset} vlog${d.reset === 1 ? '' : 's'}.`)
         await refreshDiag()
       }
     } catch (err: any) {
@@ -841,7 +844,7 @@ function DiagnosticPanel({
   loading: boolean
   error: string | null
   onRefresh: () => void
-  onResetStuck: () => void
+  onResetStuck: (alsoFailed?: boolean) => void
   resetBusy: boolean
   resetResult: string | null
   onKillAll: () => void
@@ -880,14 +883,35 @@ function DiagnosticPanel({
           Refresh
         </button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 12 }}>
         <Stat label="Complete + data" value={status.complete_with_data ?? 0} tone="ok" />
-        <Stat label="Complete + no data" value={status.complete_no_data ?? 0} tone={status.complete_no_data ? 'err' : 'mute'} />
+        <Stat label="B-roll" value={status.b_roll ?? 0} tone="mute" />
+        <Stat label="Complete + no data" value={status.complete_no_data ?? 0} tone={status.complete_no_data ? 'mute' : 'mute'} />
         <Stat label="Transcribed only" value={status.transcribed_only ?? 0} />
         <Stat label="Untranscribed" value={status.untranscribed ?? 0} />
+        <Stat label="Archived" value={status.archived ?? 0} tone="mute" />
         <Stat label="Stuck > 5 min" value={stuck} tone={stuck > 0 ? 'err' : 'mute'} />
         <Stat label="Failed" value={status.failed ?? 0} tone={status.failed ? 'err' : 'mute'} />
       </div>
+      {diag.failure_breakdown && Object.keys(diag.failure_breakdown).length > 0 && (
+        <details style={{ fontSize: 12, marginTop: 4 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--fg-2)' }}>
+            Failure breakdown ({Object.values(diag.failure_breakdown as Record<string, number>).reduce((a, b) => a + b, 0)} total) · click to expand
+          </summary>
+          <div style={{
+            marginTop: 6, padding: 8,
+            background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 4,
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+          }}>
+            {Object.entries(diag.failure_breakdown as Record<string, number>).map(([id, count]) => (
+              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span>{FAILURE_LABELS[id] || id}</span>
+                <span style={{ color: 'var(--fg-3)' }}>{count}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
       {inFlightRecent > 0 && (
         <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
           {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
@@ -902,16 +926,28 @@ function DiagnosticPanel({
         fontSize: 12, color: 'var(--fg-1)',
         display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        {stuck > 0 && (
+        {(stuck > 0 || (status.failed ?? 0) > 0) && (
           <div>
             <div style={{ marginBottom: 6 }}>
-              <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
-              Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
-              Does NOT stop the actual background workflows.
+              {stuck > 0 && <><b>{stuck}</b> stuck</>}
+              {stuck > 0 && (status.failed ?? 0) > 0 && ' · '}
+              {(status.failed ?? 0) > 0 && <><b>{status.failed}</b> failed</>}
+              {' '}from prior runs. Reset clears their state +
+              pipeline_error + restart counter so the next bulk run picks them
+              up. Free — only D1 updates. Doesn't stop background workflows.
             </div>
-            <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
-              {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {stuck > 0 && (
+                <button className="btn" onClick={() => onResetStuck(false)} disabled={resetBusy}>
+                  {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck`}
+                </button>
+              )}
+              {(status.failed ?? 0) > 0 && (
+                <button className="btn" onClick={() => onResetStuck(true)} disabled={resetBusy}>
+                  {resetBusy ? 'Resetting…' : `Reset ${status.failed} failed + restart counter`}
+                </button>
+              )}
+            </div>
             {resetResult && (
               <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
             )}
@@ -1124,6 +1160,19 @@ async function dispatchChunkWithRetry(
 // vlogs by status across the whole corpus.
 const CHUNK_SIZE = 6
 const CHUNK_PAUSE_MS = 1000
+
+// Human-readable labels for the failure_breakdown buckets returned by
+// /api/v2/admin/pipeline-state. Keys match the FAILURE_CATEGORIES `id`
+// values in that endpoint.
+const FAILURE_LABELS: Record<string, string> = {
+  short_transcript: 'Transcript too short (will become b-roll)',
+  whisper_timeout: 'Whisper timeout (large file)',
+  whisper_empty: 'Whisper returned empty',
+  ffmpeg_503: 'FFmpeg container failure',
+  llm_degraded: 'LLM degraded response',
+  restart_limit: 'Stuck → healer gave up',
+  other: 'Other / uncategorized',
+}
 
 
 function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {

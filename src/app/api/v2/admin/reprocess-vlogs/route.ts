@@ -185,7 +185,11 @@ export async function POST(req: NextRequest) {
             //   1. Pipeline never finished (status != 'complete')
             //   2. No active extraction_runs row at all
             //   3. Active extraction_runs row exists but total_items=0
-            //      (silent-empty extraction bug victims)
+            //      AND the transcript is substantial (>= 200 chars).
+            //      Short-transcript zero-item runs are b-roll — those
+            //      are terminal, NOT eligible for re-dispatch.
+            //   4. extraction_runs.model = 'short-transcript-skip' is
+            //      explicitly the b-roll marker; never re-dispatch.
             : `SELECT v.id AS id,
                       CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
                            THEN 1 ELSE 0 END AS has_transcript
@@ -195,7 +199,11 @@ export async function POST(req: NextRequest) {
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
                   AND (v.pipeline_status != 'complete'
                        OR r.id IS NULL
-                       OR COALESCE(r.total_items, 0) = 0)
+                       OR (
+                         COALESCE(r.total_items, 0) = 0
+                         AND COALESCE(r.model, '') != 'short-transcript-skip'
+                         AND LENGTH(COALESCE(v.transcript_text, '')) >= 200
+                       ))
                   ${inFlightWhere}
                 ORDER BY v.id
                 LIMIT ${MAX_LIST_RESOLVE}`,
