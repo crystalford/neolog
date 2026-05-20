@@ -62,6 +62,14 @@ class_name = "VlogPipelineDO"
 name = "LLAMA_GATE"
 class_name = "LlamaGate"
 
+# Second LLM gate, points at Workers AI Kimi K2.6. Separate rate-limit
+# pool from Llama so the pipeline can round-robin between them and
+# effectively double extract throughput while staying entirely within
+# Workers AI (no Anthropic spend).
+[[durable_objects.bindings]]
+name = "KIMI_GATE"
+class_name = "KimiGate"
+
 # Singleton DO that gates FFmpeg container calls. The FFmpeg worker has
 # max_instances=5; without this gate, simultaneous bulk dispatches burst
 # the container pool and 503 on instances 6+. The pipeline DO acquires
@@ -82,6 +90,10 @@ new_classes = ["LlamaGate"]
 tag = "v3"
 new_classes = ["FFmpegGate"]
 
+[[migrations]]
+tag = "v4"
+new_classes = ["KimiGate"]
+
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
 R2_BUCKET_NAME = "neolog-videos"
@@ -95,6 +107,10 @@ LLAMA_GATE_CONCURRENCY = "3"
 # has max_instances=5, so we leave 2 instances of headroom for thumbnail
 # / transcode work from the legacy workflow. Default 3.
 FFMPEG_GATE_CONCURRENCY = "3"
+# Concurrent calls to Workers AI Kimi K2.6 through the gate. Same
+# default as Llama. Total in-flight LLM extract calls = LLAMA + KIMI
+# = up to 6 across two separate rate-limit pools.
+KIMI_GATE_CONCURRENCY = "3"
 
 [observability]
 enabled = true

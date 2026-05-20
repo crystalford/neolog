@@ -81,12 +81,12 @@ interface AiBinding {
   run: (model: string, input: any, opts?: any) => Promise<any>
 }
 
-// Shape of the LlamaGate singleton DO binding from workers/pipeline. We
+// Shape of a singleton AI gate DO binding from workers/pipeline. We
 // don't import the real DurableObjectNamespace type here because this
 // file is shared between the Pages app and the worker, and Pages
 // doesn't carry the Workers DO type globally. The shape we actually
 // touch is narrower than DurableObjectNamespace anyway.
-interface LlamaGateBinding {
+interface AIGateBinding {
   idFromName(name: string): unknown
   get(id: unknown): {
     fetch: (input: string | Request, init?: RequestInit) => Promise<Response>
@@ -96,11 +96,17 @@ interface LlamaGateBinding {
 export interface ExtractEnv {
   AI: AiBinding
   ANTHROPIC_API_KEY?: string
-  // Optional. When present, callLlama70B routes through the gate to
+  // Optional. When present, extract calls route through a gate to
   // enforce a global concurrency cap on Workers AI. When absent (e.g.
-  // the legacy process-upload workflow, single-vlog Pages calls
-  // without a binding), we fall back to direct env.AI.run.
-  LLAMA_GATE?: LlamaGateBinding
+  // the legacy process-upload workflow), we fall back to direct
+  // env.AI.run.
+  LLAMA_GATE?: AIGateBinding
+  // Second gate, points at Kimi K2.6 (separate Workers AI rate-limit
+  // pool). Extraction round-robins between Llama and Kimi to double
+  // effective throughput. If Llama fails, the call automatically
+  // retries on Kimi (cross-model fallback). When KIMI_GATE is absent,
+  // we just stick with LLAMA_GATE.
+  KIMI_GATE?: AIGateBinding
   // For observability — when set, the gate logs wait/run timings
   // against this vlog/operator in pipeline_events.
   LLAMA_GATE_VLOG_ID?: string
@@ -287,79 +293,122 @@ export async function runExtraction(
   }
 }
 
+const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
+
+type LlmProvider = 'llama' | 'kimi'
+
+// Round-robin pick: if both gates are bound, alternate by hashing the
+// vlog_id. With LLAMA_GATE cap 3 + KIMI_GATE cap 3, we get 6 effective
+// in-flight LLM extract slots without touching Anthropic. If only Llama
+// is bound (legacy callers), stick with it.
+function pickProvider(env: ExtractEnv): LlmProvider {
+  if (!env.KIMI_GATE) return 'llama'
+  if (!env.LLAMA_GATE) return 'kimi'
+  const seed = env.LLAMA_GATE_VLOG_ID || ''
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0
+  return (h & 1) === 0 ? 'llama' : 'kimi'
+}
+
+const PROVIDER_MODELS: Record<LlmProvider, string> = {
+  llama: LLAMA_70B,
+  kimi: KIMI_K2_6,
+}
+const PROVIDER_GATE_NAMES: Record<LlmProvider, string> = {
+  llama: 'llama-gate-singleton',
+  kimi: 'kimi-gate-singleton',
+}
+
+async function callViaGate(
+  env: ExtractEnv,
+  provider: LlmProvider,
+  messages: any[],
+): Promise<any> {
+  const binding = provider === 'llama' ? env.LLAMA_GATE : env.KIMI_GATE
+  if (!binding) {
+    // Caller is responsible for picking a bound provider. If we get here,
+    // fall back to direct env.AI.run on the right model.
+    return env.AI.run(PROVIDER_MODELS[provider], { messages, max_tokens: 4096 } as any)
+  }
+  const stub = binding.get(binding.idFromName(PROVIDER_GATE_NAMES[provider]))
+  let gateRes: Response
+  try {
+    gateRes = await stub.fetch('https://gate/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        max_tokens: 4096,
+        vlog_id: env.LLAMA_GATE_VLOG_ID,
+        operator_id: env.LLAMA_GATE_OPERATOR_ID,
+      }),
+    })
+  } catch (err: any) {
+    throw new Error(`${provider} gate fetch failed: ${err?.message || err}`)
+  }
+  let envelope: any
+  try { envelope = await gateRes.json() }
+  catch (err: any) {
+    throw new Error(`${provider} gate returned non-JSON (status=${gateRes.status}): ${err?.message || err}`)
+  }
+  if (!gateRes.ok || envelope?.ok === false) {
+    throw new Error(
+      `${provider} gate upstream error (status=${gateRes.status}, wait=${envelope?.wait_ms}ms, run=${envelope?.run_ms}ms): ` +
+      `${envelope?.error || 'unknown'}`,
+    )
+  }
+  return envelope.result
+}
+
+function validateLLMResponse(provider: LlmProvider, res: any): string {
+  if (!res) throw new Error(`${provider} returned null/undefined response`)
+  if (res.errors) throw new Error(`${provider} errors: ${JSON.stringify(res.errors).slice(0, 400)}`)
+  if (res.success === false) {
+    throw new Error(`${provider} success:false ${res.error ? `: ${String(res.error).slice(0, 200)}` : ''}`)
+  }
+  const text = res?.response ?? res?.text ?? ''
+  if (typeof text !== 'string' || text.length < 50) {
+    throw new Error(`${provider} returned suspiciously short response (${text?.length ?? 0} chars): ${String(text).slice(0, 120)}`)
+  }
+  return text
+}
+
+// Workers AI extract call with automatic cross-model fallback.
+// - Picks an initial provider (round-robin between Llama / Kimi).
+// - If that throws (rate-limit / degraded response / network), retries
+//   ONCE on the OTHER provider. Different rate-limit pool, so failures
+//   on one model usually succeed on the other.
+// - Only throws if both providers fail.
+//
+// This is the in-house alternative to falling back to Sonnet — keeps
+// extraction entirely on Workers AI while still recovering from
+// transient single-model failures.
 async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {
   const messages = [
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: `Transcript:\n\n${transcript}${jsonReminder ? '\n\nReturn ONLY the JSON object — no prose.' : ''}` },
   ]
 
-  let res: any
-  if (env.LLAMA_GATE) {
-    // Routed path: the gate DO enforces concurrency before calling
-    // env.AI.run internally. We hold this fetch until a slot opens —
-    // that's the desired backpressure shape per CLAUDE.md ("hold the
-    // connection, we underestimate how long it takes"). The gate
-    // returns the raw env.AI.run result inside { ok, result } or an
-    // error envelope which we re-throw.
-    const stub = env.LLAMA_GATE.get(env.LLAMA_GATE.idFromName('llama-gate-singleton'))
-    let gateRes: Response
-    try {
-      gateRes = await stub.fetch('https://gate/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages,
-          max_tokens: 4096,
-          vlog_id: env.LLAMA_GATE_VLOG_ID,
-          operator_id: env.LLAMA_GATE_OPERATOR_ID,
-        }),
-      })
-    } catch (err: any) {
-      throw new Error(`LlamaGate fetch failed: ${err?.message || err}`)
-    }
+  const primary = pickProvider(env)
+  const secondary: LlmProvider = primary === 'llama' ? 'kimi' : 'llama'
 
-    let envelope: any
+  try {
+    const res = await callViaGate(env, primary, messages)
+    return validateLLMResponse(primary, res)
+  } catch (primaryErr: any) {
+    // Only cross-fall-back if the OTHER gate is bound. Otherwise re-throw.
+    const otherBinding = secondary === 'llama' ? env.LLAMA_GATE : env.KIMI_GATE
+    if (!otherBinding) throw primaryErr
     try {
-      envelope = await gateRes.json()
-    } catch (err: any) {
-      throw new Error(`LlamaGate returned non-JSON (status=${gateRes.status}): ${err?.message || err}`)
-    }
-    if (!gateRes.ok || envelope?.ok === false) {
+      const res = await callViaGate(env, secondary, messages)
+      return validateLLMResponse(secondary, res)
+    } catch (secondaryErr: any) {
       throw new Error(
-        `LlamaGate upstream error (status=${gateRes.status}, wait=${envelope?.wait_ms}ms, run=${envelope?.run_ms}ms): ` +
-        `${envelope?.error || 'unknown'}`,
+        `both providers failed: ${primary}: ${primaryErr?.message || primaryErr} | ` +
+        `${secondary}: ${secondaryErr?.message || secondaryErr}`,
       )
     }
-    res = envelope.result
-  } else {
-    // Fallback path: direct Workers AI call. Used by the legacy
-    // process-upload Workflow which doesn't have the gate binding.
-    try {
-      res = await env.AI.run(LLAMA_70B, { messages, max_tokens: 4096 } as any)
-    } catch (err: any) {
-      // Workers AI throws an AiError on rate limits / capacity. Re-throw so
-      // the DO retries with backoff — don't swallow into "empty extraction".
-      throw new Error(`Workers AI Llama failed: ${err?.message || err}`)
-    }
   }
-
-  if (!res) {
-    throw new Error('Workers AI Llama returned null/undefined response')
-  }
-  if (res.errors) {
-    throw new Error(`Workers AI Llama errors: ${JSON.stringify(res.errors).slice(0, 400)}`)
-  }
-  if (res.success === false) {
-    throw new Error(`Workers AI Llama success:false ${res.error ? `: ${String(res.error).slice(0, 200)}` : ''}`)
-  }
-  const text = res?.response ?? res?.text ?? ''
-  if (typeof text !== 'string' || text.length < 50) {
-    // A real extraction is multi-KB JSON. Anything under 50 chars is a
-    // truncated/degraded response — not safe to parse as "valid empty
-    // extraction." Throw so the DO retries.
-    throw new Error(`Workers AI Llama returned suspiciously short response (${text?.length ?? 0} chars): ${String(text).slice(0, 120)}`)
-  }
-  return text
 }
 
 async function callSonnet(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {

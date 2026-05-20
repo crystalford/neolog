@@ -667,14 +667,15 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5,
               padding: 8, background: 'var(--bg-1)', borderRadius: 4, border: '1px solid var(--line)',
             }}>
-              <b style={{ color: 'var(--fg-1)' }}>Bounded-parallel mode:</b> processes 3 vlogs
-              simultaneously, each polled independently. Downstream rate-limiters
-              (FFmpegGate cap 3 + LlamaGate cap 3) absorb the concurrency safely —
-              external services never see more than their cap regardless of how many
-              vlogs are in flight client-side. Per-vlog poll every 5s with adaptive
-              deadline: extends as long as the vlog's updated_at keeps advancing;
-              abandons if 8 min pass with no progress, or 25 min absolute. Close
-              the modal anytime — localStorage checkpoint resumes from where it stopped.
+              <b style={{ color: 'var(--fg-1)' }}>6-parallel mode with multi-LLM:</b> 6 vlogs
+              processed simultaneously, each polled independently. LLM extract calls
+              round-robin between Llama 3.3-70B and Kimi K2.6 (CLAUDE.md's preferred
+              voice-preserving model) — two separate Workers AI rate-limit pools,
+              with automatic cross-model fallback if either rate-limits. Downstream
+              gates: FFmpeg cap 3, Llama cap 3, Kimi cap 3. Per-vlog poll every 5s
+              with adaptive deadline: extends as long as updated_at keeps advancing,
+              8 min no-progress timeout, 25 min absolute. Close the modal anytime —
+              localStorage checkpoint resumes from where it stopped.
             </div>
 
             {previewError && (
@@ -1155,11 +1156,14 @@ async function dispatchChunkWithRetry(
 
 // Number of vlogs the client processes simultaneously. Each one
 // dispatches + polls independently. The downstream rate-limiters
-// (FFmpegGate cap 3, LlamaGate cap 3 in workers/pipeline) are sized to
-// safely absorb this; CLIENT_CONCURRENCY = 3 fills the gate budget
-// without overshooting. Going higher (e.g. 6) doesn't get faster — it
-// just builds queue depth at the gates.
-const CLIENT_CONCURRENCY = 3
+// (FFmpegGate cap 3, LlamaGate cap 3, KimiGate cap 3) sum to 6
+// effective LLM slots across two separate Workers AI rate-limit
+// pools, so CLIENT_CONCURRENCY = 6 fills the LLM budget. FFmpeg is
+// still cap 3 so audio_extract serializes through that gate — but
+// that step finishes quickly relative to the LLM step, so 6 vlogs
+// can be in different stages of the pipeline simultaneously without
+// the FFmpeg bottleneck dominating.
+const CLIENT_CONCURRENCY = 6
 
 // Adaptive polling: extends the deadline whenever the vlog's updated_at
 // advances (= the pipeline is still doing real work). A long video that
