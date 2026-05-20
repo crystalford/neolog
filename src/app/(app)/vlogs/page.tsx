@@ -652,7 +652,9 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
             }}>
               <b style={{ color: 'var(--fg-1)' }}>Strict serial mode:</b> one vlog at a time,
               dispatch then wait for it to actually finish before moving to the next.
-              Per-vlog poll every 5s, 12-minute hard cap per vlog. This is the slowest
+              Per-vlog poll every 5s. Adaptive deadline: extends as long as
+              the vlog's updated_at keeps advancing; abandons if 8 min pass
+              with no progress, or 25 min absolute. This is the slowest
               throughput but the only mode that's been proven reliable on this corpus.
               You can close the modal and reopen — the run resumes from a localStorage
               checkpoint.
@@ -1128,44 +1130,93 @@ async function dispatchChunkWithRetry(
   return { kind: 'fatal', lastError }
 }
 
-// Poll /api/v2/vlogs/[id] every POLL_INTERVAL_MS until pipeline_status
-// reaches a terminal value, or POLL_TIMEOUT_MS elapses, or signal is
-// aborted. This is what makes "serial" actually serial — without it,
-// dispatch returns immediately and the next vlog kicks off before this
-// one's external services (FFmpeg, Workers AI) are free.
+// Adaptive polling: extends the deadline whenever the vlog's updated_at
+// advances (= the pipeline is still doing real work). A long video that
+// legitimately takes 20 min to transcribe shouldn't get prematurely
+// abandoned — but a DO whose alarm got dropped should be caught quickly.
+// Also: when polling timeout finally hits, do one last check (the vlog
+// might have completed during the last sleep cycle).
 const POLL_INTERVAL_MS = 5000
-const POLL_TIMEOUT_MS = 12 * 60 * 1000  // 12 min per vlog hard cap
+const POLL_BASE_TIMEOUT_MS = 25 * 60 * 1000      // 25 min absolute cap
+const POLL_NO_PROGRESS_TIMEOUT_MS = 8 * 60 * 1000 // 8 min without updated_at change → abandon
 
 async function pollVlogCompletion(
   vlog_id: string,
   signal: AbortSignal,
 ): Promise<{ ok: boolean; error?: string; aborted?: boolean }> {
   const start = Date.now()
-  while (Date.now() - start < POLL_TIMEOUT_MS) {
+  let lastUpdatedAt: string | null = null
+  let lastProgressAt = start
+
+  while (Date.now() - start < POLL_BASE_TIMEOUT_MS) {
     if (signal.aborted) return { ok: false, aborted: true }
     await sleepWithAbort(POLL_INTERVAL_MS, signal)
     if (signal.aborted) return { ok: false, aborted: true }
     try {
       const r = await fetch(`/api/v2/vlogs/${vlog_id}`, { credentials: 'include', signal })
-      if (!r.ok) {
-        // Transient — keep polling.
-        continue
+      if (!r.ok) continue
+      const d: any = await r.json()
+      const status = d?.vlog?.pipeline_status
+      const updatedAt = d?.vlog?.updated_at ?? null
+
+      if (status === 'complete') return { ok: true }
+      if (status === 'failed') {
+        return { ok: false, error: await fetchFailureReason(vlog_id, d?.vlog?.pipeline_error) }
       }
+
+      // Progress signal: updated_at moved forward → pipeline is alive.
+      if (updatedAt && updatedAt !== lastUpdatedAt) {
+        lastUpdatedAt = updatedAt
+        lastProgressAt = Date.now()
+      }
+      // No-progress: alarm probably dropped or DO is stuck. Give up.
+      if (Date.now() - lastProgressAt > POLL_NO_PROGRESS_TIMEOUT_MS) {
+        return {
+          ok: false,
+          error: `no pipeline progress in ${POLL_NO_PROGRESS_TIMEOUT_MS / 60000} min (last status=${status})`,
+        }
+      }
+    } catch (err: any) {
+      if (signal.aborted || err?.name === 'AbortError') return { ok: false, aborted: true }
+      console.warn(`[pollVlogCompletion] ${vlog_id} fetch error:`, err?.message || err)
+    }
+  }
+  // Final check at the cap — the vlog may have just finished.
+  try {
+    const r = await fetch(`/api/v2/vlogs/${vlog_id}`, { credentials: 'include', signal })
+    if (r.ok) {
       const d: any = await r.json()
       const status = d?.vlog?.pipeline_status
       if (status === 'complete') return { ok: true }
       if (status === 'failed') {
-        return { ok: false, error: d?.vlog?.pipeline_error || 'pipeline_status=failed' }
+        return { ok: false, error: await fetchFailureReason(vlog_id, d?.vlog?.pipeline_error) }
       }
-      // 'uploaded' / 'transcoding' / 'transcribing' / 'extracting' / 'archived'
-      // are all non-terminal from the operator's perspective — keep polling.
-    } catch (err: any) {
-      if (signal.aborted || err?.name === 'AbortError') return { ok: false, aborted: true }
-      // Transient fetch error — log and continue polling.
-      console.warn(`[pollVlogCompletion] ${vlog_id} fetch error:`, err?.message || err)
     }
-  }
-  return { ok: false, error: `polling timed out after ${POLL_TIMEOUT_MS / 60000} min` }
+  } catch {}
+  return { ok: false, error: `polling timed out at the ${POLL_BASE_TIMEOUT_MS / 60000} min absolute cap` }
+}
+
+// When a vlog enters pipeline_status='failed', the bare status doesn't
+// tell the operator anything actionable. Read the most recent failed
+// pipeline_event so the bulk failure list shows e.g.
+// "[extract] Workers AI Llama failed: 429 rate limit" instead of just
+// "pipeline_status=failed".
+async function fetchFailureReason(vlog_id: string, fallback: string | null | undefined): Promise<string> {
+  try {
+    const r = await fetch(`/api/v2/vlogs/${vlog_id}/events`, { credentials: 'include' })
+    if (r.ok) {
+      const d: any = await r.json()
+      const events: any[] = d?.events ?? []
+      const lastFailure = events
+        .filter(e => e?.status === 'failed' || e?.status === 'failed_terminal')
+        .pop()
+      if (lastFailure) {
+        const detail = lastFailure.error_full_text || lastFailure.detail_json || ''
+        return `[${lastFailure.step}] ${String(detail).slice(0, 240)}`
+      }
+    }
+  } catch {}
+  return fallback || 'pipeline_status=failed (no detail)'
 }
 
 function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
