@@ -158,6 +158,40 @@ function runFfmpegCapture(args) {
   })
 }
 
+/**
+ * Run ffprobe and return parsed JSON, or throw with stderr.
+ *
+ * Used by /extract-audio to detect inputs with no audio stream BEFORE
+ * burning 5 strategies on them. DJI Mimo slow-mo (120/240 fps) records
+ * video-only — the audio track is omitted because stretched audio would
+ * sound awful. FFmpeg's `-c:a copy` (and the other 4 codec strategies)
+ * all exit 234 / EINVAL when asked to extract a non-existent stream,
+ * and the stderr is just the build banner. Probing first lets us return
+ * `{ ok: true, no_audio: true }` so the pipeline marks the vlog as
+ * b-roll instead of failing.
+ */
+function ffprobeJson(inputFile) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffprobe', [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_streams',
+      '-show_format',
+      inputFile,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    proc.stdout.on('data', d => { stdout += d.toString() })
+    proc.stderr.on('data', d => { stderr += d.toString() })
+    proc.on('error', err => reject(err))
+    proc.on('exit', code => {
+      if (code !== 0) return reject(new Error(`ffprobe exit ${code}: ${stderr.slice(-1500)}`))
+      try { resolve(JSON.parse(stdout)) }
+      catch (e) { reject(new Error(`ffprobe returned non-JSON: ${e.message}`)) }
+    })
+  })
+}
+
 function streamFile(res, filePath, contentType) {
   const stat = statSync(filePath)
   res.writeHead(200, {
@@ -374,6 +408,52 @@ async function extractAudio(body, res) {
     operator_id,
     step: 'audio_extract',
   })
+
+  // Pre-flight: probe the input to check for an audio stream. If there
+  // isn't one (DJI Mimo slow-mo records video-only, GoPro / iPhone time-
+  // lapses are silent, some screen recordings, etc.) we return a clear
+  // "no audio" signal instead of grinding through 5 codec strategies
+  // that all fail with FFmpeg's unhelpful EINVAL/build-banner combo.
+  //
+  // The caller (pipeline DO) treats `no_audio: true` as a successful
+  // result with empty transcript, which flows through the existing
+  // b-roll classification path (transcript_len < 200 + 0 items).
+  try {
+    await beat('running', 'probe', { state: 'probing' })
+    const probe = await ffprobeJson(inputFile)
+    const audioStreams = (probe.streams || []).filter(s => s.codec_type === 'audio')
+    if (audioStreams.length === 0) {
+      const videoStreams = (probe.streams || []).filter(s => s.codec_type === 'video')
+      const v = videoStreams[0] || {}
+      await beat('ok', 'probe', {
+        state: 'no_audio',
+        reason: 'input_has_no_audio_stream',
+        video_codec: v.codec_name || null,
+        video_fps: v.r_frame_rate || null,
+        duration_sec: probe.format?.duration ? parseFloat(probe.format.duration) : null,
+        note: 'Likely DJI slow-mo, time-lapse, or other silent recording. Returning empty audio signal so the pipeline marks the vlog as b-roll instead of failing.',
+      })
+      cleanup(dir)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        ok: true,
+        no_audio: true,
+        video_codec: v.codec_name || null,
+        video_fps: v.r_frame_rate || null,
+        duration_sec: probe.format?.duration ? parseFloat(probe.format.duration) : null,
+      }))
+      return
+    }
+  } catch (err) {
+    // If ffprobe itself fails the input really IS unreadable. Fall
+    // through to the strategy cascade — its error message will be more
+    // diagnostic than ffprobe's, and a strategy *might* still squeeze
+    // audio out.
+    await beat('retrying', 'probe', {
+      state: 'probe_failed_falling_back',
+      error: String(err?.message || err).slice(0, 800),
+    })
+  }
 
   // Audio extraction strategies, tried in order until one succeeds.
   // Each previous strategy got stuck on roughly 1 in 5 vlogs with

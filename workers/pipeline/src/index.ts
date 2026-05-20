@@ -633,6 +633,53 @@ export class VlogPipelineDO {
         throw new Error(`ffmpeg /extract-audio ${resp.status}: ${errBody}`)
       }
 
+      // Probe-detected silent input (DJI slow-mo, time-lapse, etc.) —
+      // FFmpeg returns a JSON envelope { ok: true, no_audio: true }
+      // instead of audio bytes. Skip the R2 write, mark transcript as
+      // empty, mark pipeline complete. The b-roll classifier picks
+      // this up via transcript_len < 200 + 0 extracted items.
+      const contentType = resp.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const envelope: any = await resp.json().catch(() => ({}))
+        if (envelope?.no_audio === true) {
+          await this.recordEvent(vlog.id, 'audio_extract', 'ok', 'no_audio_input',
+            {
+              state: 'silent_input',
+              reason: 'ffprobe_found_no_audio_stream',
+              video_codec: envelope.video_codec,
+              video_fps: envelope.video_fps,
+              duration_sec: envelope.duration_sec,
+              note: 'Input has no audio stream (DJI slow-mo, time-lapse, or other silent recording). Marking complete as b-roll — no transcribe / extract steps will run.',
+            },
+          )
+          // Mark transcript empty + jump straight to complete. Skip
+          // transcribe + extract entirely. The diagnosis banner will
+          // classify this as b-roll on the next /events poll.
+          await this.env.DB.prepare(
+            `UPDATE vlogs
+                SET pipeline_status = 'complete',
+                    transcript_text = '',
+                    pipeline_error = NULL,
+                    state = 'ready',
+                    state_error = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+          ).bind(vlog.id).run()
+          // Insert an active extraction_runs row so the UI reads this
+          // as "complete with 0 items" rather than "no run at all".
+          const runId = ulid()
+          await this.env.DB.prepare(
+            `INSERT INTO extraction_runs
+               (id, vlog_id, operator_id, model, escalated_from, mode, r2_key,
+                total_items, invalid_items, fail_rate, is_active, created_at)
+             VALUES (?, ?, ?, 'no-audio-skip', NULL, 'cheap', '', 0, 0, 0, 1, ?)`,
+          ).bind(runId, vlog.id, vlog.operator_id, Date.now()).run()
+          // Short-circuit — the alarm loop will see pipeline_status='complete'
+          // on the next tick and exit cleanly.
+          return
+        }
+      }
+
       const audioBytes = new Uint8Array(await resp.arrayBuffer())
       const r2Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
       await this.env.VIDEOS.put(r2Key, audioBytes, {
