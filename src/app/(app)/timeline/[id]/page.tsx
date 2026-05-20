@@ -180,6 +180,17 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {sizeMb && <span>{sizeMb} MB</span>}
         {vlog.mime_type && <span>{vlog.mime_type}</span>}
         <span className="status-pill">{status}</span>
+        {/* Derived "b-roll" classification: complete + minimal transcript
+            + no extracted items. Surfaced as a separate pill so the
+            operator can tell silent/dialogue-less footage apart from
+            truly-broken vlogs at a glance. */}
+        {status === 'complete' &&
+         (vlog.transcript_text?.length ?? 0) < 200 &&
+         (threads.length + clips.length + creative.length + entities.length) === 0 && (
+          <span className="status-pill" style={{ background: 'var(--bg-2)', color: 'var(--fg-3)' }}>
+            B-ROLL
+          </span>
+        )}
       </div>
 
       {vlog.pipeline_error && (

@@ -70,6 +70,13 @@ export async function GET(req: NextRequest) {
       n: number
     }>(
       db,
+      // B-roll classification: a vlog is b-roll when it completed
+      // successfully but has either no transcript or very short
+      // (< 200 chars) transcript content AND zero extracted items.
+      // These are silent / dialogue-less recordings — still valid
+      // footage, just nothing to extract. They shouldn't visually
+      // group with "failed" or even "complete + no data" (which
+      // implies the LLM tried and rejected the content).
       `WITH classified AS (
          SELECT v.id,
                 CASE
@@ -85,6 +92,14 @@ export async function GET(req: NextRequest) {
                             AND COALESCE(r.total_items, 0) > 0
                        )
                     THEN 'complete_with_data'
+                  WHEN v.pipeline_status = 'complete'
+                       AND LENGTH(COALESCE(v.transcript_text, '')) < 200
+                       AND EXISTS (
+                         SELECT 1 FROM extraction_runs r
+                          WHERE r.vlog_id = v.id AND r.is_active = 1
+                            AND COALESCE(r.total_items, 0) = 0
+                       )
+                    THEN 'b_roll'
                   WHEN v.pipeline_status = 'complete'
                     THEN 'complete_no_data'
                   WHEN v.pipeline_status = 'failed'
@@ -108,6 +123,7 @@ export async function GET(req: NextRequest) {
     const by_status: Record<string, number> = {
       complete_with_data: 0,
       complete_no_data: 0,
+      b_roll: 0,
       transcribed_only: 0,
       untranscribed: 0,
       stuck_in_flight: 0,
@@ -119,6 +135,54 @@ export async function GET(req: NextRequest) {
     for (const row of rows) {
       by_status[row.bucket] = row.n
       total += row.n
+    }
+
+    // Failure breakdown: pull the latest failed_terminal pipeline_event
+    // per failed vlog and classify by substring match. Lets the operator
+    // see why things failed instead of a single "Failed: 35" number.
+    const FAILURE_CATEGORIES: Array<{ id: string; match: RegExp; label: string }> = [
+      { id: 'short_transcript', match: /transcript_text missing or too short|transcript_too_short/i, label: 'Transcript too short' },
+      { id: 'whisper_timeout', match: /whisper.*timed?\s*out|workers.*timeout|exceeded the allowed/i, label: 'Whisper timeout' },
+      { id: 'whisper_empty', match: /whisper returned empty/i, label: 'Whisper returned empty' },
+      { id: 'ffmpeg_503', match: /ffmpeg.*503|container failed to start|durable object is overloaded/i, label: 'FFmpeg container failure' },
+      { id: 'llm_degraded', match: /suspiciously short|JSON but lacks expected keys|both providers failed/i, label: 'LLM degraded response' },
+      { id: 'restart_limit', match: /auto-restart limit reached/i, label: 'Stuck → healer gave up' },
+    ]
+    const failure_breakdown: Record<string, number> = {}
+    try {
+      const failedEvents = await findMany<{ vlog_id: string; error_full_text: string | null }>(
+        db,
+        `WITH latest AS (
+           SELECT vlog_id, MAX(started_at) AS last_failed_at
+             FROM pipeline_events
+            WHERE operator_id = ? AND status IN ('failed', 'failed_terminal')
+            GROUP BY vlog_id
+         )
+         SELECT pe.vlog_id, pe.error_full_text
+           FROM pipeline_events pe
+           JOIN latest l ON l.vlog_id = pe.vlog_id AND l.last_failed_at = pe.started_at
+          WHERE pe.operator_id = ?
+            AND pe.vlog_id IN (
+              SELECT id FROM vlogs WHERE operator_id = ? AND pipeline_status = 'failed' AND deleted_at IS NULL
+            )`,
+        operator.id, operator.id, operator.id,
+      )
+      for (const ev of failedEvents) {
+        const text = ev.error_full_text || ''
+        let matched = false
+        for (const cat of FAILURE_CATEGORIES) {
+          if (cat.match.test(text)) {
+            failure_breakdown[cat.id] = (failure_breakdown[cat.id] ?? 0) + 1
+            matched = true
+            break
+          }
+        }
+        if (!matched) {
+          failure_breakdown.other = (failure_breakdown.other ?? 0) + 1
+        }
+      }
+    } catch (err: any) {
+      console.warn('[pipeline-state] failure_breakdown failed:', err?.message || err)
     }
 
     // First few stuck examples so the operator can spot-check what they are.
@@ -153,6 +217,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       total,
       by_status,
+      failure_breakdown,
       stuck_examples,
       counts_for_run: {
         needs_full_pipeline: needsFullPipeline,

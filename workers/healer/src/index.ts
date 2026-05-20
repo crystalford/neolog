@@ -30,8 +30,16 @@ interface Env {
 }
 
 const STUCK_STATUSES = ['transcoding', 'transcribing', 'extracting'] as const
+// Base stuck threshold. Large files (>500 MB) get a longer grace window
+// since their FFmpeg audio extract + Whisper transcribe can legitimately
+// take 15-20 min on a 1+ GB vlog.
 const STUCK_AFTER_MINUTES = 10
-const MAX_RESTARTS = 3
+const STUCK_AFTER_MINUTES_LARGE = 25
+const LARGE_FILE_BYTES = 500 * 1024 * 1024
+// Bumped 3 → 6 because large vlogs need more retry budget. With chunked
+// audio + Whisper retries internally, a single overall pipeline attempt
+// can take 10+ min on its own.
+const MAX_RESTARTS = 6
 
 interface StuckRow {
   id: string
@@ -39,6 +47,7 @@ interface StuckRow {
   pipeline_status: string
   pipeline_restart_count: number
   updated_at: string
+  file_size_bytes: number | null
 }
 
 export default {
@@ -65,20 +74,30 @@ async function sweep(env: Env): Promise<{
   errors: Array<{ id: string; error: string }>
 }> {
   const placeholders = STUCK_STATUSES.map(() => '?').join(',')
-  // datetime('now','-10 minutes') is the SQLite idiom for "older than" —
-  // compares against the timestamp stored in updated_at by every workflow
-  // step. A healthy workflow updates this column at least once per minute.
-  const cutoff = `-${STUCK_AFTER_MINUTES} minutes`
-
+  // Use a size-aware cutoff: small/medium files use the base
+  // STUCK_AFTER_MINUTES; files over LARGE_FILE_BYTES get the longer
+  // STUCK_AFTER_MINUTES_LARGE window. A 1 GB vlog with 30 min of audio
+  // legitimately takes ~15-20 min for FFmpeg + Whisper to finish.
   const stmt = env.DB.prepare(
-    `SELECT id, operator_id, pipeline_status, pipeline_restart_count, updated_at
+    `SELECT id, operator_id, pipeline_status, pipeline_restart_count, updated_at,
+            file_size_bytes
        FROM vlogs
       WHERE pipeline_status IN (${placeholders})
         AND deleted_at IS NULL
-        AND updated_at < datetime('now', ?)
+        AND (
+          (COALESCE(file_size_bytes, 0) >= ?
+            AND updated_at < datetime('now', ?))
+          OR
+          (COALESCE(file_size_bytes, 0) < ?
+            AND updated_at < datetime('now', ?))
+        )
       ORDER BY updated_at ASC
       LIMIT 50`,
-  ).bind(...STUCK_STATUSES, cutoff)
+  ).bind(
+    ...STUCK_STATUSES,
+    LARGE_FILE_BYTES, `-${STUCK_AFTER_MINUTES_LARGE} minutes`,
+    LARGE_FILE_BYTES, `-${STUCK_AFTER_MINUTES} minutes`,
+  )
 
   const rows = (await stmt.all<StuckRow>()).results ?? []
 

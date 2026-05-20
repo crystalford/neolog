@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     scope?: 'in_flight' | 'failed' | 'all'
     stuck_minutes?: number
     dry_run?: boolean
+    reset_restart_count?: boolean
   }
   const scope = body.scope === 'failed' || body.scope === 'all' ? body.scope : 'in_flight'
   const stuckMin = Math.max(0, Math.min(60 * 24, body.stuck_minutes ?? 5))
@@ -120,14 +121,23 @@ export async function POST(req: NextRequest) {
     // Actually reset. Operator-scoped UPDATE; sets pipeline_status to
     // 'archived' (the operator-opt-in processing state) so the row stays
     // out of the "in flight" set in subsequent dispatches. Clears
-    // pipeline_error so stale red banners disappear.
+    // pipeline_error AND state_error AND extraction_outcomes so stale
+    // red banners disappear. Also resets pipeline_restart_count to 0
+    // when the caller passed reset_restart_count:true — necessary to
+    // re-eligible vlogs that hit the healer's MAX_RESTARTS limit.
+    const resetRestartCount = body.reset_restart_count === true
+    const sqlParts = [
+      `pipeline_status = 'archived'`,
+      `pipeline_error = NULL`,
+      `state_error = NULL`,
+      `extraction_outcomes = NULL`,
+      `updated_at = CURRENT_TIMESTAMP`,
+    ]
+    if (resetRestartCount) sqlParts.push(`pipeline_restart_count = 0`)
     await run(
       db,
       `UPDATE vlogs
-          SET pipeline_status = 'archived',
-              pipeline_error = NULL,
-              extraction_outcomes = NULL,
-              updated_at = CURRENT_TIMESTAMP
+          SET ${sqlParts.join(',\n              ')}
         WHERE operator_id = ? AND deleted_at IS NULL AND ${whereClause}`,
       operator.id,
     )

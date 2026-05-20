@@ -784,8 +784,37 @@ export class VlogPipelineDO {
     const transcript = await this.env.DB.prepare(
       `SELECT transcript_text FROM vlogs WHERE id = ?`,
     ).bind(vlog.id).first<{ transcript_text: string | null }>()
+
+    // Short / missing transcript: don't throw. The previous behavior
+    // marked every silent / one-word vlog as failed after 5 retries —
+    // but the model returning "nothing extractable" for a 2-char
+    // transcript is correct. Persist a zero-item extraction_runs row
+    // (is_active=1, model='short-transcript-skip') so the pipeline
+    // marks complete cleanly and the diagnostic classifies it as
+    // b-roll. No LLM call, no FFmpeg call, no retry.
     if (!transcript?.transcript_text || transcript.transcript_text.length < 20) {
-      throw new Error(`transcript_text missing or too short: ${transcript?.transcript_text?.length ?? 0} chars`)
+      const lenChars = transcript?.transcript_text?.length ?? 0
+      await this.recordEvent(vlog.id, 'extract', 'ok', 'short_transcript_skip', {
+        state: 'skipped', reason: 'transcript_too_short', length: lenChars,
+      })
+      const run_id = ulid()
+      const r2_key = `${vlog.operator_id}/extractions/${vlog.id}/${run_id}.json`
+      try {
+        await this.env.DB.prepare(
+          `UPDATE extraction_runs SET is_active = 0 WHERE vlog_id = ? AND is_active = 1`,
+        ).bind(vlog.id).run()
+        await this.env.DB.prepare(
+          `INSERT INTO extraction_runs
+             (id, vlog_id, operator_id, model, escalated_from, mode, r2_key,
+              total_items, invalid_items, fail_rate, is_active, created_at)
+           VALUES (?, ?, ?, 'short-transcript-skip', NULL, ?, ?, 0, 0, 0, 1, ?)`,
+        ).bind(
+          run_id, vlog.id, vlog.operator_id, mode, r2_key, Date.now(),
+        ).run()
+      } catch (err: any) {
+        console.warn(`[stepExtract] short-transcript marker write failed: ${err?.message || err}`)
+      }
+      return
     }
 
     const progress = async (sub: string, payload: Record<string, unknown>) => {
@@ -1009,11 +1038,32 @@ export class VlogPipelineDO {
   }
 
   private async setVlogState(vlog_id: string, state: string, error: string | null): Promise<void> {
-    await this.env.DB.prepare(
-      `UPDATE vlogs SET state = ?, state_error = ?, pipeline_status = ?,
-                        updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
-    ).bind(state, error, mapStateToLegacyPipelineStatus(state), vlog_id).run()
+    // When the state transitions to anything OTHER than 'failed', wipe
+    // pipeline_error too. Without this, a vlog that was set to 'failed'
+    // by the healer (with a "Auto-restart limit reached" error) keeps
+    // that red banner even after a /kill or /reset moves it back to
+    // 'archived' / 'ready'. The operator sees "ARCHIVED" + a failure
+    // banner and is rightly confused. State='failed' is the only state
+    // that should carry an error message.
+    const legacyStatus = mapStateToLegacyPipelineStatus(state)
+    const clearPipelineError = state !== 'failed'
+    if (clearPipelineError) {
+      await this.env.DB.prepare(
+        `UPDATE vlogs SET state = ?, state_error = ?, pipeline_status = ?,
+                          pipeline_error = NULL,
+                          updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+      ).bind(state, error, legacyStatus, vlog_id).run()
+    } else {
+      // Failed transitions: write state_error AND mirror it into
+      // pipeline_error so the legacy UI surface sees the same message.
+      await this.env.DB.prepare(
+        `UPDATE vlogs SET state = ?, state_error = ?, pipeline_status = ?,
+                          pipeline_error = ?,
+                          updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+      ).bind(state, error, legacyStatus, error, vlog_id).run()
+    }
   }
 
   private async recordEvent(
