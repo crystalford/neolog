@@ -82,9 +82,18 @@ new_classes = ["LlamaGate"]
 tag = "v3"
 new_classes = ["FFmpegGate"]
 
-# v4 (KimiGate) was rolled back — the multi-LLM detour didn't help.
-# We need this placeholder so wrangler's migration index stays
-# monotonic even after the rollback.
+# v4 created KimiGate during the multi-LLM detour. It was already
+# applied server-side before we rolled back, so the entry has to stay
+# here for wrangler's migration history to remain continuous —
+# removing it makes wrangler try to re-apply earlier migrations like
+# v1's new_sqlite_classes, which fails because VlogPipelineDO already
+# exists with data. v5 below deletes the class cleanly.
+[[migrations]]
+tag = "v4"
+new_classes = ["KimiGate"]
+
+# v5 reverses v4. Drops the KimiGate class since we're back to
+# Llama-only after the multi-LLM detour didn't help.
 [[migrations]]
 tag = "v5"
 deleted_classes = ["KimiGate"]
