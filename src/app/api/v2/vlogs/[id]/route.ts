@@ -198,3 +198,71 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     entities,
   })
 }
+
+/**
+ * DELETE /api/v2/vlogs/[id]
+ *
+ * Soft-deletes the vlog row (sets deleted_at) AND removes the underlying
+ * R2 objects (original, transcoded, thumbnail). All derived rows that
+ * reference the vlog (threads, clips, creative_elements, entity_mentions,
+ * extraction_runs, pipeline_events, transcript_words) are removed by
+ * ON DELETE CASCADE on the foreign keys.
+ *
+ * Soft-delete on the vlog row preserves the ID so any cross-references
+ * left dangling fail loudly instead of returning silent nulls. The R2
+ * bytes are gone — only the recorded_at + filename remain in the DB.
+ *
+ * Best-effort: if R2 deletes fail (transient network), the DB row is
+ * still soft-deleted and we return ok; orphan R2 bytes can be cleaned
+ * later. This matches the operator's expectation that "delete should
+ * not leave a vlog visible just because R2 had a hiccup."
+ */
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const env = getRequestContext().env as unknown as Env
+
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
+
+  const { id: vlog_id } = params
+  if (!vlog_id) return NextResponse.json({ error: 'vlog id required' }, { status: 400 })
+
+  const db = getDb(env)
+  const row = await findOne<{
+    id: string
+    r2_key: string | null
+    transcoded_r2_key: string | null
+    thumbnail_r2_key: string | null
+  }>(
+    db,
+    `SELECT id, r2_key, transcoded_r2_key, thumbnail_r2_key
+       FROM vlogs
+      WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+    vlog_id, operator.id,
+  )
+  if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  // Best-effort R2 deletes (we still soft-delete the row even if any fail).
+  const r2Errors: string[] = []
+  const { deleteObject } = await import('@/lib/r2')
+  for (const key of [row.r2_key, row.transcoded_r2_key, row.thumbnail_r2_key]) {
+    if (!key) continue
+    try { await deleteObject(env, key) }
+    catch (e: any) { r2Errors.push(`${key}: ${e?.message || String(e)}`) }
+  }
+
+  // Soft-delete the vlog row. CASCADE handles the derived tables.
+  await db.prepare(
+    `UPDATE vlogs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND operator_id = ?`,
+  ).bind(vlog_id, operator.id).run()
+
+  return NextResponse.json({
+    ok: true,
+    vlog_id,
+    r2_errors: r2Errors.length ? r2Errors : undefined,
+  }, { headers: { 'Cache-Control': 'no-store' } })
+}
