@@ -278,7 +278,7 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   const [skipped, setSkipped] = useState(0)
   const [failed, setFailed] = useState(0)
   const [failures, setFailures] = useState<{ vlog_id: string; error: string; reason?: string }[]>([])
-  const [currentVlogId, setCurrentVlogId] = useState<string | null>(null)
+  const [currentVlogIds, setCurrentVlogIds] = useState<Set<string>>(new Set())
 
   // Mutable refs so the async loop reads the latest values without the
   // closure-over-state hazard.
@@ -451,13 +451,15 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     const signal = abortRef.current.signal
 
     const startIdx = resume ? processed : 0
-    // STRICT SERIAL: one vlog at a time, dispatch → poll until terminal →
-    // next. The operator confirmed: if per-vlog re-extract works in
-    // isolation, the only way bulk can fail is if it tries to do too
-    // many at once. So we don't.
+    // BOUNDED PARALLEL: process CLIENT_CONCURRENCY vlogs simultaneously.
+    // The downstream FFmpegGate (cap 3) + LlamaGate (cap 3) absorb the
+    // concurrency safely — they queue calls so external services
+    // (FFmpeg container, Workers AI) never see more than their cap. The
+    // earlier serial-only run was leaving 2/3 of the gate budget idle.
+    // 3 in parallel ≈ 3x throughput with the same reliability profile.
     const cp: BulkCheckpoint = {
       version: 1,
-      mode, scope, chunkSize: 1, pauseMs: 0,
+      mode, scope, chunkSize: CLIENT_CONCURRENCY, pauseMs: 0,
       ids,
       processedIdx: startIdx,
       dispatched: resume ? dispatched : 0,
@@ -472,60 +474,75 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
     setProcessed(startIdx)
     setPhase('running')
 
-    let idx = startIdx
-    while (idx < ids.length) {
-      if (cancelledRef.current) break
-      const vlog_id = ids[idx]
-      setCurrentVlogId(vlog_id)
+    // Worker pool pattern. Each worker pulls the next vlog from the
+    // shared cursor, processes it end-to-end (dispatch + poll), then
+    // grabs the next. Cancellation propagates via signal.aborted.
+    let cursor = startIdx
+    const inFlightIds = new Set<string>()
 
-      // 1. Dispatch ONE vlog.
-      const chunkRes = await dispatchChunkWithRetry([vlog_id], mode, signal)
-      if (chunkRes === 'aborted') break
+    const processOne = async (vlog_id: string): Promise<void> => {
+      inFlightIds.add(vlog_id)
+      setCurrentVlogIds(new Set(inFlightIds))
+      try {
+        const chunkRes = await dispatchChunkWithRetry([vlog_id], mode, signal)
+        if (chunkRes === 'aborted') return
 
-      let dispatchOk = false
-      let dispatchReason: string | undefined
-      let dispatchError: string | undefined
-      if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
-        dispatchError = chunkRes.lastError
-      } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
-        const r = chunkRes.results[0]
-        if (r?.ok) dispatchOk = true
-        else if (r?.reason) dispatchReason = r.reason
-        else dispatchError = r?.error || 'unknown dispatch failure'
-      }
-
-      // 2. If dispatch failed, record + move on. If it succeeded, WAIT
-      //    for completion before moving on.
-      if (!dispatchOk) {
-        if (dispatchReason) {
-          cp.skipped += 1
-          cp.failures.push({ vlog_id, error: dispatchReason, reason: dispatchReason })
-        } else {
-          cp.failed += 1
-          cp.failures.push({ vlog_id, error: dispatchError || 'unknown' })
+        let dispatchOk = false
+        let dispatchReason: string | undefined
+        let dispatchError: string | undefined
+        if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
+          dispatchError = chunkRes.lastError
+        } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
+          const r = chunkRes.results[0]
+          if (r?.ok) dispatchOk = true
+          else if (r?.reason) dispatchReason = r.reason
+          else dispatchError = r?.error || 'unknown dispatch failure'
         }
-      } else {
-        const completion = await pollVlogCompletion(vlog_id, signal)
-        if (completion.aborted) break
-        if (completion.ok) {
-          cp.dispatched += 1
+
+        if (!dispatchOk) {
+          if (dispatchReason) {
+            cp.skipped += 1
+            cp.failures.push({ vlog_id, error: dispatchReason, reason: dispatchReason })
+          } else {
+            cp.failed += 1
+            cp.failures.push({ vlog_id, error: dispatchError || 'unknown' })
+          }
         } else {
-          cp.failed += 1
-          cp.failures.push({ vlog_id, error: completion.error || 'completion timed out' })
+          const completion = await pollVlogCompletion(vlog_id, signal)
+          if (completion.aborted) return
+          if (completion.ok) {
+            cp.dispatched += 1
+          } else {
+            cp.failed += 1
+            cp.failures.push({ vlog_id, error: completion.error || 'completion timed out' })
+          }
         }
+
+        cp.processedIdx = Math.max(cp.processedIdx, cursor)
+        saveCheckpoint(cp)
+
+        // Mirror to React state for the UI.
+        setProcessed(p => p + 1)
+        setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
+        setFailures([...cp.failures])
+      } finally {
+        inFlightIds.delete(vlog_id)
+        setCurrentVlogIds(new Set(inFlightIds))
       }
-
-      idx += 1
-      cp.processedIdx = idx
-      saveCheckpoint(cp)
-
-      // Mirror to React state for the UI.
-      setProcessed(idx)
-      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
-      setFailures([...cp.failures])
     }
 
-    setCurrentVlogId(null)
+    const worker = async () => {
+      while (true) {
+        if (cancelledRef.current || signal.aborted) return
+        const idx = cursor++
+        if (idx >= ids.length) return
+        await processOne(ids[idx])
+      }
+    }
+
+    await Promise.all(Array.from({ length: CLIENT_CONCURRENCY }, () => worker()))
+
+    setCurrentVlogIds(new Set())
     cp.finishedAt = Date.now()
     saveCheckpoint(cp)
     setPhase('done')
@@ -650,14 +667,14 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5,
               padding: 8, background: 'var(--bg-1)', borderRadius: 4, border: '1px solid var(--line)',
             }}>
-              <b style={{ color: 'var(--fg-1)' }}>Strict serial mode:</b> one vlog at a time,
-              dispatch then wait for it to actually finish before moving to the next.
-              Per-vlog poll every 5s. Adaptive deadline: extends as long as
-              the vlog's updated_at keeps advancing; abandons if 8 min pass
-              with no progress, or 25 min absolute. This is the slowest
-              throughput but the only mode that's been proven reliable on this corpus.
-              You can close the modal and reopen — the run resumes from a localStorage
-              checkpoint.
+              <b style={{ color: 'var(--fg-1)' }}>Bounded-parallel mode:</b> processes 3 vlogs
+              simultaneously, each polled independently. Downstream rate-limiters
+              (FFmpegGate cap 3 + LlamaGate cap 3) absorb the concurrency safely —
+              external services never see more than their cap regardless of how many
+              vlogs are in flight client-side. Per-vlog poll every 5s with adaptive
+              deadline: extends as long as the vlog's updated_at keeps advancing;
+              abandons if 8 min pass with no progress, or 25 min absolute. Close
+              the modal anytime — localStorage checkpoint resumes from where it stopped.
             </div>
 
             {previewError && (
@@ -732,24 +749,30 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
           <>
             <ProgressBar processed={processed} total={ids.length} />
 
-            {phase === 'running' && currentVlogId && (
+            {phase === 'running' && currentVlogIds.size > 0 && (
               <div style={{
                 fontSize: 12, color: 'var(--fg-2)', padding: 10,
                 background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 6,
-                display: 'flex', alignItems: 'center', gap: 8,
+                display: 'flex', flexDirection: 'column', gap: 6,
               }}>
-                <span style={{
-                  display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                  background: 'var(--accent)', animation: 'pulse 1.5s infinite',
-                }}/>
-                <span>Processing</span>
-                <Link href={`/timeline/${currentVlogId}`} className="mono"
-                  style={{ color: 'var(--fg-1)', textDecoration: 'underline' }}>
-                  …{currentVlogId.slice(-12)}
-                </Link>
-                <span style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
-                  polling every {POLL_INTERVAL_MS / 1000}s
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+                    background: 'var(--accent)', animation: 'pulse 1.5s infinite',
+                  }}/>
+                  <span>Processing {currentVlogIds.size} in parallel</span>
+                  <span style={{ marginLeft: 'auto', color: 'var(--fg-3)' }}>
+                    polling every {POLL_INTERVAL_MS / 1000}s
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {Array.from(currentVlogIds).map(vid => (
+                    <Link key={vid} href={`/timeline/${vid}`} className="mono"
+                      style={{ fontSize: 11, color: 'var(--fg-1)', textDecoration: 'underline' }}>
+                      …{vid.slice(-12)}
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -821,14 +844,14 @@ function estDurationLabel(
   untranscribed: number = 0,
   transcribed: number = 0,
 ): string {
-  // Strict serial: each vlog runs to completion before the next dispatches.
-  // Untranscribed vlogs: ~3-5 min each (audio extract + transcribe + LLM).
-  // Transcribed vlogs: ~30-60 sec each (just LLM extract).
-  // Cap the per-vlog estimate generously to avoid promising too fast.
+  // Bounded-parallel at CLIENT_CONCURRENCY in flight at a time.
+  // Per-vlog wall-clock: untranscribed ~4 min, transcribed ~45s.
+  // Total wall-clock ≈ (sum of work) / CLIENT_CONCURRENCY.
   const knownSplit = untranscribed > 0 || transcribed > 0
   const u = knownSplit ? untranscribed : Math.floor(total * 0.5)
   const t = knownSplit ? transcribed : total - u
-  const ms = (u * 4 * 60 * 1000) + (t * 45 * 1000)
+  const serialMs = (u * 4 * 60 * 1000) + (t * 45 * 1000)
+  const ms = serialMs / CLIENT_CONCURRENCY
   if (ms < 60_000) return `~${Math.round(ms / 1000)}s`
   const m = Math.round(ms / 60_000)
   if (m < 60) return `~${m} min`
@@ -1129,6 +1152,14 @@ async function dispatchChunkWithRetry(
   }
   return { kind: 'fatal', lastError }
 }
+
+// Number of vlogs the client processes simultaneously. Each one
+// dispatches + polls independently. The downstream rate-limiters
+// (FFmpegGate cap 3, LlamaGate cap 3 in workers/pipeline) are sized to
+// safely absorb this; CLIENT_CONCURRENCY = 3 fills the gate budget
+// without overshooting. Going higher (e.g. 6) doesn't get faster — it
+// just builds queue depth at the gates.
+const CLIENT_CONCURRENCY = 3
 
 // Adaptive polling: extends the deadline whenever the vlog's updated_at
 // advances (= the pipeline is still doing real work). A long video that
