@@ -70,6 +70,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const [clips, setClips] = useState<ClipRow[]>([])
   const [creative, setCreative] = useState<CreativeRow[]>([])
   const [entities, setEntities] = useState<EntityRow[]>([])
+  const [diagnosis, setDiagnosis] = useState<{
+    status: string
+    label: string
+    recommendation?: string
+    attempts?: number
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
   const [mode, setMode] = useState<'cheap' | 'premium'>('cheap')
@@ -116,6 +122,25 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     const id = setTimeout(() => { load() }, 5000)
     return () => clearTimeout(id)
   }, [vlog?.pipeline_status, vlog?.updated_at])
+
+  // Poll /events for the synthesized diagnosis. This is the operator-
+  // facing "what's actually wrong with this vlog" banner — one sentence
+  // + recommendation instead of cryptic FFmpeg exit codes. Same endpoint
+  // also returns the full event log for the LivePipeline component.
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/v2/vlogs/${params.id}/events`, { credentials: 'include' })
+        if (!r.ok) return
+        const d: any = await r.json()
+        if (!cancelled && d?.diagnosis) setDiagnosis(d.diagnosis)
+      } catch {}
+    }
+    tick()
+    const id = setInterval(tick, 8000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [params.id])
 
   // Pick up operator's preferred default mode (set in /settings).
   // Tolerates the older `free/max` vocabulary in stored settings.
@@ -193,8 +218,13 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      {vlog.pipeline_error && (
-        <div className="error-row" style={{ marginBottom: 16 }}>Pipeline error: {vlog.pipeline_error}</div>
+      {/* DIAGNOSIS BANNER — one sentence telling the operator what's
+          actually happening and what to do, synthesized from
+          pipeline_events server-side. Replaces the "raw error text +
+          ARCHIVED pill + nothing else" confusion that was driving the
+          operator nuts. */}
+      {diagnosis && (
+        <DiagnosisBanner d={diagnosis} />
       )}
 
       {!vlog.thumbnail_url && (
@@ -790,6 +820,58 @@ function PipelineStatus({ vlog }: { vlog: VlogDetail; onRestart?: () => void }) 
 type Pass = 'threads' | 'clip_candidates' | 'creative_elements' | 'entities'
 function MODEL_FOR_PASS(mode: 'cheap' | 'premium', _pass: Pass): string {
   return mode === 'premium' ? 'Sonnet' : 'Llama'
+}
+
+// Status → color/icon. The synthesizer in src/lib/diagnose-vlog.ts
+// produces a small enum of statuses; this maps each to a visual style.
+const DIAG_STYLE: Record<string, { bg: string; fg: string; icon: string }> = {
+  complete:           { bg: 'var(--ok-bg, #0f3a1f)',   fg: 'var(--ok, #4ade80)',   icon: '✓' },
+  b_roll:             { bg: 'var(--bg-2)',             fg: 'var(--fg-2)',          icon: '◐' },
+  healthy:            { bg: 'var(--ok-bg, #0f3a1f)',   fg: 'var(--ok, #4ade80)',   icon: '✓' },
+  in_flight:          { bg: 'var(--accent-bg, #1a2a4a)', fg: 'var(--accent, #60a5fa)', icon: '↻' },
+  queued:             { bg: 'var(--bg-2)',             fg: 'var(--fg-2)',          icon: '⏸' },
+  ffmpeg_overloaded:  { bg: 'var(--warn-bg, #3a2e0f)', fg: 'var(--warn, #fbbf24)', icon: '⌛' },
+  code_reset:         { bg: 'var(--warn-bg, #3a2e0f)', fg: 'var(--warn, #fbbf24)', icon: '↻' },
+  network_lost:       { bg: 'var(--warn-bg, #3a2e0f)', fg: 'var(--warn, #fbbf24)', icon: '!' },
+  whisper_stuck:      { bg: 'var(--err-bg, #3a0f1f)',  fg: 'var(--err, #f87171)',  icon: '!' },
+  whisper_timeout:    { bg: 'var(--err-bg, #3a0f1f)',  fg: 'var(--err, #f87171)',  icon: '!' },
+  broken_input:       { bg: 'var(--err-bg, #3a0f1f)',  fg: 'var(--err, #f87171)',  icon: '✗' },
+  restart_limit:      { bg: 'var(--err-bg, #3a0f1f)',  fg: 'var(--err, #f87171)',  icon: '✗' },
+  short_transcript:   { bg: 'var(--bg-2)',             fg: 'var(--fg-2)',          icon: '◐' },
+  unknown:            { bg: 'var(--bg-2)',             fg: 'var(--fg-3)',          icon: '?' },
+}
+
+function DiagnosisBanner({ d }: { d: {
+  status: string; label: string; recommendation?: string; attempts?: number
+} }) {
+  const style = DIAG_STYLE[d.status] ?? DIAG_STYLE.unknown
+  return (
+    <div style={{
+      marginBottom: 16,
+      padding: '12px 14px',
+      background: style.bg,
+      border: `1px solid ${style.fg}33`,
+      borderLeft: `3px solid ${style.fg}`,
+      borderRadius: 6,
+      color: 'var(--fg-1)',
+      fontSize: 13, lineHeight: 1.5,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ color: style.fg, fontWeight: 600, fontSize: 14 }}>{style.icon}</span>
+        <span style={{ fontWeight: 500 }}>{d.label}</span>
+        {d.attempts != null && d.attempts > 1 && (
+          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+            · {d.attempts} attempt{d.attempts === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+      {d.recommendation && (
+        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.55 }}>
+          → {d.recommendation}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function deriveTitle(filename: string | null): string {
