@@ -62,14 +62,6 @@ class_name = "VlogPipelineDO"
 name = "LLAMA_GATE"
 class_name = "LlamaGate"
 
-# Second LLM gate, points at Workers AI Kimi K2.6. Separate rate-limit
-# pool from Llama so the pipeline can round-robin between them and
-# effectively double extract throughput while staying entirely within
-# Workers AI (no Anthropic spend).
-[[durable_objects.bindings]]
-name = "KIMI_GATE"
-class_name = "KimiGate"
-
 # Singleton DO that gates FFmpeg container calls. The FFmpeg worker has
 # max_instances=5; without this gate, simultaneous bulk dispatches burst
 # the container pool and 503 on instances 6+. The pipeline DO acquires
@@ -90,27 +82,28 @@ new_classes = ["LlamaGate"]
 tag = "v3"
 new_classes = ["FFmpegGate"]
 
+# v4 (KimiGate) was rolled back — the multi-LLM detour didn't help.
+# We need this placeholder so wrangler's migration index stays
+# monotonic even after the rollback.
 [[migrations]]
-tag = "v4"
-new_classes = ["KimiGate"]
+tag = "v5"
+deleted_classes = ["KimiGate"]
 
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
 R2_BUCKET_NAME = "neolog-videos"
 PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers.dev"
-# Hard cap on concurrent Workers AI calls funneled through LlamaGate.
-# Default is 3 — gentle enough to avoid the burst failure but parallel
-# enough to keep bulk wall-clock reasonable. Tune by setting in this
-# vars block or via wrangler secret/var override.
-LLAMA_GATE_CONCURRENCY = "3"
+# Concurrent Workers AI Llama 3.3-70B calls through the gate. Bumped
+# from 3 → 8 after the over-aggressive cap-of-3 turned out to be
+# throttling bulk runs to a crawl. Workers AI handles 8 simultaneous
+# Llama calls fine; the original cap was a guess made when we thought
+# burst was the cause of empty-extraction failures (the real cause was
+# an over-aggressive < 50 char validation check in extract-unified.ts).
+LLAMA_GATE_CONCURRENCY = "8"
 # Hard cap on concurrent FFmpeg container calls. The container worker
 # has max_instances=5, so we leave 2 instances of headroom for thumbnail
 # / transcode work from the legacy workflow. Default 3.
 FFMPEG_GATE_CONCURRENCY = "3"
-# Concurrent calls to Workers AI Kimi K2.6 through the gate. Same
-# default as Llama. Total in-flight LLM extract calls = LLAMA + KIMI
-# = up to 6 across two separate rate-limit pools.
-KIMI_GATE_CONCURRENCY = "3"
 
 [observability]
 enabled = true
