@@ -31,6 +31,13 @@ export interface ExtractedThread {
   take: string
   key_quotes: string[]
   register: 'riff' | 'observation' | 'argument' | 'story' | 'aside' | 'question'
+  /**
+   * Generalized pattern this topic represents. The clustering engine
+   * groups threads across vlogs by lower(abstracted_topic). E.g.
+   * "the YouTube For You page" and "Twitter's algorithm" both abstract
+   * to "recommender systems failing despite explicit user signals".
+   */
+  abstracted_topic?: string
   // post-validate
   validated?: 0 | 1
 }
@@ -127,10 +134,11 @@ For every "take" / "quote" / "content":
 {
   "summary": "<60-120 word plain-English paragraph: what this vlog is about, in the operator's voice. May paraphrase; not subject to the verbatim 4-word rule.>",
   "threads": [
-    { "topic": "<short label>",
+    { "topic": "<short label, e.g. 'YouTube algorithm' or 'Music features'>",
       "take": "<verbatim 4+ word substring>",
       "key_quotes": ["<verbatim>", ...],
-      "register": "riff|observation|argument|story|aside|question" }
+      "register": "riff|observation|argument|story|aside|question",
+      "abstracted_topic": "<the GENERALIZED pattern this thread is really about, used to cluster across vlogs. E.g. 'YouTube algorithm' and 'Twitter For You page' BOTH abstract to 'recommender systems failing despite explicit user signals'. Aim for the underlying idea, not the surface example. Multiple vlogs should arrive at the SAME abstracted_topic when they're riffing on the same thing.>" }
   ],
   "clips": [
     { "headline": "<short label>",
