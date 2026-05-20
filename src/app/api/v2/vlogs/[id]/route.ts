@@ -103,6 +103,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
+  // Filter all extraction outputs to the currently-active extraction
+  // run for this vlog. Without this, re-extracted vlogs show duplicate
+  // threads/clips/creative/entities from both old and new runs (the
+  // pipeline marks old extraction_runs.is_active=0 on re-extract but
+  // doesn't physically remove the older rows).
+  //
+  // INNER JOIN with er.is_active=1 means: only return rows whose run_id
+  // matches the operator's current active run. Old run rows simply
+  // disappear from the API response.
   const [threads, clips, creative_elements, entities] = await Promise.all([
     safe('threads', () => findMany<{
       id: string
@@ -119,12 +128,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       validated: number | null
     }>(
       db,
-      `SELECT id, topic, take, register, strength,
-              transcript_span_start, transcript_span_end, extracted_at,
-              key_quotes, abstracted_topic, run_id, validated
-         FROM threads
-        WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL
-        ORDER BY transcript_span_start ASC, extracted_at ASC`,
+      `SELECT t.id, t.topic, t.take, t.register, t.strength,
+              t.transcript_span_start, t.transcript_span_end, t.extracted_at,
+              t.key_quotes, t.abstracted_topic, t.run_id, t.validated
+         FROM threads t
+         JOIN extraction_runs er ON er.id = t.run_id
+        WHERE t.vlog_id = ? AND t.operator_id = ?
+          AND t.deleted_at IS NULL
+          AND er.is_active = 1
+        ORDER BY t.transcript_span_start ASC, t.extracted_at ASC`,
       params.id, operator.id,
     )),
     safe('clips', () => findMany<{
@@ -139,11 +151,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       validated: number | null
     }>(
       db,
-      `SELECT id, start_time, end_time, headline, quote, why_clippable, status,
-              run_id, validated
-         FROM clip_candidates
-        WHERE vlog_id = ? AND operator_id = ?
-        ORDER BY start_time ASC, id ASC`,
+      `SELECT c.id, c.start_time, c.end_time, c.headline, c.quote, c.why_clippable, c.status,
+              c.run_id, c.validated
+         FROM clip_candidates c
+         JOIN extraction_runs er ON er.id = c.run_id
+        WHERE c.vlog_id = ? AND c.operator_id = ?
+          AND c.deleted_at IS NULL
+          AND er.is_active = 1
+        ORDER BY c.start_time ASC, c.id ASC`,
       params.id, operator.id,
     )),
     safe('creative_elements', () => findMany<{
@@ -158,12 +173,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       extracted_at: string
     }>(
       db,
-      `SELECT id, element_type, content, register,
-              transcript_span_start, transcript_span_end, run_id, validated,
-              extracted_at
-         FROM creative_elements
-        WHERE vlog_id = ? AND operator_id = ?
-        ORDER BY element_type ASC, extracted_at DESC`,
+      `SELECT ce.id, ce.element_type, ce.content, ce.register,
+              ce.transcript_span_start, ce.transcript_span_end, ce.run_id, ce.validated,
+              ce.extracted_at
+         FROM creative_elements ce
+         JOIN extraction_runs er ON er.id = ce.run_id
+        WHERE ce.vlog_id = ? AND ce.operator_id = ?
+          AND ce.deleted_at IS NULL
+          AND er.is_active = 1
+        ORDER BY ce.element_type ASC, ce.extracted_at DESC`,
       params.id, operator.id,
     )),
     safe('entities', () => findMany<{
@@ -174,10 +192,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       mention_count: number | null
     }>(
       db,
-      `SELECT id, name, entity_type, aliases, mention_count
-         FROM entities
-        WHERE vlog_id = ? AND operator_id = ?
-        ORDER BY mention_count DESC, name ASC`,
+      `SELECT e.id, e.name, e.entity_type, e.aliases, e.mention_count
+         FROM entities e
+         JOIN extraction_runs er ON er.id = e.run_id
+        WHERE e.vlog_id = ? AND e.operator_id = ?
+          AND e.deleted_at IS NULL
+          AND er.is_active = 1
+        ORDER BY e.mention_count DESC, e.name ASC`,
       params.id, operator.id,
     )),
   ])

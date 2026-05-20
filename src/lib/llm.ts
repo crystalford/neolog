@@ -40,10 +40,11 @@ export const CHAT_MODELS = {
   CLAUDE: CLAUDE_SONNET,
 } as const
 
-// 'scout' = Llama 4 Scout on Workers AI (cheapest, multimodal)
-// 'kimi'  = Kimi K2.6 on Workers AI (closest-to-Claude voice)
-// 'claude' = Anthropic Sonnet 4.6 (premium, third-party billing)
-export type ChatModelKey = 'scout' | 'kimi' | 'claude'
+// 'scout'    = Llama 4 Scout on Workers AI (cheapest, multimodal)
+// 'kimi'     = Kimi K2.6 on Workers AI (closest-to-Claude voice)
+// 'llama70b' = Llama 3.3 70B dense on Workers AI (operator default for chat)
+// 'claude'   = Anthropic Sonnet 4.6 (premium, third-party billing)
+export type ChatModelKey = 'scout' | 'kimi' | 'llama70b' | 'claude'
 
 /**
  * Route a pass to the right provider based on tier.
@@ -262,9 +263,12 @@ export async function callChat(
   if (args.model === 'claude') {
     return callClaudeChat(env, args)
   }
-  // 'scout' and 'kimi' both go through the OpenAI-compatible Workers AI path —
-  // same response shape, just different model id.
-  const workersModel = args.model === 'scout' ? LLAMA_4_SCOUT : KIMI_K2_6
+  // All three Workers AI models share the OpenAI-compatible chat path —
+  // same response shape, different model id.
+  const workersModel =
+    args.model === 'scout' ? LLAMA_4_SCOUT :
+    args.model === 'llama70b' ? LLAMA_70B :
+    KIMI_K2_6
   return callWorkersAiChat(env, workersModel, args)
 }
 
