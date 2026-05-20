@@ -366,7 +366,6 @@ async function extractAudio(body, res) {
   if (!input_url) return jsonError(res, 400, 'input_url required')
 
   const { dir, file: inputFile } = await downloadToTmp(input_url, 'audio-in')
-  const outFile = join(dir, 'audio.mp3')
 
   const beat = makeHeartbeat({
     url: heartbeat_url,
@@ -375,28 +374,90 @@ async function extractAudio(body, res) {
     operator_id,
     step: 'audio_extract',
   })
-  try {
-    await beat('starting', 'ffmpeg', { state: 'starting' })
-    await runFfmpegWithProgress(
-      [
-        '-y',
-        '-progress', 'pipe:1',
-        '-i', inputFile,
-        '-vn',
-        '-c:a', 'libmp3lame',
-        '-b:a', '128k',
-        outFile,
-      ],
-      beat,
-    )
-    await beat('ok', 'ffmpeg', { state: 'ok' })
-    streamFile(res, outFile, 'audio/mpeg')
-    res.on('close', () => cleanup(dir))
-  } catch (err) {
-    await beat('error', 'ffmpeg', { state: 'error', error: err.message })
-    cleanup(dir)
-    jsonError(res, 500, err.message)
+
+  // Audio extraction strategies, tried in order until one succeeds.
+  // Each previous strategy got stuck on roughly 1 in 5 vlogs with
+  // ffmpeg exit 234 + just the build banner in stderr — a sign that
+  // ffmpeg rejected the codec/format/args at startup, before doing
+  // any work. The cascade tries progressively more permissive paths:
+  //
+  //   1. libmp3lame   — the original path. Smallest output, but
+  //                     requires libmp3lame in the FFmpeg build.
+  //   2. native MP3   — FFmpeg's built-in MP3 encoder, no external lib.
+  //   3. AAC          — always built into FFmpeg. Output .m4a.
+  //   4. PCM WAV      — codec-free, always works as long as decode works.
+  //   5. stream copy  — no re-encode at all; just demux the audio.
+  //
+  // Whisper accepts all of these.
+  const strategies = [
+    { name: 'libmp3lame', ext: 'mp3', mime: 'audio/mpeg',
+      audio_args: ['-c:a', 'libmp3lame', '-b:a', '128k'] },
+    { name: 'mp3_native', ext: 'mp3', mime: 'audio/mpeg',
+      audio_args: ['-c:a', 'mp3', '-b:a', '128k'] },
+    { name: 'aac',        ext: 'm4a', mime: 'audio/mp4',
+      audio_args: ['-c:a', 'aac', '-b:a', '128k'] },
+    { name: 'pcm_wav',    ext: 'wav', mime: 'audio/wav',
+      audio_args: ['-c:a', 'pcm_s16le', '-ar', '16000', '-ac', '1'] },
+    { name: 'copy',       ext: 'mka', mime: 'audio/x-matroska',
+      audio_args: ['-c:a', 'copy'] },
+  ]
+
+  await beat('starting', 'ffmpeg', { state: 'starting' })
+
+  let lastErr = null
+  let lastStrategy = null
+  for (let i = 0; i < strategies.length; i++) {
+    const s = strategies[i]
+    const outFile = join(dir, `audio.${s.ext}`)
+    try {
+      await beat('running', 'ffmpeg_strategy', { state: 'running', strategy: s.name, attempt: i + 1 })
+      await runFfmpegWithProgress(
+        [
+          '-y',
+          '-progress', 'pipe:1',
+          // -err_detect ignore_err + lenient fflags let FFmpeg get past
+          // minor input corruption / unusual timestamps that would
+          // otherwise abort decoding. Safe to set globally — they don't
+          // affect output quality for clean input.
+          '-err_detect', 'ignore_err',
+          '-fflags', '+genpts+ignidx+igndts',
+          '-i', inputFile,
+          '-vn',
+          ...s.audio_args,
+          outFile,
+        ],
+        beat,
+      )
+      await beat('ok', 'ffmpeg', { state: 'ok', strategy: s.name, attempt: i + 1 })
+      streamFile(res, outFile, s.mime)
+      res.on('close', () => cleanup(dir))
+      return
+    } catch (err) {
+      lastErr = err
+      lastStrategy = s.name
+      // Capture the full error per-strategy so the diagnostic shows
+      // exactly which path failed and why.
+      await beat('retrying', 'ffmpeg_strategy', {
+        state: 'retrying', strategy: s.name, attempt: i + 1,
+        error: String(err?.message || err).slice(0, 800),
+      })
+    }
   }
+
+  // All strategies failed. Surface a detailed error with the LAST stderr
+  // (where the actual FFmpeg complaint lives — earlier 'first 500
+  // chars' captured the build banner and lost the real message).
+  cleanup(dir)
+  await beat('error', 'ffmpeg', {
+    state: 'error',
+    strategies_tried: strategies.length,
+    last_strategy: lastStrategy,
+    error: String(lastErr?.message || lastErr).slice(0, 1000),
+  })
+  jsonError(res, 500,
+    `ffmpeg /extract-audio failed across ${strategies.length} strategies. ` +
+    `Last (${lastStrategy}): ${String(lastErr?.message || lastErr).slice(0, 1500)}`,
+  )
 }
 
 /**
@@ -497,7 +558,12 @@ function runFfmpegWithProgress(args, beat) {
     proc.on('error', err => reject(err))
     proc.on('exit', code => {
       if (code === 0) resolve()
-      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-2000)}`))
+      // Show the LAST 4000 chars of stderr. FFmpeg prints its build
+      // banner FIRST (~1500 chars), then any actual errors LAST. The
+      // old 2000-char tail was sometimes still inside the banner for
+      // verbose builds, producing useless errors like "le-shared
+      // --enable-vaapi --enable-vdpau..." with no actual diagnostic.
+      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-4000)}`))
     })
   })
 }
