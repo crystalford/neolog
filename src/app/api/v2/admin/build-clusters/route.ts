@@ -70,20 +70,28 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
-  // Group threads by lower(abstracted_topic). Skip null/empty topics.
-  // Note: COUNT(DISTINCT vlog_id) gives us the cross-vlog reach so we
-  // don't form clusters from 5 threads of a single rambling vlog.
+  // Group threads by lower(COALESCE(abstracted_topic, topic)). The
+  // abstracted_topic field was being dropped on INSERT in a prior bug
+  // (worker side fix is Deploy 2), so all existing 498 threads have
+  // abstracted_topic=NULL. COALESCE falls back to the literal topic
+  // string, which is still good enough for first-pass clustering on
+  // the existing corpus. Once the worker fix ships and threads carry
+  // proper abstracted_topics, those become the stronger grouping key.
+  //
+  // COUNT(DISTINCT vlog_id) ensures cross-vlog reach so we don't form
+  // clusters from 5 threads in a single rambling vlog.
   const groupsRes = await db.prepare(
-    `SELECT lower(abstracted_topic) AS abstracted_lower,
-            MAX(abstracted_topic)   AS abstracted_topic,
+    `SELECT lower(COALESCE(abstracted_topic, topic)) AS abstracted_lower,
+            MAX(COALESCE(abstracted_topic, topic))   AS abstracted_topic,
             COUNT(*)                AS thread_count,
             COUNT(DISTINCT vlog_id) AS vlog_count,
             AVG(COALESCE(strength, 3)) AS avg_strength
        FROM threads
       WHERE operator_id = ?
-        AND abstracted_topic IS NOT NULL
-        AND trim(abstracted_topic) != ''
-      GROUP BY lower(abstracted_topic)
+        AND COALESCE(abstracted_topic, topic) IS NOT NULL
+        AND trim(COALESCE(abstracted_topic, topic)) != ''
+        AND deleted_at IS NULL
+      GROUP BY lower(COALESCE(abstracted_topic, topic))
       HAVING thread_count >= ? AND vlog_count >= ?
       ORDER BY thread_count DESC`,
   ).bind(operator.id, minThreads, minVlogs).all<{
@@ -103,7 +111,9 @@ export async function POST(req: NextRequest) {
     const tRes = await db.prepare(
       `SELECT id, topic, take, strength
          FROM threads
-        WHERE operator_id = ? AND lower(abstracted_topic) = ?
+        WHERE operator_id = ?
+          AND lower(COALESCE(abstracted_topic, topic)) = ?
+          AND deleted_at IS NULL
         ORDER BY COALESCE(strength, 3) DESC, extracted_at DESC`,
     ).bind(operator.id, g.abstracted_lower).all<{
       id: string; topic: string; take: string | null; strength: number | null
@@ -141,9 +151,12 @@ export async function POST(req: NextRequest) {
   let updated = 0
   let threadsAdded = 0
   for (const g of groups) {
+    // Match existing clusters by abstracted_topic OR topic, mirroring
+    // the COALESCE used in the grouping query above.
     const existing = await db.prepare(
       `SELECT id FROM clusters
-        WHERE operator_id = ? AND lower(abstracted_topic) = ?
+        WHERE operator_id = ?
+          AND lower(COALESCE(abstracted_topic, topic)) = ?
           AND deleted_at IS NULL
         LIMIT 1`,
     ).bind(operator.id, g.abstracted_lower).first<{ id: string }>()

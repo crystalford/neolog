@@ -41,10 +41,11 @@ interface PendingAttachment {
   text_body?: string | null
 }
 
-const MODEL_LABELS: Record<'scout' | 'kimi' | 'claude', { label: string; sub: string }> = {
-  scout:  { label: 'Llama 4 Scout', sub: 'cheap + multimodal (Workers AI)' },
-  kimi:   { label: 'Kimi K2.6',     sub: 'closest-to-Claude voice (Workers AI)' },
-  claude: { label: 'Sonnet (max)',  sub: 'premium, uses Anthropic API' },
+const MODEL_LABELS: Record<'scout' | 'kimi' | 'llama70b' | 'claude', { label: string; sub: string }> = {
+  llama70b: { label: 'Llama 3.3 70B',  sub: 'dense, strong writing (Workers AI, default)' },
+  scout:    { label: 'Llama 4 Scout',  sub: 'cheap + multimodal (Workers AI)' },
+  kimi:     { label: 'Kimi K2.6',      sub: 'closest-to-Claude voice (Workers AI)' },
+  claude:   { label: 'Sonnet (max)',   sub: 'premium, uses Anthropic API' },
 }
 
 export default function ChatPage() {
@@ -53,7 +54,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<MessageRow[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [model, setModel] = useState<'scout' | 'kimi' | 'claude'>('kimi')
+  const [model, setModel] = useState<'scout' | 'kimi' | 'llama70b' | 'claude'>('llama70b')
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -87,7 +88,7 @@ export default function ChatPage() {
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => {
         const m = d?.settings?.chat_default_model
-        if (m === 'scout' || m === 'kimi' || m === 'claude') setModel(m)
+        if (m === 'scout' || m === 'kimi' || m === 'llama70b' || m === 'claude') setModel(m)
       })
       .catch(() => {})
   }, [])
@@ -228,7 +229,7 @@ export default function ChatPage() {
       }}>
         {/* Thread list */}
         <div style={{
-          width: 260,
+          width: 220,
           background: 'var(--ink-2)',
           border: '1px solid var(--line)',
           borderRadius: 12,
@@ -319,7 +320,7 @@ export default function ChatPage() {
             color: 'var(--bone-3)',
           }}>
             <span>Model:</span>
-            {(['scout', 'kimi', 'claude'] as const).map(m => (
+            {(['llama70b', 'scout', 'kimi', 'claude'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => setModel(m)}
@@ -481,8 +482,13 @@ function Bubble({ m }: { m: MessageRow }) {
   const imageParts = Array.isArray(contentParts) ? contentParts.filter((p: any) => p?.type === 'image_url') : []
   return (
     <div style={{
-      alignSelf: isUser ? 'flex-end' : 'flex-start',
-      maxWidth: '85%',
+      // User messages stay bubble-like on the right but expand wider.
+      // Assistant messages fill the full conversation pane — no
+      // "85% of a wide pane" cramped feeling. Bubble border only on
+      // user side to keep the assistant reading like an essay.
+      alignSelf: isUser ? 'flex-end' : 'stretch',
+      maxWidth: isUser ? '92%' : '100%',
+      width: isUser ? 'auto' : '100%',
       background: isUser ? 'rgba(236,228,210,0.06)' : 'transparent',
       border: isUser ? '1px solid var(--line-warm)' : 'none',
       borderRadius: 12,

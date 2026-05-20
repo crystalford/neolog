@@ -83,13 +83,15 @@ export async function POST(req: NextRequest) {
 
   const db = getDb(env)
 
-  // Resolve model: explicit request value > operator default > 'kimi'.
+  // Resolve model: explicit request value > operator default > 'llama70b'.
+  // Llama 3.3 70B is the new default — dense text model, better writing
+  // quality than Scout, cheaper than Kimi K2.6, no Anthropic billing.
   let model: ChatModelKey
-  if (body.model === 'scout' || body.model === 'kimi' || body.model === 'claude') {
+  if (body.model === 'scout' || body.model === 'kimi' || body.model === 'llama70b' || body.model === 'claude') {
     model = body.model
   } else {
     const pref = await getSetting(db, operator.id, SETTING_KEYS.CHAT_DEFAULT_MODEL)
-    model = (pref === 'kimi' || pref === 'claude' || pref === 'scout') ? pref : 'kimi'
+    model = (pref === 'kimi' || pref === 'claude' || pref === 'scout' || pref === 'llama70b') ? pref : 'llama70b'
   }
 
   // ── Resolve / create thread ───────────────────────────────────────────────

@@ -29,7 +29,10 @@ export default function ThreadsPage() {
   const [topicFilter, setTopicFilter] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/v2/threads/recent?limit=200', { credentials: 'include' })
+    // Use the full threads list endpoint, not /threads/recent (that
+    // one is a 5-row "last 14 days" summary for the Capture page).
+    // Active-run filter + vlog-not-deleted filter applied server-side.
+    fetch('/api/v2/threads?limit=500', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => {
         if (d?.threads) setThreads(d.threads)

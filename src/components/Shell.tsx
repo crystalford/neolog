@@ -106,7 +106,10 @@ function Topbar({ breadcrumb, hot, busy, rightExtra }: { breadcrumb: string[]; h
 function Sidebar({ active }: { active: NavId }) {
   const operate: SidebarItem[] = [
     { id: 'timeline',    label: 'Timeline',    href: '/',            icon: 'Threads',     kbd: 'G T' },
-    { id: 'console',     label: 'Console',     href: '/console',     icon: 'Console',     kbd: 'G C' },
+    // Console route now renders the chat experience — rename the
+    // nav entry so the operator sees it as Chat. /chat still works
+    // as an alias for prior bookmarks.
+    { id: 'console',     label: 'Chat',        href: '/console',     icon: 'Chat',        kbd: 'G C' },
     { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',       icon: 'Vlogs' },
     { id: 'transcript',  label: 'Transcript',  href: '/transcript',  icon: 'Threads',     kbd: 'G R' },
     { id: 'threads',     label: 'Threads',     href: '/threads',     icon: 'Filter' },
@@ -115,7 +118,8 @@ function Sidebar({ active }: { active: NavId }) {
   ]
   const inspect: SidebarItem[] = [
     { id: 'graph', label: 'Graph', href: '/graph', icon: 'Graph' },
-    { id: 'chat',  label: 'Chat',  href: '/chat',  icon: 'Chat', kbd: 'G H' },
+    // Chat moved up to the Operate group (as 'Console' route alias).
+    // /chat URL still works as an alias — just not in the sidebar.
   ]
   const admin: SidebarItem[] = [
     { id: 'capture',  label: 'Capture',  href: '/capture',  icon: 'Capture', kbd: '⌘N' },

@@ -896,6 +896,42 @@ export class VlogPipelineDO {
       })
     } catch {}
 
+    // Cascade-deactivate the OLD run's extraction outputs before
+    // marking the run inactive. Without this, threads/clips/etc. from
+    // prior runs persist and show up alongside the new run's outputs
+    // on the vlog detail page (duplicates). The /api/v2/vlogs/[id]
+    // route filters by er.is_active=1 as a defense-in-depth, but
+    // physically marking the old rows deleted is the right primary
+    // fix — it also keeps the threads list / clusters / counts honest.
+    //
+    // Entities don't have a deleted_at column historically but the
+    // schema does include one (db/schema.sql:237) — soft-delete them
+    // too.
+    try {
+      await this.env.DB.prepare(
+        `UPDATE threads SET deleted_at = CURRENT_TIMESTAMP
+          WHERE vlog_id = ? AND deleted_at IS NULL
+            AND run_id IN (SELECT id FROM extraction_runs WHERE vlog_id = ? AND is_active = 1)`,
+      ).bind(vlog.id, vlog.id).run()
+      await this.env.DB.prepare(
+        `UPDATE clip_candidates SET deleted_at = CURRENT_TIMESTAMP
+          WHERE vlog_id = ? AND deleted_at IS NULL
+            AND run_id IN (SELECT id FROM extraction_runs WHERE vlog_id = ? AND is_active = 1)`,
+      ).bind(vlog.id, vlog.id).run()
+      await this.env.DB.prepare(
+        `UPDATE creative_elements SET deleted_at = CURRENT_TIMESTAMP
+          WHERE vlog_id = ? AND deleted_at IS NULL
+            AND run_id IN (SELECT id FROM extraction_runs WHERE vlog_id = ? AND is_active = 1)`,
+      ).bind(vlog.id, vlog.id).run()
+      await this.env.DB.prepare(
+        `UPDATE entities SET deleted_at = CURRENT_TIMESTAMP
+          WHERE vlog_id = ? AND deleted_at IS NULL
+            AND run_id IN (SELECT id FROM extraction_runs WHERE vlog_id = ? AND is_active = 1)`,
+      ).bind(vlog.id, vlog.id).run()
+    } catch (err: any) {
+      console.warn('[extract] cascade-deactivate failed:', err?.message || err)
+    }
+
     await this.env.DB.prepare(
       `UPDATE extraction_runs SET is_active = 0 WHERE vlog_id = ? AND is_active = 1`,
     ).bind(vlog.id).run()
@@ -952,15 +988,20 @@ export class VlogPipelineDO {
     }
 
     await runBatch('threads', run.payload.threads.map(t => this.env.DB.prepare(
+      // abstracted_topic IS the clustering key. Was being dropped on
+      // INSERT before — clusters table stayed empty no matter how many
+      // vlogs we extracted. Now persisted, used by build-clusters.
       `INSERT INTO threads
-         (id, operator_id, vlog_id, run_id, topic, take, key_quotes, register, validated, extraction_prompt_version, extracted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+         (id, operator_id, vlog_id, run_id, topic, take, key_quotes,
+          register, abstracted_topic, validated, extraction_prompt_version, extracted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
     ).bind(
       ulid(), vlog.operator_id, vlog.id, run_id,
       String(t.topic || '').slice(0, 200),
       String(t.take || ''),
       JSON.stringify(t.key_quotes ?? []),
       String(t.register || 'observation'),
+      (t as any).abstracted_topic ? String((t as any).abstracted_topic).slice(0, 300) : null,
       t.validated ?? 1,
       promptVersion,
     )))

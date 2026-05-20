@@ -464,9 +464,13 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {/* See section comment below — clips subtitle inlined in render. */}
       {clips.length > 0 && (
         <div className="section">
           <div className="label">{clips.length} clip{clips.length === 1 ? '' : 's'}</div>
+          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
+            Pre-edited delivery moments worth using as-is.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {clips.map(c => <ClipCardInline key={c.id} clip={c}/>)}
           </div>
@@ -476,6 +480,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       {creative.length > 0 && (
         <div className="section">
           <div className="label">{creative.length} creative element{creative.length === 1 ? '' : 's'}</div>
+          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
+            Fictional / creative material for projects (characters, themes, scenes).
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {Object.entries(groupBy(creative, c => c.element_type)).map(([type, items]) => (
               <div key={type}>
@@ -502,6 +509,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       {entities.length > 0 && (
         <div className="section">
           <div className="label">{entities.length} entit{entities.length === 1 ? 'y' : 'ies'}</div>
+          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
+            People, places, tools, and concepts mentioned in this vlog.
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {entities.map(e => (
               <span key={e.id} style={{
@@ -529,6 +539,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       {threads.length > 0 && (
         <div className="section">
           <div className="label">{threads.length} thread{threads.length === 1 ? '' : 's'} extracted</div>
+          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
+            Atomic takes — one idea each, voice-grounded.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {threads.map(t => {
               const keyQuote = parseFirstQuote(t.key_quotes)

@@ -31,6 +31,13 @@ export interface ExtractedThread {
   take: string
   key_quotes: string[]
   register: 'riff' | 'observation' | 'argument' | 'story' | 'aside' | 'question'
+  /**
+   * Generalized pattern this topic represents. The clustering engine
+   * groups threads across vlogs by lower(abstracted_topic). E.g.
+   * "the YouTube For You page" and "Twitter's algorithm" both abstract
+   * to "recommender systems failing despite explicit user signals".
+   */
+  abstracted_topic?: string
   // post-validate
   validated?: 0 | 1
 }
@@ -127,10 +134,11 @@ For every "take" / "quote" / "content":
 {
   "summary": "<60-120 word plain-English paragraph: what this vlog is about, in the operator's voice. May paraphrase; not subject to the verbatim 4-word rule.>",
   "threads": [
-    { "topic": "<short label>",
+    { "topic": "<short label, e.g. 'YouTube algorithm' or 'Music features'>",
       "take": "<verbatim 4+ word substring>",
       "key_quotes": ["<verbatim>", ...],
-      "register": "riff|observation|argument|story|aside|question" }
+      "register": "riff|observation|argument|story|aside|question",
+      "abstracted_topic": "<the GENERALIZED pattern this thread is really about, used to cluster across vlogs. E.g. 'YouTube algorithm' and 'Twitter For You page' BOTH abstract to 'recommender systems failing despite explicit user signals'. Aim for the underlying idea, not the surface example. Multiple vlogs should arrive at the SAME abstracted_topic when they're riffing on the same thing.>" }
   ],
   "clips": [
     { "headline": "<short label>",
@@ -249,42 +257,12 @@ export async function runExtraction(
     (first.payload.creative_elements?.length ?? 0) +
     (first.payload.entities?.length ?? 0)
 
-  // Auto-extract fallback: if the LLM produced nothing AND the
-  // transcript has meaningful content, don't drop the content. The
-  // transcript IS the data. Preserve it as a single observation
-  // thread with the full transcript as both take and key_quote.
-  //
-  // This catches the case where Llama refuses to structure short or
-  // fragmented utterances ("We got Phil's fat dented head for eight
-  // songs!") but the operator still wants the line preserved as
-  // searchable / browsable content. Extraction is meant to interpret
-  // vlogs, not throw them away.
-  //
-  // Threshold: 30 chars minimum (anything shorter is genuinely
-  // filler / b-roll). No upper bound — even a 5000 char transcript
-  // that the LLM emptied out gets preserved as a single thread.
-  if (itemCount === 0 && transcript.trim().length >= 30) {
-    const cleaned = transcript.trim()
-    const firstWords = cleaned.split(/\s+/).slice(0, 8).join(' ')
-    const autoThread: any = {
-      topic: firstWords.length > 60 ? firstWords.slice(0, 57) + '…' : firstWords,
-      take: cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned,
-      key_quotes: [cleaned.length > 500 ? cleaned.slice(0, 500) + '…' : cleaned],
-      questions_raised: [],
-      register: 'observation',
-      strength: 3,
-      validated: 1,
-    }
-    first.payload.threads = [autoThread]
-    first.total = 1
-    first.invalid = 0
-    first.failRate = 0
-    await progress('llm_validate', {
-      state: 'ok', reason: 'auto_extract_fallback',
-      model: initialModel, transcript_length: transcript.length,
-      note: 'LLM returned empty; preserved transcript as a single observation thread.',
-    })
-  } else if (itemCount === 0) {
+  if (itemCount === 0) {
+    // LLM returned nothing extractable. Don't manufacture threads from
+    // raw transcripts — that fills the table with junk like 10-second
+    // throwaway utterances. Let the vlog land as zero-item complete;
+    // the b-roll classifier (transcript_len < 200 + 0 items) picks it
+    // up cleanly.
     await progress('llm_validate', {
       state: 'ok', reason: 'empty_extraction_accepted',
       model: initialModel, transcript_length: transcript.length,
