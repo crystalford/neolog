@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import LivePipeline from './live-pipeline'
 import Shell from '@/components/Shell'
+import { topicColor } from '@/lib/topic-color'
 
 interface VlogDetail {
   id: string
@@ -247,9 +248,25 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      <h2>{deriveTitle(vlog.original_filename)}</h2>
+      {/* Editorial vlog header — topic-toned spine on the left,
+          eyebrow + title + meta. Derives the spine color from the
+          filename so a recurring DJI / PXL / iPhone source reads
+          consistently across days. */}
+      <div style={{
+        borderLeft: `3px solid ${topicColor(vlog.original_filename ?? vlog.id)}`,
+        paddingLeft: 14, marginTop: 18, marginBottom: 4,
+      }}>
+        <div className="mono" style={{
+          fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+          color: 'var(--fg-4)', marginBottom: 8,
+        }}>
+          Vlog · {recorded}
+        </div>
+        <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 26, lineHeight: 1.2 }}>
+          {deriveTitle(vlog.original_filename)}
+        </h2>
+      </div>
       <div className="meta-row">
-        <span>{recorded}</span>
         {sizeMb && <span>{sizeMb} MB</span>}
         {vlog.mime_type && <span>{vlog.mime_type}</span>}
         <span className="status-pill">{status}</span>

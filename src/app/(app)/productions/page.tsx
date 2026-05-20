@@ -57,12 +57,18 @@ export default function ProductionsPage() {
 
   return (
     <Shell active="productions" breadcrumb={['Productions']} hot={busy ? `${counts.materializing} materializing` : 'all healthy'} busy={busy}>
-      <div className="pad-tight">
-        <div className="h1-row">
-          <div>
-            <h1>Productions</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
-              Long-running creative containers — books, series, documentaries, sound pieces. The thing the substrate is for.
+      <div className="pad-tight" style={{ maxWidth: 940, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{ borderLeft: '3px solid var(--t-3)', paddingLeft: 14 }}>
+            <div className="mono" style={{
+              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+              color: 'var(--fg-4)', marginBottom: 6,
+            }}>
+              The thing the substrate is for
+            </div>
+            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Productions</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 580 }}>
+              Long-running creative containers — books, series, documentaries, sound pieces.
             </p>
           </div>
           <button className="btn primary"><span className="ico">{NavIcons.Plus}</span>New production</button>

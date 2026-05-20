@@ -10,6 +10,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell, { NavIcons, TopicDot } from '@/components/Shell'
+import { topicColor } from '@/lib/topic-color'
 
 interface ClusterRow {
   id: string
@@ -92,11 +93,17 @@ export default function ClustersPage() {
 
   return (
     <Shell active="clusters" breadcrumb={['Clusters']} hot={busy ? `${counts.ready} ready` : 'all healthy'} busy={busy}>
-      <div className="pad-tight">
-        <div className="h1-row">
-          <div>
-            <h1>Clusters</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
+      <div className="pad-tight" style={{ maxWidth: 940, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
+          <div style={{ borderLeft: '3px solid var(--t-4)', paddingLeft: 14 }}>
+            <div className="mono" style={{
+              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
+              color: 'var(--fg-4)', marginBottom: 6,
+            }}>
+              Riffs
+            </div>
+            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Clusters</h1>
+            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 580 }}>
               When threads start to circle the same idea, they form a cluster. When a cluster ripens, you materialize it into a production.
             </p>
           </div>
@@ -153,37 +160,47 @@ export default function ClustersPage() {
 function ClusterCard({ c }: { c: ClusterRow }) {
   const ready = c.state === 'ready'
   const onHold = c.state === 'hold_for_more'
-  const topic = (c.topic_color_token ?? c.abstracted_topic ?? 'misc').toLowerCase()
+  const topic = c.abstracted_topic ?? c.topic_color_token ?? c.name ?? 'misc'
+  const color = topicColor(topic)
   const ripeness = Math.min(100, Math.max(0, c.ripeness_score ?? 0))
   return (
     <Link href={`/cluster/${c.id}`} style={{
       display: 'block',
       background: 'var(--bg-1)',
-      border: ready ? '1px solid var(--accent-bd)' : '1px solid var(--line)',
+      border: '1px solid var(--line)',
+      borderLeft: `3px solid ${color}`,
       borderRadius: 10,
-      padding: '20px 22px',
+      padding: '22px 24px',
       opacity: onHold ? 0.75 : 1,
       position: 'relative',
       overflow: 'hidden',
     }}>
       {ready && (
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 40% 60% at 0% 0%, rgba(59,130,246,0.08), transparent 60%)' }}/>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 40% 60% at 0% 0%, ${color}1a, transparent 60%)` }}/>
       )}
       <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', position: 'relative' }}>
         <div style={{ flex: 1.4, minWidth: 0 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <TopicDot topic={topic}/>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.3 }}>Cluster</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <span className="mono" style={{
+              fontSize: 10, color: color,
+              textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
+            }}>
+              Cluster
+            </span>
             {ready && <span className="pill accent">◆ ready</span>}
             {!ready && !onHold && <span className="pill mute">{c.state}</span>}
             {onHold && <span className="pill mute">on hold</span>}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.3px', marginBottom: 12 }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.3px', marginBottom: 14, lineHeight: 1.25 }}>
             {c.name ?? c.abstracted_topic ?? c.id}
           </div>
           {c.take && (
-            <div style={{ fontSize: 14, color: 'var(--fg-2)', fontStyle: 'italic', lineHeight: 1.55, paddingLeft: 12, borderLeft: '2px solid var(--bg-4)', marginBottom: 16 }}>
-              "{c.take}"
+            <div style={{
+              fontSize: 15, color: 'var(--fg-2)',
+              fontStyle: 'italic', lineHeight: 1.55,
+              marginBottom: 14,
+            }}>
+              “{c.take}”
             </div>
           )}
           {c.gap_question && (
