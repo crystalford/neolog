@@ -26,6 +26,15 @@ on:
     # Solo-operator mode — merging via PR is unnecessary friction; every push
     # should land in production within the deploy window.
     branches: [main, claude/integrate-filament-update-XWb1v]
+    # ONLY redeploy workers when worker code actually changes. Every
+    # redeploy of the FFmpeg container worker kills its container DO,
+    # which fails any in-flight /extract-audio calls with:
+    #   "Runtime signalled the container to exit due to a new version rollout"
+    # This filter prevents Pages-only changes (src/**, etc) from
+    # disturbing in-flight pipeline work.
+    paths:
+      - 'workers/**'
+      - '.github/workflows/deploy-workers.yml'
   workflow_dispatch:
 
 jobs:

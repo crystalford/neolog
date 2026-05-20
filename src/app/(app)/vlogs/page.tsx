@@ -477,15 +477,18 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
       const chunkRes = await dispatchChunkWithRetry(chunk, mode, signal)
 
       if (chunkRes === 'aborted') break
-      if (chunkRes === 'fatal') {
-        // Network gave up after retries. Mark this chunk's ids as failed
-        // (cannot tell which dispatched) and keep going so a transient
-        // outage doesn't block the rest.
+      if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
+        // All 3 retries failed. The actual upstream error (4xx body, 5xx
+        // text, or network failure) is now in lastError so the operator
+        // can see WHY it failed instead of a generic "chunk request
+        // failed after retries" blanket. This is usually the smoking
+        // gun: missing PIPELINE binding, missing HEARTBEAT_TOKEN,
+        // upstream 5xx from the worker, etc.
         for (const vlog_id of chunk) {
-          cp.failures.push({ vlog_id, error: 'chunk request failed after retries' })
+          cp.failures.push({ vlog_id, error: chunkRes.lastError })
           cp.failed += 1
         }
-      } else {
+      } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
         for (const r of chunkRes.results) {
           if (r.ok) cp.dispatched += 1
           else if (r.reason) {
@@ -879,48 +882,97 @@ function DiagnosticPanel({
           {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
         </div>
       )}
-      {(stuck > 0 || inFlightRecent > 0) && (
-        <div style={{
-          padding: 10, borderRadius: 6,
-          background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
-          fontSize: 12, color: 'var(--fg-1)',
-          display: 'flex', flexDirection: 'column', gap: 10,
-        }}>
-          {stuck > 0 && (
-            <div>
-              <div style={{ marginBottom: 6 }}>
-                <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
-                Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
-                Does NOT stop the actual background workflows.
-              </div>
-              <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
-                {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
-              </button>
-              {resetResult && (
-                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
-              )}
-            </div>
-          )}
+
+      {/* Kill button always available — useful even when nothing is "stuck"
+          because zombies might be running with recent updated_at timestamps. */}
+      <div style={{
+        padding: 10, borderRadius: 6,
+        background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
+        fontSize: 12, color: 'var(--fg-1)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        {stuck > 0 && (
           <div>
             <div style={{ marginBottom: 6 }}>
-              <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
-              instance + Durable Object for your operator. Use this when zombie
-              workflows from a prior bulk are still spamming failures. Counts as
-              compute used but stops further work immediately.
+              <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
+              Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
+              Does NOT stop the actual background workflows.
             </div>
-            <button className="btn" onClick={onKillAll} disabled={killBusy}
-              style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
-              {killBusy ? 'Killing…' : 'Kill all running'}
+            <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
+              {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
             </button>
-            {killResult && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
+            {resetResult && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
             )}
           </div>
+        )}
+        <div>
+          <div style={{ marginBottom: 6 }}>
+            <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
+            instance + Durable Object for your operator. Use this when zombie
+            workflows from a prior bulk are still spamming failures. Counts as
+            compute used but stops further work immediately.
+          </div>
+          <button className="btn" onClick={onKillAll} disabled={killBusy}
+            style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
+            {killBusy ? 'Killing…' : 'Kill all running'}
+          </button>
+          {killResult && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
+          )}
         </div>
-      )}
+        <BindingsCheck />
+      </div>
       <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
         To bring the whole corpus to complete + data: ~${cost.toFixed(2)} estimated cost.
       </div>
+    </div>
+  )
+}
+
+function BindingsCheck() {
+  const [data, setData] = useState<any | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const run = async () => {
+    setLoading(true); setErr(null)
+    try {
+      const r = await fetch('/api/v2/admin/bindings-check', { credentials: 'include' })
+      if (!r.ok) {
+        setErr(`HTTP ${r.status}`)
+        return
+      }
+      setData(await r.json())
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <div style={{ fontSize: 11, color: 'var(--fg-3)', borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span>Binding sanity check (use this if bulk Run returns "chunk request failed"):</span>
+        <button className="btn ghost small" onClick={run} disabled={loading} style={{ marginLeft: 'auto' }}>
+          {loading ? 'Checking…' : 'Check now'}
+        </button>
+      </div>
+      {err && <div style={{ color: 'var(--err)' }}>Error: {err}</div>}
+      {data && (
+        <div style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
+          padding: 8, background: 'var(--bg-2)', borderRadius: 4,
+          whiteSpace: 'pre-wrap',
+        }}>
+          {`ready_for.bulk_dispatch:       ${data.ready_for?.bulk_dispatch ? '✅' : '❌ (PIPELINE + HEARTBEAT_TOKEN required)'}
+ready_for.terminate_workflows: ${data.ready_for?.terminate_workflows ? '✅' : '❌ (CLOUDFLARE_API_TOKEN + ACCOUNT_ID required)'}
+ready_for.terminate_dos:       ${data.ready_for?.terminate_dos ? '✅' : '❌'}
+pipeline_probe:                ${data.pipeline_probe?.reachable ? `reachable (status ${data.pipeline_probe.status})` : `❌ ${data.pipeline_probe?.error || 'unreachable'}`}
+
+services:  PIPELINE=${data.services?.PIPELINE} PROCESS_UPLOAD=${data.services?.PROCESS_UPLOAD} DB=${data.services?.DB}
+secrets:   HEARTBEAT_TOKEN=${data.secrets?.HEARTBEAT_TOKEN} CF_API_TOKEN=${data.secrets?.CLOUDFLARE_API_TOKEN} ANTHROPIC=${data.secrets?.ANTHROPIC_API_KEY}`}
+        </div>
+      )}
     </div>
   )
 }
@@ -999,9 +1051,10 @@ async function dispatchChunkWithRetry(
 ): Promise<
   | { results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] }
   | 'aborted'
-  | 'fatal'
+  | { kind: 'fatal'; lastError: string }
 > {
   const maxAttempts = 3
+  let lastError = 'unknown — request never reached the server'
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (signal.aborted) return 'aborted'
     try {
@@ -1016,21 +1069,35 @@ async function dispatchChunkWithRetry(
         const d: any = await r.json()
         return { results: d.results ?? [] }
       }
+      // Capture the actual server error message for both 4xx and 5xx.
+      // Previously 5xx errors were retried silently and we lost the
+      // upstream error; now we keep the latest one and surface it if
+      // every retry fails.
+      let serverErr = `HTTP ${r.status}`
+      try {
+        const d: any = await r.json()
+        const hint = d?.hint ? ` · ${String(d.hint).slice(0, 200)}` : ''
+        const details = d?.details ? ` · ${String(d.details).slice(0, 200)}` : ''
+        serverErr = `HTTP ${r.status}: ${d?.error || 'unknown'}${details}${hint}`
+      } catch {
+        try { serverErr = `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` } catch {}
+      }
+      lastError = serverErr
       // 4xx (bad request, unauth) — fatal, don't retry.
       if (r.status >= 400 && r.status < 500) {
-        const d: any = await r.json().catch(() => ({}))
-        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: d?.error || `HTTP ${r.status}` })) }
+        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: serverErr })) }
       }
       // 5xx — retry with backoff.
     } catch (err: any) {
       if (signal.aborted || err?.name === 'AbortError') return 'aborted'
+      lastError = `network: ${err?.message || String(err)}`
     }
     if (attempt < maxAttempts) {
       await sleepWithAbort(500 * Math.pow(2, attempt - 1), signal)
       if (signal.aborted) return 'aborted'
     }
   }
-  return 'fatal'
+  return { kind: 'fatal', lastError }
 }
 
 function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
