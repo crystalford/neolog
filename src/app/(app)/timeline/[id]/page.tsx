@@ -197,6 +197,30 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
+  // Permanent delete: removes R2 bytes (original + transcoded + thumbnail)
+  // and soft-deletes the DB row. CASCADE removes all derived rows.
+  // Two confirm prompts because this is irreversible — R2 bytes are gone.
+  const deleteVlog = async () => {
+    if (!confirm('Delete this vlog permanently?\n\nThis removes the video file from R2 and deletes all extracted threads, clips, and entities. This cannot be undone.')) return
+    if (!confirm('Are you sure? This is permanent.')) return
+    setProcessing(true)
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!r.ok) {
+        const d: any = await r.json().catch(() => ({}))
+        throw new Error(d?.error || `HTTP ${r.status}`)
+      }
+      // Navigate back to the vlogs list — this vlog no longer exists.
+      window.location.href = '/vlogs'
+    } catch (e: any) {
+      setError(String(e.message || e))
+      setProcessing(false)
+    }
+  }
+
   if (error) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Error']}><div className="pad"><div className="card" style={{ color: 'var(--err)' }}>Error: {error}</div></div></Shell>
   if (!vlog) return <Shell active="vlogs" breadcrumb={['Vlogs', 'Loading…']}><div className="pad"><div style={{ color: 'var(--fg-3)' }}>Loading…</div></div></Shell>
 
@@ -331,6 +355,23 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           style={{ width: '100%', marginTop: 8, fontSize: 12 }}
         >
           {processing ? '…' : 'Mark as B-roll (skip extraction — silent / no dialogue)'}
+        </button>
+
+        {/* Permanent delete — destructive, kept visually distinct from
+            the other escape hatches. Removes R2 bytes + all derived
+            rows. Two confirmation prompts because this can't be
+            undone. */}
+        <button
+          onClick={deleteVlog}
+          disabled={processing}
+          className="btn ghost"
+          style={{
+            width: '100%', marginTop: 8, fontSize: 12,
+            color: 'var(--err, #f87171)',
+            borderColor: 'var(--err, #f87171)33',
+          }}
+        >
+          {processing ? '…' : 'Delete this vlog permanently'}
         </button>
 
         <button

@@ -47,6 +47,12 @@ export default function VlogsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
+  // Multi-select for bulk delete. Set of vlog ids currently selected.
+  // Cleared whenever the filter or query changes so the operator can't
+  // accidentally delete vlogs they aren't currently looking at.
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [deleting, setDeleting] = useState(false)
+  useEffect(() => { setSelected(new Set()) }, [filter, query])
 
   const load = () => {
     setLoading(true)
@@ -154,6 +160,84 @@ export default function VlogsPage() {
           </div>
         </div>
 
+        {/* Multi-select action bar — only shown when at least one vlog
+            is selected OR when on a filter where bulk delete is the
+            obvious action (failed / archived). Lets the operator
+            "Select all in view" then delete the whole filtered set
+            in one POST. */}
+        {filtered.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12,
+            padding: '8px 12px',
+            background: selected.size > 0 ? 'var(--err-bg, #3a0f1f)' : 'var(--bg-2)',
+            border: `1px solid ${selected.size > 0 ? 'var(--err, #f87171)33' : 'var(--line)'}`,
+            borderRadius: 6,
+            fontSize: 12,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={selected.size > 0 && selected.size === filtered.length}
+                ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < filtered.length }}
+                onChange={e => {
+                  if (e.target.checked) setSelected(new Set(filtered.map(v => v.id)))
+                  else setSelected(new Set())
+                }}
+              />
+              {selected.size === 0
+                ? `Select all in view (${filtered.length})`
+                : selected.size === filtered.length
+                  ? `All ${filtered.length} selected`
+                  : `${selected.size} of ${filtered.length} selected`}
+            </label>
+            <div style={{ flex: 1 }}/>
+            {selected.size > 0 && (
+              <>
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="btn ghost"
+                  style={{ fontSize: 11 }}
+                >Clear</button>
+                <button
+                  disabled={deleting}
+                  onClick={async () => {
+                    const n = selected.size
+                    if (!confirm(`Delete ${n} vlog${n === 1 ? '' : 's'} permanently?\n\nR2 video bytes will be removed and all extracted threads / clips / entities for these vlogs will be deleted. This cannot be undone.`)) return
+                    if (!confirm(`Are you sure? This is permanent for all ${n} vlog${n === 1 ? '' : 's'}.`)) return
+                    setDeleting(true)
+                    try {
+                      const r = await fetch('/api/v2/vlogs/bulk-delete', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: Array.from(selected) }),
+                      })
+                      const d: any = await r.json().catch(() => ({}))
+                      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+                      setSelected(new Set())
+                      load()
+                      alert(`Deleted ${d.deleted ?? 0} vlog${d.deleted === 1 ? '' : 's'}.${d.r2_errors ? `\n\nSome R2 deletes failed: ${Object.keys(d.r2_errors).length} vlogs had orphaned bytes. DB rows are soft-deleted regardless.` : ''}`)
+                    } catch (e: any) {
+                      alert(`Bulk delete failed: ${e?.message || String(e)}`)
+                    } finally {
+                      setDeleting(false)
+                    }
+                  }}
+                  className="btn"
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--err, #f87171)',
+                    borderColor: 'var(--err, #f87171)',
+                    background: 'transparent',
+                  }}
+                >
+                  {deleting ? 'Deleting…' : `Delete ${selected.size} selected`}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Grid */}
         {loading ? (
           <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
@@ -166,7 +250,30 @@ export default function VlogsPage() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-            {filtered.map(v => <VlogCard key={v.id} v={v}/>)}
+            {filtered.map((v, idx) => (
+              <VlogCard
+                key={v.id}
+                v={v}
+                isSelected={selected.has(v.id)}
+                onToggleSelect={(id, e) => {
+                  setSelected(prev => {
+                    const next = new Set(prev)
+                    // Shift-click to range-select within the current filter.
+                    if (e.shiftKey && prev.size > 0) {
+                      const lastSelectedIdx = filtered.findIndex(x => prev.has(x.id))
+                      const [lo, hi] = idx < lastSelectedIdx
+                        ? [idx, lastSelectedIdx]
+                        : [lastSelectedIdx, idx]
+                      for (let i = lo; i <= hi; i++) next.add(filtered[i].id)
+                    } else {
+                      if (next.has(id)) next.delete(id)
+                      else next.add(id)
+                    }
+                    return next
+                  })
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -1184,7 +1291,11 @@ function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
-function VlogCard({ v }: { v: VlogRow }) {
+function VlogCard({ v, isSelected, onToggleSelect }: {
+  v: VlogRow
+  isSelected?: boolean
+  onToggleSelect?: (id: string, e: React.MouseEvent) => void
+}) {
   const statusCls = v.pipeline_status === 'complete' ? 'ok'
     : v.pipeline_status === 'archived' ? 'mute'
     : v.pipeline_status === 'failed' ? 'err'
@@ -1194,7 +1305,11 @@ function VlogCard({ v }: { v: VlogRow }) {
   const size = v.file_size_bytes ? `${(v.file_size_bytes / 1_000_000).toFixed(1)} MB` : '—'
 
   return (
-    <Link href={`/timeline/${v.id}`} className="card no-pad" style={{ overflow: 'hidden', cursor: 'pointer', display: 'block' }}>
+    <Link href={`/timeline/${v.id}`} className="card no-pad" style={{
+      overflow: 'hidden', cursor: 'pointer', display: 'block',
+      outline: isSelected ? '2px solid var(--err, #f87171)' : 'none',
+      outlineOffset: -2,
+    }}>
       <div style={{
         aspectRatio: '16/10',
         background: v.thumbnail_url
@@ -1203,6 +1318,31 @@ function VlogCard({ v }: { v: VlogRow }) {
         position: 'relative',
         borderBottom: '1px solid var(--line)',
       }}>
+        {/* Selection checkbox — sits over the thumbnail. stopPropagation
+            on the wrapper prevents the Link from navigating when the
+            operator clicks the checkbox. */}
+        {onToggleSelect && (
+          <div
+            onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleSelect(v.id, e) }}
+            style={{
+              position: 'absolute', top: 6, left: 6, zIndex: 2,
+              padding: 6, borderRadius: 4,
+              background: isSelected ? 'var(--err, #f87171)' : 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(4px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 22, height: 22,
+            }}
+            title={isSelected ? 'Deselect' : 'Select for bulk action'}
+          >
+            {isSelected && (
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="white">
+                <polyline points="3,8 7,12 13,4" stroke="white" strokeWidth="2" fill="none"/>
+              </svg>
+            )}
+          </div>
+        )}
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
             <svg width="11" height="11" viewBox="0 0 16 16" fill="white"><polygon points="5,3 12,8 5,13"/></svg>
