@@ -192,6 +192,21 @@ export default {
       return resp
     }
 
+    // /kill/:vlog_id — cancel the DO's pending alarm and clear its
+    // pointer storage. After this the DO is dormant and won't run any
+    // more steps. Used by /api/v2/admin/terminate-all to stop a stuck
+    // bulk run from continuing to spam failures in pipeline_events.
+    if (route === 'kill') {
+      const body = await req.json().catch(() => ({})) as any
+      const stub = env.PIPELINE_DO.get(env.PIPELINE_DO.idFromName(vlog_id))
+      const resp = await stub.fetch('https://do/kill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_id, ...body }),
+      })
+      return resp
+    }
+
     return new Response('not found', { status: 404 })
   },
 
@@ -438,6 +453,34 @@ export class VlogPipelineDO {
       }
       await this.state.storage.setAlarm(Date.now() + 100)
       return new Response('kicked')
+    }
+
+    // /kill — stop this DO from progressing. Cancels the pending alarm,
+    // clears pointer/force flags, marks the vlog state as 'archived' in
+    // D1 so it's no longer counted as in-flight. Used by the bulk kill
+    // endpoint to stop a stuck DO without waiting for retries to exhaust.
+    if (route === 'kill') {
+      const body = await req.json().catch(() => ({})) as { vlog_id?: string }
+      const vlog_id = body.vlog_id ?? (await this.state.storage.get<string>('vlog_id'))
+      try { await this.state.storage.deleteAlarm() } catch {}
+      // Clear all step-progression state. Leave per-step "force" flags
+      // alone (deletion below is cheap and idempotent).
+      const keys = ['pointer', 'force_audio_extract', 'force_transcribe', 'force_extract']
+      for (const k of keys) {
+        try { await this.state.storage.delete(k) } catch {}
+      }
+      await this.clearAttempts()
+      if (vlog_id) {
+        try {
+          await this.setVlogState(vlog_id, 'archived',
+            'killed by /api/v2/admin/terminate-all — re-dispatch to resume')
+        } catch {}
+        try {
+          await this.recordEvent(vlog_id, '_internal_', 'failed_terminal',
+            'killed', { reason: 'admin_terminate_all' })
+        } catch {}
+      }
+      return new Response('killed')
     }
 
     return new Response('not found', { status: 404 })

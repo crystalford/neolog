@@ -265,6 +265,10 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
   const [resetBusy, setResetBusy] = useState(false)
   const [resetResult, setResetResult] = useState<string | null>(null)
 
+  // Kill-all state (terminate workflow instances + DOs)
+  const [killBusy, setKillBusy] = useState(false)
+  const [killResult, setKillResult] = useState<string | null>(null)
+
   // Smoke-test state
   const [smokeBusy, setSmokeBusy] = useState(false)
   const [smokeResult, setSmokeResult] = useState<{ ok: boolean; vlog_id?: string; message: string } | null>(null)
@@ -330,6 +334,36 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
       setResetResult(`Reset error: ${err?.message || err}`)
     } finally {
       setResetBusy(false)
+    }
+  }
+
+  const runKillAll = async () => {
+    if (!confirm('Terminate every running Workflow + Durable Object for your operator? This stops all in-flight pipeline work — including any vlog that\'s legitimately progressing. Continue?')) return
+    setKillBusy(true); setKillResult(null)
+    try {
+      const r = await fetch('/api/v2/admin/terminate-all', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflows: true, dos: true }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) {
+        setKillResult(`Kill failed: ${d?.details || d?.error || `HTTP ${r.status}`}`)
+      } else {
+        const wf = d.workflows ?? {}
+        const dos = d.dos ?? {}
+        const summary = [
+          `Workflows: ${wf.terminated}/${wf.found} terminated`,
+          `DOs: ${dos.terminated}/${dos.found} killed`,
+          (wf.errors?.length || dos.errors?.length) ? `(${(wf.errors?.length ?? 0) + (dos.errors?.length ?? 0)} errors)` : '',
+        ].filter(Boolean).join(' · ')
+        setKillResult(summary)
+        await refreshDiag()
+      }
+    } catch (err: any) {
+      setKillResult(`Kill error: ${err?.message || err}`)
+    } finally {
+      setKillBusy(false)
     }
   }
 
@@ -537,6 +571,9 @@ function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: 
               onResetStuck={runResetStuck}
               resetBusy={resetBusy}
               resetResult={resetResult}
+              onKillAll={runKillAll}
+              killBusy={killBusy}
+              killResult={killResult}
             />
 
             {/* Smoke test — runs ONE vlog through the full pipeline. ~$0.10. */}
@@ -782,7 +819,9 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 }
 
 function DiagnosticPanel({
-  diag, loading, error, onRefresh, onResetStuck, resetBusy, resetResult,
+  diag, loading, error, onRefresh,
+  onResetStuck, resetBusy, resetResult,
+  onKillAll, killBusy, killResult,
 }: {
   diag: any | null
   loading: boolean
@@ -791,6 +830,9 @@ function DiagnosticPanel({
   onResetStuck: () => void
   resetBusy: boolean
   resetResult: string | null
+  onKillAll: () => void
+  killBusy: boolean
+  killResult: string | null
 }) {
   if (loading && !diag) {
     return (
@@ -837,22 +879,43 @@ function DiagnosticPanel({
           {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
         </div>
       )}
-      {stuck > 0 && (
+      {(stuck > 0 || inFlightRecent > 0) && (
         <div style={{
           padding: 10, borderRadius: 6,
           background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
           fontSize: 12, color: 'var(--fg-1)',
+          display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ marginBottom: 6 }}>
-            <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
-            Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
-          </div>
-          <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
-            {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck`}
-          </button>
-          {resetResult && (
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
+          {stuck > 0 && (
+            <div>
+              <div style={{ marginBottom: 6 }}>
+                <b>{stuck}</b> vlog{stuck === 1 ? '' : 's'} stuck from a prior failed run.
+                Reset their pipeline_status so they're re-runnable. Free — only D1 updates.
+                Does NOT stop the actual background workflows.
+              </div>
+              <button className="btn" onClick={onResetStuck} disabled={resetBusy}>
+                {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck (D1 only)`}
+              </button>
+              {resetResult && (
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
+              )}
+            </div>
           )}
+          <div>
+            <div style={{ marginBottom: 6 }}>
+              <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
+              instance + Durable Object for your operator. Use this when zombie
+              workflows from a prior bulk are still spamming failures. Counts as
+              compute used but stops further work immediately.
+            </div>
+            <button className="btn" onClick={onKillAll} disabled={killBusy}
+              style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
+              {killBusy ? 'Killing…' : 'Kill all running'}
+            </button>
+            {killResult && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
+            )}
+          </div>
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
