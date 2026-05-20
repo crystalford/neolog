@@ -22,7 +22,10 @@ name: Deploy workers
 
 on:
   push:
-    branches: [main]
+    # Auto-deploy from the active claude/* feature branch too, not just main.
+    # Solo-operator mode — merging via PR is unnecessary friction; every push
+    # should land in production within the deploy window.
+    branches: [main, claude/integrate-filament-update-XWb1v]
   workflow_dispatch:
 
 jobs:

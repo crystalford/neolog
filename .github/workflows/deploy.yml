@@ -5,10 +5,14 @@ name: Fast deploy to Pages
 # Access app config — all of which are handled by `bootstrap-cloudflare.yml`
 # (workflow_dispatch only) when infra actually changes.
 #
-# This is what runs on every push to main. Total wall time ~60-90s.
+# This is what runs on every push to main OR the active claude/* feature
+# branch. Total wall time ~60-90s.
 #
 # Trigger:
 #   - push to main (auto)
+#   - push to claude/integrate-filament-update-XWb1v (auto, solo-operator mode
+#     where merge-to-main is unnecessary ceremony — we want to ship every push
+#     straight to prod without a PR cycle)
 #   - workflow_dispatch (manual, e.g. to redeploy current main)
 #
 # Required secrets (already configured for bootstrap-cloudflare.yml — same set):
@@ -17,7 +21,7 @@ name: Fast deploy to Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/integrate-filament-update-XWb1v]
   workflow_dispatch:
 
 jobs:
