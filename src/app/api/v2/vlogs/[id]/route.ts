@@ -210,6 +210,71 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     thumbnail_r2_key: _thumbr2,
     ...safeVlog
   } = vlog
+  // ── Extra fields for the comprehensive Vlog detail page ──────────
+  // navigation: prev/next vlog by recorded_at; anchor thread = the
+  // strongest thread for this vlog; entity_mention_times = timestamps
+  // for the multi-track timeline's "entities" track.
+  const [navigation, anchorThread, entityMentionTimes] = await Promise.all([
+    (async () => {
+      try {
+        const [prev, next] = await Promise.all([
+          findOne<{ id: string }>(
+            db,
+            `SELECT id FROM vlogs
+              WHERE operator_id = ? AND deleted_at IS NULL
+                AND (recorded_at < ? OR (recorded_at = ? AND id < ?))
+              ORDER BY recorded_at DESC, id DESC LIMIT 1`,
+            operator.id, vlog.recorded_at, vlog.recorded_at, params.id,
+          ),
+          findOne<{ id: string }>(
+            db,
+            `SELECT id FROM vlogs
+              WHERE operator_id = ? AND deleted_at IS NULL
+                AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
+              ORDER BY recorded_at ASC, id ASC LIMIT 1`,
+            operator.id, vlog.recorded_at, vlog.recorded_at, params.id,
+          ),
+        ])
+        return { prev_vlog_id: prev?.id ?? null, next_vlog_id: next?.id ?? null }
+      } catch { return { prev_vlog_id: null, next_vlog_id: null } }
+    })(),
+    (async () => {
+      try {
+        return await findOne<{ id: string; topic: string; take: string | null; strength: number | null }>(
+          db,
+          `SELECT t.id, t.topic, t.take, t.strength
+             FROM threads t
+             JOIN extraction_runs er ON er.id = t.run_id
+            WHERE t.vlog_id = ? AND t.operator_id = ?
+              AND t.deleted_at IS NULL
+              AND er.is_active = 1
+            ORDER BY COALESCE(t.strength, 0) DESC, t.extracted_at ASC
+            LIMIT 1`,
+          params.id, operator.id,
+        )
+      } catch { return null }
+    })(),
+    (async () => {
+      try {
+        // Get entity_mentions with timestamps for the multi-track
+        // "Entities" track on the Vlog detail timeline.
+        return await findMany<{ entity_id: string; mention_time: number | null; entity_name: string; entity_type: string }>(
+          db,
+          `SELECT em.entity_id, em.mention_time,
+                  e.name AS entity_name, e.entity_type
+             FROM entity_mentions em
+             JOIN entities e ON e.id = em.entity_id
+            WHERE em.source_kind = 'vlog' AND em.source_id = ?
+              AND em.operator_id = ?
+              AND em.mention_time IS NOT NULL
+            ORDER BY em.mention_time ASC
+            LIMIT 100`,
+          params.id, operator.id,
+        )
+      } catch { return [] }
+    })(),
+  ])
+
   return NextResponse.json({
     vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl },
     video_url: videoUrl,
@@ -217,6 +282,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     clips,
     creative_elements,
     entities,
+    navigation,
+    anchor_thread: anchorThread,
+    entity_mention_times: entityMentionTimes,
   })
 }
 

@@ -7,9 +7,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import LivePipeline from './live-pipeline'
 import Shell from '@/components/Shell'
 import { topicColor } from '@/lib/topic-color'
+import { NavBtn, MultiTrackTimeline, editorialLabel, type MultiTrackBand, type MultiTrackMark } from '@/components/threadkit'
 
 interface VlogDetail {
   id: string
@@ -37,6 +39,8 @@ interface ThreadRow {
   strength: number | null
   abstracted_topic: string | null
   register?: string | null
+  transcript_span_start?: number | null
+  transcript_span_end?: number | null
 }
 
 interface ClipRow {
@@ -67,11 +71,15 @@ interface EntityRow {
 }
 
 export default function VlogDetailPage({ params }: { params: { id: string } }) {
+  const router = useRouter()
   const [vlog, setVlog] = useState<VlogDetail | null>(null)
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [clips, setClips] = useState<ClipRow[]>([])
   const [creative, setCreative] = useState<CreativeRow[]>([])
   const [entities, setEntities] = useState<EntityRow[]>([])
+  const [navigation, setNavigation] = useState<{ prev_vlog_id: string | null; next_vlog_id: string | null }>({ prev_vlog_id: null, next_vlog_id: null })
+  const [anchorThread, setAnchorThread] = useState<{ id: string; topic: string; take: string | null; strength: number | null } | null>(null)
+  const [entityMentionTimes, setEntityMentionTimes] = useState<{ entity_id: string; entity_name: string; entity_type: string; mention_time: number | null }[]>([])
   const [diagnosis, setDiagnosis] = useState<{
     status: string
     label: string
@@ -106,6 +114,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       setClips(data.clips || [])
       setCreative(data.creative_elements || [])
       setEntities(data.entities || [])
+      setNavigation(data.navigation || { prev_vlog_id: null, next_vlog_id: null })
+      setAnchorThread(data.anchor_thread ?? null)
+      setEntityMentionTimes(data.entity_mention_times || [])
     } catch (e: any) {
       setError(String(e.message || e))
     }
@@ -254,16 +265,24 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           <span style={{ color: 'var(--fg-5)' }}>/</span>
           <span style={{ color: 'var(--fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{breadcrumbTail}</span>
         </nav>
-        <button onClick={() => {
-          navigator.clipboard?.writeText(`${location.origin}/timeline/${vlog.id}`).catch(() => {})
-        }} style={{
-          width: 28, height: 28, padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'transparent', color: 'var(--fg-3)',
-          border: '1px solid var(--line)', borderRadius: 5, cursor: 'pointer',
-        }} title="Copy vlog link">
-          <svg viewBox="0 0 14 14" width="13" height="13"><path d="M6 4 L10 4 A2 2 0 0 1 12 6 L12 10" fill="none" stroke="currentColor" strokeWidth="1.4"/><path d="M8 10 L4 10 A2 2 0 0 1 2 8 L2 4 A2 2 0 0 1 4 2 L8 2" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <NavBtn disabled={!navigation.prev_vlog_id}
+            onClick={() => navigation.prev_vlog_id && router.push(`/timeline/${navigation.prev_vlog_id}`)}
+            label="◂ Prev"/>
+          <NavBtn disabled={!navigation.next_vlog_id}
+            onClick={() => navigation.next_vlog_id && router.push(`/timeline/${navigation.next_vlog_id}`)}
+            label="Next ▸"/>
+          <button onClick={() => {
+            navigator.clipboard?.writeText(`${location.origin}/timeline/${vlog.id}`).catch(() => {})
+          }} style={{
+            width: 28, height: 28, padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', color: 'var(--fg-3)',
+            border: '1px solid var(--line)', borderRadius: 5, cursor: 'pointer',
+          }} title="Copy vlog link">
+            <svg viewBox="0 0 14 14" width="13" height="13"><path d="M6 4 L10 4 A2 2 0 0 1 12 6 L12 10" fill="none" stroke="currentColor" strokeWidth="1.4"/><path d="M8 10 L4 10 A2 2 0 0 1 2 8 L2 4 A2 2 0 0 1 4 2 L8 2" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>
+          </button>
+        </div>
       </div>
 
     <div className="pad-tight vlog-detail">
@@ -279,6 +298,78 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           <img src={vlog.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         )}
       </div>
+
+      {/* Multi-track timeline matching the Vlog.html prototype.
+          4 tracks stacked: audio waveform / thread spans / clip
+          brackets / entity mentions. Click any band or tick to
+          seek the video element. Threads colored by topic so the
+          operator can see at a glance where each idea lives in
+          the recording. */}
+      {(threads.length > 0 || clips.length > 0 || entityMentionTimes.length > 0) && (() => {
+        const dur = Math.max(
+          ...threads.map(t => Number(t.transcript_span_end ?? 0)),
+          ...clips.map(c => Number(c.end_time ?? 0)),
+          ...entityMentionTimes.map(em => Number(em.mention_time ?? 0)),
+          60,
+        )
+        const threadBands: MultiTrackBand[] = threads
+          .filter(t => t.transcript_span_start != null && t.transcript_span_end != null)
+          .map(t => ({
+            start: Number(t.transcript_span_start),
+            end: Number(t.transcript_span_end),
+            color: topicColor(t.abstracted_topic ?? t.topic ?? 'misc'),
+            label: t.take ?? undefined,
+          }))
+        const clipBands: MultiTrackBand[] = clips
+          .filter(c => c.start_time != null && c.end_time != null)
+          .map(c => ({
+            start: Number(c.start_time),
+            end: Number(c.end_time),
+            color: 'var(--accent)',
+            label: c.headline,
+          }))
+        const entityMarks: MultiTrackMark[] = entityMentionTimes
+          .filter(em => em.mention_time != null)
+          .map(em => ({
+            time: Number(em.mention_time),
+            color: ENTITY_TRACK_COLOR[em.entity_type] ?? 'var(--fg-3)',
+            label: em.entity_name,
+          }))
+        return (
+          <div style={{ marginTop: 14, marginBottom: 18 }}>
+            <MultiTrackTimeline
+              durationSec={dur}
+              threadBands={threadBands}
+              clipBands={clipBands}
+              entityMarks={entityMarks}
+              currentT={0}
+              onSeek={(t) => {
+                const v = document.querySelector('.vplayer video, .vplayer audio') as HTMLVideoElement | HTMLAudioElement | null
+                if (v) { v.currentTime = t; v.play().catch(() => {}) }
+              }}
+              accentColor={topicColor(vlog.original_filename ?? vlog.id)}
+            />
+          </div>
+        )
+      })()}
+
+      {/* Anchor take callout — the strongest thread for this vlog.
+          Click jumps to that thread's detail page. */}
+      {anchorThread && (
+        <Link href={`/thread/${anchorThread.id}`} style={{
+          display: 'block', marginBottom: 18, padding: '14px 18px',
+          background: 'var(--bg-1)', border: '1px solid var(--line)',
+          borderLeft: `3px solid ${topicColor(anchorThread.topic)}`,
+          borderRadius: 6, textDecoration: 'none',
+        }}>
+          <div style={editorialLabel(topicColor(anchorThread.topic), 6)}>
+            Anchor take · strongest moment
+          </div>
+          <div style={{ fontSize: 16, color: 'var(--fg-1)', lineHeight: 1.55, fontStyle: 'italic' }}>
+            “{anchorThread.take ?? anchorThread.topic}”
+          </div>
+        </Link>
+      )}
 
       {/* Editorial vlog header — topic-toned spine on the left,
           eyebrow + title + meta. Derives the spine color from the
@@ -1124,6 +1215,17 @@ const ENTITY_COLORS: Record<string, { bg: string; bd: string }> = {
 }
 function entityTypeBg(t: string): string { return ENTITY_COLORS[t]?.bg ?? 'var(--bg-2)' }
 function entityTypeBd(t: string): string { return ENTITY_COLORS[t]?.bd ?? 'var(--line)' }
+
+// Entity tick color in the multi-track timeline.
+const ENTITY_TRACK_COLOR: Record<string, string> = {
+  person:    'var(--t-5)',
+  place:     'var(--t-3)',
+  concept:   'var(--t-2)',
+  tool:      'var(--t-6)',
+  project:   'var(--t-4)',
+  theme:     'var(--t-8)',
+  reference: 'var(--t-1)',
+}
 
 function ProvField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
