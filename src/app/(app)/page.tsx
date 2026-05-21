@@ -16,6 +16,7 @@
 export const runtime = 'edge'
 
 import { useEffect, useState, useMemo } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
 
@@ -55,9 +56,73 @@ const FILTERS: { key: Filter; label: string }[] = [
 ]
 
 export default function TimelinePage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlFilter = (searchParams?.get('filter') as Filter | null) ?? 'all'
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>(
+    ['all', 'vlog', 'thread', 'post', 'surfaced'].includes(urlFilter as string) ? urlFilter : 'all',
+  )
+  // Right-rail content: ripening clusters + graph preview.
+  const [rail, setRail] = useState<{
+    ripening: { id: string; name: string; topic: string; ripeness: number; thread_count: number }[]
+    graph: { clusters: { id: string; topic: string; ripeness: number; thread_count: number }[]; entities_count: number; threads_count: number }
+    hero_cluster: { id: string; name: string; topic: string; take: string | null; ripeness: number; thread_count: number; gap_question: string | null } | null
+  } | null>(null)
+
+  // Keep URL in sync with filter — operator can deep-link a filter view
+  // (e.g. /?filter=thread for the threads-only view).
+  useEffect(() => {
+    const current = searchParams?.get('filter')
+    if (filter === 'all' && current) router.replace('/', { scroll: false })
+    else if (filter !== 'all' && current !== filter) router.replace(`/?filter=${filter}`, { scroll: false })
+  }, [filter])
+
+  // Load clusters for the right-rail (ripening list) + pinned hero
+  // card. Lightweight query, runs in parallel with the main timeline
+  // fetch.
+  useEffect(() => {
+    fetch('/api/v2/clusters?limit=12', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => {
+        if (!d?.clusters) return
+        const sorted = [...d.clusters].sort((a: any, b: any) => (b.ripeness ?? 0) - (a.ripeness ?? 0))
+        const top = sorted[0]
+        setRail({
+          ripening: sorted.slice(0, 8).map((c: any) => ({
+            id: c.id,
+            name: c.name ?? c.abstracted_topic ?? c.topic ?? 'cluster',
+            topic: c.abstracted_topic ?? c.topic ?? 'misc',
+            ripeness: c.ripeness ?? 0,
+            thread_count: c.thread_count ?? c.stats?.threads ?? 0,
+          })),
+          graph: {
+            clusters: sorted.slice(0, 7).map((c: any) => ({
+              id: c.id,
+              topic: c.abstracted_topic ?? c.topic ?? 'misc',
+              ripeness: c.ripeness ?? 0,
+              thread_count: c.thread_count ?? c.stats?.threads ?? 0,
+            })),
+            entities_count: 0,
+            threads_count: 0,
+          },
+          // Pin a hero card only if the top cluster is genuinely ripe
+          // (>= 60). Otherwise the page leads with the feed, which is
+          // the right behavior when there's nothing dramatic to flag.
+          hero_cluster: (top && (top.ripeness ?? 0) >= 60) ? {
+            id: top.id,
+            name: top.name ?? top.abstracted_topic ?? top.topic,
+            topic: top.abstracted_topic ?? top.topic ?? 'misc',
+            take: top.take ?? null,
+            ripeness: top.ripeness ?? 0,
+            thread_count: top.thread_count ?? top.stats?.threads ?? 0,
+            gap_question: top.gap_question ?? null,
+          } : null,
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/v2/timeline?limit=200', { credentials: 'include' })
@@ -103,54 +168,64 @@ export default function TimelinePage() {
 
   return (
     <Shell active="timeline" breadcrumb={['Timeline']}>
-      {/* Editorial reading column — slightly wider than the default
-          760 to give cards more presence; topic spines lean inward.
-          Generous vertical rhythm (32px between days, 14px between
-          cards) so the page feels like a journal, not a dashboard. */}
-      <div className="pad-tight" style={{ maxWidth: 820, marginLeft: 'auto', marginRight: 'auto' }}>
-        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
-          <div style={{
-            borderLeft: '3px solid var(--t-1)',
-            paddingLeft: 14,
-          }}>
-            <div className="mono" style={{
-              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
-              color: 'var(--fg-4)', marginBottom: 6,
-            }}>
-              The feed
+      {/* Two-column layout matching the design prototype's structure:
+          main feed (820px reading column) + right rail (340px sticky)
+          with ripening cluster list + graph preview. The rail surfaces
+          what's emerging in the corpus alongside the chronological
+          feed so the operator can see "what's happening" in two
+          views at once. */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 340px',
+        gap: 36,
+        maxWidth: 1240,
+        margin: '0 auto',
+        padding: '24px 36px',
+      }}>
+        <div style={{ minWidth: 0 }}>
+          {/* Pinned hero — only renders when a cluster is ripe enough
+              to materialize. This is the "macro-cluster ready" callout
+              from the prototype. Replaces the small "the feed" editorial
+              accent when there's something dramatic to flag. */}
+          {rail?.hero_cluster ? (
+            <HeroClusterCard hero={rail.hero_cluster}/>
+          ) : (
+            <div style={{ borderLeft: '3px solid var(--t-1)', paddingLeft: 14, marginBottom: 28 }}>
+              <div className="mono" style={{ fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--fg-4)', marginBottom: 6 }}>
+                The feed
+              </div>
+              <h1 style={{ marginTop: 0, marginBottom: 8 }}>Timeline</h1>
+              <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
+                Vlogs, threads, posts — chronological by recording date.
+              </p>
             </div>
-            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Timeline</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
-              Everything in order. Vlogs, threads, clips, posts, surfaced cards — newest first.
-            </p>
-          </div>
-        </div>
+          )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 28, marginBottom: 30 }}>
-          <div className="pills">
-            {FILTERS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`filter-pill ${filter === f.key ? 'active' : ''}`}
-              >
-                {f.label} <span className="n">{counts[f.key]}</span>
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+            <div className="pills">
+              {FILTERS.map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={`filter-pill ${filter === f.key ? 'active' : ''}`}
+                >
+                  {f.label} <span className="n">{counts[f.key]}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {loading ? (
-          <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">
-            <div className="ico">{NavIcons.Vlogs}</div>
-            <h3>Nothing on the timeline yet</h3>
-            <p>Drop a vlog on Capture to seed it. New threads, clips, and surfaced cards land here as they're created.</p>
-            <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+          {loading ? (
+            <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="empty">
+              <div className="ico">{NavIcons.Vlogs}</div>
+              <h3>Nothing on the timeline yet</h3>
+              <p>Drop a vlog on Capture to seed it. New threads and surfaced cards land here as they're created.</p>
+              <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
             {groups.map((g, gi) => (
               <div key={gi}>
                 {/* Editorial day band — uppercase mono, hairline below,
@@ -178,11 +253,151 @@ export default function TimelinePage() {
                   {g.items.map(it => <FeedCard key={it.id + ':' + it.ts} item={it}/>)}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right rail — Ripening list + Graph preview. Matches the
+            prototype's "RIPENING" + "GRAPH · THIS WEEK" rail. Sticky
+            so it stays visible while scrolling the feed. */}
+        <aside style={{ position: 'sticky', top: 24, alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
+          {rail && rail.ripening.length > 0 && (
+            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 8, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 12, fontWeight: 500, color: 'var(--fg-1)' }}>Ripening</h3>
+                <Link href="/clusters" style={{ fontSize: 10, color: 'var(--fg-3)', textDecoration: 'none', letterSpacing: 0.4, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>All {rail.ripening.length} →</Link>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {rail.ripening.map(r => (
+                  <Link key={r.id} href={`/cluster/${r.id}`} style={{ display: 'block', textDecoration: 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: topicColor(r.topic), flexShrink: 0 }}/>
+                      <span style={{ flex: 1, fontSize: 12, color: 'var(--fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {r.name}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>{Math.round(r.ripeness)}</span>
+                    </div>
+                    <div style={{ height: 2, background: 'var(--bg-3)', borderRadius: 1, position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', left: 0, top: 0, height: 2, width: `${Math.min(100, r.ripeness)}%`, background: topicColor(r.topic), borderRadius: 1 }}/>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--fg-4)', marginTop: 4, letterSpacing: 0.4, fontFamily: 'Geist Mono, ui-monospace, monospace', textTransform: 'uppercase' }}>
+                      {r.thread_count} thread{r.thread_count === 1 ? '' : 's'}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {rail && rail.graph.clusters.length > 0 && (
+            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 8, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 12, fontWeight: 500, color: 'var(--fg-1)' }}>Graph · this week</h3>
+                <Link href="/graph" style={{ fontSize: 10, color: 'var(--fg-3)', textDecoration: 'none', letterSpacing: 0.4, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>Open →</Link>
+              </div>
+              <Link href="/graph" style={{ display: 'block', textDecoration: 'none' }}>
+                <RailGraphPreview clusters={rail.graph.clusters}/>
+              </Link>
+            </div>
+          )}
+        </aside>
       </div>
     </Shell>
+  )
+}
+
+// Pinned hero card — surfaces the operator's top-ranked ripe cluster
+// at the top of the timeline. Replaces the small editorial accent when
+// there's something dramatic to flag (e.g. cluster's ready to materialize).
+function HeroClusterCard({ hero }: { hero: { id: string; name: string; topic: string; take: string | null; ripeness: number; thread_count: number; gap_question: string | null } }) {
+  const color = topicColor(hero.topic)
+  const ready = hero.ripeness >= 70
+  const circumference = 2 * Math.PI * 26
+  const dash = circumference * (1 - hero.ripeness / 100)
+  return (
+    <Link href={`/cluster/${hero.id}`} style={{
+      display: 'block', marginBottom: 28,
+      padding: '24px 26px',
+      background: 'var(--bg-1)',
+      border: '1px solid var(--line)',
+      borderLeft: `3px solid ${color}`,
+      borderRadius: 10,
+      textDecoration: 'none',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: `radial-gradient(ellipse 30% 60% at 0% 0%, ${color}1a, transparent 60%)` }}/>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 24, alignItems: 'flex-start', position: 'relative' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 10, color, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600,
+            fontFamily: 'Geist Mono, ui-monospace, monospace', marginBottom: 12,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }}/>
+            {ready ? 'Ready to produce' : 'Ripening'} · {hero.topic}
+          </div>
+          <h1 style={{ margin: '0 0 12px', fontSize: 34, fontWeight: 500, letterSpacing: '-0.8px', lineHeight: 1.18, color: 'var(--fg)' }}>
+            {hero.name}
+          </h1>
+          {hero.take && (
+            <p style={{ margin: '0 0 14px', fontSize: 15, color: 'var(--fg-2)', lineHeight: 1.55, fontStyle: 'italic', maxWidth: 600 }}>
+              “{hero.take.length > 200 ? hero.take.slice(0, 197) + '…' : hero.take}”
+            </p>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22, fontSize: 11, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace', letterSpacing: 0.3 }}>
+            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{hero.thread_count}</b> threads</span>
+            {hero.gap_question && <span style={{ color: 'var(--fg-4)' }}>· 1 gap question</span>}
+            <span style={{ marginLeft: 'auto', color }}>Open in Studio →</span>
+          </div>
+        </div>
+        <div style={{ position: 'relative', width: 80, height: 80, alignSelf: 'center' }}>
+          <svg viewBox="0 0 80 80" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+            <circle cx="40" cy="40" r="26" fill="none" stroke="var(--line-2)" strokeWidth="4"/>
+            <circle cx="40" cy="40" r="26" fill="none" stroke={color} strokeWidth="4"
+              strokeDasharray={circumference} strokeDashoffset={dash} strokeLinecap="round"/>
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.8px', lineHeight: 1 }}>{Math.round(hero.ripeness)}</span>
+            <span style={{ fontSize: 8, color, letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace', fontWeight: 600, marginTop: 2 }}>ripe</span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// Small radial graph preview for the right rail — clusters as
+// topic-colored dots scattered around a central point.
+function RailGraphPreview({ clusters }: { clusters: { id: string; topic: string; ripeness: number; thread_count: number }[] }) {
+  const W = 280, H = 160, cx = W / 2, cy = H / 2
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 160, display: 'block' }}>
+      <defs>
+        {clusters.map((c, i) => (
+          <radialGradient key={i} id={`rg-${i}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={topicColor(c.topic)} stopOpacity={0.45}/>
+            <stop offset="100%" stopColor={topicColor(c.topic)} stopOpacity={0}/>
+          </radialGradient>
+        ))}
+      </defs>
+      {clusters.map((c, i) => {
+        const a = (i / Math.max(1, clusters.length)) * Math.PI * 2 - Math.PI / 2
+        const r = 56
+        const x = cx + Math.cos(a) * r
+        const y = cy + Math.sin(a) * r
+        const sz = 6 + (c.thread_count ?? 0) * 0.6
+        return (
+          <g key={c.id}>
+            <line x1={cx} y1={cy} x2={x} y2={y} stroke={topicColor(c.topic)} strokeWidth={0.5} strokeOpacity={0.25}/>
+            <circle cx={x} cy={y} r={sz + 6} fill={`url(#rg-${i})`}/>
+            <circle cx={x} cy={y} r={sz} fill={topicColor(c.topic)} fillOpacity={0.92}/>
+          </g>
+        )
+      })}
+      <circle cx={cx} cy={cy} r={5} fill="var(--fg)"/>
+    </svg>
   )
 }
 

@@ -115,11 +115,15 @@ function Sidebar({ active }: { active: NavId }) {
   //     old uploads grid per HANDOFF.md). Capture is for new recordings.
   //   - Transcript → opens within Vlog detail, not standalone nav
   const operate: SidebarItem[] = [
-    { id: 'timeline',    label: 'Timeline',    href: '/',            icon: 'Threads',     kbd: 'G T' },
-    { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',       icon: 'Vlogs',       kbd: 'G V' },
-    { id: 'threads',     label: 'Threads',     href: '/threads',     icon: 'Filter',      kbd: 'G R' },
-    { id: 'clusters',    label: 'Clusters',    href: '/clusters',    icon: 'Clusters' },
-    { id: 'productions', label: 'Productions', href: '/productions', icon: 'Productions' },
+    { id: 'timeline',    label: 'Timeline',    href: '/',                    icon: 'Threads',     kbd: 'G T' },
+    { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',               icon: 'Vlogs',       kbd: 'G V' },
+    // Threads merged into Timeline as a filter — /?filter=thread.
+    // /threads route still works (redirects). Operator: "shouldn't
+    // thread and timeline merge? you can just filter by threads on
+    // the timeline?"
+    { id: 'threads',     label: 'Threads',     href: '/?filter=thread',      icon: 'Filter',      kbd: 'G R' },
+    { id: 'clusters',    label: 'Clusters',    href: '/clusters',            icon: 'Clusters' },
+    { id: 'productions', label: 'Productions', href: '/productions',         icon: 'Productions' },
   ]
   const inspect: SidebarItem[] = [
     { id: 'graph',   label: 'Graph', href: '/graph',   icon: 'Graph' },

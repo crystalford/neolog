@@ -352,8 +352,10 @@ async function handle(req: NextRequest) {
   }
 
   // ── Entities ────────────────────────────────────────────────────────────
-  // Top-ranked entities by mention count. Shown as a different card style:
-  // not a journal entry but "the system noticed X across N vlogs."
+  // Top-ranked entities. Same fix as threads/clips/creative — sort + display
+  // by parent vlog's recorded_at, not by extraction-time, so an entity from
+  // a March vlog doesn't pile at the top of "today" just because extraction
+  // ran recently.
   try {
     const ents = await findMany<{
       id: string
@@ -361,13 +363,16 @@ async function handle(req: NextRequest) {
       name: string
       entity_type: string
       mention_count: number | null
-      last_mentioned_at: string | null
+      vlog_recorded_at: string | null
+      vlog_uploaded_at: string
     }>(
       db,
-      `SELECT id, vlog_id, name, entity_type, mention_count, last_mentioned_at
-         FROM entities
-        WHERE operator_id = ?
-        ORDER BY COALESCE(last_mentioned_at, '') DESC, mention_count DESC
+      `SELECT e.id, e.vlog_id, e.name, e.entity_type, e.mention_count,
+              v.recorded_at AS vlog_recorded_at, v.uploaded_at AS vlog_uploaded_at
+         FROM entities e
+         JOIN vlogs v ON v.id = e.vlog_id
+        WHERE e.operator_id = ? AND e.deleted_at IS NULL AND v.deleted_at IS NULL
+        ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC, e.mention_count DESC
         LIMIT 30`,
       operator.id,
     )
@@ -375,7 +380,7 @@ async function handle(req: NextRequest) {
       cards.push({
         id: e.id,
         type: 'entity',
-        created_at: e.last_mentioned_at || new Date().toISOString(),
+        created_at: e.vlog_recorded_at || e.vlog_uploaded_at,
         name: e.name,
         entity_type: e.entity_type,
         mention_count: e.mention_count ?? 1,
