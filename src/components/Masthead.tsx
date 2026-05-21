@@ -21,7 +21,7 @@ const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Timeline',    href: '/',            matchPaths: [/^\/$/, /^\/timeline/, /^\/threads/, /^\/thread\//] },
   { label: 'Inbox',       href: '/inbox',       matchPaths: [/^\/inbox/] },
   { label: 'Vlogs',       href: '/vlogs',       matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
-  { label: 'Studio',      href: '/studio',      matchPaths: [/^\/studio/, /^\/clusters/, /^\/cluster\//] },
+  { label: 'Clusters',    href: '/studio',      matchPaths: [/^\/studio/, /^\/clusters/, /^\/cluster\//] },
   { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/projects/, /^\/materialize/, /^\/library/, /^\/entity/, /^\/graph/] },
   { label: 'Chat',        href: '/chat',        matchPaths: [/^\/chat/, /^\/console/] },
   { label: 'About',       href: '/about',       matchPaths: [/^\/about/] },

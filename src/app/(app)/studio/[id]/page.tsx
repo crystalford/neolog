@@ -139,13 +139,13 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
 
   if (error) return (
     <Shell>
-      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Studio', href: '/studio' }, 'Error']} />
+      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Clusters', href: '/studio' }, 'Error']} />
       <div style={{ padding: 40, color: 'var(--t-terra)' }}>Error: {error}</div>
     </Shell>
   )
   if (!data) return (
     <Shell>
-      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Studio', href: '/studio' }, '…']} />
+      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Clusters', href: '/studio' }, '…']} />
       <div style={{ padding: 40, color: 'var(--fg-3)' }}>Loading…</div>
     </Shell>
   )
@@ -175,7 +175,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
         <CanonCrumbs
           trail={[
             { label: 'Timeline', href: '/' },
-            { label: 'Studio', href: '/studio' },
+            { label: 'Clusters', href: '/studio' },
             { label: truncate(topicName, 40) },
           ]}
           prev={navigation.prev_cluster_id ? `/studio/${navigation.prev_cluster_id}` : null}
