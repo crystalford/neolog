@@ -5,12 +5,17 @@
  * Crown + Dock + FAB chrome with a desktop Topbar + Sidebar + main + optional
  * right rail. Every page renders its own `<Shell active="..." breadcrumb={...}>`
  * so the layout here is intentionally thin — it just provides the
- * authentication boundary + the html structure.
- *
- * Legacy pages that still wrap themselves in `<main>` directly will render
- * un-chromed; we port them one by one.
+ * authentication boundary + the html structure + the global CMD-K
+ * palette overlay (mounted once so every page gets the shortcut).
  */
 
+import { CmdK } from '@/components/CmdK'
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      <CmdK/>
+    </>
+  )
 }
