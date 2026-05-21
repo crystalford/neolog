@@ -867,6 +867,68 @@ async function extractVideoSegment(body, res) {
   }
 }
 
+// ── endpoint: /concat-audio ─────────────────────────────────────────
+// Stitches N audio inputs (webm/mp4/mp3) into one MP3, in order.
+// Used by the production engine to assemble per-beat voiceover takes
+// into a single voiceover track.
+// Input: { input_urls: string[] }
+// Output: MP3 audio stream.
+async function concatAudio(body, res) {
+  const { input_urls } = body
+  if (!Array.isArray(input_urls) || input_urls.length === 0) {
+    return jsonError(res, 400, 'input_urls (non-empty array) required')
+  }
+  if (input_urls.length > 50) {
+    return jsonError(res, 400, 'Too many inputs (cap 50)')
+  }
+
+  const { join } = await import('path')
+  const { writeFileSync } = await import('fs')
+  const { dir } = await downloadToTmp(input_urls[0], 'concat-tmp')  // creates dir
+  const inputs = []
+  try {
+    // Download each input to tmp
+    for (let i = 0; i < input_urls.length; i++) {
+      const inputFile = join(dir, `in-${String(i).padStart(3, '0')}`)
+      const resp = await fetch(input_urls[i])
+      if (!resp.ok) throw new Error(`input ${i} fetch ${resp.status}`)
+      const buf = Buffer.from(await resp.arrayBuffer())
+      writeFileSync(inputFile, buf)
+      inputs.push(inputFile)
+    }
+
+    // ffmpeg concat demuxer needs a manifest file listing inputs.
+    const manifestFile = join(dir, 'manifest.txt')
+    writeFileSync(
+      manifestFile,
+      inputs.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'),
+    )
+    const outFile = join(dir, 'voiceover.mp3')
+
+    // Two-pass: try concat demuxer + re-encode to mp3 (safe across
+    // mixed input codecs). -ar 44100 / -ac 2 for portability.
+    await runFfmpeg(
+      [
+        '-y',
+        '-f', 'concat', '-safe', '0',
+        '-i', manifestFile,
+        '-vn',
+        '-c:a', 'libmp3lame',
+        '-b:a', '160k',
+        '-ar', '44100',
+        '-ac', '2',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'audio/mpeg')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /concat-audio failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -874,6 +936,7 @@ const routes = {
   '/extract-audio':  extractAudio,
   '/extract-audio-segment': extractAudioSegment,
   '/extract-video-segment': extractVideoSegment,
+  '/concat-audio': concatAudio,
   '/trim':           trim,
   '/concat':         concat,
 }

@@ -304,6 +304,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             {/* VIDEO ESSAY — beats list with per-beat record affordance */}
             {p.production_type === 'video_essay' && (
               <>
+                <VoiceoverPanel production={p} beats={data.beats ?? []} onStitched={load}/>
                 <section className="canon-section">
                   <div className="canon-section-head">
                     <h2>Beats <span className="meta">· {data.beats?.length ?? 0}</span></h2>
@@ -838,5 +839,130 @@ function EngineCard({ production, onRegenerated }: { production: Production; onR
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * VoiceoverPanel — for video_essay productions. Shows current
+ * voiceover state (none / stitched), Stitch button when all beats are
+ * recorded, audio player when stitched. The stitched MP3 lives at
+ * productions.output_r2_key (with output_metadata.kind='voiceover').
+ */
+function VoiceoverPanel({ production, beats, onStitched }: {
+  production: Production
+  beats: Beat[]
+  onStitched: () => void
+}) {
+  const [stitching, setStitching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const recordedCount = beats.filter(b => b.audio_r2_key).length
+  const totalCount = beats.length
+  const allRecorded = totalCount > 0 && recordedCount === totalCount
+
+  // Determine if the existing output is a stitched voiceover (vs a
+  // future final-render artifact).
+  let isVoiceover = false
+  try {
+    const meta = JSON.parse(production.output_metadata || '{}')
+    isVoiceover = meta?.kind === 'voiceover'
+  } catch {}
+  const hasVoiceover = isVoiceover && !!production.output_url
+
+  const stitch = async () => {
+    setStitching(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/voiceover`, {
+        method: 'POST', credentials: 'include',
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onStitched()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 220))
+    } finally {
+      setStitching(false)
+    }
+  }
+
+  return (
+    <section className="canon-section">
+      <div className="canon-section-head">
+        <h2>Voiceover {hasVoiceover && <span className="meta">· stitched from {(() => { try { return JSON.parse(production.output_metadata || '{}').beat_count } catch { return recordedCount } })()} beats</span>}</h2>
+        <div className="meta">{recordedCount}/{totalCount} beats recorded</div>
+      </div>
+
+      {hasVoiceover && production.output_url && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line-1)',
+          borderLeft: '2px solid var(--sig)',
+          borderRadius: '0 12px 12px 0',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.6,
+            textTransform: 'uppercase', color: 'var(--sig)', fontWeight: 600,
+          }}>Voiceover ready</div>
+          <audio src={production.output_url} controls style={{ width: '100%' }}/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={stitch}
+              disabled={stitching || !allRecorded}
+              className="canon-btn ghost"
+              style={{ fontSize: 11 }}
+            >
+              {stitching ? 'Re-stitching…' : 'Re-stitch'}
+            </button>
+            <a
+              href={production.output_url}
+              download={`voiceover-${production.id}.mp3`}
+              className="canon-btn ghost"
+              style={{ fontSize: 11 }}
+            >
+              Download
+            </a>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-3)' }}>
+              MP3 · 160k · stitched from all beats in order
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!hasVoiceover && (
+        <div style={{
+          padding: '18px 22px',
+          background: 'var(--bg-1)',
+          border: '1px dashed var(--line-2)',
+          borderRadius: 10,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+            {allRecorded
+              ? 'All beats recorded. Stitch them into a single voiceover MP3.'
+              : `Record voiceover for ${totalCount - recordedCount} more beat${totalCount - recordedCount === 1 ? '' : 's'} below, then stitch.`}
+          </div>
+          <div>
+            <button
+              onClick={stitch}
+              disabled={stitching || !allRecorded}
+              className="canon-btn primary"
+              style={{ fontSize: 12, opacity: !allRecorded ? 0.5 : 1 }}
+            >
+              {stitching ? 'Stitching…' : 'Stitch voiceover'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          marginTop: 8, padding: '8px 12px',
+          background: 'rgba(230,99,74,0.06)', border: '1px solid var(--t-terra)',
+          borderRadius: 6, fontSize: 12, color: 'var(--fg-1)',
+        }}>{error}</div>
+      )}
+    </section>
   )
 }
