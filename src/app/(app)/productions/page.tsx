@@ -42,21 +42,39 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'dormant',       label: 'Dormant' },
 ]
 
+interface DraftRow {
+  id: string
+  production_type: string
+  state: string
+  script_text: string | null
+  source_kind: string
+  source_id: string
+  created_at: string
+  updated_at: string
+  produced_at: string | null
+  visibility: string
+}
+
 export default function ProductionsListPage() {
   const [productions, setProductions] = useState<ProductionRow[]>([])
+  const [drafts, setDrafts] = useState<DraftRow[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('all')
 
   const load = () => {
     setLoading(true)
-    fetch('/api/v2/projects?limit=200', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { projects: [], productions: [] })
-      .then((d: any) => {
-        const rows = d?.projects ?? d?.productions ?? []
-        setProductions(rows)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch('/api/v2/projects?limit=200', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : { projects: [] })
+        .catch(() => ({ projects: [] })),
+      fetch('/api/v2/library?limit=100', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : { productions: [] })
+        .catch(() => ({ productions: [] })),
+    ]).then(([proj, lib]: any[]) => {
+      setProductions(proj?.projects ?? proj?.productions ?? [])
+      setDrafts(lib?.productions ?? [])
+      setLoading(false)
+    })
   }
   useEffect(load, [])
 
@@ -108,7 +126,49 @@ export default function ProductionsListPage() {
         </div>
       </section>
 
-      {/* Tabs */}
+      {/* Recent drafts — actual production artifacts (productions table).
+          Distinct from the project containers below. */}
+      {drafts.length > 0 && (
+        <section className="canon-reveal d2" style={{ marginBottom: 36 }}>
+          <div className="canon-section-head">
+            <h2>Recent drafts <span className="meta">· {drafts.length}</span></h2>
+            <div className="meta">script_text · live</div>
+          </div>
+          <div style={{
+            display: 'grid', gap: 10,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+          }}>
+            {drafts.slice(0, 12).map(d => (
+              <Link key={d.id} href={`/production/${d.id}`} className="canon-production-card" style={{ ['--c' as any]: 'var(--sig)' } as React.CSSProperties}>
+                <div className="kind-row">
+                  <span className="topic-pill" style={{ '--topic': 'var(--sig)', '--topic-soft': 'var(--sig-soft)' } as any}>
+                    <span className="type">{d.production_type.replace(/_/g, ' ')}</span>
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                    letterSpacing: 1.6, textTransform: 'uppercase',
+                    color: 'var(--fg-3)',
+                    padding: '3px 9px', borderRadius: 100,
+                    background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+                  }}>{d.state.replace(/_/g, ' ')}</span>
+                  <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)' }}>
+                    {new Date(d.updated_at || d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                <p className="blurb" style={{ WebkitLineClamp: 3 } as any}>
+                  {d.script_text ? d.script_text.replace(/\s+/g, ' ').slice(0, 220) : '(empty draft)'}
+                </p>
+                <div className="meta-pills">
+                  <span>from <b>{d.source_kind}</b></span>
+                  {d.visibility === 'public' && <span style={{ color: 'var(--sig)' }}>· public</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Tabs (project containers below) */}
       <div className="canon-reveal d2" style={{
         display: 'flex', gap: 6, borderBottom: '1px solid var(--line)',
         paddingBottom: 18, marginBottom: 32, flexWrap: 'wrap',

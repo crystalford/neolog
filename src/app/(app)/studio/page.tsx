@@ -123,7 +123,7 @@ export default function StudioListPage() {
           fontSize: 72, lineHeight: 1.0, letterSpacing: '-3px',
           color: 'var(--fg)', margin: '0 0 22px', textWrap: 'balance',
         }}>
-          Studio<span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>,</span> <span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>cultivated</span><span style={{ color: 'var(--sig)' }}>.</span>
+          Clusters<span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>,</span> <span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>cultivating</span><span style={{ color: 'var(--sig)' }}>.</span>
         </h1>
         <p style={{
           fontSize: 17, lineHeight: 1.55, color: 'var(--fg-2)',
