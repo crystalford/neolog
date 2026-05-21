@@ -529,6 +529,31 @@ function Wavebox({ vlog, thread, color, currentT, setCurrentT, playing, setPlayi
   playing: boolean; setPlaying: (b: boolean) => void
   setAudioEl: (el: HTMLAudioElement | null) => void
 }) {
+  // Segment toggle — when on, plays just the thread's span as a
+  // separately-generated MP3. Lazy: requests audio segment on first
+  // click, caches presigned URL.
+  const [segmentMode, setSegmentMode] = useState(false)
+  const [segmentUrl, setSegmentUrl] = useState<string | null>(null)
+  const [segmentLoading, setSegmentLoading] = useState(false)
+  const [segmentError, setSegmentError] = useState<string | null>(null)
+
+  const requestSegment = async () => {
+    if (segmentUrl) { setSegmentMode(true); return }
+    setSegmentLoading(true)
+    setSegmentError(null)
+    try {
+      const r = await fetch(`/api/v2/threads/${thread.id}/audio-segment`, { credentials: 'include' })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setSegmentUrl(d.url)
+      setSegmentMode(true)
+    } catch (e: any) {
+      setSegmentError(String(e?.message || e).slice(0, 200))
+    } finally {
+      setSegmentLoading(false)
+    }
+  }
+
   const N = 240
   const heights = useMemo(() => {
     const h: number[] = []
@@ -604,11 +629,40 @@ function Wavebox({ vlog, thread, color, currentT, setCurrentT, playing, setPlayi
         <span>{formatMmSs(dur)}</span>
       </div>
 
+      {/* Segment toggle — play thread's span as a standalone audio clip
+          (generated on first click via FFmpeg + R2 cache). Hidden when
+          the thread has no computed span (operator must re-extract). */}
+      {thread.transcript_span_start != null && thread.transcript_span_end != null && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+          <button onClick={() => {
+            if (segmentMode) { setSegmentMode(false); return }
+            requestSegment()
+          }} disabled={segmentLoading} style={{
+            padding: '6px 12px', fontSize: 11,
+            background: segmentMode ? color : 'var(--bg-2)',
+            color: segmentMode ? 'var(--bg)' : 'var(--fg-1)',
+            border: `1px solid ${segmentMode ? color : 'var(--line)'}`,
+            borderRadius: 5, cursor: segmentLoading ? 'wait' : 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>
+            {segmentLoading ? '◌ Generating segment…' : segmentMode ? '◉ Thread segment only' : '▶ Thread segment only'}
+          </button>
+          {segmentUrl && !segmentLoading && (
+            <a href={segmentUrl} download={`thread-${thread.id.slice(0, 12)}.mp3`} style={{
+              fontSize: 10, color: 'var(--fg-3)',
+              fontFamily: 'Geist Mono, ui-monospace, monospace',
+              textDecoration: 'none', letterSpacing: 0.4, textTransform: 'uppercase',
+            }}>Download mp3 →</a>
+          )}
+          {segmentError && <span style={{ fontSize: 10, color: 'var(--err)' }}>{segmentError}</span>}
+        </div>
+      )}
+
       {vlog.playback_url && (
         <audio
           id="thread-audio"
           ref={(el) => setAudioEl(el)}
-          src={vlog.playback_url}
+          src={segmentMode && segmentUrl ? segmentUrl : vlog.playback_url}
           preload="metadata"
           onTimeUpdate={(e) => setCurrentT((e.target as HTMLAudioElement).currentTime)}
           onPause={() => setPlaying(false)}

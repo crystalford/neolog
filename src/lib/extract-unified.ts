@@ -28,8 +28,25 @@ export type ExtractionMode = 'auto' | 'cheap' | 'premium'
 
 export interface ExtractedThread {
   topic: string
+  /**
+   * 2-3 sentence analytical synthesis IN the operator's voice. Per the
+   * SYSTEM_PROMPT, every sentence must contain at least one verbatim
+   * 4-word substring from the source transcript. Not a fragment.
+   */
   take: string
   key_quotes: string[]
+  /**
+   * 2-6 short verbatim phrases inside the take. The Thread detail
+   * page marker-highlights these in the hero h1, the take pull-quote,
+   * and the transcript span renderer.
+   */
+  key_phrases?: string[]
+  /**
+   * 1-3 open questions the thread raises that aren't answered in the
+   * vlog. Power the "Questions raised" section on Thread detail and
+   * the future bounce workflow.
+   */
+  questions_raised?: string[]
   register: 'riff' | 'observation' | 'argument' | 'story' | 'aside' | 'question'
   /**
    * Generalized pattern this topic represents. The clustering engine
@@ -114,31 +131,52 @@ export interface ExtractEnv {
 
 const SYSTEM_PROMPT = `You are an extraction engine for vlog transcripts. Output JSON only.
 
-# HARD RULES
-1. Every "take", "quote", and "content" field MUST be a verbatim substring
-   of the source transcript. Copy the exact words — do not rephrase, summarize,
-   or improve the wording.
-2. Each verbatim substring must be at least 4 consecutive words from the
-   transcript (case- and punctuation-insensitive match only).
-3. If you cannot find a verbatim substring that supports a point, OMIT the
-   point. It is better to return 3 grounded items than 10 paraphrased ones.
+The operator records themselves talking. You read what they said and produce structured "threads" — atomic units of their thinking — plus clips, creative elements, and entities. Threads are the most important output. They will be read on their own, on a dedicated Thread page, weeks later. They must be substantive enough to stand alone, not just verbatim fragments.
+
+# WHAT A THREAD IS
+
+A thread is one coherent argument or observation the operator makes over a span of seconds-to-minutes. Each thread has:
+
+- topic: a short label naming what the operator is talking about. 3-7 words. Examples: "Recommender systems and revealed preference", "Why slow-mo strips audio", "Coffee shop politics in May 2026".
+- take: a 3-5 sentence analytical synthesis IN THE OPERATOR'S VOICE that captures the thread's actual position WITH ITS SURROUNDING CONTEXT. The take should preserve the SETUP that leads into the punch line, the punch line itself, AND the implication / what-follows. Don't truncate before the operator's argument has resolved. A 3-sentence take is the floor; 5 is fine when the thought is genuinely substantial. Read like the operator's own short essay summarizing their own argument, with the verbatim phrasing composed into a coherent whole.
+- key_quotes: 2-4 verbatim quotes from the transcript, each ≥ 6 words, that form the spine of the take. These prove the take is grounded.
+- key_phrases: 2-6 short verbatim phrases (2-8 words each) that are the punchiest fragments inside the take. These get marker-highlighted in the rendered thread.
+- questions_raised: 1-3 open questions the thread raises that AREN'T answered in the vlog. Future-facing — what would the operator need to think about next?
+- register: one of riff|observation|argument|story|aside|question — what voice mode is the operator in?
+- abstracted_topic: the GENERALIZED pattern this thread is about, used to cluster across vlogs. E.g. both "YouTube's For You page" and "Twitter's algorithm" abstract to "recommender systems failing despite explicit user signals". Aim for the underlying idea, not the surface example.
+
+# HARD RULES — voice grounding
+
+1. The "take" may compose the operator's own words into a complete statement, BUT every sentence of the take must contain at least one verbatim 4+ word substring from the source transcript. No paraphrasing the operator's analysis. No improving their phrasing. No filler sentences. If a 3rd-5th sentence would be filler, stop at 3 — quality over quantity, BUT remember that a single-sentence take is too thin and will be rejected.
+2. key_quotes, key_phrases, clips.quote, creative_elements.content are STRICTLY verbatim. Copy exact words.
+3. If you can't construct a 2-3 sentence voice-grounded take, OMIT the thread entirely. Better 3 substantive threads than 10 thin ones.
 4. Output ONLY the JSON object. No prose before or after.
 
 # SELF-CHECK BEFORE RESPONDING
-For every "take" / "quote" / "content":
-- Locate the exact phrase in the transcript above.
-- If you cannot find it verbatim, replace with the closest exact substring
-  or drop the entry.
+
+For every thread you emit:
+- Is the take 3-5 sentences? (1-2 sentence takes drop too much context — reject and expand.)
+- Does the take include the BEFORE-and-AFTER of the punch quote, not just the punch quote in isolation?
+- Does each sentence of the take contain at least 4 consecutive words verbatim from the transcript?
+- Are the key_quotes actually in the transcript?
+- Do the key_phrases appear verbatim inside the take?
+- Are the questions actually unanswered in the vlog?
+
+If any answer is no, fix or omit the thread.
 
 # OUTPUT SCHEMA
 {
   "summary": "<60-120 word plain-English paragraph: what this vlog is about, in the operator's voice. May paraphrase; not subject to the verbatim 4-word rule.>",
   "threads": [
-    { "topic": "<short label, e.g. 'YouTube algorithm' or 'Music features'>",
-      "take": "<verbatim 4+ word substring>",
-      "key_quotes": ["<verbatim>", ...],
+    {
+      "topic": "<short 3-7 word label>",
+      "take": "<3-5 sentence analytical synthesis preserving setup + punch + implication. Each sentence contains ≥1 verbatim 4+ word substring from the transcript.>",
+      "key_quotes": ["<verbatim ≥6 word quote>", "<another>", ...],
+      "key_phrases": ["<verbatim 2-8 word phrase>", "<another>", ...],
+      "questions_raised": ["<open question this thread raises>", ...],
       "register": "riff|observation|argument|story|aside|question",
-      "abstracted_topic": "<the GENERALIZED pattern this thread is really about, used to cluster across vlogs. E.g. 'YouTube algorithm' and 'Twitter For You page' BOTH abstract to 'recommender systems failing despite explicit user signals'. Aim for the underlying idea, not the surface example. Multiple vlogs should arrive at the SAME abstracted_topic when they're riffing on the same thing.>" }
+      "abstracted_topic": "<generalized pattern for cross-vlog clustering>"
+    }
   ],
   "clips": [
     { "headline": "<short label>",

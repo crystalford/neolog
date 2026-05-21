@@ -753,11 +753,59 @@ async function concat(body, res) {
 
 // ─── HTTP server ─────────────────────────────────────────────────────────────
 
+// ── endpoint: /extract-audio-segment ───────────────────────────────
+// Slices the vlog's audio between start_sec and (start_sec + duration_sec)
+// into an MP3, streamed back to the caller. Used by the Thread page
+// "Play thread segment only" toggle so the operator can audition just
+// the span of audio that produced a thread, without scrubbing through
+// the full vlog.
+//
+// Output is streamed straight to the response body. Caller is expected
+// to upload it to R2 (or proxy through their own R2 PUT URL) and cache
+// the result for subsequent requests.
+async function extractAudioSegment(body, res) {
+  const { input_url, start_sec, duration_sec } = body
+  if (!input_url) return jsonError(res, 400, 'input_url required')
+  if (!isFinite(start_sec) || start_sec < 0) return jsonError(res, 400, 'start_sec must be a non-negative number')
+  if (!isFinite(duration_sec) || duration_sec <= 0) return jsonError(res, 400, 'duration_sec must be positive')
+
+  // Hard cap on slice duration to prevent runaway encodes.
+  const maxDur = 600
+  const clipped = Math.min(maxDur, duration_sec)
+
+  const { dir, file: inputFile } = await downloadToTmp(input_url, 'audio-seg-in')
+  const outFile = join(dir, 'segment.mp3')
+
+  try {
+    // -ss before -i for a fast seek; libmp3lame for broad compatibility
+    // with browser audio players. -vn drops any video stream.
+    await runFfmpeg(
+      [
+        '-y',
+        '-ss', String(start_sec),
+        '-i', inputFile,
+        '-t',  String(clipped),
+        '-vn',
+        '-c:a', 'libmp3lame',
+        '-b:a', '128k',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'audio/mpeg')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /extract-audio-segment failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
   '/extract-thumb-mini-transcode': extractThumbMiniTranscode,
   '/extract-audio':  extractAudio,
+  '/extract-audio-segment': extractAudioSegment,
   '/trim':           trim,
   '/concat':         concat,
 }

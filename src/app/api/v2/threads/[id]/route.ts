@@ -45,12 +45,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const db = getDb(env)
 
-  // Core thread row + vlog metadata in one query.
+  // Core thread row + vlog metadata in one query. key_phrases was
+  // added in migration 2026-05-20; default to NULL on old rows.
   const row = await findOne<{
     id: string
     topic: string
     take: string | null
     key_quotes: string | null
+    key_phrases: string | null
     questions_raised: string | null
     register: string | null
     strength: number | null
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     vlog_transcoded_key: string | null
   }>(
     db,
-    `SELECT t.id, t.topic, t.take, t.key_quotes, t.questions_raised, t.register,
+    `SELECT t.id, t.topic, t.take, t.key_quotes, t.key_phrases, t.questions_raised, t.register,
             t.strength, t.transcript_span_start, t.transcript_span_end,
             t.abstracted_topic, t.extracted_at, t.extraction_prompt_version,
             t.run_id,
@@ -197,21 +199,37 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       params.id,
     ), []),
 
-    // Entities — try the thread-scoped mentions first; fall back to vlog-scoped
-    // entities since today's data only has the vlog level. Once we backfill
-    // entity_mentions for threads this will narrow naturally.
-    safe('entities', () => findMany<{
-      id: string; name: string; entity_type: string; mention_count: number | null
-    }>(db,
-      `SELECT id, name, entity_type, mention_count
-         FROM entities
-        WHERE vlog_id = ?
-          AND operator_id = ?
-          AND deleted_at IS NULL
-        ORDER BY COALESCE(mention_count, 0) DESC, name ASC
-        LIMIT 20`,
-      row.vlog_id, operator.id,
-    ), []),
+    // Entities — prefer thread-scoped mentions (source_kind='thread')
+    // when they exist; otherwise fall back to all vlog entities. The
+    // post-extraction hook populates entity_mentions per-thread, so new
+    // threads narrow naturally to entities actually present in the
+    // thread's quotes.
+    safe('entities', async () => {
+      const threadScoped = await findMany<{ id: string; name: string; entity_type: string; mention_count: number | null }>(
+        db,
+        `SELECT DISTINCT e.id, e.name, e.entity_type, e.mention_count
+           FROM entity_mentions m
+           JOIN entities e ON e.id = m.entity_id
+          WHERE m.source_kind = 'thread' AND m.source_id = ?
+            AND e.operator_id = ?
+            AND e.deleted_at IS NULL
+          ORDER BY COALESCE(e.mention_count, 0) DESC, e.name ASC
+          LIMIT 20`,
+        params.id, operator.id,
+      )
+      if (threadScoped.length > 0) return threadScoped
+      return findMany<{ id: string; name: string; entity_type: string; mention_count: number | null }>(
+        db,
+        `SELECT id, name, entity_type, mention_count
+           FROM entities
+          WHERE vlog_id = ?
+            AND operator_id = ?
+            AND deleted_at IS NULL
+          ORDER BY COALESCE(mention_count, 0) DESC, name ASC
+          LIMIT 20`,
+        row.vlog_id, operator.id,
+      )
+    }, []),
 
     // Productions / posts that reference this thread (none yet, but the
     // schema supports it via posts.source_kind='thread' source_id=thread_id).
@@ -236,8 +254,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             ORDER BY word_index ASC
             LIMIT 1200`,
           row.vlog_id,
-          Math.max(0, spanStart - 30),
-          spanEnd + 30,
+          // Wider transcript window (±60s) so operators can see the
+          // setup before and the implication after the thread's
+          // verbatim quote. Per operator: "the threads need to be
+          // slightly longer to preserve entire context of the quote."
+          Math.max(0, spanStart - 60),
+          spanEnd + 60,
         ), [])
       : Promise.resolve([]),
 
@@ -300,7 +322,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       take: row.take || '',
       key_quotes: parseArr<string>(row.key_quotes, (x) => typeof x === 'string' ? x : (x?.text ?? '')),
       questions_raised: parseArr<string>(row.questions_raised),
-      key_phrases: [] as string[],  // column not yet added; empty for forward compat
+      key_phrases: parseArr<string>(row.key_phrases),
       register: row.register,
       strength: row.strength,
       transcript_span_start: spanStart,

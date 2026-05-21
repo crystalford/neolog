@@ -987,24 +987,67 @@ export class VlogPipelineDO {
       }
     }
 
-    await runBatch('threads', run.payload.threads.map(t => this.env.DB.prepare(
-      // abstracted_topic IS the clustering key. Was being dropped on
-      // INSERT before — clusters table stayed empty no matter how many
-      // vlogs we extracted. Now persisted, used by build-clusters.
+    // Pre-generate thread IDs so we can:
+    //   1. compute transcript_span_start/end per thread after INSERT
+    //   2. attach entity_mentions to the thread (source_kind='thread')
+    // Each id is bound to the same thread index across all three passes.
+    const threadIds = run.payload.threads.map(() => ulid())
+
+    await runBatch('threads', run.payload.threads.map((t, i) => this.env.DB.prepare(
+      // abstracted_topic IS the clustering key. key_phrases and
+      // questions_raised newly populated by the expanded extraction
+      // prompt — used by the comprehensive Thread detail page.
       `INSERT INTO threads
          (id, operator_id, vlog_id, run_id, topic, take, key_quotes,
+          key_phrases, questions_raised,
           register, abstracted_topic, validated, extraction_prompt_version, extracted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
     ).bind(
-      ulid(), vlog.operator_id, vlog.id, run_id,
+      threadIds[i], vlog.operator_id, vlog.id, run_id,
       String(t.topic || '').slice(0, 200),
       String(t.take || ''),
       JSON.stringify(t.key_quotes ?? []),
+      JSON.stringify((t as any).key_phrases ?? []),
+      JSON.stringify((t as any).questions_raised ?? []),
       String(t.register || 'observation'),
       (t as any).abstracted_topic ? String((t as any).abstracted_topic).slice(0, 300) : null,
       t.validated ?? 1,
       promptVersion,
     )))
+
+    // Post-INSERT: compute transcript_span_start/end for each thread by
+    // matching its first key_quote (or take, if no quotes) against the
+    // vlog's transcript_words. Wrapped so failure doesn't abort the run.
+    try {
+      await computeAndUpdateThreadSpans(
+        this.env.DB,
+        vlog.id,
+        run.payload.threads.map((t, i) => ({
+          id: threadIds[i],
+          probe: (t.key_quotes && t.key_quotes[0]) || t.take || '',
+        })),
+      )
+    } catch (err: any) {
+      console.warn('[extract] thread span computation failed:', err?.message || err)
+    }
+
+    // Post-INSERT: write entity_mentions for entities that appear in
+    // each thread's key_quotes. Cheap string match — narrows the
+    // Thread detail page's "Entities mentioned" rail from vlog-scope
+    // to thread-scope.
+    try {
+      await writeThreadEntityMentions(
+        this.env.DB,
+        vlog.operator_id, vlog.id,
+        run.payload.threads.map((t, i) => ({
+          id: threadIds[i],
+          quotes: t.key_quotes ?? [],
+        })),
+        run.payload.entities ?? [],
+      )
+    } catch (err: any) {
+      console.warn('[extract] thread entity_mentions write failed:', err?.message || err)
+    }
 
     await runBatch('clips', run.payload.clips.map(c => this.env.DB.prepare(
       `INSERT INTO clip_candidates
@@ -1531,5 +1574,127 @@ function mapStateToLegacyPipelineStatus(state: string): string {
     case 'ready': return 'complete'
     case 'failed': return 'failed'
     default: return state
+  }
+}
+
+/**
+ * Compute transcript_span_start / transcript_span_end for each newly
+ * inserted thread by matching its probe text (first key_quote, falling
+ * back to take) against the vlog's transcript_words. Updates the rows
+ * in-place. Failures per thread are logged but don't abort the batch.
+ *
+ * Strategy: join transcript words into a single normalized string,
+ * find the probe substring's start char offset, then walk words by
+ * cumulative length to identify which word_index spans the match.
+ * Returns each match's first word start_time and last word end_time.
+ */
+async function computeAndUpdateThreadSpans(
+  db: D1Database,
+  vlog_id: string,
+  threads: { id: string; probe: string }[],
+): Promise<void> {
+  if (threads.length === 0) return
+  const words = (await db.prepare(
+    `SELECT word, start_time, end_time, word_index
+       FROM transcript_words WHERE vlog_id = ? ORDER BY word_index ASC`,
+  ).bind(vlog_id).all<{ word: string; start_time: number; end_time: number; word_index: number }>()).results ?? []
+  if (words.length === 0) return
+
+  // Build a normalized concatenation: lowercase, alnum-and-space only,
+  // single-space separators. Track each word's char range so we can map
+  // back from char offsets to start/end times.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  const offsets: { start: number; end: number; t_start: number; t_end: number }[] = []
+  let acc = ''
+  for (const w of words) {
+    const n = norm(w.word)
+    if (!n) continue
+    const start = acc.length + (acc.length > 0 ? 1 : 0)
+    if (acc.length > 0) acc += ' '
+    acc += n
+    offsets.push({ start, end: acc.length, t_start: w.start_time, t_end: w.end_time })
+  }
+  if (acc.length === 0) return
+
+  for (const t of threads) {
+    if (!t.probe) continue
+    const probe = norm(t.probe).slice(0, 240) // cap probe length
+    if (probe.length < 12) continue            // too short to match reliably
+    const idx = acc.indexOf(probe)
+    if (idx === -1) continue
+    const endIdx = idx + probe.length
+    let firstWord: typeof offsets[number] | undefined
+    let lastWord: typeof offsets[number] | undefined
+    for (const o of offsets) {
+      if (o.end <= idx) continue
+      if (!firstWord) firstWord = o
+      if (o.start >= endIdx) break
+      lastWord = o
+    }
+    if (!firstWord || !lastWord) continue
+    try {
+      await db.prepare(
+        `UPDATE threads SET transcript_span_start = ?, transcript_span_end = ?
+          WHERE id = ?`,
+      ).bind(firstWord.t_start, lastWord.t_end, t.id).run()
+    } catch (e: any) {
+      console.warn(`[span] update failed for ${t.id}:`, e?.message || e)
+    }
+  }
+}
+
+/**
+ * For each thread, write entity_mentions rows with source_kind='thread'
+ * for any entity whose name appears (case-insensitive) in any of the
+ * thread's key_quotes.
+ *
+ * Resolves entity ids by name within the vlog scope — extraction wrote
+ * one entity row per unique name per vlog, so a SELECT by (vlog_id,
+ * lower(name)) finds the persisted entity id.
+ */
+async function writeThreadEntityMentions(
+  db: D1Database,
+  operator_id: string,
+  vlog_id: string,
+  threads: { id: string; quotes: string[] }[],
+  entities: { name?: string; aliases?: string[] }[],
+): Promise<void> {
+  if (threads.length === 0 || entities.length === 0) return
+
+  // Fetch the persisted entity ids for this vlog so we can write mentions
+  // with the right entity_id. Don't trust the run-time payload; entities
+  // are inserted earlier in the pipeline and might have been deduped.
+  const persisted = (await db.prepare(
+    `SELECT id, name FROM entities
+      WHERE operator_id = ? AND vlog_id = ? AND deleted_at IS NULL`,
+  ).bind(operator_id, vlog_id).all<{ id: string; name: string }>()).results ?? []
+
+  const byLowerName: Record<string, string> = {}
+  for (const e of persisted) {
+    if (e.name) byLowerName[e.name.toLowerCase()] = e.id
+  }
+  if (Object.keys(byLowerName).length === 0) return
+
+  for (const t of threads) {
+    const haystack = (t.quotes ?? []).join(' ').toLowerCase()
+    if (!haystack) continue
+    const seen = new Set<string>()
+    for (const [lowerName, entity_id] of Object.entries(byLowerName)) {
+      // Require a word-boundary-ish match so "AI" doesn't match every "aim".
+      if (lowerName.length < 2) continue
+      const pattern = new RegExp('(^|[^a-z0-9])' + lowerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)')
+      if (pattern.test(haystack) && !seen.has(entity_id)) {
+        seen.add(entity_id)
+        try {
+          await db.prepare(
+            `INSERT INTO entity_mentions
+               (id, entity_id, operator_id, source_kind, source_id, mention_text)
+             VALUES (?, ?, ?, 'thread', ?, ?)`,
+          ).bind(ulid(), entity_id, operator_id, t.id, lowerName).run()
+        } catch (e: any) {
+          // Silent — usually a unique-constraint dupe on retry
+        }
+      }
+    }
   }
 }
