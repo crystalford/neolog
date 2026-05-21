@@ -2090,3 +2090,64 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 @media (max-width: 960px) {
   .canon-ripe-panel { grid-template-columns: 1fr; gap: 24px; padding: 20px; }
 }
+
+/* ============================================================
+ * CANON — Vlog detail extensions per 04-Vlog.html
+ * ============================================================ */
+
+/* Session digest — 4-cell strip */
+.canon-digest {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line-1);
+  border: 1px solid var(--line-1);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.canon-digest-cell {
+  background: var(--bg-1);
+  padding: 22px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.canon-digest-cell .n {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 56px;
+  color: var(--fg);
+  letter-spacing: -2.2px;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.canon-digest-cell .l {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  font-weight: 500;
+}
+
+/* Transcript flow — plain wall of text with topic-colored spans overlay */
+.canon-transcript-flow {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--fg-2);
+  letter-spacing: -0.1px;
+  padding: 24px 28px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  text-wrap: pretty;
+  max-height: 600px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 960px) {
+  .canon-digest { grid-template-columns: repeat(2, 1fr); }
+  .canon-digest-cell .n { font-size: 40px; letter-spacing: -1.5px; }
+}
