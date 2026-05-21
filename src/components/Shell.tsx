@@ -1,187 +1,64 @@
 'use client'
 
 /**
- * Console-direction app shell — topbar + 3-group sidebar + main + optional rail.
+ * Canon app shell — top-horizontal masthead + main.
  *
- * Every authenticated page wraps its content in <Shell active="..."
- * breadcrumb={[...]} hot="2 active" busy={true} rail={<...>}>. The rail
- * is optional; pages that don't pass one render two-column.
+ * Replaces the older sidebar-based shell. Wraps `<Masthead/>` over the
+ * page content. The `active`/`breadcrumb`/`hot`/`busy`/`rail` props are
+ * preserved so existing pages still compile, but they're no-ops now —
+ * masthead infers active state from pathname, and per-surface rails
+ * are rendered inside each page's content (canon pattern).
  *
- * The component is a Client Component so the sidebar can render the
- * active state from `usePathname()` (no manual `active=` needed in most
- * cases — pass it only to override).
+ * NavIcons / LogoMark / Pips / TopicDot remain exported for backward
+ * compatibility with pages that imported them from here.
+ *
+ * Source: /tmp/neolognextlevel/design-reference/00-Sitemap.html
  */
 
 import { ReactNode } from 'react'
-import { usePathname } from 'next/navigation'
-import Link from 'next/link'
+import { Masthead } from './Masthead'
 
 export interface ShellProps {
-  active?: NavId
+  active?: string
   breadcrumb?: string[]
-  hot?: string         // e.g. "2 active" — text inside the status chip
-  busy?: boolean       // pulses the led + switches to hot color
-  rail?: ReactNode     // right rail content (use <PipelineRail/> by default)
-  rightExtra?: ReactNode  // extra topbar widget before status chip
+  hot?: string
+  busy?: boolean
+  rail?: ReactNode
+  rightExtra?: ReactNode
   children: ReactNode
 }
 
-type NavId =
-  | 'timeline' | 'console' | 'vlogs' | 'transcript' | 'threads' | 'clusters' | 'productions'
-  | 'graph' | 'chat'
-  | 'capture' | 'system' | 'settings'
-
-const NAV_BY_PATH: { match: RegExp; id: NavId }[] = [
-  { match: /^\/vlogs/,       id: 'vlogs' },
-  { match: /^\/uploads/,     id: 'vlogs' },  // legacy
-  { match: /^\/console/,     id: 'console' },
-  { match: /^\/threads/,     id: 'threads' },
-  { match: /^\/thread\//,    id: 'threads' },
-  { match: /^\/clusters/,    id: 'clusters' },
-  { match: /^\/studio/,      id: 'clusters' }, // legacy
-  { match: /^\/cluster\//,   id: 'clusters' },
-  { match: /^\/productions/, id: 'productions' },
-  { match: /^\/projects/,    id: 'productions' }, // legacy
-  { match: /^\/graph/,       id: 'graph' },
-  { match: /^\/chat/,        id: 'chat' },
-  { match: /^\/capture/,     id: 'capture' },
-  { match: /^\/system/,      id: 'system' },
-  { match: /^\/settings/,    id: 'settings' },
-  { match: /^\/transcript/,  id: 'transcript' },
-  { match: /^\/timeline/,    id: 'timeline' },  // legacy /timeline path
-  { match: /^\/?$/,          id: 'timeline' },  // / is now the timeline
-]
-
-export default function Shell({ active, breadcrumb, hot, busy, rail, rightExtra, children }: ShellProps) {
-  const pathname = usePathname() ?? '/'
-  const inferred: NavId = active ?? (NAV_BY_PATH.find(n => n.match.test(pathname))?.id ?? 'console')
-  return (
-    <>
-      <Topbar breadcrumb={breadcrumb ?? []} hot={hot} busy={busy} rightExtra={rightExtra} />
-      <div className={`frame ${rail ? 'with-rail' : ''}`}>
-        <Sidebar active={inferred} />
-        <main className="main">{children}</main>
-        {rail && <aside className="rail">{rail}</aside>}
-      </div>
-    </>
-  )
+/** Trigger the global CmdK palette by dispatching a synthetic ⌘K keydown.
+ *  CmdK is mounted globally in `app/(app)/layout.tsx` and listens for the
+ *  shortcut itself, so any button can open it without prop-drilling. */
+function triggerCmdK() {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
 }
 
-function Topbar({ breadcrumb, hot, busy, rightExtra }: { breadcrumb: string[]; hot?: string; busy?: boolean; rightExtra?: ReactNode }) {
+export default function Shell({ children }: ShellProps) {
   return (
-    <div className="topbar">
-      <Link href="/" className="brand">
-        <span className="mark"><LogoMark size={18}/></span>
-        neolog
-      </Link>
-      {breadcrumb.length > 0 && (
-        <div className="breadcrumb">
-          {breadcrumb.map((c, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              {i > 0 && <span className="slash">/</span>}
-              <span className={i === breadcrumb.length - 1 ? 'last' : ''}>{c}</span>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="right">
-        <div className="cmd-k">
-          <span className="ico">{NavIcons.Search}</span>
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Search anything · jump anywhere
-          </span>
-          <kbd>⌘K</kbd>
-        </div>
-        {rightExtra}
-        <span className={`status-chip ${busy ? 'busy' : ''}`}>
-          <span className="led"/>
-          {hot || 'all healthy'}
-        </span>
-        <div className="avatar">CF</div>
+    <div className="canon-page">
+      <div className="canon-wrap">
+        <Masthead onCmdK={triggerCmdK}/>
+        <main className="canon-main">
+          {children}
+        </main>
       </div>
     </div>
   )
 }
 
-function Sidebar({ active }: { active: NavId }) {
-  // Consolidated nav (matches the Console-design HANDOFF spec):
-  //   Operate — Timeline / Vlogs / Threads / Clusters / Productions
-  //   Inspect — Graph / Chat
-  //   Admin   — Capture / System / Settings
-  //
-  // Folded in:
-  //   - Console → Chat (route /console renders chat; sidebar entry is "Chat")
-  //   - Uploads → folded into Vlogs (filter "All / Archived" handles the
-  //     old uploads grid per HANDOFF.md). Capture is for new recordings.
-  //   - Transcript → opens within Vlog detail, not standalone nav
-  const operate: SidebarItem[] = [
-    { id: 'timeline',    label: 'Timeline',    href: '/',                    icon: 'Threads',     kbd: 'G T' },
-    { id: 'vlogs',       label: 'Vlogs',       href: '/vlogs',               icon: 'Vlogs',       kbd: 'G V' },
-    // Threads merged into Timeline as a filter — /?filter=thread.
-    // /threads route still works (redirects). Operator: "shouldn't
-    // thread and timeline merge? you can just filter by threads on
-    // the timeline?"
-    { id: 'threads',     label: 'Threads',     href: '/?filter=thread',      icon: 'Filter',      kbd: 'G R' },
-    { id: 'clusters',    label: 'Clusters',    href: '/clusters',            icon: 'Clusters' },
-    { id: 'productions', label: 'Productions', href: '/productions',         icon: 'Productions' },
-  ]
-  const inspect: SidebarItem[] = [
-    { id: 'graph',   label: 'Graph', href: '/graph',   icon: 'Graph' },
-    { id: 'console', label: 'Chat',  href: '/console', icon: 'Chat',  kbd: 'G C' },
-  ]
-  const admin: SidebarItem[] = [
-    { id: 'capture',  label: 'Capture',  href: '/capture',  icon: 'Capture', kbd: '⌘N' },
-    // System merged into Settings. /system route stays alive but
-    // doesn't get its own nav entry — operator reaches it via the
-    // "Health" section at the top of Settings.
-    { id: 'settings', label: 'Settings', href: '/settings', icon: 'Settings' },
-  ]
-
-  return (
-    <aside className="side">
-      <div className="sect">Operate</div>
-      {operate.map(item => <SidebarLink key={item.id} item={item} active={active} />)}
-      <div className="sect">Inspect</div>
-      {inspect.map(item => <SidebarLink key={item.id} item={item} active={active} />)}
-      <div className="sect">Admin</div>
-      {admin.map(item => <SidebarLink key={item.id} item={item} active={active} />)}
-      <div className="foot">
-        <span className="avatar" style={{ width: 22, height: 22, fontSize: 10 }}>CF</span>
-        crystal@neolog.ai
-      </div>
-    </aside>
-  )
-}
-
-interface SidebarItem {
-  id: NavId
-  label: string
-  href: string
-  icon: keyof typeof NavIcons
-  kbd?: string
-  count?: string
-  badge?: string
-}
-
-function SidebarLink({ item, active }: { item: SidebarItem; active: NavId }) {
-  const isActive = item.id === active
-  return (
-    <Link href={item.href} className={`item ${isActive ? 'active' : ''}`}>
-      <span className="ico">{NavIcons[item.icon]}</span>
-      <span style={{ flex: 1 }}>{item.label}</span>
-      {item.badge && <span className="badge">{item.badge}</span>}
-      {item.kbd && !item.badge && <span className="kbd">{item.kbd}</span>}
-      {item.count && !item.kbd && !item.badge && <span className="count">{item.count}</span>}
-    </Link>
-  )
-}
+/* ─── Backward-compat exports ────────────────────────────────────────
+ * The 17 pages currently importing from `@/components/Shell` use these
+ * helpers. Keep them here until each page ports to threadkit/cards or
+ * an explicit per-component import. */
 
 export function LogoMark({ size = 18 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 22 22" width={size} height={size} fill="none" aria-label="Neolog">
-      <path d="M 3 11 Q 7 4, 11 11 T 19 11" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <circle cx="3" cy="11" r="1.8" fill="currentColor" />
-      <circle cx="19" cy="11" r="1.8" fill="currentColor" />
+    <svg viewBox="0 0 32 32" width={size} height={size} fill="none" aria-label="Neolog">
+      <path d="M 3 16 Q 9 4, 16 16 T 29 16" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinecap="round" />
+      <circle cx="3" cy="16" r="2.4" fill="currentColor" />
+      <circle cx="29" cy="16" r="2.4" fill="currentColor" />
     </svg>
   )
 }
@@ -223,14 +100,14 @@ export function Pips({ n = 0, max = 5, accent = false }: { n?: number; max?: num
 
 export function TopicDot({ topic }: { topic?: string }) {
   const map: Record<string, string> = {
-    curbsider:    'var(--t-1)',
-    memory:       'var(--t-2)',
-    form:         'var(--t-3)',
-    'pack rats':  'var(--t-4)',
-    voice:        'var(--t-5)',
-    graph:        'var(--t-6)',
-    regulation:   'var(--t-7)',
-    misc:         'var(--t-8)',
+    curbsider:    'var(--t-steel)',
+    memory:       'var(--t-plum)',
+    form:         'var(--t-sage)',
+    'pack rats':  'var(--t-terra)',
+    voice:        'var(--t-rose)',
+    graph:        'var(--t-teal)',
+    regulation:   'var(--t-ochre)',
+    misc:         'var(--t-violet)',
   }
   return <span className="topic-dot" style={{ background: map[topic?.toLowerCase() ?? ''] || 'var(--fg-3)' }}/>
 }
