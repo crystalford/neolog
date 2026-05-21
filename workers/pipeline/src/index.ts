@@ -1049,12 +1049,15 @@ export class VlogPipelineDO {
       console.warn('[extract] thread entity_mentions write failed:', err?.message || err)
     }
 
-    await runBatch('clips', run.payload.clips.map(c => this.env.DB.prepare(
+    // Pre-generate clip IDs so we can compute their time spans
+    // post-INSERT (same pattern as threads).
+    const clipIds = run.payload.clips.map(() => ulid())
+    await runBatch('clips', run.payload.clips.map((c, i) => this.env.DB.prepare(
       `INSERT INTO clip_candidates
          (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extraction_prompt_version, extracted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
     ).bind(
-      ulid(), vlog.operator_id, vlog.id, run_id,
+      clipIds[i], vlog.operator_id, vlog.id, run_id,
       c.start_time_ms != null ? c.start_time_ms / 1000 : 0,
       c.end_time_ms != null ? c.end_time_ms / 1000 : 0,
       String(c.headline || '').slice(0, 200),
@@ -1063,6 +1066,23 @@ export class VlogPipelineDO {
       c.validated ?? 1,
       promptVersion,
     )))
+
+    // Post-INSERT: compute start_time / end_time for each clip by
+    // matching its quote against the vlog's transcript_words. Without
+    // this, clips display 0:00 → 0:00 and the audio segment endpoint
+    // generates a 0-second segment. Same algorithm as threads.
+    try {
+      await computeAndUpdateClipSpans(
+        this.env.DB,
+        vlog.id,
+        run.payload.clips.map((c, i) => ({
+          id: clipIds[i],
+          probe: c.quote || c.headline || '',
+        })),
+      )
+    } catch (err: any) {
+      console.warn('[extract] clip span computation failed:', err?.message || err)
+    }
 
     await runBatch('creative', run.payload.creative_elements.map(e => this.env.DB.prepare(
       `INSERT INTO creative_elements
@@ -1639,6 +1659,65 @@ async function computeAndUpdateThreadSpans(
       ).bind(firstWord.t_start, lastWord.t_end, t.id).run()
     } catch (e: any) {
       console.warn(`[span] update failed for ${t.id}:`, e?.message || e)
+    }
+  }
+}
+
+/**
+ * Same algorithm as computeAndUpdateThreadSpans but for clip_candidates.
+ * Walks the vlog's transcript_words once, finds each clip's quote by
+ * normalized substring match, UPDATEs start_time + end_time on the row.
+ * Without this clips display 0:00 → 0:00 on the Timeline and the audio
+ * segment endpoint generates an empty MP3.
+ */
+async function computeAndUpdateClipSpans(
+  db: D1Database,
+  vlog_id: string,
+  clips: { id: string; probe: string }[],
+): Promise<void> {
+  if (clips.length === 0) return
+  const words = (await db.prepare(
+    `SELECT word, start_time, end_time, word_index
+       FROM transcript_words WHERE vlog_id = ? ORDER BY word_index ASC`,
+  ).bind(vlog_id).all<{ word: string; start_time: number; end_time: number; word_index: number }>()).results ?? []
+  if (words.length === 0) return
+
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  const offsets: { start: number; end: number; t_start: number; t_end: number }[] = []
+  let acc = ''
+  for (const w of words) {
+    const n = norm(w.word)
+    if (!n) continue
+    const start = acc.length + (acc.length > 0 ? 1 : 0)
+    if (acc.length > 0) acc += ' '
+    acc += n
+    offsets.push({ start, end: acc.length, t_start: w.start_time, t_end: w.end_time })
+  }
+  if (acc.length === 0) return
+
+  for (const c of clips) {
+    if (!c.probe) continue
+    const probe = norm(c.probe).slice(0, 240)
+    if (probe.length < 8) continue
+    const idx = acc.indexOf(probe)
+    if (idx === -1) continue
+    const endIdx = idx + probe.length
+    let firstWord: typeof offsets[number] | undefined
+    let lastWord: typeof offsets[number] | undefined
+    for (const o of offsets) {
+      if (o.end <= idx) continue
+      if (!firstWord) firstWord = o
+      if (o.start >= endIdx) break
+      lastWord = o
+    }
+    if (!firstWord || !lastWord) continue
+    try {
+      await db.prepare(
+        `UPDATE clip_candidates SET start_time = ?, end_time = ?
+          WHERE id = ?`,
+      ).bind(firstWord.t_start, lastWord.t_end, c.id).run()
+    } catch (e: any) {
+      console.warn(`[clip-span] update failed for ${c.id}:`, e?.message || e)
     }
   }
 }

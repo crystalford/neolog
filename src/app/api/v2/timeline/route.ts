@@ -130,6 +130,21 @@ async function handle(req: NextRequest) {
           catch { /* presign needs R2 keys — leave null */ }
         }
         const wordCount = v.transcript_text ? v.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
+        // B-roll classification — matches the logic in
+        // /api/v2/admin/pipeline-state. A vlog is b-roll when it
+        // completed but has no transcript-worth-extracting AND
+        // zero extracted items. Visually treated differently in the
+        // timeline so the operator can tell silent footage apart
+        // from "vlog that the system couldn't process."
+        const transcriptLen = v.transcript_text ? v.transcript_text.length : 0
+        const threadsForVlog = threadCounts.get(v.id) ?? 0
+        const clipsForVlog = clipCounts.get(v.id) ?? 0
+        const is_broll = (
+          v.pipeline_status === 'complete' &&
+          transcriptLen < 200 &&
+          threadsForVlog === 0 &&
+          clipsForVlog === 0
+        )
         return {
           id: v.id,
           type: 'vlog' as const,
@@ -140,11 +155,12 @@ async function handle(req: NextRequest) {
           duration_seconds: v.duration_seconds,
           file_size_bytes: v.file_size_bytes,
           mime_type: v.mime_type,
-          thread_count: threadCounts.get(v.id) ?? 0,
-          clip_count: clipCounts.get(v.id) ?? 0,
+          thread_count: threadsForVlog,
+          clip_count: clipsForVlog,
           transcript_word_count: wordCount,
           visibility: 'private',
           pipeline_status: v.pipeline_status,
+          is_broll,
         }
       }),
     )
@@ -155,6 +171,11 @@ async function handle(req: NextRequest) {
   }
 
   // ── Threads ──────────────────────────────────────────────────────────────
+  // Sort + display threads by the PARENT VLOG's recorded_at, not by the
+  // thread's extracted_at. Threads are facts ABOUT a moment in time
+  // (when the operator said it), not about when the system processed
+  // them. Otherwise all threads cluster on whatever days extraction
+  // ran rather than next to the vlogs they came from.
   try {
     const threads = await findMany<{
       id: string
@@ -164,17 +185,20 @@ async function handle(req: NextRequest) {
       strength: number | null
       abstracted_topic: string | null
       extracted_at: string
+      vlog_recorded_at: string | null
+      vlog_uploaded_at: string
       vlog_id: string
       transcript_span_start: number | null
       vlog_filename: string | null
     }>(
       db,
       `SELECT t.id, t.topic, t.take, t.key_quotes, t.strength, t.abstracted_topic, t.extracted_at,
+              v.recorded_at AS vlog_recorded_at, v.uploaded_at AS vlog_uploaded_at,
               t.vlog_id, t.transcript_span_start, v.original_filename AS vlog_filename
          FROM threads t
          JOIN vlogs v ON v.id = t.vlog_id
-        WHERE t.operator_id = ?
-        ORDER BY t.extracted_at DESC
+        WHERE t.operator_id = ? AND t.deleted_at IS NULL AND v.deleted_at IS NULL
+        ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC
         LIMIT 200`,
       operator.id,
     )
@@ -183,7 +207,11 @@ async function handle(req: NextRequest) {
       cards.push({
         id: t.id,
         type: 'thread',
-        created_at: t.extracted_at,
+        // created_at = the moment the operator SAID this (vlog
+        // recording date), not when extraction ran. Threads land
+        // chronologically next to their source vlog in the feed.
+        created_at: t.vlog_recorded_at || t.vlog_uploaded_at,
+        extracted_at: t.extracted_at,
         topic: t.abstracted_topic || t.topic,
         abstracted_topic: t.abstracted_topic ?? undefined,
         take: t.take || '(no take extracted)',
@@ -202,6 +230,8 @@ async function handle(req: NextRequest) {
   }
 
   // ── Clip candidates ──────────────────────────────────────────────────────
+  // Same fix as threads: sort/display by parent vlog's recorded_at so
+  // clips appear next to the vlog they came from.
   try {
     const clips = await findMany<{
       id: string
@@ -211,12 +241,16 @@ async function handle(req: NextRequest) {
       quote: string | null
       status: string
       extracted_at: string
+      vlog_recorded_at: string | null
+      vlog_uploaded_at: string
     }>(
       db,
-      `SELECT id, start_time, end_time, headline, quote, status, extracted_at
-         FROM clip_candidates
-        WHERE operator_id = ?
-        ORDER BY extracted_at DESC
+      `SELECT c.id, c.start_time, c.end_time, c.headline, c.quote, c.status, c.extracted_at,
+              v.recorded_at AS vlog_recorded_at, v.uploaded_at AS vlog_uploaded_at
+         FROM clip_candidates c
+         JOIN vlogs v ON v.id = c.vlog_id
+        WHERE c.operator_id = ? AND c.deleted_at IS NULL AND v.deleted_at IS NULL
+        ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC
         LIMIT 200`,
       operator.id,
     )
@@ -224,7 +258,8 @@ async function handle(req: NextRequest) {
       cards.push({
         id: c.id,
         type: 'clip',
-        created_at: c.extracted_at,
+        created_at: c.vlog_recorded_at || c.vlog_uploaded_at,
+        extracted_at: c.extracted_at,
         status: c.status === 'published' ? 'published' : 'candidate',
         start_seconds: c.start_time,
         end_seconds: c.end_time,
@@ -286,20 +321,25 @@ async function handle(req: NextRequest) {
       register: string | null
       validated: number | null
       extracted_at: string
+      vlog_recorded_at: string | null
+      vlog_uploaded_at: string
     }>(
       db,
-      `SELECT id, vlog_id, element_type, content, register, validated, extracted_at
-         FROM creative_elements
-        WHERE operator_id = ?
-        ORDER BY extracted_at DESC
+      `SELECT c.id, c.vlog_id, c.element_type, c.content, c.register, c.validated, c.extracted_at,
+              v.recorded_at AS vlog_recorded_at, v.uploaded_at AS vlog_uploaded_at
+         FROM creative_elements c
+         JOIN vlogs v ON v.id = c.vlog_id
+        WHERE c.operator_id = ? AND c.deleted_at IS NULL AND v.deleted_at IS NULL
+        ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC
         LIMIT 50`,
       operator.id,
     )
-    for (const c of creative) {
+    for (const c of creative as any[]) {
       cards.push({
         id: c.id,
         type: 'creative',
-        created_at: c.extracted_at,
+        created_at: c.vlog_recorded_at || c.vlog_uploaded_at,
+        extracted_at: c.extracted_at,
         element_type: c.element_type,
         content: c.content,
         validated: c.validated,
@@ -312,8 +352,10 @@ async function handle(req: NextRequest) {
   }
 
   // ── Entities ────────────────────────────────────────────────────────────
-  // Top-ranked entities by mention count. Shown as a different card style:
-  // not a journal entry but "the system noticed X across N vlogs."
+  // Top-ranked entities. Same fix as threads/clips/creative — sort + display
+  // by parent vlog's recorded_at, not by extraction-time, so an entity from
+  // a March vlog doesn't pile at the top of "today" just because extraction
+  // ran recently.
   try {
     const ents = await findMany<{
       id: string
@@ -321,13 +363,16 @@ async function handle(req: NextRequest) {
       name: string
       entity_type: string
       mention_count: number | null
-      last_mentioned_at: string | null
+      vlog_recorded_at: string | null
+      vlog_uploaded_at: string
     }>(
       db,
-      `SELECT id, vlog_id, name, entity_type, mention_count, last_mentioned_at
-         FROM entities
-        WHERE operator_id = ?
-        ORDER BY COALESCE(last_mentioned_at, '') DESC, mention_count DESC
+      `SELECT e.id, e.vlog_id, e.name, e.entity_type, e.mention_count,
+              v.recorded_at AS vlog_recorded_at, v.uploaded_at AS vlog_uploaded_at
+         FROM entities e
+         JOIN vlogs v ON v.id = e.vlog_id
+        WHERE e.operator_id = ? AND e.deleted_at IS NULL AND v.deleted_at IS NULL
+        ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC, e.mention_count DESC
         LIMIT 30`,
       operator.id,
     )
@@ -335,7 +380,7 @@ async function handle(req: NextRequest) {
       cards.push({
         id: e.id,
         type: 'entity',
-        created_at: e.last_mentioned_at || new Date().toISOString(),
+        created_at: e.vlog_recorded_at || e.vlog_uploaded_at,
         name: e.name,
         entity_type: e.entity_type,
         mention_count: e.mention_count ?? 1,

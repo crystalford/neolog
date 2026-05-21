@@ -82,7 +82,6 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'j' && data.navigation.next_thread_id) router.push(`/thread/${data.navigation.next_thread_id}`)
       else if (e.key === 'k' && data.navigation.prev_thread_id) router.push(`/thread/${data.navigation.prev_thread_id}`)
-      else if (e.key === 'r') router.push(`/capture?riff_of=${data.thread.id}`)
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -182,12 +181,9 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Action primary label="Riff on this" hint="R" onClick={() => router.push(`/capture?riff_of=${thread.id}`)}/>
-            {cluster && <Action label="Open in Studio" hint="S" onClick={() => router.push(`/cluster/${cluster.id}`)}/>}
-            <Action label="Materialize" onClick={() => alert('Materialize — coming with production engine')}/>
-            <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '6px 0' }}/>
-            <Action label="Cite as source" onClick={() => navigator.clipboard?.writeText(`${location.origin}/thread/${thread.id}`).catch(() => {})}/>
-            <Action label="Snooze" onClick={() => alert('Snooze — coming next')}/>
+            {cluster && <Action primary label="Open cluster" onClick={() => router.push(`/cluster/${cluster.id}`)}/>}
+            <Action label="Open source vlog" onClick={() => router.push(`/timeline/${vlog.id}`)}/>
+            <Action label="Copy link" onClick={() => navigator.clipboard?.writeText(`${location.origin}/thread/${thread.id}`).catch(() => {})}/>
           </div>
         </section>
 
@@ -320,7 +316,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
             <RailCard label="Adjacent insights" more={cluster ? 'attach' : null}>
               {adjacent_insights.length === 0 ? (
                 <EmptyHint>
-                  {cluster ? <>Run <Link href={`/cluster/${cluster.id}`} style={{ color: 'var(--accent)' }}>cultivate on this cluster</Link> to surface named concepts + adjacent thinkers.</> : 'No cluster yet — this thread isn\'t grouped with siblings.'}
+                  {cluster ? <>Open the <Link href={`/cluster/${cluster.id}`} style={{ color: 'var(--accent)' }}>parent cluster</Link> and click <strong>Identify pattern</strong> — the model will name the concept and suggest adjacent thinkers.</> : 'No cluster yet — this thread isn\'t grouped with siblings.'}
                 </EmptyHint>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -358,7 +354,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
 
             <RailCard label="Used in" more={productions_used_in.length > 0 ? `${productions_used_in.length} production${productions_used_in.length === 1 ? '' : 's'}` : null}>
               {productions_used_in.length === 0 ? (
-                <EmptyHint>Not used in any productions yet. Materialize this cluster to start one.</EmptyHint>
+                <EmptyHint>Not used in any productions yet. Open the cluster and click <strong>Produce a draft</strong> to start one.</EmptyHint>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {productions_used_in.map((p, i) => (

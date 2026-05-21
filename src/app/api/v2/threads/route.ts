@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
        JOIN vlogs v ON v.id = t.vlog_id
       WHERE ${where.join(' AND ')}
         AND v.deleted_at IS NULL
-      ORDER BY t.extracted_at DESC, t.id DESC
+      ORDER BY COALESCE(v.recorded_at, v.uploaded_at) DESC, t.id DESC
       LIMIT ? OFFSET ?`,
     ...args,
   )

@@ -87,7 +87,7 @@ export default function ProductionsPage() {
           <div className="empty">
             <div className="ico">{NavIcons.Productions}</div>
             <h3>No productions in this state yet</h3>
-            <p>Materialize a ready cluster to start one — or click New production for a blank slate.</p>
+            <p>Open a ready cluster and click <strong>Produce a draft</strong> to start one — or click New production for a blank slate.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -178,11 +178,6 @@ If any answer is no, fix or omit the thread.
       "abstracted_topic": "<generalized pattern for cross-vlog clustering>"
     }
   ],
-  "clips": [
-    { "headline": "<short label>",
-      "quote": "<verbatim 4+ word substring>",
-      "why_clippable": "<your reasoning, not constrained>" }
-  ],
   "creative_elements": [
     { "element_type": "character_beat|scene_fragment|dialogue|theme|setting|tonal_reference|plot_fragment",
       "content": "<verbatim 4+ word substring>" }

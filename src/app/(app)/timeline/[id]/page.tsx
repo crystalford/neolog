@@ -305,10 +305,17 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           seek the video element. Threads colored by topic so the
           operator can see at a glance where each idea lives in
           the recording. */}
-      {(threads.length > 0 || clips.length > 0 || entityMentionTimes.length > 0) && (() => {
+      {(() => {
+        // Show the multi-track only when at least one band/mark
+        // would actually render. Old vlogs whose threads were
+        // extracted before transcript_span computation ran have
+        // all-zero spans — showing empty tracks just looks broken.
+        const hasThreadBand = threads.some(t => t.transcript_span_start != null && t.transcript_span_end != null && (t.transcript_span_end as number) > (t.transcript_span_start as number))
+        const hasClipBand = false  // clips deprecated
+        const hasEntityMark = entityMentionTimes.some(em => em.mention_time != null && em.mention_time > 0)
+        if (!hasThreadBand && !hasClipBand && !hasEntityMark) return null
         const dur = Math.max(
           ...threads.map(t => Number(t.transcript_span_end ?? 0)),
-          ...clips.map(c => Number(c.end_time ?? 0)),
           ...entityMentionTimes.map(em => Number(em.mention_time ?? 0)),
           60,
         )
@@ -320,14 +327,10 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             color: topicColor(t.abstracted_topic ?? t.topic ?? 'misc'),
             label: t.take ?? undefined,
           }))
-        const clipBands: MultiTrackBand[] = clips
-          .filter(c => c.start_time != null && c.end_time != null)
-          .map(c => ({
-            start: Number(c.start_time),
-            end: Number(c.end_time),
-            color: 'var(--accent)',
-            label: c.headline,
-          }))
+        // Clips deprecated — empty band array keeps the track in
+        // the timeline component for visual consistency without
+        // ever showing data.
+        const clipBands: MultiTrackBand[] = []
         const entityMarks: MultiTrackMark[] = entityMentionTimes
           .filter(em => em.mention_time != null)
           .map(em => ({
@@ -414,6 +417,32 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       {diagnosis && (
         <DiagnosisBanner d={diagnosis} />
       )}
+
+      {/* System & admin panel — Pipeline, re-extract controls, mark-
+          as-broll, delete, thumbnail regen. All the operator
+          infrastructure stuff is collapsed by default so it doesn't
+          dominate the page above the actual content (summary,
+          threads, transcript). Click the disclosure to expand. */}
+      <details style={{
+        marginTop: 24, marginBottom: 24,
+        background: 'var(--bg-1)',
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        padding: '0 18px',
+      }}>
+        <summary style={{
+          padding: '14px 0', cursor: 'pointer',
+          fontSize: 13, color: 'var(--fg-2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          listStyle: 'none',
+        }}>
+          <span style={{
+            fontSize: 10, color: 'var(--fg-3)',
+            letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600,
+            fontFamily: 'Geist Mono, ui-monospace, monospace',
+          }}>System actions</span>
+          <span style={{ fontSize: 11, color: 'var(--fg-4)' }}>pipeline · re-extract · mark b-roll · delete</span>
+        </summary>
 
       {!vlog.thumbnail_url && (
         <div className="section">
@@ -579,6 +608,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           </div>
         )}
       </div>
+      </details>
 
       {vlog.summary && (
         <div className="section">
@@ -597,6 +627,47 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {/* Threads — promoted to the primary content position, right
+          after the Summary. Was buried at the bottom of the page.
+          Each thread renders as a topic-spine card matching the
+          Timeline vocabulary; click navigates to the thread detail. */}
+      {threads.length > 0 && (
+        <div className="section">
+          <div className="label">{threads.length} thread{threads.length === 1 ? '' : 's'} extracted</div>
+          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 12, marginTop: -2 }}>
+            Atomic takes — one idea each, voice-grounded.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {threads.map(t => {
+              const color = topicColor(t.abstracted_topic ?? t.topic ?? 'misc')
+              return (
+                <a key={t.id} href={`/thread/${t.id}`} style={{
+                  display: 'block',
+                  padding: '14px 18px',
+                  background: 'var(--bg-1)',
+                  border: '1px solid var(--line)',
+                  borderLeft: `3px solid ${color}`,
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                }}>
+                  <div style={{
+                    fontSize: 10, color, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600,
+                    fontFamily: 'Geist Mono, ui-monospace, monospace',
+                    marginBottom: 6,
+                  }}>
+                    Thread · {t.register ?? 'observation'}
+                    {t.abstracted_topic && <span style={{ color: 'var(--fg-4)', fontWeight: 400, marginLeft: 8 }}>· {t.abstracted_topic}</span>}
+                  </div>
+                  <div style={{ fontSize: 15, color: 'var(--fg-1)', lineHeight: 1.55, fontStyle: 'italic' }}>
+                    {(t.take || '').length > 280 ? (t.take || '').slice(0, 277) + '…' : (t.take || t.topic || '')}
+                  </div>
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {vlog.transcript_text && (
         <div className="section">
           <div className="label">Transcript</div>
@@ -604,8 +675,11 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* See section comment below — clips subtitle inlined in render. */}
-      {clips.length > 0 && (
+      {/* Clips deprecated as a separate concept — threads cover the
+          same data (quote + timespan). Section hidden but the data
+          still loads to keep the API stable; existing clip rows in
+          the DB stay there. */}
+      {false && clips.length > 0 && (
         <div className="section">
           <div className="label">{clips.length} clip{clips.length === 1 ? '' : 's'}</div>
           <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
@@ -676,30 +750,6 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {threads.length > 0 && (
-        <div className="section">
-          <div className="label">{threads.length} thread{threads.length === 1 ? '' : 's'} extracted</div>
-          <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>
-            Atomic takes — one idea each, voice-grounded.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {threads.map(t => {
-              const keyQuote = parseFirstQuote(t.key_quotes)
-              return (
-                <a key={t.id} href={`/thread/${t.id}`} className="tcard thread has-topic" style={{ ['--topic' as any]: 'var(--t-brass)' } as React.CSSProperties}>
-                  <div className="t-meta">
-                    <span className="type-tag">Thread</span>
-                    <span className="sep">·</span>
-                    <span className="status">{t.abstracted_topic || t.topic}</span>
-                  </div>
-                  <div className="t-headline">{t.take}</div>
-                  {keyQuote && <div className="quote">{keyQuote}</div>}
-                </a>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
 
     {/* Provenance footer matching the Thread page's design vocabulary.
