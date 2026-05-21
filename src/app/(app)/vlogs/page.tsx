@@ -18,7 +18,9 @@ export const runtime = 'edge'
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { CapturePanel } from '@/components/CapturePanel'
 
 interface VlogRow {
   id: string
@@ -55,6 +57,8 @@ export default function VlogsPage() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [deleting, setDeleting] = useState(false)
   const [actionNote, setActionNote] = useState<string | null>(null)
+  const sp = useSearchParams()
+  const [captureOpen, setCaptureOpen] = useState(sp?.get('capture') === 'open')
   useEffect(() => { setSelected(new Set()) }, [filter, query])
 
   const load = () => {
@@ -176,16 +180,23 @@ export default function VlogsPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap' }}>
-          <Link href="/capture" className="canon-btn primary">
-            New capture
+          <button onClick={() => setCaptureOpen(o => !o)} className={`canon-btn ${captureOpen ? 'ghost' : 'primary'}`}>
             <span className="ico"><svg viewBox="0 0 14 14"><path d="M8 3 L8 11 M3 7 L8 3 L13 7"/></svg></span>
-          </Link>
+            {captureOpen ? 'Hide upload' : 'Drop new vlogs'}
+          </button>
           <button onClick={load} className="canon-btn ghost">
             <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7a4 4 0 0 1 4-4 4 4 0 0 1 4 4 M3 7a4 4 0 0 0 4 4 4 4 0 0 0 4 -4 M11 3 L11 6 L8 6"/></svg></span>
             Refresh
           </button>
         </div>
       </section>
+
+      {/* Inline Capture panel (replaces standalone /capture route) */}
+      {captureOpen && (
+        <div className="canon-reveal d2" style={{ marginBottom: 28 }}>
+          <CapturePanel onUploaded={load}/>
+        </div>
+      )}
 
       {/* Tabs + search */}
       <div className="canon-reveal d2" style={{
