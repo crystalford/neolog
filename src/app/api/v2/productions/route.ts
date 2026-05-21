@@ -75,7 +75,9 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDb(env)
-  const modelKey: ModelKey = body.model ?? 'claude'
+  // Workers AI by default — keep generation in-house unless the operator
+  // explicitly upgrades to Sonnet via the picker.
+  const modelKey: ModelKey = body.model ?? 'llama70b'
 
   // Build source context — different prompt shape per source kind.
   let sourceContext = ''
