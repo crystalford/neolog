@@ -304,6 +304,8 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             {/* VIDEO ESSAY — beats list with per-beat record affordance */}
             {p.production_type === 'video_essay' && (
               <>
+                <VoiceoverPanel production={p} beats={data.beats ?? []} onStitched={load}/>
+                <BrollRenderPanel production={p} onRendered={load}/>
                 <section className="canon-section">
                   <div className="canon-section-head">
                     <h2>Beats <span className="meta">· {data.beats?.length ?? 0}</span></h2>
@@ -412,20 +414,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
               )}
             </div>
 
-            <div className="rail-card">
-              <div className="rc-head"><h3>Engine</h3></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: 'var(--fg-2)' }}>
-                <div><span style={{ color: 'var(--fg-3)' }}>Model:</span> <strong style={{ color: 'var(--fg-1)' }}>{p.prompt_version?.split('·')[1]?.trim() || 'unknown'}</strong></div>
-                <div><span style={{ color: 'var(--fg-3)' }}>Prompt:</span> <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.prompt_version?.split('·')[0]?.trim() || '—'}</span></div>
-                <button
-                  onClick={() => alert('Re-generate — coming next.')}
-                  className="canon-btn ghost"
-                  style={{ fontSize: 12, marginTop: 8 }}
-                >
-                  Re-generate draft
-                </button>
-              </div>
-            </div>
+            <EngineCard production={p} onRegenerated={load}/>
           </aside>
         </div>
 
@@ -767,5 +756,441 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * EngineCard — model picker + Re-generate button on the production
+ * rail. Re-generate POSTs to /api/v2/productions/[id]/regenerate
+ * with the selected model. For video_essay, warns that existing beat
+ * recordings will be lost since beats get re-indexed.
+ */
+function EngineCard({ production, onRegenerated }: { production: Production; onRegenerated: () => void }) {
+  const [model, setModel] = useState<'llama70b' | 'kimi' | 'claude'>('llama70b')
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isClip = production.production_type === 'clip'
+  const isVideoEssay = production.production_type === 'video_essay'
+
+  const regenerate = async () => {
+    if (isVideoEssay) {
+      if (!confirm('Re-generating a video essay wipes all beat recordings (new beats won\'t match old indices). Continue?')) return
+    }
+    setGenerating(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/regenerate`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onRegenerated()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 200))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="rail-card">
+      <div className="rc-head"><h3>Engine</h3></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12, color: 'var(--fg-2)' }}>
+        <div><span style={{ color: 'var(--fg-3)' }}>Model:</span> <strong style={{ color: 'var(--fg-1)' }}>{production.prompt_version?.split('·')[1]?.trim() || 'unknown'}</strong></div>
+        <div><span style={{ color: 'var(--fg-3)' }}>Prompt:</span> <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{production.prompt_version?.split('·')[0]?.trim() || '—'}</span></div>
+
+        {isClip ? (
+          <div style={{
+            fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.5, marginTop: 4,
+            padding: '8px 10px', background: 'var(--bg-2)', borderRadius: 6,
+          }}>
+            Clips are FFmpeg slices — to re-generate, delete and Produce a fresh clip from the thread.
+          </div>
+        ) : (
+          <>
+            <div style={{
+              display: 'flex', gap: 4, flexWrap: 'wrap',
+              paddingTop: 8, borderTop: '1px solid var(--line)', marginTop: 4,
+            }}>
+              {(['llama70b', 'kimi', 'claude'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setModel(m)}
+                  disabled={generating}
+                  className={`canon-filter-chip ${model === m ? 'active' : ''}`}
+                  style={{ fontSize: 10, padding: '3px 8px' }}
+                >
+                  {m === 'llama70b' ? 'Llama 70B' : m === 'kimi' ? 'Kimi' : 'Sonnet'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={regenerate}
+              disabled={generating}
+              className="canon-btn ghost"
+              style={{ fontSize: 12 }}
+            >
+              {generating ? 'Re-generating…' : 'Re-generate draft'}
+            </button>
+            {error && (
+              <div style={{ fontSize: 11.5, color: 'var(--t-terra)' }}>{error}</div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * VoiceoverPanel — for video_essay productions. Shows current
+ * voiceover state (none / stitched), Stitch button when all beats are
+ * recorded, audio player when stitched. The stitched MP3 lives at
+ * productions.output_r2_key (with output_metadata.kind='voiceover').
+ */
+function VoiceoverPanel({ production, beats, onStitched }: {
+  production: Production
+  beats: Beat[]
+  onStitched: () => void
+}) {
+  const [stitching, setStitching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const recordedCount = beats.filter(b => b.audio_r2_key).length
+  const totalCount = beats.length
+  const allRecorded = totalCount > 0 && recordedCount === totalCount
+
+  // Determine if the existing output is a stitched voiceover (vs a
+  // future final-render artifact).
+  let isVoiceover = false
+  try {
+    const meta = JSON.parse(production.output_metadata || '{}')
+    isVoiceover = meta?.kind === 'voiceover'
+  } catch {}
+  const hasVoiceover = isVoiceover && !!production.output_url
+
+  const stitch = async () => {
+    setStitching(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/voiceover`, {
+        method: 'POST', credentials: 'include',
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onStitched()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 220))
+    } finally {
+      setStitching(false)
+    }
+  }
+
+  return (
+    <section className="canon-section">
+      <div className="canon-section-head">
+        <h2>Voiceover {hasVoiceover && <span className="meta">· stitched from {(() => { try { return JSON.parse(production.output_metadata || '{}').beat_count } catch { return recordedCount } })()} beats</span>}</h2>
+        <div className="meta">{recordedCount}/{totalCount} beats recorded</div>
+      </div>
+
+      {hasVoiceover && production.output_url && (
+        <div style={{
+          padding: '16px 20px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line-1)',
+          borderLeft: '2px solid var(--sig)',
+          borderRadius: '0 12px 12px 0',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.6,
+            textTransform: 'uppercase', color: 'var(--sig)', fontWeight: 600,
+          }}>Voiceover ready</div>
+          <audio src={production.output_url} controls style={{ width: '100%' }}/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={stitch}
+              disabled={stitching || !allRecorded}
+              className="canon-btn ghost"
+              style={{ fontSize: 11 }}
+            >
+              {stitching ? 'Re-stitching…' : 'Re-stitch'}
+            </button>
+            <a
+              href={production.output_url}
+              download={`voiceover-${production.id}.mp3`}
+              className="canon-btn ghost"
+              style={{ fontSize: 11 }}
+            >
+              Download
+            </a>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-3)' }}>
+              MP3 · 160k · stitched from all beats in order
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!hasVoiceover && (
+        <div style={{
+          padding: '18px 22px',
+          background: 'var(--bg-1)',
+          border: '1px dashed var(--line-2)',
+          borderRadius: 10,
+          display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+          <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+            {allRecorded
+              ? 'All beats recorded. Stitch them into a single voiceover MP3.'
+              : `Record voiceover for ${totalCount - recordedCount} more beat${totalCount - recordedCount === 1 ? '' : 's'} below, then stitch.`}
+          </div>
+          <div>
+            <button
+              onClick={stitch}
+              disabled={stitching || !allRecorded}
+              className="canon-btn primary"
+              style={{ fontSize: 12, opacity: !allRecorded ? 0.5 : 1 }}
+            >
+              {stitching ? 'Stitching…' : 'Stitch voiceover'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          marginTop: 8, padding: '8px 12px',
+          background: 'rgba(230,99,74,0.06)', border: '1px solid var(--t-terra)',
+          borderRadius: 6, fontSize: 12, color: 'var(--fg-1)',
+        }}>{error}</div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * BrollRenderPanel — pick b-roll clips + render the final MP4.
+ *
+ * Fetches /api/v2/broll for available b-roll vlogs (vlogs the
+ * operator marked as silent via Mark broll). Operator picks any
+ * number in order via clickable thumbnails. Render button calls
+ * /api/v2/productions/[id]/render and replaces the production's
+ * output with the final MP4 (state → produced).
+ *
+ * If output_metadata.kind === 'final_render', shows the rendered
+ * <video> + Re-render button. If voiceover not stitched yet, shows
+ * a hint pointing back to VoiceoverPanel.
+ */
+function BrollRenderPanel({ production, onRendered }: {
+  production: Production
+  onRendered: () => void
+}) {
+  const [broll, setBroll] = useState<{
+    id: string; filename: string | null; duration_sec: number | null
+    thumbnail_url: string | null; playback_url: string | null
+    recorded_at: string | null
+  }[]>([])
+  const [picked, setPicked] = useState<string[]>([])
+  const [loadingBroll, setLoadingBroll] = useState(true)
+  const [rendering, setRendering] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Check if a voiceover exists (must come before render).
+  let isVoiceover = false
+  let isFinalRender = false
+  try {
+    const meta = JSON.parse(production.output_metadata || '{}')
+    isVoiceover = meta?.kind === 'voiceover'
+    isFinalRender = meta?.kind === 'final_render'
+  } catch {}
+
+  useEffect(() => {
+    fetch('/api/v2/broll', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { broll: [] })
+      .then((d: any) => { setBroll(d.broll ?? []); setLoadingBroll(false) })
+      .catch(() => setLoadingBroll(false))
+  }, [])
+
+  const toggle = (id: string) => {
+    setPicked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const render = async () => {
+    if (picked.length === 0) return
+    setRendering(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/render`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ broll_vlog_ids: picked }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onRendered()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 240))
+    } finally {
+      setRendering(false)
+    }
+  }
+
+  return (
+    <section className="canon-section">
+      <div className="canon-section-head">
+        <h2>Render <span className="meta">{isFinalRender ? '· final MP4 ready' : ''}</span></h2>
+        <div className="meta">b-roll + voiceover → final MP4</div>
+      </div>
+
+      {/* Existing final render — show the video */}
+      {isFinalRender && production.output_url && (
+        <div style={{
+          padding: '16px 20px', marginBottom: 14,
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line-1)',
+          borderLeft: '2px solid var(--sig)',
+          borderRadius: '0 12px 12px 0',
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.6,
+            textTransform: 'uppercase', color: 'var(--sig)', fontWeight: 600, marginBottom: 10,
+          }}>Final render</div>
+          <video src={production.output_url} controls style={{
+            width: '100%', maxHeight: 480, background: '#000', borderRadius: 8, display: 'block',
+          }}/>
+          <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <a href={production.output_url} download={`render-${production.id}.mp4`} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Download MP4
+            </a>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)' }}>
+              Pick new b-roll below to re-render
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* No voiceover yet */}
+      {!isVoiceover && !isFinalRender && (
+        <div className="canon-empty-hint">
+          Stitch the voiceover above first. Once the voiceover MP3 exists, pick b-roll here and render the final video.
+        </div>
+      )}
+
+      {/* Voiceover exists — show b-roll picker */}
+      {(isVoiceover || isFinalRender) && (
+        <>
+          {loadingBroll && <div style={{ color: 'var(--fg-3)', padding: 16 }}>Loading b-roll…</div>}
+          {!loadingBroll && broll.length === 0 && (
+            <div className="canon-empty-hint">
+              No b-roll vlogs yet. Mark some vlogs as B-roll from their detail page (System actions →
+              Mark as B-roll). Those become available here.
+            </div>
+          )}
+          {!loadingBroll && broll.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+                Pick b-roll clips in the order they should appear in the final video. They'll be
+                concatenated and trimmed to match the voiceover length.
+              </div>
+              <div style={{
+                display: 'grid', gap: 10,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              }}>
+                {broll.map(b => {
+                  const idx = picked.indexOf(b.id)
+                  const isPicked = idx >= 0
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => toggle(b.id)}
+                      disabled={rendering}
+                      style={{
+                        position: 'relative',
+                        padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{
+                        aspectRatio: '16 / 9',
+                        background: b.thumbnail_url ? `url(${b.thumbnail_url}) center / cover` : 'linear-gradient(135deg, #1a1a1a, #050505)',
+                        borderRadius: 8,
+                        border: `2px solid ${isPicked ? 'var(--sig)' : 'var(--line-1)'}`,
+                        boxShadow: isPicked ? '0 0 0 2px var(--sig-soft)' : 'none',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        transition: 'all .15s',
+                      }}>
+                        {isPicked && (
+                          <span style={{
+                            position: 'absolute', top: 8, left: 8,
+                            width: 24, height: 24, borderRadius: '50%',
+                            background: 'var(--sig)', color: '#061735',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                          }}>{idx + 1}</span>
+                        )}
+                        {b.duration_sec != null && (
+                          <span style={{
+                            position: 'absolute', bottom: 6, right: 6,
+                            fontFamily: 'var(--font-mono)', fontSize: 10,
+                            color: 'var(--fg)',
+                            background: 'rgba(0,0,0,0.7)',
+                            padding: '2px 6px', borderRadius: 4,
+                          }}>
+                            {Math.floor(b.duration_sec / 60)}:{String(Math.floor(b.duration_sec % 60)).padStart(2, '0')}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        marginTop: 6, fontSize: 11.5, color: 'var(--fg-2)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {b.filename || 'Untitled'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                paddingTop: 14, borderTop: '1px solid var(--line)',
+              }}>
+                <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                  <strong style={{ color: 'var(--fg)' }}>{picked.length}</strong> clip{picked.length === 1 ? '' : 's'} picked
+                  {picked.length > 0 && (() => {
+                    const total = picked.reduce((s, id) => {
+                      const b = broll.find(x => x.id === id)
+                      return s + (b?.duration_sec ?? 0)
+                    }, 0)
+                    return total > 0 ? ` · ~${Math.round(total)}s of footage` : ''
+                  })()}
+                </span>
+                {picked.length > 0 && (
+                  <button onClick={() => setPicked([])} disabled={rendering} className="canon-btn ghost" style={{ fontSize: 11 }}>
+                    Clear
+                  </button>
+                )}
+                <button
+                  onClick={render}
+                  disabled={rendering || picked.length === 0}
+                  className="canon-btn primary"
+                  style={{ marginLeft: 'auto', fontSize: 12, opacity: picked.length === 0 ? 0.5 : 1 }}
+                >
+                  {rendering ? 'Rendering… (may take a minute)' : isFinalRender ? 'Re-render' : 'Render final MP4'}
+                </button>
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'rgba(230,99,74,0.06)', border: '1px solid var(--t-terra)',
+                  borderRadius: 8, fontSize: 12.5, color: 'var(--fg-1)',
+                }}>{error}</div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   )
 }

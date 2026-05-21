@@ -27,7 +27,7 @@ const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'About',       href: '/about',       matchPaths: [/^\/about/] },
 ]
 
-export function Masthead({ onCmdK }: { onCmdK?: () => void }) {
+export function Masthead() {
   const pathname = usePathname() ?? '/'
   return (
     <header className="canon-masthead">
@@ -54,11 +54,6 @@ export function Masthead({ onCmdK }: { onCmdK?: () => void }) {
       </nav>
 
       <div className="canon-meta">
-        <button className="canon-search" onClick={() => onCmdK?.()} aria-label="Open search palette">
-          <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5 L13 13"/></svg>
-          <span>Search anything · jump anywhere</span>
-          <span className="kbd">⌘K</span>
-        </button>
         <HealthPill/>
         <AvatarMenu/>
       </div>

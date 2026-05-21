@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     catch (err: any) { console.warn(`[inbox] ${label}: ${err?.message || err}`); return [] }
   }
 
-  const [surfaced, ripening, processing, failed, drafts] = await Promise.all([
+  const [surfaced, ripening, processing, failed, drafts, worthShipping, topicsHot] = await Promise.all([
     safe('surfaced', () => findMany<{
       id: string; subtype: string; body: string; body_html: string | null
       topic_color: string | null; surfaced_at: string
@@ -114,6 +114,45 @@ export async function GET(req: NextRequest) {
         LIMIT 12`,
       operator.id,
     )),
+    // Worth shipping — strength 4-5 threads (not b-roll) that don't
+    // have a production linked yet. These are the threads the operator
+    // nailed solo; quality without needing a cluster.
+    safe('worth_shipping', () => findMany<{
+      id: string; topic: string; abstracted_topic: string | null
+      take: string | null; strength: number; extracted_at: string
+      vlog_id: string
+    }>(
+      db,
+      `SELECT t.id, t.topic, t.abstracted_topic, t.take, t.strength, t.extracted_at, t.vlog_id
+         FROM threads t
+         JOIN extraction_runs er ON er.id = t.run_id AND er.is_active = 1
+        WHERE t.operator_id = ? AND t.deleted_at IS NULL
+          AND COALESCE(t.strength, 0) >= 4
+          AND NOT EXISTS (
+            SELECT 1 FROM productions p
+             WHERE p.source_kind = 'thread' AND p.source_id = t.id
+               AND p.deleted_at IS NULL
+          )
+        ORDER BY t.strength DESC, t.extracted_at DESC
+        LIMIT 8`,
+      operator.id,
+    )),
+    // Topics hot — top topic_buckets in the last 30 days by thread
+    // count. Surfaces what the operator's been circling lately without
+    // requiring formal cluster membership.
+    safe('topics_hot', () => findMany<{ topic: string; n: number }>(
+      db,
+      `SELECT COALESCE(abstracted_topic, topic) AS topic, COUNT(*) AS n
+         FROM threads
+        WHERE operator_id = ? AND deleted_at IS NULL
+          AND extracted_at >= datetime('now', '-30 days')
+          AND COALESCE(abstracted_topic, topic) != ''
+        GROUP BY COALESCE(abstracted_topic, topic)
+       HAVING n >= 2
+        ORDER BY n DESC, MAX(extracted_at) DESC
+        LIMIT 8`,
+      operator.id,
+    )),
   ])
 
   return NextResponse.json({
@@ -122,13 +161,17 @@ export async function GET(req: NextRequest) {
     processing,
     failed,
     drafts,
+    worth_shipping: worthShipping,
+    topics_hot: topicsHot,
     counts: {
       surfaced: surfaced.length,
       ripening: ripening.length,
       processing: processing.length,
       failed: failed.length,
       drafts: drafts.length,
-      total: surfaced.length + ripening.length + processing.length + failed.length + drafts.length,
+      worth_shipping: worthShipping.length,
+      topics_hot: topicsHot.length,
+      total: surfaced.length + ripening.length + processing.length + failed.length + drafts.length + worthShipping.length,
     },
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

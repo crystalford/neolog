@@ -29,7 +29,7 @@ export type ExtractionMode = 'auto' | 'cheap' | 'premium'
 export interface ExtractedThread {
   topic: string
   /**
-   * 2-3 sentence analytical synthesis IN the operator's voice. Per the
+   * 5-8 sentence analytical synthesis IN the operator's voice. Per the
    * SYSTEM_PROMPT, every sentence must contain at least one verbatim
    * 4-word substring from the source transcript. Not a fragment.
    */
@@ -138,7 +138,7 @@ The operator records themselves talking. You read what they said and produce str
 A thread is one coherent argument or observation the operator makes over a span of seconds-to-minutes. Each thread has:
 
 - topic: a short label naming what the operator is talking about. 3-7 words. Examples: "Recommender systems and revealed preference", "Why slow-mo strips audio", "Coffee shop politics in May 2026".
-- take: a 3-5 sentence analytical synthesis IN THE OPERATOR'S VOICE that captures the thread's actual position WITH ITS SURROUNDING CONTEXT. The take should preserve the SETUP that leads into the punch line, the punch line itself, AND the implication / what-follows. Don't truncate before the operator's argument has resolved. A 3-sentence take is the floor; 5 is fine when the thought is genuinely substantial. Read like the operator's own short essay summarizing their own argument, with the verbatim phrasing composed into a coherent whole.
+- take: a 5-8 sentence analytical synthesis IN THE OPERATOR'S VOICE that captures the thread's actual position WITH ITS SURROUNDING CONTEXT. The take should preserve the SETUP that leads into the punch line, the punch line itself, AND the implication / what-follows. Don't truncate before the operator's argument has resolved. A 5-sentence take is the floor; 8 is the upper end when the thought is genuinely substantial. Read like the operator's own short essay summarizing their own argument, with the verbatim phrasing composed into a coherent whole.
 - key_quotes: 2-4 verbatim quotes from the transcript, each ≥ 6 words, that form the spine of the take. These prove the take is grounded.
 - key_phrases: 2-6 short verbatim phrases (2-8 words each) that are the punchiest fragments inside the take. These get marker-highlighted in the rendered thread.
 - questions_raised: 1-3 open questions the thread raises that AREN'T answered in the vlog. Future-facing — what would the operator need to think about next?
@@ -147,15 +147,15 @@ A thread is one coherent argument or observation the operator makes over a span 
 
 # HARD RULES — voice grounding
 
-1. The "take" may compose the operator's own words into a complete statement, BUT every sentence of the take must contain at least one verbatim 4+ word substring from the source transcript. No paraphrasing the operator's analysis. No improving their phrasing. No filler sentences. If a 3rd-5th sentence would be filler, stop at 3 — quality over quantity, BUT remember that a single-sentence take is too thin and will be rejected.
+1. The "take" may compose the operator's own words into a complete statement, BUT every sentence of the take must contain at least one verbatim 4+ word substring from the source transcript. No paraphrasing the operator's analysis. No improving their phrasing. No filler sentences. If a 6th-8th sentence would be filler, stop at 5 — quality over quantity, BUT remember that a single-sentence take is too thin and will be rejected.
 2. key_quotes, key_phrases, clips.quote, creative_elements.content are STRICTLY verbatim. Copy exact words.
-3. If you can't construct a 2-3 sentence voice-grounded take, OMIT the thread entirely. Better 3 substantive threads than 10 thin ones.
+3. If you can't construct a 5+ sentence voice-grounded take, OMIT the thread entirely. Better 3 substantive threads than 10 thin ones.
 4. Output ONLY the JSON object. No prose before or after.
 
 # SELF-CHECK BEFORE RESPONDING
 
 For every thread you emit:
-- Is the take 3-5 sentences? (1-2 sentence takes drop too much context — reject and expand.)
+- Is the take 5-8 sentences? (Anything under 5 sentences drops too much context — reject and expand.)
 - Does the take include the BEFORE-and-AFTER of the punch quote, not just the punch quote in isolation?
 - Does each sentence of the take contain at least 4 consecutive words verbatim from the transcript?
 - Are the key_quotes actually in the transcript?
@@ -170,7 +170,7 @@ If any answer is no, fix or omit the thread.
   "threads": [
     {
       "topic": "<short 3-7 word label>",
-      "take": "<3-5 sentence analytical synthesis preserving setup + punch + implication. Each sentence contains ≥1 verbatim 4+ word substring from the transcript.>",
+      "take": "<5-8 sentence analytical synthesis preserving setup + punch + implication. Each sentence contains ≥1 verbatim 4+ word substring from the transcript.>",
       "key_quotes": ["<verbatim ≥6 word quote>", "<another>", ...],
       "key_phrases": ["<verbatim 2-8 word phrase>", "<another>", ...],
       "questions_raised": ["<open question this thread raises>", ...],

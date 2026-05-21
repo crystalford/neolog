@@ -867,6 +867,167 @@ async function extractVideoSegment(body, res) {
   }
 }
 
+// ── endpoint: /concat-audio ─────────────────────────────────────────
+// Stitches N audio inputs (webm/mp4/mp3) into one MP3, in order.
+// Used by the production engine to assemble per-beat voiceover takes
+// into a single voiceover track.
+// Input: { input_urls: string[] }
+// Output: MP3 audio stream.
+async function concatAudio(body, res) {
+  const { input_urls } = body
+  if (!Array.isArray(input_urls) || input_urls.length === 0) {
+    return jsonError(res, 400, 'input_urls (non-empty array) required')
+  }
+  if (input_urls.length > 50) {
+    return jsonError(res, 400, 'Too many inputs (cap 50)')
+  }
+
+  const { join } = await import('path')
+  const { writeFileSync } = await import('fs')
+  const { dir } = await downloadToTmp(input_urls[0], 'concat-tmp')  // creates dir
+  const inputs = []
+  try {
+    // Download each input to tmp
+    for (let i = 0; i < input_urls.length; i++) {
+      const inputFile = join(dir, `in-${String(i).padStart(3, '0')}`)
+      const resp = await fetch(input_urls[i])
+      if (!resp.ok) throw new Error(`input ${i} fetch ${resp.status}`)
+      const buf = Buffer.from(await resp.arrayBuffer())
+      writeFileSync(inputFile, buf)
+      inputs.push(inputFile)
+    }
+
+    // ffmpeg concat demuxer needs a manifest file listing inputs.
+    const manifestFile = join(dir, 'manifest.txt')
+    writeFileSync(
+      manifestFile,
+      inputs.map(p => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'),
+    )
+    const outFile = join(dir, 'voiceover.mp3')
+
+    // Two-pass: try concat demuxer + re-encode to mp3 (safe across
+    // mixed input codecs). -ar 44100 / -ac 2 for portability.
+    await runFfmpeg(
+      [
+        '-y',
+        '-f', 'concat', '-safe', '0',
+        '-i', manifestFile,
+        '-vn',
+        '-c:a', 'libmp3lame',
+        '-b:a', '160k',
+        '-ar', '44100',
+        '-ac', '2',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'audio/mpeg')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /concat-audio failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
+// ── endpoint: /render-video-essay ───────────────────────────────────
+// Combine a voiceover MP3 with N b-roll video clips to produce a
+// final MP4. The voiceover audio replaces any audio in the b-roll;
+// b-roll videos concatenate in order; output trims to voiceover
+// duration (-shortest). If the b-roll is shorter than the voiceover,
+// the last frame freezes for the remainder (handled via tpad on the
+// final clip's filter chain — simpler approach: just trim; operator
+// picks enough b-roll).
+//
+// Input:
+//   { voiceover_url: string, broll_urls: string[] }
+// Output:
+//   MP4 stream
+async function renderVideoEssay(body, res) {
+  const { voiceover_url, broll_urls } = body
+  if (!voiceover_url) return jsonError(res, 400, 'voiceover_url required')
+  if (!Array.isArray(broll_urls) || broll_urls.length === 0) {
+    return jsonError(res, 400, 'broll_urls (non-empty array) required')
+  }
+  if (broll_urls.length > 30) return jsonError(res, 400, 'Too many broll clips (cap 30)')
+
+  const { join } = await import('path')
+  const { writeFileSync } = await import('fs')
+  const { dir } = await downloadToTmp(voiceover_url, 'render-tmp')
+
+  try {
+    // Download voiceover
+    const voFile = join(dir, 'voiceover.mp3')
+    const voResp = await fetch(voiceover_url)
+    if (!voResp.ok) throw new Error(`voiceover fetch ${voResp.status}`)
+    writeFileSync(voFile, Buffer.from(await voResp.arrayBuffer()))
+
+    // Download b-roll
+    const brollFiles = []
+    for (let i = 0; i < broll_urls.length; i++) {
+      const f = join(dir, `broll-${String(i).padStart(3, '0')}.mp4`)
+      const r = await fetch(broll_urls[i])
+      if (!r.ok) throw new Error(`broll ${i} fetch ${r.status}`)
+      writeFileSync(f, Buffer.from(await r.arrayBuffer()))
+      brollFiles.push(f)
+    }
+
+    const outFile = join(dir, 'final.mp4')
+
+    // Build the FFmpeg invocation. We need to concat N video streams
+    // (dropping their audio) and pair with the voiceover audio,
+    // trimming to whichever ends first.
+    // Note: scaling to a common 1920x1080 size keeps concat happy
+    // when sources have mixed resolutions.
+    const inputArgs = []
+    for (const f of brollFiles) {
+      inputArgs.push('-i', f)
+    }
+    inputArgs.push('-i', voFile)
+
+    const N = brollFiles.length
+    // Per-input scale + setsar to normalize before concat:
+    //   [0:v]scale=1920:1080:force_original_aspect_ratio=decrease,
+    //        pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];
+    const scaleChains = []
+    for (let i = 0; i < N; i++) {
+      scaleChains.push(
+        `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,` +
+        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
+      )
+    }
+    const concatInputs = Array.from({ length: N }, (_, i) => `[v${i}]`).join('')
+    const filterComplex =
+      scaleChains.join(';') + ';' +
+      `${concatInputs}concat=n=${N}:v=1:a=0[vout]`
+
+    await runFfmpeg(
+      [
+        '-y',
+        ...inputArgs,
+        '-filter_complex', filterComplex,
+        '-map', '[vout]',
+        '-map', `${N}:a`,
+        '-shortest',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '22',
+        '-c:a', 'aac',
+        '-b:a', '160k',
+        '-ar', '44100',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /render-video-essay failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -874,6 +1035,8 @@ const routes = {
   '/extract-audio':  extractAudio,
   '/extract-audio-segment': extractAudioSegment,
   '/extract-video-segment': extractVideoSegment,
+  '/concat-audio': concatAudio,
+  '/render-video-essay': renderVideoEssay,
   '/trim':           trim,
   '/concat':         concat,
 }

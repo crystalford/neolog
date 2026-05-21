@@ -44,7 +44,9 @@ export function ProduceModal({
   const router = useRouter()
   const options = sourceKind === 'thread' ? THREAD_OPTIONS : CLUSTER_OPTIONS
   const [picked, setPicked] = useState<ProdType | null>(null)
-  const [model, setModel] = useState<'claude' | 'llama70b' | 'kimi'>('claude')
+  // Llama 70B is the in-house default. Sonnet is opt-in when the
+  // operator wants the quality bump (and is willing to pay Anthropic).
+  const [model, setModel] = useState<'claude' | 'llama70b' | 'kimi'>('llama70b')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -173,14 +175,14 @@ export function ProduceModal({
                 fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.4,
                 textTransform: 'uppercase', color: 'var(--fg-3)',
               }}>Model</span>
-              {(['claude', 'llama70b', 'kimi'] as const).map(m => (
+              {(['llama70b', 'kimi', 'claude'] as const).map(m => (
                 <button
                   key={m}
                   onClick={() => setModel(m)}
                   className={`canon-filter-chip ${model === m ? 'active' : ''}`}
                   style={{ fontSize: 10.5, padding: '4px 10px' }}
                 >
-                  {m === 'claude' ? 'Sonnet (best)' : m === 'kimi' ? 'Kimi' : 'Llama 70B'}
+                  {m === 'llama70b' ? 'Llama 70B · in-house' : m === 'kimi' ? 'Kimi K2.6' : 'Sonnet · max'}
                 </button>
               ))}
             </div>
