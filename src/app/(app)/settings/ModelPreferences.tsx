@@ -68,7 +68,7 @@ export function ModelPreferences() {
 
   if (loading) {
     return (
-      <div style={{ padding: '14px 0', fontSize: 12, color: 'var(--bone-4)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
+      <div style={{ padding: '14px 0', fontSize: 12, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
         LOADING…
       </div>
     )
@@ -98,7 +98,7 @@ export function ModelPreferences() {
         }}
         savingThis={savingKey === 'extraction_default_tier'}
       />
-      {err && <div style={{ fontSize: 12, color: 'var(--state-err)' }}>Save failed: {err}</div>}
+      {err && <div style={{ fontSize: 12, color: 'var(--t-terra)' }}>Save failed: {err}</div>}
     </div>
   )
 }
@@ -116,14 +116,14 @@ function PickerRow({
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
-        <div style={{ fontSize: 13, color: 'var(--bone)', fontWeight: 500 }}>{title}</div>
+        <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{title}</div>
         {savingThis && (
-          <span style={{ fontSize: 10, color: 'var(--bone-4)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
+          <span style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
             SAVING…
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--bone-3)', marginBottom: 10 }}>{sub}</div>
+      <div style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>{sub}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {options.map(o => {
           const active = value === o.key
@@ -135,14 +135,14 @@ function PickerRow({
                 textAlign: 'left',
                 padding: '10px 14px',
                 background: active ? 'rgba(236,228,210,0.08)' : 'rgba(236,228,210,0.02)',
-                border: `1px solid ${active ? 'var(--bone-3)' : 'var(--line-warm)'}`,
+                border: `1px solid ${active ? 'var(--fg-3)' : 'var(--line-2)'}`,
                 borderRadius: 10,
-                color: 'var(--bone)',
+                color: 'var(--fg)',
                 cursor: 'pointer',
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 500 }}>{o.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--bone-3)', marginTop: 2 }}>{o.sub}</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{o.sub}</div>
             </button>
           )
         })}

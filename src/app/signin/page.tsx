@@ -41,7 +41,7 @@ export default function SignInPage() {
             </g>
           )
         })}
-        <circle cx="600" cy="400" r="10" fill="var(--accent)" opacity="0.9"/>
+        <circle cx="600" cy="400" r="10" fill="var(--sig)" opacity="0.9"/>
       </svg>
 
       <div style={{
@@ -80,7 +80,7 @@ export default function SignInPage() {
             />
           </div>
 
-          <button type="submit" className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 14 }}>
+          <button type="submit" className="canon-btn primary" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 14 }}>
             Send PIN →
           </button>
         </form>

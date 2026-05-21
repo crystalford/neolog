@@ -33,7 +33,7 @@ export default function PublicProfilePage({ params }: { params: { handle: string
       <section className="features-section">
         <div className="pitch-kicker">Latest</div>
         <h2 className="section-h2">Nothing public yet.</h2>
-        <p style={{ color: 'var(--bone-2)', fontSize: 14, marginTop: 16, maxWidth: 540 }}>
+        <p style={{ color: 'var(--fg-2)', fontSize: 14, marginTop: 16, maxWidth: 540 }}>
           The operator hasn't shared a public piece yet. When they do, articles and threads land here in reverse chronological order.
         </p>
       </section>

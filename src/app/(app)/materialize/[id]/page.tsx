@@ -41,7 +41,7 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
       <div className="detail-stage">
         <section style={{ paddingTop: 24 }}>
           <div className="kicker" style={{ marginBottom: 12 }}>Materialize</div>
-          <h1 style={{ fontWeight: 400, fontSize: 32, letterSpacing: '-0.7px', lineHeight: 1.15, color: 'var(--bone)' }}>
+          <h1 style={{ fontWeight: 400, fontSize: 32, letterSpacing: '-0.7px', lineHeight: 1.15, color: 'var(--fg)' }}>
             {cluster?.take || cluster?.topic || 'Loading…'}
           </h1>
           <p className="lead" style={{ marginTop: 12, maxWidth: 480 }}>
@@ -77,10 +77,10 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
                   }}
                   style={{
                     padding: '12px 16px',
-                    border: `1px solid ${on ? 'var(--bone-3)' : 'var(--line-warm)'}`,
+                    border: `1px solid ${on ? 'var(--fg-3)' : 'var(--line-2)'}`,
                     background: on ? 'rgba(236,228,210,0.04)' : 'transparent',
                     borderRadius: 12,
-                    color: on ? 'var(--bone)' : 'var(--bone-2)',
+                    color: on ? 'var(--fg)' : 'var(--fg-2)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -91,7 +91,7 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
                   }}
                 >
                   {o.label}
-                  <span style={{ color: on ? 'var(--sig)' : 'var(--bone-4)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                  <span style={{ color: on ? 'var(--sig)' : 'var(--fg-4)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
                     {on ? '✓' : '+'}
                   </span>
                 </button>
@@ -102,8 +102,8 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
 
         <div className="section">
           <div className="section-label">Voice</div>
-          <div style={{ padding: '14px 16px', background: 'var(--ink-2)', border: '1px solid var(--line)', borderRadius: 12, fontSize: 13, color: 'var(--bone-1)' }}>
-            {voice} <span style={{ color: 'var(--bone-3)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1, marginLeft: 8 }}>· EDIT IN SETTINGS</span>
+          <div style={{ padding: '14px 16px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 12, fontSize: 13, color: 'var(--fg-1)' }}>
+            {voice} <span style={{ color: 'var(--fg-3)', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1, marginLeft: 8 }}>· EDIT IN SETTINGS</span>
           </div>
         </div>
 
@@ -112,8 +112,8 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
             style={{
               padding: '14px 28px',
               borderRadius: 100,
-              background: 'var(--bone)',
-              color: 'var(--ink)',
+              background: 'var(--fg)',
+              color: 'var(--bg)',
               fontSize: 14,
               fontWeight: 500,
               cursor: 'pointer',
@@ -126,7 +126,7 @@ export default function MaterializePage({ params }: { params: { id: string } }) 
           >
             Start production →
           </button>
-          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--bone-3)', maxWidth: 480 }}>
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--fg-3)', maxWidth: 480 }}>
             Production engine is staged — the cluster-cultivate pipeline ships first, then this button dispatches the script-generation Workflow.
           </div>
         </div>

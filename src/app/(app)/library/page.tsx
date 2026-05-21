@@ -75,7 +75,7 @@ export default function LibraryPage() {
 
       {loading && (
         <div className="empty-row reveal d5">
-          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--bone-3)' }}>LOADING…</p>
+          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--fg-3)' }}>LOADING…</p>
         </div>
       )}
 
@@ -83,7 +83,7 @@ export default function LibraryPage() {
         <div className="empty-row reveal d5">
           <h3>{filter === 'all' ? 'Nothing produced yet' : `No ${filter.replace('_', ' ')}s yet`}</h3>
           <p>
-            Productions ship from <a href="/studio" style={{ color: 'var(--bone)', textDecoration: 'underline' }}>Studio</a> when a cluster ripens. Go cultivate something and it'll land here once the production engine runs.
+            Productions ship from <a href="/studio" style={{ color: 'var(--fg)', textDecoration: 'underline' }}>Studio</a> when a cluster ripens. Go cultivate something and it'll land here once the production engine runs.
           </p>
         </div>
       )}

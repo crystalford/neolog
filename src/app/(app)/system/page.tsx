@@ -76,7 +76,7 @@ export default function SystemPage() {
           {loading ? 'Refreshing…' : 'Refresh'}
         </button>
         {lastFetchedAt && (
-          <span style={{ fontSize: 12, color: 'var(--bone-3)', fontFamily: 'JetBrains Mono, monospace' }}>
+          <span style={{ fontSize: 12, color: 'var(--fg-3)', fontFamily: 'JetBrains Mono, monospace' }}>
             updated {Math.max(0, Math.round((Date.now() - lastFetchedAt) / 1000))}s ago
           </span>
         )}
@@ -95,11 +95,11 @@ export default function SystemPage() {
         <div className="settings-section">
           <div className="label">Pipeline</div>
           <div className="row"><div className="k">Vlogs total</div><div className="v">{status?.vlog_total ?? '—'}</div></div>
-          <div className="row"><div className="k">Complete</div><div className="v" style={{ color: 'var(--state-ok)' }}>{status?.vlog_complete ?? '—'}</div></div>
+          <div className="row"><div className="k">Complete</div><div className="v" style={{ color: 'var(--t-sage)' }}>{status?.vlog_complete ?? '—'}</div></div>
           <div className="row"><div className="k">Transcribing</div><div className="v">{status?.vlog_transcribing ?? '—'}</div></div>
           <div className="row"><div className="k">Extracting</div><div className="v">{status?.vlog_extracting ?? '—'}</div></div>
           <div className="row"><div className="k">Archived (skipped)</div><div className="v">{status?.vlog_archived ?? '—'}</div></div>
-          <div className="row"><div className="k">Errored</div><div className="v" style={{ color: 'var(--state-err)' }}>{status?.vlog_error ?? '—'}</div></div>
+          <div className="row"><div className="k">Errored</div><div className="v" style={{ color: 'var(--t-terra)' }}>{status?.vlog_error ?? '—'}</div></div>
         </div>
 
         <div className="settings-section">
@@ -112,37 +112,37 @@ export default function SystemPage() {
 
       {status?.recent_failures && status.recent_failures.length > 0 && (
         <section style={{ padding: '16px 24px' }}>
-          <h2 style={{ fontSize: 14, letterSpacing: 1.4, textTransform: 'uppercase', color: 'var(--bone-2)', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 14, letterSpacing: 1.4, textTransform: 'uppercase', color: 'var(--fg-2)', marginBottom: 12 }}>
             Recent failures (last 24h, {status.recent_failures.length})
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {status.recent_failures.map(f => (
               <details key={f.id} style={{
-                background: 'var(--ink-2)',
-                border: '1px solid var(--state-err)',
+                background: 'var(--bg-2)',
+                border: '1px solid var(--t-terra)',
                 borderRadius: 8,
                 padding: '10px 14px',
                 fontSize: 12,
                 fontFamily: 'JetBrains Mono, monospace',
-                color: 'var(--bone-1)',
+                color: 'var(--fg-1)',
               }}>
                 <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
-                  <strong style={{ color: 'var(--state-err)' }}>✗ {f.step}</strong>
-                  {' · '}<a href={`/timeline/${f.vlog_id}`} style={{ color: 'var(--bone-2)' }}>{f.vlog_id.slice(-6)}</a>
+                  <strong style={{ color: 'var(--t-terra)' }}>✗ {f.step}</strong>
+                  {' · '}<a href={`/timeline/${f.vlog_id}`} style={{ color: 'var(--fg-2)' }}>{f.vlog_id.slice(-6)}</a>
                   {' · '}{f.runtime}{f.worker_version ? `@${f.worker_version}` : ''}
                   {' · '}{f.duration_ms ?? '?'}ms
-                  {' · '}<span style={{ color: 'var(--bone-3)' }}>{f.started_at}</span>
+                  {' · '}<span style={{ color: 'var(--fg-3)' }}>{f.started_at}</span>
                 </summary>
                 <pre style={{
                   marginTop: 8,
                   padding: 10,
-                  background: 'var(--ink-1)',
+                  background: 'var(--bg-1)',
                   border: '1px solid var(--line)',
                   borderRadius: 6,
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                   fontSize: 11,
-                  color: 'var(--bone-1)',
+                  color: 'var(--fg-1)',
                 }}>{f.error_full_text || '(no error text recorded)'}</pre>
               </details>
             ))}
@@ -156,10 +156,10 @@ export default function SystemPage() {
 
 function DepRow({ name, r }: { name: string; r?: DependencyResult }) {
   const color = r === undefined
-    ? 'var(--bone-3)'
+    ? 'var(--fg-3)'
     : r.ok
-    ? 'var(--state-ok)'
-    : 'var(--state-err)'
+    ? 'var(--t-sage)'
+    : 'var(--t-terra)'
   const label = r === undefined
     ? '—'
     : r.ok
@@ -180,7 +180,7 @@ function pillStyle(busy: boolean): React.CSSProperties {
     padding: '6px 12px',
     border: '1px solid var(--line)',
     background: busy ? 'rgba(236,228,210,0.04)' : 'rgba(236,228,210,0.08)',
-    color: 'var(--bone-1)',
+    color: 'var(--fg-1)',
     borderRadius: 100,
     fontFamily: 'JetBrains Mono, monospace',
     fontSize: 10,

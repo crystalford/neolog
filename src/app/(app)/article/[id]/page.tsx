@@ -39,17 +39,17 @@ export default function ArticleDetailPage({ params }: { params: { id: string } }
             {['Premise: what the algorithm trusts', 'Revealed vs stated preference', 'Why subscription is theater', '(Drafting) What good would look like'].map((s, i) => (
               <li key={i} style={{
                 counterIncrement: 'sec',
-                background: 'var(--ink-2)',
+                background: 'var(--bg-2)',
                 border: '1px solid var(--line)',
                 borderRadius: 12,
                 padding: '12px 16px',
                 fontSize: 14,
-                color: 'var(--bone-1)',
+                color: 'var(--fg-1)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
               }}>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--bone-3)', letterSpacing: 1, minWidth: 22 }}>0{i + 1}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--fg-3)', letterSpacing: 1, minWidth: 22 }}>0{i + 1}</span>
                 {s}
               </li>
             ))}
@@ -57,7 +57,7 @@ export default function ArticleDetailPage({ params }: { params: { id: string } }
         </div>
 
         <div className="section" style={{ paddingBottom: 32 }}>
-          <button onClick={() => alert('Article editor + Substack publish ships with the production engine.')} style={{ padding: '12px 24px', borderRadius: 100, background: 'var(--bone)', color: 'var(--ink)', fontWeight: 500, fontSize: 14, border: 'none' }}>Open editor →</button>
+          <button onClick={() => alert('Article editor + Substack publish ships with the production engine.')} style={{ padding: '12px 24px', borderRadius: 100, background: 'var(--fg)', color: 'var(--bg)', fontWeight: 500, fontSize: 14, border: 'none' }}>Open editor →</button>
         </div>
       </div>
     </main>

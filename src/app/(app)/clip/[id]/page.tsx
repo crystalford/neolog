@@ -26,7 +26,7 @@ export default function ClipDetailPage({ params }: { params: { id: string } }) {
       .catch(() => {})
   }, [params.id])
 
-  if (!c) return <main><div className="empty-row"><p style={{ color: 'var(--bone-3)' }}>Loading…</p></div></main>
+  if (!c) return <main><div className="empty-row"><p style={{ color: 'var(--fg-3)' }}>Loading…</p></div></main>
 
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
   const dur = c.end_time - c.start_time
@@ -54,15 +54,15 @@ export default function ClipDetailPage({ params }: { params: { id: string } }) {
         {c.why_clippable && (
           <div className="section">
             <div className="section-label">Why it's clippable</div>
-            <p style={{ fontSize: 14, color: 'var(--bone-1)', lineHeight: 1.55, background: 'var(--ink-2)', border: '1px solid var(--line)', borderRadius: 12, padding: '14px 16px' }}>
+            <p style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55, background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 12, padding: '14px 16px' }}>
               {c.why_clippable}
             </p>
           </div>
         )}
 
         <div className="section" style={{ paddingBottom: 32, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <a href={`/timeline/${c.vlog_id}`} style={{ padding: '10px 18px', border: '1px solid var(--line-warm)', borderRadius: 100, fontSize: 13, color: 'var(--bone-2)' }}>Open source vlog →</a>
-          <button onClick={() => alert('Clip publishing ships after the clip-publish Workflow.')} style={{ padding: '10px 18px', border: '1px solid var(--bone-3)', background: 'rgba(236,228,210,0.04)', borderRadius: 100, fontSize: 13, color: 'var(--bone)' }}>Approve + ship</button>
+          <a href={`/timeline/${c.vlog_id}`} style={{ padding: '10px 18px', border: '1px solid var(--line-2)', borderRadius: 100, fontSize: 13, color: 'var(--fg-2)' }}>Open source vlog →</a>
+          <button onClick={() => alert('Clip publishing ships after the clip-publish Workflow.')} style={{ padding: '10px 18px', border: '1px solid var(--fg-3)', background: 'rgba(236,228,210,0.04)', borderRadius: 100, fontSize: 13, color: 'var(--fg)' }}>Approve + ship</button>
         </div>
       </div>
     </main>

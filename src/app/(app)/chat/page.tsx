@@ -208,15 +208,30 @@ export default function ChatPage() {
   }
 
   return (
-    <Shell active="chat" breadcrumb={["Chat"]}><div className="pad-tight" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 60px)" }}>
-      <section className="hero" style={{ paddingBottom: 8 }}>
-        <div className="crumb reveal d2">Assistant</div>
-        <h1 className="reveal d3">Chat</h1>
-        <p className="lead reveal d4">
-          Default: <strong>Kimi K2.6</strong> on Workers AI &mdash; the closest-to-Claude voice we
-          can host natively. <strong>Llama 4 Scout</strong> is faster and cheaper but lower
-          quality. <strong>Sonnet</strong> is the paid premium. Default is operator-configurable in
-          Settings.
+    <Shell><div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 140px)", paddingTop: 8 }}>
+      <section className="canon-reveal d1" style={{ paddingBottom: 16, marginBottom: 14 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
+          textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 16,
+          display: 'inline-flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
+          The assistant · in-corpus
+        </div>
+        <h1 style={{
+          fontFamily: 'var(--font-body)', fontWeight: 400,
+          fontSize: 48, lineHeight: 1.0, letterSpacing: '-1.8px',
+          color: 'var(--fg)', margin: '0 0 14px',
+        }}>
+          Chat<span style={{ color: 'var(--sig)' }}>.</span>
+        </h1>
+        <p style={{
+          fontSize: 14.5, lineHeight: 1.55, color: 'var(--fg-2)',
+          maxWidth: 620, letterSpacing: '-0.1px', margin: 0,
+        }}>
+          Default is Llama 3.3 70B on Workers AI — dense, strong on writing.
+          Kimi K2.6 is the closest-to-Claude voice. Sonnet is the paid premium.
         </p>
       </section>
 
@@ -224,13 +239,12 @@ export default function ChatPage() {
         display: 'flex',
         flex: 1,
         gap: 16,
-        padding: '0 24px 16px',
-        minHeight: 0,
+        minHeight: 480,
       }}>
         {/* Thread list */}
         <div style={{
           width: 220,
-          background: 'var(--ink-2)',
+          background: 'var(--bg-2)',
           border: '1px solid var(--line)',
           borderRadius: 12,
           display: 'flex',
@@ -243,7 +257,7 @@ export default function ChatPage() {
               padding: '12px 14px',
               borderBottom: '1px solid var(--line)',
               background: 'transparent',
-              color: 'var(--bone-1)',
+              color: 'var(--fg-1)',
               fontSize: 13,
               fontWeight: 500,
               textAlign: 'left',
@@ -252,7 +266,7 @@ export default function ChatPage() {
           >+ New conversation</button>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {threads.length === 0 && (
-              <div style={{ padding: '14px 14px', fontSize: 12, color: 'var(--bone-4)' }}>
+              <div style={{ padding: '14px 14px', fontSize: 12, color: 'var(--fg-4)' }}>
                 No conversations yet. Type below to start one.
               </div>
             )}
@@ -269,7 +283,7 @@ export default function ChatPage() {
                     flex: 1,
                     padding: '10px 14px',
                     background: 'transparent',
-                    color: 'var(--bone-1)',
+                    color: 'var(--fg-1)',
                     fontSize: 12,
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -279,7 +293,7 @@ export default function ChatPage() {
                   }}
                 >
                   {t.title || '(untitled)'}
-                  <div style={{ fontSize: 10, color: 'var(--bone-4)', marginTop: 2, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--fg-4)', marginTop: 2, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
                     {t.model.toUpperCase()}
                   </div>
                 </button>
@@ -289,7 +303,7 @@ export default function ChatPage() {
                   style={{
                     padding: '8px 10px',
                     background: 'transparent',
-                    color: 'var(--bone-4)',
+                    color: 'var(--fg-4)',
                     fontSize: 14,
                     cursor: 'pointer',
                   }}
@@ -302,7 +316,7 @@ export default function ChatPage() {
         {/* Conversation pane */}
         <div style={{
           flex: 1,
-          background: 'var(--ink-2)',
+          background: 'var(--bg-2)',
           border: '1px solid var(--line)',
           borderRadius: 12,
           display: 'flex',
@@ -317,28 +331,28 @@ export default function ChatPage() {
             alignItems: 'center',
             gap: 8,
             fontSize: 12,
-            color: 'var(--bone-3)',
+            color: 'var(--fg-3)',
           }}>
             <span>Model:</span>
             {(['llama70b', 'scout', 'kimi', 'claude'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => setModel(m)}
-                className={`fchip ${model === m ? 'active' : ''}`}
+                className={`canon-filter-chip ${model === m ? 'active' : ''}`}
                 style={{ padding: '4px 10px', fontSize: 11 }}
                 title={MODEL_LABELS[m].sub}
               >
                 {MODEL_LABELS[m].label}
               </button>
             ))}
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: 'var(--bone-4)' }}>
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg-4)' }}>
               {messages.length} messages
             </span>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {messages.length === 0 && !sending && (
-              <div style={{ color: 'var(--bone-4)', fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ color: 'var(--fg-4)', fontSize: 13, lineHeight: 1.6 }}>
                 Ask anything. Examples:
                 <ul style={{ marginTop: 8 }}>
                   <li>"What have I been saying about loneliness lately?"</li>
@@ -349,7 +363,7 @@ export default function ChatPage() {
               </div>
             )}
             {messages.map(m => <Bubble key={m.id} m={m} />)}
-            {sending && <div style={{ color: 'var(--bone-4)', fontSize: 12, fontStyle: 'italic' }}>thinking…</div>}
+            {sending && <div style={{ color: 'var(--fg-4)', fontSize: 12, fontStyle: 'italic' }}>thinking…</div>}
             <div ref={scrollEndRef} />
           </div>
 
@@ -367,10 +381,10 @@ export default function ChatPage() {
                   <div key={a.id} style={{
                     padding: '4px 8px',
                     background: 'rgba(236,228,210,0.06)',
-                    border: '1px solid var(--line-warm)',
+                    border: '1px solid var(--line-2)',
                     borderRadius: 8,
                     fontSize: 11,
-                    color: 'var(--bone-1)',
+                    color: 'var(--fg-1)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
@@ -381,7 +395,7 @@ export default function ChatPage() {
                     </span>
                     <button
                       onClick={() => setAttachments(prev => prev.filter(x => x.id !== a.id))}
-                      style={{ background: 'transparent', color: 'var(--bone-4)', cursor: 'pointer' }}
+                      style={{ background: 'transparent', color: 'var(--fg-4)', cursor: 'pointer' }}
                     >×</button>
                   </div>
                 ))}
@@ -404,12 +418,12 @@ export default function ChatPage() {
                 style={{
                   flex: 1,
                   resize: 'none',
-                  background: 'var(--ink-1)',
-                  border: '1px solid var(--line-warm)',
+                  background: 'var(--bg-1)',
+                  border: '1px solid var(--line-2)',
                   borderRadius: 10,
                   padding: '10px 12px',
                   fontSize: 13,
-                  color: 'var(--bone)',
+                  color: 'var(--fg)',
                   fontFamily: 'Geist, system-ui, sans-serif',
                 }}
                 disabled={sending}
@@ -440,7 +454,7 @@ export default function ChatPage() {
               </button>
             </div>
             {error && (
-              <div style={{ fontSize: 12, color: 'var(--state-err)', padding: '4px 0' }}>
+              <div style={{ fontSize: 12, color: 'var(--t-terra)', padding: '4px 0' }}>
                 {error}
               </div>
             )}
@@ -459,7 +473,7 @@ function Bubble({ m }: { m: MessageRow }) {
     return (
       <details style={{
         fontSize: 11,
-        color: 'var(--bone-4)',
+        color: 'var(--fg-4)',
         fontFamily: 'JetBrains Mono, monospace',
         background: 'rgba(236,228,210,0.03)',
         border: '1px solid var(--line-dim, rgba(236,228,210,0.05))',
@@ -490,10 +504,10 @@ function Bubble({ m }: { m: MessageRow }) {
       maxWidth: isUser ? '92%' : '100%',
       width: isUser ? 'auto' : '100%',
       background: isUser ? 'rgba(236,228,210,0.06)' : 'transparent',
-      border: isUser ? '1px solid var(--line-warm)' : 'none',
+      border: isUser ? '1px solid var(--line-2)' : 'none',
       borderRadius: 12,
       padding: isUser ? '10px 14px' : '4px 0',
-      color: 'var(--bone-1)',
+      color: 'var(--fg-1)',
       fontSize: 14,
       lineHeight: 1.55,
       whiteSpace: 'pre-wrap',
@@ -503,7 +517,7 @@ function Bubble({ m }: { m: MessageRow }) {
       ))}
       {textPart}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && (
-        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--bone-4)', fontFamily: 'JetBrains Mono, monospace' }}>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono, monospace' }}>
           → called {toolCalls.map((tc: any) => tc.name).join(', ')}
         </div>
       )}
@@ -536,9 +550,9 @@ function buildMessageText(input: string, attachments: PendingAttachment[]): stri
 function composerBtnStyle(primary: boolean): React.CSSProperties {
   return {
     padding: '10px 16px',
-    background: primary ? 'var(--bone)' : 'transparent',
-    color: primary ? 'var(--ink)' : 'var(--bone-1)',
-    border: primary ? 'none' : '1px solid var(--line-warm)',
+    background: primary ? 'var(--fg)' : 'transparent',
+    color: primary ? 'var(--bg)' : 'var(--fg-1)',
+    border: primary ? 'none' : '1px solid var(--line-2)',
     borderRadius: 10,
     fontSize: 13,
     fontWeight: 500,
