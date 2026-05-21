@@ -67,6 +67,12 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
   const [error, setError] = useState<string | null>(null)
   const [cultivating, setCultivating] = useState<null | 'workers' | 'sonnet'>(null)
   const [cultivateNote, setCultivateNote] = useState<string | null>(null)
+  const [bounceOpen, setBounceOpen] = useState(false)
+  const [bounceTurns, setBounceTurns] = useState<{ q: string; a: string }[]>([])
+  const [bounceQ, setBounceQ] = useState('')
+  const [bounceSending, setBounceSending] = useState(false)
+  const [bounceRunId, setBounceRunId] = useState<string | null>(null)
+  const [bounceErr, setBounceErr] = useState<string | null>(null)
 
   const load = () => {
     fetch(`/api/v2/clusters/${params.id}`, { credentials: 'include' })
@@ -210,7 +216,7 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <Action primary label="Materialize" onClick={() => alert('Production engine — coming in a later deploy.')}/>
             <Action label="Cultivate" hint="C" onClick={() => cultivate('workers')} disabled={cultivating !== null}/>
-            <Action label="Bounce ideas" onClick={() => alert('Bounce workflow — Deploy 4.')}/>
+            <Action label="Bounce ideas" onClick={() => setBounceOpen(o => !o)}/>
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '6px 0' }}/>
             <Action label="Re-cultivate (Sonnet)" onClick={() => cultivate('sonnet')} disabled={cultivating !== null}/>
             <Action label="Hold for more" onClick={() => alert('Hold flow — coming later.')}/>
@@ -223,6 +229,99 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
             background: 'var(--bg-2)', border: '1px solid var(--line)',
             borderRadius: 6, fontSize: 12, color: 'var(--fg-2)',
           }}>{cultivateNote}</div>
+        )}
+
+        {/* Bounce panel — conversational refinement of the cluster.
+            Each Q+A pair gets saved as cluster_insights tagged with
+            bounce_run_id, so the conversation persists across reloads
+            (visible later in the Surfaced insights list). */}
+        {bounceOpen && (
+          <div style={{
+            margin: '0 36px 24px',
+            background: 'var(--bg-1)', border: '1px solid var(--line)',
+            borderLeft: `3px solid ${color}`, borderRadius: 8,
+            padding: 18,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color, letterSpacing: 1.2, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace', fontWeight: 600, marginBottom: 4 }}>
+                  Bounce · {bounceTurns.length} turn{bounceTurns.length === 1 ? '' : 's'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                  Ask the model anything about this cluster. Threads + prior insights are in context.
+                </div>
+              </div>
+              <button onClick={() => setBounceOpen(false)} style={{
+                padding: '4px 10px', fontSize: 11,
+                background: 'transparent', color: 'var(--fg-3)',
+                border: '1px solid var(--line)', borderRadius: 5, cursor: 'pointer',
+              }}>Close</button>
+            </div>
+            {bounceTurns.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14, maxHeight: 360, overflowY: 'auto' }}>
+                {bounceTurns.map((turn, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{
+                      alignSelf: 'flex-end', maxWidth: '85%',
+                      padding: '8px 12px',
+                      background: 'var(--bg-2)', border: '1px solid var(--line)',
+                      borderRadius: 6,
+                      fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5,
+                    }}>{turn.q}</div>
+                    <div style={{
+                      padding: '8px 12px',
+                      borderLeft: `2px solid ${color}`,
+                      fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.6,
+                    }}>{turn.a}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {bounceErr && <div style={{ fontSize: 11, color: 'var(--err)', marginBottom: 8 }}>{bounceErr}</div>}
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              const q = bounceQ.trim()
+              if (!q || bounceSending) return
+              setBounceSending(true)
+              setBounceErr(null)
+              try {
+                const r = await fetch(`/api/v2/clusters/${params.id}/bounce`, {
+                  method: 'POST', credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ question: q, bounce_run_id: bounceRunId ?? undefined }),
+                })
+                const d: any = await r.json().catch(() => ({}))
+                if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+                setBounceTurns(prev => [...prev, { q, a: d.answer }])
+                setBounceRunId(d.bounce_run_id)
+                setBounceQ('')
+              } catch (err: any) {
+                setBounceErr(String(err?.message || err).slice(0, 240))
+              } finally {
+                setBounceSending(false)
+              }
+            }} style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={bounceQ}
+                onChange={e => setBounceQ(e.target.value)}
+                placeholder="Ask a follow-up about this cluster…"
+                disabled={bounceSending}
+                style={{
+                  flex: 1, padding: '8px 12px',
+                  background: 'var(--bg-2)', border: '1px solid var(--line)',
+                  borderRadius: 6, fontSize: 13, color: 'var(--fg-1)',
+                  fontFamily: 'Geist, system-ui, sans-serif',
+                }}
+              />
+              <button type="submit" disabled={bounceSending || !bounceQ.trim()} style={{
+                padding: '8px 16px', fontSize: 12,
+                background: color, color: 'var(--bg)',
+                border: 'none', borderRadius: 6, cursor: bounceSending ? 'wait' : 'pointer',
+                opacity: bounceSending || !bounceQ.trim() ? 0.5 : 1,
+                fontWeight: 500,
+              }}>{bounceSending ? '…' : 'Send'}</button>
+            </form>
+          </div>
         )}
 
         {/* Composite ripeness panel */}

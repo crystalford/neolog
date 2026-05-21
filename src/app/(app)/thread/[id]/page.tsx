@@ -82,6 +82,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'j' && data.navigation.next_thread_id) router.push(`/thread/${data.navigation.next_thread_id}`)
       else if (e.key === 'k' && data.navigation.prev_thread_id) router.push(`/thread/${data.navigation.prev_thread_id}`)
+      else if (e.key === 'r') router.push(`/capture?riff_of=${data.thread.id}`)
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
@@ -181,7 +182,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Action primary label="Riff on this" hint="R" onClick={() => alert('Riff workflow — coming next')}/>
+            <Action primary label="Riff on this" hint="R" onClick={() => router.push(`/capture?riff_of=${thread.id}`)}/>
             {cluster && <Action label="Open in Studio" hint="S" onClick={() => router.push(`/cluster/${cluster.id}`)}/>}
             <Action label="Materialize" onClick={() => alert('Materialize — coming with production engine')}/>
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '6px 0' }}/>

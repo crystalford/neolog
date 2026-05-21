@@ -1,265 +1,530 @@
 /**
- * Graph — visual substrate. Clusters as large nodes, threads as medium
- * nodes attached to their cluster, entities as small dots near the vlogs
- * that mention them.
+ * Graph — the visual substrate.
  *
- * Real data from /api/v2/graph (built from D1 clusters/threads/entities
- * tables). Layout is a static radial-by-cluster placement: each cluster
- * gets a slice of the canvas, threads radiate around it, entities
- * scatter near the edges. No physics — just enough to read the shape.
+ * Pure SVG, no force-directed layout (yet) — deterministic positions
+ * hashed from ids so the canvas doesn't shuffle on every reload.
  *
- * Empty state shows when the operator has no clusters yet.
+ * Layout strategy:
+ *   - Topic territories: faint radial-gradient regions, one per topic
+ *     color, positioned by the topic's hash slot.
+ *   - Cluster nodes: large circles in the center of each territory,
+ *     sized by ripeness, glow by topic color.
+ *   - Thread satellites: orbit their parent cluster. Sized by strength.
+ *   - Entity dots: scattered near their parent vlog's cluster (or in
+ *     the "misc" territory when unclustered).
+ *
+ * Interactive:
+ *   - Click any node → side panel with details + open in detail page
+ *   - Time-lapse scrubber at the bottom: drag to filter the visible
+ *     graph to only nodes whose created_at <= scrubber position.
+ *     Watch the corpus grow over time.
+ *
+ * Reads /api/v2/graph (operator-scoped).
  */
 'use client'
 
-import { useEffect, useState } from 'react'
+export const runtime = 'edge'
+
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Shell, { TopicDot } from '@/components/Shell'
+import Shell from '@/components/Shell'
+import { topicColor } from '@/lib/topic-color'
+import { editorialLabel, formatDate, formatFullDate, truncate } from '@/components/threadkit'
 
-interface GraphNode {
-  id: string
-  kind: 'cluster' | 'thread' | 'entity'
-  label: string
-  size: number
-  color?: string
-  parent?: string
-  state?: string
-  strength?: number
-  entity_type?: string
-  mention_count?: number
+interface ClusterNode {
+  id: string; label: string; topic: string
+  state: string; ripeness: number; thread_count: number; created_at: string
 }
-
-interface GraphEdge {
-  from: string
-  to: string
-  kind: 'membership' | 'cosine' | 'mention'
-  weight?: number
+interface ThreadNode {
+  id: string; label: string; topic: string
+  cluster_id: string | null; vlog_id: string; strength: number; take: string; extracted_at: string
 }
+interface EntityNode {
+  id: string; label: string; type: string; mention_count: number; vlog_id: string; created_at: string
+}
+interface Connection { from: string; to: string; strength: number; type: string }
 
 interface GraphData {
-  nodes: GraphNode[]
-  edges: GraphEdge[]
+  clusters: ClusterNode[]
+  threads: ThreadNode[]
+  entities: EntityNode[]
+  connections: Connection[]
   counts: { clusters: number; threads: number; entities: number; connections: number }
-  has_data: boolean
 }
 
-const TOPIC_COLOR: Record<string, string> = {
-  curbsider:    '#60a5fa',
-  memory:       '#a78bfa',
-  form:         '#34d399',
-  'pack rats':  '#fb923c',
-  voice:        '#f472b6',
-  graph:        '#2dd4bf',
-  regulation:   '#fbbf24',
-  misc:         '#c084fc',
-}
-const ENTITY_COLOR: Record<string, string> = {
-  person:    '#a78bfa',
-  place:     '#60a5fa',
-  project:   '#fb923c',
-  tool:      '#2dd4bf',
-  concept:   '#34d399',
-  theme:     '#f472b6',
-  reference: '#fbbf24',
-}
-const colorFor = (n: GraphNode): string => {
-  if (n.kind === 'entity') return ENTITY_COLOR[n.entity_type ?? ''] ?? '#71717a'
-  return TOPIC_COLOR[n.color?.toLowerCase() ?? ''] ?? '#71717a'
-}
+type SelectedKind = 'cluster' | 'thread' | 'entity'
+interface Selected { kind: SelectedKind; id: string }
+
+const CANVAS_W = 1600
+const CANVAS_H = 1000
+const MARGIN = 80
 
 export default function GraphPage() {
   const [data, setData] = useState<GraphData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Selected | null>(null)
+  const [scrubberPct, setScrubberPct] = useState(1) // 0..1
+  const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
     fetch('/api/v2/graph', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((d: any) => setData(d as GraphData))
+      .catch(e => setError(String(e?.message || e)))
   }, [])
 
-  const counts = data?.counts ?? { clusters: 0, threads: 0, entities: 0, connections: 0 }
-  const selected = data?.nodes.find(n => n.id === selectedId) ?? null
+  // Play loop: advance the scrubber over 12s if playing
+  useEffect(() => {
+    if (!playing) return
+    let raf = 0
+    let start = performance.now() - scrubberPct * 12000
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / 12000)
+      setScrubberPct(p)
+      if (p < 1) raf = requestAnimationFrame(tick)
+      else setPlaying(false)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing])
+
+  const positions = useMemo(() => layoutAll(data), [data])
+
+  const filtered = useMemo(() => {
+    if (!data) return null
+    const sortedTimes = [
+      ...data.clusters.map(c => new Date(c.created_at).getTime()),
+      ...data.threads.map(t => new Date(t.extracted_at).getTime()),
+      ...data.entities.map(e => new Date(e.created_at).getTime()),
+    ].filter(t => isFinite(t)).sort((a, b) => a - b)
+    const earliest = sortedTimes[0] ?? 0
+    const latest = sortedTimes[sortedTimes.length - 1] ?? Date.now()
+    const cutoff = earliest + (latest - earliest) * scrubberPct
+    return {
+      clusters: data.clusters.filter(c => new Date(c.created_at).getTime() <= cutoff),
+      threads: data.threads.filter(t => new Date(t.extracted_at).getTime() <= cutoff),
+      entities: data.entities.filter(e => new Date(e.created_at).getTime() <= cutoff),
+      cutoffDate: new Date(cutoff),
+    }
+  }, [data, scrubberPct])
+
+  if (error) {
+    return (
+      <Shell active="graph" breadcrumb={['Graph']}>
+        <div className="pad-tight" style={{ color: 'var(--err)' }}>Error: {error}</div>
+      </Shell>
+    )
+  }
+  if (!data || !filtered) {
+    return (
+      <Shell active="graph" breadcrumb={['Graph']}>
+        <div className="pad-tight" style={{ color: 'var(--fg-3)' }}>Loading the substrate…</div>
+      </Shell>
+    )
+  }
+
+  const visibleClusterIds = new Set(filtered.clusters.map(c => c.id))
+  const visibleThreadIds = new Set(filtered.threads.map(t => t.id))
 
   return (
     <Shell active="graph" breadcrumb={['Graph']}>
-      <div className="pad">
-        <div className="h1-row">
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
+
+        {/* Hero strip */}
+        <div style={{
+          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+          padding: '14px 32px', borderBottom: '1px solid var(--line)',
+        }}>
           <div>
-            <h1>Graph</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 6 }}>
-              {loading
-                ? 'Loading…'
-                : `${counts.threads} threads · ${counts.clusters} clusters · ${counts.entities} entities · ${counts.connections} cross-links`}
-            </p>
+            <div style={{
+              fontSize: 10, color: 'var(--fg-4)', letterSpacing: 1.2,
+              textTransform: 'uppercase',
+              fontFamily: 'Geist Mono, ui-monospace, monospace',
+              marginBottom: 4,
+            }}>
+              The substrate · mapped
+            </div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, letterSpacing: '-0.4px' }}>
+              Graph
+            </h1>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 24,
+            fontSize: 11, color: 'var(--fg-3)',
+            fontFamily: 'Geist Mono, ui-monospace, monospace',
+          }}>
+            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{data.counts.clusters}</b> clusters</span>
+            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{data.counts.threads}</b> threads</span>
+            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{data.counts.entities}</b> entities</span>
+            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{data.counts.connections}</b> edges</span>
           </div>
         </div>
 
-        {!loading && (!data || !data.has_data) ? (
-          <div className="empty" style={{ marginTop: 32 }}>
-            <h3>Graph populates as clusters form</h3>
-            <p>
-              You need at least one cluster for the graph to take shape (clusters
-              form automatically when 3+ threads converge on the same abstracted
-              topic). Drop in more vlogs and run the unified extraction — the
-              graph fills in as the substrate grows.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 280px' : '1fr', gap: 18, marginTop: 18 }}>
-            <div style={{
-              background: 'var(--bg-1)',
-              border: '1px solid var(--line)',
-              borderRadius: 10,
-              padding: 0,
-              overflow: 'hidden',
-              aspectRatio: '4/3',
-              minHeight: 480,
-            }}>
-              {data && <GraphCanvas data={data} selectedId={selectedId} onSelect={setSelectedId} />}
-            </div>
+        {/* Canvas + side panel */}
+        <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 340px' : '1fr', flex: 1, minHeight: 0 }}>
 
-            {selected && (
-              <div className="card">
-                <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                  {selected.kind}
+          <div style={{ position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
+            <svg
+              viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+              preserveAspectRatio="xMidYMid meet"
+              style={{ width: '100%', height: '100%', display: 'block' }}
+              onClick={() => setSelected(null)}
+            >
+              <defs>
+                {Array.from({ length: 8 }, (_, i) => i + 1).map(slot => (
+                  <radialGradient key={slot} id={`territory-${slot}`} cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor={`var(--t-${slot})`} stopOpacity={0.08}/>
+                    <stop offset="100%" stopColor={`var(--t-${slot})`} stopOpacity={0}/>
+                  </radialGradient>
+                ))}
+                <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation={4}/>
+                </filter>
+              </defs>
+
+              {filtered.clusters.map(c => {
+                const p = positions.clusterById.get(c.id)
+                if (!p) return null
+                const slot = hashSlot(c.topic)
+                return (
+                  <circle key={`terr-${c.id}`}
+                    cx={p.x} cy={p.y} r={180}
+                    fill={`url(#territory-${slot})`}
+                  />
+                )
+              })}
+
+              {filtered.threads.map(t => {
+                if (!t.cluster_id || !visibleClusterIds.has(t.cluster_id)) return null
+                const tp = positions.threadById.get(t.id)
+                const cp = positions.clusterById.get(t.cluster_id)
+                if (!tp || !cp) return null
+                const color = topicColor(t.topic)
+                return (
+                  <line key={`m-${t.id}`} x1={tp.x} y1={tp.y} x2={cp.x} y2={cp.y}
+                    stroke={color} strokeWidth={0.5} strokeOpacity={0.18}/>
+                )
+              })}
+
+              {data.connections.map((e, i) => {
+                if (!visibleThreadIds.has(e.from) || !visibleThreadIds.has(e.to)) return null
+                const a = positions.threadById.get(e.from)
+                const b = positions.threadById.get(e.to)
+                if (!a || !b) return null
+                return (
+                  <line key={`e-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                    stroke={`var(--fg-5)`} strokeWidth={0.6} strokeOpacity={Math.max(0.15, e.strength * 0.5)}/>
+                )
+              })}
+
+              {filtered.entities.map(e => {
+                const p = positions.entityById.get(e.id)
+                if (!p) return null
+                const color = entityColor(e.type)
+                const r = 2 + Math.min(4, Math.log2(1 + e.mention_count))
+                const sel = selected?.kind === 'entity' && selected.id === e.id
+                return (
+                  <circle key={`en-${e.id}`}
+                    cx={p.x} cy={p.y} r={sel ? r + 2 : r}
+                    fill={color}
+                    fillOpacity={sel ? 1 : 0.55}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(ev) => { ev.stopPropagation(); setSelected({ kind: 'entity', id: e.id }) }}
+                  />
+                )
+              })}
+
+              {filtered.threads.map(t => {
+                const p = positions.threadById.get(t.id)
+                if (!p) return null
+                const color = topicColor(t.topic)
+                const r = 4 + (t.strength ?? 3)
+                const sel = selected?.kind === 'thread' && selected.id === t.id
+                return (
+                  <g key={`th-${t.id}`}>
+                    {sel && <circle cx={p.x} cy={p.y} r={r + 6} fill={color} fillOpacity={0.18}/>}
+                    <circle cx={p.x} cy={p.y} r={r}
+                      fill={color}
+                      fillOpacity={sel ? 1 : 0.85}
+                      stroke={sel ? color : 'none'}
+                      strokeWidth={sel ? 1 : 0}
+                      style={{ cursor: 'pointer' }}
+                      onClick={(ev) => { ev.stopPropagation(); setSelected({ kind: 'thread', id: t.id }) }}
+                    />
+                  </g>
+                )
+              })}
+
+              {filtered.clusters.map(c => {
+                const p = positions.clusterById.get(c.id)
+                if (!p) return null
+                const color = topicColor(c.topic)
+                const r = 18 + Math.min(20, (c.thread_count ?? 0) * 1.5)
+                const sel = selected?.kind === 'cluster' && selected.id === c.id
+                return (
+                  <g key={`cl-${c.id}`} style={{ cursor: 'pointer' }}
+                    onClick={(ev) => { ev.stopPropagation(); setSelected({ kind: 'cluster', id: c.id }) }}
+                  >
+                    <circle cx={p.x} cy={p.y} r={r + 12} fill={color} fillOpacity={sel ? 0.25 : 0.12} filter="url(#nodeGlow)"/>
+                    <circle cx={p.x} cy={p.y} r={r} fill={color} fillOpacity={0.95}
+                      stroke={sel ? 'var(--fg)' : 'none'} strokeWidth={sel ? 2 : 0}/>
+                    <text x={p.x} y={p.y - r - 10} textAnchor="middle"
+                      fontFamily="Geist, system-ui, sans-serif" fontSize={13}
+                      fill="var(--fg-1)" fontWeight={500}>
+                      {truncate(c.label, 28)}
+                    </text>
+                    <text x={p.x} y={p.y + r + 18} textAnchor="middle"
+                      fontFamily="Geist Mono, ui-monospace, monospace" fontSize={10}
+                      fill="var(--fg-3)" letterSpacing={0.3}>
+                      {c.thread_count} · ripe {Math.round(c.ripeness)}
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+
+            {data.counts.clusters === 0 && (
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                pointerEvents: 'none',
+              }}>
+                <div style={{
+                  padding: 18, background: 'var(--bg-1)', border: '1px solid var(--line)',
+                  borderRadius: 8, maxWidth: 360, textAlign: 'center',
+                  color: 'var(--fg-3)', fontSize: 13, lineHeight: 1.6,
+                }}>
+                  No clusters yet. Click <Link href="/clusters" style={{ color: 'var(--accent)', pointerEvents: 'auto' }}>Build clusters</Link> on the clusters page after extraction lands a few threads on the same abstracted topic.
                 </div>
-                <div style={{ fontSize: 16, color: 'var(--fg)', fontWeight: 500, marginBottom: 10 }}>
-                  {selected.label}
-                </div>
-                {selected.kind === 'cluster' && (
-                  <Link href={`/cluster/${selected.id}`} className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    Open cluster
-                  </Link>
-                )}
-                {selected.kind === 'thread' && (
-                  <Link href={`/thread/${selected.id}`} className="btn" style={{ width: '100%', justifyContent: 'center' }}>
-                    Open thread
-                  </Link>
-                )}
-                {selected.kind === 'entity' && (
-                  <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                    {selected.entity_type} · mentioned {selected.mention_count ?? 1}×
-                  </div>
-                )}
               </div>
             )}
           </div>
-        )}
+
+          {selected && (
+            <aside style={{
+              borderLeft: '1px solid var(--line)',
+              padding: 22, overflowY: 'auto',
+              background: 'var(--bg-1)',
+            }}>
+              {selected.kind === 'cluster' && (() => {
+                const c = data.clusters.find(x => x.id === selected.id)
+                if (!c) return null
+                const color = topicColor(c.topic)
+                const memberThreads = data.threads.filter(t => t.cluster_id === c.id)
+                return (
+                  <>
+                    <div style={editorialLabel(color, 8)}>Cluster · {c.state}</div>
+                    <h2 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 500, letterSpacing: '-0.4px' }}>{c.label}</h2>
+                    <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--fg-3)', marginBottom: 18, fontFamily: 'Geist Mono, ui-monospace, monospace' }}>
+                      <span><b style={{ color, fontFamily: 'inherit' }}>{c.thread_count}</b> threads</span>
+                      <span><b style={{ color, fontFamily: 'inherit' }}>{Math.round(c.ripeness)}</b> ripe</span>
+                    </div>
+                    {memberThreads.length > 0 && (
+                      <div style={{ marginBottom: 18 }}>
+                        <div style={editorialLabel('var(--fg-3)', 8)}>Members</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {memberThreads.slice(0, 8).map(t => (
+                            <Link key={t.id} href={`/thread/${t.id}`} style={{
+                              fontSize: 12, color: 'var(--fg-1)', lineHeight: 1.5,
+                              textDecoration: 'none', padding: '6px 8px',
+                              borderLeft: `2px solid ${color}`,
+                              background: 'var(--bg-2)', borderRadius: 4,
+                            }}>{truncate(t.take || t.label, 70)}</Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <Link href={`/cluster/${c.id}`} style={{
+                      display: 'block', padding: '10px 14px', textAlign: 'center',
+                      background: color, color: 'var(--bg)', border: 'none',
+                      borderRadius: 6, textDecoration: 'none',
+                      fontSize: 13, fontWeight: 500,
+                    }}>Open cluster →</Link>
+                  </>
+                )
+              })()}
+              {selected.kind === 'thread' && (() => {
+                const t = data.threads.find(x => x.id === selected.id)
+                if (!t) return null
+                const color = topicColor(t.topic)
+                return (
+                  <>
+                    <div style={editorialLabel(color, 8)}>Thread · strength {t.strength}/5</div>
+                    <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 500, lineHeight: 1.4 }}>{t.label}</h2>
+                    {t.take && (
+                      <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.6, fontStyle: 'italic' }}>
+                        “{truncate(t.take, 240)}”
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <Link href={`/thread/${t.id}`} style={{
+                        padding: '10px 14px', textAlign: 'center',
+                        background: color, color: 'var(--bg)',
+                        borderRadius: 6, textDecoration: 'none',
+                        fontSize: 13, fontWeight: 500,
+                      }}>Open thread →</Link>
+                      <Link href={`/timeline/${t.vlog_id}`} style={{
+                        padding: '8px 14px', textAlign: 'center',
+                        background: 'var(--bg-2)', color: 'var(--fg-1)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 6, textDecoration: 'none',
+                        fontSize: 12,
+                      }}>Open source vlog</Link>
+                    </div>
+                  </>
+                )
+              })()}
+              {selected.kind === 'entity' && (() => {
+                const e = data.entities.find(x => x.id === selected.id)
+                if (!e) return null
+                const color = entityColor(e.type)
+                return (
+                  <>
+                    <div style={editorialLabel(color, 8)}>Entity · {e.type}</div>
+                    <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 500, letterSpacing: '-0.3px' }}>{e.label}</h2>
+                    <div style={{ fontSize: 12, color: 'var(--fg-3)', marginBottom: 18, fontFamily: 'Geist Mono, ui-monospace, monospace' }}>
+                      {e.mention_count} mention{e.mention_count === 1 ? '' : 's'} · first seen {formatDate(e.created_at)}
+                    </div>
+                    <Link href={`/timeline/${e.vlog_id}`} style={{
+                      display: 'block', padding: '10px 14px', textAlign: 'center',
+                      background: color, color: 'var(--bg)',
+                      borderRadius: 6, textDecoration: 'none',
+                      fontSize: 13, fontWeight: 500,
+                    }}>Open vlog mentioning →</Link>
+                  </>
+                )
+              })()}
+            </aside>
+          )}
+        </div>
+
+        {/* Time-lapse scrubber */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 32px', borderTop: '1px solid var(--line)',
+          background: 'var(--bg-1)',
+        }}>
+          <button onClick={() => setPlaying(p => !p)} style={{
+            width: 32, height: 32, padding: 0,
+            background: playing ? 'var(--accent)' : 'var(--bg-2)',
+            color: playing ? 'var(--bg)' : 'var(--fg-1)',
+            border: '1px solid var(--line)', borderRadius: 16, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {playing
+              ? <svg width="10" height="10" viewBox="0 0 14 14" fill="currentColor"><rect x="3" y="2.5" width="2.5" height="9"/><rect x="8.5" y="2.5" width="2.5" height="9"/></svg>
+              : <svg width="10" height="10" viewBox="0 0 14 14" fill="currentColor"><polygon points="3.5,2 11.5,7 3.5,12"/></svg>}
+          </button>
+          <div style={{ fontSize: 10, color: 'var(--fg-4)', letterSpacing: 0.4, fontFamily: 'Geist Mono, ui-monospace, monospace', minWidth: 80, textTransform: 'uppercase' }}>
+            Time-lapse
+          </div>
+          <input
+            type="range" min={0} max={1000} value={Math.round(scrubberPct * 1000)}
+            onChange={e => { setScrubberPct(Number(e.target.value) / 1000); setPlaying(false) }}
+            style={{ flex: 1, accentColor: 'var(--accent)' }}
+          />
+          <div style={{ fontSize: 11, color: 'var(--fg-2)', minWidth: 150, textAlign: 'right', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>
+            {formatFullDate(filtered.cutoffDate.toISOString())}
+          </div>
+        </div>
       </div>
     </Shell>
   )
 }
 
-function GraphCanvas({ data, selectedId, onSelect }: { data: GraphData; selectedId: string | null; onSelect: (id: string | null) => void }) {
-  const W = 900, H = 700
-  const cx = W / 2, cy = H / 2
+// ── Layout ──────────────────────────────────────────────────────────
 
-  // Position clusters radially around the center.
-  const clusters = data.nodes.filter(n => n.kind === 'cluster')
-  const threads = data.nodes.filter(n => n.kind === 'thread')
-  const entities = data.nodes.filter(n => n.kind === 'entity')
+function layoutAll(data: GraphData | null) {
+  const clusterById = new Map<string, { x: number; y: number }>()
+  const threadById = new Map<string, { x: number; y: number }>()
+  const entityById = new Map<string, { x: number; y: number }>()
+  if (!data) return { clusterById, threadById, entityById }
 
-  const posById: Record<string, { x: number; y: number }> = {}
-  const clusterRadius = clusters.length === 0 ? 0 : Math.min(W, H) * 0.32
-
-  if (clusters.length === 1) {
-    posById[clusters[0].id] = { x: cx, y: cy - 40 }
-  } else if (clusters.length > 1) {
-    clusters.forEach((c, i) => {
-      const angle = (i / clusters.length) * Math.PI * 2 - Math.PI / 2
-      posById[c.id] = {
-        x: cx + Math.cos(angle) * clusterRadius,
-        y: cy + Math.sin(angle) * clusterRadius,
-      }
-    })
-  }
-
-  // Position threads around their cluster (or in a corner blob if unclustered).
-  const threadsByParent: Record<string, GraphNode[]> = {}
-  for (const t of threads) {
-    const key = t.parent ?? '__orphan__'
-    if (!threadsByParent[key]) threadsByParent[key] = []
-    threadsByParent[key].push(t)
-  }
-  for (const [parent, group] of Object.entries(threadsByParent)) {
-    const center = posById[parent] ?? { x: cx + 200, y: cy + 200 }
-    const r = 70 + Math.min(60, group.length * 3)
-    group.forEach((t, i) => {
-      const a = (i / group.length) * Math.PI * 2
-      posById[t.id] = {
-        x: center.x + Math.cos(a) * r,
-        y: center.y + Math.sin(a) * r,
-      }
-    })
-  }
-
-  // Entities scatter in the outer ring.
-  entities.forEach((e, i) => {
-    const a = (i / Math.max(1, entities.length)) * Math.PI * 2
-    const r = Math.min(W, H) * 0.46
-    posById[e.id] = { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }
+  const clusters = data.clusters
+  const cols = Math.ceil(Math.sqrt(Math.max(1, clusters.length)))
+  const rows = Math.ceil(clusters.length / cols)
+  const cellW = (CANVAS_W - MARGIN * 2) / Math.max(1, cols)
+  const cellH = (CANVAS_H - MARGIN * 2) / Math.max(1, rows)
+  clusters.forEach((c, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const baseX = MARGIN + col * cellW + cellW / 2
+    const baseY = MARGIN + row * cellH + cellH / 2
+    const h = hashFloat(c.id)
+    const jx = (h - 0.5) * cellW * 0.3
+    const jy = (hashFloat(c.id + '-y') - 0.5) * cellH * 0.3
+    clusterById.set(c.id, { x: baseX + jx, y: baseY + jy })
   })
 
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg"
-      style={{ width: '100%', height: '100%', cursor: 'pointer' }}
-      onClick={(ev) => {
-        if (ev.target === ev.currentTarget) onSelect(null)
-      }}>
-      {/* Membership edges */}
-      <g stroke="var(--line-1)" strokeWidth="0.6" opacity="0.6" fill="none">
-        {data.edges.filter(e => e.kind === 'membership').map((e, i) => {
-          const a = posById[e.from], b = posById[e.to]
-          if (!a || !b) return null
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
-        })}
-      </g>
-      {/* Cosine edges (dashed) */}
-      <g stroke="var(--accent)" strokeWidth="0.5" opacity="0.4" strokeDasharray="2,3" fill="none">
-        {data.edges.filter(e => e.kind === 'cosine').map((e, i) => {
-          const a = posById[e.from], b = posById[e.to]
-          if (!a || !b) return null
-          return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} opacity={(e.weight ?? 0.5)} />
-        })}
-      </g>
-      {/* Nodes */}
-      {[...threads, ...entities, ...clusters].map(n => {
-        const p = posById[n.id]
-        if (!p) return null
-        const color = colorFor(n)
-        const isSel = n.id === selectedId
-        return (
-          <g key={n.id} onClick={(ev) => { ev.stopPropagation(); onSelect(n.id) }} style={{ cursor: 'pointer' }}>
-            {n.kind === 'cluster' && (
-              <circle cx={p.x} cy={p.y} r={n.size + 8} fill={color} opacity={0.12} />
-            )}
-            <circle
-              cx={p.x} cy={p.y} r={n.size}
-              fill={color}
-              opacity={isSel ? 1 : (n.kind === 'cluster' ? 1 : n.kind === 'thread' ? 0.85 : 0.7)}
-              stroke={isSel ? 'var(--fg)' : 'none'}
-              strokeWidth={isSel ? 2 : 0}
-            />
-            {n.kind === 'cluster' && (
-              <text
-                x={p.x} y={p.y - n.size - 8}
-                textAnchor="middle"
-                fontFamily="var(--font-body)"
-                fontSize="11"
-                fill="var(--fg-1)"
-                fontWeight="500"
-              >
-                {n.label.length > 24 ? n.label.slice(0, 22) + '…' : n.label}
-              </text>
-            )}
-          </g>
-        )
-      })}
-      <text x="20" y={H - 14} fontFamily="var(--font-mono)" fontSize="9" fill="var(--fg-4)" letterSpacing="1">
-        {data.counts.clusters} CLUSTERS · {data.counts.threads} THREADS · {data.counts.entities} ENTITIES
-      </text>
-    </svg>
-  )
+  const threadsByCluster: Record<string, ThreadNode[]> = {}
+  const orphanThreads: ThreadNode[] = []
+  for (const t of data.threads) {
+    if (t.cluster_id && clusterById.has(t.cluster_id)) {
+      ;(threadsByCluster[t.cluster_id] ||= []).push(t)
+    } else {
+      orphanThreads.push(t)
+    }
+  }
+  for (const [cid, ts] of Object.entries(threadsByCluster)) {
+    const cp = clusterById.get(cid)!
+    ts.forEach((t, i) => {
+      const angle = (i / Math.max(1, ts.length)) * Math.PI * 2 + hashFloat(cid) * Math.PI
+      const radius = 70 + hashFloat(t.id) * 60
+      threadById.set(t.id, {
+        x: cp.x + Math.cos(angle) * radius,
+        y: cp.y + Math.sin(angle) * radius,
+      })
+    })
+  }
+  orphanThreads.forEach((t, i) => {
+    const h = hashFloat(t.id)
+    threadById.set(t.id, {
+      x: MARGIN + h * (CANVAS_W - MARGIN * 2),
+      y: MARGIN + ((i * 37 + 13) % (CANVAS_H - MARGIN * 2)),
+    })
+  })
+
+  const vlogToCluster: Record<string, string> = {}
+  for (const t of data.threads) {
+    if (t.cluster_id && !vlogToCluster[t.vlog_id]) {
+      vlogToCluster[t.vlog_id] = t.cluster_id
+    }
+  }
+  data.entities.forEach((e, i) => {
+    const cid = vlogToCluster[e.vlog_id]
+    const cp = cid ? clusterById.get(cid) : null
+    if (cp) {
+      const angle = hashFloat(e.id) * Math.PI * 2
+      const radius = 130 + hashFloat(e.id + '-r') * 50
+      entityById.set(e.id, {
+        x: cp.x + Math.cos(angle) * radius,
+        y: cp.y + Math.sin(angle) * radius,
+      })
+    } else {
+      const h = hashFloat(e.id)
+      entityById.set(e.id, {
+        x: MARGIN / 2 + h * (CANVAS_W - MARGIN),
+        y: MARGIN / 2 + ((i * 53 + 7) % (CANVAS_H - MARGIN)),
+      })
+    }
+  })
+
+  return { clusterById, threadById, entityById }
+}
+
+function hashFloat(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return (h % 10000) / 10000
+}
+function hashSlot(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return (h % 8) + 1
+}
+function entityColor(t: string): string {
+  return ({
+    person: 'var(--t-5)', place: 'var(--t-3)', concept: 'var(--t-2)',
+    tool: 'var(--t-6)', project: 'var(--t-4)', theme: 'var(--t-8)', reference: 'var(--t-1)',
+  } as Record<string, string>)[t] || 'var(--fg-3)'
 }
