@@ -1,51 +1,106 @@
 'use client'
 
 /**
- * Timeline — the heterogeneous feed. Everything you've ever captured or
- * the system has surfaced, newest first, one card per item.
+ * Timeline — the canon Landing per /tmp/neolognextlevel/design-reference/01-Landing.html
  *
- * The Console-direction design technically folded this into the activity
- * stream on /, but the operator wanted a dedicated feed surface that
- * reads like an X timeline — full-bleed, card-per-item, scroll forever.
- * So /timeline is back, in the new design language.
+ * Single surface serving:
+ *   - Operator's FYP: hero (operator name + live snapshot) + 8-cell stats
+ *     strip + 10-topic spectrum + day-banded feed + right rail.
+ *   - Public landing (when unauthed via middleware): same chrome, filtered
+ *     to `visibility='public'` rows + signin CTA.
  *
- * Reads from /api/v2/timeline which fans across vlogs, threads,
- * clip_candidates, posts, surfaced_cards, etc., returning a sorted union.
+ * Data sources:
+ *   /api/v2/timeline      — heterogeneous feed (vlogs/threads/posts/clips/
+ *                            entities/creative/surfaced)
+ *   /api/v2/graph/stats   — counts (threads/clusters/entities)
+ *   /api/v2/clusters      — ripening clusters for rail
+ *
+ * Feed cards: vlog · thread · post · article · clip · surfaced (three
+ * subtypes) · project-update. Topic colors hash from the topic string
+ * onto the 10-territory palette.
  */
 
 export const runtime = 'edge'
 
-import { useEffect, useState, useMemo } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Shell from '@/components/Shell'
 
-// Clips dropped as a distinct type — operator's call: "clips are
-// separate, but really it seems like the same thing." Threads cover
-// the same data (quote + timespan). Filtering them out at the type
-// level keeps them off the feed entirely. Existing clip rows stay
-// in the DB hidden behind the absence of any rendering path.
-type Filter = 'all' | 'vlog' | 'thread' | 'post' | 'surfaced'
-
-// Hash arbitrary topic strings into one of the 8 topic accent slots.
-// The same string always maps to the same color so a recurring topic
-// across vlogs reads as one visual thread without relying on a hand-
-// curated map. Falls back to --fg-3 for genuinely empty topics.
-function topicColor(topic?: string | null): string {
+// ─── Topic hashing ───────────────────────────────────────────────────────
+const TOPIC_TOKENS = [
+  '--t-brass', '--t-terra', '--t-ochre', '--t-rose', '--t-plum',
+  '--t-violet', '--t-steel', '--t-teal', '--t-sage', '--t-moss',
+] as const
+function topicVar(topic?: string | null): string {
   const t = (topic ?? '').trim().toLowerCase()
-  if (!t) return 'var(--fg-3)'
+  if (!t) return '--fg-3'
   let h = 0
   for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
-  return `var(--t-${(h % 8) + 1})`
+  return TOPIC_TOKENS[h % TOPIC_TOKENS.length]
+}
+function topicSoft(topic?: string | null): string {
+  // Compute a 7% soft variant of the topic var. Falls back to fg-5.
+  return `color-mix(in srgb, var(${topicVar(topic)}) 7%, transparent)`
 }
 
-interface FeedItem {
+// ─── Types from /api/v2/timeline ─────────────────────────────────────────
+interface ApiCard {
   id: string
-  kind: string
-  ts: number
-  // shape varies per kind — we destructure inside renderers
-  raw: any
+  type: 'vlog' | 'thread' | 'clip' | 'post' | 'creative' | 'entity' | 'surfaced'
+  // shared
+  created_at?: string
+  recorded_at?: string
+  recorded_at_source?: string | null
+  posted_at?: string
+  extracted_at?: string
+  // vlog
+  title?: string
+  thumbnail_url?: string | null
+  duration_seconds?: number | null
+  file_size_bytes?: number | null
+  mime_type?: string | null
+  thread_count?: number
+  clip_count?: number
+  transcript_word_count?: number
+  pipeline_status?: string
+  is_broll?: boolean
+  // thread
+  topic?: string
+  abstracted_topic?: string
+  take?: string
+  key_quote?: string | null
+  strength?: number
+  source_vlog_title?: string
+  source_timecode?: string
+  // clip
+  start_seconds?: number
+  end_seconds?: number
+  quote?: string
+  status?: string
+  // post
+  platform?: string
+  text?: string
+  views?: number
+  reposts?: number
+  replies?: number
+  // surfaced
+  kind?: 'cluster_ready' | 'adjacent_insight' | 'gap_question' | 'auto_link'
+  body?: string
+  visibility?: 'private' | 'public'
 }
+
+interface ApiCluster {
+  id: string
+  topic: string
+  abstracted_topic?: string | null
+  ripeness_score?: number
+  thread_count?: number
+  state?: string
+  topic_color?: string | null
+}
+
+type Filter = 'all' | 'vlog' | 'thread' | 'post' | 'surfaced'
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all',      label: 'All' },
@@ -55,743 +110,649 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'surfaced', label: 'Surfaced' },
 ]
 
+// ─── Page ────────────────────────────────────────────────────────────────
 export default function TimelinePage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const urlFilter = (searchParams?.get('filter') as Filter | null) ?? 'all'
-  const [items, setItems] = useState<FeedItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<Filter>(
-    ['all', 'vlog', 'thread', 'post', 'surfaced'].includes(urlFilter as string) ? urlFilter : 'all',
-  )
-  // Right-rail content: ripening clusters + graph preview.
-  const [rail, setRail] = useState<{
-    ripening: { id: string; name: string; topic: string; ripeness: number; thread_count: number }[]
-    graph: { clusters: { id: string; topic: string; ripeness: number; thread_count: number }[]; entities_count: number; threads_count: number }
-    hero_cluster: { id: string; name: string; topic: string; take: string | null; ripeness: number; thread_count: number; gap_question: string | null } | null
-  } | null>(null)
+  const sp = useSearchParams()
+  const filter = (sp?.get('filter') as Filter | null) ?? 'all'
 
-  // Keep URL in sync with filter — operator can deep-link a filter view
-  // (e.g. /?filter=thread for the threads-only view).
-  useEffect(() => {
-    const current = searchParams?.get('filter')
-    if (filter === 'all' && current) router.replace('/', { scroll: false })
-    else if (filter !== 'all' && current !== filter) router.replace(`/?filter=${filter}`, { scroll: false })
-  }, [filter])
+  const [cards, setCards] = useState<ApiCard[] | null>(null)
+  const [stats, setStats] = useState<{ thread_count: number; cluster_count: number; entity_count: number } | null>(null)
+  const [clusters, setClusters] = useState<ApiCluster[]>([])
+  const [counts, setCounts] = useState<Record<string, number>>({})
 
-  // Load clusters for the right-rail (ripening list) + pinned hero
-  // card. Lightweight query, runs in parallel with the main timeline
-  // fetch.
   useEffect(() => {
-    fetch('/api/v2/clusters?limit=12', { credentials: 'include' })
+    fetch('/api/v2/timeline', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { cards: [], counts: {} })
+      .then((d: any) => { setCards(d.cards ?? []); setCounts(d.counts ?? {}) })
+      .catch(() => setCards([]))
+    fetch('/api/v2/graph/stats', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (!d?.clusters) return
-        const sorted = [...d.clusters].sort((a: any, b: any) => (b.ripeness ?? 0) - (a.ripeness ?? 0))
-        const top = sorted[0]
-        setRail({
-          ripening: sorted.slice(0, 8).map((c: any) => ({
-            id: c.id,
-            name: c.name ?? c.abstracted_topic ?? c.topic ?? 'cluster',
-            topic: c.abstracted_topic ?? c.topic ?? 'misc',
-            ripeness: c.ripeness ?? 0,
-            thread_count: c.thread_count ?? c.stats?.threads ?? 0,
-          })),
-          graph: {
-            clusters: sorted.slice(0, 7).map((c: any) => ({
-              id: c.id,
-              topic: c.abstracted_topic ?? c.topic ?? 'misc',
-              ripeness: c.ripeness ?? 0,
-              thread_count: c.thread_count ?? c.stats?.threads ?? 0,
-            })),
-            entities_count: 0,
-            threads_count: 0,
-          },
-          // Pin a hero card only if the top cluster is genuinely ripe
-          // (>= 60). Otherwise the page leads with the feed, which is
-          // the right behavior when there's nothing dramatic to flag.
-          hero_cluster: (top && (top.ripeness ?? 0) >= 60) ? {
-            id: top.id,
-            name: top.name ?? top.abstracted_topic ?? top.topic,
-            topic: top.abstracted_topic ?? top.topic ?? 'misc',
-            take: top.take ?? null,
-            ripeness: top.ripeness ?? 0,
-            thread_count: top.thread_count ?? top.stats?.threads ?? 0,
-            gap_question: top.gap_question ?? null,
-          } : null,
-        })
-      })
+      .then((d: any) => { if (d) setStats(d) })
+      .catch(() => {})
+    fetch('/api/v2/clusters?limit=6', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => { if (d?.clusters) setClusters(d.clusters) })
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    fetch('/api/v2/timeline?limit=200', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (!d) return
-        const raw: any[] = d.items ?? d.cards ?? []
-        const mapped: FeedItem[] = raw.map((it: any) => ({
-          id: it.id ?? `${it.kind ?? 'item'}-${it.ts ?? Date.now()}`,
-          kind: it.kind ?? it.type ?? 'event',
-          ts: toMs(it.ts ?? it.created_at ?? it.recorded_at ?? it.extracted_at),
-          raw: it,
-        }))
-        mapped.sort((a, b) => b.ts - a.ts)
-        setItems(mapped)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+  // Filter + group cards by day band.
+  const filteredCards = useMemo(() => {
+    if (!cards) return null
+    if (filter === 'all') return cards
+    return cards.filter(c => c.type === filter)
+  }, [cards, filter])
 
-  const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: 0, vlog: 0, thread: 0, post: 0, surfaced: 0 }
-    for (const it of items) {
-      c.all++
-      if (it.kind in c) (c as any)[it.kind]++
+  const byDay = useMemo(() => {
+    if (!filteredCards) return null
+    const map = new Map<string, ApiCard[]>()
+    for (const c of filteredCards) {
+      const ts = c.recorded_at || c.posted_at || c.created_at || c.extracted_at
+      if (!ts) continue
+      const d = new Date(ts)
+      const dayKey = d.toISOString().slice(0, 10)
+      if (!map.has(dayKey)) map.set(dayKey, [])
+      map.get(dayKey)!.push(c)
     }
-    return c
-  }, [items])
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [filteredCards])
 
-  const filtered = filter === 'all' ? items : items.filter(it => it.kind === filter)
+  // Top thread for the hero snapshot card — pull the strongest recent thread.
+  const heroSnapshot = useMemo(() => {
+    if (!cards) return null
+    const recentThreads = cards.filter(c => c.type === 'thread').slice(0, 20)
+    if (recentThreads.length === 0) return null
+    return recentThreads.sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))[0]
+  }, [cards])
 
-  // Group items by day for sticky date dividers
-  const groups: { label: string; items: FeedItem[] }[] = []
-  let currentDay = ''
-  for (const it of filtered) {
-    const day = new Date(it.ts).toDateString()
-    if (day !== currentDay) {
-      currentDay = day
-      groups.push({ label: dayLabel(it.ts), items: [] })
+  // Topic spectrum — count threads/clusters per topic (top 10).
+  const spectrum = useMemo(() => {
+    if (!cards) return []
+    const tally = new Map<string, number>()
+    for (const c of cards) {
+      const t = c.topic || c.abstracted_topic
+      if (!t) continue
+      tally.set(t, (tally.get(t) ?? 0) + 1)
     }
-    groups[groups.length - 1].items.push(it)
+    const all = Array.from(tally.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10)
+    const max = all[0]?.[1] ?? 1
+    return all.map(([name, count]) => ({ name, count, mag: count / max }))
+  }, [cards])
+
+  const setFilter = (f: Filter) => {
+    const url = new URL(window.location.href)
+    if (f === 'all') url.searchParams.delete('filter')
+    else url.searchParams.set('filter', f)
+    router.replace(url.pathname + url.search)
   }
 
   return (
-    <Shell active="timeline" breadcrumb={['Timeline']}>
-      {/* Two-column layout matching the design prototype's structure:
-          main feed (820px reading column) + right rail (340px sticky)
-          with ripening cluster list + graph preview. The rail surfaces
-          what's emerging in the corpus alongside the chronological
-          feed so the operator can see "what's happening" in two
-          views at once. */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 340px',
-        gap: 36,
-        maxWidth: 1240,
-        margin: '0 auto',
-        padding: '24px 36px',
-      }}>
-        <div style={{ minWidth: 0 }}>
-          {/* Pinned hero — only renders when a cluster is ripe enough
-              to materialize. This is the "macro-cluster ready" callout
-              from the prototype. Replaces the small "the feed" editorial
-              accent when there's something dramatic to flag. */}
-          {rail?.hero_cluster ? (
-            <HeroClusterCard hero={rail.hero_cluster}/>
-          ) : (
-            <div style={{ borderLeft: '3px solid var(--t-1)', paddingLeft: 14, marginBottom: 28 }}>
-              <div className="mono" style={{ fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: 'var(--fg-4)', marginBottom: 6 }}>
-                The feed
-              </div>
-              <h1 style={{ marginTop: 0, marginBottom: 8 }}>Timeline</h1>
-              <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
-                Vlogs, threads, posts — chronological by recording date.
-              </p>
-            </div>
+    <Shell>
+      <CanonHero snapshot={heroSnapshot}/>
+      <CanonStats stats={stats} counts={counts}/>
+      {spectrum.length > 0 && <CanonSpectrum spectrum={spectrum}/>}
+      <div className="canon-body">
+        <div className="canon-feed-col">
+          {byDay === null && <div style={{ color: 'var(--fg-3)', padding: 20 }}>Loading…</div>}
+          {byDay !== null && byDay.length === 0 && (
+            <CanonEmpty/>
           )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
-            <div className="pills">
-              {FILTERS.map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`filter-pill ${filter === f.key ? 'active' : ''}`}
-                >
-                  {f.label} <span className="n">{counts[f.key]}</span>
-                </button>
+          {byDay !== null && byDay.length > 0 && (
+            <>
+              <FilterRow current={filter} counts={counts} onChange={setFilter}/>
+              <RipenestMacroBanner cluster={clusters[0]}/>
+              {byDay.map(([dayKey, dayCards]) => (
+                <DayBand key={dayKey} dayKey={dayKey} cards={dayCards}/>
               ))}
-            </div>
-          </div>
-
-          {loading ? (
-            <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
-          ) : filtered.length === 0 ? (
-            <div className="empty">
-              <div className="ico">{NavIcons.Vlogs}</div>
-              <h3>Nothing on the timeline yet</h3>
-              <p>Drop a vlog on Capture to seed it. New threads and surfaced cards land here as they're created.</p>
-              <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
-            {groups.map((g, gi) => (
-              <div key={gi}>
-                {/* Editorial day band — uppercase mono, hairline below,
-                    breathing room so each day reads as a chapter. */}
-                <div style={{
-                  display: 'flex', alignItems: 'baseline',
-                  paddingBottom: 10, marginBottom: 14,
-                  borderBottom: '1px solid var(--line)',
-                }}>
-                  <span className="mono" style={{
-                    fontSize: 11, color: 'var(--fg-2)',
-                    letterSpacing: 1.5, textTransform: 'uppercase',
-                    fontWeight: 500,
-                  }}>
-                    {g.label}
-                  </span>
-                  <span className="mono" style={{
-                    marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)',
-                    letterSpacing: 0.4,
-                  }}>
-                    {g.items.length} {g.items.length === 1 ? 'item' : 'items'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {g.items.map(it => <FeedCard key={it.id + ':' + it.ts} item={it}/>)}
-                </div>
-              </div>
-              ))}
-            </div>
+            </>
           )}
         </div>
-
-        {/* Right rail — Ripening list + Graph preview. Matches the
-            prototype's "RIPENING" + "GRAPH · THIS WEEK" rail. Sticky
-            so it stays visible while scrolling the feed. */}
-        <aside style={{ position: 'sticky', top: 24, alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
-          {rail && rail.ripening.length > 0 && (
-            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 8, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 12, fontWeight: 500, color: 'var(--fg-1)' }}>Ripening</h3>
-                <Link href="/clusters" style={{ fontSize: 10, color: 'var(--fg-3)', textDecoration: 'none', letterSpacing: 0.4, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>All {rail.ripening.length} →</Link>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {rail.ripening.map(r => (
-                  <Link key={r.id} href={`/cluster/${r.id}`} style={{ display: 'block', textDecoration: 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: topicColor(r.topic), flexShrink: 0 }}/>
-                      <span style={{ flex: 1, fontSize: 12, color: 'var(--fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {r.name}
-                      </span>
-                      <span style={{ fontSize: 10, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>{Math.round(r.ripeness)}</span>
-                    </div>
-                    <div style={{ height: 2, background: 'var(--bg-3)', borderRadius: 1, position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute', left: 0, top: 0, height: 2, width: `${Math.min(100, r.ripeness)}%`, background: topicColor(r.topic), borderRadius: 1 }}/>
-                    </div>
-                    <div style={{ fontSize: 9, color: 'var(--fg-4)', marginTop: 4, letterSpacing: 0.4, fontFamily: 'Geist Mono, ui-monospace, monospace', textTransform: 'uppercase' }}>
-                      {r.thread_count} thread{r.thread_count === 1 ? '' : 's'}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {rail && rail.graph.clusters.length > 0 && (
-            <div style={{ background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 8, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 12, fontWeight: 500, color: 'var(--fg-1)' }}>Graph · this week</h3>
-                <Link href="/graph" style={{ fontSize: 10, color: 'var(--fg-3)', textDecoration: 'none', letterSpacing: 0.4, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>Open →</Link>
-              </div>
-              <Link href="/graph" style={{ display: 'block', textDecoration: 'none' }}>
-                <RailGraphPreview clusters={rail.graph.clusters}/>
-              </Link>
-            </div>
-          )}
+        <aside className="canon-rail">
+          <NowCard/>
+          <RipeningRail clusters={clusters}/>
+          <GraphMiniCard stats={stats}/>
+          <CtaCard/>
         </aside>
       </div>
     </Shell>
   )
 }
 
-// Pinned hero card — surfaces the operator's top-ranked ripe cluster
-// at the top of the timeline. Replaces the small editorial accent when
-// there's something dramatic to flag (e.g. cluster's ready to materialize).
-function HeroClusterCard({ hero }: { hero: { id: string; name: string; topic: string; take: string | null; ripeness: number; thread_count: number; gap_question: string | null } }) {
-  const color = topicColor(hero.topic)
-  const ready = hero.ripeness >= 70
-  const circumference = 2 * Math.PI * 26
-  const dash = circumference * (1 - hero.ripeness / 100)
+// ─── Hero ────────────────────────────────────────────────────────────────
+function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
+  const dateLine = useMemo(() => {
+    const d = new Date()
+    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
+    return d.toLocaleDateString('en-US', opts)
+  }, [])
+
   return (
-    <Link href={`/cluster/${hero.id}`} style={{
-      display: 'block', marginBottom: 28,
-      padding: '24px 26px',
-      background: 'var(--bg-1)',
-      border: '1px solid var(--line)',
-      borderLeft: `3px solid ${color}`,
-      borderRadius: 10,
-      textDecoration: 'none',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: `radial-gradient(ellipse 30% 60% at 0% 0%, ${color}1a, transparent 60%)` }}/>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 24, alignItems: 'flex-start', position: 'relative' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: 10, color, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600,
-            fontFamily: 'Geist Mono, ui-monospace, monospace', marginBottom: 12,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }}/>
-            {ready ? 'Ready to produce' : 'Ripening'} · {hero.topic}
+    <section className="canon-hero canon-reveal d1">
+      <div>
+        <div className="canon-hero-eyebrow">
+          <span className="pip"/> Operator · neolog.ai · {dateLine}
+        </div>
+        <h1>
+          Everything<span className="soft">,</span><br/>
+          <span className="soft">in</span> order<span className="period">.</span>
+        </h1>
+        <p className="canon-hero-sub">
+          A personal life graph and production engine. Raw, unedited voice in — threads, clusters,
+          and finished work out. This is the live record.
+        </p>
+        <div className="canon-hero-cta">
+          <Link href="/capture" className="canon-btn primary">
+            New capture
+            <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
+          </Link>
+          <Link href="/studio" className="canon-btn ghost">
+            <span className="ico"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="3.5" fill="currentColor" stroke="none"/><circle cx="7" cy="7" r="6"/></svg></span>
+            Open Studio
+          </Link>
+        </div>
+      </div>
+
+      <div>
+        <div className="canon-hero-card">
+          <div className="kicker">
+            <span>{snapshot ? 'Latest extracted take' : 'No takes yet'}</span>
+            {snapshot && <span className="live">Active</span>}
           </div>
-          <h1 style={{ margin: '0 0 12px', fontSize: 34, fontWeight: 500, letterSpacing: '-0.8px', lineHeight: 1.18, color: 'var(--fg)' }}>
-            {hero.name}
-          </h1>
-          {hero.take && (
-            <p style={{ margin: '0 0 14px', fontSize: 15, color: 'var(--fg-2)', lineHeight: 1.55, fontStyle: 'italic', maxWidth: 600 }}>
-              “{hero.take.length > 200 ? hero.take.slice(0, 197) + '…' : hero.take}”
-            </p>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 22, fontSize: 11, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace', letterSpacing: 0.3 }}>
-            <span><b style={{ color: 'var(--fg-1)', fontFamily: 'inherit' }}>{hero.thread_count}</b> threads</span>
-            {hero.gap_question && <span style={{ color: 'var(--fg-4)' }}>· 1 gap question</span>}
-            <span style={{ marginLeft: 'auto', color }}>Open in Studio →</span>
+          <div className="quote">
+            {snapshot?.key_quote || snapshot?.take || snapshot?.body || 'Drop your first vlog. The system will extract the takes, find the patterns, and ship them back.'}
+          </div>
+          <div className="from">
+            <span className="src">
+              {snapshot?.source_vlog_title || snapshot?.topic || 'neolog'}
+              {snapshot?.source_timecode && ` · ${snapshot.source_timecode}`}
+            </span>
+            <span className="strength" aria-label={`Strength ${snapshot?.strength ?? 0} of 5`}>
+              {[1,2,3,4,5].map(i => (
+                <span key={i} className={`pip ${i <= (snapshot?.strength ?? 0) ? 'on' : ''}`}/>
+              ))}
+            </span>
           </div>
         </div>
-        <div style={{ position: 'relative', width: 80, height: 80, alignSelf: 'center' }}>
-          <svg viewBox="0 0 80 80" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-            <circle cx="40" cy="40" r="26" fill="none" stroke="var(--line-2)" strokeWidth="4"/>
-            <circle cx="40" cy="40" r="26" fill="none" stroke={color} strokeWidth="4"
-              strokeDasharray={circumference} strokeDashoffset={dash} strokeLinecap="round"/>
-          </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 24, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.8px', lineHeight: 1 }}>{Math.round(hero.ripeness)}</span>
-            <span style={{ fontSize: 8, color, letterSpacing: 0.8, textTransform: 'uppercase', fontFamily: 'Geist Mono, ui-monospace, monospace', fontWeight: 600, marginTop: 2 }}>ripe</span>
-          </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── Stats strip ─────────────────────────────────────────────────────────
+function CanonStats({ stats, counts }: { stats: any; counts: Record<string, number> }) {
+  const cells = [
+    { n: counts.vlog ?? 0, l: 'Vlogs' },
+    { n: stats?.thread_count ?? counts.thread ?? 0, l: 'Threads' },
+    { n: stats?.cluster_count ?? 0, l: 'Clusters' },
+    { n: 0, l: 'Macro', accent: true },
+    { n: stats?.entity_count ?? 0, l: 'Entities' },
+    { n: counts.post ?? 0, l: 'Posts' },
+    { n: counts.clip ?? 0, l: 'Clips' },
+    { n: counts.article ?? 0, l: 'Articles' },
+  ]
+  return (
+    <section className="canon-stats canon-reveal d2">
+      {cells.map((c, i) => (
+        <div key={i} className="canon-stat">
+          <span className={`n ${c.accent ? 'accent' : ''}`}>{c.n.toLocaleString()}</span>
+          <span className="l">{c.l}</span>
         </div>
+      ))}
+    </section>
+  )
+}
+
+// ─── Spectrum ────────────────────────────────────────────────────────────
+function CanonSpectrum({ spectrum }: { spectrum: { name: string; count: number; mag: number }[] }) {
+  return (
+    <section className="canon-spectrum canon-reveal d2">
+      <div className="canon-spectrum-label">Topic<br/>spectrum</div>
+      <div className="canon-spectrum-bar">
+        {spectrum.map(s => (
+          <button
+            key={s.name}
+            className="canon-spectrum-chip"
+            style={{ '--c': `var(${topicVar(s.name)})`, '--mag': s.mag } as any}
+          >
+            <span className="t">{s.name}</span>
+            <span className="c">{s.count}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ─── Filter chip row ─────────────────────────────────────────────────────
+function FilterRow({ current, counts, onChange }: { current: Filter; counts: Record<string, number>; onChange: (f: Filter) => void }) {
+  return (
+    <div className="canon-filter-row">
+      {FILTERS.map(f => {
+        const n = f.key === 'all'
+          ? Object.entries(counts).filter(([k]) => k !== 'all').reduce((s, [, v]) => s + (v as number), 0)
+          : (counts[f.key] ?? 0)
+        return (
+          <button
+            key={f.key}
+            className={`canon-filter-chip ${current === f.key ? 'active' : ''}`}
+            onClick={() => onChange(f.key)}
+          >
+            {f.label}
+            {n > 0 && <span className="n">{n}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Macro banner ────────────────────────────────────────────────────────
+function RipenestMacroBanner({ cluster }: { cluster?: ApiCluster }) {
+  if (!cluster || (cluster.ripeness_score ?? 0) < 70) return null
+  const ripeness = Math.round(cluster.ripeness_score ?? 0)
+  const radius = 44
+  const circ = 2 * Math.PI * radius
+  const fillDash = circ * (ripeness / 100)
+  const offset = circ - fillDash
+  const topic = cluster.abstracted_topic || cluster.topic
+  return (
+    <Link href={`/studio/${cluster.id}`} className="canon-macro-banner canon-reveal d3">
+      <div className="ripeness">
+        <svg viewBox="0 0 100 100">
+          <circle className="track" cx="50" cy="50" r={radius}/>
+          <circle className="fill" cx="50" cy="50" r={radius} strokeDasharray={circ} strokeDashoffset={offset}/>
+        </svg>
+        <div className="num">
+          {ripeness}
+          <span className="l">Ripe</span>
+        </div>
+      </div>
+      <div className="mb-eyebrow">Cluster ready · {topic}</div>
+      <h2>{topic}<span className="soft"> is ready.</span></h2>
+      <p className="mb-sub">
+        Threads have braided into a position. Open in Studio to see the breakdown, riff
+        progression, and production candidates.
+      </p>
+      <div className="mb-row">
+        <span className="stat"><span className="n">{cluster.thread_count ?? 0}</span> threads</span>
+        <span className="stat"><span className="n">{ripeness}</span>/100 ripe</span>
+        <span className="arrow">
+          Open in Studio
+          <svg viewBox="0 0 12 12"><path d="M3 6 L9 6 M6.5 3.5 L9 6 L6.5 8.5"/></svg>
+        </span>
       </div>
     </Link>
   )
 }
 
-// Small radial graph preview for the right rail — clusters as
-// topic-colored dots scattered around a central point.
-function RailGraphPreview({ clusters }: { clusters: { id: string; topic: string; ripeness: number; thread_count: number }[] }) {
-  const W = 280, H = 160, cx = W / 2, cy = H / 2
+// ─── Day band ────────────────────────────────────────────────────────────
+function DayBand({ dayKey, cards }: { dayKey: string; cards: ApiCard[] }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const d = new Date(dayKey + 'T12:00:00Z')
+  const isToday = dayKey === today
+  const isYesterday = dayKey === yesterday
+  const name = isToday ? 'Today' : isYesterday ? 'Yesterday' : d.toLocaleDateString('en-US', { weekday: 'long' })
+  const date = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 160, display: 'block' }}>
-      <defs>
-        {clusters.map((c, i) => (
-          <radialGradient key={i} id={`rg-${i}`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={topicColor(c.topic)} stopOpacity={0.45}/>
-            <stop offset="100%" stopColor={topicColor(c.topic)} stopOpacity={0}/>
-          </radialGradient>
-        ))}
-      </defs>
-      {clusters.map((c, i) => {
-        const a = (i / Math.max(1, clusters.length)) * Math.PI * 2 - Math.PI / 2
-        const r = 56
-        const x = cx + Math.cos(a) * r
-        const y = cy + Math.sin(a) * r
-        const sz = 6 + (c.thread_count ?? 0) * 0.6
-        return (
-          <g key={c.id}>
-            <line x1={cx} y1={cy} x2={x} y2={y} stroke={topicColor(c.topic)} strokeWidth={0.5} strokeOpacity={0.25}/>
-            <circle cx={x} cy={y} r={sz + 6} fill={`url(#rg-${i})`}/>
-            <circle cx={x} cy={y} r={sz} fill={topicColor(c.topic)} fillOpacity={0.92}/>
-          </g>
-        )
-      })}
-      <circle cx={cx} cy={cy} r={5} fill="var(--fg)"/>
-    </svg>
+    <section className="canon-feed-section">
+      <div className="canon-day">
+        <span className={`name ${isToday ? 'today' : ''}`}>{name}</span>
+        <span className="date">{date}</span>
+        <span className="count"><strong>{cards.length}</strong> item{cards.length === 1 ? '' : 's'}</span>
+      </div>
+      <div className="canon-day-cards">
+        {cards.map((c, i) => <Card key={c.id ?? i} card={c}/>)}
+      </div>
+    </section>
   )
 }
 
-function FeedCard({ item }: { item: FeedItem }) {
-  switch (item.kind) {
-    case 'vlog':     return <VlogCard r={item.raw}/>
-    case 'thread':   return <ThreadCard r={item.raw}/>
-    // 'clip' deprecated — return null so any stale clip rows from
-    // before the drop don't render. The ClipCard component is kept
-    // (dead code) in case we ever bring clips back as a real
-    // publishing surface.
-    case 'clip':     return null
-    case 'post':     return <PostCard r={item.raw}/>
-    case 'surfaced': return <SurfacedCard r={item.raw}/>
-    case 'creative': return <CreativeCard r={item.raw}/>
-    case 'entity':   return <EntityCard r={item.raw}/>
-    case 'pipeline_event': return <PipelineEventCard r={item.raw}/>
-    default:         return <DefaultCard r={item.raw} kind={item.kind}/>
+// ─── Card dispatcher ─────────────────────────────────────────────────────
+function Card({ card }: { card: ApiCard }) {
+  switch (card.type) {
+    case 'vlog':     return <VlogCard card={card}/>
+    case 'thread':   return <ThreadCard card={card}/>
+    case 'post':     return <PostCard card={card}/>
+    case 'clip':     return <ClipCard card={card}/>
+    case 'surfaced': return <SurfacedCard card={card}/>
+    case 'creative': return <CreativeCard card={card}/>
+    case 'entity':   return null  // entities surface inline in cluster/thread rails, not main feed
+    default:         return null
   }
 }
 
-function VlogCard({ r }: { r: any }) {
-  const status = r.pipeline_status ?? 'uploaded'
-  const isBroll = r.is_broll === true
-  const cls = isBroll ? 'mute'
-    : status === 'complete' ? 'ok'
-    : status === 'failed' ? 'err'
-    : status === 'archived' ? 'mute'
-    : 'hot'
-  const size = r.file_size_bytes ? `${(r.file_size_bytes / 1_000_000).toFixed(1)} MB` : ''
-  // B-roll vlogs use a neutral gray spine instead of a topic color —
-  // they're not contributing extracted ideas, just visual footage.
-  // Visually separable from "complete vlog with threads" at a glance.
-  const color = isBroll ? 'var(--fg-4)' : topicColor(r.title ?? r.original_filename ?? r.id)
+function timeOnly(iso?: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+function fmtDuration(sec?: number | null): string {
+  if (sec == null) return ''
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+function fmtSize(bytes?: number | null): string {
+  if (bytes == null) return ''
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+// Vlog card
+function VlogCard({ card }: { card: ApiCard }) {
+  const topic = card.is_broll ? 'broll' : (card.topic || 'vlog')
+  const style: any = {
+    '--topic': `var(${topicVar(topic)})`,
+    '--topic-soft': topicSoft(topic),
+  }
   return (
-    <Link href={`/timeline/${r.id}`} className="card" style={{
-      padding: '14px 18px', display: 'block',
-      borderLeft: `3px solid ${color}`,
-      opacity: isBroll ? 0.78 : 1,
-    }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        <div style={{
-          width: 140, aspectRatio: '16/10', flexShrink: 0,
-          borderRadius: 6,
-          background: r.thumbnail_url ? `center / cover no-repeat url(${r.thumbnail_url})` : 'linear-gradient(135deg, var(--bg-3), var(--bg-2))',
-          border: '1px solid var(--line)',
-          position: 'relative',
-        }}>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
-              <svg width="9" height="9" viewBox="0 0 16 16" fill="white"><polygon points="5,3 12,8 5,13"/></svg>
+    <Link href={`/vlog/${card.id}`} className="tcard vlog" style={style}>
+      <div className="t-header">
+        <span className="topic-pill">
+          <span className="type">{card.is_broll ? 'B-roll' : 'Vlog'}</span>
+        </span>
+        {!card.is_broll && (card.thread_count || card.clip_count) ? (
+          <span className="t-status">
+            {card.thread_count ? <><strong>{card.thread_count}</strong> threads</> : null}
+            {card.thread_count && card.clip_count ? ' · ' : ''}
+            {card.clip_count ? <><strong>{card.clip_count}</strong> clips</> : null}
+          </span>
+        ) : card.is_broll ? (
+          <span className="t-status">Silent footage</span>
+        ) : null}
+        <span className="t-time">{timeOnly(card.recorded_at || card.created_at)}</span>
+      </div>
+      <div className="vlog-row">
+        <div className="vlog-thumb">
+          {card.thumbnail_url && <img src={card.thumbnail_url} alt=""/>}
+          {card.duration_seconds != null && <span className="dur">{fmtDuration(card.duration_seconds)}</span>}
+        </div>
+        <div className="vlog-info">
+          <div className="title">{card.title || 'Untitled vlog'}</div>
+          <div className="extracted">
+            {card.transcript_word_count != null && <><span className="n">{card.transcript_word_count.toLocaleString()}</span> words · </>}
+            {fmtSize(card.file_size_bytes)}{card.mime_type ? ` · ${card.mime_type.replace('video/', '').toUpperCase()}` : ''}
+          </div>
+          {(card.thread_count || card.clip_count) ? (
+            <div className="extractions">
+              {card.thread_count ? <span className="ex"><span className="n">{card.thread_count}</span> threads</span> : null}
+              {card.clip_count ? <span className="ex hot"><span className="n">{card.clip_count}</span> clips</span> : null}
             </div>
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            <span className="mono" style={{
-              fontSize: 10, color: color,
-              textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-            }}>
-              {isBroll ? 'B-roll' : 'Vlog'}
-            </span>
-            {isBroll
-              ? <span className="pill mute" title="No extractable dialogue — silent / ambient footage. Still usable as visual material for future productions.">silent footage</span>
-              : <span className={`pill ${cls}`}>{status}</span>}
-            <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-              {timeOfDay(r.ts ?? r.recorded_at ?? r.created_at)}
-            </span>
-          </div>
-          <div style={{
-            fontSize: 14, color: 'var(--fg)', fontWeight: 500,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            marginBottom: 4,
-          }}>
-            {r.original_filename ?? r.title ?? r.id}
-          </div>
-          {size && (
-            <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
-              {size}
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
     </Link>
   )
 }
 
-function ThreadCard({ r }: { r: any }) {
-  const topic = (r.abstracted_topic ?? r.topic ?? 'misc')
-  const color = topicColor(topic)
+// Thread card
+function ThreadCard({ card }: { card: ApiCard }) {
+  const topic = card.topic || card.abstracted_topic || 'thread'
+  const style: any = {
+    '--topic': `var(${topicVar(topic)})`,
+    '--topic-soft': topicSoft(topic),
+  }
   return (
-    <Link href={`/thread/${r.id}`} className="card" style={{
-      padding: '18px 22px',
-      display: 'block',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <span className="mono" style={{
-          fontSize: 10, color: color,
-          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-        }}>
-          Thread · {r.register ?? 'observation'}
-        </span>
-        {r.strength != null && <Pips n={r.strength}/>}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.extracted_at)}
-        </span>
+    <Link href={`/thread/${card.id}`} className="tcard thread" style={style}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Thread</span><span className="sep">·</span>{topic}</span>
+        <span className="t-time">{timeOnly(card.recorded_at || card.created_at)}</span>
       </div>
-      {/* The take reads like a pull-quote — italic, large, no extra
-          left bar because the card spine IS the bar. */}
-      <div style={{
-        fontSize: 17, color: 'var(--fg)',
-        lineHeight: 1.45, fontStyle: 'italic',
-        fontWeight: 400,
-      }}>
-        “{String(r.take ?? '').slice(0, 280)}”
-      </div>
-      {r.topic && (
-        <div className="mono" style={{
-          fontSize: 10, color: 'var(--fg-3)', marginTop: 14,
-          letterSpacing: 0.8, textTransform: 'uppercase',
-        }}>
-          {r.topic}
-        </div>
+      {card.take && <div className="t-headline">{card.take}</div>}
+      {card.key_quote && (
+        <div className="quote">{card.key_quote}</div>
       )}
-    </Link>
-  )
-}
-
-function ClipCard({ r }: { r: any }) {
-  const start = formatTime(Number(r.start_time ?? 0))
-  const end = formatTime(Number(r.end_time ?? 0))
-  const color = topicColor(r.topic ?? r.headline ?? 'clip')
-  return (
-    <Link href={`/clip/${r.id}`} className="card" style={{
-      padding: '16px 20px', display: 'block',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <span className="mono" style={{
-          fontSize: 10, color: color,
-          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-        }}>
-          Clip · {start} → {end}
+      <div className="strength-row">
+        <span className="strength-label">Strength</span>
+        <span className="canon-pips">
+          {[1,2,3,4,5].map(i => (
+            <span key={i} className={`pip ${i <= (card.strength ?? 0) ? 'on' : ''}`}/>
+          ))}
         </span>
-        <span className={`pill ${r.status === 'published' ? 'ok' : 'mute'}`}>{r.status ?? 'candidate'}</span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.extracted_at)}
-        </span>
-      </div>
-      {r.headline && (
-        <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginBottom: 8 }}>
-          {r.headline}
-        </div>
-      )}
-      {r.quote && (
-        <div style={{
-          fontSize: 15, color: 'var(--fg-1)',
-          lineHeight: 1.5, fontStyle: 'italic',
-        }}>
-          “{r.quote}”
-        </div>
-      )}
-    </Link>
-  )
-}
-
-function PostCard({ r }: { r: any }) {
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-          {r.kind ?? 'post'} · {r.state ?? 'draft'}
-        </span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts ?? r.published_at ?? r.created_at)}</span>
-      </div>
-      <div style={{ fontSize: 14, color: 'var(--fg)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-        {String(r.body ?? r.title ?? '').slice(0, 320)}
-      </div>
-    </div>
-  )
-}
-
-function SurfacedCard({ r }: { r: any }) {
-  const subtypeKey = String(r.subtype ?? r.kind ?? 'card')
-  const subtype = subtypeKey.replace(/_/g, ' ')
-  const isAdjacent = subtypeKey === 'adjacent_insight'
-
-  // cultivate-pass cards have no headline — the body IS the punchline.
-  // Render it directly with **bold** support. Other surfaced subtypes
-  // (cluster_ready / new_evidence / auto_link) keep the headline +
-  // body_html pattern.
-  const refs = (() => {
-    try { return r.refs ? JSON.parse(r.refs) : {} } catch { return {} }
-  })()
-  const href = r.target_url
-    ?? (isAdjacent && refs.cluster_id ? `/cluster/${refs.cluster_id}` : '#')
-
-  return (
-    <Link href={href} className="card" style={{
-      padding: '18px 22px', display: 'block',
-      borderLeft: '3px solid var(--accent, #60a5fa)',
-      background: 'var(--bg-1)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <span className="mono" style={{
-          fontSize: 10, color: 'var(--accent, #60a5fa)',
-          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-        }}>
-          ◆ {isAdjacent ? 'Adjacent insight' : `Surfaced · ${subtype}`}
-        </span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.surfaced_at)}
-        </span>
-      </div>
-      {isAdjacent ? (
-        <div style={{
-          fontSize: 15, color: 'var(--fg-1)',
-          lineHeight: 1.6,
-        }} dangerouslySetInnerHTML={{ __html: renderInlineBold(String(r.body ?? '').slice(0, 600)) }}/>
-      ) : (
-        <>
-          <div style={{
-            fontSize: 16, color: 'var(--fg)', fontWeight: 500,
-            marginBottom: r.body_html ? 10 : 0, lineHeight: 1.4,
-          }}>
-            {r.headline ?? r.title ?? '—'}
-          </div>
-          {r.body_html && (
-            <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}
-              dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
-          )}
-        </>
-      )}
-    </Link>
-  )
-}
-
-function renderInlineBold(s: string): string {
-  const escaped = s
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return escaped.replace(/\*\*([^*]+)\*\*/g, '<strong style="color: var(--fg); font-weight: 500;">$1</strong>')
-}
-
-function CreativeCard({ r }: { r: any }) {
-  const elementType = String(r.element_type ?? 'theme').replace(/_/g, ' ')
-  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
-  const color = topicColor(elementType)
-  return (
-    <Link href={href} className="card" style={{
-      padding: '16px 20px', display: 'block',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <span className="mono" style={{
-          fontSize: 10, color: color,
-          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-        }}>
-          Creative · {elementType}
-        </span>
-        {r.register && (
-          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{r.register}</span>
-        )}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.created_at ?? r.extracted_at)}
-        </span>
-      </div>
-      <div style={{
-        fontSize: 15, color: 'var(--fg-1)',
-        lineHeight: 1.55, fontStyle: 'italic',
-      }}>
-        “{String(r.content ?? '').slice(0, 320)}”
-      </div>
-    </Link>
-  )
-}
-
-const ENTITY_DOT: Record<string, string> = {
-  person:    'var(--t-rose)',
-  place:     'var(--t-sage)',
-  project:   'var(--t-brass)',
-  tool:      'var(--t-steel)',
-  concept:   'var(--t-plum)',
-  theme:     'var(--t-violet)',
-  reference: 'var(--t-teal)',
-}
-
-function EntityCard({ r }: { r: any }) {
-  const entityType = String(r.entity_type ?? 'concept')
-  const dot = ENTITY_DOT[entityType] ?? 'var(--fg-3)'
-  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
-  return (
-    <Link href={href} className="card" style={{
-      padding: '14px 20px', display: 'block',
-      borderLeft: `3px solid ${dot}`,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span className="mono" style={{
-          fontSize: 10, color: dot,
-          textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-        }}>
-          Entity · {entityType}
-        </span>
-        <span style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, marginLeft: 4 }}>
-          {r.name ?? '—'}
-        </span>
-        {r.mention_count != null && Number(r.mention_count) > 1 && (
-          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>
-            ×{r.mention_count}
+        {card.source_vlog_title && (
+          <span className="from">
+            from <b>{card.source_vlog_title}</b>{card.source_timecode && ` · ${card.source_timecode}`}
           </span>
         )}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.last_mentioned_at ?? r.created_at)}
-        </span>
       </div>
     </Link>
   )
 }
 
-function PipelineEventCard({ r }: { r: any }) {
-  const step = String(r.step ?? 'step')
-  const status = String(r.status ?? 'ok')
-  const cls = status === 'failed' ? 'err' : status === 'skipped' ? 'mute' : 'ok'
-  const d = r.detail ?? {}
-  const counts = [
-    d.threads != null ? `${d.threads}t` : null,
-    d.clips != null ? `${d.clips}c` : null,
-    d.creative_elements != null ? `${d.creative_elements}cr` : null,
-    d.entities != null ? `${d.entities}e` : null,
-  ].filter(Boolean).join(' · ')
-  const dur = r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : null
-  const href = r.vlog_id ? `/timeline/${r.vlog_id}` : '#'
+// Post card
+function PostCard({ card }: { card: ApiCard }) {
+  const style: any = {
+    '--topic': 'var(--t-terra)',
+    '--topic-soft': 'rgba(230,99,74,0.08)',
+  }
   return (
-    <Link href={href} className="card" style={{ padding: '10px 14px', display: 'block', opacity: 0.85 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--fg-2)' }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-          Pipeline
-        </span>
-        <span className={`pill ${cls}`}>{step} · {status}</span>
-        {counts && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{counts}</span>}
-        {d.model && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{d.model}</span>}
-        {dur && <span className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>{dur}</span>}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {timeOfDay(r.ts ?? r.created_at)}
-        </span>
+    <div className="tcard post" style={style}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Post</span></span>
+        <span className="t-status">Published to {card.platform || 'X'}</span>
+        <span className="t-time">{timeOnly(card.posted_at)}</span>
       </div>
-    </Link>
-  )
-}
-
-function DefaultCard({ r, kind }: { r: any; kind: string }) {
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase' }}>{kind}</span>
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>{timeOfDay(r.ts)}</span>
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--fg-1)' }}>{r.title ?? r.headline ?? r.body ?? JSON.stringify(r).slice(0, 200)}</div>
+      <div className="post-text">{card.text || ''}</div>
+      {(card.views != null || card.reposts != null || card.replies != null) && (
+        <div className="engagement">
+          {card.views != null && <span className="stat"><span className="n">{card.views.toLocaleString()}</span> <span className="label">views</span></span>}
+          {card.reposts != null && <span className="stat"><span className="n">{card.reposts.toLocaleString()}</span> <span className="label">reposts</span></span>}
+          {card.replies != null && <span className="stat"><span className="n">{card.replies.toLocaleString()}</span> <span className="label">replies</span></span>}
+        </div>
+      )}
     </div>
   )
 }
 
-function toMs(v: unknown): number {
-  if (!v) return Date.now()
-  if (typeof v === 'number') return v < 1e12 ? v * 1000 : v
-  if (typeof v === 'string') return new Date(v).getTime()
-  return Date.now()
+// Clip card (folded into thread vocabulary per earlier operator note)
+function ClipCard({ card }: { card: ApiCard }) {
+  const style: any = {
+    '--topic': 'var(--t-terra)',
+    '--topic-soft': 'rgba(230,99,74,0.08)',
+  }
+  return (
+    <Link href={`/clip/${card.id}`} className="tcard thread" style={style}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Clip</span><span className="sep">·</span>{card.status === 'published' ? 'Published' : 'Candidate'}</span>
+        <span className="t-time">{timeOnly(card.recorded_at || card.created_at)}</span>
+      </div>
+      {card.quote && <div className="quote">{card.quote}</div>}
+      <div className="strength-row">
+        <span className="strength-label">
+          {card.start_seconds != null && card.end_seconds != null
+            ? `${fmtDuration(card.start_seconds)} → ${fmtDuration(card.end_seconds)} · ${fmtDuration(card.end_seconds - card.start_seconds)}`
+            : ''}
+        </span>
+      </div>
+    </Link>
+  )
 }
 
-function timeOfDay(v: unknown): string {
-  if (!v) return ''
-  const d = new Date(toMs(v))
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+// Creative element card
+function CreativeCard({ card }: { card: any }) {
+  const style: any = {
+    '--topic': 'var(--t-plum)',
+    '--topic-soft': 'rgba(164,122,209,0.08)',
+  }
+  return (
+    <div className="tcard" style={style}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">{card.element_type || 'Creative'}</span></span>
+        <span className="t-time">{timeOnly(card.created_at)}</span>
+      </div>
+      <div style={{ fontSize: 14.5, lineHeight: 1.55, color: 'var(--fg-1)' }}>
+        {card.content}
+      </div>
+    </div>
+  )
 }
 
-function dayLabel(ts: number): string {
-  // Compare LOCAL calendar dates, not millisecond differences. A vlog
-  // recorded at 11pm yesterday is ~11 hours ago; the old code would
-  // floor that to 0 and label it "Today · May 20" when it's actually
-  // already May 21. Operator caught: "it shows today as may 20? it's
-  // may 21."
-  const d = new Date(ts)
-  const now = new Date()
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000)
-  if (dayDiff === 0) return 'Today · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-  if (dayDiff === 1) return 'Yesterday · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-  if (dayDiff < 7) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+// Surfaced card (dashed border, three subtypes)
+function SurfacedCard({ card }: { card: ApiCard }) {
+  const subtype = card.kind || 'adjacent_insight'
+  const label = subtype === 'cluster_ready' ? 'Cluster ready'
+    : subtype === 'gap_question' ? 'Gap question'
+    : subtype === 'auto_link' ? 'Auto-linked'
+    : 'Adjacent insight'
+  const topicToken = subtype === 'cluster_ready' ? '--sig'
+    : subtype === 'gap_question' ? '--t-ochre'
+    : '--t-violet'
+  const style: any = {
+    '--topic': `var(${topicToken})`,
+    '--topic-soft': 'rgba(126,123,227,0.07)',
+  }
+  return (
+    <div className="tcard surfaced" style={style}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Surfaced</span></span>
+        <span className="t-status">{label}</span>
+        <span className="t-time">{timeOnly(card.created_at)}</span>
+      </div>
+      <div className="surfaced-body">
+        <span className="surfaced-ico">
+          <svg viewBox="0 0 16 16"><path d="M8 14 L8 2 M3 7 L8 2 L13 7"/></svg>
+        </span>
+        <div className="surfaced-text" dangerouslySetInnerHTML={{ __html: card.body ?? '' }}/>
+      </div>
+    </div>
+  )
 }
 
-function formatTime(s: number): string {
-  if (!isFinite(s) || s < 0) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
+// ─── Empty state ─────────────────────────────────────────────────────────
+function CanonEmpty() {
+  return (
+    <div style={{
+      padding: '60px 32px',
+      border: '1px dashed var(--line-2)',
+      borderRadius: 14,
+      background: 'var(--bg-1)',
+      textAlign: 'center',
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 2.5,
+        textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 18,
+      }}>
+        The feed
+      </div>
+      <h2 style={{
+        fontFamily: 'var(--font-body)', fontSize: 36, fontWeight: 400,
+        letterSpacing: '-1.2px', color: 'var(--fg)', margin: '0 0 14px',
+      }}>
+        Nothing here yet.
+      </h2>
+      <p style={{ color: 'var(--fg-2)', maxWidth: 480, margin: '0 auto 24px', lineHeight: 1.55 }}>
+        Drop your first vlog. The system threads it, finds the patterns, and ships the work back.
+      </p>
+      <Link href="/capture" className="canon-btn primary">
+        Capture
+        <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
+      </Link>
+    </div>
+  )
+}
+
+// ─── Right rail cards ────────────────────────────────────────────────────
+function NowCard() {
+  return (
+    <div className="rail-card canon-reveal d4">
+      <div className="rc-head">
+        <h3>Now</h3>
+        <span className="more">{new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+      </div>
+      <div className="live-now">
+        <div className="ico">
+          <svg viewBox="0 0 14 14">
+            <rect x="5" y="2" width="4" height="7" rx="2"/>
+            <path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/>
+          </svg>
+        </div>
+        <div className="waveform">
+          {[40, 65, 30, 80, 50, 70, 35, 90, 45, 60, 75, 55].map((h, i) => (
+            <span key={i} style={{ height: `${h}%`, animationDelay: `${i * 0.08}s` }}/>
+          ))}
+        </div>
+        <div className="label">
+          <span className="l">Ready</span>
+          <span className="v">⌘N</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RipeningRail({ clusters }: { clusters: ApiCluster[] }) {
+  if (clusters.length === 0) return null
+  return (
+    <div className="rail-card canon-reveal d4">
+      <div className="rc-head">
+        <h3>Ripening</h3>
+        <Link href="/studio" className="more">all →</Link>
+      </div>
+      <div className="ripening-list">
+        {clusters.slice(0, 5).map(c => {
+          const r = Math.round(c.ripeness_score ?? 0)
+          const hot = r >= 70
+          const topic = c.abstracted_topic || c.topic
+          return (
+            <Link key={c.id} href={`/studio/${c.id}`} className="ripening" style={{ '--c': `var(${topicVar(topic)})` } as any}>
+              <div className="row1">
+                <span className="name">{topic}</span>
+                <span className={`pct ${hot ? 'hot' : ''}`}>{r}</span>
+              </div>
+              <div className="track"><div className={`fill ${hot ? 'hot' : ''}`} style={{ width: `${r}%` }}/></div>
+              <div className="threads">{c.thread_count ?? 0} threads</div>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function GraphMiniCard({ stats }: { stats: any }) {
+  return (
+    <div className="rail-card canon-reveal d5">
+      <div className="rc-head">
+        <h3>The graph · today</h3>
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 16, fontFamily: 'var(--font-mono)',
+      }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fontSize: 22, color: 'var(--fg)', letterSpacing: '-0.5px' }}>
+            {(stats?.thread_count ?? 0).toLocaleString()}
+          </div>
+          <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--fg-3)', marginTop: 4 }}>Threads</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fontSize: 22, color: 'var(--fg)', letterSpacing: '-0.5px' }}>
+            {(stats?.cluster_count ?? 0).toLocaleString()}
+          </div>
+          <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--fg-3)', marginTop: 4 }}>Clusters</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fontSize: 22, color: 'var(--fg)', letterSpacing: '-0.5px' }}>
+            {(stats?.entity_count ?? 0).toLocaleString()}
+          </div>
+          <div style={{ fontSize: 9.5, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--fg-3)', marginTop: 4 }}>Entities</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CtaCard() {
+  return (
+    <div className="cta-card canon-reveal d5">
+      <h4>Your <span className="soft">own</span> neolog.</h4>
+      <p>One operator at a time. Bring your API keys. Talk into it. Watch the graph grow.</p>
+      <Link href="/about" className="canon-btn accent">
+        About the system
+        <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
+      </Link>
+    </div>
+  )
 }
