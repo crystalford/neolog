@@ -12,15 +12,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Surface */
-  --bg:        #09090b;
-  --bg-1:      #0d0d10;
-  --bg-2:      #131316;
-  --bg-3:      #1a1a1f;
-  --bg-4:      #232328;
-  --line:      #1f1f24;
-  --line-1:    #2a2a30;
-  --line-2:    #3a3a42;
+  /* Surface — pure black + cool grays (canon: 00-Sitemap.html) */
+  --bg:        #000000;
+  --bg-1:      #0a0a0a;
+  --bg-2:      #111111;
+  --bg-3:      #161616;
+  --bg-4:      #1c1c1c;
+  --bg-5:      #232323;
+  --line:      #1d1d1d;
+  --line-1:    #262626;
+  --line-2:    #2e2e2e;
+  --line-3:    #3f3f3f;
 
   /* Text */
   --fg:        #fafafa;
@@ -28,59 +30,63 @@
   --fg-2:      #a1a1aa;
   --fg-3:      #71717a;
   --fg-4:      #52525b;
-  --fg-5:      #27272a;
+  --fg-5:      #3f3f46;
 
-  /* Signal */
-  --accent:    #3b82f6;
-  --accent-bg: rgba(59,130,246,0.10);
-  --accent-bd: rgba(59,130,246,0.30);
-  --ok:        #10b981;
-  --warn:      #f59e0b;
-  --err:       #ef4444;
-  --hot:       #ec5f3a;
+  /* Signal — cobalt blue, the system's accent */
+  --sig:       #5b8df6;
+  --sig-soft:  rgba(91,141,246,0.12);
+  --sig-glow:  rgba(91,141,246,0.40);
+  --accent:    var(--sig);          /* alias for older code */
+  --accent-bg: var(--sig-soft);
+  --accent-bd: var(--sig-glow);
 
-  /* Topic territories */
-  --t-1: #60a5fa;  /* sky    — curbsider */
-  --t-2: #a78bfa;  /* violet — memory */
-  --t-3: #34d399;  /* emerald— form */
-  --t-4: #fb923c;  /* orange — pack rats */
-  --t-5: #f472b6;  /* pink   — voice */
-  --t-6: #2dd4bf;  /* teal   — graph */
-  --t-7: #fbbf24;  /* amber  — regulation */
-  --t-8: #c084fc;  /* purple — misc */
+  /* State semantics */
+  --ok:        #34c1a8;             /* teal */
+  --warn:      #c89640;             /* ochre */
+  --err:       #e6634a;             /* terra */
+  --hot:       #e6634a;             /* terra — replaces old orange */
 
-  /* Legacy aliases — every page that hasn't been ported yet still references
-   * these var names. Map them onto the new tokens so old pages don't go
-   * unstyled while the port is in progress. Remove this block once every
-   * page is on the new system. */
-  --ink:      var(--bg);
-  --ink-1:    var(--bg-1);
-  --ink-2:    var(--bg-2);
-  --ink-3:    var(--bg-3);
-  --bone:     var(--fg);
-  --bone-1:   var(--fg-1);
-  --bone-2:   var(--fg-2);
-  --bone-3:   var(--fg-3);
-  --bone-4:   var(--fg-4);
-  --bone-5:   var(--fg-5);
-  --line-warm: var(--line-1);
+  /* Topic territories — 10 canonical (canon) */
+  --t-brass:   #e29248;
+  --t-terra:   #e6634a;
+  --t-ochre:   #c89640;
+  --t-rose:    #e07598;
+  --t-plum:    #a47ad1;
+  --t-violet:  #7e7be3;
+  --t-steel:   #4ea1d5;
+  --t-teal:    #34c1a8;
+  --t-sage:    #84b16f;
+  --t-moss:    #5e9a6a;
+
+  /* Legacy numeric topic aliases — 8 slots mapped onto the 10 canonical hues.
+   * Pages that still reference --t-1 through --t-8 keep working until they
+   * port to the named tokens. */
+  --t-1: var(--t-steel);   /* curbsider */
+  --t-2: var(--t-plum);    /* memory */
+  --t-3: var(--t-sage);    /* form */
+  --t-4: var(--t-terra);   /* pack rats */
+  --t-5: var(--t-rose);    /* voice */
+  --t-6: var(--t-teal);    /* graph */
+  --t-7: var(--t-ochre);   /* regulation */
+  --t-8: var(--t-violet);  /* misc */
+
+  /* Legacy bone/ink aliases — older pages still use these names. Map them
+   * to the new tokens so nothing goes unstyled while pages port over. */
+  --ink:         var(--bg);
+  --ink-1:       var(--bg-1);
+  --ink-2:       var(--bg-2);
+  --ink-3:       var(--bg-3);
+  --bone:        var(--fg);
+  --bone-1:      var(--fg-1);
+  --bone-2:      var(--fg-2);
+  --bone-3:      var(--fg-3);
+  --bone-4:      var(--fg-4);
+  --bone-5:      var(--fg-5);
+  --line-warm:   var(--line-1);
   --line-bright: var(--line-2);
-  --sig:      var(--accent);
-  --sig-soft: var(--accent-bg);
-  --sig-glow: var(--accent-bd);
-  --state-ok:   var(--ok);
-  --state-warn: var(--warn);
-  --state-err:  var(--err);
-  --t-brass: var(--t-1);
-  --t-terra: var(--t-4);
-  --t-ochre: var(--t-7);
-  --t-rose:  var(--t-5);
-  --t-plum:  var(--t-2);
-  --t-violet: var(--t-2);
-  --t-steel: var(--t-6);
-  --t-teal:  var(--t-6);
-  --t-sage:  var(--t-3);
-  --t-moss:  var(--t-3);
+  --state-ok:    var(--ok);
+  --state-warn:  var(--warn);
+  --state-err:   var(--err);
 
   --font-body: 'Geist', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
@@ -547,3 +553,209 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* legacy gallery summary row used by /uploads */
 .gallery-summary { display: flex; align-items: center; gap: 18px; padding: 12px 36px 24px; color: var(--fg-2); font-family: var(--font-mono); font-size: 11px; flex-wrap: wrap; }
 .gallery-summary .n { color: var(--fg); font-size: 13px; }
+
+/* ============================================================
+ * CANON — top-horizontal masthead chrome
+ * Source: /tmp/neolognextlevel/design-reference/00-Sitemap.html
+ * Applied app-wide. Replaces the older sidebar `.frame` layout.
+ * ============================================================ */
+.canon-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 1100px 600px at 50% -2%, rgba(91,141,246,0.06) 0%, transparent 55%),
+    radial-gradient(ellipse 700px 600px at 10% 32%, rgba(230,99,74,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 700px 700px at 96% 70%, rgba(164,122,209,0.035) 0%, transparent 60%),
+    var(--bg);
+  position: relative;
+  overflow-x: hidden;
+}
+.canon-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.canon-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 56px;
+  position: relative;
+}
+.canon-masthead {
+  padding: 22px 0 20px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 32px;
+  border-bottom: 1px solid var(--line);
+}
+.canon-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+.canon-lockup .mark {
+  width: 26px;
+  height: 26px;
+  color: var(--fg);
+  display: inline-flex;
+}
+.canon-lockup .mark svg { width: 100%; height: 100%; display: block; }
+.canon-lockup .wordmark {
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.5px;
+  color: var(--fg);
+  line-height: 1;
+}
+.canon-nav {
+  justify-self: center;
+  display: flex;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.canon-nav a {
+  padding: 8px 14px;
+  border-radius: 8px;
+  transition: color .15s, background .15s;
+}
+.canon-nav a:hover { color: var(--fg); background: var(--bg-3); }
+.canon-nav a.current { color: var(--fg); background: var(--bg-3); }
+.canon-meta {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.canon-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  color: var(--fg-3);
+  font-size: 12.5px;
+  min-width: 260px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.canon-search:hover { border-color: var(--line-2); color: var(--fg-2); }
+.canon-search svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  flex-shrink: 0;
+}
+.canon-search .kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  padding: 2px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--bg-1);
+}
+.canon-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: 100px;
+  font-size: 12px;
+  color: var(--fg-1);
+}
+.canon-health::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sig);
+  box-shadow: 0 0 8px var(--sig-glow);
+  animation: canon-pulse 2.2s ease-in-out infinite;
+}
+.canon-health.warn::before { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+.canon-health.err::before { background: var(--err); box-shadow: 0 0 8px var(--err); }
+@keyframes canon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.canon-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--t-violet), var(--t-teal));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--bg);
+  cursor: pointer;
+  border: none;
+  transition: filter .15s;
+}
+.canon-avatar:hover { filter: brightness(1.1); }
+.canon-main {
+  position: relative;
+  z-index: 1;
+}
+
+/* Avatar dropdown menu */
+.canon-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  z-index: 220;
+}
+.canon-dropdown a, .canon-dropdown button {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fg-1);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.canon-dropdown a:hover, .canon-dropdown button:hover { background: var(--bg-3); color: var(--fg); }
+.canon-dropdown .sep { height: 1px; background: var(--line); margin: 4px 0; }
+.canon-dropdown .kbd {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  padding: 1px 5px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--bg-2);
+}
+
+@media (max-width: 960px) {
+  .canon-wrap { padding: 0 24px; }
+  .canon-search { min-width: 0; }
+  .canon-search span:not(.kbd) { display: none; }
+}
+@media (max-width: 720px) {
+  .canon-nav { display: none; }
+  .canon-health { display: none; }
+}
