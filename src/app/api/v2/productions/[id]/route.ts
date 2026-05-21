@@ -17,9 +17,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { presignGetUrl, type R2Env } from '@/lib/r2'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 type ProductionRow = {
   id: string; operator_id: string
@@ -32,7 +33,13 @@ type ProductionRow = {
   visibility: string
   published_to: string | null; engagement: string | null
   produced_at: string | null
+  output_r2_key: string | null; output_metadata: string | null
   created_at: string; updated_at: string
+}
+type BeatRow = {
+  id: string; beat_index: number; beat_text: string; cue: string | null
+  audio_r2_key: string | null; take_number: number; recorded_at: string | null
+  visual_treatment: string | null
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -50,12 +57,45 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     `SELECT id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
             script_text, script_version, voice_profile_id, form, length_magnitude,
             prompt_version, visibility, published_to, engagement, produced_at,
+            output_r2_key, output_metadata,
             created_at, updated_at
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,
   )
   if (!prod) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Presign the output if it's a clip (or any other type with an
+  // r2_key — e.g., a future final-mix MP4).
+  let output_url: string | null = null
+  if (prod.output_r2_key) {
+    try { output_url = await presignGetUrl(env, prod.output_r2_key, 4 * 3600) }
+    catch { /* leave null */ }
+  }
+
+  // Load beats for video_essay productions. Each beat has its own
+  // index, text, optional cue (title), and optional audio_r2_key
+  // once the operator records voiceover.
+  let beats: (BeatRow & { audio_url: string | null })[] = []
+  if (prod.production_type === 'video_essay') {
+    try {
+      const rows = await findMany<BeatRow>(
+        db,
+        `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment
+           FROM production_beats
+          WHERE production_id = ?
+          ORDER BY beat_index ASC`,
+        params.id,
+      )
+      beats = await Promise.all(rows.map(async b => {
+        let audio_url: string | null = null
+        if (b.audio_r2_key) {
+          try { audio_url = await presignGetUrl(env, b.audio_r2_key, 4 * 3600) } catch {}
+        }
+        return { ...b, audio_url }
+      }))
+    } catch {}
+  }
 
   // Source context — what we drafted FROM.
   let source: any = null
@@ -94,7 +134,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
   } catch {}
 
-  return NextResponse.json({ production: prod, source })
+  return NextResponse.json({
+    production: { ...prod, output_url },
+    source,
+    beats,
+  })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

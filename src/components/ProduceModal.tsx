@@ -18,7 +18,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SourceKind = 'thread' | 'cluster'
-type ProdType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip'
+type ProdType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay'
 
 const THREAD_OPTIONS: { key: ProdType; label: string; sub: string }[] = [
   { key: 'x_post',      label: 'X post',      sub: '≤ 270 chars · single post, in your voice' },
@@ -26,8 +26,9 @@ const THREAD_OPTIONS: { key: ProdType; label: string; sub: string }[] = [
   { key: 'clip',        label: 'Clip',        sub: 'Audio segment + caption — pulls the existing R2 segment' },
 ]
 const CLUSTER_OPTIONS: { key: ProdType; label: string; sub: string }[] = [
-  { key: 'article',  label: 'Article',  sub: '~1200 words · long-form synthesis' },
-  { key: 'x_thread', label: 'X thread', sub: '4-7 connected posts · build the argument' },
+  { key: 'video_essay', label: 'Video essay', sub: '~10-15 min spoken · script + beats for voiceover recording' },
+  { key: 'article',     label: 'Article',     sub: '~1200 words · long-form synthesis' },
+  { key: 'x_thread',    label: 'X thread',    sub: '4-7 connected posts · build the argument' },
 ]
 
 export function ProduceModal({

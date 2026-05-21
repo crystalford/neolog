@@ -42,6 +42,20 @@ interface Production {
   created_at: string
   updated_at: string
   prompt_version: string | null
+  output_r2_key: string | null
+  output_metadata: string | null
+  output_url: string | null
+}
+interface Beat {
+  id: string
+  beat_index: number
+  beat_text: string
+  cue: string | null
+  audio_r2_key: string | null
+  audio_url: string | null
+  take_number: number
+  recorded_at: string | null
+  visual_treatment: string | null
 }
 
 interface ThreadSource {
@@ -68,7 +82,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function ProductionDraftPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const [data, setData] = useState<{ production: Production; source: Source } | null>(null)
+  const [data, setData] = useState<{ production: Production; source: Source; beats?: Beat[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [script, setScript] = useState('')
   const [savedScript, setSavedScript] = useState('')
@@ -253,24 +267,107 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
         {/* Body grid */}
         <div className="canon-detail-body">
           <div className="canon-detail-main">
-            <section className="canon-section">
-              <div className="canon-section-head">
-                <h2>Draft</h2>
-                <div className="meta">
-                  <SaveStatus state={savingState}/>
-                  · v{p.script_version} · {script.split(/\s+/).filter(Boolean).length} words
+
+            {/* CLIP — render the actual video segment, no editor */}
+            {p.production_type === 'clip' && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>The clip</h2>
+                  <div className="meta">
+                    {(() => {
+                      try { const m = JSON.parse(p.output_metadata || '{}'); return `${m.duration_sec ? m.duration_sec.toFixed(1) + 's' : ''}${m.start_sec != null ? ` · from ${Math.floor(m.start_sec/60)}:${String(Math.floor(m.start_sec%60)).padStart(2,'0')} in vlog` : ''}` }
+                      catch { return '' }
+                    })()}
+                  </div>
                 </div>
-              </div>
-              <textarea
-                value={script}
-                onChange={e => setScript(e.target.value)}
-                spellCheck
-                style={{
-                  width: '100%', minHeight: 420,
-                  padding: '20px 22px',
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--line-1)',
-                  borderLeft: `2px solid ${color}`,
+                {p.output_url ? (
+                  <video
+                    src={p.output_url}
+                    controls
+                    style={{
+                      width: '100%', maxHeight: 540,
+                      background: '#000',
+                      border: `1px solid var(--line-1)`,
+                      borderLeft: `2px solid ${color}`,
+                      borderRadius: '0 12px 12px 0',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  <div className="canon-empty-hint">
+                    Clip video isn't available — R2 fetch may have failed. Try regenerating.
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* VIDEO ESSAY — beats list with per-beat record affordance */}
+            {p.production_type === 'video_essay' && (
+              <>
+                <section className="canon-section">
+                  <div className="canon-section-head">
+                    <h2>Beats <span className="meta">· {data.beats?.length ?? 0}</span></h2>
+                    <div className="meta">{data.beats?.filter(b => b.audio_r2_key).length ?? 0} recorded · {Math.max(0, (data.beats?.length ?? 0) - (data.beats?.filter(b => b.audio_r2_key).length ?? 0))} pending</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(data.beats ?? []).map(b => (
+                      <BeatCard key={b.id} beat={b} color={color} productionId={p.id} onUpdated={load}/>
+                    ))}
+                    {(!data.beats || data.beats.length === 0) && (
+                      <div className="canon-empty-hint">
+                        The script didn't parse into beats — open the full script below to read it as-is.
+                      </div>
+                    )}
+                  </div>
+                </section>
+                <section className="canon-section">
+                  <div className="canon-section-head">
+                    <h2>Full script</h2>
+                    <div className="meta">{script.split(/\s+/).filter(Boolean).length} words · spoken time ≈ {Math.round(script.split(/\s+/).filter(Boolean).length / 160)} min</div>
+                  </div>
+                  <textarea
+                    value={script}
+                    onChange={e => setScript(e.target.value)}
+                    spellCheck
+                    style={{
+                      width: '100%', minHeight: 320,
+                      padding: '20px 22px',
+                      background: 'var(--bg-1)',
+                      border: '1px solid var(--line-1)',
+                      borderLeft: `2px solid ${color}`,
+                      borderRadius: '0 12px 12px 0',
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 16, lineHeight: 1.7,
+                      color: 'var(--fg)', resize: 'vertical', outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-3)', marginTop: 6 }}>
+                    <SaveStatus state={savingState}/> · v{p.script_version}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* TEXT — default editor for x_post / x_thread / micro_essay / article */}
+            {p.production_type !== 'clip' && p.production_type !== 'video_essay' && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>Draft</h2>
+                  <div className="meta">
+                    <SaveStatus state={savingState}/>
+                    · v{p.script_version} · {script.split(/\s+/).filter(Boolean).length} words
+                  </div>
+                </div>
+                <textarea
+                  value={script}
+                  onChange={e => setScript(e.target.value)}
+                  spellCheck
+                  style={{
+                    width: '100%', minHeight: 420,
+                    padding: '20px 22px',
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--line-1)',
+                    borderLeft: `2px solid ${color}`,
                   borderRadius: '0 12px 12px 0',
                   fontFamily: p.production_type === 'article' || p.production_type === 'micro_essay'
                     ? 'var(--font-body)'
@@ -283,6 +380,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
                 }}
               />
             </section>
+            )}
 
             <section className="canon-section">
               <div className="canon-section-head">
@@ -457,6 +555,217 @@ function ClusterSourceCard({ source, color }: { source: ClusterSource; color: st
           {source.threads.length} threads in cluster
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * BeatCard — one beat of a video_essay script. Shows the beat text +
+ * a record control. When the operator clicks Record, asks for mic
+ * permission via getUserMedia, records via MediaRecorder, then PUTs
+ * the resulting blob to /api/v2/productions/[id]/beats/[beatId]/audio.
+ *
+ * Replays the existing take if one exists. Retake replaces it; the
+ * server bumps take_number each time so we keep history.
+ */
+function BeatCard({ beat, color, productionId, onUpdated }: {
+  beat: Beat
+  color: string
+  productionId: string
+  onUpdated: () => void
+}) {
+  const [recording, setRecording] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [localBlob, setLocalBlob] = useState<Blob | null>(null)
+  const [localUrl, setLocalUrl] = useState<string | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const wordCount = beat.beat_text.split(/\s+/).filter(Boolean).length
+  const estSec = Math.round(wordCount / 2.67)  // ~160 wpm spoken
+
+  const start = async () => {
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : ''
+      const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream)
+      recorderRef.current = rec
+      chunksRef.current = []
+      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        setLocalBlob(blob)
+        if (localUrl) URL.revokeObjectURL(localUrl)
+        setLocalUrl(URL.createObjectURL(blob))
+        if (timerRef.current) clearInterval(timerRef.current)
+        streamRef.current?.getTracks().forEach(t => t.stop())
+      }
+      rec.start()
+      setRecording(true)
+      setElapsedMs(0)
+      const startedAt = Date.now()
+      timerRef.current = setInterval(() => setElapsedMs(Date.now() - startedAt), 100)
+    } catch (e: any) {
+      setError(`Mic access: ${e?.message || e}`)
+    }
+  }
+
+  const stop = () => {
+    recorderRef.current?.stop()
+    setRecording(false)
+  }
+
+  const save = async () => {
+    if (!localBlob) return
+    setUploading(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${productionId}/beats/${beat.id}/audio`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': localBlob.type || 'audio/webm' },
+        body: localBlob,
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setLocalBlob(null)
+      if (localUrl) URL.revokeObjectURL(localUrl)
+      setLocalUrl(null)
+      onUpdated()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 200))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const discardLocal = () => {
+    setLocalBlob(null)
+    if (localUrl) URL.revokeObjectURL(localUrl)
+    setLocalUrl(null)
+  }
+
+  const clearRemote = async () => {
+    if (!confirm('Clear the saved recording for this beat?')) return
+    try {
+      const r = await fetch(`/api/v2/productions/${productionId}/beats/${beat.id}/audio`, {
+        method: 'DELETE', credentials: 'include',
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      onUpdated()
+    } catch (e: any) {
+      alert(`Clear failed: ${e?.message || e}`)
+    }
+  }
+
+  const seconds = (elapsedMs / 1000).toFixed(1)
+  const hasRemote = !!beat.audio_r2_key
+  const hasLocal = !!localBlob
+
+  return (
+    <div style={{
+      background: 'var(--bg-1)',
+      border: '1px solid var(--line-1)',
+      borderLeft: `2px solid ${hasRemote ? 'var(--sig)' : color}`,
+      borderRadius: '0 12px 12px 0',
+      padding: '16px 20px',
+      display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
+          textTransform: 'uppercase', color: hasRemote ? 'var(--sig)' : color,
+          fontWeight: 600, flexShrink: 0,
+        }}>{String(beat.beat_index + 1).padStart(2, '0')}{beat.cue ? ` · ${beat.cue}` : ''}</span>
+        <span style={{
+          marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--fg-3)', letterSpacing: 0.4,
+        }}>
+          {wordCount} words · ≈ {estSec}s spoken
+          {beat.take_number > 1 && <> · take {beat.take_number}</>}
+        </span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: 15, lineHeight: 1.6,
+        color: 'var(--fg-1)', letterSpacing: '-0.15px',
+        whiteSpace: 'pre-wrap',
+      }}>
+        {beat.beat_text}
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        paddingTop: 10, borderTop: '1px solid var(--line)',
+      }}>
+        {/* Existing saved recording */}
+        {hasRemote && beat.audio_url && !hasLocal && (
+          <audio src={beat.audio_url} controls style={{ height: 32, flex: 1, minWidth: 200 }}/>
+        )}
+        {hasRemote && !hasLocal && (
+          <>
+            <button onClick={start} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Retake
+            </button>
+            <button onClick={clearRemote} className="canon-btn ghost" style={{ fontSize: 11, color: 'var(--t-terra)' }}>
+              Clear
+            </button>
+          </>
+        )}
+
+        {/* Local recording in progress */}
+        {recording && (
+          <>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--t-terra)', fontWeight: 500,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%', background: 'var(--t-terra)',
+                boxShadow: '0 0 6px var(--t-terra)',
+                animation: 'canon-pulse 1.1s ease-in-out infinite',
+              }}/>
+              REC · {seconds}s
+            </span>
+            <button onClick={stop} className="canon-btn primary" style={{ fontSize: 11 }}>
+              Stop
+            </button>
+          </>
+        )}
+
+        {/* Just recorded — preview before save */}
+        {hasLocal && !recording && (
+          <>
+            <audio src={localUrl!} controls style={{ height: 32, flex: 1, minWidth: 200 }}/>
+            <button onClick={save} disabled={uploading} className="canon-btn primary" style={{ fontSize: 11 }}>
+              {uploading ? 'Saving…' : 'Save take'}
+            </button>
+            <button onClick={discardLocal} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Discard
+            </button>
+          </>
+        )}
+
+        {/* No recording at all */}
+        {!hasRemote && !hasLocal && !recording && (
+          <button onClick={start} className="canon-btn primary" style={{ fontSize: 12 }}>
+            <span className="ico">
+              <svg viewBox="0 0 14 14"><rect x="5" y="2" width="4" height="7" rx="2"/><path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/></svg>
+            </span>
+            Record beat
+          </button>
+        )}
+
+        {error && (
+          <span style={{ fontSize: 11.5, color: 'var(--t-terra)', marginLeft: 'auto' }}>{error}</span>
+        )}
+      </div>
     </div>
   )
 }

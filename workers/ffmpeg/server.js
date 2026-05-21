@@ -800,12 +800,80 @@ async function extractAudioSegment(body, res) {
   }
 }
 
+// ── endpoint: /extract-video-segment ───────────────────────────────
+// Slices the vlog's video + audio between start_sec and (start_sec +
+// duration_sec) into an MP4, streamed back to the caller. Used by
+// the production engine to materialize a "clip" production — the raw
+// moment from the parent vlog with both video and audio tracks intact.
+// No captions, no overlays, no re-encoding when the source is already
+// H.264/AAC (stream copy).
+async function extractVideoSegment(body, res) {
+  const { input_url, start_sec, duration_sec } = body
+  if (!input_url) return jsonError(res, 400, 'input_url required')
+  if (!isFinite(start_sec) || start_sec < 0) return jsonError(res, 400, 'start_sec must be a non-negative number')
+  if (!isFinite(duration_sec) || duration_sec <= 0) return jsonError(res, 400, 'duration_sec must be positive')
+
+  // Hard cap — clips longer than 10 minutes don't make sense as a
+  // production artifact and would blow up R2 transfer time.
+  const maxDur = 600
+  const clipped = Math.min(maxDur, duration_sec)
+
+  const { dir, file: inputFile } = await downloadToTmp(input_url, 'video-seg-in')
+  const outFile = join(dir, 'segment.mp4')
+
+  try {
+    // Two-pass strategy:
+    //   1. Try stream copy (no re-encode) — fast, lossless, works when
+    //      the source is already H.264/AAC. -ss before -i for fast seek.
+    //   2. Fall back to re-encode if stream copy produces a broken file
+    //      (some sources need re-encode for clean keyframe seek).
+    try {
+      await runFfmpeg(
+        [
+          '-y',
+          '-ss', String(start_sec),
+          '-i', inputFile,
+          '-t',  String(clipped),
+          '-c',  'copy',
+          '-movflags', '+faststart',
+          outFile,
+        ],
+        outFile,
+      )
+    } catch (copyErr) {
+      // Stream copy failed — try a clean re-encode.
+      await runFfmpeg(
+        [
+          '-y',
+          '-ss', String(start_sec),
+          '-i', inputFile,
+          '-t',  String(clipped),
+          '-c:v', 'libx264',
+          '-preset', 'veryfast',
+          '-crf', '23',
+          '-c:a', 'aac',
+          '-b:a', '128k',
+          '-movflags', '+faststart',
+          outFile,
+        ],
+        outFile,
+      )
+    }
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /extract-video-segment failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
   '/extract-thumb-mini-transcode': extractThumbMiniTranscode,
   '/extract-audio':  extractAudio,
   '/extract-audio-segment': extractAudioSegment,
+  '/extract-video-segment': extractVideoSegment,
   '/trim':           trim,
   '/concat':         concat,
 }
