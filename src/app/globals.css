@@ -707,6 +707,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .canon-main {
   position: relative;
   z-index: 1;
+  padding: 40px 0 80px;
 }
 
 /* Avatar dropdown menu */

@@ -20,7 +20,6 @@ import { usePathname } from 'next/navigation'
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Timeline',    href: '/',            matchPaths: [/^\/$/, /^\/timeline/, /^\/threads/, /^\/thread\//, /^\/vlog\//, /^\/vlogs/, /^\/uploads/, /^\/transcript/] },
   { label: 'Studio',      href: '/studio',      matchPaths: [/^\/studio/, /^\/clusters/, /^\/cluster\//] },
-  { label: 'Graph',       href: '/graph',       matchPaths: [/^\/graph/] },
   { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/projects/, /^\/materialize/, /^\/library/] },
   { label: 'About',       href: '/about',       matchPaths: [/^\/about/] },
 ]

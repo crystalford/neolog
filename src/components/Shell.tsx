@@ -40,10 +40,10 @@ export default function Shell({ children }: ShellProps) {
     <div className="canon-page">
       <div className="canon-wrap">
         <Masthead onCmdK={triggerCmdK}/>
+        <main className="canon-main">
+          {children}
+        </main>
       </div>
-      <main className="canon-main">
-        {children}
-      </main>
     </div>
   )
 }
