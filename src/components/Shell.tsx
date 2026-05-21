@@ -28,18 +28,11 @@ export interface ShellProps {
   children: ReactNode
 }
 
-/** Trigger the global CmdK palette by dispatching a synthetic ⌘K keydown.
- *  CmdK is mounted globally in `app/(app)/layout.tsx` and listens for the
- *  shortcut itself, so any button can open it without prop-drilling. */
-function triggerCmdK() {
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
-}
-
 export default function Shell({ children }: ShellProps) {
   return (
     <div className="canon-page">
       <div className="canon-wrap">
-        <Masthead onCmdK={triggerCmdK}/>
+        <Masthead/>
         <main className="canon-main">
           {children}
         </main>
