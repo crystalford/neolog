@@ -125,6 +125,19 @@ export default function VlogsPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn" onClick={load}><span className="ico">{NavIcons.Refresh}</span>Refresh</button>
+            <button className="btn" onClick={async () => {
+              if (!confirm('Clean up auto-extract residue threads? This removes thin "fallback" threads like \'We got Phil\'s fat dented head\' that were generated when the LLM returned empty. Soft-delete only — reversible.')) return
+              try {
+                const r = await fetch('/api/v2/admin/cleanup-auto-extracted', { method: 'POST', credentials: 'include' })
+                const d: any = await r.json().catch(() => ({}))
+                if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+                alert(`Found ${d.candidates_found} candidates, deleted ${d.deleted}.${d.sample?.length ? '\n\nSample:\n' + d.sample.map((s: any) => '• ' + s.take).join('\n') : ''}`)
+              } catch (e: any) {
+                alert(`Cleanup failed: ${e?.message || String(e)}`)
+              }
+            }}>
+              Clean junk threads
+            </button>
             <button className="btn" onClick={() => setBulkOpen(true)}>
               Re-process all
             </button>
