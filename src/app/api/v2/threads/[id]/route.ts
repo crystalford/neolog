@@ -254,8 +254,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             ORDER BY word_index ASC
             LIMIT 1200`,
           row.vlog_id,
-          Math.max(0, spanStart - 30),
-          spanEnd + 30,
+          // Wider transcript window (±60s) so operators can see the
+          // setup before and the implication after the thread's
+          // verbatim quote. Per operator: "the threads need to be
+          // slightly longer to preserve entire context of the quote."
+          Math.max(0, spanStart - 60),
+          spanEnd + 60,
         ), [])
       : Promise.resolve([]),
 
