@@ -11,9 +11,10 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { findOne, run } from './d1'
 
 export const SETTING_KEYS = {
-  CHAT_DEFAULT_MODEL: 'chat_default_model',                  // 'scout' | 'kimi' | 'claude'
+  CHAT_DEFAULT_MODEL: 'chat_default_model',                  // 'scout' | 'kimi' | 'llama70b' | 'claude'
   EXTRACTION_WORKERS_MODEL: 'extraction_workers_model',      // '@cf/...' model id
   EXTRACTION_DEFAULT_TIER: 'extraction_default_tier',        // 'free' | 'premium' | 'max'
+  CULTIVATE_DEFAULT_MODEL: 'cultivate_default_model',        // 'llama70b' | 'kimi' | 'sonnet'
 } as const
 
 export type SettingKey = typeof SETTING_KEYS[keyof typeof SETTING_KEYS]

@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
     state_changed_at: string
     thread_count: number
     vlog_count: number
+    insight_count: number
   }>(
     db,
     `SELECT c.id, c.topic, c.take, c.abstracted_topic, c.state, c.ripeness_score,
@@ -56,7 +57,8 @@ export async function GET(req: NextRequest) {
             (SELECT COUNT(DISTINCT t.vlog_id)
                FROM cluster_threads ct
                JOIN threads t ON t.id = ct.thread_id
-              WHERE ct.cluster_id = c.id) AS vlog_count
+              WHERE ct.cluster_id = c.id) AS vlog_count,
+            (SELECT COUNT(*) FROM cluster_insights WHERE cluster_id = c.id) AS insight_count
        FROM clusters c
       WHERE c.operator_id = ? AND c.deleted_at IS NULL
         AND c.state NOT IN ('archived', 'produced')
@@ -83,9 +85,15 @@ export async function GET(req: NextRequest) {
       { name: 'X thread',    live: r.ripeness_score != null && r.ripeness_score >= 50 },
       { name: 'Clips',       live: r.ripeness_score != null && r.ripeness_score >= 80 },
     ],
+    // Flat fields matching the page's ClusterRow interface (legacy).
+    // Keep `stats` block too for any consumer expecting that shape.
+    thread_count: r.thread_count,
+    vlog_count: r.vlog_count,
+    insight_count: r.insight_count,
     stats: {
       threads: r.thread_count,
       sessions: r.vlog_count,
+      insights: r.insight_count,
       awaiting: r.state === 'hold_for_more',
     },
     primary_action: r.state === 'ready' ? 'Materialize' : r.state === 'hold_for_more' ? 'Resume' : 'Develop',

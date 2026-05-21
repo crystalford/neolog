@@ -36,12 +36,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     params.id, operator.id,
   )
 
-  const insights = await findMany<{ subtype: string; body: string }>(
+  // cluster_insights schema (db/schema.sql:313) uses `kind` + `title`
+  // + `body` columns and has no operator_id (cluster_id FK to clusters
+  // already scopes to the operator). Previously queried non-existent
+  // columns — fixed when the cultivate pass started populating this
+  // table.
+  const insights = await findMany<{ kind: string; title: string | null; body: string; bounce_run_id: string | null; created_at: string }>(
     db,
-    `SELECT subtype, body FROM cluster_insights
-      WHERE cluster_id = ? AND operator_id = ?
-      ORDER BY created_at DESC LIMIT 10`,
-    params.id, operator.id,
+    `SELECT kind, title, body, bounce_run_id, created_at
+       FROM cluster_insights
+      WHERE cluster_id = ?
+      ORDER BY created_at DESC
+      LIMIT 30`,
+    params.id,
   )
 
   return NextResponse.json({
@@ -56,11 +63,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       gap_question: c.gap_question,
       topic_color: c.topic_color,
       threads: threads.map(t => ({ id: t.id, topic: t.topic, take: t.take || '', strength: t.strength })),
-      insights: insights.map(i => ({ kind: kindLabel(i.subtype), body: i.body })),
+      insights: insights.map(i => ({
+        kind: i.kind,
+        kind_label: kindLabel(i.kind),
+        title: i.title,
+        body: i.body,
+        bounce_run_id: i.bounce_run_id,
+        created_at: i.created_at,
+      })),
     },
   })
 }
 
 function kindLabel(k: string): string {
-  return ({ name: 'Name', parallel: 'Parallel', evidence: 'Evidence', framework: 'Framework', auto_link: 'Auto-link' } as Record<string, string>)[k] || k
+  return ({
+    name: 'Named concept',
+    parallel: 'Adjacent',
+    evidence: 'Evidence',
+    framework: 'Framework',
+    counter_position: 'Counter',
+    gap_question: 'Open question',
+  } as Record<string, string>)[k] || k
 }
