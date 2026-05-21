@@ -20,7 +20,12 @@ interface ThreadRow {
   strength: number | null
   abstracted_topic: string | null
   vlog_id: string
+  // extracted_at = when the system processed the thread; vlog_recorded_at =
+  // when the operator actually said it. Display the latter — what matters
+  // is when the thought happened, not when extraction ran.
   extracted_at: string
+  vlog_recorded_at: string | null
+  vlog_filename: string | null
   connections?: number
 }
 
@@ -126,7 +131,7 @@ function ThreadEditorialCard({ t }: { t: ThreadRow }) {
         </span>
         {t.strength != null && <Pips n={t.strength}/>}
         <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
-          {new Date(t.extracted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {new Date(t.vlog_recorded_at ?? t.extracted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
       </div>
       <div style={{

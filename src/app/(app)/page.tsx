@@ -198,13 +198,22 @@ function FeedCard({ item }: { item: FeedItem }) {
 
 function VlogCard({ r }: { r: any }) {
   const status = r.pipeline_status ?? 'uploaded'
-  const cls = status === 'complete' ? 'ok' : status === 'failed' ? 'err' : status === 'archived' ? 'mute' : 'hot'
+  const isBroll = r.is_broll === true
+  const cls = isBroll ? 'mute'
+    : status === 'complete' ? 'ok'
+    : status === 'failed' ? 'err'
+    : status === 'archived' ? 'mute'
+    : 'hot'
   const size = r.file_size_bytes ? `${(r.file_size_bytes / 1_000_000).toFixed(1)} MB` : ''
-  const color = topicColor(r.title ?? r.original_filename ?? r.id)
+  // B-roll vlogs use a neutral gray spine instead of a topic color —
+  // they're not contributing extracted ideas, just visual footage.
+  // Visually separable from "complete vlog with threads" at a glance.
+  const color = isBroll ? 'var(--fg-4)' : topicColor(r.title ?? r.original_filename ?? r.id)
   return (
     <Link href={`/timeline/${r.id}`} className="card" style={{
       padding: '14px 18px', display: 'block',
       borderLeft: `3px solid ${color}`,
+      opacity: isBroll ? 0.78 : 1,
     }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <div style={{
@@ -226,9 +235,11 @@ function VlogCard({ r }: { r: any }) {
               fontSize: 10, color: color,
               textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
             }}>
-              Vlog
+              {isBroll ? 'B-roll' : 'Vlog'}
             </span>
-            <span className={`pill ${cls}`}>{status}</span>
+            {isBroll
+              ? <span className="pill mute" title="No extractable dialogue — silent / ambient footage. Still usable as visual material for future productions.">silent footage</span>
+              : <span className={`pill ${cls}`}>{status}</span>}
             <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
               {timeOfDay(r.ts ?? r.recorded_at ?? r.created_at)}
             </span>
