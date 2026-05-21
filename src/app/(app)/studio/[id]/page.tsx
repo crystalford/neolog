@@ -35,6 +35,7 @@ import {
   truncate, formatDate, formatFullDate, renderInsightBody,
   type RiffTimelineNode, type RiffWindow as RW,
 } from '@/components/threadkit'
+import { ProduceModal } from '@/components/ProduceModal'
 
 interface Insight {
   id: string; kind: string; kind_label: string; title: string | null; body: string
@@ -77,6 +78,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
   const [bounceSending, setBounceSending] = useState(false)
   const [bounceRunId, setBounceRunId] = useState<string | null>(null)
   const [bounceErr, setBounceErr] = useState<string | null>(null)
+  const [produceOpen, setProduceOpen] = useState(false)
 
   const load = () => {
     fetch(`/api/v2/clusters/${params.id}`, { credentials: 'include' })
@@ -237,7 +239,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
             )}
           </div>
           <div className="actions">
-            <button className="action primary" onClick={() => alert('Production engine — coming in a later deploy.')}>
+            <button className="action primary" onClick={() => setProduceOpen(true)}>
               Produce a draft
             </button>
             <button className="action" onClick={() => cultivate('workers')} disabled={cultivating !== null}>
@@ -607,6 +609,15 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
         </section>
 
         {/* Footer */}
+        <ProduceModal
+          open={produceOpen}
+          onClose={() => setProduceOpen(false)}
+          sourceKind="cluster"
+          sourceId={cluster.id}
+          topic={topicName}
+          color={color}
+        />
+
         <footer className="canon-detail-footer">
           <span>neolog · cluster {truncate(cluster.id, 22)}</span>
           <span className="kbd-row">

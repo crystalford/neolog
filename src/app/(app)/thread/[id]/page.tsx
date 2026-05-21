@@ -33,6 +33,7 @@ import {
   Wavebox, truncate, formatMmSs, formatDate, formatFullDate,
   insightKindLabel, renderInsightBody,
 } from '@/components/threadkit'
+import { ProduceModal } from '@/components/ProduceModal'
 
 // ─── Types from /api/v2/threads/[id] ─────────────────────────────────────
 interface Word { word: string; start_time: number; end_time: number }
@@ -78,6 +79,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
   const [segment, setSegment] = useState<{ url: string; duration: number } | null>(null)
   const [segmentStatus, setSegmentStatus] = useState<'idle' | 'loading' | 'ready' | 'no-span' | 'failed'>('idle')
   const [segmentError, setSegmentError] = useState<string | null>(null)
+  const [produceOpen, setProduceOpen] = useState(false)
 
   useEffect(() => {
     fetch(`/api/v2/threads/${params.id}`, { credentials: 'include' })
@@ -190,10 +192,13 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
           <div className="actions">
+            <button className="action primary" onClick={() => setProduceOpen(true)}>
+              Produce
+              <span style={{ color: 'rgba(6,23,53,0.5)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>P</span>
+            </button>
             {cluster && (
-              <Link className="action primary" href={`/studio/${cluster.id}`}>
+              <Link className="action" href={`/studio/${cluster.id}`}>
                 Open cluster
-                <span><svg width="11" height="11" viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10" fill="none" stroke="currentColor" strokeWidth="1.7"/></svg></span>
               </Link>
             )}
             <Link className="action" href={`/vlog/${vlog.id}`}>
@@ -472,6 +477,15 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
           <ProvCell label="Run id" value={thread.run_id || '—'} mono/>
           <ProvCell label="Total items" value={String(thread.extracted_total_items ?? '—')} mono/>
         </section>
+
+        <ProduceModal
+          open={produceOpen}
+          onClose={() => setProduceOpen(false)}
+          sourceKind="thread"
+          sourceId={thread.id}
+          topic={thread.abstracted_topic ?? thread.topic}
+          color={topicCol}
+        />
 
         {/* Footer */}
         <footer className="canon-detail-footer">
