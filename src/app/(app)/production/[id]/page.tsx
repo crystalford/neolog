@@ -412,20 +412,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
               )}
             </div>
 
-            <div className="rail-card">
-              <div className="rc-head"><h3>Engine</h3></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: 'var(--fg-2)' }}>
-                <div><span style={{ color: 'var(--fg-3)' }}>Model:</span> <strong style={{ color: 'var(--fg-1)' }}>{p.prompt_version?.split('·')[1]?.trim() || 'unknown'}</strong></div>
-                <div><span style={{ color: 'var(--fg-3)' }}>Prompt:</span> <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.prompt_version?.split('·')[0]?.trim() || '—'}</span></div>
-                <button
-                  onClick={() => alert('Re-generate — coming next.')}
-                  className="canon-btn ghost"
-                  style={{ fontSize: 12, marginTop: 8 }}
-                >
-                  Re-generate draft
-                </button>
-              </div>
-            </div>
+            <EngineCard production={p} onRegenerated={load}/>
           </aside>
         </div>
 
@@ -764,6 +751,90 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
 
         {error && (
           <span style={{ fontSize: 11.5, color: 'var(--t-terra)', marginLeft: 'auto' }}>{error}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * EngineCard — model picker + Re-generate button on the production
+ * rail. Re-generate POSTs to /api/v2/productions/[id]/regenerate
+ * with the selected model. For video_essay, warns that existing beat
+ * recordings will be lost since beats get re-indexed.
+ */
+function EngineCard({ production, onRegenerated }: { production: Production; onRegenerated: () => void }) {
+  const [model, setModel] = useState<'llama70b' | 'kimi' | 'claude'>('llama70b')
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const isClip = production.production_type === 'clip'
+  const isVideoEssay = production.production_type === 'video_essay'
+
+  const regenerate = async () => {
+    if (isVideoEssay) {
+      if (!confirm('Re-generating a video essay wipes all beat recordings (new beats won\'t match old indices). Continue?')) return
+    }
+    setGenerating(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/regenerate`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onRegenerated()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 200))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <div className="rail-card">
+      <div className="rc-head"><h3>Engine</h3></div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12, color: 'var(--fg-2)' }}>
+        <div><span style={{ color: 'var(--fg-3)' }}>Model:</span> <strong style={{ color: 'var(--fg-1)' }}>{production.prompt_version?.split('·')[1]?.trim() || 'unknown'}</strong></div>
+        <div><span style={{ color: 'var(--fg-3)' }}>Prompt:</span> <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{production.prompt_version?.split('·')[0]?.trim() || '—'}</span></div>
+
+        {isClip ? (
+          <div style={{
+            fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.5, marginTop: 4,
+            padding: '8px 10px', background: 'var(--bg-2)', borderRadius: 6,
+          }}>
+            Clips are FFmpeg slices — to re-generate, delete and Produce a fresh clip from the thread.
+          </div>
+        ) : (
+          <>
+            <div style={{
+              display: 'flex', gap: 4, flexWrap: 'wrap',
+              paddingTop: 8, borderTop: '1px solid var(--line)', marginTop: 4,
+            }}>
+              {(['llama70b', 'kimi', 'claude'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setModel(m)}
+                  disabled={generating}
+                  className={`canon-filter-chip ${model === m ? 'active' : ''}`}
+                  style={{ fontSize: 10, padding: '3px 8px' }}
+                >
+                  {m === 'llama70b' ? 'Llama 70B' : m === 'kimi' ? 'Kimi' : 'Sonnet'}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={regenerate}
+              disabled={generating}
+              className="canon-btn ghost"
+              style={{ fontSize: 12 }}
+            >
+              {generating ? 'Re-generating…' : 'Re-generate draft'}
+            </button>
+            {error && (
+              <div style={{ fontSize: 11.5, color: 'var(--t-terra)' }}>{error}</div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -29,6 +29,8 @@ interface RipeningRow { id: string; topic: string; abstracted_topic: string | nu
 interface ProcessingRow { id: string; original_filename: string | null; pipeline_status: string; recorded_at: string | null; uploaded_at: string }
 interface FailedRow extends ProcessingRow { pipeline_error: string | null }
 interface DraftRow { id: string; name: string; tagline: string | null; blurb: string | null; state: string; last_activity_at: string | null }
+interface WorthShippingRow { id: string; topic: string; abstracted_topic: string | null; take: string | null; strength: number; extracted_at: string; vlog_id: string }
+interface TopicHot { topic: string; n: number }
 
 interface Payload {
   surfaced: SurfacedRow[]
@@ -36,7 +38,12 @@ interface Payload {
   processing: ProcessingRow[]
   failed: FailedRow[]
   drafts: DraftRow[]
-  counts: { surfaced: number; ripening: number; processing: number; failed: number; drafts: number; total: number }
+  worth_shipping: WorthShippingRow[]
+  topics_hot: TopicHot[]
+  counts: {
+    surfaced: number; ripening: number; processing: number; failed: number; drafts: number
+    worth_shipping: number; topics_hot: number; total: number
+  }
 }
 
 export default function InboxPage() {
@@ -101,11 +108,13 @@ export default function InboxPage() {
 
         {data && (
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 24,
+            display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 18,
             paddingTop: 28, marginTop: 28, borderTop: '1px solid var(--line)',
           }}>
+            <StatCell n={data.counts.worth_shipping} l="Worth shipping" onClick={() => scrollTo('worth-shipping')}/>
             <StatCell n={data.counts.surfaced}   l="Surfaced"   onClick={() => scrollTo('surfaced')}/>
             <StatCell n={data.counts.ripening}   l="Ripening"   onClick={() => scrollTo('ripening')}/>
+            <StatCell n={data.counts.topics_hot} l="Hot topics"  onClick={() => scrollTo('topics-hot')}/>
             <StatCell n={data.counts.processing} l="Processing" onClick={() => scrollTo('processing')}/>
             <StatCell n={data.counts.failed}     l="Failed"     warn={data.counts.failed > 0} onClick={() => scrollTo('failed')}/>
             <StatCell n={data.counts.drafts}     l="Drafts"     onClick={() => scrollTo('drafts')}/>
@@ -138,6 +147,18 @@ export default function InboxPage() {
       {data && data.counts.total > 0 && (
         <div className="canon-reveal d2" style={{ display: 'flex', flexDirection: 'column', gap: 36, paddingBottom: 48 }}>
 
+          {/* Worth shipping — strong threads without a production yet */}
+          {data.worth_shipping.length > 0 && (
+            <Section id="worth-shipping" title="Worth shipping" count={data.worth_shipping.length} meta="strength 4-5 · no production yet">
+              <div style={{
+                display: 'grid', gap: 10,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+              }}>
+                {data.worth_shipping.map(t => <WorthShippingCard key={t.id} thread={t}/>)}
+              </div>
+            </Section>
+          )}
+
           {/* Surfaced */}
           {data.surfaced.length > 0 && (
             <Section id="surfaced" title="Surfaced" count={data.surfaced.length} meta="the system noticed">
@@ -145,6 +166,37 @@ export default function InboxPage() {
                 {data.surfaced.map(s => (
                   <SurfacedCard key={s.id} card={s} onDismiss={() => dismiss(s.id)}/>
                 ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Topics hot — recurring topics across the last 30 days */}
+          {data.topics_hot.length > 0 && (
+            <Section id="topics-hot" title="Hot topics" count={data.topics_hot.length} meta="last 30 days · 2+ threads each">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {data.topics_hot.map(t => {
+                  const tcolor = topicColor(t.topic)
+                  return (
+                    <Link
+                      key={t.topic}
+                      href={`/?filter=thread`}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px',
+                        background: 'var(--bg-1)',
+                        border: '1px solid var(--line-1)',
+                        borderLeft: `2px solid ${tcolor}`,
+                        borderRadius: '0 100px 100px 0',
+                        textDecoration: 'none', color: 'inherit',
+                        fontSize: 13,
+                      }}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: tcolor, boxShadow: `0 0 4px ${tcolor}` }}/>
+                      <span style={{ color: 'var(--fg-1)', fontWeight: 500 }}>{t.topic}</span>
+                      <span style={{ color: 'var(--fg-3)', fontFamily: 'var(--font-mono)', fontSize: 10.5 }}>×{t.n}</span>
+                    </Link>
+                  )
+                })}
               </div>
             </Section>
           )}
@@ -446,6 +498,53 @@ function DraftCard({ draft }: { draft: DraftRow }) {
           {draft.tagline || draft.blurb}
         </div>
       )}
+    </Link>
+  )
+}
+
+/**
+ * WorthShippingCard — a strong-but-unproduced thread surfaced in
+ * Inbox. Click to open the thread (where Produce action lives).
+ */
+function WorthShippingCard({ thread }: { thread: WorthShippingRow }) {
+  const topic = thread.abstracted_topic ?? thread.topic
+  const c = topicColor(topic)
+  return (
+    <Link href={`/thread/${thread.id}`} className="tcard" style={{
+      '--topic': c,
+      '--topic-soft': `color-mix(in srgb, ${c} 9%, transparent)`,
+      borderLeft: `3px solid ${c}`,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    } as any}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Thread</span></span>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5,
+          letterSpacing: 1.6, textTransform: 'uppercase',
+          color: 'var(--sig)',
+          padding: '3px 9px', borderRadius: 100,
+          background: 'var(--sig-soft)',
+          border: '1px solid color-mix(in srgb, var(--sig) 35%, transparent)',
+        }}>
+          ★ {thread.strength}/5
+        </span>
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)' }}>
+          {formatDate(thread.extracted_at)}
+        </span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 500,
+        color: 'var(--fg)', letterSpacing: '-0.25px', lineHeight: 1.35,
+        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+      }}>
+        {thread.take || topic}
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+        letterSpacing: 0.4,
+      }}>
+        {topic}
+      </div>
     </Link>
   )
 }
