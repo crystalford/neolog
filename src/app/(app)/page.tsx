@@ -132,7 +132,7 @@ export default function TimelinePage() {
           setPublicMode(true)
           // Fetch public productions instead.
           const pr = await fetch('/api/p')
-          const pd = pr.ok ? await pr.json() : { productions: [] }
+          const pd: any = pr.ok ? await pr.json() : { productions: [] }
           setPublicProductions(pd.productions ?? [])
           setCards([])
           return null
@@ -175,12 +175,12 @@ export default function TimelinePage() {
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filteredCards])
 
-  // Top thread for the hero snapshot card — pull the strongest recent thread.
-  const heroSnapshot = useMemo(() => {
-    if (!cards) return null
-    const recentThreads = cards.filter(c => c.type === 'thread').slice(0, 20)
-    if (recentThreads.length === 0) return null
-    return recentThreads.sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))[0]
+  // Hero "Top of mind" — the 3 strongest recent threads.
+  const heroTopOfMind = useMemo(() => {
+    if (!cards) return [] as ApiCard[]
+    const recentThreads = cards.filter(c => c.type === 'thread').slice(0, 30)
+    if (recentThreads.length === 0) return []
+    return [...recentThreads].sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0)).slice(0, 3)
   }, [cards])
 
   // Topic spectrum — count threads/clusters per topic (top 10).
@@ -210,7 +210,7 @@ export default function TimelinePage() {
 
   return (
     <Shell>
-      <CanonHero snapshot={heroSnapshot}/>
+      <CanonHero topOfMind={heroTopOfMind}/>
       <CanonStats stats={stats} counts={counts}/>
       {spectrum.length > 0 && <CanonSpectrum spectrum={spectrum}/>}
       <div className="canon-body">
@@ -241,7 +241,7 @@ export default function TimelinePage() {
 }
 
 // ─── Hero ────────────────────────────────────────────────────────────────
-function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
+function CanonHero({ topOfMind }: { topOfMind: ApiCard[] }) {
   const dateLine = useMemo(() => {
     const d = new Date()
     const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
@@ -263,7 +263,7 @@ function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
           and finished work out. This is the live record.
         </p>
         <div className="canon-hero-cta">
-          <Link href="/capture" className="canon-btn primary">
+          <Link href="/vlogs?capture=open" className="canon-btn primary">
             New capture
             <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
           </Link>
@@ -274,29 +274,85 @@ function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
         </div>
       </div>
 
-      <div>
-        <div className="canon-hero-card">
-          <div className="kicker">
-            <span>{snapshot ? 'Latest extracted take' : 'No takes yet'}</span>
-            {snapshot && <span className="live">Active</span>}
-          </div>
-          <div className="quote">
-            {snapshot?.key_quote || snapshot?.take || snapshot?.body || 'Drop your first vlog. The system will extract the takes, find the patterns, and ship them back.'}
-          </div>
-          <div className="from">
-            <span className="src">
-              {snapshot?.source_vlog_title || snapshot?.topic || 'neolog'}
-              {snapshot?.source_timecode && ` · ${snapshot.source_timecode}`}
-            </span>
-            <span className="strength" aria-label={`Strength ${snapshot?.strength ?? 0} of 5`}>
-              {[1,2,3,4,5].map(i => (
-                <span key={i} className={`pip ${i <= (snapshot?.strength ?? 0) ? 'on' : ''}`}/>
-              ))}
-            </span>
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 2.4,
+          textTransform: 'uppercase', color: 'var(--fg-3)',
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          marginBottom: 4,
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 6px var(--sig-glow)' }}/>
+          Top of mind
+          <span style={{ color: 'var(--fg-5)' }}>·</span>
+          <span style={{ color: 'var(--fg-4)' }}>strongest 3</span>
         </div>
+        {topOfMind.length === 0 ? (
+          <div style={{
+            padding: '24px 22px',
+            border: '1px dashed var(--line-2)',
+            borderRadius: 12,
+            background: 'var(--bg-1)',
+            color: 'var(--fg-3)', fontSize: 13.5, lineHeight: 1.5,
+          }}>
+            Drop your first vlog. The system extracts the takes, finds the patterns, and surfaces
+            the strongest threads here.
+          </div>
+        ) : (
+          topOfMind.map((t, i) => <TopOfMindCard key={t.id} card={t} rank={i + 1}/>)
+        )}
       </div>
     </section>
+  )
+}
+
+function TopOfMindCard({ card, rank }: { card: ApiCard; rank: number }) {
+  const topic = card.topic || card.abstracted_topic || ''
+  const tcolor = `var(${topicVar(topic)})`
+  const body = card.key_quote || card.take || ''
+  return (
+    <Link href={`/thread/${card.id}`} className="canon-hero-card" style={{
+      display: 'block', textDecoration: 'none', color: 'inherit',
+      borderLeft: `2px solid ${tcolor}`,
+      padding: '14px 18px',
+    }}>
+      <div className="kicker" style={{ marginBottom: 8 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: tcolor, fontWeight: 600,
+          }}>{String(rank).padStart(2, '0')}</span>
+          <span style={{ color: 'var(--fg-3)' }}>{topic ? topic : 'Thread'}</span>
+        </span>
+        <span className="strength" aria-label={`Strength ${card.strength ?? 0} of 5`} style={{ display: 'inline-flex', gap: 3 }}>
+          {[1,2,3,4,5].map(i => (
+            <span key={i} style={{
+              width: 4, height: 4, borderRadius: '50%',
+              background: i <= (card.strength ?? 0) ? tcolor : 'var(--bg-5)',
+            }}/>
+          ))}
+        </span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontWeight: 400,
+        fontSize: 15.5, lineHeight: 1.35, letterSpacing: '-0.25px',
+        color: 'var(--fg)',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {body || 'no take extracted'}
+      </div>
+      {card.source_vlog_title && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5,
+          color: 'var(--fg-4)', letterSpacing: 0.4,
+          marginTop: 8,
+        }}>
+          from {card.source_vlog_title}{card.source_timecode && ` · ${card.source_timecode}`}
+        </div>
+      )}
+    </Link>
   )
 }
 
