@@ -14,6 +14,7 @@
 
 import Link from 'next/link'
 import { Logo } from '@/components/Logo'
+import { PublishedWork } from '@/components/PublishedWork'
 
 export const runtime = 'edge'
 
@@ -207,6 +208,9 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* Published work — public productions gallery */}
+      <PublishedWork/>
 
       {/* Footer CTA */}
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '100px 48px 80px', textAlign: 'center', borderTop: '1px solid var(--line)' }}>
