@@ -1657,3 +1657,413 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .canon-body { grid-template-columns: 1fr; gap: 32px; }
   .canon-rail { position: relative; top: 0; }
 }
+
+/* ============================================================
+ * CANON — Thread detail page per 02-Thread.html
+ * ============================================================ */
+
+/* Crumbs row -------------------------------------------- */
+.canon-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.canon-crumbs a { color: var(--fg-3); text-decoration: none; transition: color .15s; }
+.canon-crumbs a:hover { color: var(--fg-1); }
+.canon-crumbs .here { color: var(--fg-1); text-transform: none; letter-spacing: 0; font-family: var(--font-body); font-size: 13px; }
+.canon-crumbs .sep { color: var(--fg-5); }
+.canon-crumbs .spacer { flex: 1; }
+.canon-crumbs .navbtns { display: flex; align-items: center; gap: 4px; }
+.canon-crumbs .navbtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all .15s;
+  text-decoration: none;
+}
+.canon-crumbs .navbtn:hover:not(:disabled) { color: var(--fg); border-color: var(--line-3); }
+.canon-crumbs .navbtn:disabled,
+.canon-crumbs .navbtn[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.canon-crumbs .navbtn .kbd {
+  font-size: 9px; color: var(--fg-4);
+  padding: 1px 4px; border: 1px solid var(--line-2); border-radius: 3px;
+  background: var(--bg-1);
+}
+
+/* Detail hero ------------------------------------------- */
+.canon-detail-hero {
+  padding: 56px 0 32px;
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 48px;
+  align-items: start;
+}
+.canon-detail-hero .pills-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.canon-detail-hero h1 {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 1.05;
+  letter-spacing: -2.2px;
+  color: var(--fg);
+  margin: 0 0 22px;
+  text-wrap: balance;
+}
+.canon-detail-hero h1 mark {
+  background: transparent;
+  color: inherit;
+  border-bottom: 2px solid var(--topic, var(--sig));
+  padding-bottom: 1px;
+}
+.canon-detail-hero .meta-strip {
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.canon-detail-hero .meta-strip strong { color: var(--fg-1); font-weight: 500; }
+.canon-detail-hero .actions {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.canon-detail-hero .action {
+  display: inline-flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  cursor: pointer;
+  transition: all .15s;
+  text-decoration: none;
+}
+.canon-detail-hero .action:hover { color: var(--fg); border-color: var(--line-3); background: var(--bg-2); }
+.canon-detail-hero .action.primary {
+  background: var(--sig); color: #061735; border-color: var(--sig);
+  box-shadow: 0 0 20px var(--sig-glow);
+}
+.canon-detail-hero .action.primary:hover { background: #7ba3f8; }
+
+/* Cluster pill -- richer than basic topic-pill -------- */
+.canon-cluster-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--topic, var(--sig)) 10%, var(--bg-2));
+  border: 1px solid color-mix(in srgb, var(--topic, var(--sig)) 30%, var(--line-1));
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--fg-1);
+  text-decoration: none;
+  transition: all .15s;
+}
+.canon-cluster-pill:hover { background: color-mix(in srgb, var(--topic, var(--sig)) 16%, var(--bg-2)); }
+.canon-cluster-pill svg { width: 11px; height: 11px; stroke: var(--topic, var(--sig)); fill: none; stroke-width: 1.6; }
+.canon-cluster-pill .accent { color: var(--sig); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.5px; }
+
+/* The Take pull-quote ----------------------------------- */
+.canon-pull {
+  padding: 32px 0 30px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 40px;
+  position: relative;
+}
+.canon-pull .label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--topic, var(--sig));
+  margin-bottom: 16px;
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.canon-pull .label::before {
+  content: ''; width: 18px; height: 1px;
+  background: var(--topic, var(--sig));
+}
+.canon-pull .quote {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.4;
+  letter-spacing: -0.6px;
+  color: var(--fg);
+  max-width: 880px;
+  text-wrap: pretty;
+}
+.canon-pull .quote mark {
+  background: transparent;
+  color: inherit;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--topic, var(--sig)) 80%, transparent);
+  padding-bottom: 1px;
+}
+
+/* Detail body grid (main + rail) ----------------------- */
+.canon-detail-body {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 48px;
+  padding-bottom: 64px;
+}
+.canon-detail-main { min-width: 0; display: flex; flex-direction: column; gap: 36px; }
+.canon-detail-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 16px; align-self: start; }
+
+/* Section block ----------------------------------------- */
+.canon-section {
+  display: flex; flex-direction: column;
+}
+.canon-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.canon-section-head h2 {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--fg-1);
+  margin: 0;
+}
+.canon-section-head .meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* Transcript with inline span markers ------------------ */
+.canon-transcript {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--fg-2);
+  letter-spacing: -0.1px;
+  padding: 24px 28px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  text-wrap: pretty;
+}
+.canon-transcript .pre,
+.canon-transcript .post { color: var(--fg-3); }
+.canon-transcript .t-span {
+  position: relative;
+  padding: 4px 0 4px 14px;
+  margin: 14px 0;
+  display: block;
+  color: var(--fg);
+  border-left: 2px solid var(--topic, var(--sig));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--topic, var(--sig)) 8%, transparent), transparent 70%);
+}
+.canon-transcript .t-span::before {
+  content: attr(data-badge);
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--topic, var(--sig));
+  margin-right: 10px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--topic, var(--sig)) 40%, transparent);
+  border-radius: 4px;
+  vertical-align: 0.15em;
+  background: color-mix(in srgb, var(--topic, var(--sig)) 8%, var(--bg));
+}
+.canon-transcript .key {
+  background: linear-gradient(180deg, transparent 60%, color-mix(in srgb, var(--topic, var(--sig)) 28%, transparent) 60%);
+  padding: 0 2px;
+  color: var(--fg);
+}
+
+/* Key quotes list -------------------------------------- */
+.canon-quote-list { display: flex; flex-direction: column; gap: 10px; }
+.canon-quote-item {
+  padding: 14px 18px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-left: 2px solid var(--topic, var(--sig));
+  border-radius: 0 10px 10px 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg-1);
+  letter-spacing: -0.15px;
+}
+
+/* Questions list --------------------------------------- */
+.canon-questions { display: flex; flex-direction: column; gap: 8px; }
+.canon-question {
+  padding: 12px 16px;
+  background: var(--bg-1);
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  font-size: 14.5px;
+  color: var(--fg-1);
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.canon-question::before {
+  content: '?';
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--sig);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Sibling threads list (cluster context) --------------- */
+.canon-siblings { display: flex; flex-direction: column; gap: 8px; }
+.canon-sibling {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  transition: all .15s;
+}
+.canon-sibling:hover { border-color: var(--line-3); background: var(--bg-2); }
+.canon-sibling .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--c, var(--fg-3));
+  flex-shrink: 0;
+  box-shadow: 0 0 4px color-mix(in srgb, var(--c, var(--fg-3)) 50%, transparent);
+}
+.canon-sibling .name {
+  font-size: 13.5px;
+  color: var(--fg-1);
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.canon-sibling .strength { display: inline-flex; gap: 3px; }
+.canon-sibling .strength .pip { width: 5px; height: 5px; border-radius: 50%; background: var(--bg-5); }
+.canon-sibling .strength .pip.on { background: var(--c, var(--fg-3)); }
+
+/* Entity chip in rail/inline --------------------------- */
+.canon-entity-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 100px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--fg-1);
+  text-decoration: none;
+  transition: all .15s;
+}
+.canon-entity-chip:hover { border-color: var(--line-3); background: var(--bg-3); }
+.canon-entity-chip .glyph {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--t-violet), var(--t-teal));
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--bg);
+}
+.canon-entity-chip .n { color: var(--fg-3); font-family: var(--font-mono); font-size: 10px; }
+
+/* Provenance grid -------------------------------------- */
+.canon-prov-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--line-1);
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.canon-prov-cell {
+  background: var(--bg-1);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.canon-prov-cell .l {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.canon-prov-cell .v {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg-1);
+  font-weight: 500;
+  word-break: break-all;
+}
+.canon-prov-cell .v.mono { font-family: var(--font-mono); font-size: 11px; font-weight: 400; }
+.canon-prov-cell .v a { color: var(--sig); text-decoration: none; }
+.canon-prov-cell .v a:hover { text-decoration: underline; }
+
+/* Detail footer ---------------------------------------- */
+.canon-detail-footer {
+  margin-top: 56px;
+  padding: 24px 0 48px;
+  border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.canon-detail-footer .kbd-row { display: inline-flex; align-items: center; gap: 10px; }
+.canon-detail-footer .kbd {
+  font-family: var(--font-mono); font-size: 10px;
+  padding: 2px 6px; border: 1px solid var(--line-2); border-radius: 3px;
+  background: var(--bg-1); color: var(--fg-2);
+}
+
+/* Empty hint inside section ---------------------------- */
+.canon-empty-hint {
+  padding: 24px 20px;
+  border: 1px dashed var(--line-2);
+  border-radius: 10px;
+  background: var(--bg-1);
+  color: var(--fg-3);
+  font-size: 13.5px;
+  line-height: 1.55;
+  text-align: center;
+}
+.canon-empty-hint strong { color: var(--fg-1); font-weight: 500; }
+
+@media (max-width: 960px) {
+  .canon-detail-hero { grid-template-columns: 1fr; gap: 24px; padding: 32px 0 24px; }
+  .canon-detail-hero h1 { font-size: 40px; letter-spacing: -1.4px; }
+  .canon-detail-hero .actions { flex-direction: row; flex-wrap: wrap; }
+  .canon-detail-body { grid-template-columns: 1fr; gap: 32px; }
+  .canon-detail-rail { position: relative; top: 0; }
+  .canon-prov-grid { grid-template-columns: repeat(2, 1fr); }
+}
