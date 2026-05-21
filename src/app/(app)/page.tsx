@@ -348,9 +348,22 @@ function PostCard({ r }: { r: any }) {
 }
 
 function SurfacedCard({ r }: { r: any }) {
-  const subtype = String(r.subtype ?? r.kind ?? 'card').replace(/_/g, ' ')
+  const subtypeKey = String(r.subtype ?? r.kind ?? 'card')
+  const subtype = subtypeKey.replace(/_/g, ' ')
+  const isAdjacent = subtypeKey === 'adjacent_insight'
+
+  // cultivate-pass cards have no headline — the body IS the punchline.
+  // Render it directly with **bold** support. Other surfaced subtypes
+  // (cluster_ready / new_evidence / auto_link) keep the headline +
+  // body_html pattern.
+  const refs = (() => {
+    try { return r.refs ? JSON.parse(r.refs) : {} } catch { return {} }
+  })()
+  const href = r.target_url
+    ?? (isAdjacent && refs.cluster_id ? `/cluster/${refs.cluster_id}` : '#')
+
   return (
-    <Link href={r.target_url ?? '#'} className="card" style={{
+    <Link href={href} className="card" style={{
       padding: '18px 22px', display: 'block',
       borderLeft: '3px solid var(--accent, #60a5fa)',
       background: 'var(--bg-1)',
@@ -360,24 +373,39 @@ function SurfacedCard({ r }: { r: any }) {
           fontSize: 10, color: 'var(--accent, #60a5fa)',
           textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
         }}>
-          ◆ Surfaced · {subtype}
+          ◆ {isAdjacent ? 'Adjacent insight' : `Surfaced · ${subtype}`}
         </span>
         <span className="mono" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-4)' }}>
           {timeOfDay(r.ts ?? r.surfaced_at)}
         </span>
       </div>
-      <div style={{
-        fontSize: 16, color: 'var(--fg)', fontWeight: 500,
-        marginBottom: r.body_html ? 10 : 0, lineHeight: 1.4,
-      }}>
-        {r.headline ?? r.title ?? '—'}
-      </div>
-      {r.body_html && (
-        <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}
-          dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
+      {isAdjacent ? (
+        <div style={{
+          fontSize: 15, color: 'var(--fg-1)',
+          lineHeight: 1.6,
+        }} dangerouslySetInnerHTML={{ __html: renderInlineBold(String(r.body ?? '').slice(0, 600)) }}/>
+      ) : (
+        <>
+          <div style={{
+            fontSize: 16, color: 'var(--fg)', fontWeight: 500,
+            marginBottom: r.body_html ? 10 : 0, lineHeight: 1.4,
+          }}>
+            {r.headline ?? r.title ?? '—'}
+          </div>
+          {r.body_html && (
+            <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}
+              dangerouslySetInnerHTML={{ __html: String(r.body_html).slice(0, 600) }}/>
+          )}
+        </>
       )}
     </Link>
   )
+}
+
+function renderInlineBold(s: string): string {
+  const escaped = s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped.replace(/\*\*([^*]+)\*\*/g, '<strong style="color: var(--fg); font-weight: 500;">$1</strong>')
 }
 
 function CreativeCard({ r }: { r: any }) {

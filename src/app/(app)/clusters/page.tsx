@@ -21,6 +21,7 @@ interface ClusterRow {
   state: string
   ripeness_score: number
   thread_count?: number
+  insight_count?: number
   topic_color_token?: string | null
   last_touched_at?: string | null
   gap_question?: string | null
@@ -224,9 +225,17 @@ function ClusterCard({ c }: { c: ClusterRow }) {
             <div className="mono" style={{ fontSize: 10, color: 'var(--fg-4)', marginTop: 5 }}>threshold · 70</div>
           </div>
 
-          <div style={{ marginBottom: 14, fontSize: 12 }}>
-            <div style={{ color: 'var(--fg-1)', fontWeight: 500, fontSize: 16 }}>{c.thread_count ?? 0}</div>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4 }}>Threads</div>
+          <div style={{ marginBottom: 14, fontSize: 12, display: 'flex', gap: 18 }}>
+            <div>
+              <div style={{ color: 'var(--fg-1)', fontWeight: 500, fontSize: 16 }}>{c.thread_count ?? 0}</div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4 }}>Threads</div>
+            </div>
+            {(c.insight_count ?? 0) > 0 && (
+              <div>
+                <div style={{ color: 'var(--accent)', fontWeight: 500, fontSize: 16 }}>{c.insight_count}</div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4 }}>Insights</div>
+              </div>
+            )}
           </div>
 
           <button className={`btn ${ready ? 'primary' : ''}`} style={{ width: '100%', justifyContent: 'center' }}>
