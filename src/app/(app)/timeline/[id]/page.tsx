@@ -604,8 +604,11 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      {/* See section comment below — clips subtitle inlined in render. */}
-      {clips.length > 0 && (
+      {/* Clips deprecated as a separate concept — threads cover the
+          same data (quote + timespan). Section hidden but the data
+          still loads to keep the API stable; existing clip rows in
+          the DB stay there. */}
+      {false && clips.length > 0 && (
         <div className="section">
           <div className="label">{clips.length} clip{clips.length === 1 ? '' : 's'}</div>
           <p style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10, marginTop: -2 }}>

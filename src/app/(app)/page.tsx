@@ -19,7 +19,12 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Shell, { NavIcons, Pips, TopicDot } from '@/components/Shell'
 
-type Filter = 'all' | 'vlog' | 'thread' | 'clip' | 'post' | 'surfaced'
+// Clips dropped as a distinct type — operator's call: "clips are
+// separate, but really it seems like the same thing." Threads cover
+// the same data (quote + timespan). Filtering them out at the type
+// level keeps them off the feed entirely. Existing clip rows stay
+// in the DB hidden behind the absence of any rendering path.
+type Filter = 'all' | 'vlog' | 'thread' | 'post' | 'surfaced'
 
 // Hash arbitrary topic strings into one of the 8 topic accent slots.
 // The same string always maps to the same color so a recurring topic
@@ -45,7 +50,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all',      label: 'All' },
   { key: 'vlog',     label: 'Vlogs' },
   { key: 'thread',   label: 'Threads' },
-  { key: 'clip',     label: 'Clips' },
   { key: 'post',     label: 'Posts' },
   { key: 'surfaced', label: 'Surfaced' },
 ]
@@ -75,7 +79,7 @@ export default function TimelinePage() {
   }, [])
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: 0, vlog: 0, thread: 0, clip: 0, post: 0, surfaced: 0 }
+    const c: Record<Filter, number> = { all: 0, vlog: 0, thread: 0, post: 0, surfaced: 0 }
     for (const it of items) {
       c.all++
       if (it.kind in c) (c as any)[it.kind]++
@@ -186,7 +190,11 @@ function FeedCard({ item }: { item: FeedItem }) {
   switch (item.kind) {
     case 'vlog':     return <VlogCard r={item.raw}/>
     case 'thread':   return <ThreadCard r={item.raw}/>
-    case 'clip':     return <ClipCard r={item.raw}/>
+    // 'clip' deprecated — return null so any stale clip rows from
+    // before the drop don't render. The ClipCard component is kept
+    // (dead code) in case we ever bring clips back as a real
+    // publishing surface.
+    case 'clip':     return null
     case 'post':     return <PostCard r={item.raw}/>
     case 'surfaced': return <SurfacedCard r={item.raw}/>
     case 'creative': return <CreativeCard r={item.raw}/>
@@ -551,9 +559,15 @@ function timeOfDay(v: unknown): string {
 }
 
 function dayLabel(ts: number): string {
+  // Compare LOCAL calendar dates, not millisecond differences. A vlog
+  // recorded at 11pm yesterday is ~11 hours ago; the old code would
+  // floor that to 0 and label it "Today · May 20" when it's actually
+  // already May 21. Operator caught: "it shows today as may 20? it's
+  // may 21."
   const d = new Date(ts)
   const now = new Date()
-  const dayDiff = Math.floor((now.getTime() - d.getTime()) / 86_400_000)
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000)
   if (dayDiff === 0) return 'Today · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
   if (dayDiff === 1) return 'Yesterday · ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
   if (dayDiff < 7) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })

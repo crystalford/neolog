@@ -75,7 +75,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const startSec = Number(row.transcript_span_start)
   const endSec = Number(row.transcript_span_end)
-  const durationSec = Math.max(1, Math.min(600, endSec - startSec))
+  // Reject degenerate spans (0..0 or end<=start). Older threads that
+  // never got spans computed were producing 1-second segments of the
+  // start of the vlog because Math.max(1, 0-0) fell through; better
+  // to surface a clear error so the operator knows re-extraction is
+  // needed.
+  if (endSec - startSec < 1) {
+    return NextResponse.json({
+      error: `Thread span is too short or missing (start=${startSec}, end=${endSec}). Re-extract the vlog so the span computation runs.`,
+    }, { status: 404 })
+  }
+  const durationSec = Math.min(600, endSec - startSec)
   const cacheKey = `${operator.id}/audio-segments/${params.id}.mp3`
 
   // Check cache first
