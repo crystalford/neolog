@@ -772,7 +772,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   display: grid;
   grid-template-columns: 1.05fr 1fr;
   gap: 64px;
-  align-items: end;
+  align-items: start;
 }
 .canon-hero-eyebrow {
   font-family: var(--font-mono);
