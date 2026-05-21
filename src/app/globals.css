@@ -2067,3 +2067,26 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .canon-detail-rail { position: relative; top: 0; }
   .canon-prov-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ============================================================
+ * CANON — Studio detail extensions (cluster panel)
+ * ============================================================ */
+.canon-ripe-panel {
+  display: grid;
+  grid-template-columns: 200px 1fr 1fr;
+  gap: 32px;
+  padding: 28px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-left: 3px solid var(--topic, var(--sig));
+  border-radius: 14px;
+  align-items: center;
+}
+.canon-ripe-panel .ripe-gauge-col,
+.canon-ripe-panel .ripe-breakdown-col,
+.canon-ripe-panel .ripe-traj-col {
+  min-width: 0;
+}
+@media (max-width: 960px) {
+  .canon-ripe-panel { grid-template-columns: 1fr; gap: 24px; padding: 20px; }
+}

@@ -1,225 +1,280 @@
-/**
- * Studio — cluster cultivation. Cards show ripeness, adjacent insights,
- * gap questions, and production candidates. When a cluster reaches Ready,
- * the operator clicks Materialize to go to the production engine.
- *
- * Faithful port from prototypes/studio.html. Reads from /api/v2/clusters
- * (graceful empty state until clusters populate).
- */
 'use client'
 
-import { useEffect, useState } from 'react'
+/**
+ * Studio — cluster list. Canon rebuild per 03-Cluster.html spirit
+ * (the design pack has cluster DETAIL; this list is extended from
+ * the canon vocabulary).
+ *
+ * Was /clusters. Old path redirects here.
+ *
+ * Hero: 64px h1, eyebrow, build-clusters button.
+ * Tab strip: All / Ready / Ripening / Hold.
+ * Body: editorial cluster cards (topic-bordered, ripeness bar, take pull,
+ * thread count, gap question if any, primary action).
+ *
+ * Data: GET /api/v2/clusters
+ * Build: POST /api/v2/admin/build-clusters
+ */
+
+export const runtime = 'edge'
+
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { topicColor } from '@/lib/topic-color'
+import { truncate } from '@/components/threadkit'
 
-type State = 'ripening' | 'ready' | 'hold'
-
-interface InsightItem {
-  kind: string
-  body: string // HTML allowed: <strong>, <em>
-}
-
-interface ClusterCard {
+interface ClusterRow {
   id: string
-  topic_color: string  // hex or token name
-  name: string
-  form: string         // e.g. "Concept · Mid"
-  state: State
-  headline: string
-  take: string
-  ripeness: number     // 0-100
-  insights?: { label: string; items: InsightItem[] }
-  gap_question?: string  // HTML allowed
-  outputs?: { name: string; live: boolean }[]
-  stats: { threads: number; sessions: number; sources?: number; since_viewed?: number; new_today?: number; awaiting?: boolean }
-  primary_action: string  // "Materialize" | "Develop" | "Resume"
+  abstracted_topic: string | null
+  topic: string
+  take: string | null
+  state: string
+  ripeness_score: number
+  thread_count?: number
+  insight_count?: number
+  gap_question?: string | null
+  last_touched_at?: string | null
 }
 
-const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'ripening', label: 'Ripening' },
-  { key: 'ready', label: 'Ready' },
-  { key: 'hold', label: 'Held' },
-] as const
-type Filter = (typeof FILTERS)[number]['key']
+type Tab = 'all' | 'ready' | 'ripening' | 'hold' | 'materialized'
 
-export default function StudioPage() {
-  const [clusters, setClusters] = useState<ClusterCard[]>([])
-  const [filter, setFilter] = useState<Filter>('all')
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'all',          label: 'All' },
+  { key: 'ready',        label: 'Ready' },
+  { key: 'ripening',     label: 'Ripening' },
+  { key: 'hold',         label: 'Hold' },
+  { key: 'materialized', label: 'Materialized' },
+]
+
+export default function StudioListPage() {
+  const [clusters, setClusters] = useState<ClusterRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<Tab>('all')
+  const [building, setBuilding] = useState(false)
+  const [buildNote, setBuildNote] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/v2/clusters', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { clusters: [] })
-      .then((d: any) => { setClusters(d.clusters || []); setLoading(false) })
+  const load = () => {
+    fetch('/api/v2/clusters?limit=200', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => {
+        if (d?.clusters) setClusters(d.clusters)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
-  }, [])
-
-  const filtered = filter === 'all' ? clusters : clusters.filter(c => c.state === filter)
-  const counts = {
-    all: clusters.length,
-    ripening: clusters.filter(c => c.state === 'ripening').length,
-    ready: clusters.filter(c => c.state === 'ready').length,
-    hold: clusters.filter(c => c.state === 'hold').length,
   }
-  const ready = counts.ready
+  useEffect(() => { load() }, [])
+
+  const build = async () => {
+    setBuilding(true)
+    setBuildNote(null)
+    try {
+      const r = await fetch('/api/v2/admin/build-clusters', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setBuildNote(
+        `Found ${d.groups_found} group${d.groups_found === 1 ? '' : 's'}. ` +
+        `Created ${d.clusters_created}, updated ${d.clusters_updated}, added ${d.threads_added} threads.`
+      )
+      load()
+    } catch (e: any) {
+      setBuildNote(`Failed: ${e?.message || String(e)}`)
+    } finally {
+      setBuilding(false)
+    }
+  }
+
+  const counts = useMemo(() => ({
+    all: clusters.length,
+    ready: clusters.filter(c => c.state === 'ready' || c.ripeness_score >= 70).length,
+    ripening: clusters.filter(c => ['forming', 'surfaced', 'ripening'].includes(c.state)).length,
+    hold: clusters.filter(c => c.state === 'hold').length,
+    materialized: clusters.filter(c => ['produced', 'published', 'materialized'].includes(c.state)).length,
+  }), [clusters])
+
+  const filtered = useMemo(() => {
+    if (tab === 'all') return clusters
+    if (tab === 'ready') return clusters.filter(c => c.state === 'ready' || c.ripeness_score >= 70)
+    if (tab === 'ripening') return clusters.filter(c => ['forming', 'surfaced', 'ripening'].includes(c.state))
+    if (tab === 'hold') return clusters.filter(c => c.state === 'hold')
+    if (tab === 'materialized') return clusters.filter(c => ['produced', 'published', 'materialized'].includes(c.state))
+    return clusters
+  }, [clusters, tab])
 
   return (
-    <Shell active="clusters" breadcrumb={["Clusters","Studio"]}><div className="pad">
-      <section className="hero">
-        <div className="crumb reveal d2">Living threads</div>
-        <h1 className="reveal d3">
-          {clusters.length > 0 ? (
-            <>
-              {clusters.length} piece{clusters.length === 1 ? '' : 's'}<br />
-              quietly cultivating.<br />
-              {ready > 0 && <span className="alive">{ready === 1 ? 'One came ripe.' : `${ready} came ripe.`}</span>}
-            </>
-          ) : (
-            <>Nothing<br />ripening yet.</>
-          )}
+    <Shell>
+      {/* Hero */}
+      <section className="canon-reveal d1" style={{ padding: '40px 0 32px' }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
+          textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 20,
+          display: 'inline-flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
+          The substrate · braided
+        </div>
+        <h1 style={{
+          fontFamily: 'var(--font-body)', fontWeight: 400,
+          fontSize: 72, lineHeight: 1.0, letterSpacing: '-3px',
+          color: 'var(--fg)', margin: '0 0 22px', textWrap: 'balance',
+        }}>
+          Studio<span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>,</span> <span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>cultivated</span><span style={{ color: 'var(--sig)' }}>.</span>
         </h1>
-        <p className="lead reveal d4">
-          {clusters.length > 0
-            ? 'The system has been working alongside you. When a cluster turns Ready, you take it to the production engine.'
-            : "Clusters form once three or more threads share a topic. Drop in a few vlogs and the system will start cultivating."}
+        <p style={{
+          fontSize: 17, lineHeight: 1.55, color: 'var(--fg-2)',
+          maxWidth: 620, letterSpacing: '-0.15px', marginBottom: 28,
+        }}>
+          Clusters are positions braided across weeks of riffs. When one ripens past 70,
+          it's ready to produce. Identify pattern fills in adjacent thinking; bounce sharpens the gap.
         </p>
-        <div className="reveal d4" style={{ marginTop: 16 }}>
-          <a href="/library" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            border: '1px solid var(--line-warm)',
-            borderRadius: 100,
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 9,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            color: 'var(--bone-2)',
-          }}>View finished library →</a>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={build} disabled={building} className="canon-btn ghost">
+            <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 8a4 4 0 0 1 4-4 4 4 0 0 1 4 4 M3 8a4 4 0 0 0 4 4 4 4 0 0 0 4 -4 M10 4 L12 2 L12 5 M4 12 L2 14 L2 11"/></svg></span>
+            {building ? 'Building…' : 'Build / refresh clusters'}
+          </button>
+          {buildNote && (
+            <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>{buildNote}</span>
+          )}
         </div>
       </section>
 
-      {clusters.length > 0 && (
-        <div className="filter-bar reveal d4" style={{ padding: '16px 24px 0' }}>
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              className={`fchip ${filter === f.key ? 'active' : ''}`}
-              onClick={() => setFilter(f.key)}
-            >
-              {f.label} <span className="num">{counts[f.key]}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading && (
-        <div className="empty-row reveal d5">
-          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--bone-3)' }}>LOADING…</p>
-        </div>
-      )}
-
-      {!loading && filtered.length === 0 && clusters.length > 0 && (
-        <div className="empty-row reveal d5">
-          <p>No clusters in this state.</p>
-        </div>
-      )}
-
-      <div className="deck" style={{ marginTop: 16 }}>
-        {filtered.map((c, i) => (
-          <a
-            key={c.id}
-            href={`/cluster/${c.id}`}
-            className={`ccard ${c.state} reveal d${Math.min(4 + i, 7) as 4 | 5 | 6 | 7}`}
-            style={{ ['--topic' as any]: cssColor(c.topic_color), ['--topic-glow' as any]: cssGlow(c.topic_color) }}
+      {/* Tabs */}
+      <div className="canon-reveal d2" style={{
+        display: 'flex', gap: 6, borderBottom: '1px solid var(--line)',
+        paddingBottom: 18, marginBottom: 32,
+      }}>
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`canon-filter-chip ${tab === t.key ? 'active' : ''}`}
           >
-            <div className="cluster-band">
-              <div className="cluster-head">
-                <span className="dot" />
-                <span className="name">{c.name}</span>
-                <span className="sep">·</span>
-                <span className="form">{c.form}</span>
-                <span className="state">{stateLabel(c.state)}</span>
-              </div>
-              <h2>{c.headline}</h2>
-              <div className="take-line">{c.take}</div>
-              <div className="ripe-row">
-                <div className="ripe-track"><div className="ripe-fill" style={{ width: `${c.ripeness}%` }} /></div>
-                <span className="ripe-num">{c.ripeness}/100</span>
-              </div>
-            </div>
-
-            {c.insights && (
-              <div className="insight-feed">
-                <div className="insight-label"><span className="pulse" />{c.insights.label}</div>
-                {c.insights.items.map((ins, idx) => (
-                  <div key={idx} className="insight-item">
-                    <span className="kind">{ins.kind}</span>
-                    <div className="body" dangerouslySetInnerHTML={{ __html: ins.body }} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {c.gap_question && (
-              <div className="gap-question">
-                <span className="ico"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" /><path d="M7 4 L7 7 L9 8.5" /></svg></span>
-                <p dangerouslySetInnerHTML={{ __html: c.gap_question }} />
-              </div>
-            )}
-
-            {c.outputs && c.outputs.length > 0 && (
-              <div className="outs-block">
-                <div className="outs-label">Production candidates</div>
-                <div className="outs">
-                  {c.outputs.map(o => <span key={o.name} className={`out ${o.live ? 'live' : ''}`}>{o.name}</span>)}
-                </div>
-              </div>
-            )}
-
-            <div className="cluster-foot">
-              <div className="cluster-stats">
-                {c.stats.awaiting && <span>Awaiting more material</span>}
-                <span><span className="n">{c.stats.threads}</span> threads</span>
-                <span><span className="n">{c.stats.sessions}</span> sessions</span>
-                {c.stats.sources !== undefined && <span><span className="n">{c.stats.sources}</span> sources</span>}
-                {c.stats.since_viewed !== undefined && <span className="new">+{c.stats.since_viewed} since viewed</span>}
-                {c.stats.new_today !== undefined && <span className="new">+{c.stats.new_today} today</span>}
-              </div>
-              <div className="cluster-acts">
-                {c.state === 'ready' && <button className="act" onClick={e => { e.preventDefault() }}>Hold</button>}
-                <span className="act go">{c.primary_action}</span>
-              </div>
-            </div>
-          </a>
+            {t.label}
+            <span className="n">{counts[t.key]}</span>
+          </button>
         ))}
       </div>
-    </div></Shell>
+
+      {/* Body */}
+      {loading && <div style={{ color: 'var(--fg-3)', padding: 20 }}>Loading…</div>}
+
+      {!loading && filtered.length === 0 && (
+        <div style={{
+          padding: '60px 32px',
+          border: '1px dashed var(--line-2)',
+          borderRadius: 14, background: 'var(--bg-1)',
+          textAlign: 'center',
+        }}>
+          <h2 style={{
+            fontFamily: 'var(--font-body)', fontSize: 32, fontWeight: 400,
+            letterSpacing: '-1px', color: 'var(--fg)', margin: '0 0 14px',
+          }}>
+            {clusters.length === 0 ? 'No clusters yet.' : `Nothing in ${tab}.`}
+          </h2>
+          <p style={{ color: 'var(--fg-2)', maxWidth: 480, margin: '0 auto', lineHeight: 1.55 }}>
+            {clusters.length === 0
+              ? 'Once you have a few threads on the same topic, hit Build / refresh clusters above to braid them together.'
+              : 'Switch tabs or build more clusters from your threads.'}
+          </p>
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="canon-reveal d3" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+          gap: 14,
+        }}>
+          {filtered.map(c => <ClusterCard key={c.id} cluster={c}/>)}
+        </div>
+      )}
+    </Shell>
   )
 }
 
-function stateLabel(s: State): string {
-  if (s === 'ready') return 'Ready'
-  if (s === 'hold') return 'Held for more'
-  return 'Ripening'
-}
-
-function cssColor(input: string): string {
-  if (input.startsWith('#') || input.startsWith('rgb') || input.startsWith('var(')) return input
-  return `var(--t-${input})`
-}
-function cssGlow(input: string): string {
-  // Simple opaque ramp; the cards already apply the gradient.
-  return `rgba(${hexToRgb(input).join(',')},0.10)`
-}
-function hexToRgb(input: string): [number, number, number] {
-  // Resolve token names to hexes from the design tokens (rough approximation)
-  const map: Record<string, string> = {
-    brass: '#d18847', terra: '#c66042', ochre: '#b48b3c', rose: '#b56676',
-    plum: '#8662a8', violet: '#6e6cb8', steel: '#4d8aa8', teal: '#4d9988',
-    sage: '#7a9a6a', moss: '#5e7d5e',
-  }
-  const hex = (input.startsWith('#') ? input : (map[input] || '#7a7160')).replace('#', '')
-  return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)]
+function ClusterCard({ cluster }: { cluster: ClusterRow }) {
+  const topicName = cluster.abstracted_topic ?? cluster.topic
+  const color = topicColor(topicName)
+  const ripe = Math.round(cluster.ripeness_score)
+  const ready = ripe >= 70
+  return (
+    <Link href={`/studio/${cluster.id}`} className="tcard" style={{
+      '--topic': color,
+      '--topic-soft': `color-mix(in srgb, ${color} 9%, transparent)`,
+      borderLeft: `3px solid ${color}`,
+    } as any}>
+      <div className="t-header">
+        <span className="topic-pill"><span className="type">Cluster</span></span>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5,
+          letterSpacing: 1.6, textTransform: 'uppercase',
+          color: ready ? 'var(--sig)' : 'var(--fg-3)',
+          padding: '3px 9px', borderRadius: 100,
+          background: ready ? 'var(--sig-soft)' : 'var(--bg-2)',
+          border: `1px solid ${ready ? 'color-mix(in srgb, var(--sig) 35%, transparent)' : 'var(--line-1)'}`,
+        }}>
+          {cluster.state}
+        </span>
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-3)' }}>
+          {cluster.thread_count ?? 0} threads
+        </span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontSize: 20, fontWeight: 500,
+        letterSpacing: '-0.4px', color: 'var(--fg)', lineHeight: 1.25,
+        marginBottom: 10,
+      }}>
+        {truncate(topicName, 80)}
+      </div>
+      {cluster.take && (
+        <div style={{
+          fontSize: 13.5, color: 'var(--fg-2)',
+          lineHeight: 1.5, marginBottom: 14,
+          fontStyle: 'italic', paddingLeft: 12,
+          borderLeft: `2px solid ${color}`,
+        }}>
+          {truncate(cluster.take, 140)}
+        </div>
+      )}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        marginBottom: 6,
+      }}>
+        <div style={{
+          flex: 1, height: 3, background: 'var(--line-1)', borderRadius: 2,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 0, height: 3,
+            width: `${ripe}%`,
+            background: ready ? 'var(--sig)' : color,
+            borderRadius: 2,
+            boxShadow: ready ? '0 0 6px var(--sig-glow)' : `0 0 6px ${color}80`,
+          }}/>
+        </div>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11,
+          color: ready ? 'var(--sig)' : 'var(--fg-1)',
+          fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+        }}>{ripe}</span>
+      </div>
+      {cluster.gap_question && (
+        <div style={{
+          marginTop: 12, padding: '10px 12px',
+          background: 'var(--bg-2)',
+          border: '1px dashed color-mix(in srgb, var(--sig) 30%, transparent)',
+          borderRadius: 6,
+          fontSize: 12, color: 'var(--fg-2)',
+          fontStyle: 'italic', lineHeight: 1.5,
+        }}>
+          {truncate(cluster.gap_question, 120)}
+        </div>
+      )}
+    </Link>
+  )
 }
