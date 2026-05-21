@@ -305,6 +305,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             {p.production_type === 'video_essay' && (
               <>
                 <VoiceoverPanel production={p} beats={data.beats ?? []} onStitched={load}/>
+                <BrollRenderPanel production={p} onRendered={load}/>
                 <section className="canon-section">
                   <div className="canon-section-head">
                     <h2>Beats <span className="meta">· {data.beats?.length ?? 0}</span></h2>
@@ -962,6 +963,233 @@ function VoiceoverPanel({ production, beats, onStitched }: {
           background: 'rgba(230,99,74,0.06)', border: '1px solid var(--t-terra)',
           borderRadius: 6, fontSize: 12, color: 'var(--fg-1)',
         }}>{error}</div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * BrollRenderPanel — pick b-roll clips + render the final MP4.
+ *
+ * Fetches /api/v2/broll for available b-roll vlogs (vlogs the
+ * operator marked as silent via Mark broll). Operator picks any
+ * number in order via clickable thumbnails. Render button calls
+ * /api/v2/productions/[id]/render and replaces the production's
+ * output with the final MP4 (state → produced).
+ *
+ * If output_metadata.kind === 'final_render', shows the rendered
+ * <video> + Re-render button. If voiceover not stitched yet, shows
+ * a hint pointing back to VoiceoverPanel.
+ */
+function BrollRenderPanel({ production, onRendered }: {
+  production: Production
+  onRendered: () => void
+}) {
+  const [broll, setBroll] = useState<{
+    id: string; filename: string | null; duration_sec: number | null
+    thumbnail_url: string | null; playback_url: string | null
+    recorded_at: string | null
+  }[]>([])
+  const [picked, setPicked] = useState<string[]>([])
+  const [loadingBroll, setLoadingBroll] = useState(true)
+  const [rendering, setRendering] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Check if a voiceover exists (must come before render).
+  let isVoiceover = false
+  let isFinalRender = false
+  try {
+    const meta = JSON.parse(production.output_metadata || '{}')
+    isVoiceover = meta?.kind === 'voiceover'
+    isFinalRender = meta?.kind === 'final_render'
+  } catch {}
+
+  useEffect(() => {
+    fetch('/api/v2/broll', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { broll: [] })
+      .then((d: any) => { setBroll(d.broll ?? []); setLoadingBroll(false) })
+      .catch(() => setLoadingBroll(false))
+  }, [])
+
+  const toggle = (id: string) => {
+    setPicked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const render = async () => {
+    if (picked.length === 0) return
+    setRendering(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/render`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ broll_vlog_ids: picked }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onRendered()
+    } catch (e: any) {
+      setError(String(e?.message || e).slice(0, 240))
+    } finally {
+      setRendering(false)
+    }
+  }
+
+  return (
+    <section className="canon-section">
+      <div className="canon-section-head">
+        <h2>Render <span className="meta">{isFinalRender ? '· final MP4 ready' : ''}</span></h2>
+        <div className="meta">b-roll + voiceover → final MP4</div>
+      </div>
+
+      {/* Existing final render — show the video */}
+      {isFinalRender && production.output_url && (
+        <div style={{
+          padding: '16px 20px', marginBottom: 14,
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line-1)',
+          borderLeft: '2px solid var(--sig)',
+          borderRadius: '0 12px 12px 0',
+        }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.6,
+            textTransform: 'uppercase', color: 'var(--sig)', fontWeight: 600, marginBottom: 10,
+          }}>Final render</div>
+          <video src={production.output_url} controls style={{
+            width: '100%', maxHeight: 480, background: '#000', borderRadius: 8, display: 'block',
+          }}/>
+          <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+            <a href={production.output_url} download={`render-${production.id}.mp4`} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Download MP4
+            </a>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)' }}>
+              Pick new b-roll below to re-render
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* No voiceover yet */}
+      {!isVoiceover && !isFinalRender && (
+        <div className="canon-empty-hint">
+          Stitch the voiceover above first. Once the voiceover MP3 exists, pick b-roll here and render the final video.
+        </div>
+      )}
+
+      {/* Voiceover exists — show b-roll picker */}
+      {(isVoiceover || isFinalRender) && (
+        <>
+          {loadingBroll && <div style={{ color: 'var(--fg-3)', padding: 16 }}>Loading b-roll…</div>}
+          {!loadingBroll && broll.length === 0 && (
+            <div className="canon-empty-hint">
+              No b-roll vlogs yet. Mark some vlogs as B-roll from their detail page (System actions →
+              Mark as B-roll). Those become available here.
+            </div>
+          )}
+          {!loadingBroll && broll.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+                Pick b-roll clips in the order they should appear in the final video. They'll be
+                concatenated and trimmed to match the voiceover length.
+              </div>
+              <div style={{
+                display: 'grid', gap: 10,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              }}>
+                {broll.map(b => {
+                  const idx = picked.indexOf(b.id)
+                  const isPicked = idx >= 0
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => toggle(b.id)}
+                      disabled={rendering}
+                      style={{
+                        position: 'relative',
+                        padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{
+                        aspectRatio: '16 / 9',
+                        background: b.thumbnail_url ? `url(${b.thumbnail_url}) center / cover` : 'linear-gradient(135deg, #1a1a1a, #050505)',
+                        borderRadius: 8,
+                        border: `2px solid ${isPicked ? 'var(--sig)' : 'var(--line-1)'}`,
+                        boxShadow: isPicked ? '0 0 0 2px var(--sig-soft)' : 'none',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        transition: 'all .15s',
+                      }}>
+                        {isPicked && (
+                          <span style={{
+                            position: 'absolute', top: 8, left: 8,
+                            width: 24, height: 24, borderRadius: '50%',
+                            background: 'var(--sig)', color: '#061735',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                          }}>{idx + 1}</span>
+                        )}
+                        {b.duration_sec != null && (
+                          <span style={{
+                            position: 'absolute', bottom: 6, right: 6,
+                            fontFamily: 'var(--font-mono)', fontSize: 10,
+                            color: 'var(--fg)',
+                            background: 'rgba(0,0,0,0.7)',
+                            padding: '2px 6px', borderRadius: 4,
+                          }}>
+                            {Math.floor(b.duration_sec / 60)}:{String(Math.floor(b.duration_sec % 60)).padStart(2, '0')}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{
+                        marginTop: 6, fontSize: 11.5, color: 'var(--fg-2)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {b.filename || 'Untitled'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                paddingTop: 14, borderTop: '1px solid var(--line)',
+              }}>
+                <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                  <strong style={{ color: 'var(--fg)' }}>{picked.length}</strong> clip{picked.length === 1 ? '' : 's'} picked
+                  {picked.length > 0 && (() => {
+                    const total = picked.reduce((s, id) => {
+                      const b = broll.find(x => x.id === id)
+                      return s + (b?.duration_sec ?? 0)
+                    }, 0)
+                    return total > 0 ? ` · ~${Math.round(total)}s of footage` : ''
+                  })()}
+                </span>
+                {picked.length > 0 && (
+                  <button onClick={() => setPicked([])} disabled={rendering} className="canon-btn ghost" style={{ fontSize: 11 }}>
+                    Clear
+                  </button>
+                )}
+                <button
+                  onClick={render}
+                  disabled={rendering || picked.length === 0}
+                  className="canon-btn primary"
+                  style={{ marginLeft: 'auto', fontSize: 12, opacity: picked.length === 0 ? 0.5 : 1 }}
+                >
+                  {rendering ? 'Rendering… (may take a minute)' : isFinalRender ? 'Re-render' : 'Render final MP4'}
+                </button>
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'rgba(230,99,74,0.06)', border: '1px solid var(--t-terra)',
+                  borderRadius: 8, fontSize: 12.5, color: 'var(--fg-1)',
+                }}>{error}</div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </section>
   )

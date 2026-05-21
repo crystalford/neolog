@@ -929,6 +929,105 @@ async function concatAudio(body, res) {
   }
 }
 
+// ── endpoint: /render-video-essay ───────────────────────────────────
+// Combine a voiceover MP3 with N b-roll video clips to produce a
+// final MP4. The voiceover audio replaces any audio in the b-roll;
+// b-roll videos concatenate in order; output trims to voiceover
+// duration (-shortest). If the b-roll is shorter than the voiceover,
+// the last frame freezes for the remainder (handled via tpad on the
+// final clip's filter chain — simpler approach: just trim; operator
+// picks enough b-roll).
+//
+// Input:
+//   { voiceover_url: string, broll_urls: string[] }
+// Output:
+//   MP4 stream
+async function renderVideoEssay(body, res) {
+  const { voiceover_url, broll_urls } = body
+  if (!voiceover_url) return jsonError(res, 400, 'voiceover_url required')
+  if (!Array.isArray(broll_urls) || broll_urls.length === 0) {
+    return jsonError(res, 400, 'broll_urls (non-empty array) required')
+  }
+  if (broll_urls.length > 30) return jsonError(res, 400, 'Too many broll clips (cap 30)')
+
+  const { join } = await import('path')
+  const { writeFileSync } = await import('fs')
+  const { dir } = await downloadToTmp(voiceover_url, 'render-tmp')
+
+  try {
+    // Download voiceover
+    const voFile = join(dir, 'voiceover.mp3')
+    const voResp = await fetch(voiceover_url)
+    if (!voResp.ok) throw new Error(`voiceover fetch ${voResp.status}`)
+    writeFileSync(voFile, Buffer.from(await voResp.arrayBuffer()))
+
+    // Download b-roll
+    const brollFiles = []
+    for (let i = 0; i < broll_urls.length; i++) {
+      const f = join(dir, `broll-${String(i).padStart(3, '0')}.mp4`)
+      const r = await fetch(broll_urls[i])
+      if (!r.ok) throw new Error(`broll ${i} fetch ${r.status}`)
+      writeFileSync(f, Buffer.from(await r.arrayBuffer()))
+      brollFiles.push(f)
+    }
+
+    const outFile = join(dir, 'final.mp4')
+
+    // Build the FFmpeg invocation. We need to concat N video streams
+    // (dropping their audio) and pair with the voiceover audio,
+    // trimming to whichever ends first.
+    // Note: scaling to a common 1920x1080 size keeps concat happy
+    // when sources have mixed resolutions.
+    const inputArgs = []
+    for (const f of brollFiles) {
+      inputArgs.push('-i', f)
+    }
+    inputArgs.push('-i', voFile)
+
+    const N = brollFiles.length
+    // Per-input scale + setsar to normalize before concat:
+    //   [0:v]scale=1920:1080:force_original_aspect_ratio=decrease,
+    //        pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];
+    const scaleChains = []
+    for (let i = 0; i < N; i++) {
+      scaleChains.push(
+        `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,` +
+        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
+      )
+    }
+    const concatInputs = Array.from({ length: N }, (_, i) => `[v${i}]`).join('')
+    const filterComplex =
+      scaleChains.join(';') + ';' +
+      `${concatInputs}concat=n=${N}:v=1:a=0[vout]`
+
+    await runFfmpeg(
+      [
+        '-y',
+        ...inputArgs,
+        '-filter_complex', filterComplex,
+        '-map', '[vout]',
+        '-map', `${N}:a`,
+        '-shortest',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '22',
+        '-c:a', 'aac',
+        '-b:a', '160k',
+        '-ar', '44100',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /render-video-essay failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -937,6 +1036,7 @@ const routes = {
   '/extract-audio-segment': extractAudioSegment,
   '/extract-video-segment': extractVideoSegment,
   '/concat-audio': concatAudio,
+  '/render-video-essay': renderVideoEssay,
   '/trim':           trim,
   '/concat':         concat,
 }
