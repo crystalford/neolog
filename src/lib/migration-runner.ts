@@ -356,6 +356,14 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-19_extraction_mode_cheap',
     sql: `UPDATE vlogs SET extraction_mode = 'cheap' WHERE extraction_mode IN ('auto', 'free')`,
   },
+  // key_phrases — short 2-8 word phrases the LLM marks as the punchiest
+  // fragments inside the take. Used by the Thread detail page to
+  // marker-highlight them in the hero h1, the take pull-quote, and the
+  // transcript span. Nullable; old rows stay NULL until re-extracted.
+  {
+    name: '2026-05-20_threads_key_phrases',
+    sql: `ALTER TABLE threads ADD COLUMN key_phrases TEXT`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

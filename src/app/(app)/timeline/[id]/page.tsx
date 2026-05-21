@@ -6,6 +6,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import LivePipeline from './live-pipeline'
 import Shell from '@/components/Shell'
 import { topicColor } from '@/lib/topic-color'
@@ -232,8 +233,39 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
   const fullTitle = vlog.original_filename ?? vlog.id
   const breadcrumbTail = fullTitle.length > 30 ? fullTitle.slice(0, 28) + '…' : fullTitle
+  const vlogTopicColor = topicColor(vlog.original_filename ?? vlog.id)
   return (
     <Shell active="vlogs" breadcrumb={['Vlogs', breadcrumbTail]}>
+    <div style={{ ['--topic' as any]: vlogTopicColor } as React.CSSProperties}>
+
+      {/* Crumbs row matching the Thread page chrome — breadcrumb +
+          copy-link. No prev/next vlog yet (would need a dedicated
+          API query); add later. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '14px 0', marginBottom: 8,
+        borderBottom: '1px solid var(--line)',
+        fontSize: 12,
+      }}>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <Link href="/" style={{ color: 'var(--fg-3)', textDecoration: 'none' }}>Timeline</Link>
+          <span style={{ color: 'var(--fg-5)' }}>/</span>
+          <Link href="/vlogs" style={{ color: 'var(--fg-3)', textDecoration: 'none' }}>Vlogs</Link>
+          <span style={{ color: 'var(--fg-5)' }}>/</span>
+          <span style={{ color: 'var(--fg-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{breadcrumbTail}</span>
+        </nav>
+        <button onClick={() => {
+          navigator.clipboard?.writeText(`${location.origin}/timeline/${vlog.id}`).catch(() => {})
+        }} style={{
+          width: 28, height: 28, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', color: 'var(--fg-3)',
+          border: '1px solid var(--line)', borderRadius: 5, cursor: 'pointer',
+        }} title="Copy vlog link">
+          <svg viewBox="0 0 14 14" width="13" height="13"><path d="M6 4 L10 4 A2 2 0 0 1 12 6 L12 10" fill="none" stroke="currentColor" strokeWidth="1.4"/><path d="M8 10 L4 10 A2 2 0 0 1 2 8 L2 4 A2 2 0 0 1 4 2 L8 2" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>
+        </button>
+      </div>
+
     <div className="pad-tight vlog-detail">
 
       <div className="vplayer">
@@ -577,6 +609,39 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
+    </div>
+
+    {/* Provenance footer matching the Thread page's design vocabulary.
+        Lives at the bottom of the vlog detail, surfaces the operator-
+        facing technical facts (id, recorded date, file size, mime,
+        pipeline status). */}
+    <section style={{
+      margin: '20px 0 8px', padding: '18px 0',
+      borderTop: '1px solid var(--line)',
+      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px 32px',
+    }}>
+      <ProvField label="Recorded" value={vlog.recorded_at ? new Date(vlog.recorded_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}/>
+      <ProvField label="Size" value={sizeMb ? `${sizeMb} MB` : '—'}/>
+      <ProvField label="MIME" value={vlog.mime_type ?? '—'} mono/>
+      <ProvField label="Pipeline" value={status}/>
+      <ProvField label="Vlog id" value={vlog.id} mono/>
+      <ProvField label="Threads" value={threads.length.toString()}/>
+      <ProvField label="Clips" value={clips.length.toString()}/>
+      <ProvField label="Entities" value={entities.length.toString()}/>
+    </section>
+
+    {/* Page footer with keyboard hints — matches Thread page */}
+    <footer style={{
+      padding: '14px 0 28px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      fontSize: 10, color: 'var(--fg-4)',
+      fontFamily: 'Geist Mono, ui-monospace, monospace',
+      letterSpacing: 0.4, textTransform: 'uppercase',
+    }}>
+      <span>neolog.ai · vlog {vlog.id.slice(0, 16)}…</span>
+      <span>↑ to top</span>
+    </footer>
+
     </div>
     </Shell>
   )
@@ -1059,3 +1124,21 @@ const ENTITY_COLORS: Record<string, { bg: string; bd: string }> = {
 }
 function entityTypeBg(t: string): string { return ENTITY_COLORS[t]?.bg ?? 'var(--bg-2)' }
 function entityTypeBd(t: string): string { return ENTITY_COLORS[t]?.bd ?? 'var(--line)' }
+
+function ProvField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 9, color: 'var(--fg-4)',
+        textTransform: 'uppercase', letterSpacing: 1, fontWeight: 500,
+        fontFamily: 'Geist Mono, ui-monospace, monospace',
+        marginBottom: 3,
+      }}>{label}</div>
+      <div style={{
+        fontSize: 12, color: 'var(--fg-1)',
+        fontFamily: mono ? 'Geist Mono, ui-monospace, monospace' : 'Geist, system-ui, sans-serif',
+        wordBreak: 'break-all',
+      }}>{value}</div>
+    </div>
+  )
+}
