@@ -58,11 +58,6 @@ interface ThreadPreview {
 export default function CapturePage() {
   const params = useSearchParams()
   const initialMode = (params?.get('mode') as Mode) || 'upload'
-  // Riff-mode: when arrived from a Thread page's "Riff on this" button,
-  // we know which thread the operator is following up on. Future uploads
-  // get tagged with this id (via state passed to the upload API).
-  const riffOf = params?.get('riff_of') ?? null
-  const [riffContext, setRiffContext] = useState<{ id: string; topic: string; take: string } | null>(null)
   const [mode, setMode] = useState<Mode>(initialMode === 'record' ? 'record' : 'upload')
   const [archive, setArchive] = useState(false)
   const [entries, setEntries] = useState<FileEntry[]>([])
@@ -70,17 +65,6 @@ export default function CapturePage() {
   const [running, setRunning] = useState(false)
   const [recent, setRecent] = useState<ThreadPreview[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!riffOf) return
-    fetch(`/api/v2/threads/${riffOf}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (d?.thread) setRiffContext({
-          id: d.thread.id, topic: d.thread.topic, take: d.thread.take,
-        })
-      }).catch(() => {})
-  }, [riffOf])
   // Cancel flag — set when the user wants to stop the queue mid-flight.
   const cancelRef = useRef(false)
 
@@ -173,46 +157,6 @@ export default function CapturePage() {
   return (
     <Shell active="capture" breadcrumb={['Capture']}>
     <div className="pad capture-stage">
-
-      {/* Riff context banner — surfaced when arriving from a Thread's
-          "Riff on this" button. Tells the operator what they're
-          following up on so the recording stays anchored. */}
-      {riffContext && (
-        <div style={{
-          margin: '24px 0 0',
-          padding: '14px 18px',
-          background: 'var(--bg-1)',
-          border: '1px solid var(--line)',
-          borderLeft: '3px solid var(--accent)',
-          borderRadius: 8,
-          display: 'flex', alignItems: 'flex-start', gap: 14,
-        }}>
-          <span style={{
-            fontSize: 10, color: 'var(--accent)',
-            textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600,
-            fontFamily: 'Geist Mono, ui-monospace, monospace',
-            paddingTop: 2, minWidth: 80,
-          }}>
-            ◌ Riff on
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, color: 'var(--fg-1)', fontWeight: 500, marginBottom: 4 }}>
-              {riffContext.topic}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--fg-2)', fontStyle: 'italic', lineHeight: 1.55 }}>
-              “{riffContext.take.length > 200 ? riffContext.take.slice(0, 197) + '…' : riffContext.take}”
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--fg-4)', marginTop: 8, fontFamily: 'Geist Mono, ui-monospace, monospace', letterSpacing: 0.4 }}>
-              Your next vlog will be tagged as a follow-up to this thread. Record or upload below.
-            </div>
-          </div>
-          <a href="/capture" style={{
-            fontSize: 11, color: 'var(--fg-3)', textDecoration: 'none',
-            padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 5,
-          }}>Cancel</a>
-        </div>
-      )}
-
       <section className="hero" style={{ padding: '32px 0 16px' }}>
         <div className="crumb reveal d2">Drop them in</div>
         <h1 className="reveal d3">Capture</h1>

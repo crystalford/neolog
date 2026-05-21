@@ -127,7 +127,9 @@ function Sidebar({ active }: { active: NavId }) {
   ]
   const admin: SidebarItem[] = [
     { id: 'capture',  label: 'Capture',  href: '/capture',  icon: 'Capture', kbd: '⌘N' },
-    { id: 'system',   label: 'System',   href: '/system',   icon: 'System' },
+    // System merged into Settings. /system route stays alive but
+    // doesn't get its own nav entry — operator reaches it via the
+    // "Health" section at the top of Settings.
     { id: 'settings', label: 'Settings', href: '/settings', icon: 'Settings' },
   ]
 

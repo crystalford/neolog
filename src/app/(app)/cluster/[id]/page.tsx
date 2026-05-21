@@ -192,7 +192,7 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
                 {cluster.length_magnitude && <><span style={{ color: 'var(--fg-5)', margin: '0 5px' }}>·</span>{cluster.length_magnitude}</>}
               </span>
               {ready
-                ? <span className="pill accent">◆ ready to materialize</span>
+                ? <span className="pill accent">◆ ready to produce</span>
                 : <span className="pill mute">{cluster.state}</span>}
             </div>
             <h1 style={{
@@ -214,11 +214,11 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Action primary label="Materialize" onClick={() => alert('Production engine — coming in a later deploy.')}/>
-            <Action label="Cultivate" hint="C" onClick={() => cultivate('workers')} disabled={cultivating !== null}/>
-            <Action label="Bounce ideas" onClick={() => setBounceOpen(o => !o)}/>
+            <Action primary label="Produce a draft" onClick={() => alert('Production engine — coming in a later deploy.')}/>
+            <Action label="Identify pattern" hint="C" onClick={() => cultivate('workers')} disabled={cultivating !== null}/>
+            <Action label="Ask the model" onClick={() => setBounceOpen(o => !o)}/>
             <hr style={{ border: 0, borderTop: '1px solid var(--line)', margin: '6px 0' }}/>
-            <Action label="Re-cultivate (Sonnet)" onClick={() => cultivate('sonnet')} disabled={cultivating !== null}/>
+            <Action label="Re-identify (Sonnet)" onClick={() => cultivate('sonnet')} disabled={cultivating !== null}/>
             <Action label="Hold for more" onClick={() => alert('Hold flow — coming later.')}/>
           </div>
         </section>
@@ -396,7 +396,7 @@ export default function ClusterDetailPage({ params }: { params: { id: string } }
 
             <SectionBlock label="Surfaced insights" count={`${cluster.insights.length} · what the system noticed`} meta={cluster.insights.length === 0 ? 'no runs yet' : 'cultivate output'}>
               {cluster.insights.length === 0 ? (
-                <EmptyHint>Click <strong>Cultivate</strong> in the action panel to surface named concepts, adjacent thinkers, and cross-references.</EmptyHint>
+                <EmptyHint>Click <strong>Identify pattern</strong> in the action panel — the model will name the concept this cluster matches, suggest an adjacent thinker, and find cross-references to your other clusters.</EmptyHint>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {cluster.insights.map((ins, i) => (

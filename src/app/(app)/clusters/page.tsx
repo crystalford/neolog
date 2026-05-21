@@ -105,7 +105,7 @@ export default function ClustersPage() {
             </div>
             <h1 style={{ marginTop: 0, marginBottom: 8 }}>Clusters</h1>
             <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 580 }}>
-              When threads start to circle the same idea, they form a cluster. When a cluster ripens, you materialize it into a production.
+              When threads start to circle the same idea, they form a cluster. When a cluster ripens, you turn it into a production — a script, article, clip, or post built from the threads inside.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -137,7 +137,7 @@ export default function ClustersPage() {
           <a className={`tab ${tab === 'ready' ? 'active' : ''}`} onClick={() => setTab('ready')}>Ready<span className="n">{counts.ready}</span></a>
           <a className={`tab ${tab === 'ripening' ? 'active' : ''}`} onClick={() => setTab('ripening')}>Ripening<span className="n">{counts.ripening}</span></a>
           <a className={`tab ${tab === 'hold' ? 'active' : ''}`} onClick={() => setTab('hold')}>Held<span className="n">{counts.hold}</span></a>
-          <a className={`tab ${tab === 'materialized' ? 'active' : ''}`} onClick={() => setTab('materialized')}>Materialized<span className="n">{counts.materialized}</span></a>
+          <a className={`tab ${tab === 'materialized' ? 'active' : ''}`} onClick={() => setTab('materialized')}>Produced<span className="n">{counts.materialized}</span></a>
         </div>
 
         {loading ? (
@@ -239,7 +239,7 @@ function ClusterCard({ c }: { c: ClusterRow }) {
           </div>
 
           <button className={`btn ${ready ? 'primary' : ''}`} style={{ width: '100%', justifyContent: 'center' }}>
-            {ready ? 'Materialize →' : onHold ? 'Resume' : 'Develop →'}
+            {ready ? 'Produce →' : onHold ? 'Resume' : 'Develop →'}
           </button>
         </div>
       </div>

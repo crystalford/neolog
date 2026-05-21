@@ -48,8 +48,34 @@ export default async function SettingsPage() {
       <section className="hero">
         <div className="crumb reveal d2">Settings</div>
         <h1 className="reveal d3">Yours</h1>
-        <p className="lead reveal d4">Identity, voice, integrations, and the keys that make the system run.</p>
+        <p className="lead reveal d4">Identity, voice, integrations, infrastructure health, and the keys that make the system run.</p>
       </section>
+
+      {/* Quick link to the full system health dashboard. System was
+          merged into Settings — operator hits this when something's
+          off, otherwise the rest of the page is the operator-level
+          stuff that matters day-to-day. */}
+      <div style={{ padding: '0 24px 16px' }}>
+        <a href="/system" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          textDecoration: 'none', color: 'var(--fg-1)',
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>
+              <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: 'var(--ok, #10b981)', marginRight: 8 }}/>
+              System health
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace', letterSpacing: 0.3 }}>
+              D1 · R2 · Workers AI · FFmpeg container · Anthropic
+            </div>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--fg-3)', fontFamily: 'Geist Mono, ui-monospace, monospace' }}>Open →</span>
+        </a>
+      </div>
 
       <div style={{ padding: '0 24px 4px' }}>
         <div className="reveal d4" style={{

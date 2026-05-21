@@ -182,7 +182,7 @@ export default function LandingPage() {
             { n: '02', c: '7', name: 'Transcribe',  d: 'Whisper on Workers AI. Word-level timestamps. Voice preserved — no sanitization.' },
             { n: '03', c: '2', name: 'Extract',     d: 'Four parallel passes: threads, clip candidates, creative elements, entities. Free or premium.' },
             { n: '04', c: '6', name: 'Cluster',     d: 'Riffs form. Threshold-based auto-link. Studio surfaces "ready" clusters with names + gaps.' },
-            { n: '05', c: '3', name: 'Materialize', d: 'Video essay, X thread, article, clip. Built from voice-grounded threads. You publish.' },
+            { n: '05', c: '3', name: 'Produce',     d: 'Video essay, X thread, article, clip. Built from voice-grounded threads. You publish.' },
           ].map((s, i) => (
             <div key={i} style={{
               background: 'var(--bg-1)',
