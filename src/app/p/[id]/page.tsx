@@ -51,7 +51,7 @@ export default function PublicProductionPage({ params }: { params: { id: string 
   }, [params.id])
 
   if (notFound) return <PublicShell><NotFound/></PublicShell>
-  if (error) return <PublicShell><div style={{ color: 'var(--err)' }}>Error: {error}</div></PublicShell>
+  if (error) return <PublicShell><div style={{ color: 'var(--t-terra)' }}>Error: {error}</div></PublicShell>
   if (!p) return <PublicShell><div style={{ color: 'var(--fg-3)' }}>Loading…</div></PublicShell>
 
   const dateStr = p.produced_at

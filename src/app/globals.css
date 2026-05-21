@@ -2151,3 +2151,208 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .canon-digest { grid-template-columns: repeat(2, 1fr); }
   .canon-digest-cell .n { font-size: 40px; letter-spacing: -1.5px; }
 }
+
+/* ============================================================
+ * CANON — About sitemap cards + Productions extensions
+ * ============================================================ */
+
+/* About — surface cards */
+.canon-surface-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 14px;
+  padding: 24px 24px 22px;
+  cursor: pointer;
+  transition: all .18s;
+  overflow: hidden;
+  min-height: 220px;
+  text-decoration: none;
+  color: inherit;
+}
+.canon-surface-card:hover {
+  background: var(--bg-2);
+  border-color: color-mix(in srgb, var(--c, var(--fg-3)) 30%, var(--line-2));
+  transform: translateY(-2px);
+}
+.canon-surface-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 0% 0%, color-mix(in srgb, var(--c, var(--fg-3)) 12%, transparent), transparent 60%);
+  pointer-events: none; opacity: 0.7;
+}
+.canon-surface-card .head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; position: relative;
+}
+.canon-surface-card .num {
+  font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 1.8px; color: var(--fg-4); font-weight: 500;
+}
+.canon-surface-card .tag {
+  font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--c, var(--fg-3)); font-weight: 500;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.canon-surface-card .tag::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--c, var(--fg-3));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c, var(--fg-3)) 50%, transparent);
+}
+.canon-surface-card h3 {
+  font-family: var(--font-body); font-weight: 500;
+  font-size: 26px; color: var(--fg);
+  letter-spacing: -0.6px; line-height: 1.1;
+  margin: 0 0 10px; position: relative;
+}
+.canon-surface-card .blurb {
+  font-size: 13.5px; color: var(--fg-1); line-height: 1.55;
+  letter-spacing: -0.1px; margin: 0 0 16px;
+  position: relative; flex: 1;
+}
+.canon-surface-card .foot {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--fg-3); font-weight: 500; position: relative;
+}
+.canon-surface-card .go {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--fg-1);
+}
+.canon-surface-card:hover .go { color: var(--c, var(--sig)); }
+
+/* Productions — character cards */
+.canon-characters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.canon-char-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all .18s;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 12px;
+  color: inherit; text-decoration: none;
+}
+.canon-char-card:hover {
+  border-color: color-mix(in srgb, var(--c1, var(--t-plum)) 30%, var(--line-2));
+  background: var(--bg-2);
+  transform: translateY(-1px);
+}
+.canon-char-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 0% 0%, color-mix(in srgb, var(--c1, var(--t-plum)) 10%, transparent), transparent 60%);
+  pointer-events: none; opacity: 0.6;
+}
+.canon-char-card .row1 {
+  display: flex; align-items: center; gap: 12px;
+  position: relative;
+}
+.canon-char-card .face {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--c1, var(--t-plum)), var(--c2, var(--t-violet)));
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-body); font-weight: 500;
+  font-size: 16px; color: var(--bg);
+  flex-shrink: 0;
+}
+.canon-char-card .nm {
+  font-family: var(--font-body); font-weight: 500;
+  font-size: 17px; color: var(--fg); letter-spacing: -0.3px;
+}
+.canon-char-card .role {
+  font-family: var(--font-mono); font-size: 9.5px;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--fg-3); margin-top: 4px;
+}
+.canon-char-card .desc {
+  font-size: 13px; color: var(--fg-2); line-height: 1.5;
+  margin: 0; position: relative;
+}
+.canon-char-card .stats {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.4px; color: var(--fg-3);
+  margin-top: auto; padding-top: 8px;
+  border-top: 1px solid var(--line);
+  position: relative;
+}
+.canon-char-card .stats b { color: var(--fg-1); font-weight: 500; }
+
+/* Productions — generation pipeline rail card */
+.canon-gen-list { display: flex; flex-direction: column; gap: 8px; }
+.canon-gen-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+}
+.canon-gen-row .body { flex: 1; min-width: 0; }
+.canon-gen-row .lbl {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--fg-3); margin-bottom: 2px;
+}
+.canon-gen-row .v {
+  font-family: var(--font-body); font-size: 12.5px;
+  color: var(--fg-1); font-weight: 500;
+}
+.canon-gen-row .pct {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--fg-2); font-variant-numeric: tabular-nums;
+}
+.canon-gen-row .pct.live { color: var(--sig); }
+
+/* Productions list cards */
+.canon-production-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-left: 3px solid var(--c, var(--t-plum));
+  border-radius: 12px;
+  padding: 22px 24px;
+  cursor: pointer;
+  transition: all .18s;
+  display: flex; flex-direction: column; gap: 14px;
+  color: inherit; text-decoration: none;
+  position: relative; overflow: hidden;
+}
+.canon-production-card:hover {
+  background: var(--bg-2);
+  border-color: var(--line-3);
+  transform: translateY(-1px);
+}
+.canon-production-card .kind-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.canon-production-card h3 {
+  font-family: var(--font-body); font-weight: 500;
+  font-size: 22px; color: var(--fg);
+  letter-spacing: -0.5px; line-height: 1.25;
+  margin: 0;
+}
+.canon-production-card .blurb {
+  font-size: 13.5px; color: var(--fg-2);
+  line-height: 1.5; letter-spacing: -0.1px;
+  margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.canon-production-card .meta-pills {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: auto;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.4px; color: var(--fg-3);
+}
+.canon-production-card .meta-pills b { color: var(--fg-1); font-weight: 500; }
+
+@media (max-width: 960px) {
+  .canon-surface-card { min-height: 0; }
+}

@@ -710,11 +710,11 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '12px 16px',
-          background: 'var(--ink-2)',
+          background: 'var(--bg-2)',
           border: '1px solid var(--line)',
           borderRadius: 12,
           fontSize: 13,
-          color: 'var(--bone-1)',
+          color: 'var(--fg-1)',
         }}>
           audio extract: <strong>{audioBatchProgress.current}/{audioBatchProgress.total}</strong>
           {' · '}done: <strong>{audioBatchProgress.done}</strong>
@@ -734,11 +734,11 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '12px 16px',
-          background: backfillStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-          border: `1px solid ${backfillStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+          background: backfillStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--bg-2)',
+          border: `1px solid ${backfillStats.lastError ? 'var(--t-terra)' : 'var(--line)'}`,
           borderRadius: 12,
           fontSize: 13,
-          color: 'var(--bone-1)',
+          color: 'var(--fg-1)',
         }}>
           {backfillStats.lastError ? (
             <>Backfill error: {backfillStats.lastError}</>
@@ -762,38 +762,38 @@ export default function UploadsPage() {
           {/* Summary header */}
           <div style={{
             padding: '12px 16px',
-            background: batchStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-            border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+            background: batchStats.lastError ? 'rgba(198,96,66,0.10)' : 'var(--bg-2)',
+            border: `1px solid ${batchStats.lastError ? 'var(--t-terra)' : 'var(--line)'}`,
             borderRadius: '12px 12px 0 0',
             borderBottom: 'none',
             fontSize: 13,
-            color: 'var(--bone-1)',
+            color: 'var(--fg-1)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
             flexWrap: 'wrap',
           }}>
             <strong>Fixing thumbnails</strong>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--bone-2)' }}>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--fg-2)' }}>
               {batchStats.direct + batchStats.mini_transcode + batchStats.queued + batchStats.failed} / {thumbQueue.length}
             </span>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--bone-3)', letterSpacing: 1 }}>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--fg-3)', letterSpacing: 1 }}>
               · {batchStats.direct} DIRECT · {batchStats.mini_transcode} MINI · {batchStats.queued} QUEUED · {batchStats.failed} FAILED
             </span>
-            {batchRunning && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--state-info, #6b9aa9)' }}>running…</span>}
-            {!batchRunning && batchStats.remaining === 0 && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--state-ok, #7a9a6a)' }}>complete</span>}
+            {batchRunning && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sig)' }}>running…</span>}
+            {!batchRunning && batchStats.remaining === 0 && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--t-sage)' }}>complete</span>}
           </div>
           {/* Progress bar */}
           <div style={{
             height: 4,
-            background: 'var(--ink-1)',
+            background: 'var(--bg-1)',
             borderLeft: '1px solid var(--line)',
             borderRight: '1px solid var(--line)',
           }}>
             <div style={{
               height: '100%',
               width: `${(((batchStats.direct + batchStats.mini_transcode + batchStats.queued + batchStats.failed) / thumbQueue.length) * 100).toFixed(1)}%`,
-              background: 'var(--bone-3)',
+              background: 'var(--fg-3)',
               transition: 'width 0.3s',
             }} />
           </div>
@@ -801,15 +801,15 @@ export default function UploadsPage() {
           <div style={{
             maxHeight: 360,
             overflowY: 'auto',
-            background: 'var(--ink-2)',
-            border: `1px solid ${batchStats.lastError ? 'var(--state-err)' : 'var(--line)'}`,
+            background: 'var(--bg-2)',
+            border: `1px solid ${batchStats.lastError ? 'var(--t-terra)' : 'var(--line)'}`,
             borderTop: 'none',
             borderRadius: '0 0 12px 12px',
           }}>
             {thumbQueue.map(row => <ThumbQueueRow key={row.vlog_id} row={row} />)}
           </div>
           {batchStats.lastError && (
-            <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--state-err)', fontFamily: 'JetBrains Mono, monospace' }}>
+            <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--t-terra)', fontFamily: 'JetBrains Mono, monospace' }}>
               {batchStats.lastError}
             </div>
           )}
@@ -820,11 +820,11 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '12px 16px',
-          background: regenResult.error ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-          border: `1px solid ${regenResult.error ? 'var(--state-err)' : 'var(--line)'}`,
+          background: regenResult.error ? 'rgba(198,96,66,0.10)' : 'var(--bg-2)',
+          border: `1px solid ${regenResult.error ? 'var(--t-terra)' : 'var(--line)'}`,
           borderRadius: 12,
           fontSize: 13,
-          color: 'var(--bone-1)',
+          color: 'var(--fg-1)',
         }}>
           {regenResult.error ? <>Failed: {regenResult.error}</> : <>{regenResult.message}</>}
         </div>
@@ -834,19 +834,19 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '16px 18px',
-          background: 'var(--ink-2)',
+          background: 'var(--bg-2)',
           border: '1px solid var(--line)',
           borderRadius: 12,
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
         }}>
-          <div style={{ fontSize: 13, color: 'var(--bone-1)', lineHeight: 1.55 }}>
-            Paste your <strong style={{ color: 'var(--bone)' }}>paused Supabase</strong> credentials. We'll read
-            the old <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--bone)' }}>video_uploads.thumbnail_url</code> column and copy each thumbnail into the matching D1 vlog by R2 key. Read-only on Supabase — nothing is written there.
+          <div style={{ fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.55 }}>
+            Paste your <strong style={{ color: 'var(--fg)' }}>paused Supabase</strong> credentials. We'll read
+            the old <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--fg)' }}>video_uploads.thumbnail_url</code> column and copy each thumbnail into the matching D1 vlog by R2 key. Read-only on Supabase — nothing is written there.
           </div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--bone-3)' }}>Project URL</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--fg-3)' }}>Project URL</span>
             <input
               type="text"
               placeholder="https://abcdefghij.supabase.co"
@@ -854,10 +854,10 @@ export default function UploadsPage() {
               onChange={e => setSupabaseUrl(e.target.value)}
               style={inputStyle}
             />
-            <span style={{ fontSize: 11, color: 'var(--bone-4)' }}>Dashboard → Project → Settings → API → "Project URL"</span>
+            <span style={{ fontSize: 11, color: 'var(--fg-4)' }}>Dashboard → Project → Settings → API → "Project URL"</span>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--bone-3)' }}>service_role key</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--fg-3)' }}>service_role key</span>
             <input
               type="password"
               placeholder="eyJhbGciOiJIUzI1NiIs… (long JWT, not your login password)"
@@ -865,7 +865,7 @@ export default function UploadsPage() {
               onChange={e => setSupabaseKey(e.target.value)}
               style={inputStyle}
             />
-            <span style={{ fontSize: 11, color: 'var(--bone-4)' }}>Same page → Project API keys → row labeled <strong style={{ color: 'var(--bone-2)' }}>service_role</strong> → Reveal</span>
+            <span style={{ fontSize: 11, color: 'var(--fg-4)' }}>Same page → Project API keys → row labeled <strong style={{ color: 'var(--fg-2)' }}>service_role</strong> → Reveal</span>
           </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
@@ -873,9 +873,9 @@ export default function UploadsPage() {
               disabled={!supabaseUrl.trim() || !supabaseKey.trim() || probing || thumbImporting}
               style={{
                 padding: '10px 18px',
-                border: '1px solid var(--line-warm)',
+                border: '1px solid var(--line-2)',
                 background: 'rgba(236,228,210,0.02)',
-                color: 'var(--bone-1)',
+                color: 'var(--fg-1)',
                 borderRadius: 100,
                 fontSize: 13,
                 fontWeight: 500,
@@ -886,20 +886,20 @@ export default function UploadsPage() {
               disabled={!supabaseUrl.trim() || !supabaseKey.trim() || thumbImporting || (probeResult != null && !probeResult.ok)}
               style={{
                 padding: '10px 18px',
-                border: '1px solid var(--bone-3)',
+                border: '1px solid var(--fg-3)',
                 background: 'rgba(236,228,210,0.04)',
-                color: 'var(--bone)',
+                color: 'var(--fg)',
                 borderRadius: 100,
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: thumbImporting ? 'wait' : 'pointer',
               }}>{thumbImporting ? 'Pulling…' : '2. Pull thumbnails'}</button>
-            <span style={{ fontSize: 11, color: 'var(--bone-3)' }}>The key is never persisted — used in-memory only.</span>
+            <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>The key is never persisted — used in-memory only.</span>
           </div>
           {probeResult && (
             <div style={{
               fontSize: 12,
-              color: probeResult.ok ? 'var(--bone-1)' : 'var(--state-err)',
+              color: probeResult.ok ? 'var(--fg-1)' : 'var(--t-terra)',
               padding: '8px 0 0',
             }}>
               {probeResult.ok
@@ -914,11 +914,11 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '12px 16px',
-          background: thumbResult.error ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-          border: `1px solid ${thumbResult.error ? 'var(--state-err)' : 'var(--line)'}`,
+          background: thumbResult.error ? 'rgba(198,96,66,0.10)' : 'var(--bg-2)',
+          border: `1px solid ${thumbResult.error ? 'var(--t-terra)' : 'var(--line)'}`,
           borderRadius: 12,
           fontSize: 13,
-          color: 'var(--bone-1)',
+          color: 'var(--fg-1)',
         }}>
           {thumbResult.error ? (
             <>Pull failed: {thumbResult.error}</>
@@ -936,11 +936,11 @@ export default function UploadsPage() {
         <div className="reveal d4" style={{
           margin: '0 24px 16px',
           padding: '12px 16px',
-          background: importResult.inserted < 0 ? 'rgba(198,96,66,0.10)' : 'var(--ink-2)',
-          border: `1px solid ${importResult.inserted < 0 ? 'var(--state-err)' : 'var(--line)'}`,
+          background: importResult.inserted < 0 ? 'rgba(198,96,66,0.10)' : 'var(--bg-2)',
+          border: `1px solid ${importResult.inserted < 0 ? 'var(--t-terra)' : 'var(--line)'}`,
           borderRadius: 12,
           fontSize: 13,
-          color: 'var(--bone-1)',
+          color: 'var(--fg-1)',
         }}>
           {importResult.inserted < 0 ? (
             <>Import failed — check the worker logs.</>
@@ -949,7 +949,7 @@ export default function UploadsPage() {
               Scanned <strong>{importResult.total_objects_scanned}</strong> R2 objects ·
               imported <strong>{importResult.inserted}</strong> new vlog{importResult.inserted === 1 ? '' : 's'} ·
               skipped <strong>{importResult.skipped_existing}</strong> already in D1.
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--bone-3)' }}>
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fg-3)' }}>
                 All imports land as <em>archived</em> (no auto-extract). Click any vlog → Re-extract to process.
               </div>
             </>
@@ -970,7 +970,7 @@ export default function UploadsPage() {
 
       {loading && (
         <div className="empty-row reveal d5">
-          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--bone-3)' }}>LOADING…</p>
+          <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--fg-3)' }}>LOADING…</p>
         </div>
       )}
 
@@ -1036,7 +1036,7 @@ function TileVideoPoster({ v }: { v: UploadRow }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--bone-4)',
+            color: 'var(--fg-4)',
             fontFamily: 'JetBrains Mono, monospace',
             fontSize: 10,
             letterSpacing: 2,
@@ -1070,25 +1070,25 @@ function adminPillStyle(busy: boolean): React.CSSProperties {
   return {
     marginLeft: 'auto',
     padding: '6px 12px',
-    border: '1px solid var(--line-bright)',
+    border: '1px solid var(--line-3)',
     borderRadius: 100,
     fontFamily: 'JetBrains Mono, monospace',
     fontSize: 9,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color: 'var(--bone-1)',
+    color: 'var(--fg-1)',
     background: 'rgba(236,228,210,0.04)',
     cursor: busy ? 'wait' : 'pointer',
   }
 }
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: 'var(--ink-1)',
-  border: '1px solid var(--line-warm)',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--line-2)',
   borderRadius: 8,
   padding: '10px 12px',
   fontSize: 13,
-  color: 'var(--bone)',
+  color: 'var(--fg)',
   fontFamily: 'JetBrains Mono, monospace',
 }
 
@@ -1104,11 +1104,11 @@ function deriveTitle(filename: string | null): string {
 // ─── Thumbnail-fix queue row ─────────────────────────────────────────────────
 function ThumbQueueRow({ row }: { row: ThumbRow }) {
   const statusColor =
-    row.status === "done" ? "var(--state-ok, #7a9a6a)" :
-    row.status === "failed" ? "var(--state-err)" :
-    row.status === "processing" ? "var(--state-info, #6b9aa9)" :
-    row.status === "queued_for_transcode" ? "var(--bone-3)" :
-    "var(--bone-4)"
+    row.status === "done" ? "var(--t-sage)" :
+    row.status === "failed" ? "var(--t-terra)" :
+    row.status === "processing" ? "var(--sig)" :
+    row.status === "queued_for_transcode" ? "var(--fg-3)" :
+    "var(--fg-4)"
   const statusLabel =
     row.status === "queued" ? "queued" :
     row.status === "processing" ? "processing…" :
@@ -1132,8 +1132,8 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
       }}>
         <div style={{
           width: 56, height: 32,
-          background: row.thumbnail_url ? `url(${row.thumbnail_url}) center/cover` : "var(--ink-1)",
-          border: "1px solid var(--line-warm)",
+          background: row.thumbnail_url ? `url(${row.thumbnail_url}) center/cover` : "var(--bg-1)",
+          border: "1px solid var(--line-2)",
           borderRadius: 4,
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0,
@@ -1151,7 +1151,7 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 12,
-            color: "var(--bone-1)",
+            color: "var(--fg-1)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -1167,7 +1167,7 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
           href={`/timeline/${row.vlog_id}`}
           style={{
             fontSize: 10,
-            color: "var(--bone-3)",
+            color: "var(--fg-3)",
             fontFamily: "JetBrains Mono, monospace",
             letterSpacing: 1,
             textTransform: "uppercase",
@@ -1182,7 +1182,7 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
           <summary style={{
             fontFamily: "JetBrains Mono, monospace",
             fontSize: 9,
-            color: "var(--bone-4)",
+            color: "var(--fg-4)",
             letterSpacing: 1,
             textTransform: "uppercase",
             cursor: "pointer",
@@ -1193,12 +1193,12 @@ function ThumbQueueRow({ row }: { row: ThumbRow }) {
           <pre style={{
             margin: "6px 0 0 68px",
             padding: "6px 8px",
-            background: "var(--ink-1)",
-            border: "1px solid var(--line-warm)",
+            background: "var(--bg-1)",
+            border: "1px solid var(--line-2)",
             borderRadius: 4,
             fontSize: 10,
             lineHeight: 1.5,
-            color: "var(--bone-2)",
+            color: "var(--fg-2)",
             fontFamily: "JetBrains Mono, monospace",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",

@@ -120,12 +120,30 @@ export default function TimelinePage() {
   const [stats, setStats] = useState<{ thread_count: number; cluster_count: number; entity_count: number } | null>(null)
   const [clusters, setClusters] = useState<ApiCluster[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [publicMode, setPublicMode] = useState<boolean | null>(null)
+  const [publicProductions, setPublicProductions] = useState<any[]>([])
 
   useEffect(() => {
+    // First, try the authed Timeline. If it returns 401, we're an
+    // unauthenticated visitor — flip into public mode (productions only).
     fetch('/api/v2/timeline', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { cards: [], counts: {} })
-      .then((d: any) => { setCards(d.cards ?? []); setCounts(d.counts ?? {}) })
+      .then(async r => {
+        if (r.status === 401) {
+          setPublicMode(true)
+          // Fetch public productions instead.
+          const pr = await fetch('/api/p')
+          const pd: any = pr.ok ? await pr.json() : { productions: [] }
+          setPublicProductions(pd.productions ?? [])
+          setCards([])
+          return null
+        }
+        return r.ok ? r.json() : { cards: [], counts: {} }
+      })
+      .then((d: any) => {
+        if (d) { setCards(d.cards ?? []); setCounts(d.counts ?? {}); setPublicMode(false) }
+      })
       .catch(() => setCards([]))
+    // Stats + clusters are operator-only; silently skip when unauthed.
     fetch('/api/v2/graph/stats', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: any) => { if (d) setStats(d) })
@@ -157,12 +175,12 @@ export default function TimelinePage() {
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filteredCards])
 
-  // Top thread for the hero snapshot card — pull the strongest recent thread.
-  const heroSnapshot = useMemo(() => {
-    if (!cards) return null
-    const recentThreads = cards.filter(c => c.type === 'thread').slice(0, 20)
-    if (recentThreads.length === 0) return null
-    return recentThreads.sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0))[0]
+  // Hero "Top of mind" — the 3 strongest recent threads.
+  const heroTopOfMind = useMemo(() => {
+    if (!cards) return [] as ApiCard[]
+    const recentThreads = cards.filter(c => c.type === 'thread').slice(0, 30)
+    if (recentThreads.length === 0) return []
+    return [...recentThreads].sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0)).slice(0, 3)
   }, [cards])
 
   // Topic spectrum — count threads/clusters per topic (top 10).
@@ -186,9 +204,13 @@ export default function TimelinePage() {
     router.replace(url.pathname + url.search)
   }
 
+  if (publicMode) {
+    return <PublicTimeline productions={publicProductions}/>
+  }
+
   return (
     <Shell>
-      <CanonHero snapshot={heroSnapshot}/>
+      <CanonHero topOfMind={heroTopOfMind}/>
       <CanonStats stats={stats} counts={counts}/>
       {spectrum.length > 0 && <CanonSpectrum spectrum={spectrum}/>}
       <div className="canon-body">
@@ -219,7 +241,7 @@ export default function TimelinePage() {
 }
 
 // ─── Hero ────────────────────────────────────────────────────────────────
-function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
+function CanonHero({ topOfMind }: { topOfMind: ApiCard[] }) {
   const dateLine = useMemo(() => {
     const d = new Date()
     const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
@@ -241,7 +263,7 @@ function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
           and finished work out. This is the live record.
         </p>
         <div className="canon-hero-cta">
-          <Link href="/capture" className="canon-btn primary">
+          <Link href="/vlogs?capture=open" className="canon-btn primary">
             New capture
             <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
           </Link>
@@ -252,29 +274,85 @@ function CanonHero({ snapshot }: { snapshot: ApiCard | null }) {
         </div>
       </div>
 
-      <div>
-        <div className="canon-hero-card">
-          <div className="kicker">
-            <span>{snapshot ? 'Latest extracted take' : 'No takes yet'}</span>
-            {snapshot && <span className="live">Active</span>}
-          </div>
-          <div className="quote">
-            {snapshot?.key_quote || snapshot?.take || snapshot?.body || 'Drop your first vlog. The system will extract the takes, find the patterns, and ship them back.'}
-          </div>
-          <div className="from">
-            <span className="src">
-              {snapshot?.source_vlog_title || snapshot?.topic || 'neolog'}
-              {snapshot?.source_timecode && ` · ${snapshot.source_timecode}`}
-            </span>
-            <span className="strength" aria-label={`Strength ${snapshot?.strength ?? 0} of 5`}>
-              {[1,2,3,4,5].map(i => (
-                <span key={i} className={`pip ${i <= (snapshot?.strength ?? 0) ? 'on' : ''}`}/>
-              ))}
-            </span>
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 2.4,
+          textTransform: 'uppercase', color: 'var(--fg-3)',
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          marginBottom: 4,
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 6px var(--sig-glow)' }}/>
+          Top of mind
+          <span style={{ color: 'var(--fg-5)' }}>·</span>
+          <span style={{ color: 'var(--fg-4)' }}>strongest 3</span>
         </div>
+        {topOfMind.length === 0 ? (
+          <div style={{
+            padding: '24px 22px',
+            border: '1px dashed var(--line-2)',
+            borderRadius: 12,
+            background: 'var(--bg-1)',
+            color: 'var(--fg-3)', fontSize: 13.5, lineHeight: 1.5,
+          }}>
+            Drop your first vlog. The system extracts the takes, finds the patterns, and surfaces
+            the strongest threads here.
+          </div>
+        ) : (
+          topOfMind.map((t, i) => <TopOfMindCard key={t.id} card={t} rank={i + 1}/>)
+        )}
       </div>
     </section>
+  )
+}
+
+function TopOfMindCard({ card, rank }: { card: ApiCard; rank: number }) {
+  const topic = card.topic || card.abstracted_topic || ''
+  const tcolor = `var(${topicVar(topic)})`
+  const body = card.key_quote || card.take || ''
+  return (
+    <Link href={`/thread/${card.id}`} className="canon-hero-card" style={{
+      display: 'block', textDecoration: 'none', color: 'inherit',
+      borderLeft: `2px solid ${tcolor}`,
+      padding: '14px 18px',
+    }}>
+      <div className="kicker" style={{ marginBottom: 8 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: tcolor, fontWeight: 600,
+          }}>{String(rank).padStart(2, '0')}</span>
+          <span style={{ color: 'var(--fg-3)' }}>{topic ? topic : 'Thread'}</span>
+        </span>
+        <span className="strength" aria-label={`Strength ${card.strength ?? 0} of 5`} style={{ display: 'inline-flex', gap: 3 }}>
+          {[1,2,3,4,5].map(i => (
+            <span key={i} style={{
+              width: 4, height: 4, borderRadius: '50%',
+              background: i <= (card.strength ?? 0) ? tcolor : 'var(--bg-5)',
+            }}/>
+          ))}
+        </span>
+      </div>
+      <div style={{
+        fontFamily: 'var(--font-body)', fontWeight: 400,
+        fontSize: 15.5, lineHeight: 1.35, letterSpacing: '-0.25px',
+        color: 'var(--fg)',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+      }}>
+        {body || 'no take extracted'}
+      </div>
+      {card.source_vlog_title && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 9.5,
+          color: 'var(--fg-4)', letterSpacing: 0.4,
+          marginTop: 8,
+        }}>
+          from {card.source_vlog_title}{card.source_timecode && ` · ${card.source_timecode}`}
+        </div>
+      )}
+    </Link>
   )
 }
 
@@ -755,4 +833,152 @@ function CtaCard() {
       </Link>
     </div>
   )
+}
+
+/**
+ * Public-mode Timeline — what unauthed visitors see at `/`.
+ * Minimal masthead (logo + Sign in), canon hero, list of public
+ * productions. No operator-only data (stats, ripening, etc).
+ */
+function PublicTimeline({ productions }: { productions: any[] }) {
+  return (
+    <div className="canon-page">
+      <div className="canon-wrap">
+        {/* Minimal public masthead */}
+        <header style={{
+          padding: '22px 0 20px',
+          display: 'grid', gridTemplateColumns: 'auto 1fr auto',
+          alignItems: 'center', gap: 32,
+          borderBottom: '1px solid var(--line)',
+        }}>
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 11, color: 'var(--fg)', textDecoration: 'none' }}>
+            <span style={{ width: 26, height: 26 }}>
+              <svg viewBox="0 0 32 32" width="26" height="26" fill="none">
+                <path d="M 3 16 Q 9 4, 16 16 T 29 16" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
+                <circle cx="3" cy="16" r="2.4" fill="currentColor"/>
+                <circle cx="29" cy="16" r="2.4" fill="currentColor"/>
+              </svg>
+            </span>
+            <span style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fontSize: 19, letterSpacing: '-0.5px' }}>neolog</span>
+          </Link>
+          <div/>
+          <Link href="/signin" className="canon-btn primary">
+            Sign in
+            <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
+          </Link>
+        </header>
+
+        <main className="canon-main">
+          {/* Hero */}
+          <section className="canon-reveal d1" style={{ padding: '72px 0 48px', maxWidth: 860 }}>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
+              textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 22,
+              display: 'inline-flex', alignItems: 'center', gap: 12,
+            }}>
+              <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
+              neolog · published work
+            </div>
+            <h1 style={{
+              fontFamily: 'var(--font-body)', fontWeight: 300,
+              fontSize: 92, lineHeight: 0.94, letterSpacing: '-3.8px',
+              color: 'var(--fg)', margin: '0 0 28px', textWrap: 'balance',
+            }}>
+              Everything<span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>,</span> in order<span style={{ color: 'var(--sig)' }}>.</span>
+            </h1>
+            <p style={{
+              fontSize: 18, lineHeight: 1.55, color: 'var(--fg-1)',
+              maxWidth: 660, letterSpacing: '-0.2px', marginBottom: 16,
+            }}>
+              A personal life graph and production engine. The operator talks into it —
+              raw, unedited. It threads, clusters, and ships in their voice. What you see
+              below is the public face of the work.
+            </p>
+            <p style={{ fontSize: 14.5, color: 'var(--fg-2)', lineHeight: 1.55, maxWidth: 660 }}>
+              The full graph is private. Sign in if you're the operator.
+            </p>
+          </section>
+
+          {/* Published work */}
+          <section style={{ paddingBottom: 64 }}>
+            <div className="canon-section-head">
+              <h2>Published work</h2>
+              <div className="meta">{productions.length} {productions.length === 1 ? 'piece' : 'pieces'}</div>
+            </div>
+
+            {productions.length === 0 ? (
+              <div style={{
+                padding: '48px 32px',
+                border: '1px dashed var(--line-2)',
+                borderRadius: 14, background: 'var(--bg-1)',
+                color: 'var(--fg-3)', fontSize: 14.5, lineHeight: 1.55,
+                textAlign: 'center', maxWidth: 640,
+              }}>
+                Nothing yet. Productions appear here once the operator publishes them —
+                essays, articles, threads, clips.
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: 14,
+              }}>
+                {productions.map((p: any) => (
+                  <Link key={p.id} href={`/p/${p.id}`} className="tcard" style={{
+                    '--topic': 'var(--sig)',
+                    '--topic-soft': 'var(--sig-soft)',
+                    display: 'flex', flexDirection: 'column', gap: 10,
+                  } as any}>
+                    <div className="t-header">
+                      <span className="topic-pill"><span className="type">{labelForType(p.type)}</span>{p.form && <><span className="sep">·</span>{String(p.form).replace(/_/g, ' ')}</>}</span>
+                      <span className="t-time">
+                        {new Date(p.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-body)', fontSize: 19, fontWeight: 500,
+                      letterSpacing: '-0.3px', lineHeight: 1.3, color: 'var(--fg)',
+                    }}>
+                      {p.title || '(untitled)'}
+                    </div>
+                    {p.attribution && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
+                        by <b style={{ color: 'var(--fg-1)' }}>{p.attribution}</b>
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <footer style={{
+            borderTop: '1px solid var(--line)',
+            padding: '32px 0 56px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
+            textTransform: 'uppercase', color: 'var(--fg-3)', fontWeight: 500,
+          }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 6px var(--sig-glow)' }}/>
+              neolog
+            </span>
+            <Link href="/signin" style={{ color: 'inherit', textDecoration: 'none' }}>Sign in</Link>
+          </footer>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function labelForType(t: string): string {
+  return ({
+    video_essay: 'Video essay',
+    article: 'Article',
+    x_post: 'Post',
+    x_thread: 'Thread',
+    clip: 'Clip',
+    creative_work: 'Creative',
+  } as Record<string, string>)[t] || t.replace(/_/g, ' ')
 }

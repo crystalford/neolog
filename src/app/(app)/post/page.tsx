@@ -32,17 +32,17 @@ export default function PostComposerPage() {
             rows={8}
             style={{
               width: '100%',
-              background: 'var(--ink-2)',
+              background: 'var(--bg-2)',
               border: '1px solid var(--line)',
               borderRadius: 12,
               padding: 16,
               fontSize: 15,
               lineHeight: 1.55,
-              color: 'var(--bone)',
+              color: 'var(--fg)',
               resize: 'vertical',
             }}
           />
-          <div style={{ marginTop: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1, color: body.length > max * 0.9 ? 'var(--state-warn)' : 'var(--bone-3)', textAlign: 'right' }}>
+          <div style={{ marginTop: 8, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1, color: body.length > max * 0.9 ? 'var(--t-ochre)' : 'var(--fg-3)', textAlign: 'right' }}>
             {body.length}/{max}
           </div>
         </div>
@@ -54,9 +54,9 @@ export default function PostComposerPage() {
             style={{
               padding: '12px 24px',
               borderRadius: 100,
-              background: body.trim() ? 'var(--bone)' : 'transparent',
-              color: body.trim() ? 'var(--ink)' : 'var(--bone-4)',
-              border: body.trim() ? 'none' : '1px solid var(--line-warm)',
+              background: body.trim() ? 'var(--fg)' : 'transparent',
+              color: body.trim() ? 'var(--bg)' : 'var(--fg-4)',
+              border: body.trim() ? 'none' : '1px solid var(--line-2)',
               fontWeight: 500,
               fontSize: 14,
               cursor: body.trim() ? 'pointer' : 'not-allowed',

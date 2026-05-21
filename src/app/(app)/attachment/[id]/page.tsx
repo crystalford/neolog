@@ -16,14 +16,14 @@ export default function AttachmentDetailPage({ params }: { params: { id: string 
 
         <div className="section">
           <div className="section-label">Extracted text</div>
-          <div style={{ background: 'var(--ink-2)', border: '1px solid var(--line)', borderRadius: 12, padding: 16, color: 'var(--bone-3)', fontSize: 13, fontStyle: 'italic' }}>
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 12, padding: 16, color: 'var(--fg-3)', fontSize: 13, fontStyle: 'italic' }}>
             extract-attachment-text Workflow pending.
           </div>
         </div>
 
         <div className="section">
           <div className="section-label">Linked threads</div>
-          <p style={{ color: 'var(--bone-3)', fontSize: 13 }}>None yet.</p>
+          <p style={{ color: 'var(--fg-3)', fontSize: 13 }}>None yet.</p>
         </div>
       </div>
     </main>

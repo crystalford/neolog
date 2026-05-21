@@ -1,20 +1,26 @@
 'use client'
 
 /**
- * Vlogs — the raw archive. Replaces /uploads.
+ * Vlogs — the raw archive. Canon vocabulary extension (the design
+ * pack covers Vlog DETAIL in 04-Vlog.html but not the list view, so
+ * this surface extends the canon vocabulary).
  *
- * Ported from neolog-design/project/screens/vlogs.jsx. Grid of vlog cards
- * with topic dot, filename, date, size, thread count. Filter pills across
- * the top + status pill on each card.
+ * Hero (68px h1) + Capture CTA + 7-tab filter strip + search + bulk
+ * select toolbar + auto-fill grid of canon vlog cards. Each card has:
+ * thumbnail (16:9, topic-tinted gradient bg if no thumb), status pill,
+ * filename, recorded date, duration, size, thread/clip count.
  *
- * Live data: GET /api/v2/vlogs?limit=200 (existing endpoint).
+ * Data: GET /api/v2/vlogs?limit=500
+ * Bulk delete: POST /api/v2/vlogs/bulk-delete
  */
 
 export const runtime = 'edge'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Shell, { NavIcons, TopicDot } from '@/components/Shell'
+import { useSearchParams } from 'next/navigation'
+import Shell from '@/components/Shell'
+import { CapturePanel } from '@/components/CapturePanel'
 
 interface VlogRow {
   id: string
@@ -26,6 +32,8 @@ interface VlogRow {
   uploaded_at: string
   thumbnail_url: string | null
   pipeline_status: string
+  thread_count?: number
+  clip_count?: number
   has_transcript?: 0 | 1 | boolean
 }
 
@@ -37,7 +45,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'week',       label: 'This week' },
   { key: 'processing', label: 'Processing' },
   { key: 'complete',   label: 'Complete' },
-  { key: 'archived',   label: 'Archived' },
+  { key: 'archived',   label: 'B-roll' },
   { key: 'failed',     label: 'Failed' },
 ]
 
@@ -46,12 +54,11 @@ export default function VlogsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
-  const [bulkOpen, setBulkOpen] = useState(false)
-  // Multi-select for bulk delete. Set of vlog ids currently selected.
-  // Cleared whenever the filter or query changes so the operator can't
-  // accidentally delete vlogs they aren't currently looking at.
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [deleting, setDeleting] = useState(false)
+  const [actionNote, setActionNote] = useState<string | null>(null)
+  const sp = useSearchParams()
+  const [captureOpen, setCaptureOpen] = useState(sp?.get('capture') === 'open')
   useEffect(() => { setSelected(new Set()) }, [filter, query])
 
   const load = () => {
@@ -69,11 +76,11 @@ export default function VlogsPage() {
     const dayMs = 86_400_000
     for (const v of vlogs) {
       c.all++
-      const recordedTs = v.recorded_at ? new Date(v.recorded_at).getTime() : new Date(v.uploaded_at).getTime()
-      const ageDays = (now - recordedTs) / dayMs
+      const ts = v.recorded_at ? new Date(v.recorded_at).getTime() : new Date(v.uploaded_at).getTime()
+      const ageDays = (now - ts) / dayMs
       if (ageDays < 1) c.today++
       if (ageDays < 7) c.week++
-      if (['transcoding', 'transcribing', 'extracting', 'uploaded'].includes(v.pipeline_status)) c.processing++
+      if (['transcoding', 'transcribing', 'extracting', 'uploaded', 'thumbnail_pending'].includes(v.pipeline_status)) c.processing++
       else if (v.pipeline_status === 'complete') c.complete++
       else if (v.pipeline_status === 'archived') c.archived++
       else if (v.pipeline_status === 'failed') c.failed++
@@ -86,16 +93,13 @@ export default function VlogsPage() {
     const now = Date.now()
     const dayMs = 86_400_000
     return vlogs.filter(v => {
-      if (q) {
-        const hay = `${v.original_filename ?? ''}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
+      if (q && !(v.original_filename ?? '').toLowerCase().includes(q)) return false
       if (filter === 'all') return true
-      const recordedTs = v.recorded_at ? new Date(v.recorded_at).getTime() : new Date(v.uploaded_at).getTime()
-      const ageDays = (now - recordedTs) / dayMs
+      const ts = v.recorded_at ? new Date(v.recorded_at).getTime() : new Date(v.uploaded_at).getTime()
+      const ageDays = (now - ts) / dayMs
       if (filter === 'today') return ageDays < 1
       if (filter === 'week') return ageDays < 7
-      if (filter === 'processing') return ['transcoding', 'transcribing', 'extracting', 'uploaded'].includes(v.pipeline_status)
+      if (filter === 'processing') return ['transcoding', 'transcribing', 'extracting', 'uploaded', 'thumbnail_pending'].includes(v.pipeline_status)
       if (filter === 'complete') return v.pipeline_status === 'complete'
       if (filter === 'archived') return v.pipeline_status === 'archived'
       if (filter === 'failed') return v.pipeline_status === 'failed'
@@ -103,1328 +107,350 @@ export default function VlogsPage() {
     })
   }, [vlogs, filter, query])
 
-  const totalBytes = vlogs.reduce((s, v) => s + (v.file_size_bytes ?? 0), 0)
-  const totalGb = (totalBytes / 1_000_000_000).toFixed(2)
-  const busy = counts.processing > 0
+  const totalSize = useMemo(() => vlogs.reduce((s, v) => s + (v.file_size_bytes ?? 0), 0), [vlogs])
+  const totalDuration = useMemo(() => vlogs.reduce((s, v) => s + (v.duration_seconds ?? 0), 0), [vlogs])
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const bulkDelete = async () => {
+    if (selected.size === 0) return
+    if (!confirm(`Delete ${selected.size} vlog${selected.size === 1 ? '' : 's'}? Removes R2 bytes too. Cannot be undone.`)) return
+    setDeleting(true)
+    setActionNote(null)
+    try {
+      const r = await fetch('/api/v2/vlogs/bulk-delete', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vlog_ids: Array.from(selected) }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setActionNote(`Deleted ${d.deleted ?? selected.size} vlog${selected.size === 1 ? '' : 's'}.`)
+      setSelected(new Set())
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
-    <Shell active="vlogs" breadcrumb={['Vlogs']} hot={busy ? `${counts.processing} active` : 'all healthy'} busy={busy}>
-      <div className="pad-tight">
-        <div className="h1-row" style={{ alignItems: 'flex-start' }}>
-          <div style={{ borderLeft: '3px solid var(--t-1)', paddingLeft: 14 }}>
-            <div className="mono" style={{
-              fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase',
-              color: 'var(--fg-4)', marginBottom: 6,
-            }}>
-              Source material
-            </div>
-            <h1 style={{ marginTop: 0, marginBottom: 8 }}>Vlogs</h1>
-            <p className="sub" style={{ marginBottom: 0, marginTop: 0, maxWidth: 540 }}>
-              Every recording you've brought into Neolog. {counts.all} files · {totalGb} GB on disk.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn" onClick={load}><span className="ico">{NavIcons.Refresh}</span>Refresh</button>
-            <button className="btn" onClick={async () => {
-              if (!confirm('Clean up auto-extract residue threads? This removes thin "fallback" threads like \'We got Phil\'s fat dented head\' that were generated when the LLM returned empty. Soft-delete only — reversible.')) return
-              try {
-                const r = await fetch('/api/v2/admin/cleanup-auto-extracted', { method: 'POST', credentials: 'include' })
-                const d: any = await r.json().catch(() => ({}))
-                if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-                alert(`Found ${d.candidates_found} candidates, deleted ${d.deleted}.${d.sample?.length ? '\n\nSample:\n' + d.sample.map((s: any) => '• ' + s.take).join('\n') : ''}`)
-              } catch (e: any) {
-                alert(`Cleanup failed: ${e?.message || String(e)}`)
-              }
-            }}>
-              Clean junk threads
-            </button>
-            <button className="btn" onClick={() => setBulkOpen(true)}>
-              Re-process all
-            </button>
-            <Link href="/capture" className="btn primary">
-              <span className="ico">{NavIcons.Plus}</span>Add vlog<span className="kbd">N</span>
-            </Link>
-          </div>
+    <Shell>
+      {/* Hero */}
+      <section className="canon-reveal d1" style={{ padding: '40px 0 32px' }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
+          textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 20,
+          display: 'inline-flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
+          The raw archive · everything you've captured
+        </div>
+        <h1 style={{
+          fontFamily: 'var(--font-body)', fontWeight: 400,
+          fontSize: 68, lineHeight: 1.0, letterSpacing: '-2.6px',
+          color: 'var(--fg)', margin: '0 0 22px', textWrap: 'balance',
+        }}>
+          Vlogs<span style={{ color: 'var(--fg-3)', fontWeight: 300 }}>,</span> in order<span style={{ color: 'var(--sig)' }}>.</span>
+        </h1>
+        <p style={{
+          fontSize: 17, lineHeight: 1.55, color: 'var(--fg-2)',
+          maxWidth: 620, letterSpacing: '-0.15px', marginBottom: 24,
+        }}>
+          Every recording you've dropped in. Newest first. Click any card for the full
+          session — player, multi-track timeline, threads, transcript, the works.
+        </p>
+
+        {/* Stats strip */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24,
+          paddingTop: 22, borderTop: '1px solid var(--line)',
+        }}>
+          <Stat n={vlogs.length} l="Total vlogs"/>
+          <Stat n={Math.round(totalDuration / 60)} l="Minutes captured" suffix=" min"/>
+          <Stat n={Math.round(totalSize / (1024 * 1024 * 1024) * 10) / 10} l="In R2" suffix=" GB"/>
+          <Stat n={vlogs.filter(v => v.pipeline_status === 'complete').length} l="Extracted"/>
         </div>
 
-        {bulkOpen && (
-          <BulkReprocessModal
-            onClose={() => setBulkOpen(false)}
-            onDone={load}
-          />
-        )}
-
-        {/* Filter row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 24, marginBottom: 18, flexWrap: 'wrap' }}>
-          <div className="pills">
-            {FILTERS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`filter-pill ${filter === f.key ? 'active' : ''}`}
-              >
-                {f.label} <span className="n">{counts[f.key]}</span>
-              </button>
-            ))}
-          </div>
-          <div style={{ flex: 1 }}/>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 11px', background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 6, width: 240 }}>
-            <span style={{ display: 'inline-flex', width: 13, height: 13, color: 'var(--fg-4)' }}>{NavIcons.Search}</span>
-            <input
-              placeholder="Filename or content"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              style={{ flex: 1, fontSize: 12, color: 'var(--fg-1)' }}
-            />
-          </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap' }}>
+          <button onClick={() => setCaptureOpen(o => !o)} className={`canon-btn ${captureOpen ? 'ghost' : 'primary'}`}>
+            <span className="ico"><svg viewBox="0 0 14 14"><path d="M8 3 L8 11 M3 7 L8 3 L13 7"/></svg></span>
+            {captureOpen ? 'Hide upload' : 'Drop new vlogs'}
+          </button>
+          <button onClick={load} className="canon-btn ghost">
+            <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7a4 4 0 0 1 4-4 4 4 0 0 1 4 4 M3 7a4 4 0 0 0 4 4 4 4 0 0 0 4 -4 M11 3 L11 6 L8 6"/></svg></span>
+            Refresh
+          </button>
         </div>
+      </section>
 
-        {/* Multi-select action bar — only shown when at least one vlog
-            is selected OR when on a filter where bulk delete is the
-            obvious action (failed / archived). Lets the operator
-            "Select all in view" then delete the whole filtered set
-            in one POST. */}
-        {filtered.length > 0 && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12,
-            padding: '8px 12px',
-            background: selected.size > 0 ? 'var(--err-bg, #3a0f1f)' : 'var(--bg-2)',
-            border: `1px solid ${selected.size > 0 ? 'var(--err, #f87171)33' : 'var(--line)'}`,
-            borderRadius: 6,
-            fontSize: 12,
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={selected.size > 0 && selected.size === filtered.length}
-                ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < filtered.length }}
-                onChange={e => {
-                  if (e.target.checked) setSelected(new Set(filtered.map(v => v.id)))
-                  else setSelected(new Set())
-                }}
-              />
-              {selected.size === 0
-                ? `Select all in view (${filtered.length})`
-                : selected.size === filtered.length
-                  ? `All ${filtered.length} selected`
-                  : `${selected.size} of ${filtered.length} selected`}
-            </label>
-            <div style={{ flex: 1 }}/>
-            {selected.size > 0 && (
-              <>
-                <button
-                  onClick={() => setSelected(new Set())}
-                  className="btn ghost"
-                  style={{ fontSize: 11 }}
-                >Clear</button>
-                <button
-                  disabled={deleting}
-                  onClick={async () => {
-                    const n = selected.size
-                    if (!confirm(`Mark ${n} vlog${n === 1 ? '' : 's'} as B-roll?\n\nEach one will be set to complete with no extraction, and the pipeline will stop retrying. R2 video bytes are kept (so they're available later as b-roll for editing). Reversible per-vlog via Reset.`)) return
-                    setDeleting(true)
-                    try {
-                      const r = await fetch('/api/v2/vlogs/bulk-mark-broll', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids: Array.from(selected) }),
-                      })
-                      const d: any = await r.json().catch(() => ({}))
-                      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-                      setSelected(new Set())
-                      load()
-                      const failCount = d.failures ? Object.keys(d.failures).length : 0
-                      alert(`Marked ${d.marked ?? 0} vlog${d.marked === 1 ? '' : 's'} as B-roll.${failCount ? `\n\n${failCount} failed: ${Object.values(d.failures).slice(0, 3).join('; ')}` : ''}`)
-                    } catch (e: any) {
-                      alert(`Bulk mark-as-B-roll failed: ${e?.message || String(e)}`)
-                    } finally {
-                      setDeleting(false)
-                    }
-                  }}
-                  className="btn"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--fg-1)',
-                    borderColor: 'var(--line)',
-                    background: 'var(--bg-2)',
-                  }}
-                >
-                  {deleting ? '…' : `Mark ${selected.size} as B-roll`}
-                </button>
-                <button
-                  disabled={deleting}
-                  onClick={async () => {
-                    const n = selected.size
-                    if (!confirm(`Delete ${n} vlog${n === 1 ? '' : 's'} permanently?\n\nR2 video bytes will be removed and all extracted threads / clips / entities for these vlogs will be deleted. This cannot be undone.`)) return
-                    if (!confirm(`Are you sure? This is permanent for all ${n} vlog${n === 1 ? '' : 's'}.`)) return
-                    setDeleting(true)
-                    try {
-                      const r = await fetch('/api/v2/vlogs/bulk-delete', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids: Array.from(selected) }),
-                      })
-                      const d: any = await r.json().catch(() => ({}))
-                      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-                      setSelected(new Set())
-                      load()
-                      alert(`Deleted ${d.deleted ?? 0} vlog${d.deleted === 1 ? '' : 's'}.${d.r2_errors ? `\n\nSome R2 deletes failed: ${Object.keys(d.r2_errors).length} vlogs had orphaned bytes. DB rows are soft-deleted regardless.` : ''}`)
-                    } catch (e: any) {
-                      alert(`Bulk delete failed: ${e?.message || String(e)}`)
-                    } finally {
-                      setDeleting(false)
-                    }
-                  }}
-                  className="btn"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--err, #f87171)',
-                    borderColor: 'var(--err, #f87171)',
-                    background: 'transparent',
-                  }}
-                >
-                  {deleting ? 'Deleting…' : `Delete ${selected.size} selected`}
-                </button>
-              </>
-            )}
-          </div>
-        )}
+      {/* Inline Capture panel (replaces standalone /capture route) */}
+      {captureOpen && (
+        <div className="canon-reveal d2" style={{ marginBottom: 28 }}>
+          <CapturePanel onUploaded={load}/>
+        </div>
+      )}
 
-        {/* Grid */}
-        {loading ? (
-          <div style={{ color: 'var(--fg-3)', padding: 40, textAlign: 'center' }}>Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">
-            <div className="ico">{NavIcons.Vlogs}</div>
-            <h3>No vlogs match this filter</h3>
-            <p>Try a different filter or upload your first vlog.</p>
-            <Link href="/capture" className="btn primary"><span className="ico">{NavIcons.Plus}</span>Add vlog</Link>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-            {filtered.map((v, idx) => (
-              <VlogCard
-                key={v.id}
-                v={v}
-                isSelected={selected.has(v.id)}
-                onToggleSelect={(id, e) => {
-                  setSelected(prev => {
-                    const next = new Set(prev)
-                    // Shift-click to range-select within the current filter.
-                    if (e.shiftKey && prev.size > 0) {
-                      const lastSelectedIdx = filtered.findIndex(x => prev.has(x.id))
-                      const [lo, hi] = idx < lastSelectedIdx
-                        ? [idx, lastSelectedIdx]
-                        : [lastSelectedIdx, idx]
-                      for (let i = lo; i <= hi; i++) next.add(filtered[i].id)
-                    } else {
-                      if (next.has(id)) next.delete(id)
-                      else next.add(id)
-                    }
-                    return next
-                  })
-                }}
-              />
-            ))}
-          </div>
-        )}
+      {/* Tabs + search */}
+      <div className="canon-reveal d2" style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        flexWrap: 'wrap', gap: 14,
+        borderBottom: '1px solid var(--line)',
+        paddingBottom: 18, marginBottom: 24,
+      }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FILTERS.map(f => (
+            <button key={f.key} onClick={() => setFilter(f.key)} className={`canon-filter-chip ${filter === f.key ? 'active' : ''}`}>
+              {f.label}
+              <span className="n">{counts[f.key]}</span>
+            </button>
+          ))}
+        </div>
+        <input
+          placeholder="Search filenames…"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{
+            padding: '7px 14px',
+            background: 'var(--bg-2)',
+            border: '1px solid var(--line-1)',
+            borderRadius: 8,
+            color: 'var(--fg-1)',
+            fontSize: 12.5,
+            fontFamily: 'var(--font-body)',
+            minWidth: 220,
+          }}
+        />
       </div>
+
+      {/* Bulk action toolbar */}
+      {selected.size > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '12px 16px', marginBottom: 18,
+          background: 'var(--sig-soft)',
+          border: '1px solid color-mix(in srgb, var(--sig) 35%, var(--line-1))',
+          borderRadius: 10,
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--fg-1)', fontWeight: 500 }}>
+            {selected.size} selected
+          </span>
+          <button onClick={() => setSelected(new Set())} style={{
+            fontSize: 11, padding: '5px 11px',
+            background: 'transparent', border: '1px solid var(--line-2)',
+            borderRadius: 6, color: 'var(--fg-2)', cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+          }}>Clear</button>
+          <button onClick={bulkDelete} disabled={deleting} style={{
+            fontSize: 11, padding: '5px 11px',
+            background: 'var(--t-terra)', border: '1px solid var(--t-terra)',
+            borderRadius: 6, color: 'var(--bg)', cursor: deleting ? 'wait' : 'pointer',
+            fontFamily: 'var(--font-body)', fontWeight: 500,
+            marginLeft: 'auto',
+          }}>{deleting ? 'Deleting…' : `Delete ${selected.size}`}</button>
+        </div>
+      )}
+
+      {actionNote && (
+        <div style={{
+          padding: '10px 14px', marginBottom: 18,
+          background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+          borderRadius: 8, fontSize: 12.5, color: 'var(--fg-2)',
+        }}>{actionNote}</div>
+      )}
+
+      {/* Grid */}
+      {loading && <div style={{ padding: 40, color: 'var(--fg-3)' }}>Loading…</div>}
+
+      {!loading && filtered.length === 0 && (
+        <div style={{
+          padding: '60px 32px',
+          border: '1px dashed var(--line-2)',
+          borderRadius: 14, background: 'var(--bg-1)',
+          textAlign: 'center',
+        }}>
+          <h2 style={{
+            fontFamily: 'var(--font-body)', fontSize: 32, fontWeight: 400,
+            letterSpacing: '-1px', color: 'var(--fg)', margin: '0 0 14px',
+          }}>
+            {vlogs.length === 0 ? 'No vlogs yet.' : `Nothing in ${filter}.`}
+          </h2>
+          <p style={{ color: 'var(--fg-2)', maxWidth: 480, margin: '0 auto 22px', lineHeight: 1.55 }}>
+            {vlogs.length === 0
+              ? 'Drop your first vlog. The system threads, clusters, and ships it back.'
+              : 'Switch tabs or clear the search.'}
+          </p>
+          {vlogs.length === 0 && (
+            <Link href="/capture" className="canon-btn primary">Capture</Link>
+          )}
+        </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <div className="canon-reveal d3" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 14,
+        }}>
+          {filtered.map(v => (
+            <VlogCard
+              key={v.id}
+              vlog={v}
+              selected={selected.has(v.id)}
+              onToggleSelect={() => toggleSelect(v.id)}
+            />
+          ))}
+        </div>
+      )}
     </Shell>
   )
 }
 
-// ─── Bulk reprocess modal ──────────────────────────────────────────────────
-//
-// State machine (phase):
-//   idle      — picking scope/mode/chunk_size, can preview
-//   preview   — fetching dry-run list, then showing count + sample
-//   ready     — preview returned, user clicks Run
-//   running   — chunked loop in flight; cancellable
-//   done      — finished or aborted, summary shown
-//
-// Durability:
-//   - Run state is checkpointed to localStorage after every chunk so
-//     closing the modal (or even reloading the page) doesn't lose progress.
-//   - Resuming a run picks up from `processed_idx` against the original
-//     `ids` list.
-//   - Per-chunk retry: each chunk POST retries up to 3x with exponential
-//     backoff before being recorded as a failed chunk; remaining chunks
-//     keep going.
-//
-// Throughput knobs the operator can tune:
-//   - chunk_size   (default 8, range 1–25): how many ids per POST.
-//   - pause_ms     (default 800): how long to wait between chunks.
-//   These are intentionally conservative so a 150-vlog run won't spike
-//   Workers AI / Anthropic rate limits.
+function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected: boolean; onToggleSelect: () => void }) {
+  const status = vlog.pipeline_status
+  const isComplete = status === 'complete'
+  const isFailed = status === 'failed'
+  const isBroll = status === 'archived'
+  const isProcessing = !isComplete && !isFailed && !isBroll
+  const color = isComplete ? 'var(--sig)'
+    : isFailed ? 'var(--t-terra)'
+    : isBroll ? 'var(--fg-3)'
+    : 'var(--t-ochre)'
 
-type BulkPhase = 'idle' | 'preview' | 'ready' | 'running' | 'done'
-
-interface BulkCheckpoint {
-  version: 1
-  mode: 'cheap' | 'premium'
-  scope: 'incomplete' | 'all'
-  chunkSize: number
-  pauseMs: number
-  ids: string[]
-  processedIdx: number
-  dispatched: number
-  skipped: number
-  failed: number
-  failures: { vlog_id: string; error: string; reason?: string }[]
-  startedAt: number
-  finishedAt: number | null
-}
-
-const CHECKPOINT_KEY = 'neolog.bulkReprocess.v1'
-
-function loadCheckpoint(): BulkCheckpoint | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(CHECKPOINT_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed?.version !== 1) return null
-    return parsed as BulkCheckpoint
-  } catch { return null }
-}
-
-function saveCheckpoint(cp: BulkCheckpoint) {
-  if (typeof window === 'undefined') return
-  try { window.localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(cp)) } catch {}
-}
-
-function clearCheckpoint() {
-  if (typeof window === 'undefined') return
-  try { window.localStorage.removeItem(CHECKPOINT_KEY) } catch {}
-}
-
-function BulkReprocessModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [phase, setPhase] = useState<BulkPhase>('idle')
-  const [mode, setMode] = useState<'cheap' | 'premium'>('cheap')
-  const [scope, setScope] = useState<'incomplete' | 'all'>('incomplete')
-  // Defaults tuned after a real 150-vlog backfill showed Workers AI
-  // degrading silently under burst pressure. Lower throughput plus the
-  // empty-extraction guard in extract-unified.ts means each individual
-  // call is reliable even if total wall-clock is a bit longer.
-  const [chunkSize, setChunkSize] = useState(6)
-  const [pauseMs, setPauseMs] = useState(1200)
-
-  const [ids, setIds] = useState<string[]>([])
-  const [skippedInFlight, setSkippedInFlight] = useState(0)
-  const [transcribedCount, setTranscribedCount] = useState(0)
-  const [untranscribedCount, setUntranscribedCount] = useState(0)
-  const [previewError, setPreviewError] = useState<string | null>(null)
-
-  // Diagnostic data — auto-fetched on modal open. ZERO cost.
-  const [diag, setDiag] = useState<any | null>(null)
-  const [diagError, setDiagError] = useState<string | null>(null)
-  const [diagLoading, setDiagLoading] = useState(true)
-
-  // Stuck-cleanup state
-  const [resetBusy, setResetBusy] = useState(false)
-  const [resetResult, setResetResult] = useState<string | null>(null)
-
-  // Kill-all state (terminate workflow instances + DOs)
-  const [killBusy, setKillBusy] = useState(false)
-  const [killResult, setKillResult] = useState<string | null>(null)
-
-  // Smoke-test state
-  const [smokeBusy, setSmokeBusy] = useState(false)
-  const [smokeResult, setSmokeResult] = useState<{ ok: boolean; vlog_id?: string; message: string } | null>(null)
-
-  const [processed, setProcessed] = useState(0)
-  const [dispatched, setDispatched] = useState(0)
-  const [skipped, setSkipped] = useState(0)
-  const [failed, setFailed] = useState(0)
-  const [failures, setFailures] = useState<{ vlog_id: string; error: string; reason?: string }[]>([])
-
-  // Mutable refs so the async loop reads the latest values without the
-  // closure-over-state hazard.
-  const abortRef = useRef<AbortController | null>(null)
-  const cancelledRef = useRef(false)
-  const checkpointRef = useRef<BulkCheckpoint | null>(null)
-
-  // Restore in-progress checkpoint on open.
-  useEffect(() => {
-    const cp = loadCheckpoint()
-    if (cp && cp.processedIdx < cp.ids.length && !cp.finishedAt) {
-      setMode(cp.mode); setScope(cp.scope); setChunkSize(cp.chunkSize); setPauseMs(cp.pauseMs)
-      setIds(cp.ids); setProcessed(cp.processedIdx)
-      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed); setFailures(cp.failures)
-      checkpointRef.current = cp
-      setPhase('ready') // let the user click Resume rather than auto-running
-    }
-  }, [])
-
-  // Fetch the free diagnostic on modal open.
-  const refreshDiag = async () => {
-    setDiagLoading(true); setDiagError(null)
-    try {
-      const r = await fetch('/api/v2/admin/pipeline-state', { credentials: 'include' })
-      if (!r.ok) {
-        const d: any = await r.json().catch(() => ({}))
-        throw new Error(d?.details || d?.error || `HTTP ${r.status}`)
-      }
-      setDiag(await r.json())
-    } catch (err: any) {
-      setDiagError(err?.message || String(err))
-    } finally {
-      setDiagLoading(false)
-    }
-  }
-  useEffect(() => { refreshDiag() }, [])
-
-  const runResetStuck = async (alsoFailed = false) => {
-    setResetBusy(true); setResetResult(null)
-    try {
-      const r = await fetch('/api/v2/admin/reset-stuck', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scope: alsoFailed ? 'failed' : 'in_flight',
-          reset_restart_count: true,
-        }),
-      })
-      const d: any = await r.json()
-      if (!r.ok) {
-        setResetResult(`Reset failed: ${d?.details || d?.error || `HTTP ${r.status}`}`)
-      } else {
-        setResetResult(`Reset ${d.reset} vlog${d.reset === 1 ? '' : 's'}.`)
-        await refreshDiag()
-      }
-    } catch (err: any) {
-      setResetResult(`Reset error: ${err?.message || err}`)
-    } finally {
-      setResetBusy(false)
-    }
-  }
-
-  const runKillAll = async () => {
-    if (!confirm('Terminate every running Workflow + Durable Object for your operator? This stops all in-flight pipeline work — including any vlog that\'s legitimately progressing. Continue?')) return
-    setKillBusy(true); setKillResult(null)
-    try {
-      const r = await fetch('/api/v2/admin/terminate-all', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflows: true, dos: true }),
-      })
-      const d: any = await r.json()
-      if (!r.ok) {
-        setKillResult(`Kill failed: ${d?.details || d?.error || `HTTP ${r.status}`}`)
-      } else {
-        const wf = d.workflows ?? {}
-        const dos = d.dos ?? {}
-        const summary = [
-          `Workflows: ${wf.terminated}/${wf.found} terminated`,
-          `DOs: ${dos.terminated}/${dos.found} killed`,
-          (wf.errors?.length || dos.errors?.length) ? `(${(wf.errors?.length ?? 0) + (dos.errors?.length ?? 0)} errors)` : '',
-        ].filter(Boolean).join(' · ')
-        setKillResult(summary)
-        await refreshDiag()
-      }
-    } catch (err: any) {
-      setKillResult(`Kill error: ${err?.message || err}`)
-    } finally {
-      setKillBusy(false)
-    }
-  }
-
-  const runSmokeTest = async () => {
-    if (!diag || diag.counts_for_run?.needs_full_pipeline === 0) {
-      setSmokeResult({ ok: false, message: 'No untranscribed vlog available to smoke-test.' })
-      return
-    }
-    setSmokeBusy(true); setSmokeResult(null)
-    try {
-      // Dry-run resolution to find the first untranscribed candidate.
-      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: 'all', mode, dry_run: true, skip_in_flight: true }),
-      })
-      const d: any = await r.json()
-      const candidates: string[] = d.ids ?? []
-      // Pick the first id we know is untranscribed (transcribed_count
-      // vs untranscribed_count tells us roughly where in the list they are
-      // but doesn't give per-id flags — we use the second response):
-      // call dispatch with a single id list and read entry='start' back.
-      if (candidates.length === 0) {
-        setSmokeResult({ ok: false, message: 'No eligible vlog found.' })
-        return
-      }
-      // The bulk endpoint dispatches per-vlog and tells us whether it
-      // routed to /start or /reextract. Send just the first candidate.
-      const dispatchRes = await fetch('/api/v2/admin/reprocess-vlogs', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_ids: [candidates[0]], mode, skip_in_flight: true }),
-      })
-      const dispatchJson: any = await dispatchRes.json()
-      if (!dispatchRes.ok || dispatchJson.dispatched === 0) {
-        setSmokeResult({
-          ok: false, vlog_id: candidates[0],
-          message: `Smoke dispatch failed: ${dispatchJson?.error || dispatchJson?.results?.[0]?.error || 'unknown'}`,
-        })
-        return
-      }
-      const entry = dispatchJson.results?.[0]?.entry
-      setSmokeResult({
-        ok: true, vlog_id: candidates[0],
-        message: `Dispatched 1 vlog via ${entry === 'start' ? '/start (full pipeline)' : '/reextract (LLM only)'}. Open the vlog detail page to watch live progress.`,
-      })
-      await refreshDiag()
-    } catch (err: any) {
-      setSmokeResult({ ok: false, message: `Smoke test error: ${err?.message || err}` })
-    } finally {
-      setSmokeBusy(false)
-    }
-  }
-
-  const runPreview = async () => {
-    setPhase('preview'); setPreviewError(null)
-    try {
-      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope, mode, dry_run: true, skip_in_flight: true }),
-      })
-      const d: any = await r.json().catch(() => ({}))
-      if (!r.ok) {
-        setPreviewError(d?.details || d?.error || `HTTP ${r.status}`)
-        setPhase('idle'); return
-      }
-      setIds(d.ids ?? [])
-      setSkippedInFlight(d.skipped_in_flight ?? 0)
-      setTranscribedCount(d.transcribed_count ?? 0)
-      setUntranscribedCount(d.untranscribed_count ?? 0)
-      setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
-      setPhase('ready')
-    } catch (err: any) {
-      setPreviewError(err?.message || String(err))
-      setPhase('idle')
-    }
-  }
-
-  const start = async (resume = false) => {
-    cancelledRef.current = false
-    abortRef.current = new AbortController()
-    const signal = abortRef.current.signal
-
-    const startIdx = resume ? processed : 0
-    // FIRE-AND-FORGET CHUNKS: dispatch CHUNK_SIZE vlogs per server call,
-    // pause CHUNK_PAUSE_MS between chunks, don't wait for them to
-    // complete. This is what the operator ranked as the BEST approach
-    // earlier — "it did a bunch" — high visible throughput, tolerant
-    // of individual vlog failures, doesn't block the queue on one
-    // slow vlog.
-    //
-    // Progress here counts DISPATCHED vlogs, not COMPLETED ones. To
-    // see actual completion progress, the operator refreshes the
-    // diagnostic panel at the top of the modal.
-    const cp: BulkCheckpoint = {
-      version: 1,
-      mode, scope, chunkSize: CHUNK_SIZE, pauseMs: CHUNK_PAUSE_MS,
-      ids,
-      processedIdx: startIdx,
-      dispatched: resume ? dispatched : 0,
-      skipped: resume ? skipped : 0,
-      failed: resume ? failed : 0,
-      failures: resume ? failures : [],
-      startedAt: Date.now(),
-      finishedAt: null,
-    }
-    checkpointRef.current = cp
-    saveCheckpoint(cp)
-    setProcessed(startIdx)
-    setPhase('running')
-
-    let idx = startIdx
-    while (idx < ids.length) {
-      if (cancelledRef.current || signal.aborted) break
-
-      const chunk = ids.slice(idx, idx + CHUNK_SIZE)
-      const chunkRes = await dispatchChunkWithRetry(chunk, mode, signal)
-      if (chunkRes === 'aborted') break
-
-      if (typeof chunkRes === 'object' && 'kind' in chunkRes && chunkRes.kind === 'fatal') {
-        for (const vlog_id of chunk) {
-          cp.failures.push({ vlog_id, error: chunkRes.lastError })
-          cp.failed += 1
-        }
-      } else if (typeof chunkRes === 'object' && 'results' in chunkRes) {
-        for (const r of chunkRes.results) {
-          if (r.ok) cp.dispatched += 1
-          else if (r.reason) {
-            cp.skipped += 1
-            cp.failures.push({ vlog_id: r.vlog_id, error: r.reason, reason: r.reason })
-          } else {
-            cp.failed += 1
-            cp.failures.push({ vlog_id: r.vlog_id, error: r.error || 'unknown' })
-          }
-        }
-      }
-
-      idx += chunk.length
-      cp.processedIdx = idx
-      saveCheckpoint(cp)
-
-      setProcessed(idx)
-      setDispatched(cp.dispatched); setSkipped(cp.skipped); setFailed(cp.failed)
-      setFailures([...cp.failures])
-
-      if (idx < ids.length && !cancelledRef.current) {
-        await sleepWithAbort(CHUNK_PAUSE_MS, signal)
-      }
-    }
-
-    cp.finishedAt = Date.now()
-    saveCheckpoint(cp)
-    setPhase('done')
-    onDone()
-  }
-
-  const cancel = () => {
-    cancelledRef.current = true
-    if (abortRef.current) abortRef.current.abort()
-  }
-
-  const reset = () => {
-    cancelledRef.current = false
-    setIds([]); setProcessed(0); setDispatched(0); setSkipped(0); setFailed(0); setFailures([])
-    clearCheckpoint()
-    checkpointRef.current = null
-    setPhase('idle')
-  }
-
-  const perVlog = mode === 'premium' ? 0.05 : 0.02
-  const estCost = ids.length * perVlog
-  const remaining = Math.max(0, ids.length - processed)
-  const pct = ids.length > 0 ? Math.round((processed / ids.length) * 100) : 0
-
+  const title = deriveTitle(vlog.original_filename)
+  const ts = vlog.recorded_at ? new Date(vlog.recorded_at) : new Date(vlog.uploaded_at)
   return (
-    <div onClick={phase === 'running' ? undefined : onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 50,
-    }}>
-      <div onClick={e => e.stopPropagation()} className="card" style={{
-        padding: 20, maxWidth: 600, width: '92%', maxHeight: '85vh', overflow: 'auto',
-        display: 'flex', flexDirection: 'column', gap: 14,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <h2 style={{ fontSize: 18, margin: 0 }}>Bulk re-process vlogs</h2>
-          {phase === 'running' && (
-            <span className="pill hot" style={{ marginLeft: 'auto' }}>running · {pct}%</span>
-          )}
-          {phase === 'done' && (
-            <span className={`pill ${failed > 0 ? 'err' : 'ok'}`} style={{ marginLeft: 'auto' }}>
-              {cancelledRef.current ? 'cancelled' : 'done'}
-            </span>
+    <div style={{ position: 'relative' }}>
+      <Link href={`/vlog/${vlog.id}`} className="tcard" style={{
+        '--topic': color, '--topic-soft': `color-mix(in srgb, ${color} 8%, transparent)`,
+        display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden',
+      } as any}>
+        {/* Thumbnail */}
+        <div style={{
+          aspectRatio: '16 / 9',
+          background: vlog.thumbnail_url
+            ? `url(${vlog.thumbnail_url}) center / cover`
+            : `radial-gradient(circle at 65% 40%, color-mix(in srgb, ${color} 22%, transparent), transparent 65%), linear-gradient(135deg, #1a1a1a, #050505)`,
+          position: 'relative',
+          borderBottom: '1px solid var(--line-1)',
+        }}>
+          {vlog.duration_seconds != null && (
+            <span style={{
+              position: 'absolute', bottom: 8, right: 8,
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+              padding: '3px 7px',
+              background: 'rgba(0,0,0,0.7)',
+              borderRadius: 4, color: 'var(--fg)',
+            }}>{fmtDur(vlog.duration_seconds)}</span>
           )}
         </div>
 
-        {(phase === 'idle' || phase === 'preview') && (
-          <>
-            {/* Free diagnostic — fetched on modal open. Costs nothing. */}
-            <DiagnosticPanel
-              diag={diag}
-              loading={diagLoading}
-              error={diagError}
-              onRefresh={refreshDiag}
-              onResetStuck={runResetStuck}
-              resetBusy={resetBusy}
-              resetResult={resetResult}
-              onKillAll={runKillAll}
-              killBusy={killBusy}
-              killResult={killResult}
-            />
-
-            {/* Smoke test — runs ONE vlog through the full pipeline. ~$0.10. */}
-            <SmokeTestRow
-              diag={diag}
-              busy={smokeBusy}
-              result={smokeResult}
-              onRun={runSmokeTest}
-            />
-
-            <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: 0 }}>
-              Bulk dispatches the right pipeline entry per vlog: untranscribed → full pipeline
-              (audio extract → transcribe → LLM extract); transcribed → LLM extract only.
-              Both paths queue through rate-limiters so external services aren't overwhelmed.
-            </p>
-
-            <div>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
-                Mode
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {([
-                  ['cheap',   'Cheap',   'Llama 3.3 70B · ~$0.02 / vlog'],
-                  ['premium', 'Premium', 'Sonnet 4.6 · ~$0.05 / vlog'],
-                ] as const).map(([k, label, sub]) => (
-                  <button
-                    key={k}
-                    className={`fchip ${mode === k ? 'active' : ''}`}
-                    style={{ flex: 1, padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
-                    onClick={() => setMode(k)}
-                  >
-                    <span style={{ fontWeight: 500 }}>{label}</span>
-                    <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{sub}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
-                Scope
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {([
-                  ['incomplete', 'Incomplete only', 'Skips vlogs that already finished with an active extraction'],
-                  ['all',        'Everything',      'Includes already-complete vlogs (will replace their extraction)'],
-                ] as const).map(([k, label, sub]) => (
-                  <button
-                    key={k}
-                    className={`fchip ${scope === k ? 'active' : ''}`}
-                    style={{ flex: 1, padding: '10px 14px', flexDirection: 'column', alignItems: 'flex-start' }}
-                    onClick={() => setScope(k)}
-                  >
-                    <span style={{ fontWeight: 500 }}>{label}</span>
-                    <span style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{sub}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{
-              fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5,
-              padding: 8, background: 'var(--bg-1)', borderRadius: 4, border: '1px solid var(--line)',
+        {/* Body */}
+        <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 9px',
+              background: `color-mix(in srgb, ${color} 10%, var(--bg-2))`,
+              border: `1px solid color-mix(in srgb, ${color} 30%, var(--line-1))`,
+              borderRadius: 100,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9, letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              color,
             }}>
-              <b style={{ color: 'var(--fg-1)' }}>Fire-and-forget chunks of 6:</b> the modal
-              dispatches 6 vlogs per call to the server, waits 1s, then dispatches the
-              next 6. Each vlog runs through its own pipeline DO in the background — the
-              modal doesn't wait for them to complete. The downstream gates (LlamaGate
-              cap 8, FFmpegGate cap 3) absorb the burst so Workers AI / FFmpeg never get
-              overwhelmed. To see how many actually completed, refresh the corpus
-              diagnostic panel at the top. Close the modal anytime — dispatched work
-              continues; the checkpoint resumes from where it stopped.
-            </div>
-
-            {previewError && (
-              <div style={{ fontSize: 12, color: 'var(--err)' }}>Preview failed: {previewError}</div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn ghost" onClick={onClose}>Cancel</button>
-              <button className="btn primary" disabled={phase === 'preview'} onClick={runPreview}>
-                {phase === 'preview' ? 'Resolving…' : 'Preview'}
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === 'ready' && (
-          <>
-            {/* Cost is split: untranscribed cost ~5x more (full pipeline:
-                FFmpeg + Whisper + LLM) vs transcribed (just LLM). */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat label="Total" value={ids.length} />
-              <Stat label="Full pipeline" value={untranscribedCount} />
-              <Stat label="Extract only" value={transcribedCount} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat
-                label="Est. cost"
-                value={`$${(untranscribedCount * 0.10 + transcribedCount * 0.02).toFixed(2)}`}
-              />
-              <Stat label="Skipped (in-flight)" value={skippedInFlight} tone="mute" />
-            </div>
-            {untranscribedCount > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
-                {untranscribedCount} untranscribed vlog{untranscribedCount === 1 ? '' : 's'} will
-                run the full pipeline (FFmpeg audio extract → Whisper transcribe → LLM extract),
-                gated through FFmpegGate (max 3 concurrent) and LlamaGate (max 3 concurrent).
-                Wall-clock estimate: ~{Math.ceil(untranscribedCount / 3)} min for FFmpeg,
-                + ~{Math.ceil(untranscribedCount / 3 / 6)} min for LLM. Transcribed vlogs
-                skip straight to the LLM step.
-              </div>
-            )}
-
-            {ids.length > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                Sample: <span className="mono">{ids.slice(0, 3).map(s => s.slice(-6)).join(', ')}{ids.length > 3 ? `, +${ids.length - 3} more` : ''}</span>
-              </div>
-            )}
-
-            {ids.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
-                No vlogs to dispatch in this scope.
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5 }}>
-                Chunks of <b>{chunkSize}</b> with <b>{pauseMs}ms</b> pause between.
-                Estimated dispatch time (modal closes once all are dispatched; actual completion runs in the background): {estDurationLabel(ids.length, untranscribedCount, transcribedCount)}.
-                You can cancel any time without losing progress so far.
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn ghost" onClick={reset}>Back</button>
-              <button className="btn ghost" onClick={onClose}>Close</button>
-              <button className="btn primary" disabled={ids.length === 0} onClick={() => start(processed > 0)}>
-                {processed > 0 ? `Resume (${processed}/${ids.length} done)` : `Run · ${ids.length} vlogs`}
-              </button>
-            </div>
-          </>
-        )}
-
-        {(phase === 'running' || phase === 'done') && (
-          <>
-            <ProgressBar processed={processed} total={ids.length} />
-
-            {phase === 'running' && (
-              <div style={{
-                fontSize: 12, color: 'var(--fg-2)', padding: 10,
-                background: 'var(--bg-1)', border: '1px solid var(--line)', borderRadius: 6,
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{
-                  display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                  background: 'var(--accent)', animation: 'pulse 1.5s infinite',
-                }}/>
-                <span>Dispatching in chunks of {CHUNK_SIZE} · refresh the corpus diagnostic above to see actual completion</span>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 12 }}>
-              <Stat label="Dispatched" value={dispatched} tone="ok" />
-              <Stat label="Skipped" value={skipped} tone="mute" />
-              <Stat label="Failed" value={failed} tone={failed > 0 ? 'err' : 'mute'} />
-              <Stat label="Remaining" value={remaining} />
-            </div>
-
-            {failures.length > 0 && (
-              <details style={{ fontSize: 12 }}>
-                <summary style={{ cursor: 'pointer', color: 'var(--fg-2)' }}>
-                  {failures.length} non-success {failures.length === 1 ? 'row' : 'rows'} · click to expand
-                </summary>
-                <div style={{
-                  marginTop: 8, maxHeight: 200, overflow: 'auto',
-                  border: '1px solid var(--line)', borderRadius: 6,
-                  fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
-                }}>
-                  {failures.slice(0, 100).map((f, i) => (
-                    <div key={i} style={{
-                      padding: '6px 10px',
-                      borderBottom: '1px solid var(--line)',
-                      color: f.reason ? 'var(--fg-3)' : 'var(--err)',
-                      display: 'flex', gap: 10, alignItems: 'baseline',
-                    }}>
-                      <Link href={`/timeline/${f.vlog_id}`} style={{ color: 'inherit' }}>
-                        …{f.vlog_id.slice(-10)}
-                      </Link>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {f.error}
-                      </span>
-                    </div>
-                  ))}
-                  {failures.length > 100 && (
-                    <div style={{ padding: '6px 10px', color: 'var(--fg-4)' }}>
-                      + {failures.length - 100} more…
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              {phase === 'running' && (
-                <button className="btn ghost" onClick={cancel}>Cancel</button>
-              )}
-              {phase === 'done' && (
-                <>
-                  <button className="btn ghost" onClick={reset}>Start over</button>
-                  <button className="btn primary" onClick={() => { clearCheckpoint(); onClose() }}>Close</button>
-                </>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n))
-}
-
-function estDurationLabel(
-  total: number,
-  _untranscribed: number = 0,
-  _transcribed: number = 0,
-): string {
-  // Dispatch time (not completion time). Each chunk POST takes maybe
-  // 1-3 seconds + CHUNK_PAUSE_MS pause. For 233 vlogs at chunk 6 with
-  // 1s pause: ~40 chunks × 2s + 1s pause = ~2 min to dispatch them all.
-  // Background completion takes much longer — that shows in diagnostic.
-  const chunks = Math.ceil(total / CHUNK_SIZE)
-  const ms = chunks * (2000 + CHUNK_PAUSE_MS)
-  if (ms < 60_000) return `~${Math.round(ms / 1000)}s`
-  const m = Math.round(ms / 60_000)
-  if (m < 60) return `~${m} min`
-  const h = Math.floor(m / 60); const remM = m % 60
-  return `~${h}h ${remM}m`
-}
-
-function Stat({ label, value, tone }: { label: string; value: number | string; tone?: 'ok' | 'err' | 'mute' }) {
-  const color = tone === 'ok' ? 'var(--ok)' : tone === 'err' ? 'var(--err)' : tone === 'mute' ? 'var(--fg-3)' : 'var(--fg)'
-  return (
-    <div style={{
-      background: 'var(--bg-1)', border: '1px solid var(--line)',
-      borderRadius: 6, padding: '8px 10px',
-    }}>
-      <div className="mono" style={{ fontSize: 9, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 16, color, marginTop: 2 }}>{value}</div>
-    </div>
-  )
-}
-
-function DiagnosticPanel({
-  diag, loading, error, onRefresh,
-  onResetStuck, resetBusy, resetResult,
-  onKillAll, killBusy, killResult,
-}: {
-  diag: any | null
-  loading: boolean
-  error: string | null
-  onRefresh: () => void
-  onResetStuck: (alsoFailed?: boolean) => void
-  resetBusy: boolean
-  resetResult: string | null
-  onKillAll: () => void
-  killBusy: boolean
-  killResult: string | null
-}) {
-  if (loading && !diag) {
-    return (
-      <div className="card" style={{ padding: 12, fontSize: 12, color: 'var(--fg-3)' }}>
-        Loading corpus diagnostic…
-      </div>
-    )
-  }
-  if (error && !diag) {
-    return (
-      <div className="card" style={{ padding: 12, fontSize: 12, color: 'var(--err)' }}>
-        Diagnostic failed: {error}
-        <button className="btn ghost small" onClick={onRefresh} style={{ marginLeft: 8 }}>Retry</button>
-      </div>
-    )
-  }
-  if (!diag) return null
-
-  const status = diag.by_status ?? {}
-  const stuck = status.stuck_in_flight ?? 0
-  const inFlightRecent = status.in_flight_recent ?? 0
-  const cost = diag.estimated_costs?.to_complete_corpus_usd ?? 0
-
-  return (
-    <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-          Corpus state · {diag.total ?? 0} vlogs
-        </span>
-        <button className="btn ghost small" onClick={onRefresh} style={{ marginLeft: 'auto' }}>
-          Refresh
-        </button>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 12 }}>
-        <Stat label="Complete + data" value={status.complete_with_data ?? 0} tone="ok" />
-        <Stat label="B-roll" value={status.b_roll ?? 0} tone="mute" />
-        <Stat label="Complete + no data" value={status.complete_no_data ?? 0} tone={status.complete_no_data ? 'mute' : 'mute'} />
-        <Stat label="Transcribed only" value={status.transcribed_only ?? 0} />
-        <Stat label="Untranscribed" value={status.untranscribed ?? 0} />
-        <Stat label="Archived" value={status.archived ?? 0} tone="mute" />
-        <Stat label="Stuck > 5 min" value={stuck} tone={stuck > 0 ? 'err' : 'mute'} />
-        <Stat label="Failed" value={status.failed ?? 0} tone={status.failed ? 'err' : 'mute'} />
-      </div>
-      {diag.failure_breakdown && Object.keys(diag.failure_breakdown).length > 0 && (
-        <details style={{ fontSize: 12, marginTop: 4 }}>
-          <summary style={{ cursor: 'pointer', color: 'var(--fg-2)' }}>
-            Failure breakdown ({Object.values(diag.failure_breakdown as Record<string, number>).reduce((a, b) => a + b, 0)} total) · click to expand
-          </summary>
+              <span style={{
+                width: 4, height: 4, borderRadius: '50%', background: color,
+                animation: isProcessing ? 'canon-pulse 2s ease-in-out infinite' : undefined,
+              }}/>
+              {isBroll ? 'B-roll' : status.replace(/_/g, ' ')}
+            </span>
+            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+              {ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </span>
+          </div>
           <div style={{
-            marginTop: 6, padding: 8,
-            background: 'var(--bg-2)', border: '1px solid var(--line)', borderRadius: 4,
-            fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+            fontFamily: 'var(--font-body)', fontSize: 14.5, fontWeight: 500,
+            color: 'var(--fg)', letterSpacing: '-0.2px', lineHeight: 1.3,
+            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          }}>{title}</div>
+          <div style={{
+            display: 'flex', gap: 12, flexWrap: 'wrap',
+            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+            letterSpacing: 0.4, marginTop: 'auto',
           }}>
-            {Object.entries(diag.failure_breakdown as Record<string, number>).map(([id, count]) => (
-              <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                <span>{FAILURE_LABELS[id] || id}</span>
-                <span style={{ color: 'var(--fg-3)' }}>{count}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-      {inFlightRecent > 0 && (
-        <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-          {inFlightRecent} vlog{inFlightRecent === 1 ? '' : 's'} actively processing (started within 5 min) — not stuck.
-        </div>
-      )}
-
-      {/* Kill button always available — useful even when nothing is "stuck"
-          because zombies might be running with recent updated_at timestamps. */}
-      <div style={{
-        padding: 10, borderRadius: 6,
-        background: 'var(--bg-1)', border: '1px solid var(--err-bd, var(--line))',
-        fontSize: 12, color: 'var(--fg-1)',
-        display: 'flex', flexDirection: 'column', gap: 10,
-      }}>
-        {(stuck > 0 || (status.failed ?? 0) > 0) && (
-          <div>
-            <div style={{ marginBottom: 6 }}>
-              {stuck > 0 && <><b>{stuck}</b> stuck</>}
-              {stuck > 0 && (status.failed ?? 0) > 0 && ' · '}
-              {(status.failed ?? 0) > 0 && <><b>{status.failed}</b> failed</>}
-              {' '}from prior runs. Reset clears their state +
-              pipeline_error + restart counter so the next bulk run picks them
-              up. Free — only D1 updates. Doesn't stop background workflows.
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {stuck > 0 && (
-                <button className="btn" onClick={() => onResetStuck(false)} disabled={resetBusy}>
-                  {resetBusy ? 'Resetting…' : `Reset ${stuck} stuck`}
-                </button>
-              )}
-              {(status.failed ?? 0) > 0 && (
-                <button className="btn" onClick={() => onResetStuck(true)} disabled={resetBusy}>
-                  {resetBusy ? 'Resetting…' : `Reset ${status.failed} failed + restart counter`}
-                </button>
-              )}
-            </div>
-            {resetResult && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{resetResult}</div>
+            {vlog.file_size_bytes != null && <span>{fmtSize(vlog.file_size_bytes)}</span>}
+            {vlog.thread_count != null && vlog.thread_count > 0 && (
+              <span style={{ color: 'var(--fg-1)' }}><b>{vlog.thread_count}</b> threads</span>
+            )}
+            {vlog.clip_count != null && vlog.clip_count > 0 && (
+              <span style={{ color: 'var(--sig)' }}><b>{vlog.clip_count}</b> clips</span>
             )}
           </div>
-        )}
-        <div>
-          <div style={{ marginBottom: 6 }}>
-            <b>Kill all running.</b> Hard-stop every active Cloudflare Workflow
-            instance + Durable Object for your operator. Use this when zombie
-            workflows from a prior bulk are still spamming failures. Counts as
-            compute used but stops further work immediately.
-          </div>
-          <button className="btn" onClick={onKillAll} disabled={killBusy}
-            style={{ background: 'var(--err)', color: 'white', borderColor: 'var(--err)' }}>
-            {killBusy ? 'Killing…' : 'Kill all running'}
-          </button>
-          {killResult && (
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-2)' }}>{killResult}</div>
-          )}
         </div>
-        <BindingsCheck />
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-        To bring the whole corpus to complete + data: ~${cost.toFixed(2)} estimated cost.
-      </div>
+      </Link>
+
+      {/* Select checkbox overlay */}
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSelect() }}
+        style={{
+          position: 'absolute', top: 10, left: 10,
+          width: 22, height: 22, borderRadius: 5,
+          background: selected ? 'var(--sig)' : 'rgba(0,0,0,0.5)',
+          border: `1px solid ${selected ? 'var(--sig)' : 'rgba(255,255,255,0.4)'}`,
+          color: selected ? 'var(--bg)' : 'var(--fg)',
+          cursor: 'pointer', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 0, fontSize: 14,
+        }}
+        title={selected ? 'Deselect' : 'Select'}
+      >
+        {selected ? '✓' : ''}
+      </button>
     </div>
   )
 }
 
-function BindingsCheck() {
-  const [data, setData] = useState<any | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const run = async () => {
-    setLoading(true); setErr(null)
-    try {
-      const r = await fetch('/api/v2/admin/bindings-check', { credentials: 'include' })
-      if (!r.ok) {
-        setErr(`HTTP ${r.status}`)
-        return
-      }
-      setData(await r.json())
-    } catch (e: any) {
-      setErr(e?.message || String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-  return (
-    <div style={{ fontSize: 11, color: 'var(--fg-3)', borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span>Binding sanity check (use this if bulk Run returns "chunk request failed"):</span>
-        <button className="btn ghost small" onClick={run} disabled={loading} style={{ marginLeft: 'auto' }}>
-          {loading ? 'Checking…' : 'Check now'}
-        </button>
-      </div>
-      {err && <div style={{ color: 'var(--err)' }}>Error: {err}</div>}
-      {data && (
-        <div style={{
-          fontFamily: 'JetBrains Mono, monospace', fontSize: 10,
-          padding: 8, background: 'var(--bg-2)', borderRadius: 4,
-          whiteSpace: 'pre-wrap',
-        }}>
-          {`ready_for.bulk_dispatch:       ${data.ready_for?.bulk_dispatch ? '✅' : '❌ (PIPELINE + HEARTBEAT_TOKEN required)'}
-ready_for.terminate_workflows: ${data.ready_for?.terminate_workflows ? '✅' : '❌ (CLOUDFLARE_API_TOKEN + ACCOUNT_ID required)'}
-ready_for.terminate_dos:       ${data.ready_for?.terminate_dos ? '✅' : '❌'}
-pipeline_probe:                ${data.pipeline_probe?.reachable ? `reachable (status ${data.pipeline_probe.status})` : `❌ ${data.pipeline_probe?.error || 'unreachable'}`}
-
-services:  PIPELINE=${data.services?.PIPELINE} PROCESS_UPLOAD=${data.services?.PROCESS_UPLOAD} DB=${data.services?.DB}
-secrets:   HEARTBEAT_TOKEN=${data.secrets?.HEARTBEAT_TOKEN} CF_API_TOKEN=${data.secrets?.CLOUDFLARE_API_TOKEN} ANTHROPIC=${data.secrets?.ANTHROPIC_API_KEY}`}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function SmokeTestRow({
-  diag, busy, result, onRun,
-}: {
-  diag: any | null
-  busy: boolean
-  result: { ok: boolean; vlog_id?: string; message: string } | null
-  onRun: () => void
-}) {
-  const needsFull = diag?.counts_for_run?.needs_full_pipeline ?? 0
-  const disabled = !diag || (needsFull === 0 && (diag?.counts_for_run?.needs_extract_only ?? 0) === 0) || busy
-  return (
-    <div className="card" style={{
-      padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
-      background: 'var(--bg-1)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-          Smoke test · ~$0.10
-        </span>
-        <button className="btn primary small" onClick={onRun} disabled={disabled} style={{ marginLeft: 'auto' }}>
-          {busy ? 'Dispatching…' : 'Run on 1 vlog'}
-        </button>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
-        Picks one vlog from the eligible set, dispatches it through the full new gated
-        pipeline as an end-to-end sanity check. Watch its detail page; if threads / clips /
-        creative / entities show up, the bulk path is safe. If not, STOP — don't bulk.
-      </div>
-      {result && (
-        <div style={{
-          fontSize: 12,
-          color: result.ok ? 'var(--ok)' : 'var(--err)',
-          padding: 8, borderRadius: 6, background: 'var(--bg-2)',
-        }}>
-          {result.message}
-          {result.vlog_id && (
-            <Link href={`/timeline/${result.vlog_id}`} style={{ marginLeft: 8, color: 'var(--accent)' }}>
-              open vlog →
-            </Link>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ProgressBar({ processed, total }: { processed: number; total: number }) {
-  const pct = total > 0 ? (processed / total) * 100 : 0
+function Stat({ n, l, suffix }: { n: number; l: string; suffix?: string }) {
   return (
     <div>
       <div style={{
-        height: 8, background: 'var(--bg-2)', borderRadius: 4, overflow: 'hidden',
-        border: '1px solid var(--line)',
-      }}>
-        <div style={{
-          width: `${pct}%`, height: '100%', background: 'var(--accent)',
-          transition: 'width 200ms ease-out',
-        }}/>
-      </div>
-      <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-        <span>{processed} / {total}</span>
-        <span>{pct.toFixed(0)}%</span>
-      </div>
+        fontFamily: 'var(--font-body)', fontWeight: 300,
+        fontSize: 36, letterSpacing: '-1.4px',
+        color: 'var(--fg)', lineHeight: 1,
+        fontVariantNumeric: 'tabular-nums',
+      }}>{n.toLocaleString()}{suffix}</div>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 9.5,
+        letterSpacing: 1.8, textTransform: 'uppercase',
+        color: 'var(--fg-3)', marginTop: 6, fontWeight: 500,
+      }}>{l}</div>
     </div>
   )
 }
 
-async function dispatchChunkWithRetry(
-  vlog_ids: string[],
-  mode: 'cheap' | 'premium',
-  signal: AbortSignal,
-): Promise<
-  | { results: { vlog_id: string; ok: boolean; backend: string; error?: string; reason?: string }[] }
-  | 'aborted'
-  | { kind: 'fatal'; lastError: string }
-> {
-  const maxAttempts = 3
-  let lastError = 'unknown — request never reached the server'
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    if (signal.aborted) return 'aborted'
-    try {
-      const r = await fetch('/api/v2/admin/reprocess-vlogs', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_ids, mode, skip_in_flight: true }),
-        signal,
-      })
-      if (r.ok) {
-        const d: any = await r.json()
-        return { results: d.results ?? [] }
-      }
-      // Capture the actual server error message for both 4xx and 5xx.
-      // Previously 5xx errors were retried silently and we lost the
-      // upstream error; now we keep the latest one and surface it if
-      // every retry fails.
-      let serverErr = `HTTP ${r.status}`
-      try {
-        const d: any = await r.json()
-        const hint = d?.hint ? ` · ${String(d.hint).slice(0, 200)}` : ''
-        const details = d?.details ? ` · ${String(d.details).slice(0, 200)}` : ''
-        serverErr = `HTTP ${r.status}: ${d?.error || 'unknown'}${details}${hint}`
-      } catch {
-        try { serverErr = `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` } catch {}
-      }
-      lastError = serverErr
-      // 4xx (bad request, unauth) — fatal, don't retry.
-      if (r.status >= 400 && r.status < 500) {
-        return { results: vlog_ids.map(id => ({ vlog_id: id, ok: false, backend: 'none', error: serverErr })) }
-      }
-      // 5xx — retry with backoff.
-    } catch (err: any) {
-      if (signal.aborted || err?.name === 'AbortError') return 'aborted'
-      lastError = `network: ${err?.message || String(err)}`
-    }
-    if (attempt < maxAttempts) {
-      await sleepWithAbort(500 * Math.pow(2, attempt - 1), signal)
-      if (signal.aborted) return 'aborted'
-    }
-  }
-  return { kind: 'fatal', lastError }
+function deriveTitle(filename: string | null): string {
+  if (!filename) return 'Untitled vlog'
+  return filename
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, ch => ch.toUpperCase()) || 'Untitled vlog'
 }
-
-// Fire-and-forget chunk-of-N dispatch. The operator ranked this as
-// the best approach: high visible throughput, failures don't block
-// the queue, each vlog runs through its own pipeline DO in the
-// background. The downstream LlamaGate (cap 8) + FFmpegGate (cap 3)
-// absorb burst load so we don't overwhelm Workers AI / FFmpeg
-// container even if all 6 vlogs in a chunk hit the LLM step
-// simultaneously.
-//
-// Progress in the modal = DISPATCHED, not completed. For completion
-// progress, the operator refreshes the diagnostic panel which counts
-// vlogs by status across the whole corpus.
-const CHUNK_SIZE = 6
-const CHUNK_PAUSE_MS = 1000
-
-// Human-readable labels for the failure_breakdown buckets returned by
-// /api/v2/admin/pipeline-state. Keys match the FAILURE_CATEGORIES `id`
-// values in that endpoint.
-const FAILURE_LABELS: Record<string, string> = {
-  short_transcript: 'Transcript too short (will become b-roll)',
-  whisper_timeout: 'Whisper timeout (large file)',
-  whisper_empty: 'Whisper returned empty',
-  ffmpeg_503: 'FFmpeg container failure',
-  llm_degraded: 'LLM degraded response',
-  restart_limit: 'Stuck → healer gave up',
-  other: 'Other / uncategorized',
+function fmtDur(s: number): string {
+  const m = Math.floor(s / 60); const sec = Math.floor(s % 60)
+  return `${m}:${String(sec).padStart(2, '0')}`
 }
-
-
-function sleepWithAbort(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise(resolve => {
-    if (signal.aborted) return resolve()
-    const t = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve() }, ms)
-    const onAbort = () => { clearTimeout(t); resolve() }
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-}
-
-function VlogCard({ v, isSelected, onToggleSelect }: {
-  v: VlogRow
-  isSelected?: boolean
-  onToggleSelect?: (id: string, e: React.MouseEvent) => void
-}) {
-  const statusCls = v.pipeline_status === 'complete' ? 'ok'
-    : v.pipeline_status === 'archived' ? 'mute'
-    : v.pipeline_status === 'failed' ? 'err'
-    : 'hot'
-  const date = v.recorded_at ? new Date(v.recorded_at) : new Date(v.uploaded_at)
-  const dateLabel = formatDate(date)
-  const size = v.file_size_bytes ? `${(v.file_size_bytes / 1_000_000).toFixed(1)} MB` : '—'
-
-  return (
-    <Link href={`/timeline/${v.id}`} className="card no-pad" style={{
-      overflow: 'hidden', cursor: 'pointer', display: 'block',
-      outline: isSelected ? '2px solid var(--err, #f87171)' : 'none',
-      outlineOffset: -2,
-    }}>
-      <div style={{
-        aspectRatio: '16/10',
-        background: v.thumbnail_url
-          ? `center / cover no-repeat url(${v.thumbnail_url})`
-          : `linear-gradient(135deg, var(--bg-3), var(--bg-1), var(--bg-2))`,
-        position: 'relative',
-        borderBottom: '1px solid var(--line)',
-      }}>
-        {/* Selection checkbox — sits over the thumbnail. stopPropagation
-            on the wrapper prevents the Link from navigating when the
-            operator clicks the checkbox. */}
-        {onToggleSelect && (
-          <div
-            onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleSelect(v.id, e) }}
-            style={{
-              position: 'absolute', top: 6, left: 6, zIndex: 2,
-              padding: 6, borderRadius: 4,
-              background: isSelected ? 'var(--err, #f87171)' : 'rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(4px)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22,
-            }}
-            title={isSelected ? 'Deselect' : 'Select for bulk action'}
-          >
-            {isSelected && (
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="white">
-                <polyline points="3,8 7,12 13,4" stroke="white" strokeWidth="2" fill="none"/>
-              </svg>
-            )}
-          </div>
-        )}
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.25)' }}>
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="white"><polygon points="5,3 12,8 5,13"/></svg>
-          </div>
-        </div>
-        <span className={`pill ${statusCls}`} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)' }}>{v.pipeline_status}</span>
-      </div>
-      <div style={{ padding: '11px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <TopicDot/>
-          <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-            {v.original_filename ?? v.id}
-          </span>
-        </div>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>{dateLabel} · {size}</span>
-          {v.has_transcript ? <span style={{ color: 'var(--fg-2)' }}>transcribed</span> : <span>—</span>}
-        </div>
-      </div>
-    </Link>
-  )
-}
-
-function formatDate(d: Date): string {
-  const now = new Date()
-  const dayDiff = Math.floor((now.getTime() - d.getTime()) / 86_400_000)
-  if (dayDiff === 0) return 'Today ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-  if (dayDiff === 1) return 'Yesterday ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-  if (dayDiff < 7) return d.toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function fmtSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }

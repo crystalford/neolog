@@ -23,7 +23,7 @@ export default function StatesPage() {
 
         <Block label="Loading">
           <div className="empty-row">
-            <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--bone-3)' }}>LOADING…</p>
+            <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 2, color: 'var(--fg-3)' }}>LOADING…</p>
           </div>
         </Block>
 

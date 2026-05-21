@@ -154,12 +154,12 @@ export default function LivePipeline({ vlogId }: { vlogId: string }) {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
-        color: state.conn === 'connected' ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
+        color: state.conn === 'connected' ? 'var(--t-sage)' : 'var(--fg-3)',
         letterSpacing: 1.2, textTransform: 'uppercase',
       }}>
         <span style={{
           width: 6, height: 6, borderRadius: '50%',
-          background: state.conn === 'connected' ? 'var(--state-ok, #7a9a6a)' : 'var(--bone-3)',
+          background: state.conn === 'connected' ? 'var(--t-sage)' : 'var(--fg-3)',
         }} />
         {state.conn === 'connected' ? 'live'
           : (state.conn === 'connecting' || state.conn === 'reconnecting') && state.events.length > 0 ? 'polling · 5s'
@@ -208,7 +208,7 @@ function StepCard({
           <h3 style={titleStyle}>{label}</h3>
           <StatusBadge status="idle" />
         </header>
-        <div style={{ fontSize: 12, color: 'var(--bone-3)' }}>Waiting…</div>
+        <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>Waiting…</div>
       </article>
     )
   }
@@ -228,7 +228,7 @@ function StepCard({
           <StatusBadge status={last.status} />
         </div>
       </header>
-      <div style={{ fontSize: 13, color: 'var(--bone-1)', marginTop: 6 }}>
+      <div style={{ fontSize: 13, color: 'var(--fg-1)', marginTop: 6 }}>
         {description}
       </div>
       {pct != null && <ProgressBar pct={pct} label={`${pct.toFixed(1)}%`} />}
@@ -236,7 +236,7 @@ function StepCard({
         <ProgressBar pct={(done / total) * 100} label={`${done}/${total}`} />}
       {last.status === 'retrying' && (
         <div style={{
-          marginTop: 6, fontSize: 11, color: 'var(--state-warn, #b8915f)',
+          marginTop: 6, fontSize: 11, color: 'var(--t-ochre)',
           fontFamily: 'JetBrains Mono, monospace',
         }}>
           Retry attempt {String(detail.attempt ?? last.attempt ?? '?')} in {detail.next_in_ms ? `${Math.round(Number(detail.next_in_ms) / 1000)}s` : '—'}
@@ -252,7 +252,7 @@ function StepCard({
           fontFamily: 'JetBrains Mono, monospace',
           letterSpacing: 1.2, textTransform: 'uppercase',
           background: 'transparent', border: '1px solid var(--line)',
-          borderRadius: 4, cursor: 'pointer', color: 'var(--bone-3)',
+          borderRadius: 4, cursor: 'pointer', color: 'var(--fg-3)',
         }}
       >
         {expanded ? 'Hide log' : `View full log (${events.length})`}
@@ -261,15 +261,15 @@ function StepCard({
         <ol style={logList}>
           {events.map((e, i) => (
             <li key={e.id ?? i} style={logRow}>
-              <span style={{ color: 'var(--bone-3)', minWidth: 80 }}>
+              <span style={{ color: 'var(--fg-3)', minWidth: 80 }}>
                 {new Date(e.ts).toLocaleTimeString('en-US', { hour12: false })}
               </span>
-              <span style={{ color: 'var(--bone-1)' }}>{e.sub_step || e.step}</span>
+              <span style={{ color: 'var(--fg-1)' }}>{e.sub_step || e.step}</span>
               <span style={{ color: statusColor(e.status), minWidth: 80 }}>{e.status}</span>
               {e.duration_ms != null && (
-                <span style={{ color: 'var(--bone-3)' }}>{e.duration_ms} ms</span>
+                <span style={{ color: 'var(--fg-3)' }}>{e.duration_ms} ms</span>
               )}
-              <code style={{ flex: 1, fontSize: 10, color: 'var(--bone-3)' }}>
+              <code style={{ flex: 1, fontSize: 10, color: 'var(--fg-3)' }}>
                 {e.detail_json.length > 300 ? e.detail_json.slice(0, 300) + '…' : e.detail_json}
               </code>
               {e.error_full_text && (
@@ -361,17 +361,17 @@ function ProgressBar({ pct, label }: { pct: number; label?: string }) {
     <div style={{ marginTop: 6 }}>
       <div style={{
         position: 'relative', height: 4, borderRadius: 2,
-        background: 'var(--ink-2)', overflow: 'hidden',
+        background: 'var(--bg-2)', overflow: 'hidden',
       }}>
         <div style={{
           position: 'absolute', left: 0, top: 0, bottom: 0,
-          width: `${clamped}%`, background: 'var(--bone-1)',
+          width: `${clamped}%`, background: 'var(--fg-1)',
           transition: 'width 200ms ease-out',
         }} />
       </div>
       {label && (
         <div style={{
-          marginTop: 4, fontSize: 10, color: 'var(--bone-3)',
+          marginTop: 4, fontSize: 10, color: 'var(--fg-3)',
           fontFamily: 'JetBrains Mono, monospace',
         }}>{label}</div>
       )}
@@ -424,15 +424,15 @@ function describeSubstep(step: string, sub: string | null, d: Record<string, unk
 
 function statusColor(status: string): string {
   switch (status) {
-    case 'ok': return 'var(--state-ok, #7a9a6a)'
+    case 'ok': return 'var(--t-sage)'
     case 'running':
-    case 'starting': return 'var(--bone-1)'
-    case 'retrying': return 'var(--state-warn, #b8915f)'
+    case 'starting': return 'var(--fg-1)'
+    case 'retrying': return 'var(--t-ochre)'
     case 'error':
-    case 'failed_terminal': return 'var(--state-err, #c66042)'
-    case 'skipped': return 'var(--bone-3)'
-    case 'idle': return 'var(--bone-3)'
-    default: return 'var(--bone-3)'
+    case 'failed_terminal': return 'var(--t-terra)'
+    case 'skipped': return 'var(--fg-3)'
+    case 'idle': return 'var(--fg-3)'
+    default: return 'var(--fg-3)'
   }
 }
 
@@ -449,8 +449,8 @@ function safeParse(s: string): Record<string, unknown> {
 
 const cardStyle = (status: string): React.CSSProperties => ({
   padding: 12,
-  border: `1px solid ${status === 'error' || status === 'failed_terminal' ? 'var(--state-err, #c66042)' : 'var(--line)'}`,
-  background: 'var(--ink-2)',
+  border: `1px solid ${status === 'error' || status === 'failed_terminal' ? 'var(--t-terra)' : 'var(--line)'}`,
+  background: 'var(--bg-2)',
   borderRadius: 8,
 })
 
@@ -459,17 +459,17 @@ const headerRow: React.CSSProperties = {
 }
 
 const titleStyle: React.CSSProperties = {
-  fontFamily: 'inherit', fontSize: 14, fontWeight: 500, color: 'var(--bone-1)', margin: 0,
+  fontFamily: 'inherit', fontSize: 14, fontWeight: 500, color: 'var(--fg-1)', margin: 0,
 }
 
 const errorBlock: React.CSSProperties = {
   marginTop: 8, padding: 8,
-  background: 'var(--ink-1)',
-  border: '1px solid var(--state-err, #c66042)',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--t-terra)',
   borderRadius: 4,
   fontFamily: 'JetBrains Mono, monospace',
   fontSize: 11,
-  color: 'var(--state-err, #c66042)',
+  color: 'var(--t-terra)',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
   maxHeight: 320,
@@ -480,7 +480,7 @@ const logList: React.CSSProperties = {
   marginTop: 8, padding: 0, listStyle: 'none',
   display: 'flex', flexDirection: 'column', gap: 4,
   maxHeight: 360, overflowY: 'auto',
-  background: 'var(--ink-1)', borderRadius: 4,
+  background: 'var(--bg-1)', borderRadius: 4,
   border: '1px solid var(--line)',
 }
 

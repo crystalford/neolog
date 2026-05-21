@@ -133,8 +133,8 @@ function AvatarMenu() {
             <span>Chat</span>
             <span className="kbd">G C</span>
           </Link>
-          <Link href="/capture" onClick={() => setOpen(false)}>
-            <span>Capture</span>
+          <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
+            <span>Drop a vlog</span>
             <span className="kbd">⌘N</span>
           </Link>
           <Link href="/settings" onClick={() => setOpen(false)}>
