@@ -72,6 +72,12 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
   const [error, setError] = useState<string | null>(null)
   const [currentT, setCurrentT] = useState(0)
   const [playing, setPlaying] = useState(false)
+  // Lazy-loaded segment audio (just the thread's span, not the full vlog).
+  // Server caches the MP3 at {operator}/audio-segments/{thread_id}.mp3
+  // after the first call.
+  const [segment, setSegment] = useState<{ url: string; duration: number } | null>(null)
+  const [segmentStatus, setSegmentStatus] = useState<'idle' | 'loading' | 'ready' | 'no-span' | 'failed'>('idle')
+  const [segmentError, setSegmentError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/v2/threads/${params.id}`, { credentials: 'include' })
@@ -90,6 +96,36 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [data, router])
+
+  // Fetch the audio segment lazily once thread+span are known. Server
+  // generates and caches on first call; subsequent calls return the
+  // cached presigned URL fast.
+  useEffect(() => {
+    if (!data) return
+    const t = data.thread
+    if (t.transcript_span_start == null || t.transcript_span_end == null) {
+      setSegmentStatus('no-span')
+      return
+    }
+    setSegmentStatus('loading')
+    setSegmentError(null)
+    fetch(`/api/v2/threads/${params.id}/audio-segment`, { credentials: 'include' })
+      .then(async r => {
+        if (!r.ok) {
+          const d: any = await r.json().catch(() => ({}))
+          throw new Error(d?.error || `HTTP ${r.status}`)
+        }
+        return r.json()
+      })
+      .then((d: any) => {
+        setSegment({ url: d.url, duration: Number(d.duration_sec) || (t.transcript_span_end! - t.transcript_span_start!) })
+        setSegmentStatus('ready')
+      })
+      .catch(err => {
+        setSegmentStatus('failed')
+        setSegmentError(String(err?.message || err))
+      })
+  }, [data, params.id])
 
   if (error) return (
     <Shell>
@@ -172,25 +208,89 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
           </div>
         </section>
 
-        {/* Wavebox */}
+        {/* Wavebox — plays JUST the thread's span (audio segment lazily
+            sliced server-side, R2-cached). Falls back to a helpful
+            message when span is missing or generation fails. */}
         <section className="canon-reveal d3" style={{ marginBottom: 32 }}>
-          <Wavebox
-            title={deriveVlogTitle(vlog.original_filename)}
-            subtitle={vlog.recorded_at ? formatFullDate(vlog.recorded_at) : undefined}
-            durationSec={vlog.duration_sec ?? 0}
-            bands={thread.transcript_span_start != null && thread.transcript_span_end != null ? [{
-              start: thread.transcript_span_start,
-              end: thread.transcript_span_end,
-              color: topicCol,
-              label: 'thread span',
-            }] : []}
-            currentT={currentT} setCurrentT={setCurrentT}
-            playing={playing} setPlaying={setPlaying}
-            audioId={`thread-audio-${thread.id}`}
-            audioSrc={vlog.playback_url}
-            accentColor={topicCol}
-            mediaLabel={`VLOG · ${formatMmSs(vlog.duration_sec ?? 0)} total · thread span ${thread.transcript_span_start != null ? formatMmSs(thread.transcript_span_start) : '?'} → ${thread.transcript_span_end != null ? formatMmSs(thread.transcript_span_end) : '?'}`}
-          />
+          {segmentStatus === 'no-span' && (
+            <div style={{
+              padding: '18px 22px',
+              background: 'var(--bg-1)',
+              border: '1px dashed var(--line-2)',
+              borderLeft: `2px solid ${topicCol}`,
+              borderRadius: 10,
+              display: 'flex', alignItems: 'flex-start', gap: 14,
+              fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.55,
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                letterSpacing: 1.6, textTransform: 'uppercase',
+                color: 'var(--fg-3)', flexShrink: 0,
+              }}>No span</span>
+              <div style={{ flex: 1 }}>
+                This thread doesn't have a computed transcript span yet, so the audio segment
+                can't be sliced. Open the source vlog and run <strong style={{ color: 'var(--fg-1)' }}>Re-extract</strong> to populate it.
+                <div style={{ marginTop: 10 }}>
+                  <Link href={`/vlog/${vlog.id}`} className="canon-btn ghost" style={{ fontSize: 12 }}>
+                    Open source vlog
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+          {segmentStatus === 'loading' && (
+            <div style={{
+              padding: '18px 22px',
+              background: 'var(--bg-1)',
+              border: '1px solid var(--line-1)',
+              borderRadius: 10,
+              color: 'var(--fg-3)', fontSize: 13.5,
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: topicCol,
+                boxShadow: `0 0 6px ${topicCol}`,
+                animation: 'canon-pulse 1.4s ease-in-out infinite',
+              }}/>
+              Slicing the segment from R2… first call takes a few seconds; cached after that.
+            </div>
+          )}
+          {segmentStatus === 'failed' && (
+            <div style={{
+              padding: '18px 22px',
+              background: 'rgba(230,99,74,0.06)',
+              border: '1px solid var(--t-terra)',
+              borderRadius: 10,
+              color: 'var(--fg-1)', fontSize: 13.5, lineHeight: 1.5,
+            }}>
+              <div style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                letterSpacing: 1.6, textTransform: 'uppercase',
+                color: 'var(--t-terra)', marginBottom: 6,
+              }}>Segment failed</div>
+              {segmentError || 'Could not generate the audio segment.'}
+            </div>
+          )}
+          {segmentStatus === 'ready' && segment && (
+            <Wavebox
+              title={deriveVlogTitle(vlog.original_filename)}
+              subtitle={vlog.recorded_at ? formatFullDate(vlog.recorded_at) : undefined}
+              durationSec={segment.duration}
+              bands={[{
+                start: 0,
+                end: segment.duration,
+                color: topicCol,
+                label: 'thread span',
+              }]}
+              currentT={currentT} setCurrentT={setCurrentT}
+              playing={playing} setPlaying={setPlaying}
+              audioId={`thread-audio-${thread.id}`}
+              audioSrc={segment.url}
+              accentColor={topicCol}
+              mediaLabel={`THREAD SEGMENT · ${formatMmSs(segment.duration)} · from ${thread.transcript_span_start != null ? formatMmSs(thread.transcript_span_start) : '?'} in vlog`}
+            />
+          )}
         </section>
 
         {/* The Take pull-quote */}
