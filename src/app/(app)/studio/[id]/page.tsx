@@ -36,7 +36,11 @@ import {
   type RiffTimelineNode, type RiffWindow as RW,
 } from '@/components/threadkit'
 
-interface Insight { kind: string; kind_label: string; title: string | null; body: string; bounce_run_id: string | null; created_at: string }
+interface Insight {
+  id: string; kind: string; kind_label: string; title: string | null; body: string
+  bounce_run_id: string | null; source_label: string | null; source_url: string | null
+  operator_authored: boolean; created_at: string
+}
 interface Thread { id: string; topic: string; take: string; strength: number | null; role: string; extracted_at: string; vlog_id: string }
 interface ConnectedCluster { id: string; topic: string; abstracted_topic: string | null; ripeness_score: number | null; thread_count: number; shared: number }
 interface ProductionCandidate { name: string; sub: string; cost: string; duration_label: string; fit: number; primary?: boolean }
@@ -110,6 +114,19 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
       setCultivateNote(`Failed: ${e?.message || String(e)}`)
     } finally {
       setCultivating(null)
+    }
+  }
+
+  const removeInsight = async (insightId: string) => {
+    if (!confirm('Remove this insight?')) return
+    try {
+      const r = await fetch(`/api/v2/clusters/${params.id}/insights/${insightId}`, {
+        method: 'DELETE', credentials: 'include',
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      load()
+    } catch (e: any) {
+      alert(`Remove failed: ${e?.message || e}`)
     }
   }
 
@@ -388,32 +405,77 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
 
             <section className="canon-section">
               <div className="canon-section-head">
-                <h2>Surfaced insights <span className="meta">· {cluster.insights.length}</span></h2>
-                <div className="meta">{cluster.insights.length === 0 ? 'no runs yet' : 'cultivate output'}</div>
+                <h2>Insights <span className="meta">· {cluster.insights.length}</span></h2>
+                <div className="meta">operator notes + cultivate output</div>
               </div>
+
+              {/* Ingest panel — operator-authored context for the cluster */}
+              <IngestPanel clusterId={params.id} onAdded={load} color={color}/>
+
               {cluster.insights.length === 0 ? (
-                <div className="canon-empty-hint">
-                  Click <strong>Identify pattern</strong> — the model will name the concept this cluster matches and surface adjacent thinkers.
+                <div className="canon-empty-hint" style={{ marginTop: 12 }}>
+                  Add a note above, or click <strong>Identify pattern</strong> in the action panel to have the model surface adjacent thinkers and parallels.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {cluster.insights.map((ins, i) => (
-                    <div key={i} style={{
-                      padding: '14px 18px',
-                      background: 'var(--bg-1)',
-                      border: '1px solid var(--line-1)',
-                      borderLeft: '2px solid var(--sig)',
-                      borderRadius: '0 10px 10px 0',
-                    }}>
-                      <div style={{
-                        fontSize: 9.5, color: 'var(--sig)', letterSpacing: 1.6,
-                        textTransform: 'uppercase',
-                        fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 8,
-                      }}>{ins.kind_label}</div>
-                      <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.6 }}
-                        dangerouslySetInnerHTML={{ __html: renderInsightBody(ins.body) }}/>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                  {cluster.insights.map(ins => {
+                    const isOp = ins.operator_authored
+                    const accent = isOp ? color : 'var(--sig)'
+                    const label = isOp
+                      ? (ins.source_url ? 'Reference' : ins.source_label && ins.source_label !== 'operator' ? 'Quote' : 'Note')
+                      : ins.kind_label
+                    return (
+                      <div key={ins.id} style={{
+                        padding: '14px 18px',
+                        background: 'var(--bg-1)',
+                        border: '1px solid var(--line-1)',
+                        borderLeft: `2px solid ${accent}`,
+                        borderRadius: '0 10px 10px 0',
+                        position: 'relative',
+                      }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                          gap: 12, marginBottom: 8,
+                        }}>
+                          <div style={{
+                            fontSize: 9.5, color: accent, letterSpacing: 1.6,
+                            textTransform: 'uppercase',
+                            fontFamily: 'var(--font-mono)', fontWeight: 500,
+                          }}>
+                            {label}
+                            {isOp && ins.source_label && ins.source_label !== 'operator' && !ins.source_url && (
+                              <span style={{ color: 'var(--fg-3)', fontWeight: 400, marginLeft: 8 }}>· {ins.source_label}</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => removeInsight(ins.id)}
+                            title="Remove"
+                            style={{
+                              background: 'transparent', border: 'none', cursor: 'pointer',
+                              color: 'var(--fg-4)', fontSize: 14, padding: 0, lineHeight: 1,
+                            }}
+                          >×</button>
+                        </div>
+                        <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.6 }}
+                          dangerouslySetInnerHTML={{ __html: renderInsightBody(ins.body) }}/>
+                        {ins.source_url && (
+                          <a
+                            href={ins.source_url}
+                            target="_blank" rel="noreferrer"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              marginTop: 10,
+                              fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                              color: accent, letterSpacing: 0.4,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            ↗ {ins.source_label || ins.source_url}
+                          </a>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </section>
@@ -630,4 +692,183 @@ function buildWeekMarkers(first: number, last: number): { position: number; labe
     })
   }
   return out
+}
+
+// ─── IngestPanel ─────────────────────────────────────────────────────────
+// Operator-authored context for the cluster. Three tabs: Note (just text),
+// Quote (text + attribution), Reference (text + URL + title).
+// All POST to /api/v2/clusters/[id]/insights — server maps them onto the
+// schema's kind='framework' with source_label/source_url packed in.
+
+function IngestPanel({ clusterId, onAdded, color }: { clusterId: string; onAdded: () => void; color: string }) {
+  const [tab, setTab] = useState<'note' | 'quote' | 'reference'>('note')
+  const [body, setBody] = useState('')
+  const [sourceLabel, setSourceLabel] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const reset = () => { setBody(''); setSourceLabel(''); setSourceUrl(''); setError(null) }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!body.trim() || saving) return
+    setSaving(true); setError(null)
+    try {
+      const r = await fetch(`/api/v2/clusters/${clusterId}/insights`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: tab,
+          body: body.trim(),
+          source_label: sourceLabel.trim() || undefined,
+          source_url: tab === 'reference' ? sourceUrl.trim() || undefined : undefined,
+        }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      reset()
+      onAdded()
+    } catch (err: any) {
+      setError(String(err?.message || err).slice(0, 240))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const TABS: { key: 'note' | 'quote' | 'reference'; label: string; hint: string }[] = [
+    { key: 'note',      label: 'Note',      hint: 'How you want this cluster to read — frame, argument, direction.' },
+    { key: 'quote',     label: 'Quote',     hint: 'Excerpt from an external source. Include attribution.' },
+    { key: 'reference', label: 'Reference', hint: 'A URL — article, book, tweet — that informs this cluster.' },
+  ]
+  const cur = TABS.find(t => t.key === tab)!
+
+  return (
+    <div style={{
+      background: 'var(--bg-1)',
+      border: '1px solid var(--line-1)',
+      borderLeft: `2px solid ${color}`,
+      borderRadius: '0 10px 10px 0',
+      padding: 16,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.6,
+          textTransform: 'uppercase', color: 'var(--fg-3)',
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }}/>
+          Add context
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {TABS.map(t => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => { setTab(t.key); setError(null) }}
+              className={`canon-filter-chip ${tab === t.key ? 'active' : ''}`}
+              style={{ fontSize: 10.5, padding: '4px 10px' }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{
+        fontSize: 12, color: 'var(--fg-3)', lineHeight: 1.5,
+      }}>{cur.hint}</div>
+
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          placeholder={
+            tab === 'note' ? 'Frame this cluster — what it\'s really about, what it isn\'t…' :
+            tab === 'quote' ? '"…paste the excerpt here…"' :
+            'Why this reference belongs here…'
+          }
+          rows={tab === 'note' ? 3 : 4}
+          disabled={saving}
+          style={{
+            width: '100%', padding: '10px 12px',
+            background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+            borderRadius: 8, fontSize: 13.5, color: 'var(--fg-1)',
+            fontFamily: 'var(--font-body)', lineHeight: 1.5,
+            resize: 'vertical', minHeight: 72,
+          }}
+        />
+
+        {tab === 'quote' && (
+          <input
+            value={sourceLabel}
+            onChange={e => setSourceLabel(e.target.value)}
+            placeholder='Attribution — "Samuelson 1948, Foundations" / Tristan Harris on YouTube / etc.'
+            disabled={saving}
+            style={{
+              width: '100%', padding: '8px 12px',
+              background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+              borderRadius: 8, fontSize: 12.5, color: 'var(--fg-1)',
+              fontFamily: 'var(--font-body)',
+            }}
+          />
+        )}
+
+        {tab === 'reference' && (
+          <>
+            <input
+              type="url"
+              value={sourceUrl}
+              onChange={e => setSourceUrl(e.target.value)}
+              placeholder="https://…"
+              disabled={saving}
+              required
+              style={{
+                width: '100%', padding: '8px 12px',
+                background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+                borderRadius: 8, fontSize: 12.5, color: 'var(--fg-1)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
+            <input
+              value={sourceLabel}
+              onChange={e => setSourceLabel(e.target.value)}
+              placeholder="Title or short label — e.g. 'Tristan Harris · Center for Humane Tech'"
+              disabled={saving}
+              style={{
+                width: '100%', padding: '8px 12px',
+                background: 'var(--bg-2)', border: '1px solid var(--line-1)',
+                borderRadius: 8, fontSize: 12.5, color: 'var(--fg-1)',
+                fontFamily: 'var(--font-body)',
+              }}
+            />
+          </>
+        )}
+
+        {error && (
+          <div style={{ fontSize: 11.5, color: 'var(--t-terra)' }}>{error}</div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="submit"
+            disabled={!body.trim() || saving}
+            className="canon-btn primary"
+            style={{ fontSize: 12, padding: '8px 14px', opacity: !body.trim() || saving ? 0.5 : 1 }}
+          >
+            {saving ? 'Adding…' : `Add ${cur.label.toLowerCase()}`}
+          </button>
+          {body.trim() && !saving && (
+            <button
+              type="button"
+              onClick={reset}
+              className="canon-btn ghost"
+              style={{ fontSize: 12, padding: '8px 12px' }}
+            >Clear</button>
+          )}
+        </div>
+      </form>
+    </div>
+  )
 }

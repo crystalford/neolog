@@ -77,13 +77,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       params.id, operator.id,
     ), []),
 
-    safe('insights', () => findMany<{ kind: string; title: string | null; body: string; bounce_run_id: string | null; created_at: string }>(
+    safe('insights', () => findMany<{
+      id: string; kind: string; title: string | null; body: string
+      bounce_run_id: string | null; source_label: string | null; source_url: string | null
+      created_at: string
+    }>(
       db,
-      `SELECT kind, title, body, bounce_run_id, created_at
+      `SELECT id, kind, title, body, bounce_run_id, source_label, source_url, created_at
          FROM cluster_insights
         WHERE cluster_id = ?
         ORDER BY created_at DESC
-        LIMIT 30`,
+        LIMIT 60`,
       params.id,
     ), []),
 
@@ -206,11 +210,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         vlog_id: t.vlog_id,
       })),
       insights: insights.map(i => ({
+        id: i.id,
         kind: i.kind,
         kind_label: kindLabel(i.kind),
         title: i.title,
         body: i.body,
         bounce_run_id: i.bounce_run_id,
+        source_label: i.source_label,
+        source_url: i.source_url,
+        // Operator-authored notes set source_label='operator' on POST;
+        // distinguishes manual notes from cultivate/bounce output.
+        operator_authored: i.source_label === 'operator' || (!i.bounce_run_id && i.source_label != null),
         created_at: i.created_at,
       })),
     },
