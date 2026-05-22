@@ -323,12 +323,15 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {vlog.playback_url && (
           <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
             <div style={{
-              width: '100%', aspectRatio: '16 / 9',
+              width: '100%',
+              maxWidth: 720,
+              aspectRatio: '16 / 9',
+              maxHeight: '55vh',
+              margin: '0 auto 14px',
               background: '#050505',
               border: '1px solid var(--line-1)',
               borderRadius: 12,
               overflow: 'hidden',
-              marginBottom: 14,
             }}>
               <video
                 ref={videoRef}
@@ -337,7 +340,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 preload="metadata"
                 poster={vlog.thumbnail_url ?? undefined}
                 onTimeUpdate={(e) => setCurrentT((e.target as HTMLVideoElement).currentTime)}
-                style={{ width: '100%', height: '100%', display: 'block', background: 'black' }}
+                style={{ width: '100%', height: '100%', display: 'block', background: 'black', objectFit: 'contain' }}
               />
             </div>
             <MultiTrackTimeline

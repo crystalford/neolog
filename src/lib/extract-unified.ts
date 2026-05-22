@@ -137,11 +137,11 @@ The operator records themselves talking. You read what they said and produce str
 
 # WHAT A THREAD IS
 
-A thread is one coherent argument or observation the operator makes over a span of seconds-to-minutes. Each thread has:
+A thread is ONE ATOMIC IDEA — one coherent argument or observation — that the operator makes over a span of seconds-to-minutes. ATOMIC means: covers ONE topic, ONE coherent thought, NOT a summary of the entire vlog. A 4-minute vlog might contain 3 distinct threads (location scouting · hydro infrastructure observation · lighting fiddling). DO NOT collapse all three into one mega-thread. If you find yourself writing a thread that has multiple subject changes ("we're at X ... also Y ... and another thing Z"), that's THREE threads, not one. Split it. Each thread has:
 
 - topic: a short label naming what the operator is talking about. 3-7 words. Examples: "Recommender systems and revealed preference", "Why slow-mo strips audio", "Coffee shop politics in May 2026".
-- take: a 5-8 sentence analytical synthesis IN THE OPERATOR'S VOICE that captures the thread's actual position WITH ITS SURROUNDING CONTEXT. The take should preserve the SETUP that leads into the punch line, the punch line itself, AND the implication / what-follows. Don't truncate before the operator's argument has resolved. A 5-sentence take is the floor; 8 is the upper end when the thought is genuinely substantial. Read like the operator's own short essay summarizing their own argument, with the verbatim phrasing composed into a coherent whole.
-- key_quotes: 2-4 verbatim quotes from the transcript, each ≥ 6 words, that form the spine of the take. These prove the take is grounded.
+- take: an analytical synthesis IN THE OPERATOR'S VOICE that captures the thread's actual position WITH ITS SURROUNDING CONTEXT. LENGTH MUST MATCH THE TRANSCRIPT. If the source span is one short sentence, the take is one short sentence — DO NOT pad it into 5-8 sentences by paraphrasing the same idea five different ways. If the source span is a real 60-second argument with setup + punch + implication, the take can be 5-8 sentences. Floor: 1 sentence. Ceiling: 8 sentences. Heuristic: take length in sentences ≈ ceil(transcript_words_in_span / 30). A 13-word transcript yields ONE sentence (or you skip the thread entirely). Padding with restated content WILL BE REJECTED.
+- key_quotes: 1-4 verbatim quotes from the transcript, each ≥ 6 words, that form the spine of the take. These prove the take is grounded. If the transcript is too short to contain even one 6-word verbatim quote, omit key_quotes — don't fabricate one.
 - key_phrases: 2-6 short verbatim phrases (2-8 words each) that are the punchiest fragments inside the take. These get marker-highlighted in the rendered thread.
 - questions_raised: 1-3 open questions the thread raises that AREN'T answered in the vlog. Future-facing — what would the operator need to think about next?
 - register: one of riff|observation|argument|story|aside|question — what voice mode is the operator in?
@@ -149,20 +149,21 @@ A thread is one coherent argument or observation the operator makes over a span 
 
 # HARD RULES — voice grounding
 
-1. The "take" may compose the operator's own words into a complete statement, BUT every sentence of the take must contain at least one verbatim 4+ word substring from the source transcript. No paraphrasing the operator's analysis. No improving their phrasing. No filler sentences. If a 6th-8th sentence would be filler, stop at 5 — quality over quantity, BUT remember that a single-sentence take is too thin and will be rejected.
+1. The "take" may compose the operator's own words into a complete statement, BUT every sentence of the take must contain at least one verbatim 4+ word substring from the source transcript. No paraphrasing the operator's analysis. No improving their phrasing. No filler. NO PADDING — if the source span only has one sentence of content, the take is one sentence. Inventing an argument the operator didn't make is rejection-worthy.
 2. key_quotes, key_phrases, clips.quote, creative_elements.content are STRICTLY verbatim. Copy exact words.
-3. If you can't construct a 5+ sentence voice-grounded take, OMIT the thread entirely. Better 3 substantive threads than 10 thin ones.
+3. SHORT TRANSCRIPTS ARE RECORDS — DON'T INFLATE THEM. If the transcript is 5-30 words, the take is at most ONE sentence and is essentially the transcript itself (lightly tidied — preserve the operator's voice). DO NOT fabricate analytical content. "I don't know what to do, but I don't know what to do" becomes a thread whose take is literally "I don't know what to do." — not a paragraph about uncertainty. Empty key_quotes is fine when there's no 6-word verbatim substring available.
 4. Output ONLY the JSON object. No prose before or after.
 
 # SELF-CHECK BEFORE RESPONDING
 
 For every thread you emit:
-- Is the take 5-8 sentences? (Anything under 5 sentences drops too much context — reject and expand.)
-- Does the take include the BEFORE-and-AFTER of the punch quote, not just the punch quote in isolation?
+- Is the take length proportional to the source span? (Roughly: take_sentences ≈ ceil(span_words / 30). A 13-word source span → one sentence. A 240-word span → up to 8.)
+- Have you avoided restating the same idea multiple times to pad length?
 - Does each sentence of the take contain at least 4 consecutive words verbatim from the transcript?
 - Are the key_quotes actually in the transcript?
 - Do the key_phrases appear verbatim inside the take?
 - Are the questions actually unanswered in the vlog?
+- If the entire transcript is < 30 words, are you returning threads: [] instead of fabricating one?
 
 If any answer is no, fix or omit the thread.
 
@@ -172,7 +173,7 @@ If any answer is no, fix or omit the thread.
   "threads": [
     {
       "topic": "<short 3-7 word label>",
-      "take": "<5-8 sentence analytical synthesis preserving setup + punch + implication. Each sentence contains ≥1 verbatim 4+ word substring from the transcript.>",
+      "take": "<analytical synthesis whose LENGTH MATCHES THE TRANSCRIPT. 1 sentence if source is short, up to 8 if source is genuinely substantial. Never pad. Each sentence contains ≥1 verbatim 4+ word substring from the transcript.>",
       "key_quotes": ["<verbatim ≥6 word quote>", "<another>", ...],
       "key_phrases": ["<verbatim 2-8 word phrase>", "<another>", ...],
       "questions_raised": ["<open question this thread raises>", ...],
@@ -210,7 +211,13 @@ CREATIVE ELEMENT RULES:
 - creative_elements are for FICTIONAL or CREATIVE material the operator is drafting (characters, scene fragments, dialogue between characters, themes, tonal references, plot fragments). They are NOT analytical takes — those go in threads.
 - element_type='dialogue' ONLY when the content is a line of dialogue spoken by a character in a story/scene the operator is workshopping. Operator monologuing about their own life is NOT dialogue. Operator asking the system rhetorical questions ("can I tell you to do stuff") is NOT dialogue.
 - If the vlog is purely analytical (no fictional/creative work being drafted), return creative_elements: []. Most operator vlogs will have zero creative_elements.
-- Each content field is a verbatim 4+ word substring from the transcript. No paraphrasing.`
+- Each content field is a verbatim 4+ word substring from the transcript. No paraphrasing.
+
+ENTITY RULES:
+- Only extract entities the operator GENUINELY REFERENCES as real things in their life or work. Hotel they're staying at: yes. Person they met: yes. Project they're shipping: yes.
+- DO NOT extract entities from improvised jokes, sarcasm, or absurd claims. "This pool was designed by Tesla himself" is the operator riffing — Tesla is NOT an entity here. Same for "Elon called me yesterday" if it's obviously a joke. Trust the operator's tone — when something is delivered with a wink, it's not real-world reference.
+- DO NOT extract entities from rhetorical examples ("imagine if Apple did this"). Only entities the operator is actually engaging with in their lived experience.
+- When in doubt, omit. A clean entities: [] is better than three fake ones.`
 
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
@@ -226,15 +233,16 @@ export async function runExtraction(
   mode: ExtractionMode,
   progress: ProgressHook = async () => {},
 ): Promise<ExtractionRun> {
-  if (transcript.length < 50) {
-    // Soft-skip: don't fail the pipeline. Tiny clips (filler, dead air,
-    // a cough) genuinely have nothing to extract — that's a known state,
-    // not an error. Caller writes an empty payload + records the skip
-    // outcome in pipeline_events so the operator sees "Skipped: transcript
-    // too short" instead of a red stack trace.
+  const wordCount = transcript.trim().split(/\s+/).filter(Boolean).length
+  // Hard floor only for transcribed silence / a single word / cough audio.
+  // Everything else gets extracted — short utterances ARE records. Operator:
+  // "if its under 30 words why not ? ... i wanted that to be a record." The
+  // job here is to PRESERVE what was said, not gatekeep length. The LLM
+  // is then told to never inflate a short transcript into a long take.
+  if (transcript.length < 20 || wordCount < 5) {
     await progress('llm_call', {
       state: 'skipped', reason: 'transcript_too_short',
-      length: transcript.length, min_length: 50,
+      length: transcript.length, words: wordCount, min_words: 5,
     })
     return {
       model: mode === 'premium' ? 'sonnet-4.6' : 'llama-3.3-70b-fp8-fast',
