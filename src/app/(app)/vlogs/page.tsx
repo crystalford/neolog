@@ -33,6 +33,7 @@ interface VlogRow {
   uploaded_at: string
   thumbnail_url: string | null
   transcoded_r2_key: string | null
+  has_transcoded?: boolean
   pipeline_status: string
   thread_count?: number
   clip_count?: number
@@ -374,7 +375,7 @@ function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected:
               }}/>
               {isBroll ? 'B-roll' : status.replace(/_/g, ' ')}
             </span>
-            {isComplete && !vlog.transcoded_r2_key && (vlog.mime_type ?? '').startsWith('video/') && (
+            {isComplete && vlog.has_transcoded === false && (vlog.mime_type ?? '').startsWith('video/') && (
               <span title="H.264 transcode never produced — playback may be audio only"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
