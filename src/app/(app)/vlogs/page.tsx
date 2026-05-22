@@ -127,7 +127,7 @@ export default function VlogsPage() {
       const r = await fetch('/api/v2/vlogs/bulk-delete', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_ids: Array.from(selected) }),
+        body: JSON.stringify({ ids: Array.from(selected) }),
       })
       const d: any = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
