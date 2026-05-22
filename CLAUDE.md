@@ -102,24 +102,81 @@ These are documentary / short film / video essay productions. **Never add captio
 
 ---
 
-## The five surfaces (target architecture)
+## Surfaces — what actually shipped
 
-Dock has five entries: **Timeline · Studio · Graph · Projects · Settings**. Capture is a global floating affordance above the dock. There is no Home page — the app opens directly into Timeline.
+The masthead is a **top-horizontal nav** (no sidebar, no bottom dock — the prototype HTML files in this repo's git history described a phone-frame mobile design but were dropped in favor of the editorial top-nav design pasted in chat at `/tmp/neolognextlevel/design-reference/*.html`).
 
-Chat is a sixth surface, accessible from the desktop sidebar (not the mobile dock). It's the in-app assistant — Kimi K2.6 on Workers AI by default, Claude Sonnet 4.6 as an opt-in `max` toggle.
+**Primary nav (7 entries, left to right):**
 
-| Surface | Path | What it is |
+| Label | Route | What it is |
 |---|---|---|
-| Timeline | `/timeline` | Single chronological feed of heterogeneous cards (Vlog, Thread, Post, Clip, Article, B-roll, Attachment, Project update, Surfaced) sorted by `recorded_at`. Filterable via pill row. |
-| Studio | `/studio` | Cluster detail = deliberate-work mode. Reached from `Surfaced · Cluster ready` cards on Timeline. |
-| Chat | `/chat` | In-app assistant with tool use. Searches the corpus, drafts posts, saves notes, ingests images / pasted docs. Kimi K2.6 default, Sonnet opt-in. |
-| Graph | `/graph` | Direct navigable view of the substrate. Nodes colored by topic territory. |
-| Projects | `/projects` | Long-form creative_work containers (Pack Rats etc). Different rhythm from the rest. |
-| Settings | `/settings` | Operator profile, voice profiles, API keys, integrations, storage. |
+| **Timeline** | `/` | The home FYP. Day-banded feed of vlogs, threads, posts, clips, surfaced cards. Public-mode variant when unauthed (productions only). Filter pills (vlog/thread/post/surfaced). |
+| **Inbox** | `/inbox` | Triage queue. Surfaced cards + ripening clusters + worth-shipping threads + hot topics + processing vlogs + failed vlogs + drafts in progress. The system's outbox to the operator. |
+| **Vlogs** | `/vlogs` | Raw archive — every recording. Inline `CapturePanel` for new uploads via "Drop new vlogs" toggle. Filter strip + bulk select. Capture lives here, not as a separate route. |
+| **Clusters** | `/studio` | Cultivation surface. Cluster list + detail. Operator notes/quotes/references can be added to shape direction. Detail page has ripeness gauge + breakdown bars + trajectory chart + riff timeline + bounce panel + member threads + production candidates. URL stays `/studio` for backward-compat; nav label is "Clusters". |
+| **Productions** | `/productions` | Unified feed of project containers (Pack Rats-style, from `projects` table) AND draft productions (from `productions` table — scripts/clips/articles/x-threads/x-posts/video-essays). |
+| **Chat** | `/chat` | In-app assistant. Llama 3.3 70B in-house default, Kimi K2.6, Claude Sonnet as opt-in `max`. Split-pane sessions list + conversation. |
+| **About** | `/about` | The system, mapped — four principles + six surface tiles. |
 
-Old paths (`/dashboard/*`) and old pages (Home, Posts, Edit, Brain, Sessions, Synthesis, Inventory, Queue, Log, Ingest, Uploads) are deleted in the rebuild. Do not reintroduce.
+**Outside the masthead:**
+- **Settings** (`/settings`) — operator card + 6 sections (Identity / AI models / API keys / Integrations / Storage / Pipeline). System health folded in.
+- **Signin** (`/signin`), **Onboarding** (`/onboarding`) — minimal chrome, no masthead. Cloudflare Access one-time-PIN.
+- **Public production view** (`/p/[id]`) — unauthed, minimal chrome. Cobalt/black palette.
+
+**Detail pages** (reached from list pages, not nav entries directly): `/thread/[id]`, `/vlog/[id]`, `/studio/[id]`, `/production/[id]` (the draft view), `/productions/[id]` (project containers), `/entity/[id]`.
+
+**Old paths that redirect:**
+- `/clusters` → `/studio` · `/cluster/[id]` → `/studio/[id]`
+- `/timeline/[id]` → `/vlog/[id]`
+- `/projects` → `/productions` · `/projects/[id]` → `/productions/[id]`
+- `/console` → `/chat`
+- `/capture` → `/vlogs?capture=open` · `/uploads` → `/vlogs`
+- `/library` → `/productions` · `/transcript` → `/?filter=thread` · `/states` → `/` · `/post` → `/productions`
+- `/clip/[id]` → `/thread/[id]` · `/article/[id]` → `/productions` · `/attachment/[id]` → `/` · `/broll/[id]` → `/vlog/[id]`
+- `/landing` → `/` · `/[handle]` → `/`
+
+The ⌘K palette + Graph nav entry were both removed (operator: "I have no idea what that is" / "[Graph] is useless"). The `/graph` route still resolves so entity-chip deep links work, but it's not a nav destination.
 
 ---
+
+## Design vocabulary — applied uniformly
+
+Pure black bg (`#000`), cool-gray fgs, cobalt signal `#5b8df6` (NOT the old warm orange). Ten topic territories (brass / terra / ochre / rose / plum / violet / steel / teal / sage / moss). Geist (300-700) + JetBrains Mono (300-600).
+
+**Type scale**: hero h1 ~ 56-92px weight 300-400 with `letter-spacing -2 to -4px`. Eyebrows: 10.5px JetBrains Mono `letter-spacing 3.2px` uppercase. Sub: 18px. Body: 14-16px.
+
+**Every detail page must answer the four principles** from `00-Sitemap.html`:
+1. The work itself (full-res audio / video / transcript / draft)
+2. Where it came from (parent vlog, source threads, model, prompt version)
+3. Where it sits (cluster context, siblings, related, entity neighborhood)
+4. What it became (productions that used the material, gaps, what's next)
+
+Reference HTMLs at `/tmp/neolognextlevel/design-reference/*.html` (8 files). The codebase doesn't re-export them — they're build references, not runtime assets.
+
+---
+
+## Production engine
+
+Six production types working end-to-end:
+
+| Source | Type | Pipeline |
+|---|---|---|
+| Thread | **x_post** | LLM (default Llama 70B) drafts ≤270 chars, voice-preserved. Editor on `/production/[id]`. |
+| Thread | **micro_essay** | LLM drafts 300-450 words. Editor. |
+| Thread | **clip** | FFmpeg slices parent vlog at `transcript_span_start..end`. No LLM. Renders as `<video>` on detail page. R2-cached at `{operator}/video-segments/{thread_id}.mp4`. |
+| Cluster | **x_thread** | LLM drafts 4-7 connected posts separated by `---`. Editor. |
+| Cluster | **article** | LLM drafts 900-1400 words. Editor. |
+| Cluster | **video_essay** | LLM drafts ~1500-2200 word script broken into 6-12 BEATS (separated by `===`). Beats stored in `production_beats` table. Per-beat browser-MediaRecorder voiceover → R2 → FFmpeg `concat-audio` stitches into single MP3 → b-roll picker (vlogs with `pipeline_status='archived'`) → FFmpeg `render-video-essay` produces final MP4 (scale-to-1920×1080 normalize + concat + `-shortest` to voiceover length). |
+
+**State machine**: `materializing → script_ready → recording → producing → produced → published`. Operator can flip `visibility='public'` → served at `/p/[id]`.
+
+**Re-generate** wired (`POST /api/v2/productions/[id]/regenerate`). Bumps `script_version`. For video_essay, wipes + re-parses beats (warning before discarding recordings).
+
+**Default model: Llama 70B (in-house Workers AI)**. Sonnet opt-in via picker on the ProduceModal + EngineCard. Kimi K2.6 is the middle option.
+
+---
+
+
 
 ## The three extraction passes
 
