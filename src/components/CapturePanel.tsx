@@ -39,6 +39,15 @@ interface FileEntry {
   message: string | null
   vlog_id?: string
   error?: string
+  /**
+   * Data URL for a client-captured thumbnail. Set as soon as the browser
+   * decodes one frame of the file — usually within a second or two of being
+   * added to the queue, well before upload completes. Shows immediately in
+   * the row and rides along inline to /api/v2/vlogs at register time so
+   * the gallery never lands without a thumb (per CLAUDE.md ⚠️ thumbnail
+   * pipeline rule — fast cascade is non-negotiable).
+   */
+  thumbnail_data_url?: string | null
 }
 
 export interface CapturePanelProps {
@@ -58,17 +67,28 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
     if (!files) return
     const list = Array.from(files)
     if (list.length === 0) return
-    setEntries(prev => [
-      ...prev,
-      ...list.map(f => ({
-        id: `${f.name}__${f.size}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
-        file: f,
-        status: 'queued' as FileStatus,
-        progress: 0,
-        bytes_uploaded: 0,
-        message: null,
-      })),
-    ])
+    const newEntries = list.map(f => ({
+      id: `${f.name}__${f.size}__${Date.now()}__${Math.random().toString(36).slice(2, 8)}`,
+      file: f,
+      status: 'queued' as FileStatus,
+      progress: 0,
+      bytes_uploaded: 0,
+      message: null,
+    }))
+    setEntries(prev => [...prev, ...newEntries])
+    // Kick off thumbnail capture for each in background, the moment it's
+    // added to the queue. By the time upload finishes (which is the long
+    // pole), the thumbnail is usually already ready and the data URL is
+    // sitting on the entry waiting to ride along with /api/v2/vlogs.
+    for (const e of newEntries) {
+      captureThumbnail(e.file, 15000).then(dataUrl => {
+        if (dataUrl) {
+          setEntries(prev => prev.map(p => p.id === e.id
+            ? { ...p, thumbnail_data_url: `data:image/jpeg;base64,${dataUrl}` }
+            : p))
+        }
+      }).catch(() => {})
+    }
   }, [])
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -94,6 +114,10 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
     setEntries(prev => prev.filter(e => e.status !== 'done' && e.status !== 'skipped'))
   }, [])
 
+  const entriesRef = useRef<FileEntry[]>([])
+  entriesRef.current = entries
+  const getLatestEntry = useCallback((id: string) => entriesRef.current.find(e => e.id === id), [])
+
   const startQueue = useCallback(async () => {
     if (running) return
     setRunning(true)
@@ -108,13 +132,13 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
           })
         })
         if (!next) break
-        await processOne(next, archive, updateEntry, () => cancelRef.current)
+        await processOne(next, archive, updateEntry, () => cancelRef.current, getLatestEntry)
       }
     } finally {
       setRunning(false)
       if (onUploaded) onUploaded()
     }
-  }, [running, archive, updateEntry, onUploaded])
+  }, [running, archive, updateEntry, onUploaded, getLatestEntry])
 
   const cancelQueue = useCallback(() => { cancelRef.current = true }, [])
 
@@ -299,6 +323,18 @@ function FileRow({ entry, onRemove, running }: { entry: FileEntry; onRemove: (id
           pointerEvents: 'none', transition: 'width .2s',
         }}/>
       )}
+      <div style={{
+        width: 56, height: 32, flexShrink: 0,
+        borderRadius: 4, overflow: 'hidden',
+        background: 'var(--bg-3)',
+        border: '1px solid var(--line-1)',
+        position: 'relative',
+      }}>
+        {e.thumbnail_data_url ? (
+          <img src={e.thumbnail_data_url} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+        ) : null}
+      </div>
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
         <div style={{
           fontSize: 13, color: 'var(--fg-1)',
@@ -358,6 +394,7 @@ async function processOne(
   archive: boolean,
   update: (id: string, patch: Partial<FileEntry>) => void,
   isCanceled: () => boolean,
+  getLatestEntry: (id: string) => FileEntry | undefined,
 ): Promise<void> {
   const { file, id } = entry
 
@@ -442,9 +479,20 @@ async function processOne(
     return
   }
 
-  // Browser thumbnail
+  // Browser thumbnail — already captured in addFiles() and stored on the
+  // entry. Read latest via getLatestEntry. Only do a last-chance capture if
+  // it never landed (HEVC the browser couldn't decode, file added super
+  // close to upload completion). Server-side ffmpeg cascade is the next
+  // fallback after that.
   let thumbnailBase64: string | null = null
-  try { thumbnailBase64 = await captureThumbnail(file, 5000) } catch {}
+  const cached = getLatestEntry(id)?.thumbnail_data_url
+  if (cached && cached.startsWith('data:image/')) {
+    const i = cached.indexOf(',')
+    if (i >= 0) thumbnailBase64 = cached.slice(i + 1)
+  }
+  if (!thumbnailBase64) {
+    try { thumbnailBase64 = await captureThumbnail(file, 8000) } catch {}
+  }
 
   // Browser audio chunks
   let audioChunksManifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null = null

@@ -18,6 +18,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { ModelPreferences } from './ModelPreferences'
+import { FixThumbnailsButton } from './FixThumbnailsButton'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -160,6 +161,11 @@ export default async function SettingsPage() {
           <Row k="Riff confidence threshold" v="0.85" sub="Cosine similarity for auto-link" arrow/>
           <Row k="Transcription provider" v="Workers AI Whisper" sub="Switch to Claude per-vlog when available" arrow/>
           <Row k="Voice preservation hard check" v="On" sub="Each thread must contain a verbatim 4-word substring" arrow/>
+        </Section>
+
+        <Section title="Maintenance">
+          <Row k="Missing thumbnails" sub="Walk every vlog where thumbnail_r2_key IS NULL and run the ffmpeg cascade to backfill. Safe to re-run."/>
+          <FixThumbnailsButton/>
         </Section>
       </div>
 

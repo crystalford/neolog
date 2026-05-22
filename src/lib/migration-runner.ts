@@ -364,6 +364,140 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-20_threads_key_phrases',
     sql: `ALTER TABLE threads ADD COLUMN key_phrases TEXT`,
   },
+  // ─── Unification: threads absorb clip_candidates + creative_elements ──────
+  // Operator decision (2026-05-22): "threads are clips ... and creative
+  // elements should just be threads with a wider register." Drop the CHECK
+  // on threads.register, add clip-flag columns, backfill the two side
+  // tables, soft-delete the originals. See chat log for the rationale.
+  {
+    name: '2026-05-22_threads_rebuild_create_new',
+    sql: `CREATE TABLE IF NOT EXISTS threads_new (
+      id                          TEXT PRIMARY KEY,
+      operator_id                 TEXT NOT NULL,
+      vlog_id                     TEXT NOT NULL,
+      topic                       TEXT NOT NULL,
+      take                        TEXT,
+      key_quotes                  TEXT,
+      questions_raised            TEXT,
+      key_phrases                 TEXT,
+      register                    TEXT,
+      strength                    INTEGER,
+      transcript_span_start       REAL,
+      transcript_span_end         REAL,
+      abstracted_topic            TEXT,
+      clippable                   INTEGER NOT NULL DEFAULT 0,
+      clip_headline               TEXT,
+      clip_reason                 TEXT,
+      run_id                      TEXT,
+      validated                   INTEGER NOT NULL DEFAULT 1,
+      extraction_prompt_version   TEXT NOT NULL,
+      extracted_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      cluster_id                  TEXT,
+      deleted_at                  TEXT,
+      created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_copy',
+    sql: `INSERT OR IGNORE INTO threads_new
+      (id, operator_id, vlog_id, topic, take, key_quotes, questions_raised,
+       key_phrases, register, strength, transcript_span_start, transcript_span_end,
+       abstracted_topic, run_id, validated, extraction_prompt_version,
+       extracted_at, cluster_id, deleted_at, created_at, updated_at)
+      SELECT id, operator_id, vlog_id, topic, take, key_quotes, questions_raised,
+             key_phrases, register, strength, transcript_span_start, transcript_span_end,
+             abstracted_topic, run_id, validated, extraction_prompt_version,
+             extracted_at, cluster_id, deleted_at, created_at, updated_at
+        FROM threads`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_drop_old',
+    sql: `DROP TABLE IF EXISTS threads`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_rename',
+    sql: `ALTER TABLE threads_new RENAME TO threads`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_operator ON threads(operator_id)`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_vlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_vlog ON threads(vlog_id)`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_abstracted',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_abstracted_topic ON threads(abstracted_topic)`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_strength',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_strength ON threads(operator_id, strength DESC)`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_cluster',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_cluster ON threads(cluster_id)`,
+  },
+  {
+    name: '2026-05-22_threads_rebuild_idx_clippable',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_clippable ON threads(operator_id, clippable)`,
+  },
+  // Backfill creative_elements → threads. The element_type becomes the
+  // widened register; content becomes the take. We synthesize a topic
+  // from the element_type prefix. key_quotes is an empty JSON array
+  // because creative_elements never had quote arrays.
+  {
+    name: '2026-05-22_backfill_creatives_into_threads',
+    sql: `INSERT OR IGNORE INTO threads
+      (id, operator_id, vlog_id, topic, take, key_quotes, register,
+       transcript_span_start, transcript_span_end,
+       extraction_prompt_version, extracted_at, created_at, updated_at)
+      SELECT id, operator_id, vlog_id,
+             'Creative · ' || element_type,
+             COALESCE(content, ''),
+             '[]',
+             element_type,
+             transcript_span_start, transcript_span_end,
+             extraction_prompt_version,
+             COALESCE(extracted_at, created_at),
+             created_at, COALESCE(updated_at, created_at)
+        FROM creative_elements
+       WHERE deleted_at IS NULL`,
+  },
+  // Backfill clip_candidates → threads with clippable=1. We synthesize
+  // a key_quotes JSON array from the quote field via json_array() so
+  // downstream voice-grounding checks still pass.
+  {
+    name: '2026-05-22_backfill_clips_into_threads',
+    sql: `INSERT OR IGNORE INTO threads
+      (id, operator_id, vlog_id, topic, take, key_quotes, register,
+       transcript_span_start, transcript_span_end,
+       clippable, clip_headline, clip_reason,
+       extraction_prompt_version, extracted_at, created_at, updated_at)
+      SELECT id, operator_id, vlog_id,
+             headline,
+             COALESCE(quote, headline),
+             CASE WHEN quote IS NOT NULL AND quote <> ''
+                  THEN json_array(quote)
+                  ELSE '[]' END,
+             'observation',
+             start_time, end_time,
+             1, headline, why_clippable,
+             extraction_prompt_version,
+             COALESCE(extracted_at, created_at),
+             created_at, COALESCE(updated_at, created_at)
+        FROM clip_candidates
+       WHERE deleted_at IS NULL`,
+  },
+  {
+    name: '2026-05-22_soft_delete_creatives',
+    sql: `UPDATE creative_elements SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL`,
+  },
+  {
+    name: '2026-05-22_soft_delete_clips',
+    sql: `UPDATE clip_candidates SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

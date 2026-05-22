@@ -55,6 +55,7 @@ interface VlogDetail {
   pipeline_status: string
   pipeline_error: string | null
   playback_url: string | null
+  has_transcoded?: boolean
   extraction_outcomes: string | null
   updated_at: string | null
   visibility?: string
@@ -140,7 +141,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       const r = await fetch(`/api/v2/vlogs/${params.id}/process`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(passes ? { passes } : {}),
+        // Always pass mode so the API doesn't short-circuit with
+        // { already_complete: true } when pipeline_status='complete'.
+        // Without this, "Re-extract" silently no-ops for any vlog that
+        // already finished once — and we never re-run transcode even
+        // when transcoded_r2_key is null.
+        body: JSON.stringify(passes ? { passes, mode: 'cheap' } : { mode: 'cheap' }),
       })
       const d: any = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
@@ -322,13 +328,41 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {/* Player + multi-track timeline */}
         {vlog.playback_url && (
           <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
+            {vlog.has_transcoded === false && (
+              <div style={{
+                maxWidth: 720, margin: '0 auto 12px',
+                padding: '12px 14px',
+                background: 'rgba(230, 99, 74, 0.08)',
+                border: '1px solid var(--t-terra)',
+                borderRadius: 8,
+                display: 'flex', gap: 12, alignItems: 'center',
+                fontSize: 13, color: 'var(--fg-1)',
+              }}>
+                <div style={{ flex: 1, lineHeight: 1.4 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
+                    textTransform: 'uppercase', color: 'var(--t-terra)', marginBottom: 2,
+                  }}>
+                    Transcode missing
+                  </div>
+                  H.264 version was never produced — Chrome can't decode the original HEVC video,
+                  so playback may be audio-only. Re-extract to rerun the transcode step.
+                </div>
+                <button onClick={() => reExtract()} className="action primary" style={{ fontSize: 12 }}>
+                  Re-transcode
+                </button>
+              </div>
+            )}
             <div style={{
-              width: '100%', aspectRatio: '16 / 9',
+              width: '100%',
+              maxWidth: 720,
+              aspectRatio: '16 / 9',
+              maxHeight: '55vh',
+              margin: '0 auto 14px',
               background: '#050505',
               border: '1px solid var(--line-1)',
               borderRadius: 12,
               overflow: 'hidden',
-              marginBottom: 14,
             }}>
               <video
                 ref={videoRef}
@@ -337,7 +371,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 preload="metadata"
                 poster={vlog.thumbnail_url ?? undefined}
                 onTimeUpdate={(e) => setCurrentT((e.target as HTMLVideoElement).currentTime)}
-                style={{ width: '100%', height: '100%', display: 'block', background: 'black' }}
+                style={{ width: '100%', height: '100%', display: 'block', background: 'black', objectFit: 'contain' }}
               />
             </div>
             <MultiTrackTimeline
