@@ -398,41 +398,58 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                   <div className="meta">delivery moments</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {clips.map(c => (
-                    <div key={c.id} style={{
-                      padding: '14px 18px',
-                      background: 'var(--bg-1)',
-                      border: '1px solid var(--line-1)',
-                      borderLeft: '2px solid var(--sig)',
-                      borderRadius: '0 10px 10px 0',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
-                        {c.start_time != null && c.end_time != null && (
-                          <button onClick={() => seek(c.start_time!)} style={{
-                            background: 'var(--sig-soft)',
-                            border: '1px solid color-mix(in srgb, var(--sig) 40%, transparent)',
-                            color: 'var(--sig)',
-                            padding: '3px 9px', borderRadius: 100,
-                            fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-                            cursor: 'pointer',
-                          }}>
-                            ▶ {formatMmSs(c.start_time)} → {formatMmSs(c.end_time)}
-                          </button>
+                  {clips.map(c => {
+                    // Span is missing when extraction didn't compute
+                    // start/end (older runs) or when start===end===0.
+                    const hasSpan = c.start_time != null && c.end_time != null
+                      && (c.end_time - c.start_time) >= 1
+                    // why_clippable sometimes lands as JSON-stringified
+                    // {"reason":"…"} instead of plain text. Parse
+                    // defensively so the operator doesn't see raw JSON.
+                    const reason = extractReason(c.why_clippable)
+                    return (
+                      <div key={c.id} style={{
+                        padding: '14px 18px',
+                        background: 'var(--bg-1)',
+                        border: '1px solid var(--line-1)',
+                        borderLeft: '2px solid var(--sig)',
+                        borderRadius: '0 10px 10px 0',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+                          {hasSpan ? (
+                            <button onClick={() => seek(c.start_time!)} style={{
+                              background: 'var(--sig-soft)',
+                              border: '1px solid color-mix(in srgb, var(--sig) 40%, transparent)',
+                              color: 'var(--sig)',
+                              padding: '3px 9px', borderRadius: 100,
+                              fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+                              cursor: 'pointer',
+                            }}>
+                              ▶ {formatMmSs(c.start_time!)} → {formatMmSs(c.end_time!)}
+                            </button>
+                          ) : (
+                            <span style={{
+                              padding: '3px 9px', borderRadius: 100,
+                              border: '1px dashed var(--line-2)',
+                              color: 'var(--fg-4)',
+                              fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+                            }}>no timecode · re-extract</span>
+                          )}
+                          <span style={{ fontSize: 14, color: 'var(--fg-1)', fontWeight: 500 }}>{c.headline}</span>
+                        </div>
+                        {c.quote && (
+                          <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                            “{c.quote}”
+                          </div>
                         )}
-                        <span style={{ fontSize: 14, color: 'var(--fg-1)', fontWeight: 500 }}>{c.headline}</span>
+                        {reason && (
+                          <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
+                            {reason}
+                          </div>
+                        )}
                       </div>
-                      {c.quote && (
-                        <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5, fontStyle: 'italic' }}>
-                          “{c.quote}”
-                        </div>
-                      )}
-                      {c.why_clippable && (
-                        <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 8, fontFamily: 'var(--font-mono)', letterSpacing: 0.3 }}>
-                          {c.why_clippable}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </section>
             )}
@@ -712,6 +729,26 @@ function fmtSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+/**
+ * extractReason — pull plain-text rationale from a why_clippable
+ * field. Some extraction runs wrote JSON like {"reason":"…"} instead
+ * of a plain sentence; parse defensively so the operator doesn't
+ * see raw JSON braces.
+ */
+function extractReason(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const t = String(raw).trim()
+  if (!t.startsWith('{')) return t
+  try {
+    const parsed = JSON.parse(t)
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.reason === 'string') return parsed.reason
+      if (typeof parsed.body === 'string') return parsed.body
+    }
+  } catch {}
+  return t  // fall through — show the raw string rather than nothing
 }
 
 function tryPrettyJson(s: string): string {

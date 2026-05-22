@@ -624,14 +624,18 @@ function PostCard({ card }: { card: ApiCard }) {
   )
 }
 
-// Clip card (folded into thread vocabulary per earlier operator note)
+// Clip card (folded into thread vocabulary per earlier operator note).
+// Renders inline on Timeline as a feed item but doesn't link anywhere —
+// clip_candidates IDs aren't thread IDs and the standalone /clip/[id]
+// route was retired.
 function ClipCard({ card }: { card: ApiCard }) {
   const style: any = {
     '--topic': 'var(--t-terra)',
     '--topic-soft': 'rgba(230,99,74,0.08)',
+    cursor: 'default',
   }
   return (
-    <Link href={`/clip/${card.id}`} className="tcard thread" style={style}>
+    <div className="tcard thread" style={style}>
       <div className="t-header">
         <span className="topic-pill"><span className="type">Clip</span><span className="sep">·</span>{card.status === 'published' ? 'Published' : 'Candidate'}</span>
         <span className="t-time">{timeOnly(card.recorded_at || card.created_at)}</span>
@@ -644,7 +648,7 @@ function ClipCard({ card }: { card: ApiCard }) {
             : ''}
         </span>
       </div>
-    </Link>
+    </div>
   )
 }
 

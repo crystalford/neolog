@@ -266,7 +266,7 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
           </div>
 
           {/* Per-file list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 600, overflowY: 'auto' }}>
             {entries.map(e => <FileRow key={e.id} entry={e} onRemove={removeEntry} running={running}/>)}
           </div>
         </>
@@ -284,6 +284,8 @@ function FileRow({ entry, onRemove, running }: { entry: FileEntry; onRemove: (id
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 14px',
+      minHeight: 52,
+      flexShrink: 0,
       background: e.status === 'failed' ? 'rgba(230,99,74,0.06)' : 'var(--bg-2)',
       border: `1px solid ${e.status === 'failed' ? 'var(--t-terra)' : 'var(--line-1)'}`,
       borderRadius: 8,

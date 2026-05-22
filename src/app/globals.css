@@ -716,7 +716,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .canon-main {
   position: relative;
   z-index: 1;
-  padding: 40px 0 80px;
+  padding: 8px 0 80px;
 }
 
 /* Avatar dropdown menu */
@@ -776,7 +776,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 
 /* Hero ----------------------------------------------------- */
 .canon-hero {
-  padding: 96px 0 72px;
+  padding: 24px 0 56px;
   position: relative;
   display: grid;
   grid-template-columns: 1.05fr 1fr;
@@ -1715,7 +1715,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 
 /* Detail hero ------------------------------------------- */
 .canon-detail-hero {
-  padding: 56px 0 32px;
+  padding: 24px 0 32px;
   display: grid;
   grid-template-columns: 1fr 240px;
   gap: 48px;
@@ -1882,7 +1882,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   text-wrap: pretty;
 }
 .canon-transcript .pre,
-.canon-transcript .post { color: var(--fg-3); }
+.canon-transcript .post { color: var(--fg-2); opacity: 0.78; }
 .canon-transcript .t-span {
   position: relative;
   padding: 4px 0 4px 14px;

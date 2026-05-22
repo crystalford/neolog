@@ -122,6 +122,46 @@ export function availableTools(): ChatToolDef[] {
         required: ['body'],
       },
     },
+    {
+      name: 'search_threads',
+      description:
+        'Search the operator\'s threads (extracted takes) by query terms. Searches across topic, take, key_quotes, and abstracted_topic. Use when the operator asks "what have I said about X" or "find threads on Y" — threads are higher-signal than raw vlog transcripts because they\'re the operator\'s distilled positions. Returns id, topic, take, strength, extracted_at, vlog_id.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search terms. Plain words; SQLite LIKE matching on topic + take + key_quotes.' },
+          min_strength: { type: 'integer', description: 'Optional: filter to threads with strength ≥ N (1-5).', minimum: 1, maximum: 5 },
+          limit: { type: 'integer', description: 'Max results. Default 10, max 30.', minimum: 1, maximum: 30 },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'search_productions',
+      description:
+        'Search the operator\'s production drafts (script_text from articles, x_threads, micro_essays, video_essay scripts). Use when the operator asks "find the article I drafted about X" or wants to reference their own published / drafting work.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search terms.' },
+          type: { type: 'string', description: 'Optional: filter by production_type.', enum: ['x_post', 'x_thread', 'micro_essay', 'article', 'clip', 'video_essay'] },
+          limit: { type: 'integer', minimum: 1, maximum: 20 },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'list_entities',
+      description:
+        'List the top entities (people, places, projects, tools, concepts) in the operator\'s corpus by mention count. Use to see what / who the operator keeps coming back to.',
+      parameters: {
+        type: 'object',
+        properties: {
+          entity_type: { type: 'string', description: 'Optional filter: person | place | project | tool | concept | theme' },
+          limit: { type: 'integer', minimum: 1, maximum: 50 },
+        },
+      },
+    },
   ]
 }
 
@@ -142,6 +182,9 @@ export async function runTool(
       case 'get_cluster':        return JSON.stringify(await getCluster(ctx, args as any))
       case 'save_note':          return JSON.stringify(await saveNote(ctx, args as any))
       case 'draft_x_post':       return JSON.stringify(await draftXPost(ctx, args as any))
+      case 'search_threads':     return JSON.stringify(await searchThreads(ctx, args as any))
+      case 'search_productions': return JSON.stringify(await searchProductions(ctx, args as any))
+      case 'list_entities':      return JSON.stringify(await listEntities(ctx, args as any))
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` })
     }
@@ -318,4 +361,129 @@ async function draftXPost(ctx: ToolCtx, args: { body: string }) {
     id, ctx.operatorId, body, body.length,
   )
   return { id, character_count: body.length, message: 'Drafted. Operator can review and publish.' }
+}
+
+// ─── search_threads ────────────────────────────────────────────────
+// Search the operator's threads by topic + take + key_quotes (LIKE).
+// Higher-signal than search_vlogs because threads are the operator's
+// distilled positions, not raw transcript text.
+async function searchThreads(
+  ctx: ToolCtx,
+  args: { query: string; min_strength?: number; limit?: number },
+) {
+  const limit = Math.min(30, Math.max(1, args.limit ?? 10))
+  const pattern = `%${(args.query || '').slice(0, 200)}%`
+  const minStrength = args.min_strength ?? 0
+  const rows = await findMany<{
+    id: string; topic: string; take: string | null
+    abstracted_topic: string | null; strength: number | null
+    extracted_at: string; vlog_id: string
+  }>(
+    ctx.db,
+    `SELECT t.id, t.topic, t.take, t.abstracted_topic, t.strength,
+            t.extracted_at, t.vlog_id
+       FROM threads t
+       JOIN extraction_runs er ON er.id = t.run_id AND er.is_active = 1
+      WHERE t.operator_id = ? AND t.deleted_at IS NULL
+        AND COALESCE(t.strength, 0) >= ?
+        AND (
+          LOWER(t.topic) LIKE LOWER(?)
+          OR LOWER(COALESCE(t.abstracted_topic, '')) LIKE LOWER(?)
+          OR LOWER(COALESCE(t.take, '')) LIKE LOWER(?)
+          OR LOWER(COALESCE(t.key_quotes, '')) LIKE LOWER(?)
+        )
+      ORDER BY t.strength DESC, t.extracted_at DESC
+      LIMIT ?`,
+    ctx.operatorId, minStrength, pattern, pattern, pattern, pattern, limit,
+  )
+  return {
+    threads: rows.map(r => ({
+      id: r.id,
+      topic: r.abstracted_topic ?? r.topic,
+      take: r.take,
+      strength: r.strength ?? null,
+      extracted_at: r.extracted_at,
+      vlog_id: r.vlog_id,
+    })),
+    count: rows.length,
+  }
+}
+
+// ─── search_productions ────────────────────────────────────────────
+// Search the operator's production drafts by script_text content.
+// Excludes clips (no script). Used when the operator references their
+// own drafting work.
+async function searchProductions(
+  ctx: ToolCtx,
+  args: { query: string; type?: string; limit?: number },
+) {
+  const limit = Math.min(20, Math.max(1, args.limit ?? 8))
+  const pattern = `%${(args.query || '').slice(0, 200)}%`
+  const typeFilter = args.type ? ' AND production_type = ?' : ''
+  const params: any[] = [ctx.operatorId, pattern]
+  if (args.type) params.push(args.type)
+  params.push(limit)
+  const rows = await findMany<{
+    id: string; production_type: string; state: string
+    script_text: string | null; source_kind: string; source_id: string
+    updated_at: string; visibility: string
+  }>(
+    ctx.db,
+    `SELECT id, production_type, state, script_text, source_kind, source_id, updated_at, visibility
+       FROM productions
+      WHERE operator_id = ? AND deleted_at IS NULL
+        AND script_text IS NOT NULL
+        AND LOWER(script_text) LIKE LOWER(?)
+        ${typeFilter}
+      ORDER BY updated_at DESC
+      LIMIT ?`,
+    ...params,
+  )
+  return {
+    productions: rows.map(r => ({
+      id: r.id,
+      production_type: r.production_type,
+      state: r.state,
+      visibility: r.visibility,
+      excerpt: (r.script_text || '').replace(/\s+/g, ' ').slice(0, 240),
+      updated_at: r.updated_at,
+      source: { kind: r.source_kind, id: r.source_id },
+    })),
+    count: rows.length,
+  }
+}
+
+// ─── list_entities ─────────────────────────────────────────────────
+// Top entities by mention_count. Surfaces the people / places /
+// concepts / tools the operator keeps returning to.
+async function listEntities(
+  ctx: ToolCtx,
+  args: { entity_type?: string; limit?: number },
+) {
+  const limit = Math.min(50, Math.max(1, args.limit ?? 20))
+  const typeFilter = args.entity_type ? ' AND entity_type = ?' : ''
+  const params: any[] = [ctx.operatorId]
+  if (args.entity_type) params.push(args.entity_type)
+  params.push(limit)
+  const rows = await findMany<{
+    id: string; name: string; entity_type: string; mention_count: number | null
+  }>(
+    ctx.db,
+    `SELECT id, name, entity_type, mention_count
+       FROM entities
+      WHERE operator_id = ? AND deleted_at IS NULL
+        ${typeFilter}
+      ORDER BY mention_count DESC, name ASC
+      LIMIT ?`,
+    ...params,
+  )
+  return {
+    entities: rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      type: r.entity_type,
+      mention_count: r.mention_count ?? 1,
+    })),
+    count: rows.length,
+  }
 }

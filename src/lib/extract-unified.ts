@@ -60,6 +60,8 @@ export interface ExtractedThread {
 }
 
 export interface ExtractedClip {
+  start_time_sec?: number
+  end_time_sec?: number
   start_time_ms?: number
   end_time_ms?: number
   headline: string
@@ -178,6 +180,15 @@ If any answer is no, fix or omit the thread.
       "abstracted_topic": "<generalized pattern for cross-vlog clustering>"
     }
   ],
+  "clips": [
+    {
+      "headline": "<short title for the moment, 3-7 words>",
+      "quote": "<verbatim ≥6 word substring from the transcript — the punch line of the clip>",
+      "why_clippable": "<one plain-text sentence explaining why this moment is shippable as a standalone clip. NOT JSON. NOT wrapped in braces. Plain English only.>",
+      "start_time_sec": <integer seconds — the start of the clip's span in the transcript. Estimate by counting words: ~2.6 words/sec.>,
+      "end_time_sec": <integer seconds — the end of the clip's span. Must satisfy end_time_sec > start_time_sec AND (end_time_sec - start_time_sec) between 5 and 120 seconds.>
+    }
+  ],
   "creative_elements": [
     { "element_type": "character_beat|scene_fragment|dialogue|theme|setting|tonal_reference|plot_fragment",
       "content": "<verbatim 4+ word substring>" }
@@ -187,7 +198,19 @@ If any answer is no, fix or omit the thread.
       "entity_type": "person|place|project|tool|concept|theme|reference",
       "aliases": ["<as appears>", ...] }
   ]
-}`
+}
+
+CLIP RULES:
+- Only emit a clip if there's a genuine PUNCHY DELIVERY MOMENT — a take the operator nailed in 10-90 seconds, quotable on its own. If nothing meets that bar, return clips: [].
+- start_time_sec / end_time_sec are REQUIRED. Compute by counting words from the start of the transcript at ~2.6 words per second. Don't emit a clip without real timecodes.
+- why_clippable is a PLAIN ENGLISH SENTENCE. Not {"reason":"…"}. Not JSON. Just a sentence.
+- 0-2 clips per vlog is normal. 5+ is suspicious — you're probably emitting takes that aren't clip-grade.
+
+CREATIVE ELEMENT RULES:
+- creative_elements are for FICTIONAL or CREATIVE material the operator is drafting (characters, scene fragments, dialogue between characters, themes, tonal references, plot fragments). They are NOT analytical takes — those go in threads.
+- element_type='dialogue' ONLY when the content is a line of dialogue spoken by a character in a story/scene the operator is workshopping. Operator monologuing about their own life is NOT dialogue. Operator asking the system rhetorical questions ("can I tell you to do stuff") is NOT dialogue.
+- If the vlog is purely analytical (no fictional/creative work being drafted), return creative_elements: []. Most operator vlogs will have zero creative_elements.
+- Each content field is a verbatim 4+ word substring from the transcript. No paraphrasing.`
 
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 
