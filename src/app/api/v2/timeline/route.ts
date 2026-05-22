@@ -77,6 +77,7 @@ async function handle(req: NextRequest) {
   try {
     const vlogs = await findMany<{
       id: string
+      title: string | null
       original_filename: string | null
       file_size_bytes: number | null
       mime_type: string | null
@@ -90,7 +91,7 @@ async function handle(req: NextRequest) {
       transcript_text: string | null
     }>(
       db,
-      `SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
+      `SELECT id, title, original_filename, file_size_bytes, mime_type, duration_seconds,
               recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key,
               pipeline_status, uploaded_at, transcript_text
          FROM vlogs
@@ -150,7 +151,7 @@ async function handle(req: NextRequest) {
           type: 'vlog' as const,
           recorded_at: v.recorded_at || v.uploaded_at,
           recorded_at_source: v.recorded_at_source ?? (v.recorded_at ? null : 'upload_time_default'),
-          title: deriveVlogTitle(v.original_filename),
+          title: (v.title && v.title.trim()) || deriveVlogTitle(v.original_filename),
           thumbnail_url: thumbnailUrl,
           duration_seconds: v.duration_seconds,
           file_size_bytes: v.file_size_bytes,

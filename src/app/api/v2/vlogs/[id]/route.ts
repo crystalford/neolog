@@ -184,23 +184,48 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         ORDER BY ce.element_type ASC, ce.extracted_at DESC`,
       params.id, operator.id,
     )),
-    safe('entities', () => findMany<{
-      id: string
-      name: string
-      entity_type: string
-      aliases: string | null
-      mention_count: number | null
-    }>(
-      db,
-      `SELECT e.id, e.name, e.entity_type, e.aliases, e.mention_count
-         FROM entities e
-         JOIN extraction_runs er ON er.id = e.run_id
-        WHERE e.vlog_id = ? AND e.operator_id = ?
-          AND e.deleted_at IS NULL
-          AND er.is_active = 1
-        ORDER BY e.mention_count DESC, e.name ASC`,
-      params.id, operator.id,
-    )),
+    safe('entities', async () => {
+      const rows = await findMany<{
+        id: string
+        name: string
+        entity_type: string
+        aliases: string | null
+        mention_count: number | null
+      }>(
+        db,
+        `SELECT e.id, e.name, e.entity_type, e.aliases, e.mention_count
+           FROM entities e
+           JOIN extraction_runs er ON er.id = e.run_id
+          WHERE e.vlog_id = ? AND e.operator_id = ?
+            AND e.deleted_at IS NULL
+            AND er.is_active = 1
+          ORDER BY e.mention_count DESC, e.name ASC`,
+        params.id, operator.id,
+      )
+      if (rows.length === 0) return rows
+      // Attach the verbatim quotes from this vlog for each entity so the
+      // rail can render "what you said about Canopticon in this vlog" —
+      // entities become a record of the operator's evolving thinking
+      // instead of dumb tags.
+      const quotesByEntity = new Map<string, string[]>()
+      const quoteRows = await findMany<{ entity_id: string; mention_text: string | null }>(
+        db,
+        `SELECT em.entity_id, em.mention_text
+           FROM entity_mentions em
+          WHERE em.operator_id = ?
+            AND em.source_kind = 'vlog'
+            AND em.source_id = ?
+            AND em.entity_id IN (${rows.map(() => '?').join(',')})`,
+        operator.id, params.id, ...rows.map(r => r.id),
+      )
+      for (const q of quoteRows) {
+        if (!q.mention_text) continue
+        const arr = quotesByEntity.get(q.entity_id) ?? []
+        arr.push(q.mention_text)
+        quotesByEntity.set(q.entity_id, arr)
+      }
+      return rows.map(r => ({ ...r, vlog_quotes: quotesByEntity.get(r.id) ?? [] }))
+    }),
   ])
 
   // Strip internal R2 keys before sending to the client, but expose a

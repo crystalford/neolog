@@ -43,6 +43,7 @@ import LivePipeline from '../../timeline/[id]/live-pipeline'
 
 interface VlogDetail {
   id: string
+  title: string | null
   original_filename: string | null
   mime_type: string | null
   file_size_bytes: number | null
@@ -83,7 +84,7 @@ interface ClipRow {
   validated: number | null
 }
 interface CreativeRow { id: string; element_type: string; content: string; register: string | null; validated: number | null }
-interface EntityRow { id: string; name: string; entity_type: string; aliases: string | null; mention_count: number | null }
+interface EntityRow { id: string; name: string; entity_type: string; aliases: string | null; mention_count: number | null; vlog_quotes?: string[] }
 interface EntityMention { entity_id: string; mention_time: number | null; entity_name: string; entity_type: string }
 
 export default function VlogDetailPage({ params }: { params: { id: string } }) {
@@ -214,7 +215,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     </Shell>
   )
 
-  const title = deriveVlogTitle(vlog.original_filename)
+  // Prefer the AI-derived title from extraction. Falls back to the
+  // de-uglified DJI filename only when extraction hasn't run yet.
+  const title = (vlog.title && vlog.title.trim()) || deriveVlogTitle(vlog.original_filename)
   const status = vlog.pipeline_status
   const isBroll = status === 'archived'
   const isProcessing = ['uploaded', 'transcoding', 'thumbnail_pending', 'transcribing', 'extracting'].includes(status)
@@ -594,16 +597,26 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             {entities.length > 0 && (
               <div className="rail-card">
                 <div className="rc-head">
-                  <h3>Entities</h3>
+                  <h3>Entities · in this vlog</h3>
                   <Link href="/graph" className="more">graph →</Link>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {entities.slice(0, 12).map(e => (
-                    <Link key={e.id} href={`/entity/${e.id}`} className="canon-entity-chip">
-                      <span className="glyph">{e.name.slice(0, 2).toUpperCase()}</span>
-                      {truncate(e.name, 22)}
-                      {e.mention_count != null && <span className="n">·{e.mention_count}</span>}
-                    </Link>
+                    <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <Link href={`/entity/${e.id}`} className="canon-entity-chip" style={{ alignSelf: 'flex-start' }}>
+                        <span className="glyph">{e.name.slice(0, 2).toUpperCase()}</span>
+                        {truncate(e.name, 22)}
+                        {e.mention_count != null && <span className="n">·{e.mention_count}</span>}
+                      </Link>
+                      {(e.vlog_quotes ?? []).slice(0, 3).map((q, i) => (
+                        <blockquote key={i} style={{
+                          margin: 0, padding: '4px 0 4px 10px',
+                          borderLeft: '2px solid var(--line-2)',
+                          fontSize: 12, lineHeight: 1.45,
+                          color: 'var(--fg-2)', fontStyle: 'italic',
+                        }}>"{q}"</blockquote>
+                      ))}
+                    </div>
                   ))}
                 </div>
               </div>

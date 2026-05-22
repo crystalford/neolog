@@ -60,10 +60,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     source_kind: string
     source_id: string
     mention_time: number | null
+    mention_text: string | null
     sentence_index: number | null
     created_at: string
   }>(db,
-    `SELECT id, source_kind, source_id, mention_time, sentence_index, created_at
+    `SELECT id, source_kind, source_id, mention_time, mention_text, sentence_index, created_at
        FROM entity_mentions
       WHERE entity_id = ? AND operator_id = ?
       ORDER BY created_at ASC
@@ -157,6 +158,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       source_kind: m.source_kind,
       source_id: m.source_id,
       time: m.mention_time,
+      text: m.mention_text,
       sentence_index: m.sentence_index,
       at: m.created_at,
     })),

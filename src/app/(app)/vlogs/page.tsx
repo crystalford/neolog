@@ -24,6 +24,7 @@ import { CapturePanel } from '@/components/CapturePanel'
 
 interface VlogRow {
   id: string
+  title: string | null
   original_filename: string | null
   file_size_bytes: number | null
   mime_type: string | null
@@ -31,6 +32,7 @@ interface VlogRow {
   recorded_at: string | null
   uploaded_at: string
   thumbnail_url: string | null
+  transcoded_r2_key: string | null
   pipeline_status: string
   thread_count?: number
   clip_count?: number
@@ -126,7 +128,7 @@ export default function VlogsPage() {
       const r = await fetch('/api/v2/vlogs/bulk-delete', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_ids: Array.from(selected) }),
+        body: JSON.stringify({ ids: Array.from(selected) }),
       })
       const d: any = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
@@ -324,7 +326,7 @@ function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected:
     : isBroll ? 'var(--fg-3)'
     : 'var(--t-ochre)'
 
-  const title = deriveTitle(vlog.original_filename)
+  const title = (vlog.title && vlog.title.trim()) || deriveTitle(vlog.original_filename)
   const ts = vlog.recorded_at ? new Date(vlog.recorded_at) : new Date(vlog.uploaded_at)
   return (
     <div style={{ position: 'relative' }}>
@@ -372,6 +374,19 @@ function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected:
               }}/>
               {isBroll ? 'B-roll' : status.replace(/_/g, ' ')}
             </span>
+            {isComplete && !vlog.transcoded_r2_key && (vlog.mime_type ?? '').startsWith('video/') && (
+              <span title="H.264 transcode never produced — playback may be audio only"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '3px 8px',
+                  background: 'rgba(230, 99, 74, 0.08)',
+                  border: '1px solid var(--t-terra)',
+                  borderRadius: 100,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9, letterSpacing: 1.4,
+                  textTransform: 'uppercase', color: 'var(--t-terra)',
+                }}>No video</span>
+            )}
             <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
               {ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
