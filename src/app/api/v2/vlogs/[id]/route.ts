@@ -203,7 +203,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     )),
   ])
 
-  // Strip internal R2 keys before sending to the client.
+  // Strip internal R2 keys before sending to the client, but expose a
+  // boolean so the vlog page can show a "Transcode missing — playback
+  // may be audio-only" banner. Chrome on Windows can't decode HEVC
+  // without the OS extension, so when the H.264 transcode never landed
+  // we have to nudge the operator to re-trigger it.
+  const hasTranscoded = !!vlog.transcoded_r2_key
   const {
     r2_key: _r2,
     transcoded_r2_key: _tr2,
@@ -276,7 +281,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   return NextResponse.json({
-    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl },
+    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, has_transcoded: hasTranscoded },
     video_url: videoUrl,
     threads,
     clips,
