@@ -24,6 +24,7 @@ import { CapturePanel } from '@/components/CapturePanel'
 
 interface VlogRow {
   id: string
+  title: string | null
   original_filename: string | null
   file_size_bytes: number | null
   mime_type: string | null
@@ -324,7 +325,7 @@ function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected:
     : isBroll ? 'var(--fg-3)'
     : 'var(--t-ochre)'
 
-  const title = deriveTitle(vlog.original_filename)
+  const title = (vlog.title && vlog.title.trim()) || deriveTitle(vlog.original_filename)
   const ts = vlog.recorded_at ? new Date(vlog.recorded_at) : new Date(vlog.uploaded_at)
   return (
     <div style={{ position: 'relative' }}>

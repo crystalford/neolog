@@ -498,6 +498,14 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-22_soft_delete_clips',
     sql: `UPDATE clip_candidates SET deleted_at = CURRENT_TIMESTAMP WHERE deleted_at IS NULL`,
   },
+  // ─── vlogs.title — short AI-derived headline ─────────────────────────────
+  // Replaces the meaningless DJI filename as the display title on the vlog
+  // hero and Timeline cards. 3-8 words, voice-flavored. Filename remains
+  // available in the meta strip + as original_filename for dedup.
+  {
+    name: '2026-05-22_vlogs_title',
+    sql: `ALTER TABLE vlogs ADD COLUMN title TEXT`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

@@ -754,15 +754,27 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             run.total_items, run.invalid_items, run.fail_rate, Date.now(),
           ).run()
 
-          // Save the 60-120 word summary to vlogs.summary so it renders at
-          // the top of the detail page without needing a separate fetch.
-          if (run.payload.summary && run.payload.summary.length > 10) {
+          // Persist the AI-derived title + 2-3 sentence summary so the
+          // vlog hero and Timeline cards stop showing the meaningless
+          // DJI filename. Both fields are nullable; we COALESCE so a
+          // missing field doesn't overwrite an existing value.
+          const newTitle = ((run.payload as any).title || '').trim().slice(0, 120) || null
+          const newSummary = (run.payload.summary || '').trim()
+          if (newTitle || (newSummary && newSummary.length > 10)) {
             try {
               await this.env.DB.prepare(
-                `UPDATE vlogs SET summary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-              ).bind(run.payload.summary, vlog_id).run()
+                `UPDATE vlogs SET
+                   title   = COALESCE(?, title),
+                   summary = COALESCE(?, summary),
+                   updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+              ).bind(
+                newTitle,
+                newSummary.length > 10 ? newSummary : null,
+                vlog_id,
+              ).run()
             } catch (err: any) {
-              console.warn('[extract] vlogs.summary write failed:', err?.message || err)
+              console.warn('[extract] vlogs title/summary write failed:', err?.message || err)
             }
           }
 
@@ -850,15 +862,38 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
             promptVersion,
           )))
 
-          await runBatch('entities', run.payload.entities.map(ent => this.env.DB.prepare(
+          const entityIds = run.payload.entities.map(() => ulid())
+          await runBatch('entities', run.payload.entities.map((ent, i) => this.env.DB.prepare(
             `INSERT INTO entities
                (id, operator_id, vlog_id, run_id, name, entity_type, mention_count, first_mentioned_at, last_mentioned_at)
              VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           ).bind(
-            ulid(), operator_id, vlog_id, run_id,
+            entityIds[i], operator_id, vlog_id, run_id,
             String(ent.name || '').slice(0, 200),
             String(ent.entity_type || 'concept'),
           )))
+
+          // entity_mentions with source_kind='vlog' — verbatim sentences
+          // from the transcript where the operator references this entity.
+          const mentionStmts: any[] = []
+          for (let i = 0; i < run.payload.entities.length; i++) {
+            const ent: any = run.payload.entities[i]
+            const quotes = Array.isArray(ent.mention_quotes) ? ent.mention_quotes : []
+            for (const raw of quotes) {
+              const q = typeof raw === 'string' ? raw.trim().slice(0, 800) : ''
+              if (!q) continue
+              mentionStmts.push(this.env.DB.prepare(
+                `INSERT INTO entity_mentions (id, entity_id, operator_id, source_kind, source_id, mention_text)
+                 VALUES (?, ?, ?, 'vlog', ?, ?)`,
+              ).bind(ulid(), entityIds[i], operator_id, vlog_id, q))
+            }
+          }
+          if (mentionStmts.length > 0) {
+            try { await this.env.DB.batch(mentionStmts) }
+            catch (err: any) {
+              console.warn('[extract] entity_mentions(vlog) write failed:', err?.message || err)
+            }
+          }
 
           const warnings: Record<string, { expected: number; persisted: number }> = {}
           for (const kind of Object.keys(expected)) {

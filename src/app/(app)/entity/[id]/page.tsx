@@ -27,7 +27,7 @@ import { topicColor } from '@/lib/topic-color'
 import { truncate, formatFullDate } from '@/components/threadkit'
 
 interface EntityCore { id: string; name: string; type: string; aliases: string[]; mention_count: number; first_seen: string }
-interface MentionRow { id: string; source_kind: string; source_id: string; time: number | null; sentence_index: number | null; at: string }
+interface MentionRow { id: string; source_kind: string; source_id: string; time: number | null; text: string | null; sentence_index: number | null; at: string }
 interface ThreadRow { id: string; topic: string; take: string | null; abstracted_topic: string | null; strength: number | null; extracted_at: string; vlog_id: string; vlog_filename: string | null }
 interface ClusterRow { id: string; topic: string; abstracted_topic: string | null; ripeness_score: number | null; thread_count: number }
 interface CoMention { id: string; name: string; entity_type: string; mention_count: number | null; shared_vlogs: number }
@@ -208,6 +208,47 @@ export default function EntityDetailPage({ params }: { params: { id: string } })
       {/* Body grid */}
       <div className="canon-detail-body">
         <div className="canon-detail-main">
+
+          {/* What you've said about this — verbatim quotes from entity_mentions.
+              This is the real value of an entity: not a tag, but a record of
+              the operator's evolving thinking. */}
+          {data.mentions.some(m => m.text && m.text.trim().length > 0) && (
+            <section className="canon-section">
+              <div className="canon-section-head">
+                <h2>What you've said <span className="meta">· {data.mentions.filter(m => m.text).length} verbatim quotes</span></h2>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {data.mentions.filter(m => m.text && m.text.trim().length > 0).slice(0, 30).map(m => (
+                  <blockquote key={m.id} style={{
+                    margin: 0,
+                    padding: '12px 18px',
+                    background: 'var(--bg-1)',
+                    borderLeft: '2px solid var(--sig)',
+                    borderRadius: '0 8px 8px 0',
+                    fontSize: 15, lineHeight: 1.5,
+                    color: 'var(--fg-1)',
+                    fontStyle: 'italic',
+                  }}>
+                    "{m.text}"
+                    <footer style={{
+                      marginTop: 6,
+                      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.4,
+                      color: 'var(--fg-4)', textTransform: 'uppercase',
+                      fontStyle: 'normal',
+                    }}>
+                      {m.source_kind === 'vlog' ? (
+                        <Link href={`/vlog/${m.source_id}`} style={{ color: 'var(--fg-4)' }}>
+                          vlog · {new Date(m.at).toLocaleDateString()}
+                        </Link>
+                      ) : (
+                        <span>{m.source_kind} · {new Date(m.at).toLocaleDateString()}</span>
+                      )}
+                    </footer>
+                  </blockquote>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Verbatim mentions (threads) */}
           {data.threads.length > 0 && (

@@ -80,13 +80,30 @@ export interface ExtractedEntity {
   name: string
   entity_type: 'person' | 'place' | 'project' | 'tool' | 'concept' | 'theme' | 'reference'
   aliases?: string[]
+  /**
+   * Verbatim sentences from this transcript where the operator references
+   * this entity. Per-vlog context. Surfaces on the entity rail (in vlog
+   * detail) and aggregates across all vlogs on /entity/[id] so an entity
+   * stops being a tag and becomes a record of what the operator has said
+   * about it. 1-4 quotes per entity per vlog.
+   */
+  mention_quotes?: string[]
 }
 
 export interface ExtractionPayload {
-  // 60-120 word plain-English summary of what the vlog is about. Shown at
-  // the top of /timeline/[id] so the operator gets a sense of the content
-  // without reading the full transcript or threads. Voice-grounded but not
-  // 4-gram verified (it's a paraphrase by design).
+  /**
+   * Short headline (3-8 words) that becomes the vlog's display title in
+   * place of the meaningless DJI filename. Should read like a phrase the
+   * operator might say — not click-bait. "Coming in hot." / "Eight minutes
+   * of gold." / "Neolog and Canopticon, simpler."
+   */
+  title?: string
+  /**
+   * 2-3 sentence plain-English reframe of what the vlog is about. Renders
+   * under the title on the vlog detail hero so the operator gets a
+   * sense of the content without reading transcript or threads. Voice-
+   * grounded but not 4-gram verified (paraphrase by design).
+   */
   summary?: string
   threads: ExtractedThread[]
   clips: ExtractedClip[]
@@ -169,7 +186,8 @@ If any answer is no, fix or omit the thread.
 
 # OUTPUT SCHEMA
 {
-  "summary": "<60-120 word plain-English paragraph: what this vlog is about, in the operator's voice. May paraphrase; not subject to the verbatim 4-word rule.>",
+  "title": "<3-8 word phrase that captures the vlog. Reads like something the operator might actually say. NOT click-bait. NOT a question. Examples: 'Coming in hot.' · 'Eight minutes of gold.' · 'Neolog and Canopticon, simpler.' · 'Recording in a cemetery.'>",
+  "summary": "<2-3 sentence plain-English reframe of what the vlog is about. Voice-flavored but allowed to paraphrase. Replaces the meaningless filename as the at-a-glance signal.>",
   "threads": [
     {
       "topic": "<short 3-7 word label>",
@@ -197,7 +215,8 @@ If any answer is no, fix or omit the thread.
   "entities": [
     { "name": "<entity name as appears>",
       "entity_type": "person|place|project|tool|concept|theme|reference",
-      "aliases": ["<as appears>", ...] }
+      "aliases": ["<as appears>", ...],
+      "mention_quotes": ["<verbatim sentence(s) from the transcript where the operator references this entity — 1 to 4 quotes>"] }
   ]
 }
 
@@ -217,6 +236,7 @@ ENTITY RULES:
 - Only extract entities the operator GENUINELY REFERENCES as real things in their life or work. Hotel they're staying at: yes. Person they met: yes. Project they're shipping: yes.
 - DO NOT extract entities from improvised jokes, sarcasm, or absurd claims. "This pool was designed by Tesla himself" is the operator riffing — Tesla is NOT an entity here. Same for "Elon called me yesterday" if it's obviously a joke. Trust the operator's tone — when something is delivered with a wink, it's not real-world reference.
 - DO NOT extract entities from rhetorical examples ("imagine if Apple did this"). Only entities the operator is actually engaging with in their lived experience.
+- mention_quotes is REQUIRED for every entity. Provide 1-4 verbatim sentences from THIS transcript that show what the operator is saying about this entity. Entities without context are useless tags. If you can't find a verbatim sentence about the entity, OMIT the entity.
 - When in doubt, omit. A clean entities: [] is better than three fake ones.`
 
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
