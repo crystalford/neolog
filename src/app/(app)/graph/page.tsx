@@ -192,7 +192,7 @@ export default function GraphPage() {
   return (
     <Shell>
       {/* Hero */}
-      <section className="canon-reveal d1" style={{ padding: '40px 0 28px' }}>
+      <section className="canon-reveal d1" style={{ padding: '8px 0 28px' }}>
         <div style={{
           fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
           textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 20,
