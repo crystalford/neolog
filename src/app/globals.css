@@ -1882,7 +1882,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   text-wrap: pretty;
 }
 .canon-transcript .pre,
-.canon-transcript .post { color: var(--fg-3); }
+.canon-transcript .post { color: var(--fg-2); opacity: 0.78; }
 .canon-transcript .t-span {
   position: relative;
   padding: 4px 0 4px 14px;
