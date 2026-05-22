@@ -309,9 +309,13 @@ export async function GET(req: NextRequest) {
           // presigning needs R2_ACCESS_KEY_ID/SECRET — leave null if absent
         }
       }
-      // Strip internal R2 keys from client response.
-      const { r2_key: _omit1, transcoded_r2_key: _omit2, thumbnail_r2_key: _omit3, ...safe } = r
-      return { ...safe, thumbnail_url }
+      // Strip internal R2 keys from client response, but expose a boolean
+      // so the gallery card can render the "No video" badge and the bulk
+      // re-transcode button can filter to only the rows that actually need
+      // work (otherwise it dispatches a full pipeline re-run for every
+      // single vlog — wasteful).
+      const { r2_key: _omit1, transcoded_r2_key, thumbnail_r2_key: _omit3, ...safe } = r
+      return { ...safe, thumbnail_url, has_transcoded: !!transcoded_r2_key }
     }),
   )
 
