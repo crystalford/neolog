@@ -1052,20 +1052,27 @@ export class VlogPipelineDO {
     // Pre-generate clip IDs so we can compute their time spans
     // post-INSERT (same pattern as threads).
     const clipIds = run.payload.clips.map(() => ulid())
-    await runBatch('clips', run.payload.clips.map((c, i) => this.env.DB.prepare(
-      `INSERT INTO clip_candidates
-         (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extraction_prompt_version, extracted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
-    ).bind(
-      clipIds[i], vlog.operator_id, vlog.id, run_id,
-      c.start_time_ms != null ? c.start_time_ms / 1000 : 0,
-      c.end_time_ms != null ? c.end_time_ms / 1000 : 0,
-      String(c.headline || '').slice(0, 200),
-      String(c.quote || ''),
-      JSON.stringify({ reason: c.why_clippable ?? '' }),
-      c.validated ?? 1,
-      promptVersion,
-    )))
+    await runBatch('clips', run.payload.clips.map((c, i) => {
+      const startSec = typeof (c as any).start_time_sec === 'number'
+        ? (c as any).start_time_sec
+        : (c.start_time_ms != null ? c.start_time_ms / 1000 : 0)
+      const endSec = typeof (c as any).end_time_sec === 'number'
+        ? (c as any).end_time_sec
+        : (c.end_time_ms != null ? c.end_time_ms / 1000 : 0)
+      return this.env.DB.prepare(
+        `INSERT INTO clip_candidates
+           (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extraction_prompt_version, extracted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
+      ).bind(
+        clipIds[i], vlog.operator_id, vlog.id, run_id,
+        startSec, endSec,
+        String(c.headline || '').slice(0, 200),
+        String(c.quote || ''),
+        typeof c.why_clippable === 'string' ? c.why_clippable : '',
+        c.validated ?? 1,
+        promptVersion,
+      )
+    }))
 
     // Post-INSERT: compute start_time / end_time for each clip by
     // matching its quote against the vlog's transcript_words. Without

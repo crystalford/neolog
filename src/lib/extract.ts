@@ -215,20 +215,28 @@ export async function extractClipCandidates(env: ExtractEnv, ctx: VlogContext): 
   const candidates = Array.isArray(parsed.clip_candidates) ? parsed.clip_candidates : []
 
   const inserts = candidates
-    .filter(c =>
-      c && typeof c.start_time === 'number' && typeof c.end_time === 'number' &&
-      c.end_time > c.start_time && typeof c.headline === 'string',
+    .map(c => {
+      const start = typeof c.start_time_sec === 'number' ? c.start_time_sec
+        : typeof c.start_time === 'number' ? c.start_time
+        : typeof c.start_time_ms === 'number' ? c.start_time_ms / 1000 : null
+      const end = typeof c.end_time_sec === 'number' ? c.end_time_sec
+        : typeof c.end_time === 'number' ? c.end_time
+        : typeof c.end_time_ms === 'number' ? c.end_time_ms / 1000 : null
+      return { c, start, end }
+    })
+    .filter(({ c, start, end }) =>
+      c && start != null && end != null && end > start && typeof c.headline === 'string',
     )
-    .map(c => ({
+    .map(({ c, start, end }) => ({
       sql: `INSERT INTO clip_candidates (
               id, operator_id, vlog_id, start_time, end_time, headline, quote,
               why_clippable, extraction_prompt_version
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       binds: [
         ulid(), ctx.operator_id, ctx.vlog_id,
-        c.start_time, c.end_time, c.headline,
+        start, end, c.headline,
         typeof c.quote === 'string' ? c.quote : null,
-        JSON.stringify(Array.isArray(c.why_clippable) ? c.why_clippable : []),
+        typeof c.why_clippable === 'string' ? c.why_clippable : '',
         prompt.version,
       ],
     }))

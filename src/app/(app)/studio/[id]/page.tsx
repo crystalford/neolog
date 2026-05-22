@@ -132,6 +132,48 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
     }
   }
 
+  // Map a production-candidate label (from the rail) onto an actual
+  // production_type the engine accepts, then POST to /api/v2/productions
+  // and navigate to the new draft. Same path as ProduceModal but
+  // pre-pick the type — fewer clicks from a hot candidate.
+  const buildFromCandidate = async (candidateName: string) => {
+    const map: Record<string, string> = {
+      'Video essay': 'video_essay',
+      'video essay': 'video_essay',
+      'Article':     'article',
+      'X thread':    'x_thread',
+      'X post':      'x_post',
+      'Single clip': 'clip',
+      'Clip':        'clip',
+    }
+    const type = map[candidateName] || 'article'
+    // 'clip' production needs a thread source, not a cluster — open the
+    // modal instead so the operator can pick which thread to clip.
+    if (type === 'clip') {
+      setProduceOpen(true)
+      return
+    }
+    try {
+      const r = await fetch('/api/v2/productions', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_kind: 'cluster',
+          source_id: params.id,
+          production_type: type,
+          // Default to Llama 70B in-house; operator can re-generate
+          // with Sonnet from the draft page.
+          model: 'llama70b',
+        }),
+      })
+      const d: any = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      router.push(`/production/${d.id}`)
+    } catch (e: any) {
+      alert(`Build failed: ${e?.message || e}`)
+    }
+  }
+
   const sendBounce = async (e: React.FormEvent) => {
     e.preventDefault()
     const q = bounceQ.trim()
@@ -555,7 +597,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
                       <span style={{ fontSize: 10, color: 'var(--fg-2)', fontFamily: 'var(--font-mono)' }}>
                         {p.cost} · {p.duration_label}
                       </span>
-                      <button onClick={() => alert(`Build ${p.name} — production engine coming next.`)} style={{
+                      <button onClick={() => buildFromCandidate(p.name)} style={{
                         padding: '4px 10px', fontSize: 10.5,
                         background: 'transparent', color: 'var(--fg-1)',
                         border: '1px solid var(--line-2)', borderRadius: 5, cursor: 'pointer',
