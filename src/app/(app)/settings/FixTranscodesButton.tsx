@@ -5,7 +5,7 @@ import { useState } from 'react'
 interface VlogRow {
   id: string
   original_filename: string | null
-  transcoded_r2_key: string | null
+  has_transcoded?: boolean
   mime_type: string | null
 }
 
@@ -27,7 +27,7 @@ export function FixTranscodesButton() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const d = (await r.json()) as { vlogs?: VlogRow[] }
       const needs = (d.vlogs ?? []).filter(v =>
-        !v.transcoded_r2_key && (v.mime_type || '').startsWith('video/'),
+        v.has_transcoded === false && (v.mime_type || '').startsWith('video/'),
       )
       if (needs.length === 0) {
         setStatus('All caught up — every video has a transcode.')

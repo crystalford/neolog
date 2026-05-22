@@ -562,9 +562,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                       textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 10,
                     }}>Per-pass re-extract</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {(['threads', 'clip_candidates', 'creative_elements', 'entities'] as const).map(p => (
+                      {(['threads', 'entities'] as const).map(p => (
                         <button key={p} onClick={() => reExtract([p])} className="canon-btn ghost" style={{ fontSize: 11 }}>
-                          {p.replace('_', ' ')}
+                          {p}
                         </button>
                       ))}
                       <button onClick={() => reExtract()} className="canon-btn primary" style={{ fontSize: 11 }}>
