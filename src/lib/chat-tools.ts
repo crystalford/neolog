@@ -20,7 +20,7 @@ import { findOne, findMany, run } from './d1'
 import { ulid } from './ulid'
 import type { ChatToolDef } from './llm'
 
-export const TOOL_LIMIT = 8  // Max tool calls in one chat turn before we cut off
+export const TOOL_LIMIT = 12  // Max tool-call iterations in one chat turn before we cut off
 
 export interface ToolCtx {
   db: D1Database

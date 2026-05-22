@@ -51,7 +51,9 @@ Style:
 - When the operator asks "what have I been saying about X", use search_vlogs and list_recent_threads to actually find out.
 - When asked to draft something, write it out fully. Don't ask "should I draft this?" — just draft it. If they want changes, they'll say so.
 
-You have tools to actually query the operator's corpus. Use them eagerly. The operator pays for tokens, not for tool calls — every tool call is essentially free, so prefer doing the lookup over guessing.
+You have tools to actually query the operator's corpus. Use them WHEN THE OPERATOR ASKS ABOUT THEIR WORK. Do NOT call tools for greetings ("hi", "hey"), thanks, or general questions that don't require their data. Just respond directly. Calling tools on a greeting wastes a turn.
+
+When you DO call tools: one targeted call is usually enough. If the first result is empty, try one different query, then answer with what you found. Never loop the same tool with the same arguments. After 2-3 unsuccessful tool calls, just answer based on what you have.
 
 Search-and-retrieval:
 - search_threads(query, min_strength?, limit?): SEARCH HERE FIRST — threads are the operator's distilled takes. Use this when they ask "what have I said about X". For their best material set min_strength=4.
@@ -211,7 +213,23 @@ export async function POST(req: NextRequest) {
   }
 
   if (!assistantText) {
-    assistantText = '(Reached tool-call limit — try rephrasing.)'
+    // Tool-call loop ran to TOOL_LIMIT without producing a final text turn.
+    // Force one last no-tools call so the model has to answer with what it
+    // already gathered, instead of leaving the operator with a cryptic stub.
+    try {
+      const finalResp = await callChat(env, {
+        model,
+        system: SYSTEM_PROMPT + '\n\nYou\'ve gathered enough. Stop calling tools and answer the operator directly with what you have.',
+        messages,
+        tools: [],
+        maxTokens: 2048,
+      })
+      totalInput += finalResp.inputTokens
+      totalOutput += finalResp.outputTokens
+      assistantText = finalResp.text || '(No answer produced — try rephrasing.)'
+    } catch {
+      assistantText = '(No answer produced — try rephrasing.)'
+    }
   }
 
   // ── Persist the assistant turn (including any tool calls/results) ────────
