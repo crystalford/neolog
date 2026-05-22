@@ -19,6 +19,7 @@ import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { ModelPreferences } from './ModelPreferences'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
+import { FixTranscodesButton } from './FixTranscodesButton'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -166,6 +167,8 @@ export default async function SettingsPage() {
         <Section title="Maintenance">
           <Row k="Missing thumbnails" sub="Walk every vlog where thumbnail_r2_key IS NULL and run the ffmpeg cascade to backfill. Safe to re-run."/>
           <FixThumbnailsButton/>
+          <Row k="Missing H.264 transcode" sub="Re-dispatch the workflow for every video where transcoded_r2_key is null. Chrome can't decode raw HEVC on Windows, so these vlogs play audio-only without an H.264 fallback. Safe to re-run."/>
+          <FixTranscodesButton/>
         </Section>
       </div>
 

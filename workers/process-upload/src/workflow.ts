@@ -306,6 +306,13 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // direct extract still misses. Thumbnail now lands in 2-5 seconds for
     // fresh uploads instead of waiting on a 5-10min transcode.
     //
+    // The gate on !vlog.thumbnail_url && !vlog.thumbnail_r2_key means the
+    // browser-side capture (CapturePanel writes thumbnail_r2_key inline at
+    // register time) already short-circuits this cascade when it lands. We
+    // keep the full server cascade as a backstop — the client path is new
+    // and we deliberately do not remove infrastructure that was previously
+    // proven to work.
+    //
     // Cascade:
     //   tier 1 — /extract-thumb on original (direct, -noautorotate)
     //   tier 2 — /extract-thumb-mini-transcode on original (2-sec mini transcode)

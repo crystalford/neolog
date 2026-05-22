@@ -32,6 +32,7 @@ interface VlogRow {
   recorded_at: string | null
   uploaded_at: string
   thumbnail_url: string | null
+  transcoded_r2_key: string | null
   pipeline_status: string
   thread_count?: number
   clip_count?: number
@@ -373,6 +374,19 @@ function VlogCard({ vlog, selected, onToggleSelect }: { vlog: VlogRow; selected:
               }}/>
               {isBroll ? 'B-roll' : status.replace(/_/g, ' ')}
             </span>
+            {isComplete && !vlog.transcoded_r2_key && (vlog.mime_type ?? '').startsWith('video/') && (
+              <span title="H.264 transcode never produced — playback may be audio only"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '3px 8px',
+                  background: 'rgba(230, 99, 74, 0.08)',
+                  border: '1px solid var(--t-terra)',
+                  borderRadius: 100,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 9, letterSpacing: 1.4,
+                  textTransform: 'uppercase', color: 'var(--t-terra)',
+                }}>No video</span>
+            )}
             <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
               {ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
