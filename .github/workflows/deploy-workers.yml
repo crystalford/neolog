@@ -256,3 +256,86 @@ jobs:
             echo ""
             echo "Result: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-admin-bridge:
+    # Tiny *.workers.dev proxy that lets Claude Code on the web reach the
+    # neolog.ai admin API (which is blocked by the sandbox egress allowlist —
+    # see anthropics/claude-code#52982). See workers/admin-bridge/README.md.
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      CLOUDFLARE_API_TOKEN:     ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID:    ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLAUDE_BEARER:            ${{ secrets.CLAUDE_BEARER }}
+      CF_ACCESS_CLIENT_ID:      ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET:  ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install wrangler
+        run: pnpm add -g wrangler@4
+      - name: Refuse to deploy without secrets
+        run: |
+          set -e
+          missing=""
+          [ -z "$CLAUDE_BEARER" ]            && missing="$missing CLAUDE_BEARER"
+          [ -z "$CF_ACCESS_CLIENT_ID" ]      && missing="$missing CF_ACCESS_CLIENT_ID"
+          [ -z "$CF_ACCESS_CLIENT_SECRET" ]  && missing="$missing CF_ACCESS_CLIENT_SECRET"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub repo secrets:$missing"
+            echo ""
+            echo "Add them at: https://github.com/crystalford/neolog/settings/secrets/actions"
+            echo "  - CLAUDE_BEARER             a random string you pick (any 32+ char value)"
+            echo "  - CF_ACCESS_CLIENT_ID       from Cloudflare Zero Trust service token"
+            echo "  - CF_ACCESS_CLIENT_SECRET   from Cloudflare Zero Trust service token"
+            exit 1
+          fi
+      - name: Deploy admin bridge worker
+        if: hashFiles('workers/admin-bridge/wrangler.toml') != ''
+        run: |
+          set -e
+          cd workers/admin-bridge
+          if [ -f package.json ]; then
+            npm install --no-audit --no-fund
+          fi
+          wrangler deploy
+          echo "$CLAUDE_BEARER"           | wrangler secret put CLAUDE_BEARER
+          echo "$CF_ACCESS_CLIENT_ID"     | wrangler secret put CF_ACCESS_CLIENT_ID
+          echo "$CF_ACCESS_CLIENT_SECRET" | wrangler secret put CF_ACCESS_CLIENT_SECRET
+      - name: Print deployed URL for the operator
+        if: success()
+        run: |
+          set -e
+          cd workers/admin-bridge
+          # Probe the workers.dev hostname we just deployed.
+          # Account subdomain comes from wrangler whoami; worker name is fixed.
+          subdomain=$(wrangler whoami 2>/dev/null | grep -oE '[a-z0-9-]+\.workers\.dev' | head -1 | sed 's/\.workers\.dev//' || echo "")
+          if [ -z "$subdomain" ]; then
+            url="https://neolog-admin-bridge.<your-acct-subdomain>.workers.dev"
+          else
+            url="https://neolog-admin-bridge.${subdomain}.workers.dev"
+          fi
+          {
+            echo "## admin bridge deployed"
+            echo ""
+            echo "**URL:** \`${url}\`"
+            echo ""
+            echo "Test it from anywhere:"
+            echo ""
+            echo "    curl ${url}/  # health probe, no auth"
+            echo ""
+            echo "Then paste the URL + your CLAUDE_BEARER secret back to Claude. Claude will use:"
+            echo ""
+            echo "    GET  ${url}/runtime-state    Authorization: Bearer <CLAUDE_BEARER>"
+            echo "    POST ${url}/transcode-one    body: { \"vlog_id\": \"...\" }"
+            echo ""
+            echo "See workers/admin-bridge/README.md for all routes."
+          } >> "$GITHUB_STEP_SUMMARY"
