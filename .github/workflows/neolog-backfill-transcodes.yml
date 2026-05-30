@@ -1,0 +1,158 @@
+name: Neolog backfill transcodes
+
+# Backfills H.264 transcodes for vlogs that never got one (the DO pipeline
+# rebuild dropped the video-transcode step, so all 299 vlogs have
+# transcoded_r2_key=null and play as un-decodable HEVC in Chrome).
+#
+# A GitHub runner has the CF Access service token + full network, so it can
+# loop /api/v2/admin/transcode-one for each vlog. transcode-one is idempotent
+# (skips already-done), so this is safe to re-run — each run continues where
+# the last left off because the audit only returns un-transcoded vlogs.
+#
+# Bounded per run (MAX_PER_RUN) to stay well inside the runner timeout and
+# give frequent progress reports. Re-fire by pushing ops/backfill/run.json
+# or via workflow_dispatch until the report shows 0 remaining.
+
+on:
+  push:
+    branches: [claude/integrate-filament-update-XWb1v]
+    paths:
+      - 'ops/backfill/run.json'
+  workflow_dispatch:
+    inputs:
+      max_per_run:
+        description: 'Max vlogs to transcode this run'
+        default: '40'
+      max_size_mb:
+        description: 'Skip vlogs larger than this many MB (4GB+ need streaming path)'
+        default: '1500'
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      BASE_URL: https://neolog.ai
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/integrate-filament-update-XWb1v
+
+      - name: Resolve run params
+        id: params
+        run: |
+          set -e
+          # Params come from run.json (push trigger) or workflow inputs.
+          max_per_run="${{ github.event.inputs.max_per_run }}"
+          max_size_mb="${{ github.event.inputs.max_size_mb }}"
+          if [ -f ops/backfill/run.json ]; then
+            j=$(cat ops/backfill/run.json)
+            [ -z "$max_per_run" ] && max_per_run=$(echo "$j" | jq -r '.max_per_run // empty')
+            [ -z "$max_size_mb" ] && max_size_mb=$(echo "$j" | jq -r '.max_size_mb // empty')
+          fi
+          [ -z "$max_per_run" ] && max_per_run=40
+          [ -z "$max_size_mb" ] && max_size_mb=1500
+          echo "max_per_run=$max_per_run" >> "$GITHUB_OUTPUT"
+          echo "max_size_mb=$max_size_mb" >> "$GITHUB_OUTPUT"
+          echo "Run params: max_per_run=$max_per_run max_size_mb=$max_size_mb"
+
+      - name: Backfill loop
+        run: |
+          set -e
+          MAXN=${{ steps.params.outputs.max_per_run }}
+          MAXMB=${{ steps.params.outputs.max_size_mb }}
+          ACCESS=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+
+          mkdir -p ops/backfill
+
+          echo "Fetching audit…"
+          curl -s -S "${ACCESS[@]}" --max-time 60 \
+            "$BASE_URL/api/v2/admin/playback-audit?limit=300" > /tmp/audit.json
+
+          total_rows=$(jq '.vlogs | length' /tmp/audit.json)
+          echo "Audit returned $total_rows vlogs."
+
+          # Candidates: video, no transcode yet, under the size cap.
+          jq -r --argjson cap "$MAXMB" '
+            .vlogs[]
+            | select(.transcoded_r2_key == null)
+            | select((.mime_type // "") | startswith("video/"))
+            | select((.file_size_mb // 0) <= $cap)
+            | "\(.id)\t\(.file_size_mb)\t\(.filename)"
+          ' /tmp/audit.json > /tmp/candidates.tsv || true
+
+          # Also count the oversized ones we are deferring.
+          deferred=$(jq -r --argjson cap "$MAXMB" '
+            [ .vlogs[]
+              | select(.transcoded_r2_key == null)
+              | select((.mime_type // "") | startswith("video/"))
+              | select((.file_size_mb // 0) > $cap) ] | length
+          ' /tmp/audit.json)
+
+          remaining=$(wc -l < /tmp/candidates.tsv | tr -d ' ')
+          echo "Candidates under ${MAXMB}MB: $remaining (deferred oversized: $deferred)"
+
+          ok=0; fail=0; n=0
+          : > /tmp/results.ndjson
+          while IFS=$'\t' read -r id size fname; do
+            [ -z "$id" ] && continue
+            if [ "$n" -ge "$MAXN" ]; then
+              echo "Hit MAX_PER_RUN=$MAXN; stopping this run."
+              break
+            fi
+            n=$((n+1))
+            echo "[$n/$MAXN] transcoding $fname (${size}MB) $id"
+            code=$(curl -s -S "${ACCESS[@]}" --max-time 280 \
+              -o /tmp/resp.json -w "%{http_code}" \
+              -X POST -H "Content-Type: application/json" \
+              --data "{\"vlog_id\":\"$id\"}" \
+              "$BASE_URL/api/v2/admin/transcode-one" || echo "000")
+            okflag=$(jq -r '.ok // false' /tmp/resp.json 2>/dev/null || echo false)
+            err=$(jq -rc '{error,ffmpeg_status,ffmpeg_response,detail} | with_entries(select(.value!=null))' /tmp/resp.json 2>/dev/null || echo '{}')
+            if [ "$code" = "200" ] && [ "$okflag" = "true" ]; then
+              ok=$((ok+1)); echo "  ✓ ok"
+            else
+              fail=$((fail+1)); echo "  ✗ HTTP $code $err"
+            fi
+            jq -nc --arg id "$id" --arg fname "$fname" --arg size "$size" \
+                   --arg code "$code" --arg okflag "$okflag" --argjson err "$err" \
+              '{id:$id, filename:$fname, size_mb:($size|tonumber? // null), http:($code|tonumber? // 0), ok:($okflag=="true"), err:$err}' \
+              >> /tmp/results.ndjson
+            sleep 1
+          done < /tmp/candidates.tsv
+
+          jq -s --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --argjson remaining "$remaining" \
+                --argjson deferred "$deferred" \
+                --argjson processed "$n" \
+                --argjson okc "$ok" \
+                --argjson failc "$fail" \
+            '{
+              ran_at: $ts,
+              candidates_under_cap: $remaining,
+              deferred_oversized: $deferred,
+              processed_this_run: $processed,
+              succeeded: $okc,
+              failed: $failc,
+              results: .
+            }' /tmp/results.ndjson > ops/backfill/report.json
+
+          echo "Done: processed=$n ok=$ok fail=$fail remaining_after≈$((remaining-ok)) deferred=$deferred"
+
+      - name: Commit report
+        run: |
+          set -e
+          git config user.name  "neolog-probe-bot"
+          git config user.email "bot@neolog.ai"
+          git add ops/backfill/report.json
+          if git diff --cached --quiet; then
+            echo "No report change."
+          else
+            git commit -m "backfill: transcode report [skip ci]"
+            git push origin claude/integrate-filament-update-XWb1v
+          fi
