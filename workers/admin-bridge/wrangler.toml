@@ -1,0 +1,32 @@
+# Cloudflare Worker: neolog-admin-bridge
+#
+# Tiny HTTPS proxy that lets Claude Code on the web reach Neolog's admin
+# endpoints. Solves the documented bug where the web sandbox's egress
+# allowlist ignores user/project settings and blocks neolog.ai with
+# `x-deny-reason: host_not_allowed` — see anthropics/claude-code#52982,
+# #34690, #19087.
+#
+# Why this works:
+#   - `*.workers.dev` is on the sandbox's default allowlist (won't be
+#     blocked even when arbitrary HTTPS hosts are).
+#   - This worker accepts requests from Claude (authenticated by a shared
+#     bearer), and forwards them to neolog.ai with Cloudflare Access
+#     service-token headers (CF-Access-Client-Id / CF-Access-Client-Secret)
+#     so the SSO challenge is bypassed.
+#
+# Inbound auth (Claude → worker):
+#   Authorization: Bearer <CLAUDE_BEARER>
+#
+# Outbound auth (worker → neolog.ai):
+#   CF-Access-Client-Id:     <CF_ACCESS_CLIENT_ID>
+#   CF-Access-Client-Secret: <CF_ACCESS_CLIENT_SECRET>
+#
+# Secrets are set via `wrangler secret put`. See README in this dir for
+# the one-shot deploy procedure.
+
+name = "neolog-admin-bridge"
+main = "src/index.ts"
+compatibility_date = "2026-05-22"
+workers_dev = true
+
+# No bindings beyond environment secrets. The worker speaks pure fetch.

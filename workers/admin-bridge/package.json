@@ -1,0 +1,15 @@
+{
+  "name": "neolog-admin-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "secret-put": "wrangler secret put"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240620.0",
+    "wrangler": "^3.78.0",
+    "typescript": "^5.5.4"
+  }
+}
