@@ -1,11 +1,409 @@
 {
-  "requested_at": "2026-05-30T16:51:27Z",
+  "requested_at": "2026-05-30T16:57:30Z",
   "method": "GET",
-  "path": "/api/v2/admin/runtime-state?status=failed&step=transcode&limit_events=20",
-  "http_status": 401,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a03f3e5e5e0ab266-ORD\r|",
-  "body": "{\"error\":\"Unauthenticated\"}",
+  "path": "/api/v2/admin/runtime-state?status=failed&limit_events=10",
+  "http_status": 200,
+  "access_headers": "set-cookie: <redacted>|cf-ray: a03f472fad263adb-IAD\r|",
+  "body": "{\"generated_at\":\"2026-05-30T16:57:30.792Z\",\"operator_id\":\"01KRCXWYTRN0BYTR3452ZTSXXJ\",\"filters\":{\"limit\":10,\"status\":\"failed\",\"step\":null,\"vlog_id\":null},\"aggregates\":{\"vlogs\":{\"total\":299,\"complete\":299,\"failed\":0,\"processing\":0,\"archived\":0,\"has_transcoded\":0,\"has_thumb\":297},\"events_by_step_status_24h\":[]},\"ffmpeg\":{\"ok\":true,\"status\":200,\"latency_ms\":1168},\"recent_failures\":[{\"vlog_id\":\"01KRMS8JDH3J2BCZ7J74E91C1V\",\"original_filename\":\"DJI_20260509121839_0055_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-21 10:01:43\"},{\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"original_filename\":\"DJI_20260417202550_0030_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:43:39\"},{\"vlog_id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"original_filename\":\"DJI_20260420184712_0036_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:42:35\"},{\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"original_filename\":\"DJI_20260509165949_0059_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:42:20\"},{\"vlog_id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"original_filename\":\"DJI_20260509170511_0060_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:42:07\"},{\"vlog_id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"original_filename\":\"DJI_20260509183059_0062_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:41:43\"},{\"vlog_id\":\"01KRMW0NDKBZ8KA6H31BPG1EV4\",\"original_filename\":\"DJI_20260509183621_0063_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:41:04\"},{\"vlog_id\":\"01KRMW6EC9K5J2N8BN6MN0YX07\",\"original_filename\":\"DJI_20260509183641_0064_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:40:53\"},{\"vlog_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"original_filename\":\"DJI_20260510090112_0065_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:38:30\"},{\"vlog_id\":\"01KRMW6EC9K5J2N8BN6MN0YX07\",\"original_filename\":\"DJI_20260509183641_0064_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:24\"},{\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"original_filename\":\"DJI_20260509165949_0059_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:23\"},{\"vlog_id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"original_filename\":\"DJI_20260509170511_0060_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:23\"},{\"vlog_id\":\"01KRMW0NDKBZ8KA6H31BPG1EV4\",\"original_filename\":\"DJI_20260509183621_0063_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:23\"},{\"vlog_id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"original_filename\":\"DJI_20260509183059_0062_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:23\"},{\"vlog_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"original_filename\":\"DJI_20260510090112_0065_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:22\"},{\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"original_filename\":\"DJI_20260417202550_0030_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:37:22\"},{\"vlog_id\":\"01KRMW8JT8JRR6VXABRRGCPQ5Q\",\"original_filename\":\"DJI_20260510090157_0066_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 20:25:33\"},{\"vlog_id\":\"01KRMW6EC9K5J2N8BN6MN0YX07\",\"original_filename\":\"DJI_20260509183641_0064_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:44:55\"},{\"vlog_id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"original_filename\":\"DJI_20260509170511_0060_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:40:02\"},{\"vlog_id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"original_filename\":\"DJI_20260420184712_0036_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ENOSPC: no space left on device, write\\nError: ffmpeg /extract-audio 500: ENOSPC: no space left on device, write\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:37:25\"},{\"vlog_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"original_filename\":\"DJI_20260510090112_0065_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:36:35\"},{\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"original_filename\":\"DJI_20260417202550_0030_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:35:28\"},{\"vlog_id\":\"01KRMW0NDKBZ8KA6H31BPG1EV4\",\"original_filename\":\"DJI_20260509183621_0063_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:34:40\"},{\"vlog_id\":\"01KRMW8JT8JRR6VXABRRGCPQ5Q\",\"original_filename\":\"DJI_20260510090157_0066_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:34:09\"},{\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"original_filename\":\"DJI_20260509165949_0059_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:21:08\"},{\"vlog_id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"original_filename\":\"DJI_20260509183059_0062_D.MP4\",\"step\":\"audio_extract\",\"error_full_text\":\"ffmpeg /extract-audio 500: Input too large: 4357276111 > 4294967296 (use rangeBytes for partial fetch)\\nError: ffmpeg /extract-audio 500: Input too large: 4357276111 > 4294967296 (use rangeBytes for partial fetch)\\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\\n    at async VlogPipelineDO.alarm (index.js:974:11)\",\"started_at\":\"2026-05-20 19:17:03\"},{\"vlog_id\":\"01KRMX3YMQP7MRK5B91CVHJVPP\",\"original_filename\":\"DJI_20260408061037_0064_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 18:56:21\"},{\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"original_filename\":\"DJI_20260417202550_0030_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 18:56:21\"},{\"vlog_id\":\"01KRMW0NDKBZ8KA6H31BPG1EV4\",\"original_filename\":\"DJI_20260509183621_0063_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 18:56:20\"},{\"vlog_id\":\"01KRMTZZV46Y2A45E3507GSB56\",\"original_filename\":\"DJI_20260509155153_0058_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-20 18:56:20\"}],\"events\":[{\"id\":\"33bf5692-0bc1-4035-a66f-8da4e397bbcf\",\"vlog_id\":\"01KS6X2EVHBSA6KZZ6RSNR2W8G\",\"step\":\"transcribe\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-22 03:53:53\",\"completed_at\":\"2026-05-22 03:53:53\",\"duration_ms\":null,\"error_full_text\":\"audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KS6X2EVHBSA6KZZ6RSNR2W8G/mp3.full\\nError: audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KS6X2EVHBSA6KZZ6RSNR2W8G/mp3.full\\n    at VlogPipelineDO.stepTranscribe (index.js:1237:23)\\n    at async VlogPipelineDO.alarm (index.js:999:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"c5749815-bf16-4d46-ae92-f9e946814cf6\",\"vlog_id\":\"01KRMS8JDH3J2BCZ7J74E91C1V\",\"step\":\"_internal_\",\"sub_step\":\"killed\",\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-21 10:01:43\",\"completed_at\":\"2026-05-21 10:01:43\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"reason\\\":\\\"admin_terminate_all\\\",\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"de99603b-6b3a-46b9-a634-78ada81356d3\",\"vlog_id\":\"01KRMN2K59RK97E1W8ETDQPNH6\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:58:21\",\"completed_at\":\"2026-05-20 20:58:21\",\"duration_ms\":null,\"error_full_text\":\"ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\\n  built with gcc 14.2.0 (Alpine 14.2.0)\\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\\n    at async VlogPipelineDO.alarm (index.js:1002:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"9ef802bd-536a-4fc4-9790-cf9d4902de87\",\"vlog_id\":\"01KRMQT21H0BV9MH4QC4YTGXBH\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:56:47\",\"completed_at\":\"2026-05-20 20:56:47\",\"duration_ms\":null,\"error_full_text\":\"ffmpeg /extract-audio 500: Input too large: 7874444010 > 4294967296 (use rangeBytes for partial fetch)\\nError: ffmpeg /extract-audio 500: Input too large: 7874444010 > 4294967296 (use rangeBytes for partial fetch)\\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\\n    at async VlogPipelineDO.alarm (index.js:1002:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"a3b3602a-19d9-47a8-85de-68c637f49384\",\"vlog_id\":\"01KRMTD478Q838RNEJ91GA3NXX\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:55:12\",\"completed_at\":\"2026-05-20 20:55:12\",\"duration_ms\":null,\"error_full_text\":\"ffmpeg /extract-audio 500: Input too large: 9123836054 > 4294967296 (use rangeBytes for partial fetch)\\nError: ffmpeg /extract-audio 500: Input too large: 9123836054 > 4294967296 (use rangeBytes for partial fetch)\\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\\n    at async VlogPipelineDO.alarm (index.js:1002:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"746cd0d5-2f0a-4ab3-8ad9-19acd63772a3\",\"vlog_id\":\"01KRMVE61EQZS44TD7CSB8GDVD\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:49:42\",\"completed_at\":\"2026-05-20 20:49:42\",\"duration_ms\":null,\"error_full_text\":\"ffmpeg /extract-audio 500: Fetch audio-in failed: HTTP 404\\nError: ffmpeg /extract-audio 500: Fetch audio-in failed: HTTP 404\\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\\n    at async VlogPipelineDO.alarm (index.js:1002:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"fce769c0-9a1f-4fdd-a43a-3ea0db4feee8\",\"vlog_id\":\"01KRMK33XQK2ARZ5W9ZYQTPYF5\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:48:06\",\"completed_at\":\"2026-05-20 20:48:06\",\"duration_ms\":null,\"error_full_text\":\"ffmpeg /extract-audio 500: Input too large: 4563281240 > 4294967296 (use rangeBytes for partial fetch)\\nError: ffmpeg /extract-audio 500: Input too large: 4563281240 > 4294967296 (use rangeBytes for partial fetch)\\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\\n    at async VlogPipelineDO.alarm (index.js:1002:11)\",\"detail_json\":\"{\\\"attempts\\\":3,\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"b2bb0c9f-b839-49b9-baaa-b1b2e81db1eb\",\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"step\":\"_internal_\",\"sub_step\":\"killed\",\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:43:39\",\"completed_at\":\"2026-05-20 20:43:39\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"reason\\\":\\\"admin_terminate_all\\\",\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"8dcf41ba-2b5f-4ec2-8bbf-fb8e3e52a708\",\"vlog_id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"step\":\"_internal_\",\"sub_step\":\"killed\",\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:42:35\",\"completed_at\":\"2026-05-20 20:42:35\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"reason\\\":\\\"admin_terminate_all\\\",\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1},{\"id\":\"09fa85ba-8f9f-44b2-888a-dde11d8f5e23\",\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"step\":\"_internal_\",\"sub_step\":\"killed\",\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-20 20:42:20\",\"completed_at\":\"2026-05-20 20:42:20\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"reason\\\":\\\"admin_terminate_all\\\",\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1}]}",
   "body_json": {
-    "error": "Unauthenticated"
+    "generated_at": "2026-05-30T16:57:30.792Z",
+    "operator_id": "01KRCXWYTRN0BYTR3452ZTSXXJ",
+    "filters": {
+      "limit": 10,
+      "status": "failed",
+      "step": null,
+      "vlog_id": null
+    },
+    "aggregates": {
+      "vlogs": {
+        "total": 299,
+        "complete": 299,
+        "failed": 0,
+        "processing": 0,
+        "archived": 0,
+        "has_transcoded": 0,
+        "has_thumb": 297
+      },
+      "events_by_step_status_24h": []
+    },
+    "ffmpeg": {
+      "ok": true,
+      "status": 200,
+      "latency_ms": 1168
+    },
+    "recent_failures": [
+      {
+        "vlog_id": "01KRMS8JDH3J2BCZ7J74E91C1V",
+        "original_filename": "DJI_20260509121839_0055_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-21 10:01:43"
+      },
+      {
+        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "original_filename": "DJI_20260417202550_0030_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:43:39"
+      },
+      {
+        "vlog_id": "01KRMNWSQRGP60YVTP4CJPZMFS",
+        "original_filename": "DJI_20260420184712_0036_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:42:35"
+      },
+      {
+        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
+        "original_filename": "DJI_20260509165949_0059_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:42:20"
+      },
+      {
+        "vlog_id": "01KRMVDQGMDETMRRE19GP1WQWP",
+        "original_filename": "DJI_20260509170511_0060_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:42:07"
+      },
+      {
+        "vlog_id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
+        "original_filename": "DJI_20260509183059_0062_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:41:43"
+      },
+      {
+        "vlog_id": "01KRMW0NDKBZ8KA6H31BPG1EV4",
+        "original_filename": "DJI_20260509183621_0063_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:41:04"
+      },
+      {
+        "vlog_id": "01KRMW6EC9K5J2N8BN6MN0YX07",
+        "original_filename": "DJI_20260509183641_0064_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:40:53"
+      },
+      {
+        "vlog_id": "01KRMW7V19YAQCV9R5FADF7CTT",
+        "original_filename": "DJI_20260510090112_0065_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:38:30"
+      },
+      {
+        "vlog_id": "01KRMW6EC9K5J2N8BN6MN0YX07",
+        "original_filename": "DJI_20260509183641_0064_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:24"
+      },
+      {
+        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
+        "original_filename": "DJI_20260509165949_0059_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:23"
+      },
+      {
+        "vlog_id": "01KRMVDQGMDETMRRE19GP1WQWP",
+        "original_filename": "DJI_20260509170511_0060_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:23"
+      },
+      {
+        "vlog_id": "01KRMW0NDKBZ8KA6H31BPG1EV4",
+        "original_filename": "DJI_20260509183621_0063_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:23"
+      },
+      {
+        "vlog_id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
+        "original_filename": "DJI_20260509183059_0062_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:23"
+      },
+      {
+        "vlog_id": "01KRMW7V19YAQCV9R5FADF7CTT",
+        "original_filename": "DJI_20260510090112_0065_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:22"
+      },
+      {
+        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "original_filename": "DJI_20260417202550_0030_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:37:22"
+      },
+      {
+        "vlog_id": "01KRMW8JT8JRR6VXABRRGCPQ5Q",
+        "original_filename": "DJI_20260510090157_0066_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 20:25:33"
+      },
+      {
+        "vlog_id": "01KRMW6EC9K5J2N8BN6MN0YX07",
+        "original_filename": "DJI_20260509183641_0064_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:44:55"
+      },
+      {
+        "vlog_id": "01KRMVDQGMDETMRRE19GP1WQWP",
+        "original_filename": "DJI_20260509170511_0060_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:40:02"
+      },
+      {
+        "vlog_id": "01KRMNWSQRGP60YVTP4CJPZMFS",
+        "original_filename": "DJI_20260420184712_0036_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ENOSPC: no space left on device, write\nError: ffmpeg /extract-audio 500: ENOSPC: no space left on device, write\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:37:25"
+      },
+      {
+        "vlog_id": "01KRMW7V19YAQCV9R5FADF7CTT",
+        "original_filename": "DJI_20260510090112_0065_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:36:35"
+      },
+      {
+        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "original_filename": "DJI_20260417202550_0030_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:35:28"
+      },
+      {
+        "vlog_id": "01KRMW0NDKBZ8KA6H31BPG1EV4",
+        "original_filename": "DJI_20260509183621_0063_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:34:40"
+      },
+      {
+        "vlog_id": "01KRMW8JT8JRR6VXABRRGCPQ5Q",
+        "original_filename": "DJI_20260510090157_0066_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:34:09"
+      },
+      {
+        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
+        "original_filename": "DJI_20260509165949_0059_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:21:08"
+      },
+      {
+        "vlog_id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
+        "original_filename": "DJI_20260509183059_0062_D.MP4",
+        "step": "audio_extract",
+        "error_full_text": "ffmpeg /extract-audio 500: Input too large: 4357276111 > 4294967296 (use rangeBytes for partial fetch)\nError: ffmpeg /extract-audio 500: Input too large: 4357276111 > 4294967296 (use rangeBytes for partial fetch)\n    at VlogPipelineDO.stepAudioExtract (index.js:1098:15)\n    at async VlogPipelineDO.alarm (index.js:974:11)",
+        "started_at": "2026-05-20 19:17:03"
+      },
+      {
+        "vlog_id": "01KRMX3YMQP7MRK5B91CVHJVPP",
+        "original_filename": "DJI_20260408061037_0064_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 18:56:21"
+      },
+      {
+        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "original_filename": "DJI_20260417202550_0030_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 18:56:21"
+      },
+      {
+        "vlog_id": "01KRMW0NDKBZ8KA6H31BPG1EV4",
+        "original_filename": "DJI_20260509183621_0063_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 18:56:20"
+      },
+      {
+        "vlog_id": "01KRMTZZV46Y2A45E3507GSB56",
+        "original_filename": "DJI_20260509155153_0058_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-20 18:56:20"
+      }
+    ],
+    "events": [
+      {
+        "id": "33bf5692-0bc1-4035-a66f-8da4e397bbcf",
+        "vlog_id": "01KS6X2EVHBSA6KZZ6RSNR2W8G",
+        "step": "transcribe",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-22 03:53:53",
+        "completed_at": "2026-05-22 03:53:53",
+        "duration_ms": null,
+        "error_full_text": "audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KS6X2EVHBSA6KZZ6RSNR2W8G/mp3.full\nError: audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KS6X2EVHBSA6KZZ6RSNR2W8G/mp3.full\n    at VlogPipelineDO.stepTranscribe (index.js:1237:23)\n    at async VlogPipelineDO.alarm (index.js:999:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "c5749815-bf16-4d46-ae92-f9e946814cf6",
+        "vlog_id": "01KRMS8JDH3J2BCZ7J74E91C1V",
+        "step": "_internal_",
+        "sub_step": "killed",
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-21 10:01:43",
+        "completed_at": "2026-05-21 10:01:43",
+        "duration_ms": null,
+        "error_full_text": null,
+        "detail_json": "{\"reason\":\"admin_terminate_all\",\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "de99603b-6b3a-46b9-a634-78ada81356d3",
+        "vlog_id": "01KRMN2K59RK97E1W8ETDQPNH6",
+        "step": "audio_extract",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:58:21",
+        "completed_at": "2026-05-20 20:58:21",
+        "duration_ms": null,
+        "error_full_text": "ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\nError: ffmpeg /extract-audio 500: ffmpeg /extract-audio failed across 5 strategies. Last (copy): ffmpeg exit 234: ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\n  built with gcc 14.2.0 (Alpine 14.2.0)\n  configuration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharf\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\n    at async VlogPipelineDO.alarm (index.js:1002:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "9ef802bd-536a-4fc4-9790-cf9d4902de87",
+        "vlog_id": "01KRMQT21H0BV9MH4QC4YTGXBH",
+        "step": "audio_extract",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:56:47",
+        "completed_at": "2026-05-20 20:56:47",
+        "duration_ms": null,
+        "error_full_text": "ffmpeg /extract-audio 500: Input too large: 7874444010 > 4294967296 (use rangeBytes for partial fetch)\nError: ffmpeg /extract-audio 500: Input too large: 7874444010 > 4294967296 (use rangeBytes for partial fetch)\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\n    at async VlogPipelineDO.alarm (index.js:1002:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "a3b3602a-19d9-47a8-85de-68c637f49384",
+        "vlog_id": "01KRMTD478Q838RNEJ91GA3NXX",
+        "step": "audio_extract",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:55:12",
+        "completed_at": "2026-05-20 20:55:12",
+        "duration_ms": null,
+        "error_full_text": "ffmpeg /extract-audio 500: Input too large: 9123836054 > 4294967296 (use rangeBytes for partial fetch)\nError: ffmpeg /extract-audio 500: Input too large: 9123836054 > 4294967296 (use rangeBytes for partial fetch)\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\n    at async VlogPipelineDO.alarm (index.js:1002:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "746cd0d5-2f0a-4ab3-8ad9-19acd63772a3",
+        "vlog_id": "01KRMVE61EQZS44TD7CSB8GDVD",
+        "step": "audio_extract",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:49:42",
+        "completed_at": "2026-05-20 20:49:42",
+        "duration_ms": null,
+        "error_full_text": "ffmpeg /extract-audio 500: Fetch audio-in failed: HTTP 404\nError: ffmpeg /extract-audio 500: Fetch audio-in failed: HTTP 404\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\n    at async VlogPipelineDO.alarm (index.js:1002:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "fce769c0-9a1f-4fdd-a43a-3ea0db4feee8",
+        "vlog_id": "01KRMK33XQK2ARZ5W9ZYQTPYF5",
+        "step": "audio_extract",
+        "sub_step": null,
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:48:06",
+        "completed_at": "2026-05-20 20:48:06",
+        "duration_ms": null,
+        "error_full_text": "ffmpeg /extract-audio 500: Input too large: 4563281240 > 4294967296 (use rangeBytes for partial fetch)\nError: ffmpeg /extract-audio 500: Input too large: 4563281240 > 4294967296 (use rangeBytes for partial fetch)\n    at VlogPipelineDO.stepAudioExtract (index.js:1126:15)\n    at async VlogPipelineDO.alarm (index.js:1002:11)",
+        "detail_json": "{\"attempts\":3,\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "b2bb0c9f-b839-49b9-baaa-b1b2e81db1eb",
+        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "step": "_internal_",
+        "sub_step": "killed",
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:43:39",
+        "completed_at": "2026-05-20 20:43:39",
+        "duration_ms": null,
+        "error_full_text": null,
+        "detail_json": "{\"reason\":\"admin_terminate_all\",\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "8dcf41ba-2b5f-4ec2-8bbf-fb8e3e52a708",
+        "vlog_id": "01KRMNWSQRGP60YVTP4CJPZMFS",
+        "step": "_internal_",
+        "sub_step": "killed",
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:42:35",
+        "completed_at": "2026-05-20 20:42:35",
+        "duration_ms": null,
+        "error_full_text": null,
+        "detail_json": "{\"reason\":\"admin_terminate_all\",\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      },
+      {
+        "id": "09fa85ba-8f9f-44b2-888a-dde11d8f5e23",
+        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
+        "step": "_internal_",
+        "sub_step": "killed",
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-20 20:42:20",
+        "completed_at": "2026-05-20 20:42:20",
+        "duration_ms": null,
+        "error_full_text": null,
+        "detail_json": "{\"reason\":\"admin_terminate_all\",\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      }
+    ]
   }
 }
