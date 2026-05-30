@@ -53,9 +53,10 @@ jobs:
           echo "→ $method $BASE_URL$path"
 
           mkdir -p ops/probe
-          # Capture body + HTTP status. -s silent, -S show errors, -w status.
+          # Capture body + HTTP status + response headers. -s silent, -S show
+          # errors, -w status, -D dumps headers (to diagnose Access 302s).
           if [ "$method" = "GET" ]; then
-            http_code=$(curl -s -S -o ops/probe/_body.txt -w "%{http_code}" \
+            http_code=$(curl -s -S -o ops/probe/_body.txt -D ops/probe/_headers.txt -w "%{http_code}" \
               --max-time 300 \
               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
               -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
@@ -66,7 +67,7 @@ jobs:
               jq -c '.body' "$REQ" > ops/probe/_reqbody.json
               body_arg=(--data @ops/probe/_reqbody.json -H "Content-Type: application/json")
             fi
-            http_code=$(curl -s -S -o ops/probe/_body.txt -w "%{http_code}" \
+            http_code=$(curl -s -S -o ops/probe/_body.txt -D ops/probe/_headers.txt -w "%{http_code}" \
               --max-time 300 \
               -X "$method" \
               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
@@ -76,6 +77,8 @@ jobs:
           fi
 
           echo "← HTTP $http_code"
+          # Pull the Access-relevant response headers for diagnosis.
+          access_headers=$(grep -iE '^(location|cf-access|cf-ray|x-deny|set-cookie):' ops/probe/_headers.txt | sed 's/[Ss]et-[Cc]ookie:.*/set-cookie: <redacted>/' | tr '\n' '|' || echo "")
 
           # Build response.json: status + the raw body (string), plus parsed
           # JSON if the body is valid JSON.
@@ -85,17 +88,19 @@ jobs:
             --arg path "$path" \
             --arg method "$method" \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg ah "$access_headers" \
             --rawfile body ops/probe/_body.txt \
             '{
               requested_at: $ts,
               method: $method,
               path: $path,
               http_status: ($status | tonumber),
+              access_headers: $ah,
               body: $body,
               body_json: (try ($body | fromjson) catch null)
             }' > ops/probe/response.json
 
-          rm -f ops/probe/_body.txt ops/probe/_reqbody.json
+          rm -f ops/probe/_body.txt ops/probe/_reqbody.json ops/probe/_headers.txt
 
       - name: Commit response
         run: |
