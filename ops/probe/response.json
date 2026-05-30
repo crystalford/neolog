@@ -1,8 +1,11 @@
 {
-  "requested_at": "2026-05-30T16:41:59Z",
+  "requested_at": "2026-05-30T16:51:27Z",
   "method": "GET",
   "path": "/api/v2/admin/runtime-state?status=failed&step=transcode&limit_events=20",
-  "http_status": 302,
-  "body": "<html>\r\n<head><title>302 Found</title></head>\r\n<body>\r\n<center><h1>302 Found</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
-  "body_json": null
+  "http_status": 401,
+  "access_headers": "set-cookie: <redacted>|cf-ray: a03f3e5e5e0ab266-ORD\r|",
+  "body": "{\"error\":\"Unauthenticated\"}",
+  "body_json": {
+    "error": "Unauthenticated"
+  }
 }
