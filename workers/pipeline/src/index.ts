@@ -87,6 +87,17 @@ const MAX_SNAPSHOT_EVENTS = 200
 type StepKey = 'audio_extract' | 'transcribe' | 'extract' | 'transcode'
 const STEPS: StepKey[] = ['audio_extract', 'transcribe', 'extract', 'transcode']
 
+// Sentinel thrown by ffmpeg steps when the gate is full. The alarm catch
+// treats it as "wait politely" — reschedule WITHOUT counting a retry attempt
+// or failing the vlog. This is what makes a 270-vlog backfill self-pace to
+// the gate's concurrency instead of bursting it.
+const GATE_BUSY = 'GATE_BUSY'
+// How long a gate-busy DO sleeps before re-checking for a free slot. Jittered
+// so hundreds of waiting DOs don't re-poll in lock-step.
+function gateBusyBackoffMs(): number {
+  return 8_000 + Math.floor(Math.random() * 12_000) // 8–20s
+}
+
 const MAX_ATTEMPTS: Record<StepKey, number> = {
   audio_extract: 3,
   transcribe: 3,
@@ -541,6 +552,12 @@ export class VlogPipelineDO {
       await this.advance(pointer)
       await this.state.storage.setAlarm(Date.now() + 50)
     } catch (e: any) {
+      // Gate full → not a failure. Reschedule and re-check for a free slot
+      // without consuming a retry attempt or touching the vlog's state.
+      if (e?.message === GATE_BUSY) {
+        await this.state.storage.setAlarm(Date.now() + gateBusyBackoffMs())
+        return
+      }
       const fullErr = `${e?.message ?? e}\n${e?.stack ?? ''}`
       const max = MAX_ATTEMPTS[pointer]
       if (attempt < max) {
