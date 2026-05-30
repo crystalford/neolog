@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/admin/runtime-state?status=failed&limit_events=10", "nonce": "1780160240" }
+{ "method": "POST", "path": "/api/v2/admin/transcode-one", "body": { "vlog_id": "01KS6X10STVFS3MD4CQ777B53Z" }, "nonce": "1780160300" }
