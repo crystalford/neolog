@@ -1,9 +1,17 @@
 {
-  "requested_at": "2026-05-30T22:57:44Z",
+  "requested_at": "2026-05-30T23:03:01Z",
   "method": "POST",
   "path": "/api/v2/admin/transcode-backfill",
-  "http_status": 524,
-  "access_headers": "cf-ray: a04153df3e02eabc-ORD\r|",
-  "body": "error code: 524",
-  "body_json": null
+  "http_status": 200,
+  "access_headers": "set-cookie: <redacted>|cf-ray: a0415e59ea1a9167-IAD\r|",
+  "body": "{\"ok\":true,\"matched\":288,\"dispatched\":272,\"oversized_skipped\":16,\"dispatch_failed\":0,\"errors\":[],\"note\":\"Transcodes run async in the pipeline DOs. Poll runtime-state.has_transcoded for progress.\"}",
+  "body_json": {
+    "ok": true,
+    "matched": 288,
+    "dispatched": 272,
+    "oversized_skipped": 16,
+    "dispatch_failed": 0,
+    "errors": [],
+    "note": "Transcodes run async in the pipeline DOs. Poll runtime-state.has_transcoded for progress."
+  }
 }
