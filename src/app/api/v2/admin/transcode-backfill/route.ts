@@ -67,39 +67,36 @@ export async function POST(req: NextRequest) {
     operator.id, limit,
   )
 
+  const PIPELINE = env.PIPELINE
+  const HEARTBEAT = env.HEARTBEAT_TOKEN
+
+  const candidates = rows.filter(v => v.file_size_bytes == null || v.file_size_bytes <= maxBytes)
+  const oversized = rows.length - candidates.length
+
   let dispatched = 0
-  let oversized = 0
   let failed = 0
   const errors: string[] = []
 
-  for (const v of rows) {
-    if (v.file_size_bytes != null && v.file_size_bytes > maxBytes) {
-      oversized += 1
-      continue
-    }
-    try {
-      const res = await env.PIPELINE.fetch(`https://internal/reextract/${v.id}`, {
+  // Dispatch in PARALLEL chunks. Each reextract POST returns fast
+  // ('scheduled'), but 400 sequential awaits blew the edge timeout (524).
+  // Chunks of 25 keep concurrency sane against the DO namespace.
+  const CHUNK = 25
+  for (let i = 0; i < candidates.length; i += CHUNK) {
+    const slice = candidates.slice(i, i + CHUNK)
+    const results = await Promise.allSettled(slice.map(v =>
+      PIPELINE.fetch(`https://internal/reextract/${v.id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
-        },
-        body: JSON.stringify({
-          vlog_id: v.id,
-          operator_id: operator.id,
-          pointer: 'transcode',
-          force: false,
-        }),
-      })
-      if (res.ok) {
-        dispatched += 1
-      } else {
-        failed += 1
-        if (errors.length < 5) errors.push(`${v.id}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`)
-      }
-    } catch (err: any) {
-      failed += 1
-      if (errors.length < 5) errors.push(`${v.id}: ${err?.message || String(err)}`)
+        headers: { 'Content-Type': 'application/json', 'X-Heartbeat-Token': HEARTBEAT },
+        body: JSON.stringify({ vlog_id: v.id, operator_id: operator.id, pointer: 'transcode', force: false }),
+      }).then(async res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 100)}`)
+        return true
+      }),
+    ))
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j]
+      if (r.status === 'fulfilled') dispatched += 1
+      else { failed += 1; if (errors.length < 5) errors.push(`${slice[j].id}: ${r.reason?.message || r.reason}`) }
     }
   }
 
