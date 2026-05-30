@@ -84,8 +84,8 @@ export interface Env {
 const WORKER_VERSION = 'pipeline-do-2026-05-18'
 const MAX_SNAPSHOT_EVENTS = 200
 
-type StepKey = 'audio_extract' | 'transcribe' | 'extract'
-const STEPS: StepKey[] = ['audio_extract', 'transcribe', 'extract']
+type StepKey = 'audio_extract' | 'transcribe' | 'extract' | 'transcode'
+const STEPS: StepKey[] = ['audio_extract', 'transcribe', 'extract', 'transcode']
 
 const MAX_ATTEMPTS: Record<StepKey, number> = {
   audio_extract: 3,
@@ -97,6 +97,10 @@ const MAX_ATTEMPTS: Record<StepKey, number> = {
   // vlog before marking failed_terminal. With concurrency 1-2 in bulk,
   // that's enough to ride out most quota recovery windows.
   extract: 5,
+  // Transcode is best-effort browser-playback H.264. 2 attempts; on terminal
+  // failure the pipeline advances anyway (see the alarm catch block) — a
+  // failed transcode must never mark an already-extracted vlog as failed.
+  transcode: 2,
 }
 
 function backoffMs(attempt: number): number {
@@ -428,6 +432,7 @@ export class VlogPipelineDO {
       await this.state.storage.put('force_audio_extract', false)
       await this.state.storage.put('force_transcribe', false)
       await this.state.storage.put('force_extract', false)
+      await this.state.storage.put('force_transcode', false)
       await this.clearAttempts()
       await this.state.storage.setAlarm(Date.now() + 100)
       return new Response('started')
@@ -527,6 +532,7 @@ export class VlogPipelineDO {
         case 'audio_extract': await this.stepAudioExtract(vlog); break
         case 'transcribe': await this.stepTranscribe(vlog); break
         case 'extract': await this.stepExtract(vlog, mode); break
+        case 'transcode': await this.stepTranscode(vlog); break
       }
       const ms = Date.now() - t0
       await this.recordEvent(vlog_id, pointer, 'ok', null, { duration_ms: ms })
@@ -543,6 +549,15 @@ export class VlogPipelineDO {
         await this.recordEvent(vlog_id, pointer, 'retrying', null,
           { attempt, next_in_ms: wait }, fullErr)
         await this.state.storage.setAlarm(Date.now() + wait)
+      } else if (pointer === 'transcode') {
+        // Soft step: transcode is best-effort browser playback. A terminal
+        // failure (large file, codec quirk) must NOT mark the vlog failed —
+        // audio/transcribe/extract already succeeded. Record the failure and
+        // advance, which (transcode being last) marks the vlog ready.
+        await this.recordEvent(vlog_id, pointer, 'failed_terminal', null,
+          { attempts: attempt, soft: true }, fullErr)
+        await this.advance(pointer)
+        await this.state.storage.setAlarm(Date.now() + 50)
       } else {
         await this.recordEvent(vlog_id, pointer, 'failed_terminal', null,
           { attempts: attempt }, fullErr)
@@ -701,6 +716,98 @@ export class VlogPipelineDO {
           })
         } catch (err: any) {
           console.warn(`[stepAudioExtract] ffmpeg-gate /release failed: ${err?.message || err}`)
+        }
+      }
+    }
+  }
+
+  /**
+   * transcode: produce a browser-playable H.264 MP4 from the source video and
+   * store it at {operator}/transcoded/{vlog_id}.mp4, setting
+   * vlogs.transcoded_r2_key. Last pipeline step, soft-failing — Chrome on
+   * Windows can't decode the raw HEVC originals, so without this the vlog
+   * detail player falls back to the original and shows audio-only.
+   *
+   * Mirrors stepAudioExtract's FFmpeg-gate discipline so we don't burst the
+   * container pool.
+   */
+  private async stepTranscode(vlog: VlogRow): Promise<void> {
+    if (!vlog.mime_type.startsWith('video/')) {
+      await this.recordEvent(vlog.id, 'transcode', 'skipped', 'not_video',
+        { reason: 'source is audio/*' })
+      return
+    }
+    if (vlog.transcoded_r2_key) {
+      await this.recordEvent(vlog.id, 'transcode', 'skipped', 'already_transcoded', {})
+      return
+    }
+
+    const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
+
+    const gateStub = this.env.FFMPEG_GATE.get(
+      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-singleton')
+    )
+    const acquireStart = Date.now()
+    let gateToken: string | null = null
+    try {
+      const gateRes = await gateStub.fetch('https://gate/acquire', { method: 'POST' })
+      if (gateRes.ok) {
+        const env = await gateRes.json() as any
+        gateToken = env.token ?? null
+        await this.recordEvent(vlog.id, 'transcode', 'running', 'ffmpeg_gate_acquired',
+          { wait_ms: Date.now() - acquireStart, in_flight: env.in_flight, waiting: env.waiting })
+      } else {
+        console.warn(`[stepTranscode] ffmpeg-gate /acquire failed: ${gateRes.status}`)
+      }
+    } catch (err: any) {
+      console.warn(`[stepTranscode] ffmpeg-gate /acquire threw: ${err?.message || err}`)
+    }
+
+    try {
+      await this.recordEvent(vlog.id, 'transcode', 'running', 'invoke_ffmpeg',
+        { source_key: vlog.r2_key })
+
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), 10 * 60 * 1000) // 10 min cap
+      let resp: Response
+      try {
+        resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/transcode-h264', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input_url: inputUrl }),
+          signal: ctl.signal,
+        } as RequestInit)
+      } catch (err: any) {
+        clearTimeout(timer)
+        throw new Error(`ffmpeg /transcode-h264 fetch failed: ${err?.message || err}`)
+      }
+      clearTimeout(timer)
+      if (!resp.ok) {
+        const errBody = (await resp.text()).slice(0, 500)
+        throw new Error(`ffmpeg /transcode-h264 ${resp.status}: ${errBody}`)
+      }
+
+      const mp4 = new Uint8Array(await resp.arrayBuffer())
+      if (mp4.byteLength < 1024) {
+        throw new Error(`transcode produced suspiciously small output: ${mp4.byteLength}B`)
+      }
+      const key = `${vlog.operator_id}/transcoded/${vlog.id}.mp4`
+      await this.env.VIDEOS.put(key, mp4, { httpMetadata: { contentType: 'video/mp4' } })
+      await this.env.DB.prepare(
+        `UPDATE vlogs SET transcoded_r2_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      ).bind(key, vlog.id).run()
+      await this.recordEvent(vlog.id, 'transcode', 'running', 'upload_r2',
+        { r2_key: key, bytes: mp4.byteLength })
+    } finally {
+      if (gateToken !== null) {
+        try {
+          await gateStub.fetch('https://gate/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: gateToken }),
+          })
+        } catch (err: any) {
+          console.warn(`[stepTranscode] ffmpeg-gate /release failed: ${err?.message || err}`)
         }
       }
     }
@@ -1215,6 +1322,14 @@ export class VlogPipelineDO {
       ).bind(vlog.id).first<{ one: number }>()
       return Boolean(row)
     }
+    if (step === 'transcode') {
+      // Skip if already transcoded (column set) or the H.264 file is in R2.
+      if (vlog.transcoded_r2_key) return true
+      if (!vlog.mime_type.startsWith('video/')) return true // audio source: nothing to transcode
+      const key = `${vlog.operator_id}/transcoded/${vlog.id}.mp4`
+      const head = await this.env.VIDEOS.head(key)
+      return head != null
+    }
     return false
   }
 
@@ -1626,6 +1741,7 @@ function stateForStep(step: StepKey): string {
     case 'audio_extract': return 'processing'
     case 'transcribe': return 'processing'
     case 'extract': return 'extracting'
+    case 'transcode': return 'processing'
   }
 }
 
