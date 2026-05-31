@@ -1,0 +1,158 @@
+name: Neolog runner thumbnails
+
+# Generates missing thumbnails on the GitHub runner. Mirrors the transcode
+# runner pattern (download → ffmpeg → upload → confirm) but produces a
+# single JPEG instead of an MP4. Source is the H.264 transcode when present
+# (rotation-clean, always decodes); falls back to the original.
+
+on:
+  push:
+    branches: [claude/integrate-filament-update-XWb1v]
+    paths:
+      - 'ops/runner-thumbs/run.json'
+  workflow_dispatch:
+    inputs:
+      limit:        { description: 'Max vlogs this run', default: '300' }
+      max_size_mb:  { description: 'Skip files larger than this (MB)', default: '4000' }
+
+permissions:
+  contents: write
+
+jobs:
+  thumbs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    env:
+      CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      BASE_URL: https://neolog.ai
+      SHARD: ${{ matrix.shard }}
+      SHARD_COUNT: '10'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/integrate-filament-update-XWb1v
+
+      - name: Ensure ffmpeg
+        run: ffmpeg -version >/dev/null 2>&1 || sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Resolve params
+        id: p
+        run: |
+          set -e
+          lim="${{ github.event.inputs.limit }}"; cap="${{ github.event.inputs.max_size_mb }}"
+          if [ -f ops/runner-thumbs/run.json ]; then
+            j=$(cat ops/runner-thumbs/run.json)
+            [ -z "$lim" ] && lim=$(echo "$j" | jq -r '.limit // empty')
+            [ -z "$cap" ] && cap=$(echo "$j" | jq -r '.max_size_mb // empty')
+          fi
+          [ -z "$lim" ] && lim=300
+          [ -z "$cap" ] && cap=4000
+          echo "limit=$lim" >> "$GITHUB_OUTPUT"
+          echo "cap=$cap" >> "$GITHUB_OUTPUT"
+
+      - name: Thumbnail loop
+        run: |
+          set -e
+          LIM=${{ steps.p.outputs.limit }}; CAP=${{ steps.p.outputs.cap }}
+          ACCESS=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          mkdir -p ops/runner-thumbs work
+
+          curl -s -S "${ACCESS[@]}" --max-time 60 "$BASE_URL/api/v2/admin/playback-audit?limit=300" > /tmp/audit.json
+
+          # Missing thumbnails, video mime, size cap.
+          jq -r --argjson cap "$CAP" '
+            .vlogs[]
+            | select(.thumbnail_r2_key == null)
+            | select((.mime_type // "") | startswith("video/"))
+            | select((.file_size_mb // 0) <= $cap)
+            | "\(.id)\t\(.file_size_mb)"
+          ' /tmp/audit.json > /tmp/all.tsv || true
+
+          : > /tmp/todo.tsv
+          while IFS=$'\t' read -r id size; do
+            [ -z "$id" ] && continue
+            h=$(printf '%s' "$id" | cksum | cut -d' ' -f1)
+            if [ $(( h % SHARD_COUNT )) -eq "$SHARD" ]; then
+              printf '%s\t%s\n' "$id" "$size" >> /tmp/todo.tsv
+            fi
+          done < /tmp/all.tsv
+          head -n "$LIM" /tmp/todo.tsv > /tmp/todo2.tsv && mv /tmp/todo2.tsv /tmp/todo.tsv
+
+          total=$(wc -l < /tmp/todo.tsv | tr -d ' ')
+          echo "Shard $SHARD/$SHARD_COUNT — to thumb this run: $total"
+
+          ok=0; fail=0; n=0
+          : > /tmp/results.ndjson
+          while IFS=$'\t' read -r id size; do
+            [ -z "$id" ] && continue
+            n=$((n+1))
+            echo "::group::[$n/$total] thumb $id (${size}MB)"
+            rm -f work/in work/thumb.jpg
+
+            urls=$(curl -s -S "${ACCESS[@]}" --max-time 60 "$BASE_URL/api/v2/admin/thumb-broker?vlog_id=$id")
+            if [ "$(echo "$urls" | jq -r '.skip // false')" = "true" ]; then
+              echo "skip: $(echo "$urls" | jq -r '.reason')"; echo "::endgroup::"; continue
+            fi
+            get_url=$(echo "$urls" | jq -r '.get_url'); put_url=$(echo "$urls" | jq -r '.put_url'); key=$(echo "$urls" | jq -r '.thumbnail_key'); source=$(echo "$urls" | jq -r '.source')
+            if [ -z "$get_url" ] || [ "$get_url" = "null" ]; then
+              echo "no urls: $urls"; fail=$((fail+1)); echo "::endgroup::"; continue
+            fi
+
+            if ! curl -s -S --max-time 1200 -o work/in "$get_url"; then
+              echo "download failed"; fail=$((fail+1)); echo "::endgroup::"; continue
+            fi
+
+            # Single frame at t=1s, 1280-wide, q=4 (good quality compact JPEG).
+            # -noautorotate stops ffmpeg from re-applying matroska/mov rotation
+            # tags that already got baked into the H.264 transcode.
+            if ! ffmpeg -y -nostdin -noautorotate -ss 1 -i work/in -frames:v 1 -q:v 4 -vf "scale='min(1280,iw)':-2" work/thumb.jpg 2> work/ff.log; then
+              # Some originals don't have a decodable frame at t=1; retry from the start.
+              if ! ffmpeg -y -nostdin -noautorotate -i work/in -frames:v 1 -q:v 4 -vf "scale='min(1280,iw)':-2" work/thumb.jpg 2>> work/ff.log; then
+                echo "ffmpeg failed:"; tail -5 work/ff.log; fail=$((fail+1))
+                jq -nc --arg id "$id" --arg err "$(tail -3 work/ff.log | tr '\n' ' ')" '{id:$id, ok:false, stage:"ffmpeg", err:$err}' >> /tmp/results.ndjson
+                echo "::endgroup::"; continue
+              fi
+            fi
+
+            bytes=$(stat -c%s work/thumb.jpg)
+            if ! curl -s -S --max-time 120 -T work/thumb.jpg -H "Content-Type: image/jpeg" "$put_url" -o /dev/null; then
+              echo "upload failed"; fail=$((fail+1)); echo "::endgroup::"; continue
+            fi
+
+            conf=$(curl -s -S "${ACCESS[@]}" --max-time 60 -X POST -H "Content-Type: application/json" \
+                   --data "{\"vlog_id\":\"$id\",\"thumbnail_key\":\"$key\"}" \
+                   "$BASE_URL/api/v2/admin/thumb-broker")
+            if [ "$(echo "$conf" | jq -r '.ok // false')" = "true" ]; then
+              ok=$((ok+1)); echo "✓ ok ($bytes B from $source)"
+              jq -nc --arg id "$id" --argjson b "$bytes" '{id:$id, ok:true, bytes:$b}' >> /tmp/results.ndjson
+            else
+              fail=$((fail+1)); echo "confirm failed: $conf"
+              jq -nc --arg id "$id" --arg err "$conf" '{id:$id, ok:false, stage:"confirm", err:$err}' >> /tmp/results.ndjson
+            fi
+            echo "::endgroup::"
+          done < /tmp/todo.tsv
+
+          mkdir -p ops/runner-thumbs
+          jq -s --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson shard "$SHARD" --argjson processed "$n" --argjson okc "$ok" --argjson failc "$fail" \
+            '{ran_at:$ts, shard:$shard, processed:$processed, succeeded:$okc, failed:$failc, results:.}' \
+            /tmp/results.ndjson > "ops/runner-thumbs/report-${SHARD}.json"
+          echo "Shard $SHARD done: processed=$n ok=$ok fail=$fail"
+
+      - name: Commit report
+        if: always()
+        run: |
+          set -e
+          git config user.name  "neolog-runner-bot"; git config user.email "bot@neolog.ai"
+          git add "ops/runner-thumbs/report-${SHARD}.json" || true
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "runner-thumbs: shard ${SHARD} report [skip ci]"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            git pull --rebase origin claude/integrate-filament-update-XWb1v 2>/dev/null || true
+            if git push origin claude/integrate-filament-update-XWb1v 2>/dev/null; then echo "pushed on $attempt"; break; fi
+            sleep $((RANDOM % 8 + 2))
+          done
