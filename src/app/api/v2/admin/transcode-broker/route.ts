@@ -102,8 +102,8 @@ export async function POST(req: NextRequest) {
     getDb(env),
     `UPDATE vlogs
         SET transcoded_r2_key = ?,
-            pipeline_status = CASE WHEN pipeline_status = 'failed' THEN pipeline_status ELSE 'complete' END,
-            state = CASE WHEN state = 'failed' THEN state ELSE 'ready' END,
+            pipeline_status = CASE WHEN pipeline_status IN ('failed','archived') THEN pipeline_status ELSE 'complete' END,
+            state = CASE WHEN state IN ('failed','archived') THEN state ELSE 'ready' END,
             updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND operator_id = ?`,
     body.transcoded_key, body.vlog_id, operator.id,
