@@ -1,1 +1,1 @@
-{ "method": "POST", "path": "/api/v2/admin/terminate-all", "body": {}, "nonce": "1780189063" }
+{ "method": "POST", "path": "/api/v2/admin/reset-stuck-transcoding", "body": {}, "nonce": "1780189107" }
