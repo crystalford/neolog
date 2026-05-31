@@ -615,7 +615,7 @@ export class VlogPipelineDO {
     // rest. Caller holds the slot for the full FFmpeg call; gate
     // auto-releases after 15 min as crash recovery.
     const gateStub = this.env.FFMPEG_GATE.get(
-      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-singleton')
+      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-v2')
     )
     const acquireStart = Date.now()
     let gateToken: string | null = null
@@ -762,7 +762,7 @@ export class VlogPipelineDO {
     const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
 
     const gateStub = this.env.FFMPEG_GATE.get(
-      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-singleton')
+      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-v2')
     )
     const acquireStart = Date.now()
     let gateToken: string | null = null
