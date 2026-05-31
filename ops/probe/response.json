@@ -1,13 +1,291 @@
 {
-  "requested_at": "2026-05-31T00:58:38Z",
-  "method": "POST",
-  "path": "/api/v2/admin/reset-stuck-transcoding",
+  "requested_at": "2026-05-31T00:59:18Z",
+  "method": "GET",
+  "path": "/api/v2/admin/runtime-state?limit_events=1",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a0420800092bb9be-SEA\r|",
-  "body": "{\"ok\":true,\"reset\":234,\"still_not_complete\":0}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a04208fdda4122c8-ORD\r|",
+  "body": "{\"generated_at\":\"2026-05-31T00:59:18.652Z\",\"operator_id\":\"01KRCXWYTRN0BYTR3452ZTSXXJ\",\"filters\":{\"limit\":1,\"status\":null,\"step\":null,\"vlog_id\":null},\"aggregates\":{\"vlogs\":{\"total\":299,\"complete\":295,\"failed\":0,\"processing\":0,\"archived\":4,\"has_transcoded\":48,\"has_thumb\":297},\"events_by_step_status_24h\":[{\"step\":\"_internal_\",\"status\":\"failed\",\"n\":238},{\"step\":\"transcode\",\"status\":\"failed\",\"n\":1},{\"step\":\"transcode\",\"status\":\"ok\",\"n\":18},{\"step\":\"transcode\",\"status\":\"skipped\",\"n\":16},{\"step\":\"transcode\",\"status\":\"started\",\"n\":2279}]},\"ffmpeg\":{\"ok\":true,\"status\":200,\"latency_ms\":119},\"recent_failures\":[{\"vlog_id\":\"01KRMX1YJB24D4JR62Z8HBR33M\",\"original_filename\":\"DJI_20260401110554_0055_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRCXXEQSX69RTA7X2DTGBK00\",\"original_filename\":\"1774887251302_dji_mimo_20260223_103154_20260223102927_1772999260256_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRCXXESHZPP3HN1100SWXCPC\",\"original_filename\":\"1774887251308_dji_mimo_20260218_114322_20260218104230_1773003021337_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRMMP58C0V1CQM7B4DGD43AQ\",\"original_filename\":\"DJI_20260415105056_0023_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRCXXHGAEKQG1YCQ78G93SX0\",\"original_filename\":\"1774887251513_dji_export_20260216_175525_1771282525370_editor.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRMWZF92TQ63HHDV5C9Q05X3\",\"original_filename\":\"DJI_20260326104337_0044_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:17\"},{\"vlog_id\":\"01KRCXXJC7MZDD2ET2N32PXNVV\",\"original_filename\":\"1774887251613_dji_mimo_20260215_145606_20260215135543_1773004680528_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXH42KN5V84VSV8ACN3QH\",\"original_filename\":\"1774887251495_dji_mimo_20260216_200354_20260216190249_1773003713551_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXK1CCVSSBJAN9ZD652M1\",\"original_filename\":\"1777515433847_DJI_20260401110554_0055_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXFSEFZCT8642DY77E9PX\",\"original_filename\":\"1774887251341_dji_mimo_20260221_181940_20260221181532_1772999644056_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXJZG6RY3C88MZ770JM7Q\",\"original_filename\":\"1777515314432_DJI_20260314180848_0011_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXGP44X00J1GRHT9C2XGJ\",\"original_filename\":\"1774887251473_dji_mimo_20260218_105634_20260218095548_1773003335762_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRMWVCJWSMAZZPHN6B32TDBC\",\"original_filename\":\"DJI_20260314184434_0014_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRMWVJ7TMQEP451F1D2JW7TM\",\"original_filename\":\"DJI_20260314194655_0016_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXFWTRYZQGM7WSP2KNGZ9\",\"original_filename\":\"1774887251345_dji_mimo_20260220_153636_20260220153503_1772999894550_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRMWVF9N04DNDQWW9ZJ5DT0Q\",\"original_filename\":\"DJI_20260314192914_0015_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXX9MAKZA6VAMK17MTYXTH\",\"original_filename\":\"1774887112555_DJI_20260311082113_0012_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXF0SQ4NQNXEMT3VPG5AT\",\"original_filename\":\"1774887251314_dji_mimo_20260223_100122_20260223095958_1772999278857_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXGD67WTJZ8CM5AT4472X\",\"original_filename\":\"1774887251397_dji_mimo_20260218_120500_20260218110339_1773002948672_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXHQ7DKS6XBJR5FR0YN99\",\"original_filename\":\"1774887251525_dji_mimo_20260215_145532_20260215135513_1773004688634_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXEAQY0P8XQD6HKWB5G9M\",\"original_filename\":\"1774887251235_dji_mimo_20260223_142014_20260223141912_1772999160523_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXECT8CGRS41SJC6FD678\",\"original_filename\":\"1774887251252_dji_mimo_20260219_174212_20260219174158_1773000137105_slowmotion.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXAXGNQ4E9RJMR8MSRCFN\",\"original_filename\":\"1774887113427_DJI_20260313092039_0031_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXE3KZJH19CA2GHA8VEH3\",\"original_filename\":\"1774887250934_IMG_1703.MOV\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXB10R3DJ86SYEHJ0EBKE\",\"original_filename\":\"1774887113429_DJI_20260313085015_0026_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXJAF1YRQ44G2N0TN488H\",\"original_filename\":\"1774887251609_dji_mimo_20260215_143128_20260215133047_1773004803960_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXG43ZA6XQMR6FMNDX4DB\",\"original_filename\":\"1774887251368_dji_mimo_20260220_154328_20260220154137_1772999873517_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXHJ0ZS4PZADZNCC3WVW4\",\"original_filename\":\"1774887251516_dji_mimo_20260216_172728_20260216162620_1773003858594_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:16\"},{\"vlog_id\":\"01KRCXXH0EKCSRQKHVR1Y8AQJF\",\"original_filename\":\"1774887251490_dji_mimo_20260216_201350_20260216191242_1773003670170_video.mp4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:15\"},{\"vlog_id\":\"01KRCXXAC1EEHW7X6RA5ZBQSF3\",\"original_filename\":\"1774887113337_DJI_20260311074230_0008_D.MP4\",\"step\":\"_internal_\",\"error_full_text\":null,\"started_at\":\"2026-05-31 00:58:15\"}],\"events\":[{\"id\":\"98d7a5fd-abd8-415b-a46d-7157e179d12d\",\"vlog_id\":\"01KRMX1YJB24D4JR62Z8HBR33M\",\"step\":\"_internal_\",\"sub_step\":\"killed\",\"status\":\"failed\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-05-31 00:58:17\",\"completed_at\":\"2026-05-31 00:58:17\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"reason\\\":\\\"admin_terminate_all\\\",\\\"state\\\":\\\"failed_terminal\\\"}\",\"attempt\":1}]}",
   "body_json": {
-    "ok": true,
-    "reset": 234,
-    "still_not_complete": 0
+    "generated_at": "2026-05-31T00:59:18.652Z",
+    "operator_id": "01KRCXWYTRN0BYTR3452ZTSXXJ",
+    "filters": {
+      "limit": 1,
+      "status": null,
+      "step": null,
+      "vlog_id": null
+    },
+    "aggregates": {
+      "vlogs": {
+        "total": 299,
+        "complete": 295,
+        "failed": 0,
+        "processing": 0,
+        "archived": 4,
+        "has_transcoded": 48,
+        "has_thumb": 297
+      },
+      "events_by_step_status_24h": [
+        {
+          "step": "_internal_",
+          "status": "failed",
+          "n": 238
+        },
+        {
+          "step": "transcode",
+          "status": "failed",
+          "n": 1
+        },
+        {
+          "step": "transcode",
+          "status": "ok",
+          "n": 18
+        },
+        {
+          "step": "transcode",
+          "status": "skipped",
+          "n": 16
+        },
+        {
+          "step": "transcode",
+          "status": "started",
+          "n": 2279
+        }
+      ]
+    },
+    "ffmpeg": {
+      "ok": true,
+      "status": 200,
+      "latency_ms": 119
+    },
+    "recent_failures": [
+      {
+        "vlog_id": "01KRMX1YJB24D4JR62Z8HBR33M",
+        "original_filename": "DJI_20260401110554_0055_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRCXXEQSX69RTA7X2DTGBK00",
+        "original_filename": "1774887251302_dji_mimo_20260223_103154_20260223102927_1772999260256_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRCXXESHZPP3HN1100SWXCPC",
+        "original_filename": "1774887251308_dji_mimo_20260218_114322_20260218104230_1773003021337_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRMMP58C0V1CQM7B4DGD43AQ",
+        "original_filename": "DJI_20260415105056_0023_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRCXXHGAEKQG1YCQ78G93SX0",
+        "original_filename": "1774887251513_dji_export_20260216_175525_1771282525370_editor.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRMWZF92TQ63HHDV5C9Q05X3",
+        "original_filename": "DJI_20260326104337_0044_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:17"
+      },
+      {
+        "vlog_id": "01KRCXXJC7MZDD2ET2N32PXNVV",
+        "original_filename": "1774887251613_dji_mimo_20260215_145606_20260215135543_1773004680528_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXH42KN5V84VSV8ACN3QH",
+        "original_filename": "1774887251495_dji_mimo_20260216_200354_20260216190249_1773003713551_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXK1CCVSSBJAN9ZD652M1",
+        "original_filename": "1777515433847_DJI_20260401110554_0055_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXFSEFZCT8642DY77E9PX",
+        "original_filename": "1774887251341_dji_mimo_20260221_181940_20260221181532_1772999644056_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXJZG6RY3C88MZ770JM7Q",
+        "original_filename": "1777515314432_DJI_20260314180848_0011_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXGP44X00J1GRHT9C2XGJ",
+        "original_filename": "1774887251473_dji_mimo_20260218_105634_20260218095548_1773003335762_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRMWVCJWSMAZZPHN6B32TDBC",
+        "original_filename": "DJI_20260314184434_0014_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRMWVJ7TMQEP451F1D2JW7TM",
+        "original_filename": "DJI_20260314194655_0016_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXFWTRYZQGM7WSP2KNGZ9",
+        "original_filename": "1774887251345_dji_mimo_20260220_153636_20260220153503_1772999894550_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRMWVF9N04DNDQWW9ZJ5DT0Q",
+        "original_filename": "DJI_20260314192914_0015_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXX9MAKZA6VAMK17MTYXTH",
+        "original_filename": "1774887112555_DJI_20260311082113_0012_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXF0SQ4NQNXEMT3VPG5AT",
+        "original_filename": "1774887251314_dji_mimo_20260223_100122_20260223095958_1772999278857_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXGD67WTJZ8CM5AT4472X",
+        "original_filename": "1774887251397_dji_mimo_20260218_120500_20260218110339_1773002948672_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXHQ7DKS6XBJR5FR0YN99",
+        "original_filename": "1774887251525_dji_mimo_20260215_145532_20260215135513_1773004688634_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXEAQY0P8XQD6HKWB5G9M",
+        "original_filename": "1774887251235_dji_mimo_20260223_142014_20260223141912_1772999160523_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXECT8CGRS41SJC6FD678",
+        "original_filename": "1774887251252_dji_mimo_20260219_174212_20260219174158_1773000137105_slowmotion.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXAXGNQ4E9RJMR8MSRCFN",
+        "original_filename": "1774887113427_DJI_20260313092039_0031_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXE3KZJH19CA2GHA8VEH3",
+        "original_filename": "1774887250934_IMG_1703.MOV",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXB10R3DJ86SYEHJ0EBKE",
+        "original_filename": "1774887113429_DJI_20260313085015_0026_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXJAF1YRQ44G2N0TN488H",
+        "original_filename": "1774887251609_dji_mimo_20260215_143128_20260215133047_1773004803960_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXG43ZA6XQMR6FMNDX4DB",
+        "original_filename": "1774887251368_dji_mimo_20260220_154328_20260220154137_1772999873517_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXHJ0ZS4PZADZNCC3WVW4",
+        "original_filename": "1774887251516_dji_mimo_20260216_172728_20260216162620_1773003858594_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:16"
+      },
+      {
+        "vlog_id": "01KRCXXH0EKCSRQKHVR1Y8AQJF",
+        "original_filename": "1774887251490_dji_mimo_20260216_201350_20260216191242_1773003670170_video.mp4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:15"
+      },
+      {
+        "vlog_id": "01KRCXXAC1EEHW7X6RA5ZBQSF3",
+        "original_filename": "1774887113337_DJI_20260311074230_0008_D.MP4",
+        "step": "_internal_",
+        "error_full_text": null,
+        "started_at": "2026-05-31 00:58:15"
+      }
+    ],
+    "events": [
+      {
+        "id": "98d7a5fd-abd8-415b-a46d-7157e179d12d",
+        "vlog_id": "01KRMX1YJB24D4JR62Z8HBR33M",
+        "step": "_internal_",
+        "sub_step": "killed",
+        "status": "failed",
+        "runtime": "pipeline",
+        "worker_version": "pipeline-do-2026-05-18",
+        "request_id": null,
+        "started_at": "2026-05-31 00:58:17",
+        "completed_at": "2026-05-31 00:58:17",
+        "duration_ms": null,
+        "error_full_text": null,
+        "detail_json": "{\"reason\":\"admin_terminate_all\",\"state\":\"failed_terminal\"}",
+        "attempt": 1
+      }
+    ]
   }
 }
