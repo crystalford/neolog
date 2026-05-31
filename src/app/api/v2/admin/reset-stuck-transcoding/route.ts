@@ -32,6 +32,11 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDb(env)
+  // Restore already-extracted vlogs (real transcript content) to complete,
+  // regardless of whatever stuck/in-flight/archived label the wedged DO
+  // dispatch or a terminate-all left them in. The transcript-length guard
+  // preserves genuine silent b-roll (transcript_text='' from no-audio-skip)
+  // and never touches operator-archived imports (no active extraction_run).
   const res = await db.prepare(
     `UPDATE vlogs
         SET pipeline_status = 'complete',
@@ -41,7 +46,8 @@ export async function POST(req: NextRequest) {
             updated_at = CURRENT_TIMESTAMP
       WHERE operator_id = ?
         AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing')
+        AND pipeline_status IN ('transcoding','processing','extracting','transcribing','archived','uploaded')
+        AND LENGTH(COALESCE(transcript_text, '')) > 0
         AND EXISTS (SELECT 1 FROM extraction_runs r WHERE r.vlog_id = vlogs.id AND r.is_active = 1)`,
   ).bind(operator.id).run()
 
@@ -49,7 +55,8 @@ export async function POST(req: NextRequest) {
     db,
     `SELECT COUNT(*) AS c FROM vlogs
       WHERE operator_id = ? AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing')`,
+        AND pipeline_status IN ('transcoding','processing','extracting','transcribing')
+        AND LENGTH(COALESCE(transcript_text, '')) > 0`,
     operator.id,
   )
 
