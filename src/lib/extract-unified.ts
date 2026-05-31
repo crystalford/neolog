@@ -353,24 +353,19 @@ export async function runExtraction(
     })
   }
 
-  // Auto-escalate if cheap pass had too many ungrounded items
-  if (mode === 'auto' && first.failRate > 0.15) {
-    await progress('llm_escalate', {
-      state: 'running',
-      reason: `fail_rate ${first.failRate.toFixed(2)} > 0.15 threshold`,
-      from: initialModel,
-      to: 'sonnet-4.6',
-    })
-    const second = await runOne('sonnet-4.6')
-    return {
-      model: 'sonnet-4.6',
-      escalated_from: 'llama-3.3-70b-fp8-fast',
-      payload: second.payload,
-      total_items: second.total,
-      invalid_items: second.invalid,
-      fail_rate: second.failRate,
-    }
-  }
+  // Auto-escalation to Anthropic Sonnet is DISABLED — operator decision
+  // (CLAUDE.md: "we are trying to keep everything possible in house"). A
+  // weak Llama extraction now just lands as-is rather than triggering a
+  // paid Anthropic retry that hit an empty credit balance and broke the
+  // pipeline with `Your credit balance is too low to access the Anthropic
+  // API`. The 'premium' mode (explicit operator opt-in) still uses Sonnet
+  // directly, but no implicit escalation from 'auto'/'cheap'.
+  //
+  // Re-enable by topping up the Anthropic key + restoring the if-block
+  // below.
+  // if (mode === 'auto' && first.failRate > 0.15) {
+  //   ... Sonnet retry path ...
+  // }
 
   return {
     model: initialModel,
