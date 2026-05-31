@@ -1,21 +1,13 @@
 {
-  "requested_at": "2026-05-31T00:58:17Z",
+  "requested_at": "2026-05-31T00:58:38Z",
   "method": "POST",
-  "path": "/api/v2/admin/terminate-all",
+  "path": "/api/v2/admin/reset-stuck-transcoding",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a04206e1c846083f-IAD\r|",
-  "body": "{\"workflows\":{\"found\":0,\"terminated\":0,\"errors\":[]},\"dos\":{\"found\":238,\"terminated\":238,\"errors\":[]},\"dry_run\":false}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a0420800092bb9be-SEA\r|",
+  "body": "{\"ok\":true,\"reset\":234,\"still_not_complete\":0}",
   "body_json": {
-    "workflows": {
-      "found": 0,
-      "terminated": 0,
-      "errors": []
-    },
-    "dos": {
-      "found": 238,
-      "terminated": 238,
-      "errors": []
-    },
-    "dry_run": false
+    "ok": true,
+    "reset": 234,
+    "still_not_complete": 0
   }
 }
