@@ -93,9 +93,18 @@ export async function POST(req: NextRequest) {
   if (!head) return NextResponse.json({ error: 'transcoded object not found in R2' }, { status: 404 })
   if (head.size < 1024) return NextResponse.json({ error: `transcoded object too small: ${head.size}B` }, { status: 422 })
 
+  // Set the transcode key AND clear any stale 'transcoding' status left by
+  // the earlier (wedged) DO dispatch — these vlogs were already 'complete'
+  // (extraction done); only the H.264 was missing. Restore complete/ready so
+  // the UI stops showing a misleading "transcoding" label on a now-playable
+  // video. Never override a genuinely 'failed' row here.
   await run(
     getDb(env),
-    `UPDATE vlogs SET transcoded_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+    `UPDATE vlogs
+        SET transcoded_r2_key = ?,
+            pipeline_status = CASE WHEN pipeline_status = 'failed' THEN pipeline_status ELSE 'complete' END,
+            state = CASE WHEN state = 'failed' THEN state ELSE 'ready' END,
+            updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND operator_id = ?`,
     body.transcoded_key, body.vlog_id, operator.id,
   )

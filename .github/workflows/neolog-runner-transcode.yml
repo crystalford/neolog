@@ -22,18 +22,20 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: runner-transcode
-  cancel-in-progress: false
-
 jobs:
   transcode:
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
     env:
       CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       BASE_URL: https://neolog.ai
+      SHARD: ${{ matrix.shard }}
+      SHARD_COUNT: '6'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,10 +76,23 @@ jobs:
             | select((.mime_type // "") | startswith("video/"))
             | select((.file_size_mb // 0) <= $cap)
             | "\(.id)\t\(.file_size_mb)"
-          ' /tmp/audit.json | head -n "$LIM" > /tmp/todo.tsv || true
+          ' /tmp/audit.json > /tmp/all.tsv || true
+
+          # Keep only this shard's slice: stable partition by cksum(vlog_id) %
+          # SHARD_COUNT, independent of audit ordering so the 6 parallel
+          # runners never collide.
+          : > /tmp/todo.tsv
+          while IFS=$'\t' read -r id size; do
+            [ -z "$id" ] && continue
+            h=$(printf '%s' "$id" | cksum | cut -d' ' -f1)
+            if [ $(( h % SHARD_COUNT )) -eq "$SHARD" ]; then
+              printf '%s\t%s\n' "$id" "$size" >> /tmp/todo.tsv
+            fi
+          done < /tmp/all.tsv
+          head -n "$LIM" /tmp/todo.tsv > /tmp/todo2.tsv && mv /tmp/todo2.tsv /tmp/todo.tsv
 
           total=$(wc -l < /tmp/todo.tsv | tr -d ' ')
-          echo "To process this run: $total"
+          echo "Shard $SHARD/$SHARD_COUNT — to process this run: $total"
 
           ok=0; fail=0; n=0
           : > /tmp/results.ndjson
@@ -127,10 +142,11 @@ jobs:
             echo "::endgroup::"
           done < /tmp/todo.tsv
 
-          jq -s --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson processed "$n" --argjson okc "$ok" --argjson failc "$fail" \
-            '{ran_at:$ts, processed:$processed, succeeded:$okc, failed:$failc, results:.}' \
-            /tmp/results.ndjson > ops/runner-transcode/report.json
-          echo "Done: processed=$n ok=$ok fail=$fail"
+          mkdir -p ops/runner-transcode
+          jq -s --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson shard "$SHARD" --argjson processed "$n" --argjson okc "$ok" --argjson failc "$fail" \
+            '{ran_at:$ts, shard:$shard, processed:$processed, succeeded:$okc, failed:$failc, results:.}' \
+            /tmp/results.ndjson > "ops/runner-transcode/report-${SHARD}.json"
+          echo "Shard $SHARD done: processed=$n ok=$ok fail=$fail"
 
       - name: Commit report
         if: always()
@@ -138,9 +154,13 @@ jobs:
           set -e
           git config user.name  "neolog-runner-bot"
           git config user.email "bot@neolog.ai"
-          git add ops/runner-transcode/report.json || true
-          if git diff --cached --quiet; then echo "no change"; else
-            git commit -m "runner-transcode: report [skip ci]"
-            git pull --rebase origin claude/integrate-filament-update-XWb1v || true
-            git push origin claude/integrate-filament-update-XWb1v
-          fi
+          git add "ops/runner-transcode/report-${SHARD}.json" || true
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "runner-transcode: shard ${SHARD} report [skip ci]"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            git pull --rebase origin claude/integrate-filament-update-XWb1v 2>/dev/null || true
+            if git push origin claude/integrate-filament-update-XWb1v 2>/dev/null; then
+              echo "pushed on attempt $attempt"; break
+            fi
+            sleep $((RANDOM % 8 + 2))
+          done
