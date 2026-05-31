@@ -331,31 +331,6 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {/* Player + multi-track timeline */}
         {vlog.playback_url && (
           <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
-            {vlog.has_transcoded === false && (
-              <div style={{
-                maxWidth: 720, margin: '0 auto 12px',
-                padding: '12px 14px',
-                background: 'rgba(230, 99, 74, 0.08)',
-                border: '1px solid var(--t-terra)',
-                borderRadius: 8,
-                display: 'flex', gap: 12, alignItems: 'center',
-                fontSize: 13, color: 'var(--fg-1)',
-              }}>
-                <div style={{ flex: 1, lineHeight: 1.4 }}>
-                  <div style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
-                    textTransform: 'uppercase', color: 'var(--t-terra)', marginBottom: 2,
-                  }}>
-                    Transcode missing
-                  </div>
-                  H.264 version was never produced — Chrome can't decode the original HEVC video,
-                  so playback may be audio-only. Re-extract to rerun the transcode step.
-                </div>
-                <button onClick={() => reExtract()} className="action primary" style={{ fontSize: 12 }}>
-                  Re-transcode
-                </button>
-              </div>
-            )}
             <div style={{
               width: '100%',
               maxWidth: 720,

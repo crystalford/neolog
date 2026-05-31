@@ -25,6 +25,34 @@ import { ulid } from './ulid'
 import type { D1Database } from '@cloudflare/workers-types'
 
 const HEADER_EMAIL = 'Cf-Access-Authenticated-User-Email'
+const HEADER_JWT = 'Cf-Access-Jwt-Assertion'
+
+/**
+ * Detect a Cloudflare Access *service token* on the request.
+ *
+ * When a service token authenticates (CF-Access-Client-Id / -Secret headers
+ * validated by Access), Cloudflare injects a Cf-Access-Jwt-Assertion whose
+ * payload carries a `common_name` claim (the token's name/client-id) and NO
+ * `email` claim. Human SSO sessions carry `email` instead.
+ *
+ * Returns the common_name string when the request is service-token-auth'd,
+ * else null. We don't verify the JWT signature — Access already did before
+ * the request reached us (same trust model as the email cookie path).
+ */
+function readServiceTokenName(request: Request): string | null {
+  const jwt = request.headers.get(HEADER_JWT)
+  if (!jwt) return null
+  try {
+    const payload = jwt.split('.')[1]
+    const decoded = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
+    ) as { email?: string; common_name?: string }
+    if (!decoded.email && decoded.common_name) return decoded.common_name
+  } catch {
+    // Malformed — not a usable service-token assertion.
+  }
+  return null
+}
 
 export interface Operator {
   id: string
@@ -105,7 +133,20 @@ export async function getOrCreateOperator(
   env: { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string },
 ): Promise<Operator | null> {
   const email = readEmail(request, env)
-  if (!email) return null
+  if (!email) {
+    // No human email. Check for a Cloudflare Access service-token identity.
+    // The request already passed Access (else it'd be 302'd at the edge), so
+    // a service token reaching us is trusted. Single-operator app → resolve
+    // to the sole operator row. This is what lets automated callers (the
+    // GitHub Actions admin probe) authenticate without a human SSO session.
+    const svc = readServiceTokenName(request)
+    if (svc) {
+      const db = getDb(env)
+      const sole = await findOne<Operator>(db, 'SELECT * FROM operator ORDER BY created_at ASC LIMIT 1')
+      if (sole) return sole
+    }
+    return null
+  }
 
   const db = getDb(env)
   const existing = await getOperatorByEmail(db, email)

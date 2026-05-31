@@ -1,0 +1,29 @@
+{
+  "ran_at": "2026-05-31T01:40:49Z",
+  "shard": 7,
+  "processed": 4,
+  "succeeded": 4,
+  "failed": 0,
+  "results": [
+    {
+      "id": "01KRMX3GFM1W54JX1QY1F92B9Q",
+      "ok": true,
+      "bytes": 40653775
+    },
+    {
+      "id": "01KRMWXQA546G8J3FQQJPX1TNM",
+      "ok": true,
+      "bytes": 9092634
+    },
+    {
+      "id": "01KRCXXENR5W9VBS9A84TTGHYQ",
+      "ok": true,
+      "bytes": 35979275
+    },
+    {
+      "id": "01KRCXXBBV49FTB59GXM2M2NQ0",
+      "ok": true,
+      "bytes": 62897242
+    }
+  ]
+}

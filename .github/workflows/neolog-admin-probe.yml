@@ -1,0 +1,116 @@
+name: Neolog admin probe
+
+# A GitHub Actions runner has unrestricted network egress, unlike the Claude
+# Code web sandbox (which blocks neolog.ai AND *.workers.dev). This workflow
+# lets Claude drive the Neolog admin API autonomously:
+#
+#   1. Claude commits ops/probe/request.json  (method + path + optional body)
+#   2. Push to this branch triggers this workflow
+#   3. The runner curls neolog.ai with the CF Access service-token headers
+#      (bypasses SSO), captures the response
+#   4. Writes ops/probe/response.json and commits it back
+#   5. Claude reads ops/probe/response.json via the GitHub MCP tools
+#
+# Full request/response loop, no operator copy-paste.
+
+on:
+  push:
+    branches:
+      - claude/integrate-filament-update-XWb1v
+    paths:
+      - 'ops/probe/request.json'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      BASE_URL: https://neolog.ai
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/integrate-filament-update-XWb1v
+
+      - name: Read request + call admin API
+        run: |
+          set -e
+          REQ=ops/probe/request.json
+          if [ ! -f "$REQ" ]; then
+            echo "No request file; nothing to do."
+            exit 0
+          fi
+
+          method=$(jq -r '.method // "GET"' "$REQ")
+          path=$(jq -r '.path' "$REQ")
+          has_body=$(jq 'has("body")' "$REQ")
+
+          echo "→ $method $BASE_URL$path"
+
+          mkdir -p ops/probe
+          # Capture body + HTTP status + response headers. -s silent, -S show
+          # errors, -w status, -D dumps headers (to diagnose Access 302s).
+          if [ "$method" = "GET" ]; then
+            http_code=$(curl -s -S -o ops/probe/_body.txt -D ops/probe/_headers.txt -w "%{http_code}" \
+              --max-time 300 \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "$BASE_URL$path" || echo "000")
+          else
+            body_arg=()
+            if [ "$has_body" = "true" ]; then
+              jq -c '.body' "$REQ" > ops/probe/_reqbody.json
+              body_arg=(--data @ops/probe/_reqbody.json -H "Content-Type: application/json")
+            fi
+            http_code=$(curl -s -S -o ops/probe/_body.txt -D ops/probe/_headers.txt -w "%{http_code}" \
+              --max-time 300 \
+              -X "$method" \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "${body_arg[@]}" \
+              "$BASE_URL$path" || echo "000")
+          fi
+
+          echo "← HTTP $http_code"
+          # Pull the Access-relevant response headers for diagnosis.
+          access_headers=$(grep -iE '^(location|cf-access|cf-ray|x-deny|set-cookie):' ops/probe/_headers.txt | sed 's/[Ss]et-[Cc]ookie:.*/set-cookie: <redacted>/' | tr '\n' '|' || echo "")
+
+          # Build response.json: status + the raw body (string), plus parsed
+          # JSON if the body is valid JSON.
+          body_raw=$(cat ops/probe/_body.txt)
+          jq -n \
+            --arg status "$http_code" \
+            --arg path "$path" \
+            --arg method "$method" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg ah "$access_headers" \
+            --rawfile body ops/probe/_body.txt \
+            '{
+              requested_at: $ts,
+              method: $method,
+              path: $path,
+              http_status: ($status | tonumber),
+              access_headers: $ah,
+              body: $body,
+              body_json: (try ($body | fromjson) catch null)
+            }' > ops/probe/response.json
+
+          rm -f ops/probe/_body.txt ops/probe/_reqbody.json ops/probe/_headers.txt
+
+      - name: Commit response
+        run: |
+          set -e
+          git config user.name  "neolog-probe-bot"
+          git config user.email "bot@neolog.ai"
+          git add ops/probe/response.json
+          if git diff --cached --quiet; then
+            echo "No change to response.json"
+          else
+            git commit -m "probe: response [skip ci]"
+            git push origin claude/integrate-filament-update-XWb1v
+          fi
