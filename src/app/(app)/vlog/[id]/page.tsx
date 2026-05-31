@@ -100,6 +100,12 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null)
   const [currentT, setCurrentT] = useState(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  // Set true once the browser actually decodes at least one video frame.
+  // If the original is already H.264, this fires immediately and we hide
+  // the "Transcode missing" banner — it's misleading on a playable file.
+  // Only stays visible when the browser genuinely can't decode the source
+  // and the runner hasn't produced an H.264 derivative yet.
+  const [videoDecodable, setVideoDecodable] = useState(false)
   const [systemOpen, setSystemOpen] = useState(false)
   const [actionNote, setActionNote] = useState<string | null>(null)
 
@@ -331,7 +337,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
         {/* Player + multi-track timeline */}
         {vlog.playback_url && (
           <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
-            {vlog.has_transcoded === false && (
+            {vlog.has_transcoded === false && !videoDecodable && (
               <div style={{
                 maxWidth: 720, margin: '0 auto 12px',
                 padding: '12px 14px',
@@ -346,10 +352,11 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                     fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
                     textTransform: 'uppercase', color: 'var(--t-terra)', marginBottom: 2,
                   }}>
-                    Transcode missing
+                    Browser-playable copy pending
                   </div>
-                  H.264 version was never produced — Chrome can't decode the original HEVC video,
-                  so playback may be audio-only. Re-extract to rerun the transcode step.
+                  No H.264 derivative has been generated yet. If the player loads frames you're fine —
+                  this only matters when the browser can't decode the original (HEVC on Chrome/Windows).
+                  Re-transcode forces it now.
                 </div>
                 <button onClick={() => reExtract()} className="action primary" style={{ fontSize: 12 }}>
                   Re-transcode
@@ -374,6 +381,13 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 preload="metadata"
                 poster={vlog.thumbnail_url ?? undefined}
                 onTimeUpdate={(e) => setCurrentT((e.target as HTMLVideoElement).currentTime)}
+                // Fires once the browser has decoded the first video frame —
+                // proves the source is playable as-is and lets us hide the
+                // "Browser-playable copy pending" banner on H.264 originals.
+                onLoadedData={(e) => {
+                  const v = e.target as HTMLVideoElement
+                  if (v.videoWidth > 0 && v.videoHeight > 0) setVideoDecodable(true)
+                }}
                 style={{ width: '100%', height: '100%', display: 'block', background: 'black', objectFit: 'contain' }}
               />
             </div>
