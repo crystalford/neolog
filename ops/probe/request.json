@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/admin/runtime-state?limit_events=1", "nonce": "1780187786" }
+{ "method": "POST", "path": "/api/v2/admin/reset-stuck-transcoding", "body": {}, "nonce": "1780187870" }
