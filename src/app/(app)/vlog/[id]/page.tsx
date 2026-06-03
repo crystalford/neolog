@@ -56,6 +56,8 @@ interface VlogDetail {
   pipeline_status: string
   pipeline_error: string | null
   playback_url: string | null
+  audio_url?: string | null
+  is_audio_only?: boolean
   has_transcoded?: boolean
   extraction_outcomes: string | null
   updated_at: string | null
@@ -328,9 +330,41 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           </div>
         </section>
 
-        {/* Player + multi-track timeline */}
-        {vlog.playback_url && (
+        {/* Player + multi-track timeline. Audio-only uploads render an
+            <audio> element instead of <video> — the operator uploaded the
+            audio track only (bad-wifi mode) and there's no video to show. */}
+        {(vlog.playback_url || vlog.audio_url) && (
           <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
+            {vlog.is_audio_only ? (
+              <div style={{
+                width: '100%', maxWidth: 720, margin: '0 auto 14px',
+                padding: '24px 20px',
+                background: 'var(--bg-1)',
+                border: '1px solid var(--line-1)',
+                borderRadius: 12,
+                display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
+                  textTransform: 'uppercase', color: 'var(--fg-3)',
+                }}>
+                  Audio-only upload · drop the original file in later to attach the video
+                </div>
+                {vlog.audio_url ? (
+                  <audio
+                    src={vlog.audio_url}
+                    controls
+                    preload="metadata"
+                    onTimeUpdate={(e) => setCurrentT((e.target as HTMLAudioElement).currentTime)}
+                    style={{ width: '100%' }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
+                    Audio still processing — refresh in a moment.
+                  </div>
+                )}
+              </div>
+            ) : (
             <div style={{
               width: '100%',
               maxWidth: 720,
@@ -344,7 +378,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             }}>
               <video
                 ref={videoRef}
-                src={vlog.playback_url}
+                src={vlog.playback_url ?? undefined}
                 controls
                 preload="metadata"
                 poster={vlog.thumbnail_url ?? undefined}
@@ -352,6 +386,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 style={{ width: '100%', height: '100%', display: 'block', background: 'black', objectFit: 'contain' }}
               />
             </div>
+            )}
             <MultiTrackTimeline
               durationSec={vlog.duration_seconds ?? 0}
               threadBands={threadBands}

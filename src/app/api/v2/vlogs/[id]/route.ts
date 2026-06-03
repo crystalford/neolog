@@ -70,13 +70,31 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   )
   if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Presign playback URL — prefer transcoded (H.264, browser-friendly) over original.
-  const playbackKey = vlog.transcoded_r2_key || vlog.r2_key
+  // Presign playback URL. Three cases:
+  //   1. Audio-only upload (mime_type 'audio/*'): no video file ever uploaded
+  //      — return the stitched MP3 the pipeline produces (or null if it
+  //      hasn't run yet). Client renders an <audio> player.
+  //   2. Video with a transcoded H.264 copy: prefer that (always browser-decodable).
+  //   3. Video without transcode: presign the original.
+  const isAudioOnly = (vlog.mime_type ?? '').startsWith('audio/')
   let videoUrl: string | null = null
-  try {
-    videoUrl = await presignGetUrl(env, playbackKey, 3600)
-  } catch (err: any) {
-    console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
+  let audioUrl: string | null = null
+  if (isAudioOnly) {
+    // Try the stitched MP3 written by the transcribe step.
+    const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
+    try {
+      const head = await env.VIDEOS.head(mp3Key)
+      if (head) audioUrl = await presignGetUrl(env, mp3Key, 3600)
+    } catch (err: any) {
+      console.warn(`[vlogs/[id]] audio-only mp3 presign failed: ${err?.message}`)
+    }
+  } else {
+    const playbackKey = vlog.transcoded_r2_key || vlog.r2_key
+    try {
+      videoUrl = await presignGetUrl(env, playbackKey, 3600)
+    } catch (err: any) {
+      console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
+    }
   }
 
   // Resolve thumbnail — same three-state contract as the list endpoint
@@ -306,8 +324,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   return NextResponse.json({
-    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, has_transcoded: hasTranscoded },
+    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, audio_url: audioUrl, is_audio_only: isAudioOnly, has_transcoded: hasTranscoded },
     video_url: videoUrl,
+    audio_url: audioUrl,
     threads,
     clips,
     creative_elements,
