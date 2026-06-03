@@ -22,7 +22,11 @@ compatibility_flags = ["nodejs_compat"]
 account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 
 [triggers]
-crons = ["*/5 * * * *"]
+# Cron DISABLED. Was */5 = 8,640 invocations/month — pure ambient cost on a
+# single-operator app where genuinely-stuck workflows are rare. The healer
+# worker stays deployed so it can still be invoked manually via HTTP for the
+# rare case where something's wedged — but it no longer auto-fires.
+crons = []
 
 [[d1_databases]]
 binding = "DB"
