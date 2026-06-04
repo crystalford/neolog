@@ -227,3 +227,158 @@ export async function uploadChunkToR2(presignedUrl: string, blob: Blob): Promise
 }
 
 export type { AudioChunk, ExtractOpts }
+
+/**
+ * Streaming audio extractor — for files too large to load via
+ * `Blob.arrayBuffer()` (Chrome NotReadableErrors at ~2 GB+, and even
+ * smaller files can fail if the OS-level file handle gets contended
+ * after the thumbnail capture or the Web Audio decode step).
+ *
+ * Pipes the source through a hidden <video> element + AudioContext +
+ * ScriptProcessor so we never need the whole file in memory at once.
+ * Trade-off: runs in REAL TIME — a 30-minute vlog extracts in 30
+ * minutes. Show progress.
+ *
+ * Output matches `extractAudioChunks`: WAV chunks at 16 kHz mono,
+ * sized to fit under Whisper's per-request limit. Each carries
+ * start/end seconds so the transcribe step stitches word timestamps
+ * correctly.
+ */
+export async function extractAudioStreaming(
+  file: File | Blob,
+  opts: ExtractOpts = {},
+): Promise<AudioChunk[]> {
+  const chunkSeconds = opts.chunkSeconds ?? DEFAULT_CHUNK_SECONDS
+  const onProgress = opts.onProgress ?? (() => {})
+
+  const url = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.style.position = 'absolute'
+  video.style.left = '-99999px'
+  video.style.width = '1px'
+  video.style.height = '1px'
+  video.muted = false
+  video.playsInline = true
+  video.preload = 'auto'
+  video.src = url
+  document.body.appendChild(video)
+
+  const cleanup = () => {
+    try { video.pause() } catch {}
+    try { video.remove() } catch {}
+    try { URL.revokeObjectURL(url) } catch {}
+  }
+
+  try {
+    await new Promise<void>((res, rej) => {
+      const onMeta = () => { video.removeEventListener('error', onErr); res() }
+      const onErr = () => { video.removeEventListener('loadedmetadata', onMeta); rej(new Error('media load failed (codec or permission)')) }
+      video.addEventListener('loadedmetadata', onMeta, { once: true })
+      video.addEventListener('error', onErr, { once: true })
+    })
+    const duration = video.duration
+    if (!isFinite(duration) || duration <= 0) {
+      throw new Error(`source duration unreadable (${duration})`)
+    }
+
+    const ACtor = (window.AudioContext || (window as any).webkitAudioContext)
+    const ctx: AudioContext = new ACtor()
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume() } catch {}
+    }
+    const sourceNode = ctx.createMediaElementSource(video)
+    // ScriptProcessor is deprecated but ubiquitous + simpler than
+    // AudioWorklet for a one-off recorder. 4096-sample buffers @ ~48 kHz
+    // ≈ 85 ms latency — plenty for chunking.
+    const BUFFER_SIZE = 4096
+    const processor = ctx.createScriptProcessor(BUFFER_SIZE, 2, 1)
+    const sampleRate = ctx.sampleRate
+    const chunkFrames = Math.round(chunkSeconds * sampleRate)
+    const chunks: AudioChunk[] = []
+    let buffer = new Float32Array(chunkFrames)
+    let bufferFill = 0
+    let totalFramesCaptured = 0
+    let chunkIndex = 0
+
+    const flushChunk = async (endOfStream: boolean) => {
+      const frames = bufferFill
+      if (frames === 0) return
+      const slice = buffer.subarray(0, frames)
+      const tempBuf = new AudioBuffer({
+        length: frames, numberOfChannels: 1, sampleRate,
+      })
+      tempBuf.getChannelData(0).set(slice)
+      const outFrames = Math.round((frames / sampleRate) * TARGET_SAMPLE_RATE)
+      const offline = new OfflineAudioContext(1, Math.max(1, outFrames), TARGET_SAMPLE_RATE)
+      const node = offline.createBufferSource()
+      node.buffer = tempBuf
+      node.connect(offline.destination)
+      node.start(0)
+      const resampled = await offline.startRendering()
+      const wav = audioBufferToWav(resampled)
+      const startSec = chunkIndex * chunkSeconds
+      const endSec = startSec + (frames / sampleRate)
+      chunks.push({
+        blob: new Blob([wav], { type: 'audio/wav' }),
+        startSec, endSec, bytes: wav.byteLength,
+      })
+      chunkIndex++
+      bufferFill = 0
+      buffer = new Float32Array(chunkFrames)
+      onProgress({
+        phase: 'chunking',
+        chunkIndex,
+        totalChunks: Math.max(chunkIndex, Math.ceil(duration / chunkSeconds)),
+        ratio: Math.min(1, endSec / duration),
+      })
+    }
+
+    let pendingFlush: Promise<void> = Promise.resolve()
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      const input = e.inputBuffer
+      const leftCh = input.getChannelData(0)
+      const rightCh = input.numberOfChannels > 1 ? input.getChannelData(1) : leftCh
+      for (let i = 0; i < input.length; i++) {
+        const sample = (leftCh[i] + rightCh[i]) * 0.5
+        if (bufferFill < buffer.length) {
+          buffer[bufferFill++] = sample
+        }
+      }
+      totalFramesCaptured += input.length
+      if (bufferFill >= chunkFrames) {
+        // Serialize flushes so we never overlap WAV encoders.
+        pendingFlush = pendingFlush.then(() => flushChunk(false)).catch(() => {})
+      }
+    }
+
+    sourceNode.connect(processor)
+    // ScriptProcessor only fires when connected through to destination.
+    // Route it through a gain=0 node so we don't actually output sound.
+    const silent = ctx.createGain()
+    silent.gain.value = 0
+    processor.connect(silent)
+    silent.connect(ctx.destination)
+
+    onProgress({ phase: 'decoding' })
+    await video.play()
+
+    await new Promise<void>(res => {
+      const onEnd = () => { video.removeEventListener('ended', onEnd); res() }
+      video.addEventListener('ended', onEnd, { once: true })
+    })
+
+    // Drain final partial buffer.
+    pendingFlush = pendingFlush.then(() => flushChunk(true)).catch(() => {})
+    await pendingFlush
+
+    try { sourceNode.disconnect() } catch {}
+    try { processor.disconnect() } catch {}
+    try { silent.disconnect() } catch {}
+    try { await ctx.close() } catch {}
+
+    onProgress({ phase: 'chunking', chunkIndex: chunks.length, totalChunks: chunks.length, ratio: 1 })
+    return chunks
+  } finally {
+    cleanup()
+  }
+}

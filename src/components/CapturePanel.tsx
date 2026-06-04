@@ -560,14 +560,47 @@ async function processOne(
   if ((file.type || '').startsWith('video/') || (file.type || '').startsWith('audio/')) {
     try {
       update(id, { status: 'finalizing', message: 'extracting audio…' })
-      const { extractAudioChunks, uploadChunkToR2 } = await import('@/lib/browser-audio')
-      const chunks = await extractAudioChunks(file, {
+      const { extractAudioChunks, extractAudioStreaming, uploadChunkToR2 } = await import('@/lib/browser-audio')
+      // Strategy:
+      //   1. For audio-only mode (bad-wifi path) we expect huge source
+      //      files. Skip arrayBuffer-based extract (Chrome throws
+      //      NotReadableError past ~2 GB) and go straight to streaming
+      //      via <video> + AudioContext — slower but bounded memory.
+      //   2. For normal video uploads, try the fast arrayBuffer path
+      //      first. On NotReadableError / failure, fall back to
+      //      streaming. The video is going to R2 anyway, so even if
+      //      both fail the pipeline will server-side extract.
+      const tryStreaming = async () => extractAudioStreaming(file, {
         onProgress: info => {
-          if (info.phase === 'chunking' && typeof info.ratio === 'number') {
-            update(id, { message: `extracting audio… ${Math.round(info.ratio * 100)}%` })
+          if (info.phase === 'decoding') {
+            update(id, { message: 'extracting audio (real-time)… 0%' })
+          } else if (info.phase === 'chunking' && typeof info.ratio === 'number') {
+            update(id, { message: `extracting audio (real-time)… ${Math.round(info.ratio * 100)}%` })
           }
         },
       })
+      let chunks
+      if (audioOnly) {
+        chunks = await tryStreaming()
+      } else {
+        try {
+          chunks = await extractAudioChunks(file, {
+            onProgress: info => {
+              if (info.phase === 'chunking' && typeof info.ratio === 'number') {
+                update(id, { message: `extracting audio… ${Math.round(info.ratio * 100)}%` })
+              }
+            },
+          })
+        } catch (fastErr: any) {
+          const msg = String(fastErr?.message || fastErr)
+          if (/NotReadableError|could not be read|decodeAudioData failed/i.test(msg)) {
+            update(id, { message: 'fast path failed — switching to real-time stream…' })
+            chunks = await tryStreaming()
+          } else {
+            throw fastErr
+          }
+        }
+      }
       const manifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> = []
       for (let i = 0; i < chunks.length; i++) {
         update(id, { message: `uploading audio chunk ${i + 1}/${chunks.length}` })
@@ -595,8 +628,8 @@ async function processOne(
     update(id, {
       status: 'failed',
       error: audioExtractError
-        ? `browser couldn't extract audio: ${audioExtractError}. HEVC source? Try the normal upload from a good connection.`
-        : 'no audio chunks produced. HEVC source? Try the normal upload from a good connection.',
+        ? `browser couldn't extract audio: ${audioExtractError}. The streaming extractor needs the tab to stay open and a decodable audio track.`
+        : 'no audio chunks produced.',
     })
     return
   }
