@@ -305,6 +305,52 @@ jobs:
             echo "✅ Access application for neolog.ai already exists ($existing)."
           fi
 
+      - name: Configure Cloudflare Access — public bypass for /podcast.xml + /podcast/*
+        run: |
+          set -e
+          # Podcast feed + audio redirect are PUBLIC. Apple Podcasts, Overcast,
+          # Spotify etc. don't carry session cookies — they need raw GET access.
+          # We create a path-specific Access app per public path with a bypass
+          # policy; the broader "Operator only" app keeps gating the rest of
+          # the site.
+          create_bypass_app() {
+            local name="$1"
+            local domain_path="$2"
+            local existing
+            existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
+              | jq -r --arg d "$domain_path" '.result[] | select(.domain == $d) | .id')
+            if [ -n "$existing" ]; then
+              echo "✅ Bypass Access app for $domain_path already exists ($existing)."
+              return
+            fi
+            echo "Creating bypass Access app for $domain_path..."
+            local app_response
+            app_response=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"name\": \"$name\",
+                \"domain\": \"$domain_path\",
+                \"type\": \"self_hosted\",
+                \"session_duration\": \"0s\"
+              }" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps")
+            echo "$app_response" | jq .
+            local app_id
+            app_id=$(echo "$app_response" | jq -r '.result.id')
+            curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "name": "Public bypass",
+                "decision": "bypass",
+                "include": [{ "everyone": {} }]
+              }' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$app_id/policies" \
+              | jq .
+          }
+          create_bypass_app "Podcast feed (public)" "neolog.ai/podcast.xml"
+          create_bypass_app "Podcast audio (public)" "neolog.ai/podcast/audio"
+
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile || pnpm install
 

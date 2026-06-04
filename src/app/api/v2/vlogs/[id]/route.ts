@@ -61,6 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     pipeline_error: string | null
     extraction_outcomes: string | null
     visibility: string
+    is_podcast: number | null
     audio_chunks_json: string | null
     created_at: string
     updated_at: string

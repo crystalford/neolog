@@ -506,6 +506,20 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-22_vlogs_title',
     sql: `ALTER TABLE vlogs ADD COLUMN title TEXT`,
   },
+  // ─── podcast feed inclusion (2026-06-04) ─────────────────────────────────
+  // Per-vlog opt-in flag for /podcast.xml. Independent of visibility=public
+  // so the operator can curate the podcast feed separately from the web
+  // archive (e.g. include audio-only quick takes that aren't web-public).
+  {
+    name: '2026-06-04_vlogs_is_podcast',
+    sql: `ALTER TABLE vlogs ADD COLUMN is_podcast INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-04_idx_vlogs_is_podcast',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_is_podcast
+            ON vlogs(operator_id, is_podcast, recorded_at DESC)
+            WHERE is_podcast = 1 AND deleted_at IS NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

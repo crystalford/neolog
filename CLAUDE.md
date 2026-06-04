@@ -96,6 +96,24 @@ The `extraction_outcomes` column is the source of truth for "what worked, what f
 
 The `@cloudflare/next-on-pages` adapter does **not** read `[[services]]` / `[[d1_databases]]` / `[[r2_buckets]]` from the root `wrangler.toml`. Pages projects under that adapter take their bindings from the project's `deployment_configs`, which the bootstrap workflow sets via the Cloudflare REST API (`.github/workflows/bootstrap-cloudflare.yml` → step "Wire Pages project bindings"). Without that step, `env.PROCESS_UPLOAD` and `env.FFMPEG` are undefined on the deployed app and the post-upload workflow never dispatches.
 
+## ⚠️ Podcast feed — in-house RSS, no third party
+
+The system has its own podcast feed at `/podcast.xml` (RSS 2.0 + iTunes
+namespace). Per-vlog opt-in via `vlogs.is_podcast` (toggle on `/vlog/[id]`,
+independent of `visibility` so you can keep audio-only quick takes off the
+public web but inside the podcast). Audio enclosure points at
+`/podcast/audio/{vlog_id}.mp3` which 302-redirects to a presigned R2 URL of
+the stitched MP3 at `{operator}/audio/{vlog_id}/mp3.full`.
+
+For audio-only uploads the pipeline calls FFmpeg `/concat-audio` after
+transcribe to stitch the browser-uploaded WAV chunks into the canonical
+mp3.full. For video uploads, `stepAudioExtract` already produces mp3.full
+as part of normal ingestion.
+
+Cloudflare Access exclusion is handled by two extra bypass apps in the
+bootstrap workflow — `neolog.ai/podcast.xml` and `neolog.ai/podcast/audio`.
+Podcast clients fetch without auth; the rest of the site stays operator-only.
+
 ## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
 
 These are documentary / short film / video essay productions. **Never add captions, subtitles, or text overlays to video output.** No burned-in text, no SRT files, no caption tracks, no lower thirds. The visual track is purely cinematic. The audio carries the narration.

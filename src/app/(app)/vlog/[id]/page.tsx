@@ -55,6 +55,7 @@ interface VlogDetail {
   summary: string | null
   pipeline_status: string
   pipeline_error: string | null
+  is_podcast?: number | boolean | null
   playback_url: string | null
   audio_url?: string | null
   audio_chunk_urls?: string[] | null
@@ -173,6 +174,34 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
+  const togglePodcast = async () => {
+    if (!vlog) return
+    const next = !vlog.is_podcast
+    setActionNote(next ? 'Adding to podcast feed…' : 'Removing from podcast feed…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/podcast`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ include: next }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data: any = await r.json().catch(() => ({}))
+      const feedUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/podcast.xml`
+      if (next) {
+        setActionNote(
+          data.stitch_triggered
+            ? `Added — stitching MP3 now (refresh in ~30s). Feed URL: ${feedUrl}`
+            : `In podcast feed. Feed URL: ${feedUrl}`
+        )
+      } else {
+        setActionNote('Removed from podcast feed.')
+      }
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
   const deleteVlog = async () => {
     if (!confirm('Delete this vlog? This removes the R2 bytes too. Cannot be undone.')) return
     try {
@@ -282,6 +311,14 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 Mark as B-roll
               </button>
             )}
+            <button
+              className="action"
+              onClick={togglePodcast}
+              style={vlog.is_podcast ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+              title={vlog.is_podcast ? 'In /podcast.xml — click to remove' : 'Add to /podcast.xml feed'}
+            >
+              {vlog.is_podcast ? 'In podcast ✓' : 'Add to podcast'}
+            </button>
             {vlog.playback_url && (
               <a className="action" href={vlog.playback_url} target="_blank" rel="noreferrer">
                 Open original

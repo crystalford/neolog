@@ -528,6 +528,20 @@ export class VlogPipelineDO {
     try {
       // Skip-if-exists
       if (!force && await this.artifactExists(vlog, pointer)) {
+        // Even when skipping transcribe (transcript already present), keep
+        // the podcast MP3 in sync: if this is an audio-only vlog with
+        // browser-uploaded WAV chunks and no stitched MP3 yet, stitch
+        // now so /podcast/audio/{id}.mp3 can serve it. Best-effort.
+        if (pointer === 'transcribe' && vlog.mime_type.startsWith('audio/') && vlog.audio_chunks_json) {
+          try {
+            const chunks = JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }>
+            if (Array.isArray(chunks) && chunks.length > 0) {
+              await this.stitchAudioChunksToMp3(vlog, chunks)
+            }
+          } catch (err: any) {
+            console.warn(`[alarm] backfill stitch failed for ${vlog.id}: ${err?.message || err}`)
+          }
+        }
         await this.recordEvent(vlog_id, pointer, 'skipped', 'skip_if_exists',
           { reason: 'artifact_exists' })
         await this.advance(pointer)
@@ -894,6 +908,21 @@ export class VlogPipelineDO {
           WHERE id = ?`,
     ).bind(stitched, vlog.id).run()
 
+    // Audio-only podcast prep: stitch the per-chunk WAVs into a single MP3
+    // at {operator}/audio/{vlog_id}/mp3.full. This is the file the on-site
+    // <audio> player and the /podcast.xml feed both serve. Best-effort —
+    // failures don't fail the pipeline, the chunk fallback still works.
+    const isAudioOnly = vlog.mime_type.startsWith('audio/')
+    if (isAudioOnly && chunks.length > 0) {
+      try {
+        await this.stitchAudioChunksToMp3(vlog, chunks)
+      } catch (err: any) {
+        console.warn(`[stepTranscribe] mp3 stitch failed for ${vlog.id}: ${err?.message || err}`)
+        await this.recordEvent(vlog.id, 'transcribe', 'failed', 'stitch_mp3',
+          { error: String(err?.message || err).slice(0, 500) })
+      }
+    }
+
     if (allWords.length > 0) {
       const stmts = allWords.map((w, idx) =>
         this.env.DB.prepare(
@@ -909,6 +938,88 @@ export class VlogPipelineDO {
     }
 
     await this.setVlogState(vlog.id, 'transcribed', null)
+  }
+
+  /**
+   * Stitch the per-chunk WAV uploads into a single MP3 at
+   * {operator}/audio/{vlog_id}/mp3.full. Called for audio-only vlogs
+   * after transcription succeeds.
+   *
+   * Why: the on-site <audio> player and the podcast RSS feed both want
+   * one continuous MP3. Multi-chunk WAV playback works via
+   * AudioOnlyPlayer's auto-advance, but it can't scrub across chunk
+   * boundaries and podcast clients (Apple/Overcast/Spotify) demand a
+   * single MP3 enclosure.
+   *
+   * Skip if mp3.full already exists (re-runs are no-ops).
+   */
+  private async stitchAudioChunksToMp3(
+    vlog: VlogRow,
+    chunks: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }>,
+  ): Promise<void> {
+    const outKey = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
+    const existing = await this.env.VIDEOS.head(outKey).catch(() => null)
+    if (existing) {
+      await this.recordEvent(vlog.id, 'transcribe', 'skipped', 'stitch_mp3',
+        { reason: 'mp3.full already exists' })
+      return
+    }
+
+    const inputUrls: string[] = []
+    for (const c of chunks) {
+      inputUrls.push(await presignR2Get(this.env, c.r2_key, 3600))
+    }
+
+    // Acquire an FFmpeg slot to avoid bursting the container pool.
+    const gateStub = this.env.FFMPEG_GATE.get(
+      this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-v2'),
+    )
+    let gateToken: string | null = null
+    try {
+      const gateRes = await gateStub.fetch('https://gate/acquire', { method: 'POST' })
+      if (gateRes.ok) {
+        const env = await gateRes.json() as any
+        gateToken = env.token ?? null
+      }
+    } catch {}
+
+    try {
+      await this.recordEvent(vlog.id, 'transcribe', 'running', 'stitch_mp3',
+        { chunks: inputUrls.length, out_key: outKey })
+
+      const ctl = new AbortController()
+      const timer = setTimeout(() => ctl.abort(), 10 * 60 * 1000)
+      let resp: Response
+      try {
+        resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/concat-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input_urls: inputUrls }),
+          signal: ctl.signal,
+        } as RequestInit)
+      } finally {
+        clearTimeout(timer)
+      }
+      if (!resp.ok) {
+        const errBody = (await resp.text()).slice(0, 500)
+        throw new Error(`ffmpeg /concat-audio ${resp.status}: ${errBody}`)
+      }
+      const mp3 = new Uint8Array(await resp.arrayBuffer())
+      if (mp3.byteLength < 256) throw new Error(`stitched mp3 too small: ${mp3.byteLength}B`)
+      await this.env.VIDEOS.put(outKey, mp3, { httpMetadata: { contentType: 'audio/mpeg' } })
+      await this.recordEvent(vlog.id, 'transcribe', 'ok', 'stitch_mp3',
+        { out_key: outKey, bytes: mp3.byteLength })
+    } finally {
+      if (gateToken !== null) {
+        try {
+          await gateStub.fetch('https://gate/release', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: gateToken }),
+          })
+        } catch {}
+      }
+    }
   }
 
   private async whisperWithRetry(

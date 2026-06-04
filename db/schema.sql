@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS vlogs (
   pipeline_error           TEXT,
   extraction_outcomes      TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+  is_podcast               INTEGER NOT NULL DEFAULT 0,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -94,6 +95,9 @@ CREATE INDEX IF NOT EXISTS idx_vlogs_operator ON vlogs(operator_id);
 CREATE INDEX IF NOT EXISTS idx_vlogs_recorded_at ON vlogs(recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_vlogs_pipeline_status ON vlogs(pipeline_status);
 CREATE INDEX IF NOT EXISTS idx_vlogs_r2_key ON vlogs(r2_key);
+CREATE INDEX IF NOT EXISTS idx_vlogs_is_podcast
+  ON vlogs(operator_id, is_podcast, recorded_at DESC)
+  WHERE is_podcast = 1 AND deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS transcript_words (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
