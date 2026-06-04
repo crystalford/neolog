@@ -17,21 +17,21 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+// Trimmed to the new product shape: Subjects · Vlogs · Productions.
+// The old surfaces (Timeline, Inbox, Clusters-as-Studio, Chat, About) still
+// resolve as routes — deep links and old bookmarks don't break — but they're
+// no longer masthead destinations. The mess goes quiet; the work stays loud.
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
-  { label: 'Timeline',    href: '/',            matchPaths: [/^\/$/, /^\/timeline/, /^\/threads/, /^\/thread\//] },
-  { label: 'Inbox',       href: '/inbox',       matchPaths: [/^\/inbox/] },
+  { label: 'Subjects',    href: '/subjects',    matchPaths: [/^\/$/, /^\/subjects/, /^\/subject\//, /^\/studio/, /^\/clusters/, /^\/cluster\//] },
   { label: 'Vlogs',       href: '/vlogs',       matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
-  { label: 'Clusters',    href: '/studio',      matchPaths: [/^\/studio/, /^\/clusters/, /^\/cluster\//] },
-  { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/projects/, /^\/materialize/, /^\/library/, /^\/entity/, /^\/graph/] },
-  { label: 'Chat',        href: '/chat',        matchPaths: [/^\/chat/, /^\/console/] },
-  { label: 'About',       href: '/about',       matchPaths: [/^\/about/] },
+  { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/] },
 ]
 
 export function Masthead() {
   const pathname = usePathname() ?? '/'
   return (
     <header className="canon-masthead">
-      <Link href="/" className="canon-lockup">
+      <Link href="/subjects" className="canon-lockup">
         <span className="mark">
           <svg viewBox="0 0 32 32" fill="none">
             <path d="M 3 16 Q 9 4, 16 16 T 29 16" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinecap="round"/>

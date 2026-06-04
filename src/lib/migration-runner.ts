@@ -528,6 +528,38 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-04_vlogs_slideshow_frames_json',
     sql: `ALTER TABLE vlogs ADD COLUMN slideshow_frames_json TEXT`,
   },
+  // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
+  // The librarian writes into the existing `clusters` table (so the
+  // production→video-essay flow already works). These columns carry the
+  // concept-naming layer: the system identifies the underlying concept a
+  // creator keeps circling — even when they never used the term — and
+  // records how it named it.
+  {
+    name: '2026-06-04_clusters_framing',
+    sql: `ALTER TABLE clusters ADD COLUMN framing TEXT`,
+  },
+  {
+    name: '2026-06-04_clusters_concept_confidence',
+    sql: `ALTER TABLE clusters ADD COLUMN concept_confidence REAL`,
+  },
+  {
+    name: '2026-06-04_clusters_named_by_system',
+    sql: `ALTER TABLE clusters ADD COLUMN named_by_system INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-04_clusters_representative_quote',
+    sql: `ALTER TABLE clusters ADD COLUMN representative_quote TEXT`,
+  },
+  {
+    name: '2026-06-04_clusters_subject_source',
+    sql: `ALTER TABLE clusters ADD COLUMN subject_source TEXT`,
+  },
+  {
+    name: '2026-06-04_idx_clusters_subject_source',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clusters_subject_source
+            ON clusters(operator_id, subject_source, ripeness_score DESC)
+            WHERE deleted_at IS NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

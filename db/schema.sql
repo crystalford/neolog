@@ -297,6 +297,11 @@ CREATE TABLE IF NOT EXISTS clusters (
   last_viewed_at              TEXT,
   gap_question                TEXT,
   topic_color                 TEXT,
+  framing                     TEXT,
+  concept_confidence          REAL,
+  named_by_system             INTEGER NOT NULL DEFAULT 0,
+  representative_quote        TEXT,
+  subject_source              TEXT,
   deleted_at                  TEXT,
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

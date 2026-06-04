@@ -126,6 +126,8 @@ export default function TimelinePage() {
   useEffect(() => {
     // First, try the authed Timeline. If it returns 401, we're an
     // unauthenticated visitor — flip into public mode (productions only).
+    // If we ARE the authed operator, the bare domain is no longer home —
+    // Subjects is. Bounce there. Unauthed visitors keep the public landing.
     fetch('/api/v2/timeline', { credentials: 'include' })
       .then(async r => {
         if (r.status === 401) {
@@ -137,6 +139,8 @@ export default function TimelinePage() {
           setCards([])
           return null
         }
+        // Authed → Subjects is the home surface now.
+        router.replace('/subjects')
         return r.ok ? r.json() : { cards: [], counts: {} }
       })
       .then((d: any) => {
