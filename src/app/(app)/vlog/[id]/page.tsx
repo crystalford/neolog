@@ -57,6 +57,7 @@ interface VlogDetail {
   pipeline_error: string | null
   playback_url: string | null
   audio_url?: string | null
+  audio_chunk_urls?: string[] | null
   is_audio_only?: boolean
   has_transcoded?: boolean
   extraction_outcomes: string | null
@@ -351,12 +352,10 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                   Audio-only upload · drop the original file in later to attach the video
                 </div>
                 {vlog.audio_url ? (
-                  <audio
-                    src={vlog.audio_url}
-                    controls
-                    preload="metadata"
-                    onTimeUpdate={(e) => setCurrentT((e.target as HTMLAudioElement).currentTime)}
-                    style={{ width: '100%' }}
+                  <AudioOnlyPlayer
+                    audioUrl={vlog.audio_url}
+                    chunkUrls={vlog.audio_chunk_urls ?? null}
+                    onTime={t => setCurrentT(t)}
                   />
                 ) : (
                   <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
@@ -784,6 +783,55 @@ function deriveVlogTitle(filename: string | null): string {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, ch => ch.toUpperCase()) || 'Untitled vlog'
+}
+
+/**
+ * AudioOnlyPlayer — wraps <audio> and auto-advances through chunk URLs
+ * when the upload was browser-chunked into N pieces (audio-only mode
+ * with bad-wifi multi-chunk extraction). Single-chunk uploads behave
+ * exactly like a plain <audio> tag.
+ *
+ * Scrubbing inside the current chunk works natively. Scrubbing across
+ * chunks isn't supported — chunk boundaries advance only by `ended`.
+ * In practice audio-only chunks are ~5min each, so this rarely bites
+ * for normal listening; the next polish pass can stitch server-side
+ * into a single mp3.full and retire this wrapper.
+ */
+function AudioOnlyPlayer({
+  audioUrl, chunkUrls, onTime,
+}: {
+  audioUrl: string
+  chunkUrls: string[] | null
+  onTime: (t: number) => void
+}) {
+  const list = chunkUrls && chunkUrls.length > 0 ? chunkUrls : [audioUrl]
+  const [idx, setIdx] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  useEffect(() => { setIdx(0) }, [chunkUrls?.length])
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <audio
+        ref={audioRef}
+        src={list[idx]}
+        controls
+        autoPlay={idx > 0}
+        preload="metadata"
+        onTimeUpdate={e => onTime((e.target as HTMLAudioElement).currentTime)}
+        onEnded={() => {
+          if (idx + 1 < list.length) setIdx(idx + 1)
+        }}
+        style={{ width: '100%' }}
+      />
+      {list.length > 1 && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+          letterSpacing: 1.2, textTransform: 'uppercase',
+        }}>
+          Part {idx + 1} of {list.length}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function fmtSize(bytes: number): string {

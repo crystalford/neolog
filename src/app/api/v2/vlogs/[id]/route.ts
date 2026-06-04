@@ -61,6 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     pipeline_error: string | null
     extraction_outcomes: string | null
     visibility: string
+    audio_chunks_json: string | null
     created_at: string
     updated_at: string
   }>(
@@ -79,6 +80,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const isAudioOnly = (vlog.mime_type ?? '').startsWith('audio/')
   let videoUrl: string | null = null
   let audioUrl: string | null = null
+  let audioChunkUrls: string[] | null = null
+  let audioBytesTotal: number | null = null
   if (isAudioOnly) {
     // Try the stitched MP3 written by the transcribe step.
     const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
@@ -87,6 +90,37 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       if (head) audioUrl = await presignGetUrl(env, mp3Key, 3600)
     } catch (err: any) {
       console.warn(`[vlogs/[id]] audio-only mp3 presign failed: ${err?.message}`)
+    }
+
+    // Fallback: serve the browser-uploaded WAV chunks. Single chunk plays
+    // straight from <audio>; multi-chunk needs the client to advance.
+    // (Future: pipeline writes a stitched mp3.full so this path stops
+    // mattering — but keep it as a belt for any vlog that didn't get
+    // stitched.)
+    if (!audioUrl && vlog.audio_chunks_json) {
+      try {
+        const manifest = JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; bytes?: number }>
+        if (Array.isArray(manifest) && manifest.length > 0) {
+          const urls: string[] = []
+          let total = 0
+          for (const c of manifest) {
+            try {
+              const head = await env.VIDEOS.head(c.r2_key)
+              if (head) {
+                urls.push(await presignGetUrl(env, c.r2_key, 3600))
+                total += typeof c.bytes === 'number' ? c.bytes : (head.size ?? 0)
+              }
+            } catch {}
+          }
+          if (urls.length > 0) {
+            audioChunkUrls = urls
+            audioUrl = urls[0]
+            audioBytesTotal = total > 0 ? total : null
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[vlogs/[id]] audio chunks fallback failed: ${err?.message}`)
+      }
     }
   } else {
     const playbackKey = vlog.transcoded_r2_key || vlog.r2_key
@@ -256,8 +290,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     r2_key: _r2,
     transcoded_r2_key: _tr2,
     thumbnail_r2_key: _thumbr2,
+    audio_chunks_json: _acj,
     ...safeVlog
   } = vlog
+  // For audio-only uploads, file_size_bytes on the row is the source video
+  // size (we never uploaded the video, just keep the original for dedup).
+  // Display the actual extracted audio size so the operator doesn't see
+  // "1.92 GB" on a 1-minute audio clip.
+  if (isAudioOnly && audioBytesTotal != null) {
+    safeVlog.file_size_bytes = audioBytesTotal
+  }
   // ── Extra fields for the comprehensive Vlog detail page ──────────
   // navigation: prev/next vlog by recorded_at; anchor thread = the
   // strongest thread for this vlog; entity_mention_times = timestamps
@@ -324,9 +366,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   return NextResponse.json({
-    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, audio_url: audioUrl, is_audio_only: isAudioOnly, has_transcoded: hasTranscoded },
+    vlog: {
+      ...safeVlog,
+      thumbnail_url: thumbnailUrl,
+      playback_url: videoUrl,
+      audio_url: audioUrl,
+      audio_chunk_urls: audioChunkUrls,
+      is_audio_only: isAudioOnly,
+      has_transcoded: hasTranscoded,
+    },
     video_url: videoUrl,
     audio_url: audioUrl,
+    audio_chunk_urls: audioChunkUrls,
     threads,
     clips,
     creative_elements,

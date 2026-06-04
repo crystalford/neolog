@@ -613,7 +613,12 @@ async function processOne(
         // downstream playback/transcode code branches on that.
         r2_key: initiate.key,
         original_filename: file.name,
-        file_size_bytes: file.size,
+        // For audio-only, the source video bytes never got uploaded, so
+        // file.size (the original DJI MP4 size) would be misleading.
+        // Send the sum of audio chunk bytes instead.
+        file_size_bytes: audioOnly && audioChunksManifest
+          ? audioChunksManifest.reduce((s, c) => s + (c.bytes || 0), 0)
+          : file.size,
         mime_type: audioOnly ? 'audio/mpeg' : (file.type || 'application/octet-stream'),
         recorded_at: recordedAt,
         archive,
