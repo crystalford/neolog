@@ -65,7 +65,8 @@ export default function SystemPage() {
   const [state, setState] = useState<RuntimeState | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  // Default OFF — was a 10s D1 poll from any open tab, steady ambient cost.
+  const [autoRefresh, setAutoRefresh] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [stepFilter, setStepFilter] = useState<string>('')
   const [vlogFilter, setVlogFilter] = useState<string>('')
@@ -92,7 +93,9 @@ export default function SystemPage() {
   useEffect(() => { load() }, [statusFilter, stepFilter, vlogFilter])
   useEffect(() => {
     if (!autoRefresh) return
-    const t = setInterval(load, 10_000)
+    // Don't poll while the tab is hidden.
+    const tick = () => { if (!document.hidden) load() }
+    const t = setInterval(tick, 10_000)
     return () => clearInterval(t)
   }, [autoRefresh, statusFilter, stepFilter, vlogFilter])
 

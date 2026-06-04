@@ -57,6 +57,13 @@ export interface CapturePanelProps {
 
 export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps) {
   const [archive, setArchive] = useState(false)
+  // Audio-only mode: extract audio in the browser as usual, but SKIP uploading
+  // the video file itself. For times when the operator is on bad wifi (hotel,
+  // coffee shop) and uploading 1GB+ DJI files isn't realistic. Transcription,
+  // threads, extraction all still happen because they only need audio. The
+  // original stays on the operator's machine; they can drop it in later from
+  // a good connection (filename + size dedup attaches it).
+  const [audioOnly, setAudioOnly] = useState(false)
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [dragging, setDragging] = useState(false)
   const [running, setRunning] = useState(false)
@@ -132,13 +139,13 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
           })
         })
         if (!next) break
-        await processOne(next, archive, updateEntry, () => cancelRef.current, getLatestEntry)
+        await processOne(next, { archive, audioOnly }, updateEntry, () => cancelRef.current, getLatestEntry)
       }
     } finally {
       setRunning(false)
       if (onUploaded) onUploaded()
     }
-  }, [running, archive, updateEntry, onUploaded, getLatestEntry])
+  }, [running, archive, audioOnly, updateEntry, onUploaded, getLatestEntry])
 
   const cancelQueue = useCallback(() => { cancelRef.current = true }, [])
 
@@ -242,6 +249,45 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
             position: 'absolute', top: 2, left: archive ? 18 : 2,
             width: 16, height: 16, borderRadius: '50%',
             background: archive ? '#061735' : 'var(--fg-2)',
+            transition: 'left .15s',
+          }}/>
+        </button>
+      </div>
+
+      {/* Audio-only toggle */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '10px 14px',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--line-1)',
+        borderRadius: 8,
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
+            textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 2,
+          }}>Audio only</div>
+          <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
+            Extract audio in the browser, skip the video bytes. For bad wifi —
+            uploads in seconds instead of GB. Drop the original later from a
+            good connection to attach the video.
+          </div>
+        </div>
+        <button
+          onClick={() => setAudioOnly(a => !a)}
+          aria-pressed={audioOnly}
+          style={{
+            width: 38, height: 22, borderRadius: 100,
+            background: audioOnly ? 'var(--sig)' : 'var(--bg-4)',
+            border: `1px solid ${audioOnly ? 'var(--sig)' : 'var(--line-2)'}`,
+            cursor: 'pointer', position: 'relative',
+            transition: 'all .15s',
+          }}
+        >
+          <span style={{
+            position: 'absolute', top: 2, left: audioOnly ? 18 : 2,
+            width: 16, height: 16, borderRadius: '50%',
+            background: audioOnly ? '#061735' : 'var(--fg-2)',
             transition: 'left .15s',
           }}/>
         </button>
@@ -391,12 +437,13 @@ function statusLabel(e: FileEntry): string {
 
 async function processOne(
   entry: FileEntry,
-  archive: boolean,
+  opts: { archive: boolean; audioOnly: boolean },
   update: (id: string, patch: Partial<FileEntry>) => void,
   isCanceled: () => boolean,
   getLatestEntry: (id: string) => FileEntry | undefined,
 ): Promise<void> {
   const { file, id } = entry
+  const { archive, audioOnly } = opts
 
   update(id, { status: 'checking_dup' })
   try {
@@ -431,52 +478,65 @@ async function processOne(
 
   if (isCanceled()) { update(id, { status: 'queued' }); return }
 
-  update(id, { status: 'uploading' })
-  const totalParts = initiate.partUrls.length
-  const partResults: { partNumber: number; etag: string }[] = new Array(totalParts)
-  let completedParts = 0
-  let completedBytes = 0
-  let failedError: string | null = null
-  let nextPartIndex = 0
-  const inFlight: Promise<void>[] = []
+  if (!audioOnly) {
+    // Normal path: multipart-upload the video bytes, then complete.
+    update(id, { status: 'uploading' })
+    const totalParts = initiate.partUrls.length
+    const partResults: { partNumber: number; etag: string }[] = new Array(totalParts)
+    let completedParts = 0
+    let completedBytes = 0
+    let failedError: string | null = null
+    let nextPartIndex = 0
+    const inFlight: Promise<void>[] = []
 
-  const launchOne = async (): Promise<void> => {
-    while (nextPartIndex < totalParts) {
-      if (isCanceled() || failedError) return
-      const i = nextPartIndex++
-      const partNumber = i + 1
-      const start = i * PART_SIZE
-      const end = Math.min(start + PART_SIZE, file.size)
-      const blob = file.slice(start, end)
-      try {
-        const etag = await uploadPartWithRetry(initiate.partUrls[i], blob, partNumber)
-        partResults[i] = { partNumber, etag }
-        completedParts++
-        completedBytes += (end - start)
-        update(id, { progress: completedParts / totalParts, bytes_uploaded: completedBytes })
-      } catch (err: any) {
-        failedError = `part ${partNumber}: ${err?.message || String(err)}`
-        return
+    const launchOne = async (): Promise<void> => {
+      while (nextPartIndex < totalParts) {
+        if (isCanceled() || failedError) return
+        const i = nextPartIndex++
+        const partNumber = i + 1
+        const start = i * PART_SIZE
+        const end = Math.min(start + PART_SIZE, file.size)
+        const blob = file.slice(start, end)
+        try {
+          const etag = await uploadPartWithRetry(initiate.partUrls[i], blob, partNumber)
+          partResults[i] = { partNumber, etag }
+          completedParts++
+          completedBytes += (end - start)
+          update(id, { progress: completedParts / totalParts, bytes_uploaded: completedBytes })
+        } catch (err: any) {
+          failedError = `part ${partNumber}: ${err?.message || String(err)}`
+          return
+        }
       }
     }
-  }
 
-  for (let i = 0; i < Math.min(PARTS_CONCURRENCY, totalParts); i++) inFlight.push(launchOne())
-  await Promise.all(inFlight)
+    for (let i = 0; i < Math.min(PARTS_CONCURRENCY, totalParts); i++) inFlight.push(launchOne())
+    await Promise.all(inFlight)
 
-  if (isCanceled()) { update(id, { status: 'queued' }); return }
-  if (failedError) { update(id, { status: 'failed', error: failedError }); return }
+    if (isCanceled()) { update(id, { status: 'queued' }); return }
+    if (failedError) { update(id, { status: 'failed', error: failedError }); return }
 
-  update(id, { status: 'finalizing' })
-  try {
-    const r = await fetch('/api/v2/upload/complete', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      body: JSON.stringify({ uploadId: initiate.uploadId, key: initiate.key, parts: partResults }),
-    })
-    if (!r.ok) throw new Error(`complete ${r.status}`)
-  } catch (err: any) {
-    update(id, { status: 'failed', error: err?.message || String(err) })
-    return
+    update(id, { status: 'finalizing' })
+    try {
+      const r = await fetch('/api/v2/upload/complete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ uploadId: initiate.uploadId, key: initiate.key, parts: partResults }),
+      })
+      if (!r.ok) throw new Error(`complete ${r.status}`)
+    } catch (err: any) {
+      update(id, { status: 'failed', error: err?.message || String(err) })
+      return
+    }
+  } else {
+    // Audio-only: skip the multipart video upload entirely. We still keep
+    // initiate.key as the per-vlog upload ULID — the audio-chunk presigner
+    // uses it to derive the {operator}/uploads/{ulid}/audio/chunk_*.wav
+    // paths. The video r2_key stays null on the vlog row; downstream
+    // playback falls back to the stitched MP3 produced by the pipeline.
+    update(id, { status: 'finalizing', message: 'audio-only: skipping video upload' })
+    // Mark "progress complete" for the file-bytes meter so the UI doesn't
+    // sit at 0% — none of the file bytes will be uploaded.
+    update(id, { progress: 1, bytes_uploaded: file.size })
   }
 
   // Browser thumbnail — already captured in addFiles() and stored on the
@@ -531,10 +591,14 @@ async function processOne(
     const r = await fetch('/api/v2/vlogs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({
+        // r2_key stays the upload prefix path in both modes — audio chunks
+        // live under it at /audio/chunk_*.wav whether or not the video itself
+        // was uploaded. Audio-only mode is signaled by mime_type 'audio/*';
+        // downstream playback/transcode code branches on that.
         r2_key: initiate.key,
         original_filename: file.name,
         file_size_bytes: file.size,
-        mime_type: file.type || 'application/octet-stream',
+        mime_type: audioOnly ? 'audio/mpeg' : (file.type || 'application/octet-stream'),
         recorded_at: recordedAt,
         archive,
         thumbnail_blob_base64: thumbnailBase64,
