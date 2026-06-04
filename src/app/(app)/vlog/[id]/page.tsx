@@ -219,7 +219,13 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
   // Prefer the AI-derived title from extraction. Falls back to the
   // de-uglified DJI filename only when extraction hasn't run yet.
-  const title = (vlog.title && vlog.title.trim()) || deriveVlogTitle(vlog.original_filename)
+  // Title precedence: AI-derived (vlog.title) → anchor thread's take →
+  // deuglified filename. The anchor-take fallback rescues short vlogs where
+  // the LLM didn't synthesize a usable title (e.g. "I don't know what to do.").
+  const anchorTitle = anchorThread?.take?.trim() || anchorThread?.topic?.trim() || ''
+  const title = (vlog.title && vlog.title.trim())
+    || (anchorTitle ? truncate(anchorTitle, 80) : '')
+    || deriveVlogTitle(vlog.original_filename)
   const status = vlog.pipeline_status
   const isBroll = status === 'archived'
   const isProcessing = ['uploaded', 'transcoding', 'thumbnail_pending', 'transcribing', 'extracting'].includes(status)

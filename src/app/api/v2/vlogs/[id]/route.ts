@@ -70,23 +70,48 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   )
   if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Presign playback URL. Three cases:
-  //   1. Audio-only upload (mime_type 'audio/*'): no video file ever uploaded
-  //      — return the stitched MP3 the pipeline produces (or null if it
-  //      hasn't run yet). Client renders an <audio> player.
+  // Presign playback URL.
+  //   1. Audio-only upload (mime_type 'audio/*'): no video file. Prefer the
+  //      stitched MP3 if it exists; otherwise fall back to the first browser-
+  //      uploaded WAV chunk (most audio-only vlogs are short enough to fit in
+  //      one chunk). Returns a list of chunk URLs for multi-chunk playback.
   //   2. Video with a transcoded H.264 copy: prefer that (always browser-decodable).
   //   3. Video without transcode: presign the original.
   const isAudioOnly = (vlog.mime_type ?? '').startsWith('audio/')
   let videoUrl: string | null = null
   let audioUrl: string | null = null
+  let audioChunkUrls: string[] | null = null
   if (isAudioOnly) {
-    // Try the stitched MP3 written by the transcribe step.
     const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
     try {
       const head = await env.VIDEOS.head(mp3Key)
       if (head) audioUrl = await presignGetUrl(env, mp3Key, 3600)
     } catch (err: any) {
-      console.warn(`[vlogs/[id]] audio-only mp3 presign failed: ${err?.message}`)
+      console.warn(`[vlogs/[id]] audio-only mp3 head/presign failed: ${err?.message}`)
+    }
+    if (!audioUrl) {
+      // Fall back to the browser-uploaded WAV chunks. Parse the manifest, head-
+      // check each (a chunk may have failed to upload), presign the ones that
+      // exist. Single-chunk vlogs (short recordings) end up with one URL the
+      // <audio> element plays directly; multi-chunk needs client-side queueing.
+      try {
+        const manifest = vlog.audio_chunks_json
+          ? JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; start_sec: number; end_sec: number }>
+          : []
+        const urls: string[] = []
+        for (const c of manifest) {
+          try {
+            const h = await env.VIDEOS.head(c.r2_key)
+            if (h) urls.push(await presignGetUrl(env, c.r2_key, 3600))
+          } catch { /* skip missing chunk */ }
+        }
+        if (urls.length > 0) {
+          audioChunkUrls = urls
+          audioUrl = urls[0]   // <audio src=...> plays the first chunk by default
+        }
+      } catch (err: any) {
+        console.warn(`[vlogs/[id]] audio chunks fallback failed: ${err?.message}`)
+      }
     }
   } else {
     const playbackKey = vlog.transcoded_r2_key || vlog.r2_key
@@ -324,9 +349,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   return NextResponse.json({
-    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, audio_url: audioUrl, is_audio_only: isAudioOnly, has_transcoded: hasTranscoded },
+    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, audio_url: audioUrl, audio_chunk_urls: audioChunkUrls, is_audio_only: isAudioOnly, has_transcoded: hasTranscoded },
     video_url: videoUrl,
     audio_url: audioUrl,
+    audio_chunk_urls: audioChunkUrls,
     threads,
     clips,
     creative_elements,
