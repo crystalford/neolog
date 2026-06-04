@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS vlogs (
   extraction_outcomes      TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
   is_podcast               INTEGER NOT NULL DEFAULT 0,
+  slideshow_frames_json    TEXT,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

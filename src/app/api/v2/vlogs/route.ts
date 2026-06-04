@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
         thumbnail_url?: string | null
         thumbnail_blob_base64?: string | null  // browser-captured JPEG, written to R2 inline
         audio_chunks_json?: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null
+        slideshow_frames_json?: Array<{ r2_key: string; time_sec: number; bytes: number }> | null
         archive?: boolean
       }
     | null
@@ -147,16 +148,32 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Validate slideshow-mode frames manifest (same prefix discipline as
+  // audio chunks). slideshow_frames_json: [{ r2_key, time_sec, bytes }].
+  let slideshowFramesJson: string | null = null
+  if (Array.isArray(body.slideshow_frames_json) && body.slideshow_frames_json.length > 0) {
+    const expectedPrefix = body.r2_key.split('/').slice(0, 3).join('/')
+    const ok = body.slideshow_frames_json.every(f =>
+      typeof f?.r2_key === 'string' &&
+      f.r2_key.startsWith(`${expectedPrefix}/slideshow/`) &&
+      typeof f.time_sec === 'number' &&
+      typeof f.bytes === 'number',
+    )
+    if (ok) {
+      slideshowFramesJson = JSON.stringify(body.slideshow_frames_json)
+    }
+  }
+
   await run(
     db,
     `INSERT INTO vlogs (
        id, operator_id, r2_key, original_filename, file_size_bytes, mime_type,
        recorded_at, recorded_at_source, thumbnail_url, thumbnail_r2_key, pipeline_status,
-       audio_chunks_json
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       audio_chunks_json, slideshow_frames_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id, operator.id, body.r2_key, body.original_filename, body.file_size_bytes, body.mime_type,
     derived.recorded_at, derived.recorded_at_source, body.thumbnail_url ?? null, thumbnailR2Key, pipelineStatus,
-    audioChunksJson,
+    audioChunksJson, slideshowFramesJson,
   )
 
   // Trigger the post-upload Workflow when not in archive mode.

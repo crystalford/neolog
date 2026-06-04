@@ -63,6 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     visibility: string
     is_podcast: number | null
     audio_chunks_json: string | null
+    slideshow_frames_json: string | null
     created_at: string
     updated_at: string
   }>(
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   let audioUrl: string | null = null
   let audioChunkUrls: string[] | null = null
   let audioBytesTotal: number | null = null
+  let slideshowFrames: Array<{ url: string; time_sec: number }> | null = null
   if (isAudioOnly) {
     // Try the stitched MP3 written by the transcribe step.
     const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
@@ -129,6 +131,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       videoUrl = await presignGetUrl(env, playbackKey, 3600)
     } catch (err: any) {
       console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
+    }
+  }
+
+  // Slideshow mode: presign each stored frame for the in-page renderer.
+  if (vlog.slideshow_frames_json) {
+    try {
+      const manifest = JSON.parse(vlog.slideshow_frames_json) as Array<{ r2_key: string; time_sec: number }>
+      if (Array.isArray(manifest) && manifest.length > 0) {
+        const arr: Array<{ url: string; time_sec: number }> = []
+        for (const f of manifest) {
+          try {
+            const url = await presignGetUrl(env, f.r2_key, 3600)
+            arr.push({ url, time_sec: f.time_sec })
+          } catch {}
+        }
+        if (arr.length > 0) slideshowFrames = arr
+      }
+    } catch (err: any) {
+      console.warn(`[vlogs/[id]] slideshow presign failed: ${err?.message}`)
     }
   }
 
@@ -292,6 +313,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     transcoded_r2_key: _tr2,
     thumbnail_r2_key: _thumbr2,
     audio_chunks_json: _acj,
+    slideshow_frames_json: _sfj,
     ...safeVlog
   } = vlog
   // For audio-only uploads, file_size_bytes on the row is the source video
@@ -373,12 +395,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       playback_url: videoUrl,
       audio_url: audioUrl,
       audio_chunk_urls: audioChunkUrls,
+      slideshow_frames: slideshowFrames,
       is_audio_only: isAudioOnly,
       has_transcoded: hasTranscoded,
     },
     video_url: videoUrl,
     audio_url: audioUrl,
     audio_chunk_urls: audioChunkUrls,
+    slideshow_frames: slideshowFrames,
     threads,
     clips,
     creative_elements,

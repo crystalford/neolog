@@ -57,13 +57,17 @@ export interface CapturePanelProps {
 
 export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps) {
   const [archive, setArchive] = useState(false)
-  // Audio-only mode: extract audio in the browser as usual, but SKIP uploading
-  // the video file itself. For times when the operator is on bad wifi (hotel,
-  // coffee shop) and uploading 1GB+ DJI files isn't realistic. Transcription,
-  // threads, extraction all still happen because they only need audio. The
-  // original stays on the operator's machine; they can drop it in later from
-  // a good connection (filename + size dedup attaches it).
-  const [audioOnly, setAudioOnly] = useState(false)
+  // Bad-wifi upload mode. Four-way:
+  //   'full'        — normal multipart upload of the whole video. Default.
+  //   'compressed'  — re-encode in-browser to ~250 kbps webm, upload that.
+  //                   Operator still sees video, but on a 4 GB DJI 4K it lands
+  //                   ~60 MB instead.
+  //   'slideshow'   — extract one still per 5 seconds + audio. Vlog page
+  //                   renders the stills timed to audio playback. Tiny payload.
+  //   'audio_only'  — audio chunks only, no video. Smallest upload.
+  // All three "lite" modes extract audio chunks the browser way, so threads /
+  // creative / clip extraction works exactly like a full upload would.
+  const [uploadMode, setUploadMode] = useState<'full' | 'compressed' | 'slideshow' | 'audio_only'>('full')
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [dragging, setDragging] = useState(false)
   const [running, setRunning] = useState(false)
@@ -139,13 +143,13 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
           })
         })
         if (!next) break
-        await processOne(next, { archive, audioOnly }, updateEntry, () => cancelRef.current, getLatestEntry)
+        await processOne(next, { archive, uploadMode }, updateEntry, () => cancelRef.current, getLatestEntry)
       }
     } finally {
       setRunning(false)
       if (onUploaded) onUploaded()
     }
-  }, [running, archive, audioOnly, updateEntry, onUploaded, getLatestEntry])
+  }, [running, archive, uploadMode, updateEntry, onUploaded, getLatestEntry])
 
   const cancelQueue = useCallback(() => { cancelRef.current = true }, [])
 
@@ -254,43 +258,62 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
         </button>
       </div>
 
-      {/* Audio-only toggle */}
+      {/* Upload mode picker — 4 buttons, mutually exclusive */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 14px',
         background: 'var(--bg-2)',
         border: '1px solid var(--line-1)',
         borderRadius: 8,
+        display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
             textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 2,
-          }}>Audio only</div>
+          }}>Upload mode</div>
           <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-            Extract audio in the browser, skip the video bytes. For bad wifi —
-            uploads in seconds instead of GB. Drop the original later from a
-            good connection to attach the video.
+            Pick how much of the video to upload. Lite modes are for bad wifi.
           </div>
         </div>
-        <button
-          onClick={() => setAudioOnly(a => !a)}
-          aria-pressed={audioOnly}
-          style={{
-            width: 38, height: 22, borderRadius: 100,
-            background: audioOnly ? 'var(--sig)' : 'var(--bg-4)',
-            border: `1px solid ${audioOnly ? 'var(--sig)' : 'var(--line-2)'}`,
-            cursor: 'pointer', position: 'relative',
-            transition: 'all .15s',
-          }}
-        >
-          <span style={{
-            position: 'absolute', top: 2, left: audioOnly ? 18 : 2,
-            width: 16, height: 16, borderRadius: '50%',
-            background: audioOnly ? '#061735' : 'var(--fg-2)',
-            transition: 'left .15s',
-          }}/>
-        </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {([
+            { key: 'full', label: 'Full', sub: 'Original quality' },
+            { key: 'compressed', label: 'Compressed', sub: '~250 kbps webm' },
+            { key: 'slideshow', label: 'Slideshow', sub: 'Stills + audio' },
+            { key: 'audio_only', label: 'Audio only', sub: 'No video' },
+          ] as const).map(m => {
+            const active = uploadMode === m.key
+            return (
+              <button
+                key={m.key}
+                onClick={() => setUploadMode(m.key)}
+                aria-pressed={active}
+                style={{
+                  padding: '8px 6px',
+                  background: active ? 'var(--sig-soft)' : 'var(--bg-3)',
+                  border: `1px solid ${active ? 'var(--sig)' : 'var(--line-2)'}`,
+                  color: active ? 'var(--fg)' : 'var(--fg-2)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{m.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
+                  {m.sub}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {uploadMode !== 'full' && (
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.4 }}>
+            {uploadMode === 'compressed' && 'Real-time re-encode in your browser — runtime ≈ clip duration. Tab must stay open.'}
+            {uploadMode === 'slideshow' && 'One still every 5 sec + streaming audio. Vlog page plays them in sync.'}
+            {uploadMode === 'audio_only' && 'Streaming audio extract — real-time. Drop the original later to attach video.'}
+          </div>
+        )}
       </div>
 
       {/* Queue summary + actions */}
@@ -437,13 +460,22 @@ function statusLabel(e: FileEntry): string {
 
 async function processOne(
   entry: FileEntry,
-  opts: { archive: boolean; audioOnly: boolean },
+  opts: { archive: boolean; uploadMode: 'full' | 'compressed' | 'slideshow' | 'audio_only' },
   update: (id: string, patch: Partial<FileEntry>) => void,
   isCanceled: () => boolean,
   getLatestEntry: (id: string) => FileEntry | undefined,
 ): Promise<void> {
   const { file, id } = entry
-  const { archive, audioOnly } = opts
+  const { archive, uploadMode } = opts
+  const audioOnly = uploadMode === 'audio_only'
+  const slideshow = uploadMode === 'slideshow'
+  const compressed = uploadMode === 'compressed'
+  const skipVideoUpload = audioOnly || slideshow
+  // For compressed mode we substitute the file with the re-encoded webm
+  // before multipart upload; declare it here so it's visible later.
+  let uploadFile: File | Blob = file
+  let uploadMime: string = file.type || 'application/octet-stream'
+  let uploadSize: number = file.size
 
   update(id, { status: 'checking_dup' })
   try {
@@ -462,12 +494,38 @@ async function processOne(
 
   if (isCanceled()) { update(id, { status: 'queued' }); return }
 
+  // Compressed mode: re-encode the source to a tiny webm BEFORE we
+  // initiate the multipart upload (so initiate's fileSize matches the
+  // bytes we'll actually upload). Real-time encode.
+  if (compressed) {
+    try {
+      update(id, { status: 'finalizing', message: 'compressing video (real-time)… 0%' })
+      const { recordCompressedVideo } = await import('@/lib/browser-audio')
+      const out = await recordCompressedVideo(file, {
+        targetWidth: 640, fps: 12,
+        onProgress: ratio => update(id, {
+          message: `compressing video (real-time)… ${Math.round(ratio * 100)}%`,
+        }),
+      })
+      uploadFile = out
+      uploadMime = out.type || 'video/webm'
+      uploadSize = out.size
+    } catch (err: any) {
+      update(id, { status: 'failed', error: `compress failed: ${err?.message || err}` })
+      return
+    }
+  }
+
   update(id, { status: 'initiating', progress: 0, bytes_uploaded: 0 })
   let initiate: { uploadId: string; key: string; partUrls: string[] }
   try {
     const r = await fetch('/api/v2/upload/initiate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      body: JSON.stringify({ fileName: file.name, mimeType: file.type || 'application/octet-stream', fileSize: file.size }),
+      body: JSON.stringify({
+        fileName: compressed ? file.name.replace(/\.[^.]+$/, '') + '.webm' : file.name,
+        mimeType: uploadMime,
+        fileSize: uploadSize,
+      }),
     })
     if (!r.ok) throw new Error(`initiate ${r.status}`)
     initiate = await r.json()
@@ -478,8 +536,8 @@ async function processOne(
 
   if (isCanceled()) { update(id, { status: 'queued' }); return }
 
-  if (!audioOnly) {
-    // Normal path: multipart-upload the video bytes, then complete.
+  if (!skipVideoUpload) {
+    // Normal / compressed paths: multipart-upload the bytes, then complete.
     update(id, { status: 'uploading' })
     const totalParts = initiate.partUrls.length
     const partResults: { partNumber: number; etag: string }[] = new Array(totalParts)
@@ -495,8 +553,8 @@ async function processOne(
         const i = nextPartIndex++
         const partNumber = i + 1
         const start = i * PART_SIZE
-        const end = Math.min(start + PART_SIZE, file.size)
-        const blob = file.slice(start, end)
+        const end = Math.min(start + PART_SIZE, uploadSize)
+        const blob = uploadFile.slice(start, end)
         try {
           const etag = await uploadPartWithRetry(initiate.partUrls[i], blob, partNumber)
           partResults[i] = { partNumber, etag }
@@ -528,15 +586,11 @@ async function processOne(
       return
     }
   } else {
-    // Audio-only: skip the multipart video upload entirely. We still keep
-    // initiate.key as the per-vlog upload ULID — the audio-chunk presigner
-    // uses it to derive the {operator}/uploads/{ulid}/audio/chunk_*.wav
-    // paths. The video r2_key stays null on the vlog row; downstream
-    // playback falls back to the stitched MP3 produced by the pipeline.
-    update(id, { status: 'finalizing', message: 'audio-only: skipping video upload' })
-    // Mark "progress complete" for the file-bytes meter so the UI doesn't
-    // sit at 0% — none of the file bytes will be uploaded.
-    update(id, { progress: 1, bytes_uploaded: file.size })
+    update(id, {
+      status: 'finalizing',
+      message: slideshow ? 'slideshow mode: skipping video upload' : 'audio-only: skipping video upload',
+    })
+    update(id, { progress: 1, bytes_uploaded: uploadSize })
   }
 
   // Browser thumbnail — already captured in addFiles() and stored on the
@@ -580,7 +634,12 @@ async function processOne(
         },
       })
       let chunks
-      if (audioOnly) {
+      if (audioOnly || slideshow || compressed) {
+        // Lite modes: source is the original (huge) file, streaming is the
+        // only path that survives. (For compressed we already produced a
+        // tiny webm, but the audio was decoded inside MediaRecorder — we
+        // still re-extract from the original here for accuracy. Streaming
+        // works on the original at any size.)
         chunks = await tryStreaming()
       } else {
         try {
@@ -624,7 +683,7 @@ async function processOne(
   // on, so if browser audio extraction failed (HEVC the browser can't decode,
   // codec error, etc.) the pipeline has nothing to transcribe. Fail-fast
   // instead of registering a doomed row.
-  if (audioOnly && (!audioChunksManifest || audioChunksManifest.length === 0)) {
+  if ((audioOnly || slideshow) && (!audioChunksManifest || audioChunksManifest.length === 0)) {
     update(id, {
       status: 'failed',
       error: audioExtractError
@@ -634,29 +693,59 @@ async function processOne(
     return
   }
 
+  // Slideshow frame extraction (only for slideshow mode).
+  let slideshowManifest: Array<{ r2_key: string; time_sec: number; bytes: number }> | null = null
+  if (slideshow) {
+    try {
+      update(id, { status: 'finalizing', message: 'extracting slideshow frames…' })
+      const { extractSlideshowFrames, uploadFrameToR2 } = await import('@/lib/browser-audio')
+      const frames = await extractSlideshowFrames(file, {
+        intervalSec: 5,
+        onProgress: info => update(id, {
+          message: `extracting frames… ${info.frameIndex}/${info.totalFrames}`,
+        }),
+      })
+      const manifest: Array<{ r2_key: string; time_sec: number; bytes: number }> = []
+      for (let i = 0; i < frames.length; i++) {
+        update(id, { message: `uploading frame ${i + 1}/${frames.length}` })
+        const presign = await fetch('/api/v2/upload/slideshow-frame-presign', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ key: initiate.key, frame_index: i }),
+        })
+        if (!presign.ok) throw new Error(`frame presign ${presign.status}`)
+        const { presigned_url, r2_key } = await presign.json() as { presigned_url: string; r2_key: string }
+        await uploadFrameToR2(presigned_url, frames[i].blob)
+        manifest.push({ r2_key, time_sec: frames[i].timeSec, bytes: frames[i].bytes })
+      }
+      slideshowManifest = manifest
+    } catch (err: any) {
+      update(id, { status: 'failed', error: `slideshow frame extract failed: ${err?.message || err}` })
+      return
+    }
+  }
+
   update(id, { status: 'registering' })
   const recordedAt = inferDateFromFilename(file.name)
   try {
     const r = await fetch('/api/v2/vlogs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({
-        // r2_key stays the upload prefix path in both modes — audio chunks
-        // live under it at /audio/chunk_*.wav whether or not the video itself
-        // was uploaded. Audio-only mode is signaled by mime_type 'audio/*';
-        // downstream playback/transcode code branches on that.
+        // r2_key stays the upload prefix path in lite modes — audio chunks +
+        // slideshow stills live under it whether or not the video itself was
+        // uploaded. The pipeline branches on mime_type (audio/* → no
+        // transcode, no audio_extract).
         r2_key: initiate.key,
         original_filename: file.name,
-        // For audio-only, the source video bytes never got uploaded, so
-        // file.size (the original DJI MP4 size) would be misleading.
-        // Send the sum of audio chunk bytes instead.
-        file_size_bytes: audioOnly && audioChunksManifest
-          ? audioChunksManifest.reduce((s, c) => s + (c.bytes || 0), 0)
-          : file.size,
-        mime_type: audioOnly ? 'audio/mpeg' : (file.type || 'application/octet-stream'),
+        file_size_bytes: skipVideoUpload
+          ? (audioChunksManifest?.reduce((s, c) => s + (c.bytes || 0), 0) ?? 0)
+            + (slideshowManifest?.reduce((s, f) => s + (f.bytes || 0), 0) ?? 0)
+          : uploadSize,
+        mime_type: skipVideoUpload ? 'audio/mpeg' : uploadMime,
         recorded_at: recordedAt,
         archive,
         thumbnail_blob_base64: thumbnailBase64,
         audio_chunks_json: audioChunksManifest,
+        slideshow_frames_json: slideshowManifest,
       }),
     })
     if (r.status === 409) {

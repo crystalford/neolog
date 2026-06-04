@@ -59,6 +59,7 @@ interface VlogDetail {
   playback_url: string | null
   audio_url?: string | null
   audio_chunk_urls?: string[] | null
+  slideshow_frames?: Array<{ url: string; time_sec: number }> | null
   is_audio_only?: boolean
   has_transcoded?: boolean
   extraction_outcomes: string | null
@@ -388,6 +389,9 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 }}>
                   Audio-only upload · drop the original file in later to attach the video
                 </div>
+                {vlog.slideshow_frames && vlog.slideshow_frames.length > 0 && (
+                  <SlideshowStage frames={vlog.slideshow_frames} currentT={currentT}/>
+                )}
                 {vlog.audio_url ? (
                   <AudioOnlyPlayer
                     audioUrl={vlog.audio_url}
@@ -866,6 +870,43 @@ function AudioOnlyPlayer({
         }}>
           Part {idx + 1} of {list.length}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * SlideshowStage — picks the latest frame whose time_sec ≤ currentT and
+ * renders it. Frames must already be sorted by time_sec asc (the API
+ * builds them in that order).
+ */
+function SlideshowStage({
+  frames, currentT,
+}: {
+  frames: Array<{ url: string; time_sec: number }>
+  currentT: number
+}) {
+  const active = useMemo(() => {
+    let pick = frames[0]
+    for (const f of frames) {
+      if (f.time_sec <= currentT) pick = f
+      else break
+    }
+    return pick
+  }, [frames, currentT])
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '16 / 9',
+      background: '#050505', borderRadius: 10, overflow: 'hidden',
+      border: '1px solid var(--line-1)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {active && (
+        <img
+          src={active.url}
+          alt=""
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+        />
       )}
     </div>
   )

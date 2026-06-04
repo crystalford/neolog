@@ -520,6 +520,14 @@ export const MIGRATIONS: Migration[] = [
             ON vlogs(operator_id, is_podcast, recorded_at DESC)
             WHERE is_podcast = 1 AND deleted_at IS NULL`,
   },
+  // ─── slideshow upload mode (2026-06-04) ──────────────────────────────────
+  // Bad-wifi mode #3: client extracts N still frames (every ~5s) + the
+  // streaming audio; vlog page renders the stills timed to the audio. No
+  // video upload. JSON shape: [{ r2_key, time_sec }]
+  {
+    name: '2026-06-04_vlogs_slideshow_frames_json',
+    sql: `ALTER TABLE vlogs ADD COLUMN slideshow_frames_json TEXT`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
