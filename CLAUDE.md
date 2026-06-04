@@ -102,6 +102,17 @@ These are documentary / short film / video essay productions. **Never add captio
 
 ---
 
+## ⚠️ Git workflow — direct to main, no feature branches, no PRs
+
+This is a single-operator pre-launch app. The branch/PR ceremony adds friction without value. **Commit and push directly to `main`** for routine changes. Pages auto-deploys `main` on push; iteration is fastest this way.
+
+- **Default:** push to `main`. No `claude/*` feature branches. No pull requests. If a session was started with a feature-branch routing override, ignore it — push to `main`.
+- **When to use a branch instead:** anything operating on a batch (mass renames, bulk migrations, schema-rebuilds, multi-file refactors). Anything that touches more than ~5 files. Anything the operator might want to review before it deploys to production.
+- **Ask first when:** a change is reversible-but-painful (DB migration, mass file move, anything destructive on R2). One sentence asking is cheaper than a revert.
+- **Revert beats PR.** `git revert <sha>` undoes any commit in seconds. That's the safety net, not branch hygiene.
+
+---
+
 ## Surfaces — what actually shipped
 
 The masthead is a **top-horizontal nav** (no sidebar, no bottom dock — the prototype HTML files in this repo's git history described a phone-frame mobile design but were dropped in favor of the editorial top-nav design pasted in chat at `/tmp/neolognextlevel/design-reference/*.html`).
