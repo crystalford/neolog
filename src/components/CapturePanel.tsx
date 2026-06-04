@@ -556,6 +556,7 @@ async function processOne(
 
   // Browser audio chunks
   let audioChunksManifest: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null = null
+  let audioExtractError: string | null = null
   if ((file.type || '').startsWith('video/') || (file.type || '').startsWith('audio/')) {
     try {
       update(id, { status: 'finalizing', message: 'extracting audio…' })
@@ -581,8 +582,23 @@ async function processOne(
       }
       audioChunksManifest = manifest
     } catch (err: any) {
-      update(id, { message: `audio extract skipped: ${err?.message || err}` })
+      audioExtractError = err?.message || String(err)
+      update(id, { message: `audio extract skipped: ${audioExtractError}` })
     }
+  }
+
+  // Audio-only mode is a hard contract: there is NO video in R2 to fall back
+  // on, so if browser audio extraction failed (HEVC the browser can't decode,
+  // codec error, etc.) the pipeline has nothing to transcribe. Fail-fast
+  // instead of registering a doomed row.
+  if (audioOnly && (!audioChunksManifest || audioChunksManifest.length === 0)) {
+    update(id, {
+      status: 'failed',
+      error: audioExtractError
+        ? `browser couldn't extract audio: ${audioExtractError}. HEVC source? Try the normal upload from a good connection.`
+        : 'no audio chunks produced. HEVC source? Try the normal upload from a good connection.',
+    })
+    return
   }
 
   update(id, { status: 'registering' })

@@ -644,11 +644,15 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {isFailed && vlog.pipeline_error && (
-              <div className="rail-card" style={{ borderLeft: '2px solid var(--t-terra)' }}>
+              <div className="rail-card" style={{ borderLeft: '2px solid var(--t-terra)', minWidth: 0, overflow: 'hidden' }}>
                 <div className="rc-head">
                   <h3>Pipeline failed</h3>
                 </div>
-                <div style={{ fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.55, fontFamily: 'var(--font-mono)' }}>
+                <div style={{
+                  fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.55, fontFamily: 'var(--font-mono)',
+                  overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                  maxHeight: 240, overflowY: 'auto',
+                }}>
                   {vlog.pipeline_error}
                 </div>
                 <button onClick={() => reExtract()} className="canon-btn primary" style={{ marginTop: 12, width: '100%', fontSize: 12 }}>
