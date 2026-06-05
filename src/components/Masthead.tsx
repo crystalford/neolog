@@ -22,9 +22,9 @@ import { usePathname } from 'next/navigation'
 // resolve as routes — deep links and old bookmarks don't break — but they're
 // no longer masthead destinations. The mess goes quiet; the work stays loud.
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
-  { label: 'Subjects',    href: '/subjects',    matchPaths: [/^\/$/, /^\/subjects/, /^\/subject\//, /^\/studio/, /^\/clusters/, /^\/cluster\//] },
-  { label: 'Vlogs',       href: '/vlogs',       matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
-  { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/] },
+  { label: 'Subjects',  href: '/subjects',  matchPaths: [/^\/$/, /^\/subjects/, /^\/subject\//, /^\/studio/, /^\/clusters/, /^\/cluster\//] },
+  { label: 'Vlogs',     href: '/vlogs',     matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
+  { label: 'Published', href: '/published', matchPaths: [/^\/published/, /^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/] },
 ]
 
 export function Masthead() {

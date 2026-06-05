@@ -15,14 +15,20 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb, findMany } from '@/lib/d1'
+import { getDb, findMany, findOne } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { buildSubjects, type LibrarianEnv } from '@/lib/librarian'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env {
+interface Env extends LibrarianEnv {
   DB: D1Database
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
+
+// How many new threads since the last librarian run before we kick off
+// a background rebuild on visit. Small enough to feel live; large enough
+// to skip rebuilding for one stray extraction.
+const STALENESS_THRESHOLD_THREADS = 5
 
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -75,5 +81,45 @@ export async function GET(req: NextRequest) {
     operator.id,
   )
 
-  return NextResponse.json({ subjects }, { headers: { 'Cache-Control': 'no-store' } })
+  // Live ingestion: count threads written after the most recent librarian
+  // cluster's updated_at. If meaningfully ahead, fire a rebuild in the
+  // background — the operator sees cached subjects now; the next refresh
+  // has the new ones. No cron, no ambient cost: it only runs on visit.
+  const staleness = await findOne<{ last_librarian_at: string | null; new_threads: number }>(
+    db,
+    `WITH last_run AS (
+       SELECT MAX(updated_at) AS last_at FROM clusters
+        WHERE operator_id = ? AND subject_source = 'librarian' AND deleted_at IS NULL
+     )
+     SELECT (SELECT last_at FROM last_run) AS last_librarian_at,
+            (SELECT COUNT(*) FROM threads
+              WHERE operator_id = ? AND deleted_at IS NULL
+                AND (
+                  (SELECT last_at FROM last_run) IS NULL
+                  OR extracted_at > (SELECT last_at FROM last_run)
+                )
+            ) AS new_threads`,
+    operator.id, operator.id,
+  )
+  const newThreads = staleness?.new_threads ?? 0
+  const isFirstRun = !staleness?.last_librarian_at && subjects.length === 0
+  const isStale = !isFirstRun && newThreads >= STALENESS_THRESHOLD_THREADS
+
+  if (isStale) {
+    const ctx = getRequestContext()
+    // waitUntil keeps the worker alive past the response so the rebuild
+    // completes. Swallow errors — a failed background rebuild must NOT
+    // affect the GET response.
+    ctx.waitUntil(
+      buildSubjects(db, operator.id, env).catch(err => {
+        console.warn(`[subjects] background librarian failed: ${err?.message || err}`)
+      }),
+    )
+  }
+
+  return NextResponse.json({
+    subjects,
+    refreshing: isStale,
+    new_threads_pending: newThreads,
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }

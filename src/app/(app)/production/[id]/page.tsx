@@ -245,15 +245,28 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
                 Mark produced
               </button>
             )}
-            {p.state === 'produced' && (
-              <button className="action primary" onClick={togglePublish}>
-                {isPublic ? 'Unpublish' : 'Publish'}
+            {(p.state === 'produced' || p.state === 'script_ready' || p.state === 'materializing') && (
+              <button
+                className="action primary"
+                onClick={() => setState('published')}
+                title="Mark this as shipped — it'll appear on the Published page."
+              >
+                Mark published
               </button>
             )}
             {p.state === 'published' && (
-              <a className="action primary" href={`/p/${p.id}`} target="_blank" rel="noreferrer">
-                View public
-              </a>
+              <>
+                <a className="action primary" href={`/p/${p.id}`} target="_blank" rel="noreferrer">
+                  View public
+                </a>
+                <button
+                  className="action"
+                  onClick={() => setState('produced')}
+                  title="Move back to produced state."
+                >
+                  Un-publish
+                </button>
+              </>
             )}
             <button className="action" onClick={togglePublish}>
               {isPublic ? 'Set private' : 'Set public'}

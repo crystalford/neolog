@@ -51,6 +51,15 @@ export default function SubjectsPage() {
       const r = await fetch('/api/v2/subjects', { credentials: 'include' })
       const d: any = await r.json()
       setSubjects(Array.isArray(d?.subjects) ? d.subjects : [])
+      // Live ingestion: when there are new threads since the last librarian
+      // run, the API fires a background rebuild. Surface that so the
+      // operator knows fresh subjects are coming on the next refresh.
+      if (d?.refreshing) {
+        setNote(
+          `${d.new_threads_pending} new moment${d.new_threads_pending === 1 ? '' : 's'} since the last pass. ` +
+          `Refreshing in the background — reload in a moment to see updates.`,
+        )
+      }
     } catch (e: any) {
       setNote(`Couldn't load subjects: ${e?.message || e}`)
     } finally {
