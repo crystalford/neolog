@@ -64,29 +64,59 @@ export interface BuildSubjectsResult {
   error?: string
 }
 
-const SYSTEM_PROMPT = `You are a sharp editor and librarian organizing a creator's spoken ideas.
+const SYSTEM_PROMPT = `You are a sharp editor identifying the SPECIFIC IDEAS a creator keeps returning to in their recordings. Not categories — ideas. Not topics — claims, mechanisms, tensions, named concepts.
 
-The creator records themselves talking freely. We've already extracted hundreds of small "topics" from those recordings. Your job is to step back and find the SUBJECTS they keep returning to — the handful of real ideas worth building a video essay around.
+The creator records themselves thinking out loud. Other systems have already tagged their topics. Your job is harder: behind the topics, find the actual recurring IDEAS — and NAME them precisely.
 
-For each subject you identify:
+═══════════════════════════════════════════════════════════════
+HARD RULES — read these. The grade comes from how well you follow them.
+═══════════════════════════════════════════════════════════════
 
-1. NAME THE REAL CONCEPT. Use your knowledge. If the creator keeps describing something that has a real name — a named idea in psychology, economics, philosophy, politics, technology, culture — NAME IT, even if they never used the term. ("The principal-agent problem." "Theory of mind." "Loss aversion." "The bystander effect." "Rent-seeking.") This is the most valuable thing you do: give them the word for the thing they've been circling. If they clearly already name it themselves, use their framing.
+1. PUSH for the SPECIFIC mechanism, not the general life-area. Broad categories ARE acceptable as fallback when no sharper concept is actually present, but always try for the sharper name first. "Procrastination as information" beats "Time Management and Productivity." "The latency tax on AI trust" beats "AI and Technology." When the creator's recurring moments really are just generic life themes, fine — name them — but don't pad weak material with generic headers.
 
-2. WRITE A ONE-LINE FRAMING. Plain language, second person, the shape: "You keep circling this: <what it is, when it shows up>." Make it feel like a mirror held up to their thinking.
+2. EVERY name should aspire to one of:
+   (a) A specific term-of-art that exists in a real field — psychology, economics, philosophy, politics, sociology, technology, design, biology, anthropology. Examples: "the principal-agent problem", "loss aversion", "theory of mind", "rent-seeking", "the bystander effect", "moral licensing", "Goodhart's law", "the optimizer's curse", "epistemic learned helplessness", "Chesterton's fence", "the streetlight effect", "phenomenological reduction".
+   (b) A sharp 3-7 word coinage that captures the SPECIFIC angle the creator takes — not the general domain. Examples: "procrastination as information", "the latency tax on AI trust", "audience as compass", "the felt sense before the thought".
 
-3. Set named_by_system to true if YOU supplied the concept name (they were describing it without the term), false if they were already using the concept's name.
+3. If your candidate name could fit on Oprah's website AND a sharper concept is actually present in the material, the sharper one wins. Only fall back to the generic category when the sharper concept genuinely isn't there.
 
-4. confidence: 0.0–1.0, how sure you are this is a real, coherent subject (not a grab-bag).
+4. named_by_system is true ONLY when:
+   - The name is a real term-of-art (existed in the world before the creator)
+   - AND the creator was clearly describing the phenomenon WITHOUT using the term
+   - It is FALSE when you coined a fresh phrase. It is FALSE when the creator was already using a name close to yours.
+   - Default: false. Only set true when you're confident you taught them a real word for something.
 
-5. member_indexes: the indexes (from the input list) of the topic-entries that belong to this subject. Group by MEANING — "the for-you page" and "recommendation algorithms" belong together even though the words differ.
+5. For each subject, write a one-line FRAMING (second person): "You keep circling this: <the specific claim or tension>, <when it shows up>." The framing must be specific. "You keep circling personal growth" is wrong. "You keep circling whether discipline is upstream or downstream of identity, mostly when you talk about your routines" is right.
 
-RULES:
-- Aim for 6–16 subjects. Quality over coverage. It's fine to leave one-off topics ungrouped — don't force everything in.
-- A subject must have genuine recurrence or substance. Don't invent connective tissue that isn't there.
-- Don't merge unrelated things just to make a bigger pile.
+6. Aim for 6–12 subjects. Fewer is better than padded. If something is genuinely a one-off, don't force it in. If two of your subjects feel like the same thing wearing different hats, merge them.
 
-Return ONLY valid JSON, no prose, no markdown fences:
-{"subjects":[{"name":"...","framing":"...","named_by_system":true,"confidence":0.0,"member_indexes":[0,1]}]}`
+7. RETURN ONLY VALID JSON. No prose. No markdown fences. No commentary.
+
+═══════════════════════════════════════════════════════════════
+EXAMPLES
+═══════════════════════════════════════════════════════════════
+
+BAD (do not do this):
+{"name":"Time Management and Productivity","framing":"You keep circling this: finding ways to manage your time effectively and overcome procrastination.","named_by_system":true,...}
+
+GOOD (do this):
+{"name":"procrastination as information","framing":"You keep circling this: the suspicion that what you put off is telling you something — that the resistance itself is data, not a flaw to crush.","named_by_system":false,...}
+
+BAD:
+{"name":"AI and Technology","framing":"You keep circling this: the potential and limitations of artificial intelligence...","named_by_system":true,...}
+
+GOOD:
+{"name":"the latency tax on AI trust","framing":"You keep circling this: how long-running AI calls erode your willingness to use the tool, even when the answers are good — the wait teaches you not to ask.","named_by_system":false,...}
+
+GOOD (term-of-art naming):
+{"name":"the principal-agent problem","framing":"You keep circling this: when someone hired to act for you ends up serving themselves instead — managers, executives, anyone whose incentives quietly diverge from the people they're supposed to represent.","named_by_system":true,...}
+
+═══════════════════════════════════════════════════════════════
+OUTPUT SHAPE
+═══════════════════════════════════════════════════════════════
+
+Return ONLY this JSON:
+{"subjects":[{"name":"...","framing":"...","named_by_system":false,"confidence":0.0,"member_indexes":[0,1]}]}`
 
 export async function buildSubjects(
   db: D1Database,
@@ -179,6 +209,14 @@ export async function buildSubjects(
     }
   }
 
+  // Operator's stance: broad categories AND sharp concepts both have value.
+  // No name filter — but we still tighten `named_by_system` so the badge
+  // doesn't mass-fire on generic category headers.
+  const acceptedSubjects = llmSubjects.map(s => ({
+    ...s,
+    named_by_system: looksLikeRealTermOfArt(s.name) ? s.named_by_system : false,
+  }))
+
   // ── 3. Resolve each subject's member threads ───────────────────────────
   // Clear prior librarian subjects (cluster_threads cascades on cluster delete).
   await db.prepare(
@@ -187,7 +225,7 @@ export async function buildSubjects(
 
   const written: BuildSubjectsResult['subjects'] = []
 
-  for (const s of llmSubjects) {
+  for (const s of acceptedSubjects) {
     const memberKeys = (s.member_indexes ?? [])
       .map(i => topicKeys[i]?.key)
       .filter((k): k is string => typeof k === 'string')
@@ -220,15 +258,19 @@ export async function buildSubjects(
     const state = ripeness >= 60 ? 'ready' : 'forming'
 
     const clusterId = ulid()
+    // IMPORTANT: do NOT write framing into the `take` column. The production
+    // generator reads `take` as voice-anchor material and will regurgitate
+    // "You keep circling this:" into a spoken script (we saw that exact
+    // bug). framing belongs only on the `framing` column for the UI; the
+    // operator's own voice never lived there.
     await db.prepare(
       `INSERT INTO clusters
          (id, operator_id, topic, take, abstracted_topic, state, ripeness_score,
           framing, concept_confidence, named_by_system, representative_quote, subject_source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian')`,
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian')`,
     ).bind(
       clusterId, operatorId,
       s.name.slice(0, 200),
-      (s.framing ?? '').slice(0, 500),
       s.name.toLowerCase().slice(0, 200),
       state, ripeness,
       (s.framing ?? '').slice(0, 500),
@@ -273,6 +315,27 @@ function firstQuote(keyQuotesJson: string | null): string {
     return keyQuotesJson
   }
   return ''
+}
+
+// Tightens the "named for you" badge — the librarian shouldn't claim it
+// taught the operator a word for "Personal Growth." A real term-of-art:
+// either has a "the X" / "X's law" / "Y effect" / "Z paradox" / "W
+// problem" shape, OR is a recognizable concept word that's unlikely to
+// be a generic category header. Conservative on purpose — false negative
+// (badge missing) is much better than false positive (badge spammed).
+function looksLikeRealTermOfArt(name: string): boolean {
+  const n = name.trim().toLowerCase()
+  if (n.length < 4) return false
+  const technicalShape = /\b(the\s+\w+(?:[-\s]\w+)?(?:\s+(problem|paradox|effect|fallacy|law|principle|theorem|curse|tax|loop|trap)))\b/.test(n)
+    || /\b(\w+'s\s+(law|principle|razor|paradox|curse|wager))\b/.test(n)
+    || /\b(principal[-\s]agent|theory\s+of\s+mind|bystander\s+effect|loss\s+aversion|rent[-\s]seeking|moral\s+licensing|goodhart|chesterton|epistemic|optimizer)/.test(n)
+  if (technicalShape) return true
+  // Multi-word generic category headers like "Personal Growth" — not a term.
+  const genericCategorySignal = /^(personal|emotional|mental|creative|career|content|business|self|time|work|life|social|digital|spiritual|professional)\s+(growth|health|wellness|management|development|process|creation|strategy|doubt|care|inspiration|regulation|distribution|productivity|balance|setting|automation|criticism)/
+  if (genericCategorySignal.test(n)) return false
+  // Single concrete noun ("attention", "delegation") is too generic for the badge.
+  if (!/\s/.test(n)) return false
+  return false
 }
 
 function clamp01(n: unknown): number {

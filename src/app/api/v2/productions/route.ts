@@ -135,18 +135,44 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     topicHint = c.abstracted_topic || c.topic
 
     const threads = await findMany<{
-      topic: string; take: string | null; key_quotes: string | null; strength: number | null
+      thread_id: string; topic: string; take: string | null; key_quotes: string | null
+      strength: number | null; vlog_id: string
+      span_start: number | null; span_end: number | null
     }>(
       db,
-      `SELECT t.topic, t.take, t.key_quotes, t.strength
+      `SELECT t.id AS thread_id, t.topic, t.take, t.key_quotes, t.strength, t.vlog_id,
+              t.transcript_span_start AS span_start,
+              t.transcript_span_end   AS span_end
          FROM threads t
          JOIN cluster_threads ct ON ct.thread_id = t.id
-         JOIN extraction_runs er ON er.id = t.run_id AND er.is_active = 1
+         LEFT JOIN extraction_runs er ON er.id = t.run_id
         WHERE ct.cluster_id = ? AND t.operator_id = ? AND t.deleted_at IS NULL
-        ORDER BY t.strength DESC, t.extracted_at ASC
-        LIMIT 20`,
+          AND (er.id IS NULL OR er.is_active = 1)
+        ORDER BY COALESCE(t.strength, 3) DESC, t.extracted_at ASC
+        LIMIT 8`,
       body.source_id, operator.id,
     )
+
+    // CRITICAL — fetch the ACTUAL verbatim transcript words for each
+    // thread's span. The old code fed the LLM only summaries-of-summaries
+    // (take + one quote), which is why the script came out in the LLM's
+    // generic voice instead of the operator's. With real spoken material
+    // anchored to each thread, the LLM has something to preserve.
+    const verbatimByThread = new Map<string, string>()
+    for (const t of threads) {
+      if (t.span_start == null || t.span_end == null) continue
+      const words = await findMany<{ word: string }>(
+        db,
+        `SELECT word FROM transcript_words
+          WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+          ORDER BY word_index ASC
+          LIMIT 400`,
+        t.vlog_id, t.span_start, t.span_end,
+      )
+      if (words.length > 0) {
+        verbatimByThread.set(t.thread_id, words.map(w => w.word).join(' '))
+      }
+    }
     const insights = await findMany<{
       kind: string; body: string; source_label: string | null; source_url: string | null
     }>(
@@ -161,20 +187,28 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     const operatorNotes = insights.filter(i => i.source_label === 'operator')
     const cultivateInsights = insights.filter(i => i.source_label !== 'operator' || !i.source_label)
 
-    sourceContext = `SOURCE: a cluster — a position braided across multiple vlogs.
-Topic: ${topicHint}
-Ripeness: ${Math.round(c.ripeness_score)}/100
-${c.take ? `Cluster take: ${c.take}\n` : ''}${c.gap_question ? `Gap question: ${c.gap_question}\n` : ''}
-Member threads (operator's verbatim takes across ${threads.length} moments):
+    sourceContext = `SOURCE: a cluster of moments where the operator returns to one subject.
+Subject: ${topicHint}
+${c.gap_question ? `Open question: ${c.gap_question}\n` : ''}
+═══════════════════════════════════════════════════════════════
+PRIMARY MATERIAL — verbatim transcript spans. THIS IS THE OPERATOR'S
+ACTUAL VOICE. The script you write must be built FROM these spans, not
+in addition to them. Quote, weave, compress — never paraphrase. If a
+beat doesn't have an anchor sentence drawn from these spans, drop it.
+═══════════════════════════════════════════════════════════════
+
 ${threads.map((t, i) => {
+  const span = verbatimByThread.get(t.thread_id)
   const quotes = parseJsonArr(t.key_quotes)
-  const q = quotes.length > 0 ? `\n     Quote: "${quotes[0]}"` : ''
-  return `  ${i + 1}. [${t.strength ?? '?'}/5] ${t.take || t.topic}${q}`
+  return `[MOMENT ${i + 1}] ${t.topic}\n` +
+    (span ? `Verbatim span:\n  "${span.trim().replace(/\s+/g, ' ').slice(0, 1800)}"\n`
+          : `(no transcript span — use the key quotes only)\n`) +
+    (quotes.length > 0 ? `Key quotes: ${quotes.slice(0, 3).map(q => `"${q}"`).join(' · ')}\n` : '')
 }).join('\n')}
 
-${operatorNotes.length > 0 ? `Operator's own framing of this cluster:
+${operatorNotes.length > 0 ? `Operator's own framing of this subject (use sparingly — these are notes, not voice):
 ${operatorNotes.map((n, i) => `  ${i + 1}. ${n.body}`).join('\n')}
-` : ''}${cultivateInsights.length > 0 ? `Surfaced insights (system + external references):
+` : ''}${cultivateInsights.length > 0 ? `External references (cite if useful, but the operator's verbatim spans come first):
 ${cultivateInsights.map((n, i) => `  ${i + 1}. [${n.kind}${n.source_label ? ' · ' + n.source_label : ''}] ${n.body}${n.source_url ? ` (${n.source_url})` : ''}`).join('\n')}
 ` : ''}`
   }
@@ -205,15 +239,35 @@ ${cultivateInsights.map((n, i) => `  ${i + 1}. [${n.kind}${n.source_label ? ' ·
     },
     video_essay: {
       maxTokens: 6000,
-      system: `You are drafting a video essay script (~10-15 minutes spoken, ~1500-2200 words) in the operator's own voice, building from a cluster of takes. This is a voiceover script — the operator will record their voice reading it, then pair it with B-roll footage from their vlogs.
+      system: `You are drafting a video essay voiceover script (~10-15 minutes spoken, ~1500-2200 words) BUILT FROM the operator's verbatim transcript spans. The operator will record their voice reading this script.
 
-STRUCTURE — break the script into BEATS. Each beat is one continuous spoken thought, 30-90 seconds when read aloud (75-225 words). Output beats separated by lines containing ONLY === on their own line.
+═══════════════════════════════════════════════════════════════
+HARD RULES — do not violate. Failures here ruin the script.
+═══════════════════════════════════════════════════════════════
 
-Each beat starts with a short directive header on its own line in brackets: [BEAT: <one-line title>]. Then the spoken prose follows. No stage directions inside the prose. No "next beat" or "in this beat" meta-commentary. Just the words the operator will speak.
+1. ANCHOR EVERY BEAT IN VERBATIM. Every beat must contain at least one sentence that is a verbatim 4+ word substring from the PRIMARY MATERIAL (the transcript spans). If you can't anchor a beat on verbatim, drop it. Building beats around general thoughts that aren't actually in the source = failure.
 
-VOICE — preserve the operator's verbatim takes as anchors. Their hesitations stay. Don't sanitize. Don't moralize. Read out loud as one continuous flow even though it's segmented into beats — the segmentation is for recording control, not for the listener.
+2. NEVER include "framing" language in the script. The script is what the operator SPEAKS — second person ("you keep circling…") is for UI surfaces, not voiceover. If you see phrases like "You keep circling this:" anywhere in the source material, do NOT carry them into the script. The operator does not refer to themselves in the second person.
 
-OPEN with the operator's strongest verbatim take or a verbatim quote. DEVELOP across 6-12 beats. CLOSE on the cluster's gap question turned into a clarifying statement — not a CTA, not a "thanks for watching."
+3. NEVER open with throat-clearing transcript noise — "we should have…", "I just said it all", "yeah I guess…" Those are pre-talk warmups, not substance. Find a moment in the verbatim where the operator says something with shape, and open there.
+
+4. NEVER write generic essay filler: "I mean, that's what we need, right?", "And that's what people are looking for", "Let me tell you something", "Now, here's the thing." If a sentence sounds like it could appear in any LLM-generated YouTube essay, cut it.
+
+5. The operator's hesitations, contradictions, and rough edges stay. Don't smooth them into clean prose. Roughness is signal.
+
+═══════════════════════════════════════════════════════════════
+STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+Break the script into BEATS. Each beat = one continuous spoken thought, 30-90 seconds when read (75-225 words). Output beats separated by lines containing ONLY === on their own line.
+
+Each beat starts with a short directive header on its own line in brackets: [BEAT: <one-line title>]. Then the spoken prose. No stage directions inside the prose. No "in this next beat" meta-commentary.
+
+OPEN with a verbatim sentence (or compressed-from-verbatim sentence) that puts the subject's specific tension on the table. Not an abstract statement of theme — the operator's actual angle.
+
+DEVELOP across 6-10 beats. Each beat takes one moment from the verbatim, anchors on it, and adds the minimum surrounding prose needed to make it land. Don't over-write. Better five tight beats than ten padded ones.
+
+CLOSE on the operator's sharpest verbatim moment from the source — or the open question turned into a statement they could plausibly say. Never "thanks for watching", never a CTA, never a moralizing summary.
 
 Output ONLY the script. No explanation, no preamble.`,
     },
