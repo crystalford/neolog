@@ -39,7 +39,9 @@ type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip'
 type ModelKey = 'claude' | 'llama70b' | 'kimi' | 'scout'
 
 const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip'])
-const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_thread', 'article', 'video_essay'])
+// x_post on a cluster: condenses a SUBJECT (multiple recurring moments)
+// into one post. Used by the Subjects screen's "Make a post" deliverable.
+const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_post', 'x_thread', 'article', 'video_essay'])
 
 export async function POST(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env

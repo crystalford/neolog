@@ -19,6 +19,7 @@
 export const runtime = 'edge'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 import { topicColor } from '@/lib/topic-color'
@@ -212,11 +213,18 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 2 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 2, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
           {s.thread_count} moment{s.thread_count === 1 ? '' : 's'} · {s.vlog_count} vlog{s.vlog_count === 1 ? '' : 's'}
         </span>
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <Link
+            href={`/subjects/${s.id}`}
+            className="canon-btn ghost"
+            style={{ fontSize: 12.5, textDecoration: 'none' }}
+          >
+            Open subject
+          </Link>
           <button
             onClick={onMake}
             disabled={making}
