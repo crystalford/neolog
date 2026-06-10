@@ -30,6 +30,8 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { callChat, type ChatMessage } from '@/lib/llm'
+import { callReasoning } from '@/lib/models'
+import { buildTranscriptFourGrams, isGrounded } from '@/lib/validator'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env { DB: D1Database; AI: Ai; ANTHROPIC_API_KEY: string; NEOLOG_DEV_OPERATOR_EMAIL?: string }
@@ -84,6 +86,10 @@ export async function POST(req: NextRequest) {
   // Build source context — different prompt shape per source kind.
   let sourceContext = ''
   let topicHint = ''
+  // Concatenated verbatim transcript spans for the subject — used to
+  // mechanically verify the generated script anchors on the operator's real
+  // words (canopticon Part 8). Populated in the cluster branch.
+  let verbatimCorpus = ''
   if (body.source_kind === 'thread') {
     const t = await findOne<{
       id: string; topic: string; take: string | null; abstracted_topic: string | null
@@ -173,6 +179,7 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
         verbatimByThread.set(t.thread_id, words.map(w => w.word).join(' '))
       }
     }
+    verbatimCorpus = Array.from(verbatimByThread.values()).join('\n')
     const insights = await findMany<{
       kind: string; body: string; source_label: string | null; source_url: string | null
     }>(
@@ -283,18 +290,70 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
 - No moralizing summary at the end.
 `
 
+  // Reasoning effort dial (canopticon Part 16): the long-form synthesis types
+  // get high effort; the short compressions get medium.
+  const effort: 'high' | 'medium' =
+    (body.production_type === 'video_essay' || body.production_type === 'article') ? 'high' : 'medium'
+
+  // generate() runs one draft. Claude stays the paid opt-in (via callChat);
+  // everything else routes through callReasoning → gpt-oss-120b with a Llama
+  // 70B fallback. Returns the text + which model actually answered.
+  const generate = async (userMsg: string): Promise<{ text: string; model: string }> => {
+    if (modelKey === 'claude') {
+      const resp = await callChat(env, {
+        model: modelKey,
+        system: cfg.system,
+        messages: [{ role: 'user', content: userMsg } as ChatMessage],
+        maxTokens: cfg.maxTokens,
+        temperature: 0.7,
+      })
+      return { text: (resp.text || '').trim(), model: resp.model || modelKey }
+    }
+    const r = await callReasoning(env, {
+      system: cfg.system,
+      user: userMsg,
+      effort,
+      maxTokens: cfg.maxTokens,
+    })
+    return { text: r.text.trim(), model: r.fellBack ? `${r.model} (fallback)` : r.model }
+  }
+
   let scriptText = ''
   let modelUsed: string = modelKey
+  let groundingRatio: number | null = null
   try {
-    const resp = await callChat(env, {
-      model: modelKey,
-      system: cfg.system,
-      messages: [{ role: 'user', content: userPrompt } as ChatMessage],
-      maxTokens: cfg.maxTokens,
-      temperature: 0.7,
-    })
-    scriptText = (resp.text || '').trim()
-    modelUsed = resp.model || modelKey
+    const first = await generate(userPrompt)
+    scriptText = first.text
+    modelUsed = first.model
+
+    // (canopticon Part 8) Mechanical verification — for video essays, check
+    // the script actually anchors on the operator's verbatim words. Beats
+    // with zero 4-gram overlap with the transcript spans are LLM filler.
+    // If too many drift, retry ONCE with a hardened reminder. Flag, never
+    // gate (operator approves).
+    if (body.production_type === 'video_essay' && verbatimCorpus.length > 40) {
+      const fourGrams = buildTranscriptFourGrams(verbatimCorpus)
+      const ratioOf = (script: string): number => {
+        const beats = script.split(/^\s*=+\s*$/m).map(b => b.trim()).filter(Boolean)
+        if (beats.length === 0) return 0
+        const anchored = beats.filter(b => isGrounded(b.replace(/^\s*\[BEAT:[^\]]*\]/i, ''), fourGrams)).length
+        return anchored / beats.length
+      }
+      groundingRatio = ratioOf(scriptText)
+      if (groundingRatio < 0.5) {
+        const harderPrompt = userPrompt +
+          `\n\n⚠️ CRITICAL: your previous attempt drifted off the source. EVERY beat MUST contain a literal 4+ word run copied from the PRIMARY MATERIAL above. Do not write a single sentence that isn't anchored in the operator's actual transcribed words. Rewrite.`
+        try {
+          const retry = await generate(harderPrompt)
+          const retryRatio = ratioOf(retry.text)
+          if (retry.text && retryRatio >= groundingRatio) {
+            scriptText = retry.text
+            modelUsed = retry.model
+            groundingRatio = retryRatio
+          }
+        } catch { /* keep the first draft if the retry errors */ }
+      }
+    }
   } catch (err: any) {
     return NextResponse.json({
       error: `LLM call failed: ${err?.message || String(err)}`,
@@ -314,7 +373,8 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
      ) VALUES (?, ?, ?, ?, ?, 'materializing', ?, ?, 'lo_fi')`,
   ).bind(
     id, operator.id, body.production_type, body.source_kind, body.source_id,
-    scriptText, `production-v1·${modelUsed}`,
+    scriptText,
+    `production-v1·${modelUsed}${groundingRatio != null ? `·grounded${Math.round(groundingRatio * 100)}%` : ''}`,
   ).run()
 
   // For video_essay, parse beats from the script ("=== " separator

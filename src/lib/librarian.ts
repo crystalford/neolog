@@ -22,9 +22,10 @@
  */
 
 import { ulid } from './ulid'
+import { callReasoning, MODELS } from './models'
 import type { D1Database } from '@cloudflare/workers-types'
 
-const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+const MODELS_HARD_ID = MODELS.HARD
 
 // How many distinct topic-keys we hand the model in one pass. Recurring
 // subjects rise to the top by thread frequency, so the long tail of
@@ -142,7 +143,7 @@ export async function buildSubjects(
 
   const aggRows = agg.results ?? []
   if (aggRows.length === 0) {
-    return { ok: true, topic_keys_considered: 0, subjects_proposed: 0, subjects_written: 0, subjects: [], model: LLAMA_70B }
+    return { ok: true, topic_keys_considered: 0, subjects_proposed: 0, subjects_written: 0, subjects: [], model: MODELS_HARD_ID }
   }
 
   // One representative take + quote per subject_key (strongest thread).
@@ -189,22 +190,23 @@ export async function buildSubjects(
 
   const userPrompt = `Here are the topic-entries extracted from the creator's recordings, most frequent first. Each line is: index. "topic" — counts — sample of what they said.\n\n${inputList}\n\nOrganize these into the subjects the creator keeps returning to. Name the real concept behind each. Return ONLY the JSON.`
 
+  // Concept-naming is the hardest-reasoning task in the system → high effort
+  // on gpt-oss-120b, with automatic Llama 70B fallback (see src/lib/models.ts).
   let llmSubjects: LlmSubject[]
+  let modelUsed: string = MODELS_HARD_ID
   try {
-    const res = await env.AI.run(LLAMA_70B, {
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 4096,
+    const res = await callReasoning(env, {
+      system: SYSTEM_PROMPT,
+      user: userPrompt,
+      effort: 'high',
+      maxTokens: 4096,
     })
-    const raw = res?.response ?? res?.text ?? res?.choices?.[0]?.message?.content ?? ''
-    const parsed = parseSubjectsJson(String(raw))
-    llmSubjects = parsed
+    modelUsed = res.fellBack ? `${res.model} (fallback)` : res.model
+    llmSubjects = parseSubjectsJson(res.text)
   } catch (err: any) {
     return {
       ok: false, topic_keys_considered: topicKeys.length, subjects_proposed: 0,
-      subjects_written: 0, subjects: [], model: LLAMA_70B,
+      subjects_written: 0, subjects: [], model: modelUsed,
       error: `librarian LLM failed: ${err?.message || err}`.slice(0, 500),
     }
   }
@@ -251,9 +253,15 @@ export async function buildSubjects(
 
     const vlogIds = new Set(threads.map(t => t.vlog_id))
     const avgStrength = threads.reduce((sum, t) => sum + (t.strength ?? 3), 0) / threads.length
-    const ripeness = Math.min(100, Math.round(
-      threads.length * 12 + (vlogIds.size - 1) * 8 + avgStrength * 3,
-    ))
+    // Meaning over frequency (canopticon Part 17): a sharp, high-confidence
+    // idea said a few times can matter more than a generic theme said often.
+    // Compute a frequency-based base, then scale by the model's confidence so
+    // conviction — not raw repetition — drives the ranking. A recurrence floor
+    // (MIN_THREADS_PER_SUBJECT) still applies above; this only orders what's
+    // already passed it.
+    const freqBase = threads.length * 12 + (vlogIds.size - 1) * 8 + avgStrength * 3
+    const confidence = clamp01(s.confidence)
+    const ripeness = Math.min(100, Math.round(freqBase * (0.6 + 0.4 * confidence)))
     const repQuote = firstQuote(threads[0]?.key_quotes) || (threads[0]?.take ?? '').slice(0, 200)
     const state = ripeness >= 60 ? 'ready' : 'forming'
 
@@ -299,7 +307,7 @@ export async function buildSubjects(
     subjects_proposed: llmSubjects.length,
     subjects_written: written.length,
     subjects: written,
-    model: LLAMA_70B,
+    model: modelUsed,
   }
 }
 
