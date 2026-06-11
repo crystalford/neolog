@@ -130,9 +130,13 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
       id: string; topic: string; abstracted_topic: string | null
       take: string | null; ripeness_score: number; gap_question: string | null
       form: string | null; length_magnitude: string | null
+      subject_kind: string | null
+      pole_a: string | null; pole_b: string | null
+      pole_a_at: string | null; pole_b_at: string | null
     }>(
       db,
-      `SELECT id, topic, abstracted_topic, take, ripeness_score, gap_question, form, length_magnitude
+      `SELECT id, topic, abstracted_topic, take, ripeness_score, gap_question, form, length_magnitude,
+              subject_kind, pole_a, pole_b, pole_a_at, pole_b_at
          FROM clusters
         WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
       body.source_id, operator.id,
@@ -196,10 +200,31 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     const operatorNotes = insights.filter(i => i.source_label === 'operator')
     const cultivateInsights = insights.filter(i => i.source_label !== 'operator' || !i.source_label)
 
+    // Tension/evolution subjects get a different opening frame — the
+    // contradiction or change-of-mind IS the spine of the script, not a
+    // recurring theme. The poles + their dates set the shape.
+    const kindHeader = (() => {
+      if (c.subject_kind === 'tension') {
+        return `THIS SUBJECT IS A TENSION — the operator has held OPPOSING positions on this idea across time. The script's spine is the contradiction itself, lived honestly. Don't resolve it artificially.\n` +
+          (c.pole_a ? `Position A (${c.pole_a_at ?? '?'}): ${c.pole_a}\n` : '') +
+          (c.pole_b ? `Position B (${c.pole_b_at ?? '?'}): ${c.pole_b}\n` : '') +
+          `Build the script so it surfaces and SITS WITH the tension — no false reconciliation, no "the real answer is somewhere in the middle" pap.\n\n`
+      }
+      if (c.subject_kind === 'evolution') {
+        return `THIS SUBJECT IS AN EVOLUTION — the operator's view on this matured / shifted in one direction over time. The script's spine is the change itself, traced honestly.\n` +
+          (c.pole_a ? `Earlier (${c.pole_a_at ?? '?'}): ${c.pole_a}\n` : '') +
+          (c.pole_b ? `Later (${c.pole_b_at ?? '?'}): ${c.pole_b}\n` : '') +
+          `Open in the earlier position (without condescending to it); walk what shifted; land on the matured view.\n\n`
+      }
+      if (c.subject_kind === 'open_loop') {
+        return `THIS SUBJECT IS AN OPEN LOOP — an unresolved question the operator keeps returning to. The script doesn't answer it. The script sits inside the question and lets the audience feel why it stays open.\n\n`
+      }
+      return ''
+    })()
     sourceContext = `SOURCE: a cluster of moments where the operator returns to one subject.
 Subject: ${topicHint}
 ${c.gap_question ? `Open question: ${c.gap_question}\n` : ''}
-═══════════════════════════════════════════════════════════════
+${kindHeader}═══════════════════════════════════════════════════════════════
 PRIMARY MATERIAL — verbatim transcript spans. THIS IS THE OPERATOR'S
 ACTUAL VOICE. The script you write must be built FROM these spans, not
 in addition to them. Quote, weave, compress — never paraphrase. If a
@@ -216,7 +241,7 @@ ${threads.map((t, i) => {
     (quotes.length > 0 ? `Key quotes: ${quotes.slice(0, 3).map(q => `"${q}"`).join(' · ')}\n` : '')
 }).join('\n')}
 
-ARC GUIDANCE (use the `kind` of each moment to compose a real essay arc, not a flat list):
+ARC GUIDANCE (use the kind label on each moment to compose a real essay arc, not a flat list):
   · open a claim moment as the position
   · ground it in a story moment (something that actually happened)
   · land on an open_question moment (the unresolved tension) — that's the strongest close

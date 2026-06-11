@@ -303,6 +303,11 @@ CREATE TABLE IF NOT EXISTS clusters (
   named_by_system             INTEGER NOT NULL DEFAULT 0,
   representative_quote        TEXT,
   subject_source              TEXT,
+  subject_kind                TEXT,
+  pole_a                      TEXT,
+  pole_b                      TEXT,
+  pole_a_at                   TEXT,
+  pole_b_at                   TEXT,
   deleted_at                  TEXT,
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

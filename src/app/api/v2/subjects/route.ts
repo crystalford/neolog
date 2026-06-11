@@ -51,6 +51,11 @@ export async function GET(req: NextRequest) {
     representative_quote: string | null
     ripeness_score: number
     state: string
+    subject_kind: string | null
+    pole_a: string | null
+    pole_b: string | null
+    pole_a_at: string | null
+    pole_b_at: string | null
     thread_count: number
     vlog_count: number
     production_id: string | null
@@ -65,6 +70,11 @@ export async function GET(req: NextRequest) {
         c.representative_quote,
         c.ripeness_score,
         c.state,
+        c.subject_kind,
+        c.pole_a,
+        c.pole_b,
+        c.pole_a_at,
+        c.pole_b_at,
         (SELECT COUNT(*) FROM cluster_threads ct WHERE ct.cluster_id = c.id)                    AS thread_count,
         (SELECT COUNT(DISTINCT t.vlog_id)
            FROM cluster_threads ct JOIN threads t ON t.id = ct.thread_id
@@ -77,7 +87,15 @@ export async function GET(req: NextRequest) {
       WHERE c.operator_id = ?
         AND c.subject_source = 'librarian'
         AND c.deleted_at IS NULL
-      ORDER BY c.ripeness_score DESC, c.updated_at DESC`,
+      ORDER BY
+        CASE c.subject_kind
+          WHEN 'tension'   THEN 0
+          WHEN 'evolution' THEN 1
+          WHEN 'open_loop' THEN 2
+          ELSE 3
+        END,
+        c.ripeness_score DESC,
+        c.updated_at DESC`,
     operator.id,
   )
 

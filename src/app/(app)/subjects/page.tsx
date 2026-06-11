@@ -33,6 +33,11 @@ interface Subject {
   representative_quote: string | null
   ripeness_score: number
   state: string
+  subject_kind: string | null
+  pole_a: string | null
+  pole_b: string | null
+  pole_a_at: string | null
+  pole_b_at: string | null
   thread_count: number
   vlog_count: number
   production_id: string | null
@@ -89,26 +94,11 @@ export default function SubjectsPage() {
   }
 
   const makeScript = async (s: Subject) => {
+    // Phase 4: route into the skeleton-first flow. Operator locks the
+    // argument shape before any prose is written. Existing scripts open
+    // directly into the production page.
     if (s.production_id) { router.push(`/production/${s.production_id}`); return }
-    setMakingId(s.id)
-    setNote(`Drafting a video-essay script for “${s.name}”…`)
-    try {
-      const r = await fetch('/api/v2/productions', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_kind: 'cluster', source_id: s.id, production_type: 'video_essay' }),
-      })
-      const d: any = await r.json()
-      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-      const pid = d?.id || d?.production?.id
-      if (pid) { router.push(`/production/${pid}`); return }
-      setNote('Script created.')
-      await load()
-    } catch (e: any) {
-      setNote(`Couldn’t make the script: ${e?.message || e}`)
-    } finally {
-      setMakingId(null)
-    }
+    router.push(`/subjects/${s.id}/skeleton`)
   }
 
   return (
@@ -177,18 +167,34 @@ export default function SubjectsPage() {
 }
 
 function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMake: () => void }) {
-  const color = topicColor(s.name)
+  const isTension = s.subject_kind === 'tension'
+  const isEvolution = s.subject_kind === 'evolution'
+  const isOpenLoop = s.subject_kind === 'open_loop'
+  const isAlive = isTension || isEvolution || isOpenLoop
+  // Tensions/evolutions/open-loops get distinct treatment — they're the
+  // sharpest essay seeds and need to feel different from plain themes.
+  const accent = isTension ? 'var(--t-terra)' : isEvolution ? 'var(--t-violet)' : isOpenLoop ? 'var(--t-ochre)' : topicColor(s.name)
+  const color = accent
   const dots = Math.max(1, Math.min(5, Math.round(s.ripeness_score / 20)))
+  const kindLabel = isTension ? 'tension' : isEvolution ? 'evolution' : isOpenLoop ? 'open loop' : null
+  const formatDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'
   return (
     <div style={{
-      border: '1px solid var(--line-1)', borderRadius: 14,
-      borderLeft: `3px solid ${color}`,
-      background: 'var(--bg-1)', padding: '20px 22px',
+      border: `1px solid ${isAlive ? color : 'var(--line-1)'}`, borderRadius: 14,
+      borderLeft: `${isAlive ? 4 : 3}px solid ${color}`,
+      background: isAlive ? 'rgba(255,255,255,0.015)' : 'var(--bg-1)', padding: '20px 22px',
       display: 'flex', flexDirection: 'column', gap: 12,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {kindLabel && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 1.4, textTransform: 'uppercase',
+                color, border: `1px solid ${color}`, borderRadius: 4, padding: '2px 8px',
+              }}>{kindLabel}</span>
+            )}
             <h2 style={{ fontSize: 22, fontWeight: 400, letterSpacing: '-0.6px', color: 'var(--fg)', margin: 0 }}>
               {s.name}
             </h2>
@@ -216,7 +222,21 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
         </div>
       </div>
 
-      {s.representative_quote && (
+      {/* Pole comparison — only for tensions / evolutions */}
+      {(isTension || isEvolution) && (s.pole_a || s.pole_b) && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'stretch',
+        }}>
+          <PoleBox label={formatDate(s.pole_a_at)} text={s.pole_a} accent={color}/>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-3)',
+          }}>{isTension ? '⇄' : '→'}</div>
+          <PoleBox label={formatDate(s.pole_b_at)} text={s.pole_b} accent={color}/>
+        </div>
+      )}
+
+      {!isAlive && s.representative_quote && (
         <div style={{
           fontSize: 13.5, color: 'var(--fg-2)', fontStyle: 'italic',
           borderLeft: `2px solid var(--line-2)`, paddingLeft: 12, lineHeight: 1.5,
@@ -258,4 +278,19 @@ function shortModelName(model: string): string {
   if (s.includes('llama-3.3-70b')) return 'llama-70b'
   if (s.includes('claude')) return 'claude'
   return s
+}
+
+function PoleBox({ label, text, accent }: { label: string; text: string | null; accent: string }) {
+  return (
+    <div style={{
+      border: '1px solid var(--line-1)', borderRadius: 8, padding: '10px 12px',
+      background: 'var(--bg-2)', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 1.2,
+        textTransform: 'uppercase', color: accent,
+      }}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--fg)', lineHeight: 1.4 }}>{text || '—'}</div>
+    </div>
+  )
 }

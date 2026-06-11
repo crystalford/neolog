@@ -543,6 +543,51 @@ export const MIGRATIONS: Migration[] = [
             ON threads(operator_id, utterance_kind)
             WHERE utterance_kind IS NOT NULL AND deleted_at IS NULL`,
   },
+  // ─── Subject kinds: theme / tension / evolution / open_loop (Phase 3) ────
+  // Tensions and evolutions are FIRST-CLASS subjects alongside themes — the
+  // contradictions and changes-of-mind the operator lives are the best
+  // essay seeds. pole_a/pole_b carry the two sides (with dates) so the
+  // subject card and script generator can render "on {date_a} you said X;
+  // on {date_b} the opposite."
+  {
+    name: '2026-06-11_clusters_subject_kind',
+    sql: `ALTER TABLE clusters ADD COLUMN subject_kind TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_a',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_a TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_b',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_b TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_a_at',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_a_at TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_b_at',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_b_at TEXT`,
+  },
+  {
+    name: '2026-06-11_idx_clusters_subject_kind',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clusters_subject_kind
+            ON clusters(operator_id, subject_kind, ripeness_score DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Phase 4: reasoning skeleton on productions ──────────────────────────
+  // Before writing full prose, the system proposes a BEAT STRUCTURE (a
+  // skeleton). Operator reviews/locks it, then prose is generated from the
+  // locked skeleton. Stored as JSON on productions so the same skeleton can
+  // fan out to multiple deliverables (essay → article → post).
+  {
+    name: '2026-06-11_productions_reasoning_skeleton_json',
+    sql: `ALTER TABLE productions ADD COLUMN reasoning_skeleton_json TEXT`,
+  },
+  {
+    name: '2026-06-11_productions_skeleton_locked',
+    sql: `ALTER TABLE productions ADD COLUMN skeleton_locked INTEGER NOT NULL DEFAULT 0`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the

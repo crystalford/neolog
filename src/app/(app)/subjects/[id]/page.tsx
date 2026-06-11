@@ -182,11 +182,13 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
         }}>
           <DeliverableCard
             label="Script"
-            sub="Video essay you record"
+            sub="Lock the argument, then write"
             prod={scriptProd ? { id: scriptProd.id, state: scriptProd.state } : null}
-            actionLabel={scriptProd ? 'Open the script' : 'Make the script'}
+            actionLabel={scriptProd ? 'Open the script' : 'Build the script'}
             busy={busy === 'video_essay'}
-            onClick={() => scriptProd ? router.push(`/production/${scriptProd.id}`) : makeProd('video_essay')}
+            onClick={() => scriptProd
+              ? router.push(`/production/${scriptProd.id}`)
+              : router.push(`/subjects/${id}/skeleton`)}
             color={color}
           />
           <DeliverableCard

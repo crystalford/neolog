@@ -22,7 +22,7 @@
  */
 
 import { ulid } from './ulid'
-import { callReasoning, MODELS } from './models'
+import { callReasoning, MODELS, type ReasoningEnv } from './models'
 import type { D1Database } from '@cloudflare/workers-types'
 
 const MODELS_HARD_ID = MODELS.HARD
@@ -274,8 +274,9 @@ export async function buildSubjects(
     await db.prepare(
       `INSERT INTO clusters
          (id, operator_id, topic, take, abstracted_topic, state, ripeness_score,
-          framing, concept_confidence, named_by_system, representative_quote, subject_source)
-       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian')`,
+          framing, concept_confidence, named_by_system, representative_quote,
+          subject_source, subject_kind)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian', 'theme')`,
     ).bind(
       clusterId, operatorId,
       s.name.slice(0, 200),
@@ -299,6 +300,21 @@ export async function buildSubjects(
       id: clusterId, name: s.name, thread_count: threads.length,
       vlog_count: vlogIds.size, named_by_system: !!s.named_by_system,
     })
+  }
+
+  // ── Phase 3: tensions, evolution, open-loops ───────────────────────────
+  // After themes are written, fire a second model pass to find the alive
+  // part of the corpus: contradictions across time (tension), changes-of-
+  // mind (evolution), and unresolved questions the operator keeps returning
+  // to (open_loop). These get their own subjects and sort to the TOP of
+  // the screen — they're the sharpest essay seeds.
+  try {
+    const tensionSubjects = await detectTensionsAndLoops(db, operatorId, env)
+    for (const t of tensionSubjects) {
+      written.push(t)
+    }
+  } catch (err: any) {
+    console.warn(`[librarian] tension pass failed: ${err?.message || err}`)
   }
 
   return {
@@ -369,5 +385,180 @@ function parseSubjectsJson(text: string): LlmSubject[] {
       named_by_system: s.named_by_system === true,
       confidence: typeof s.confidence === 'number' ? s.confidence : 0.5,
       member_indexes: s.member_indexes.filter((i: any) => Number.isInteger(i)),
+    }))
+}
+
+// ─── Phase 3: tensions / evolution / open-loops ──────────────────────────
+
+const TENSION_SYSTEM_PROMPT = `You are reading a creator's spoken recordings to surface the ALIVE part of their thinking: the contradictions, changes-of-mind, and unresolved questions they keep circling. These are the sharpest material for a video essay — far sharper than a flat recurring theme.
+
+You receive a list of MOMENTS (the operator's most substantive recent takes) with date + kind + take text. Find:
+
+1. TENSION — two moments where the operator took OPPOSING positions on the same idea. Different dates. Same underlying topic. Example: on May 12 "discipline comes first," on June 2 "discipline is downstream of identity." Surface ALL real ones; don't force fake ones.
+
+2. EVOLUTION — a directional shift: the operator's view on a topic MATURED or moved in one direction over time. Not a flat contradiction; a development. Example: early takes are exploratory, later takes are confident.
+
+3. OPEN_LOOP — a question the operator keeps RETURNING to but has not resolved. Look for kind=open_question moments, "I don't know," "I'm not sure what I'm trying to get at," and questions that recur across dates without an answer.
+
+For each finding, output:
+{
+  "kind": "tension" | "evolution" | "open_loop",
+  "name": "<a sharp 4-10 word label for this finding>",
+  "framing": "<one second-person sentence: 'You keep circling this:' or 'You changed your mind:' or 'You haven't answered this:' followed by the specifics>",
+  "pole_a": "<for tension/evolution: the earlier position, ≤ 200 chars, voice-flavored>",
+  "pole_b": "<for tension/evolution: the later position, ≤ 200 chars, voice-flavored>",
+  "pole_a_index": <integer index of the moment for pole_a>,
+  "pole_b_index": <integer index of the moment for pole_b>,
+  "supporting_indexes": [<integers>, ...] // any other moments that belong to this finding
+}
+
+For open_loop: pole_a/pole_b can be empty; pole_a_index points at the strongest example moment.
+
+Aim for 2–6 findings total across all three kinds. Quality over volume. If you can't find any, return findings: []. Don't invent.
+
+Return ONLY this JSON:
+{"findings":[ ... ]}`
+
+interface TensionFinding {
+  kind: 'tension' | 'evolution' | 'open_loop'
+  name: string
+  framing: string
+  pole_a: string
+  pole_b: string
+  pole_a_index: number
+  pole_b_index: number
+  supporting_indexes: number[]
+}
+
+async function detectTensionsAndLoops(
+  db: D1Database,
+  operatorId: string,
+  env: ReasoningEnv,
+): Promise<BuildSubjectsResult['subjects']> {
+  // Pull the operator's substantive takes — strongest first, capped to fit
+  // the model. Include the kind + vlog recorded_at so the model can reason
+  // about ordering.
+  const rows = await db.prepare(
+    `SELECT t.id        AS thread_id,
+            t.vlog_id   AS vlog_id,
+            t.take      AS take,
+            t.utterance_kind AS kind,
+            v.recorded_at AS recorded_at
+       FROM threads t
+       JOIN vlogs   v ON v.id = t.vlog_id
+      WHERE t.operator_id = ? AND t.deleted_at IS NULL
+        AND t.take IS NOT NULL AND length(t.take) > 40
+      ORDER BY COALESCE(t.strength, 3) DESC, v.recorded_at DESC
+      LIMIT 80`,
+  ).bind(operatorId).all<{
+    thread_id: string; vlog_id: string; take: string | null; kind: string | null; recorded_at: string | null
+  }>()
+
+  const moments = (rows.results ?? [])
+    .filter(r => (r.take ?? '').trim().length > 0)
+    .slice(0, 80)
+  if (moments.length < 6) return []
+
+  // Sort by date asc so position-in-list ≈ position-in-time — helps the
+  // model find directional evolution.
+  moments.sort((a, b) => String(a.recorded_at ?? '').localeCompare(String(b.recorded_at ?? '')))
+
+  const inputList = moments.map((m, i) =>
+    `${i}. [${m.recorded_at ?? '?'} · ${m.kind ?? 'observation'}] ${(m.take ?? '').replace(/\s+/g, ' ').slice(0, 280)}`,
+  ).join('\n')
+
+  const userPrompt = `Here are the operator's substantive moments, oldest first. Index. [date · kind] take.\n\n${inputList}\n\nFind tensions, evolutions, and open loops as specified. Return ONLY the JSON.`
+
+  let findings: TensionFinding[] = []
+  try {
+    const r = await callReasoning(env, {
+      system: TENSION_SYSTEM_PROMPT,
+      user: userPrompt,
+      effort: 'high',
+      maxTokens: 4096,
+    })
+    findings = parseTensionsJson(r.text)
+  } catch (err: any) {
+    console.warn(`[detectTensionsAndLoops] LLM failed: ${err?.message || err}`)
+    return []
+  }
+
+  const written: BuildSubjectsResult['subjects'] = []
+  for (const f of findings) {
+    const memberIdxs = Array.from(new Set([
+      ...(Number.isInteger(f.pole_a_index) ? [f.pole_a_index] : []),
+      ...(Number.isInteger(f.pole_b_index) ? [f.pole_b_index] : []),
+      ...(Array.isArray(f.supporting_indexes) ? f.supporting_indexes : []),
+    ])).filter(i => i >= 0 && i < moments.length)
+    if (memberIdxs.length === 0) continue
+
+    const memberMoments = memberIdxs.map(i => moments[i])
+    const vlogSet = new Set(memberMoments.map(m => m.vlog_id))
+    const poleAAt = Number.isInteger(f.pole_a_index) ? moments[f.pole_a_index]?.recorded_at ?? null : null
+    const poleBAt = Number.isInteger(f.pole_b_index) ? moments[f.pole_b_index]?.recorded_at ?? null : null
+
+    // Tensions/evolutions are sharper than themes — boost ripeness so they
+    // sort to the top of the Subjects screen.
+    const baseRipeness = Math.min(100, 50 + memberMoments.length * 6 + (vlogSet.size - 1) * 5)
+    const ripeness = f.kind === 'open_loop' ? Math.min(100, baseRipeness - 5) : Math.min(100, baseRipeness + 10)
+
+    const clusterId = ulid()
+    await db.prepare(
+      `INSERT INTO clusters
+         (id, operator_id, topic, take, abstracted_topic, state, ripeness_score,
+          framing, concept_confidence, named_by_system, representative_quote,
+          subject_source, subject_kind, pole_a, pole_b, pole_a_at, pole_b_at)
+       VALUES (?, ?, NULL, ?, ?, 'ready', ?, ?, ?, 0, ?, 'librarian', ?, ?, ?, ?, ?)`,
+    ).bind(
+      clusterId, operatorId,
+      f.name.slice(0, 200),
+      f.name.toLowerCase().slice(0, 200),
+      ripeness,
+      f.framing.slice(0, 500),
+      0.8,
+      (memberMoments[0]?.take ?? '').slice(0, 500),
+      f.kind,
+      (f.pole_a ?? '').slice(0, 500),
+      (f.pole_b ?? '').slice(0, 500),
+      poleAAt,
+      poleBAt,
+    ).run()
+
+    for (const m of memberMoments) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO cluster_threads (cluster_id, thread_id, role) VALUES (?, ?, 'core')`,
+      ).bind(clusterId, m.thread_id).run()
+    }
+    written.push({
+      id: clusterId,
+      name: `${f.kind === 'tension' ? '⚡' : f.kind === 'evolution' ? '↗' : '?'} ${f.name}`,
+      thread_count: memberMoments.length,
+      vlog_count: vlogSet.size,
+      named_by_system: false,
+    })
+  }
+  return written
+}
+
+function parseTensionsJson(text: string): TensionFinding[] {
+  let t = text.trim()
+  if (t.startsWith('```json')) t = t.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim()
+  else if (t.startsWith('```')) t = t.replace(/^```\s*/, '').replace(/```\s*$/, '').trim()
+  const firstBrace = t.indexOf('{')
+  const lastBrace = t.lastIndexOf('}')
+  if (firstBrace > 0 && lastBrace > firstBrace) t = t.slice(firstBrace, lastBrace + 1)
+  const obj = JSON.parse(t)
+  const findings = Array.isArray(obj?.findings) ? obj.findings : []
+  return findings
+    .filter((f: any) => f && ['tension','evolution','open_loop'].includes(f.kind) && typeof f.name === 'string')
+    .map((f: any) => ({
+      kind: f.kind,
+      name: String(f.name).trim(),
+      framing: String(f.framing ?? '').trim(),
+      pole_a: String(f.pole_a ?? '').trim(),
+      pole_b: String(f.pole_b ?? '').trim(),
+      pole_a_index: Number.isInteger(f.pole_a_index) ? f.pole_a_index : -1,
+      pole_b_index: Number.isInteger(f.pole_b_index) ? f.pole_b_index : -1,
+      supporting_indexes: Array.isArray(f.supporting_indexes) ? f.supporting_indexes.filter((n: any) => Number.isInteger(n)) : [],
     }))
 }
