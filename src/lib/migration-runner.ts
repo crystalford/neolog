@@ -528,6 +528,21 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-04_vlogs_slideshow_frames_json',
     sql: `ALTER TABLE vlogs ADD COLUMN slideshow_frames_json TEXT`,
   },
+  // ─── Typed utterances (2026-06-11, Phase 2) ──────────────────────────────
+  // Each thread carries a structural kind so scripts can compose a real arc
+  // (claim → story → open_question) instead of a flat collage of takes.
+  // Distinct from `register` (voice mode). Old rows stay NULL and are
+  // treated as 'observation' by downstream consumers.
+  {
+    name: '2026-06-11_threads_utterance_kind',
+    sql: `ALTER TABLE threads ADD COLUMN utterance_kind TEXT`,
+  },
+  {
+    name: '2026-06-11_idx_threads_utterance_kind',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_utterance_kind
+            ON threads(operator_id, utterance_kind)
+            WHERE utterance_kind IS NOT NULL AND deleted_at IS NULL`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the

@@ -144,11 +144,13 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
       thread_id: string; topic: string; take: string | null; key_quotes: string | null
       strength: number | null; vlog_id: string
       span_start: number | null; span_end: number | null
+      utterance_kind: string | null
     }>(
       db,
       `SELECT t.id AS thread_id, t.topic, t.take, t.key_quotes, t.strength, t.vlog_id,
               t.transcript_span_start AS span_start,
-              t.transcript_span_end   AS span_end
+              t.transcript_span_end   AS span_end,
+              t.utterance_kind        AS utterance_kind
          FROM threads t
          JOIN cluster_threads ct ON ct.thread_id = t.id
          LEFT JOIN extraction_runs er ON er.id = t.run_id
@@ -207,11 +209,20 @@ beat doesn't have an anchor sentence drawn from these spans, drop it.
 ${threads.map((t, i) => {
   const span = verbatimByThread.get(t.thread_id)
   const quotes = parseJsonArr(t.key_quotes)
-  return `[MOMENT ${i + 1}] ${t.topic}\n` +
+  const kind = t.utterance_kind || 'observation'
+  return `[MOMENT ${i + 1}] kind: ${kind} · ${t.topic}\n` +
     (span ? `Verbatim span:\n  "${span.trim().replace(/\s+/g, ' ').slice(0, 1800)}"\n`
           : `(no transcript span — use the key quotes only)\n`) +
     (quotes.length > 0 ? `Key quotes: ${quotes.slice(0, 3).map(q => `"${q}"`).join(' · ')}\n` : '')
 }).join('\n')}
+
+ARC GUIDANCE (use the `kind` of each moment to compose a real essay arc, not a flat list):
+  · open a claim moment as the position
+  · ground it in a story moment (something that actually happened)
+  · land on an open_question moment (the unresolved tension) — that's the strongest close
+  · observation/feeling moments are colour beats, not load-bearing structure
+  · intention moments can close if no open_question is present
+  If kind is missing for a moment, infer it from the span itself.
 
 ${operatorNotes.length > 0 ? `Operator's own framing of this subject (use sparingly — these are notes, not voice):
 ${operatorNotes.map((n, i) => `  ${i + 1}. ${n.body}`).join('\n')}

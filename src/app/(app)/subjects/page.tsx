@@ -76,7 +76,10 @@ export default function SubjectsPage() {
       const r = await fetch('/api/v2/admin/build-subjects', { method: 'POST', credentials: 'include' })
       const d: any = await r.json()
       if (!r.ok || !d.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-      setNote(`Found ${d.subjects_written} subject${d.subjects_written === 1 ? '' : 's'} across your recordings.`)
+      const modelLine = d?.model
+        ? ` · ran on ${shortModelName(d.model)}${String(d.model).includes('fallback') ? ' ⚠' : ''}`
+        : ''
+      setNote(`Found ${d.subjects_written} subject${d.subjects_written === 1 ? '' : 's'} across your recordings.${modelLine}`)
       await load()
     } catch (e: any) {
       setNote(`Rebuild failed: ${e?.message || e}`)
@@ -246,4 +249,13 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
       </div>
     </div>
   )
+}
+
+function shortModelName(model: string): string {
+  const s = String(model)
+  if (s.includes('gpt-oss-120b')) return 'gpt-oss-120b'
+  if (s.includes('gpt-oss-20b')) return 'gpt-oss-20b'
+  if (s.includes('llama-3.3-70b')) return 'llama-70b'
+  if (s.includes('claude')) return 'claude'
+  return s
 }

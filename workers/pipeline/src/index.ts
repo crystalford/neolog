@@ -1246,8 +1246,9 @@ export class VlogPipelineDO {
       `INSERT INTO threads
          (id, operator_id, vlog_id, run_id, topic, take, key_quotes,
           key_phrases, questions_raised,
-          register, abstracted_topic, validated, extraction_prompt_version, extracted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          register, utterance_kind, abstracted_topic, validated,
+          extraction_prompt_version, extracted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
     ).bind(
       threadIds[i], vlog.operator_id, vlog.id, run_id,
       String(t.topic || '').slice(0, 200),
@@ -1256,6 +1257,13 @@ export class VlogPipelineDO {
       JSON.stringify((t as any).key_phrases ?? []),
       JSON.stringify((t as any).questions_raised ?? []),
       String(t.register || 'observation'),
+      // Phase 2: typed utterance kind for arc-building. Coerce to the
+      // closed enum and drop unknowns so we don't write junk if the model
+      // hallucinated a kind.
+      (() => {
+        const k = String((t as any).utterance_kind || '').toLowerCase()
+        return ['claim','story','open_question','observation','intention','feeling'].includes(k) ? k : null
+      })(),
       (t as any).abstracted_topic ? String((t as any).abstracted_topic).slice(0, 300) : null,
       t.validated ?? 1,
       promptVersion,

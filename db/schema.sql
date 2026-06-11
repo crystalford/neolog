@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS threads (
   key_quotes                  TEXT,
   questions_raised            TEXT,
   register                    TEXT CHECK (register IN ('riff','observation','argument','story','aside','question')),
+  utterance_kind              TEXT,
   strength                    INTEGER CHECK (strength BETWEEN 1 AND 5),
   transcript_span_start       REAL,
   transcript_span_end         REAL,

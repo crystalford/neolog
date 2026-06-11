@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await buildSubjects(getDb(env), operator.id, env)
-    return NextResponse.json(result, {
+    // Echo model into a top-level field too — the page reads `model` from
+    // the root so the status line surfaces what actually ran.
+    return NextResponse.json({ ...result, model: result.model }, {
       status: result.ok ? 200 : 500,
       headers: { 'Cache-Control': 'no-store' },
     })
