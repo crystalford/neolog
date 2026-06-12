@@ -155,6 +155,7 @@ export default async function SettingsPage() {
         </Section>
 
         <Section title="Integrations">
+          <Row k="Your podcast feed" sub="In-house RSS · paste /podcast.xml into Apple Podcasts / Overcast / Spotify · per-vlog opt-in on /vlog/[id]" badge="Active" arrow/>
           <Row k="X / Twitter" sub="For shipping posts" badge="Not connected" badgeKind="empty" arrow/>
           <Row k="Cloudflare Access" sub={`${operator.email} · OTP via email`} badge="Active" arrow/>
         </Section>

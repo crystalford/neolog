@@ -126,16 +126,35 @@ function AvatarMenu() {
       </button>
       {open && (
         <div className="canon-dropdown" role="menu">
-          <Link href="/chat" onClick={() => setOpen(false)}>
-            <span>Chat</span>
-            <span className="kbd">G C</span>
-          </Link>
           <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
             <span>Drop a vlog</span>
             <span className="kbd">⌘N</span>
           </Link>
+          <Link href="/chat" onClick={() => setOpen(false)}>
+            <span>Chat with your corpus</span>
+            <span className="kbd">G C</span>
+          </Link>
+          <div className="sep"/>
+          {/* Lost-but-good surfaces — fully functional, brought back via dropdown
+              instead of cluttering the 4-entry masthead. */}
+          <Link href="/inbox" onClick={() => setOpen(false)}>
+            <span>Inbox</span>
+            <span className="dropdown-sub">triage — failed vlogs, drafts, ripening</span>
+          </Link>
+          <Link href="/studio" onClick={() => setOpen(false)}>
+            <span>Studio (clusters)</span>
+            <span className="dropdown-sub">the deeper cluster-cultivation surface</span>
+          </Link>
+          <a href="/podcast.xml" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+            <span>Your podcast feed</span>
+            <span className="dropdown-sub">RSS · paste into Apple/Overcast/Spotify</span>
+          </a>
+          <div className="sep"/>
           <Link href="/settings" onClick={() => setOpen(false)}>
             <span>Settings</span>
+          </Link>
+          <Link href="/about" onClick={() => setOpen(false)}>
+            <span>About neolog</span>
           </Link>
           <div className="sep"/>
           <a href="/cdn-cgi/access/logout">

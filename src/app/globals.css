@@ -759,6 +759,17 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   border-radius: 4px;
   background: var(--bg-2);
 }
+/* Subtitle line below a dropdown-item label — used to surface
+   lost-but-good destinations (Inbox, Studio, Podcast) with a one-liner
+   explanation so the operator knows what they are. */
+.canon-dropdown .dropdown-sub {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--fg-4);
+  font-style: italic;
+  text-align: right;
+  max-width: 50%;
+}
 
 @media (max-width: 960px) {
   .canon-wrap { padding: 0 24px; }
