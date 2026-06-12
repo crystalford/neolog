@@ -255,6 +255,113 @@ RULES:
 
 Return ONLY the Markdown brief. No preamble.`
 
+// ─── Angle suggestions ──────────────────────────────────────────────────
+// Given a topic title, propose 4-6 specific angles a video essay could take.
+// Each angle is short + concrete + actionable. When a Brave key is present
+// we peek at the top search results so the suggestions reflect what's
+// actually out there about the topic; without a key they're concept-only.
+
+export interface SuggestedAngle {
+  angle: string
+  framing: string
+  research_questions: string[]
+}
+
+const ANGLES_SYSTEM = `You are a sharp documentary / video-essay editor pitching DIRECTIONS for a piece on a topic the operator just named.
+
+Your job: propose 4–6 SPECIFIC, ACTIONABLE angles. Each one is a DIFFERENT video essay you could make about the same topic. The operator will pick one (or write their own).
+
+WHAT MAKES A GOOD ANGLE:
+- A NAMED LENS, not a vague theme. Not "Identity" — "The persona drifts: what happens when a character you play for 8 hours a day starts running the rest of your decisions."
+- A SPECIFIC TENSION, contradiction, or question — something the piece could actually argue or investigate.
+- Different ANGLES on the same topic should feel like DIFFERENT essays, not variations of the same thing.
+
+EACH ANGLE has three parts:
+  · angle: a 4-10 word DIRECTIONAL handle. ("The parasocial collapse." "Attention economy as a job.")
+  · framing: one sentence in second person telling the operator what this piece would actually argue, attack, or explore. ("You'd examine the moment the relationship between streamer and viewer crosses from product to obligation, using X as the case study.")
+  · research_questions: 2-4 specific questions the operator would need answered to write this piece. The operator can use these to direct research.
+
+RULES:
+- If the topic is a PERSON, lean on what they DO that's interesting, not biographical recap. ("LeBron's longevity" → angles about training science, business decisions, racial scripting of "the chosen one," the politics of acknowledgment, etc.)
+- If the topic is an IDEA, push toward where the idea is contested, applied, or has consequences.
+- If WEB SEARCH RESULTS are provided, use them to ground angles in what actually exists — don't propose angles that have no purchase on reality.
+- NEVER propose angles that require the operator to be the topic's expert. They are a generalist video essayist.
+- DON'T moralize. ("Why X matters" / "The dark side of Y" are bad angles.)
+
+Return ONLY this JSON. No prose. No markdown fences.
+{"angles":[{"angle":"...","framing":"...","research_questions":["...","..."]}]}`
+
+export async function suggestTopicAngles(
+  env: ResearchEnv,
+  args: {
+    title: string
+    angle?: string | null
+    braveKey?: string | null
+  },
+): Promise<{ suggestions: SuggestedAngle[]; grounded: boolean; error?: string }> {
+  // Peek at the web if we can — five lightweight results from Brave (title +
+  // description, no crawling) so the model knows what's actually out there.
+  let webContext = ''
+  let grounded = false
+  if (args.braveKey) {
+    try {
+      const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(args.title)}&count=8`
+      const r = await fetch(url, {
+        headers: { Accept: 'application/json', 'X-Subscription-Token': args.braveKey },
+      })
+      if (r.ok) {
+        const data: any = await r.json()
+        const results = (data?.web?.results ?? []).slice(0, 8)
+        if (results.length > 0) {
+          webContext = `\n\nWEB SEARCH RESULTS (for grounding — don't quote these literally, use them to know what's real):\n` +
+            results.map((res: any, i: number) =>
+              `${i + 1}. ${res.title ?? '(no title)'}\n   ${res.url ?? ''}\n   ${(res.description ?? '').slice(0, 240)}`,
+            ).join('\n')
+          grounded = true
+        }
+      }
+    } catch (err: any) {
+      // Brave search is best-effort here; suggestions still ship without it.
+      console.warn(`[suggestTopicAngles] brave failed: ${err?.message || err}`)
+    }
+  }
+
+  const userPrompt = `TOPIC: ${args.title}${args.angle ? `\nOperator's existing angle (refine around this — don't drop it): ${args.angle}` : ''}${webContext}\n\nPropose 4–6 angles for a video essay on this topic.`
+
+  try {
+    const r = await callReasoning(env as any, {
+      system: ANGLES_SYSTEM,
+      user: userPrompt,
+      effort: 'high',
+      maxTokens: 2048,
+    })
+    const parsed = parseAnglesJson(r.text)
+    return { suggestions: parsed, grounded }
+  } catch (err: any) {
+    return { suggestions: [], grounded, error: err?.message || String(err) }
+  }
+}
+
+function parseAnglesJson(text: string): SuggestedAngle[] {
+  let t = text.trim()
+  if (t.startsWith('```json')) t = t.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim()
+  else if (t.startsWith('```')) t = t.replace(/^```\s*/, '').replace(/```\s*$/, '').trim()
+  const firstBrace = t.indexOf('{')
+  const lastBrace = t.lastIndexOf('}')
+  if (firstBrace > 0 && lastBrace > firstBrace) t = t.slice(firstBrace, lastBrace + 1)
+  const obj = JSON.parse(t)
+  const arr = Array.isArray(obj?.angles) ? obj.angles : []
+  return arr
+    .filter((a: any) => a && typeof a.angle === 'string' && typeof a.framing === 'string')
+    .map((a: any) => ({
+      angle: String(a.angle).trim(),
+      framing: String(a.framing).trim(),
+      research_questions: Array.isArray(a.research_questions)
+        ? a.research_questions.filter((q: any) => typeof q === 'string').map((q: string) => q.trim()).slice(0, 6)
+        : [],
+    }))
+}
+
 function uniqueUrls(arr: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []

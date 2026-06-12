@@ -36,6 +36,11 @@ interface SourceRow {
   bytes: number | null; fetched_at: string; error: string | null
 }
 interface Production { id: string; state: string }
+interface SuggestedAngle {
+  angle: string
+  framing: string
+  research_questions: string[]
+}
 
 export default function TopicDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -49,6 +54,12 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
   const [savingField, setSavingField] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [urlsDraft, setUrlsDraft] = useState('')
+  const [suggestions, setSuggestions] = useState<SuggestedAngle[] | null>(null)
+  const [suggestionsGrounded, setSuggestionsGrounded] = useState(false)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  // Show the suggestion panel by default UNLESS the operator already wrote
+  // an angle (then collapse it; they know where they're going).
+  const [showSuggestions, setShowSuggestions] = useState(true)
 
   const load = useCallback(async () => {
     try {
@@ -59,11 +70,51 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
       setSources(d.sources ?? [])
       setProduction(d.production ?? null)
       setUrlsDraft((d.topic?.pasted_urls ?? []).join('\n'))
+      // Collapse suggestions if operator already typed an angle.
+      if ((d.topic?.angle ?? '').trim().length > 20) setShowSuggestions(false)
     } catch (e: any) {
       setNote(e?.message || String(e))
     } finally { setLoading(false) }
   }, [id])
   useEffect(() => { load() }, [load])
+
+  const fetchSuggestions = useCallback(async () => {
+    setLoadingSuggestions(true)
+    try {
+      const r = await fetch(`/api/v2/topics/${id}/suggest-angles`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: '{}',
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      setSuggestions(Array.isArray(d?.suggestions) ? d.suggestions : [])
+      setSuggestionsGrounded(!!d?.grounded)
+    } catch (e: any) {
+      setNote(`Couldn't fetch suggestions: ${e?.message || e}`)
+    } finally { setLoadingSuggestions(false) }
+  }, [id])
+
+  // Auto-load suggestions once on first visit (unless already collapsed).
+  useEffect(() => {
+    if (!topic || suggestions !== null || !showSuggestions) return
+    fetchSuggestions()
+  }, [topic, suggestions, showSuggestions, fetchSuggestions])
+
+  const useAngle = async (s: SuggestedAngle) => {
+    const angleText = `${s.angle} — ${s.framing}`
+    await patch('angle', angleText)
+    // Append research questions to notes so they shape the research step
+    // without overwriting any notes the operator already wrote.
+    if (s.research_questions.length > 0) {
+      const block = `Research questions for "${s.angle}":\n` +
+        s.research_questions.map(q => `  · ${q}`).join('\n')
+      const existing = (topic?.notes ?? '').trim()
+      const next = existing ? `${existing}\n\n${block}` : block
+      await patch('notes', next)
+    }
+    await load()
+    setShowSuggestions(false)
+  }
 
   const patch = async (field: string, value: any) => {
     setSavingField(field)
@@ -165,6 +216,106 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
             {savingField ? 'Saving…' : 'Edit fields inline. Auto-save on blur.'}
           </div>
         </section>
+
+        {/* Angle suggestions — auto-generated when the page opens */}
+        {showSuggestions ? (
+          <section style={{
+            padding: 18, border: '1px solid var(--line-1)', borderRadius: 14,
+            background: 'rgba(91, 141, 246, 0.03)', marginBottom: 24,
+            display: 'flex', flexDirection: 'column', gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, letterSpacing: 2.4,
+                  textTransform: 'uppercase', color: 'var(--fg-3)',
+                }}>
+                  Where do you want to take this?
+                  {suggestionsGrounded && (
+                    <span style={{ marginLeft: 8, color: 'var(--sig)' }}>· grounded in web search</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 4, lineHeight: 1.5 }}>
+                  Pick one to direct the piece (the angle + research questions get filled in), or skip and write your own below.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={fetchSuggestions} disabled={loadingSuggestions}
+                  className="canon-btn ghost" style={{ fontSize: 11 }}>
+                  {loadingSuggestions ? 'Thinking…' : 'Regenerate'}
+                </button>
+                <button onClick={() => setShowSuggestions(false)} className="canon-btn ghost" style={{ fontSize: 11 }}>
+                  Hide
+                </button>
+              </div>
+            </div>
+
+            {loadingSuggestions && (!suggestions || suggestions.length === 0) ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-3)', padding: '14px 0' }}>
+                Reading the topic and proposing angles… ~15s.
+              </div>
+            ) : suggestions && suggestions.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                Couldn't propose angles for this topic. Write one in the field below.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+                {(suggestions ?? []).map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => useAngle(s)}
+                    disabled={loadingSuggestions}
+                    style={{
+                      textAlign: 'left',
+                      padding: '14px 14px',
+                      border: '1px solid var(--line-2)',
+                      borderRadius: 10,
+                      background: 'var(--bg-2)',
+                      color: 'var(--fg)',
+                      cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                      transition: 'all .15s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--sig)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line-2)' }}
+                  >
+                    <div style={{
+                      fontSize: 14, fontWeight: 500, lineHeight: 1.3, letterSpacing: '-0.2px',
+                    }}>
+                      {s.angle}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.45 }}>
+                      {s.framing}
+                    </div>
+                    {s.research_questions.length > 0 && (
+                      <ul style={{
+                        margin: '4px 0 0 0', padding: '0 0 0 14px',
+                        fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.45,
+                      }}>
+                        {s.research_questions.slice(0, 3).map((q, qi) => (
+                          <li key={qi}>{q}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <div style={{
+                      marginTop: 'auto', fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 10, letterSpacing: 1, color: 'var(--sig)',
+                      textTransform: 'uppercase',
+                    }}>
+                      use this →
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <button onClick={() => setShowSuggestions(true)} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Suggest angles
+            </button>
+          </div>
+        )}
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 24 }}>
           <FieldBlock
