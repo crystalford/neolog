@@ -62,6 +62,9 @@ interface Beat {
   broll_video_url: string | null
   broll_prompt: string | null
   broll_status: string | null
+  synth_audio_r2_key: string | null
+  synth_audio_url: string | null
+  synth_voice_id: string | null
 }
 
 interface ThreadSource {
@@ -588,8 +591,30 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
   const [error, setError] = useState<string | null>(null)
   const [localBlob, setLocalBlob] = useState<Blob | null>(null)
   const [localUrl, setLocalUrl] = useState<string | null>(null)
+  const [synthesizing, setSynthesizing] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
+
+  const synthesize = async () => {
+    setSynthesizing(true)
+    setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${productionId}/voiceover/synthesize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beat_indexes: [beat.beat_index] }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      const result = d.results?.[0]
+      if (result?.status === 'failed') throw new Error(result.error || 'synth failed')
+      onUpdated()
+    } catch (e: any) {
+      setError(e?.message || String(e))
+    } finally {
+      setSynthesizing(false)
+    }
+  }
   const streamRef = useRef<MediaStream | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -761,14 +786,48 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
           </>
         )}
 
-        {/* No recording at all */}
-        {!hasRemote && !hasLocal && !recording && (
-          <button onClick={start} className="canon-btn primary" style={{ fontSize: 12 }}>
-            <span className="ico">
-              <svg viewBox="0 0 14 14"><rect x="5" y="2" width="4" height="7" rx="2"/><path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/></svg>
-            </span>
-            Record beat
-          </button>
+        {/* Synthesized take exists but no operator recording */}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <audio src={beat.synth_audio_url} controls
+            style={{ height: 32, flex: 1, minWidth: 200 }}/>
+        )}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <span style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1,
+            color: 'var(--sig)', border: '1px solid var(--sig)', borderRadius: 4, padding: '2px 6px',
+          }}>SYNTH</span>
+        )}
+
+        {/* No audio at all — offer both paths */}
+        {!hasRemote && !hasLocal && !recording && !beat.synth_audio_url && (
+          <>
+            <button onClick={start} className="canon-btn primary" style={{ fontSize: 12 }}>
+              <span className="ico">
+                <svg viewBox="0 0 14 14"><rect x="5" y="2" width="4" height="7" rx="2"/><path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/></svg>
+              </span>
+              Record beat
+            </button>
+            <button onClick={synthesize} className="canon-btn ghost"
+              disabled={synthesizing}
+              title="Generate this beat with Cloudflare TTS (MiniMax 2.8 if your voice profile is set, Aura-2 preset otherwise)."
+              style={{ fontSize: 12, color: 'var(--sig)' }}>
+              {synthesizing ? 'Synthesizing…' : 'Synthesize'}
+            </button>
+          </>
+        )}
+
+        {/* Synthesized exists — show Re-synth + Record-instead */}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <>
+            <button onClick={synthesize} className="canon-btn ghost"
+              disabled={synthesizing}
+              style={{ fontSize: 11, color: 'var(--sig)' }}>
+              {synthesizing ? '…' : 'Re-synthesize'}
+            </button>
+            <button onClick={start} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Record instead
+            </button>
+          </>
         )}
 
         {error && (
@@ -875,11 +934,47 @@ function VoiceoverPanel({ production, beats, onStitched }: {
   onStitched: () => void
 }) {
   const [stitching, setStitching] = useState(false)
+  const [synthAllProgress, setSynthAllProgress] = useState<{ done: number; total: number; current?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const recordedCount = beats.filter(b => b.audio_r2_key).length
+  const synthCount = beats.filter(b => !b.audio_r2_key && b.synth_audio_r2_key).length
   const totalCount = beats.length
+  const audibleCount = recordedCount + synthCount
+  const allAudible = totalCount > 0 && audibleCount === totalCount
   const allRecorded = totalCount > 0 && recordedCount === totalCount
+
+  // Sequential per-beat synthesis so the progress UI reflects real per-tile
+  // state. Total wall-clock matches a batch POST; granularity is the win.
+  const synthesizeAll = async () => {
+    const pending = beats.filter(b => !b.audio_r2_key && !b.synth_audio_r2_key)
+    if (pending.length === 0) return
+    setSynthAllProgress({ done: 0, total: pending.length })
+    setError(null)
+    let failures = 0
+    for (let i = 0; i < pending.length; i++) {
+      const beat = pending[i]
+      setSynthAllProgress({ done: i, total: pending.length, current: beat.beat_index })
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}/voiceover/synthesize`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beat_indexes: [beat.beat_index] }),
+        })
+        const d: any = await r.json()
+        const result = d?.results?.[0]
+        if (!r.ok || result?.status === 'failed') {
+          failures++
+          if (failures === 1) setError(`beat ${beat.beat_index}: ${result?.error || d?.error || 'failed'}`)
+        }
+      } catch (e: any) {
+        failures++
+        if (failures === 1) setError(`beat ${beat.beat_index}: ${e?.message || String(e)}`)
+      }
+      onStitched() // refresh production state for each tile
+    }
+    setSynthAllProgress(null)
+  }
 
   // Determine if the existing output is a stitched voiceover (vs a
   // future final-render artifact).
@@ -910,7 +1005,14 @@ function VoiceoverPanel({ production, beats, onStitched }: {
     <section className="canon-section">
       <div className="canon-section-head">
         <h2>Voiceover {hasVoiceover && <span className="meta">· stitched from {(() => { try { return JSON.parse(production.output_metadata || '{}').beat_count } catch { return recordedCount } })()} beats</span>}</h2>
-        <div className="meta">{recordedCount}/{totalCount} beats recorded</div>
+        <div className="meta">
+          {recordedCount} recorded{synthCount > 0 ? `, ${synthCount} synth` : ''} / {totalCount} beats
+          {synthAllProgress && (
+            <span style={{ marginLeft: 8, color: 'var(--sig)' }}>
+              · synthesizing {synthAllProgress.done + 1}/{synthAllProgress.total}{synthAllProgress.current != null ? ` (beat ${synthAllProgress.current + 1})` : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {hasVoiceover && production.output_url && (
@@ -960,16 +1062,29 @@ function VoiceoverPanel({ production, beats, onStitched }: {
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
           <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-            {allRecorded
-              ? 'All beats recorded. Stitch them into a single voiceover MP3.'
-              : `Record voiceover for ${totalCount - recordedCount} more beat${totalCount - recordedCount === 1 ? '' : 's'} below, then stitch.`}
+            {allAudible
+              ? `All beats have audio (${recordedCount} recorded${synthCount > 0 ? `, ${synthCount} synthesized` : ''}). Stitch into the final voiceover.`
+              : `${totalCount - audibleCount} beat${totalCount - audibleCount === 1 ? '' : 's'} need${totalCount - audibleCount === 1 ? 's' : ''} audio. Record below, or synthesize all remaining at once.`}
           </div>
-          <div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!allAudible && (
+              <button
+                onClick={synthesizeAll}
+                disabled={!!synthAllProgress || stitching}
+                className="canon-btn ghost"
+                style={{ fontSize: 12, color: 'var(--sig)' }}
+                title="Synthesize every un-audio beat with Cloudflare TTS (MiniMax 2.8 if your voice profile is set, Aura-2 preset otherwise)."
+              >
+                {synthAllProgress
+                  ? `Synthesizing ${synthAllProgress.done + 1}/${synthAllProgress.total}…`
+                  : `Synthesize ${totalCount - audibleCount} remaining`}
+              </button>
+            )}
             <button
               onClick={stitch}
-              disabled={stitching || !allRecorded}
+              disabled={stitching || !allAudible || !!synthAllProgress}
               className="canon-btn primary"
-              style={{ fontSize: 12, opacity: !allRecorded ? 0.5 : 1 }}
+              style={{ fontSize: 12, opacity: !allAudible ? 0.5 : 1 }}
             >
               {stitching ? 'Stitching…' : 'Stitch voiceover'}
             </button>
@@ -1013,6 +1128,8 @@ function BrollRenderPanel({ production, onRendered }: {
   const [picked, setPicked] = useState<string[]>([])
   const [loadingBroll, setLoadingBroll] = useState(true)
   const [rendering, setRendering] = useState(false)
+  const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [renderElapsed, setRenderElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   // Check if a voiceover exists (must come before render).
@@ -1030,6 +1147,26 @@ function BrollRenderPanel({ production, onRendered }: {
       .then((d: any) => { setBroll(d.broll ?? []); setLoadingBroll(false) })
       .catch(() => setLoadingBroll(false))
   }, [])
+
+  // Render heartbeat — while a render is in flight, poll the production
+  // every 3 seconds and surface render_status (the server updates this
+  // between substeps: presigning → ffmpeg → uploading → done). Also tick
+  // an elapsed-seconds counter for the ETA line.
+  useEffect(() => {
+    if (!rendering) { setRenderStatus(null); setRenderElapsed(0); return }
+    const started = Date.now()
+    const tick = setInterval(() => setRenderElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}`, { credentials: 'include' })
+        if (!r.ok) return
+        const d: any = await r.json()
+        const status = d?.production?.render_status
+        if (typeof status === 'string') setRenderStatus(status)
+      } catch {}
+    }, 3000)
+    return () => { clearInterval(tick); clearInterval(poll) }
+  }, [rendering, production.id])
 
   const toggle = (id: string) => {
     setPicked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -1196,7 +1333,11 @@ function BrollRenderPanel({ production, onRendered }: {
                   className="canon-btn primary"
                   style={{ marginLeft: 'auto', fontSize: 12, opacity: picked.length === 0 ? 0.5 : 1 }}
                 >
-                  {rendering ? 'Rendering… (may take a minute)' : isFinalRender ? 'Re-render' : 'Render final MP4'}
+                  {rendering
+                    ? renderStatus
+                      ? `${renderStatus} · ${renderElapsed}s`
+                      : `Rendering… ${renderElapsed}s`
+                    : isFinalRender ? 'Re-render' : 'Render final MP4'}
                 </button>
               </div>
 
@@ -1232,34 +1373,70 @@ function AiBrollPanel({ production, beats, onChanged }: {
   onChanged: () => void
 }) {
   const [busy, setBusy] = useState<string | null>(null)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; current: number; stage: string } | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [rendering, setRendering] = useState(false)
+  const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [renderElapsed, setRenderElapsed] = useState(0)
+
+  useEffect(() => {
+    if (!rendering) { setRenderStatus(null); setRenderElapsed(0); return }
+    const started = Date.now()
+    const tick = setInterval(() => setRenderElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}`, { credentials: 'include' })
+        if (!r.ok) return
+        const d: any = await r.json()
+        const status = d?.production?.render_status
+        if (typeof status === 'string') setRenderStatus(status)
+      } catch {}
+    }, 3000)
+    return () => { clearInterval(tick); clearInterval(poll) }
+  }, [rendering, production.id])
 
   const haveAnyImages = beats.some(b => !!b.broll_image_r2_key)
   const haveAllImages = beats.length > 0 && beats.every(b => !!b.broll_image_r2_key)
   const haveAllVideos = beats.length > 0 && beats.every(b => !!b.broll_video_r2_key)
 
+  // Sequential per-beat generation: one POST per beat so each tile reflects
+  // its real state (prompting/Flux/Wan/Grok/done/failed) instead of a single
+  // "..." across the whole panel. Same total wall-clock; better feedback.
   const generate = async (stage: 'image' | 'video' | 'both' | 'direct_video', beatIndexes?: number[]) => {
-    const label = beatIndexes && beatIndexes.length === 1
-      ? `beat ${beatIndexes[0]}:${stage}`
-      : `${stage}:all`
-    setBusy(label)
+    const targets = beatIndexes && beatIndexes.length > 0
+      ? beatIndexes
+      : beats.map(b => b.beat_index)
+    const isBulk = !beatIndexes || beatIndexes.length > 1
+    if (isBulk) setBulkProgress({ done: 0, total: targets.length, current: targets[0], stage })
     setErr(null)
-    try {
-      const r = await fetch(`/api/v2/productions/${production.id}/broll`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage, beat_indexes: beatIndexes }),
-      })
-      const d: any = await r.json()
-      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-      if (d.failures > 0) setErr(`${d.failures} beat${d.failures === 1 ? '' : 's'} failed — see beat status.`)
-      onChanged()
-    } catch (e: any) {
-      setErr(e?.message || String(e))
-    } finally {
-      setBusy(null)
+    let failures = 0
+    for (let i = 0; i < targets.length; i++) {
+      const idx = targets[i]
+      setBusy(`beat ${idx}:${stage}`)
+      if (isBulk) setBulkProgress({ done: i, total: targets.length, current: idx, stage })
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}/broll`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage, beat_indexes: [idx] }),
+        })
+        const d: any = await r.json()
+        if (!r.ok) {
+          failures++
+          if (failures === 1) setErr(d?.error || `HTTP ${r.status}`)
+        } else if (d.failures > 0) {
+          failures++
+          const detail = d.results?.find((x: any) => x.status === 'failed')?.error
+          if (failures === 1) setErr(`beat ${idx}: ${detail || 'failed'}`)
+        }
+        onChanged()
+      } catch (e: any) {
+        failures++
+        if (failures === 1) setErr(`beat ${idx}: ${e?.message || String(e)}`)
+      }
     }
+    setBusy(null)
+    if (isBulk) setBulkProgress(null)
   }
 
   const render = async () => {
@@ -1321,10 +1498,37 @@ function AiBrollPanel({ production, beats, onChanged }: {
             disabled={!!busy || rendering}
             style={{ fontSize: 12 }}
           >
-            {rendering ? 'Rendering…' : 'Render with AI b-roll'}
+            {rendering
+              ? renderStatus
+                ? `${renderStatus} · ${renderElapsed}s`
+                : `Rendering… ${renderElapsed}s`
+              : 'Render with AI b-roll'}
           </button>
         )}
       </div>
+      {bulkProgress && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, letterSpacing: 1,
+            color: 'var(--fg-3)', marginBottom: 4, display: 'flex', justifyContent: 'space-between',
+          }}>
+            <span>
+              {bulkProgress.stage.toUpperCase()} · BEAT {bulkProgress.done + 1}/{bulkProgress.total}{bulkProgress.current != null ? ` (#${bulkProgress.current + 1})` : ''}
+            </span>
+            <span>
+              ~{estimateBrollRemaining(bulkProgress)}s remaining
+            </span>
+          </div>
+          <div style={{
+            height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', width: `${(bulkProgress.done / bulkProgress.total) * 100}%`,
+              background: 'var(--sig)', transition: 'width 0.3s',
+            }}/>
+          </div>
+        </div>
+      )}
       {err && (
         <div style={{ marginTop: 10, fontSize: 12, color: 'var(--t-terra)', wordBreak: 'break-word' }}>
           {err}
@@ -1418,4 +1622,15 @@ function BrollBeatTile({ beat, busy, onGenerate, onAnimate, onDirectVideo }: {
       </div>
     </div>
   )
+}
+
+// Rough seconds-per-beat for each broll stage. Used purely for the user-
+// facing ETA on the progress bar — never for billing or scheduling.
+function estimateBrollRemaining(p: { done: number; total: number; stage: string }): number {
+  const perBeat = p.stage === 'direct_video' ? 60
+    : p.stage === 'video' ? 25
+    : p.stage === 'image' ? 10
+    : 35 // 'both' = image + video
+  const remaining = p.total - p.done
+  return Math.max(0, remaining * perBeat)
 }

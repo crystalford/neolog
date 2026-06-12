@@ -50,7 +50,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
 
   const propose = useCallback(async () => {
     setProposing(true)
-    setNote('Proposing a beat skeleton…')
+    setNote('Reading the subject\'s moments and proposing the beat skeleton (~15s)…')
     try {
       const r = await fetch(`/api/v2/subjects/${id}/skeleton`, {
         method: 'POST', credentials: 'include',
@@ -83,7 +83,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
 
   const lock = async () => {
     setLocking(true)
-    setNote('Locking the skeleton and writing the full script…')
+    setNote('Skeleton locked. Writing the full prose script from the locked beats (~45s)…')
     try {
       const r = await fetch(`/api/v2/subjects/${id}/skeleton`, {
         method: 'POST', credentials: 'include',

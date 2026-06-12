@@ -39,6 +39,15 @@ export const MODELS = {
   // ALWAYS on — shape it by mentioning sound in the prompt
   // ("with ambient city noise", "soft piano underneath").
   TEXT_TO_VIDEO_AUDIO: '@cf/xai/grok-imagine-video',
+  // Text-to-speech with voice cloning. MiniMax 2.8 Turbo clones from a
+  // 5-10s reference clip — operator records themselves once, then every
+  // beat synthesizes in their voice. 40+ languages, inline interjection
+  // tags ((laughs), (sighs), (breath), etc.).
+  TTS_CLONE: '@cf/minimax/speech-2.8-turbo',
+  // Preset-voice TTS fallback. Deepgram Aura-2 — 40+ voices, natural
+  // context-aware pacing. Used when cloning fails or the operator picks
+  // a preset voice instead.
+  TTS_PRESET: '@cf/deepgram/aura-2-en',
 } as const
 
 export type ReasoningEffort = 'low' | 'medium' | 'high'

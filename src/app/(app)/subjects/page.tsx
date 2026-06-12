@@ -76,7 +76,7 @@ export default function SubjectsPage() {
 
   const rebuild = async () => {
     setBuilding(true)
-    setNote('Reading across everything you’ve said… this takes a moment.')
+    setNote('Reading every take across your vlogs… the librarian pass takes ~20–60s.')
     try {
       const r = await fetch('/api/v2/admin/build-subjects', { method: 'POST', credentials: 'include' })
       const d: any = await r.json()
@@ -84,7 +84,9 @@ export default function SubjectsPage() {
       const modelLine = d?.model
         ? ` · ran on ${shortModelName(d.model)}${String(d.model).includes('fallback') ? ' ⚠' : ''}`
         : ''
-      setNote(`Found ${d.subjects_written} subject${d.subjects_written === 1 ? '' : 's'} across your recordings.${modelLine}`)
+      const tenseSubjects = Array.isArray(d.subjects) ? d.subjects.filter((s: any) => /^[⚡↗?]/.test(s.name)).length : 0
+      const tensionLine = tenseSubjects > 0 ? ` · ${tenseSubjects} tension/evolution/loop` : ''
+      setNote(`Found ${d.subjects_written} subject${d.subjects_written === 1 ? '' : 's'}${tensionLine}${modelLine}.`)
       await load()
     } catch (e: any) {
       setNote(`Rebuild failed: ${e?.message || e}`)

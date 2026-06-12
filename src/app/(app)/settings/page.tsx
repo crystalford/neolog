@@ -18,6 +18,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { ModelPreferences } from './ModelPreferences'
+import { VoicePreferences } from './VoicePreferences'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
 
@@ -140,6 +141,10 @@ export default async function SettingsPage() {
 
         <Section title="AI models">
           <ModelPreferences/>
+        </Section>
+
+        <Section title="Your voice">
+          <VoicePreferences/>
         </Section>
 
         <Section title="API keys">

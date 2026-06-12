@@ -130,19 +130,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'FFmpeg binding not available' }, { status: 503 })
   }
 
-  // Presign everything for the FFmpeg worker.
+  // Render heartbeat: write substep status to productions.render_status so
+  // the page poll can show "Presigning → FFmpeg → Uploading" instead of a
+  // five-minute silent spinner. Best-effort writes; never fail the render
+  // for a heartbeat write.
+  const setStatus = async (status: string) => {
+    try {
+      await db.prepare(
+        `UPDATE productions SET render_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND operator_id = ?`,
+      ).bind(status, params.id, operator.id).run()
+    } catch {}
+  }
+  try {
+    await db.prepare(
+      `UPDATE productions SET render_started_at = CURRENT_TIMESTAMP WHERE id = ? AND operator_id = ?`,
+    ).bind(params.id, operator.id).run()
+  } catch {}
+
+  await setStatus(`presigning · ${ordered.length} clips`)
   let voiceoverUrl: string
   try { voiceoverUrl = await presignGetUrl(env, voiceoverKey, 1800) }
-  catch (err: any) { return NextResponse.json({ error: `Voiceover presign failed: ${err?.message}` }, { status: 500 }) }
+  catch (err: any) {
+    await setStatus(`failed: voiceover presign — ${err?.message || err}`)
+    return NextResponse.json({ error: `Voiceover presign failed: ${err?.message}` }, { status: 500 })
+  }
 
   const brollUrls: string[] = []
   for (const b of ordered) {
     try { brollUrls.push(await presignGetUrl(env, b.key, 1800)) }
     catch (err: any) {
+      await setStatus(`failed: broll presign — ${err?.message || err}`)
       return NextResponse.json({ error: `Broll presign failed for ${b.label}: ${err?.message}` }, { status: 500 })
     }
   }
 
+  await setStatus(`ffmpeg rendering · ${ordered.length} clips + voiceover`)
   let renderedBytes: Uint8Array
   try {
     const ffResp = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/render-video-essay', {
@@ -152,19 +174,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
     if (!ffResp.ok) {
       const txt = (await ffResp.text()).slice(0, 500)
+      await setStatus(`failed: ffmpeg ${ffResp.status}`)
       return NextResponse.json({ error: `FFmpeg render failed: ${txt}` }, { status: 502 })
     }
     renderedBytes = new Uint8Array(await ffResp.arrayBuffer())
   } catch (err: any) {
+    await setStatus(`failed: ffmpeg — ${err?.message || err}`)
     return NextResponse.json({ error: `FFmpeg call failed: ${err?.message || String(err)}` }, { status: 502 })
   }
 
+  await setStatus(`uploading · ${(renderedBytes.byteLength / 1_000_000).toFixed(1)} MB`)
   const r2Key = `${operator.id}/renders/${params.id}.mp4`
   try {
     await putObject(env, r2Key, renderedBytes, { httpMetadata: { contentType: 'video/mp4' } })
   } catch (err: any) {
+    await setStatus(`failed: r2 upload — ${err?.message || err}`)
     return NextResponse.json({ error: `R2 upload failed: ${err?.message || String(err)}` }, { status: 500 })
   }
+  await setStatus(`done · ${(renderedBytes.byteLength / 1_000_000).toFixed(1)} MB`)
 
   const meta = JSON.stringify({
     kind: 'final_render',

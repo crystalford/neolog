@@ -34,6 +34,7 @@ type ProductionRow = {
   published_to: string | null; engagement: string | null
   produced_at: string | null
   output_r2_key: string | null; output_metadata: string | null
+  render_status: string | null; render_started_at: string | null
   created_at: string; updated_at: string
 }
 type BeatRow = {
@@ -44,6 +45,8 @@ type BeatRow = {
   broll_video_r2_key: string | null
   broll_prompt: string | null
   broll_status: string | null
+  synth_audio_r2_key: string | null
+  synth_voice_id: string | null
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -61,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     `SELECT id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
             script_text, script_version, voice_profile_id, form, length_magnitude,
             prompt_version, visibility, published_to, engagement, produced_at,
-            output_r2_key, output_metadata,
+            output_r2_key, output_metadata, render_status, render_started_at,
             created_at, updated_at
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
@@ -80,13 +83,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Load beats for video_essay productions. Each beat has its own
   // index, text, optional cue (title), and optional audio_r2_key
   // once the operator records voiceover.
-  let beats: (BeatRow & { audio_url: string | null; broll_image_url: string | null; broll_video_url: string | null })[] = []
+  let beats: (BeatRow & {
+    audio_url: string | null
+    synth_audio_url: string | null
+    broll_image_url: string | null
+    broll_video_url: string | null
+  })[] = []
   if (prod.production_type === 'video_essay') {
     try {
       const rows = await findMany<BeatRow>(
         db,
         `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment,
-                broll_image_r2_key, broll_video_r2_key, broll_prompt, broll_status
+                broll_image_r2_key, broll_video_r2_key, broll_prompt, broll_status,
+                synth_audio_r2_key, synth_voice_id
            FROM production_beats
           WHERE production_id = ?
           ORDER BY beat_index ASC`,
@@ -94,10 +103,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       )
       beats = await Promise.all(rows.map(async b => {
         let audio_url: string | null = null
+        let synth_audio_url: string | null = null
         let broll_image_url: string | null = null
         let broll_video_url: string | null = null
         if (b.audio_r2_key) {
           try { audio_url = await presignGetUrl(env, b.audio_r2_key, 4 * 3600) } catch {}
+        }
+        if (b.synth_audio_r2_key) {
+          try { synth_audio_url = await presignGetUrl(env, b.synth_audio_r2_key, 4 * 3600) } catch {}
         }
         if (b.broll_image_r2_key) {
           try { broll_image_url = await presignGetUrl(env, b.broll_image_r2_key, 4 * 3600) } catch {}
@@ -105,7 +118,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         if (b.broll_video_r2_key) {
           try { broll_video_url = await presignGetUrl(env, b.broll_video_r2_key, 4 * 3600) } catch {}
         }
-        return { ...b, audio_url, broll_image_url, broll_video_url }
+        return { ...b, audio_url, synth_audio_url, broll_image_url, broll_video_url }
       }))
     } catch {}
   }

@@ -612,6 +612,42 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-12_production_beats_broll_duration_sec',
     sql: `ALTER TABLE production_beats ADD COLUMN broll_duration_sec REAL`,
   },
+  // ─── Voice synthesis (Phase 5) ───────────────────────────────────────────
+  // Operator can either record each beat OR synthesize via Cloudflare TTS.
+  // MiniMax 2.8 Turbo clones from a 10s reference; Aura-2 / Grok use presets.
+  // synth_audio_r2_key lives next to audio_r2_key; stitch picks whichever
+  // exists (recorded wins ties — operator's actual voice trumps clone).
+  {
+    name: '2026-06-12_production_beats_synth_audio_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN synth_audio_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_synth_voice_id',
+    sql: `ALTER TABLE production_beats ADD COLUMN synth_voice_id TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_profile_r2_key',
+    sql: `ALTER TABLE operator ADD COLUMN voice_profile_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_synth_mode',
+    sql: `ALTER TABLE operator ADD COLUMN voice_synth_mode TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_synth_voice_id',
+    sql: `ALTER TABLE operator ADD COLUMN voice_synth_voice_id TEXT`,
+  },
+  // Render heartbeat: the render step writes intermediate substeps here so
+  // the client poll surfaces "concating audio" / "rendering" / "uploading"
+  // instead of a 5-minute silent spinner.
+  {
+    name: '2026-06-12_productions_render_status',
+    sql: `ALTER TABLE productions ADD COLUMN render_status TEXT`,
+  },
+  {
+    name: '2026-06-12_productions_render_started_at',
+    sql: `ALTER TABLE productions ADD COLUMN render_started_at TEXT`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the
