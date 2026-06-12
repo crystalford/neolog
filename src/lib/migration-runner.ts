@@ -648,6 +648,34 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-12_productions_render_started_at',
     sql: `ALTER TABLE productions ADD COLUMN render_started_at TEXT`,
   },
+  // ─── Topics surface — essays on arbitrary subjects, in your voice ────────
+  // A 'topic' is a free-text subject the operator types (a person, an idea,
+  // a fascination). Distinct from 'clusters' which are auto-surfaced from
+  // the operator's own vlogs. Stored as its own table so the Subjects screen
+  // stays cleanly about reflection while Topics is the create-from-scratch
+  // surface. Same production downstream — a Topic generates a video_essay
+  // with source_kind='topic', source_id=<topic id>.
+  {
+    name: '2026-06-12_topics',
+    sql: `CREATE TABLE IF NOT EXISTS topics (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      title           TEXT NOT NULL,
+      framing         TEXT,
+      angle           TEXT,
+      notes           TEXT,
+      state           TEXT NOT NULL DEFAULT 'forming',
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-12_idx_topics_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_topics_operator
+            ON topics(operator_id, updated_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the

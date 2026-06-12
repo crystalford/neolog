@@ -206,7 +206,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return `[BEAT ${b.index + 1}: ${b.title}] kind=${b.kind}\n  Directive: ${b.one_line}\n  Verbatim to anchor in: "${span.slice(0, 1400)}"`
   }).join('\n\n')
 
-  const userPrompt = `Locked skeleton — write the prose, beat by beat, in order. Anchor each beat in its verbatim. Output the full script with === separators between beats.\n\n${beatBlock}`
+  // Voice-shape anchoring: pull register-varied strong takes from across
+  // the operator's corpus to lock voice. Even for cluster sources where
+  // beats already have their own verbatim anchors, this teaches the model
+  // the operator's connective tissue cadence (the words between the
+  // anchors) so the prose sounds like one person.
+  const { loadVoiceSamples, formatVoiceSamples } = await import('@/lib/voice-shape')
+  const voiceSamples = await loadVoiceSamples(db, operator.id, 4)
+  const voiceBlock = formatVoiceSamples(voiceSamples)
+
+  const userPrompt = `Locked skeleton — write the prose, beat by beat, in order. Anchor each beat in its verbatim. Output the full script with === separators between beats.\n\n${beatBlock}${voiceBlock}`
 
   let scriptText = ''
   let modelUsed = ''

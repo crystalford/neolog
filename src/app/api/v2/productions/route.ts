@@ -36,7 +36,7 @@ import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env { DB: D1Database; AI: Ai; ANTHROPIC_API_KEY: string; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
-type SourceKind = 'thread' | 'cluster'
+type SourceKind = 'thread' | 'cluster' | 'topic'
 type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay'
 type ModelKey = 'claude' | 'llama70b' | 'kimi' | 'scout'
 
@@ -44,6 +44,10 @@ const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip
 // x_post on a cluster: condenses a SUBJECT (multiple recurring moments)
 // into one post. Used by the Subjects screen's "Make a post" deliverable.
 const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_post', 'x_thread', 'article', 'video_essay'])
+// Topic sources: free-text subjects the operator types. The Topics surface
+// generates a video_essay (or article / x_thread) anchored on the topic +
+// voice-shape examples from the operator's past vlogs.
+const VALID_FOR_TOPIC = new Set<ProductionType>(['video_essay', 'article', 'x_thread', 'micro_essay'])
 
 export async function POST(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -69,6 +73,9 @@ export async function POST(req: NextRequest) {
   }
   if (body.source_kind === 'cluster' && !VALID_FOR_CLUSTER.has(body.production_type)) {
     return NextResponse.json({ error: `cluster sources can only produce: ${Array.from(VALID_FOR_CLUSTER).join(', ')}` }, { status: 400 })
+  }
+  if (body.source_kind === 'topic' && !VALID_FOR_TOPIC.has(body.production_type)) {
+    return NextResponse.json({ error: `topic sources can only produce: ${Array.from(VALID_FOR_TOPIC).join(', ')}` }, { status: 400 })
   }
 
   // CLIP: no LLM. Calls the video-segment endpoint internally to slice
@@ -124,6 +131,41 @@ ${quotes.map((q, i) => `  ${i + 1}. "${q}"`).join('\n') || '  (none)'}
 Open questions the operator raised:
 ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
 `
+  } else if (body.source_kind === 'topic') {
+    // ── Topic source: type-a-subject → video essay in operator's voice ────
+    // No verbatim spans from the operator's past vlogs about THIS topic
+    // (they may have never recorded about it). The substance comes from
+    // the operator's typed angle/notes + the topic name. The VOICE is
+    // taught to the model via voice-shape samples drawn from their
+    // strongest past takes across the corpus — same person, new subject.
+    const t = await findOne<{
+      id: string; title: string; framing: string | null; angle: string | null; notes: string | null
+    }>(
+      db,
+      `SELECT id, title, framing, angle, notes
+         FROM topics WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+      body.source_id, operator.id,
+    )
+    if (!t) return NextResponse.json({ error: 'Topic not found' }, { status: 404 })
+    topicHint = t.title
+
+    // Voice shape: pull 6 strong, register-varied takes with their verbatim
+    // spans. Dropped into the system prompt as STYLE EXAMPLES.
+    const { loadVoiceSamples, formatVoiceSamples } = await import('@/lib/voice-shape')
+    const voiceSamples = await loadVoiceSamples(db, operator.id, 6)
+    const voiceBlock = formatVoiceSamples(voiceSamples)
+
+    sourceContext = `SOURCE: an arbitrary TOPIC the operator wants a piece about. They may have never recorded about this subject before. The substance comes from the topic + their angle; the VOICE comes from the voice-shape samples below.
+Topic: ${t.title}
+${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${voiceBlock}
+
+═══════════════════════════════════════════════════════════════
+HARD RULES for TOPIC pieces (additive to the per-type rules below):
+═══════════════════════════════════════════════════════════════
+- The new piece is ABOUT the topic, not about the operator's existing vlogs. Do NOT reference, summarize, or quote the voice samples — they are STYLE references only. Pretend the operator just sat down to write this fresh.
+- The voice should read like the SAME PERSON wrote both the samples and the new piece. Match their cadence, their hedges, their landing rhythm, their move-by-move way of building a thought. Don't impersonate a generic essay LLM.
+- If the operator's typed angle/notes contradict your default approach, defer to the angle. They are the editor.
+- If facts beyond the operator's angle/notes are needed and you don't know them with confidence, say so plainly (e.g. "[verify: when did X happen?]"). Don't fabricate facts.`
   } else {
     // cluster
     const c = await findOne<{

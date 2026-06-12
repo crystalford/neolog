@@ -23,6 +23,7 @@ import { usePathname } from 'next/navigation'
 // no longer masthead destinations. The mess goes quiet; the work stays loud.
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Subjects',  href: '/subjects',  matchPaths: [/^\/$/, /^\/subjects/, /^\/subject\//, /^\/studio/, /^\/clusters/, /^\/cluster\//] },
+  { label: 'Topics',    href: '/topics',    matchPaths: [/^\/topics/, /^\/topic\//] },
   { label: 'Vlogs',     href: '/vlogs',     matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
   { label: 'Published', href: '/published', matchPaths: [/^\/published/, /^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/] },
 ]
