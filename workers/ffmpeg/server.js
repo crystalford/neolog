@@ -1028,6 +1028,58 @@ async function renderVideoEssay(body, res) {
   }
 }
 
+// ── endpoint: /ken-burns ───────────────────────────────────────────────
+// Turn a single still image into a video clip with a slow zoom + pan
+// (Ken Burns effect). Used as the b-roll fallback when Wan 2.7 errors —
+// keeps the essay shippable even when image-to-video isn't reachable.
+// Input:  { image_url: string, duration_sec: number, width?, height? }
+// Output: MP4 video stream.
+async function kenBurns(body, res) {
+  const { image_url, duration_sec } = body
+  const width = body.width || 1280
+  const height = body.height || 720
+  if (!image_url || typeof image_url !== 'string') {
+    return jsonError(res, 400, 'image_url required')
+  }
+  const dur = Math.max(1, Math.min(30, Number(duration_sec) || 6))
+  const { join } = await import('path')
+  const { dir, file: inputFile } = await downloadToTmp(image_url, 'kenburns')
+  const outFile = join(dir, 'out.mp4')
+  try {
+    const fps = 30
+    const totalFrames = Math.round(dur * fps)
+    // Slow zoom from 1.0 → 1.12 with a tiny rightward pan. Scale source to a
+    // big intermediate so zoompan has resolution headroom, then downscale.
+    const filter = [
+      `scale=${width * 2}:${height * 2}:flags=lanczos`,
+      `zoompan=z='min(zoom+0.0008,1.12)':d=${totalFrames}:x='iw/2-(iw/zoom/2)+(on*0.2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}:fps=${fps}`,
+      `format=yuv420p`,
+    ].join(',')
+    await runFfmpeg(
+      [
+        '-y',
+        '-loop', '1',
+        '-i', inputFile,
+        '-vf', filter,
+        '-t', String(dur),
+        '-r', String(fps),
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-movflags', '+faststart',
+        '-an',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /ken-burns failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -1037,6 +1089,7 @@ const routes = {
   '/extract-video-segment': extractVideoSegment,
   '/concat-audio': concatAudio,
   '/render-video-essay': renderVideoEssay,
+  '/ken-burns': kenBurns,
   '/trim':           trim,
   '/concat':         concat,
 }

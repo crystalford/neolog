@@ -27,6 +27,13 @@ export const MODELS = {
   BULK: '@cf/openai/gpt-oss-20b',
   // Fallback when the strong model errors or the catalog moved.
   FALLBACK: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  // Image generation for AI b-roll. Flux Schnell is the verified shape on
+  // Workers AI: { prompt, seed, steps:1..8 } → response.image is base64 JPEG.
+  IMAGE: '@cf/black-forest-labs/flux-1-schnell',
+  // Image-to-video for animated b-roll. The Workers AI catalog hosts Wan 2.7
+  // (Alibaba) as the image-to-video model; exact id may churn so the caller
+  // also has a Ken-Burns FFmpeg fallback if the AI call fails.
+  IMAGE_TO_VIDEO: '@cf/alibaba/wan-2.7',
 } as const
 
 export type ReasoningEffort = 'low' | 'medium' | 'high'

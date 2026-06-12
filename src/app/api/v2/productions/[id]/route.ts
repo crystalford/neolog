@@ -40,6 +40,10 @@ type BeatRow = {
   id: string; beat_index: number; beat_text: string; cue: string | null
   audio_r2_key: string | null; take_number: number; recorded_at: string | null
   visual_treatment: string | null
+  broll_image_r2_key: string | null
+  broll_video_r2_key: string | null
+  broll_prompt: string | null
+  broll_status: string | null
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -76,12 +80,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Load beats for video_essay productions. Each beat has its own
   // index, text, optional cue (title), and optional audio_r2_key
   // once the operator records voiceover.
-  let beats: (BeatRow & { audio_url: string | null })[] = []
+  let beats: (BeatRow & { audio_url: string | null; broll_image_url: string | null; broll_video_url: string | null })[] = []
   if (prod.production_type === 'video_essay') {
     try {
       const rows = await findMany<BeatRow>(
         db,
-        `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment
+        `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment,
+                broll_image_r2_key, broll_video_r2_key, broll_prompt, broll_status
            FROM production_beats
           WHERE production_id = ?
           ORDER BY beat_index ASC`,
@@ -89,10 +94,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       )
       beats = await Promise.all(rows.map(async b => {
         let audio_url: string | null = null
+        let broll_image_url: string | null = null
+        let broll_video_url: string | null = null
         if (b.audio_r2_key) {
           try { audio_url = await presignGetUrl(env, b.audio_r2_key, 4 * 3600) } catch {}
         }
-        return { ...b, audio_url }
+        if (b.broll_image_r2_key) {
+          try { broll_image_url = await presignGetUrl(env, b.broll_image_r2_key, 4 * 3600) } catch {}
+        }
+        if (b.broll_video_r2_key) {
+          try { broll_video_url = await presignGetUrl(env, b.broll_video_r2_key, 4 * 3600) } catch {}
+        }
+        return { ...b, audio_url, broll_image_url, broll_video_url }
       }))
     } catch {}
   }

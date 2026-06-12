@@ -588,6 +588,30 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-11_productions_skeleton_locked',
     sql: `ALTER TABLE productions ADD COLUMN skeleton_locked INTEGER NOT NULL DEFAULT 0`,
   },
+  // ─── AI b-roll per beat (2026-06-12) ─────────────────────────────────────
+  // For each beat: a Flux still + a Wan-2.7 (or Ken-Burns-fallback) clip.
+  // broll_status: null → 'image' → 'video' → 'failed'. broll_prompt is
+  // stored so regeneration uses the operator's edits and we can audit drift.
+  {
+    name: '2026-06-12_production_beats_broll_image_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_image_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_video_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_video_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_prompt',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_prompt TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_status',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_status TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_duration_sec',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_duration_sec REAL`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the

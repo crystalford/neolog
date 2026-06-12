@@ -56,6 +56,12 @@ interface Beat {
   take_number: number
   recorded_at: string | null
   visual_treatment: string | null
+  broll_image_r2_key: string | null
+  broll_image_url: string | null
+  broll_video_r2_key: string | null
+  broll_video_url: string | null
+  broll_prompt: string | null
+  broll_status: string | null
 }
 
 interface ThreadSource {
@@ -318,6 +324,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             {p.production_type === 'video_essay' && (
               <>
                 <VoiceoverPanel production={p} beats={data.beats ?? []} onStitched={load}/>
+                <AiBrollPanel production={p} beats={data.beats ?? []} onChanged={load}/>
                 <BrollRenderPanel production={p} onRendered={load}/>
                 <section className="canon-section">
                   <div className="canon-section-head">
@@ -1205,5 +1212,184 @@ function BrollRenderPanel({ production, onRendered }: {
         </>
       )}
     </section>
+  )
+}
+
+/**
+ * AiBrollPanel — Cloudflare-native AI b-roll for video essays.
+ *
+ * For each beat: gpt-oss writes a cinematic image prompt → Flux 1 Schnell
+ * generates a 1024×1024 still → Wan 2.7 animates it into a 5-10s clip
+ * (FFmpeg Ken Burns fallback if Wan errors). All Workers AI + R2, no third
+ * party. Then "Render with AI b-roll" calls /render with use_ai_broll=true.
+ *
+ * The operator can regenerate per-beat (single image or single clip)
+ * without re-running the whole production.
+ */
+function AiBrollPanel({ production, beats, onChanged }: {
+  production: Production
+  beats: Beat[]
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [rendering, setRendering] = useState(false)
+
+  const haveAnyImages = beats.some(b => !!b.broll_image_r2_key)
+  const haveAllImages = beats.length > 0 && beats.every(b => !!b.broll_image_r2_key)
+  const haveAllVideos = beats.length > 0 && beats.every(b => !!b.broll_video_r2_key)
+
+  const generate = async (stage: 'image' | 'video' | 'both', beatIndexes?: number[]) => {
+    const label = beatIndexes && beatIndexes.length === 1
+      ? `beat ${beatIndexes[0]}:${stage}`
+      : `${stage}:all`
+    setBusy(label)
+    setErr(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/broll`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage, beat_indexes: beatIndexes }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      if (d.failures > 0) setErr(`${d.failures} beat${d.failures === 1 ? '' : 's'} failed — see beat status.`)
+      onChanged()
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const render = async () => {
+    setRendering(true)
+    setErr(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/render`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_ai_broll: true }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onChanged()
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setRendering(false)
+    }
+  }
+
+  if (beats.length === 0) return null
+
+  return (
+    <section className="rail-card" style={{ marginTop: 16 }}>
+      <div className="rc-head">
+        <h3>AI b-roll <span className="meta">· Cloudflare Workers AI</span></h3>
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5, marginTop: 4 }}>
+        Each beat gets a cinematic still from Flux, animated by Wan&nbsp;2.7. No third party.
+      </p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <button
+          className="canon-btn primary"
+          onClick={() => generate(haveAllImages ? 'video' : 'both')}
+          disabled={!!busy || rendering}
+          style={{ fontSize: 12 }}
+        >
+          {busy === 'both:all' ? 'Generating…'
+            : busy === 'video:all' ? 'Animating…'
+            : !haveAnyImages ? 'Generate b-roll for all beats'
+            : !haveAllImages ? 'Finish generating (mixed state)'
+            : !haveAllVideos ? 'Animate all stills'
+            : 'Regenerate all'}
+        </button>
+        {haveAllVideos && (
+          <button
+            className="canon-btn primary"
+            onClick={render}
+            disabled={!!busy || rendering}
+            style={{ fontSize: 12 }}
+          >
+            {rendering ? 'Rendering…' : 'Render with AI b-roll'}
+          </button>
+        )}
+      </div>
+      {err && (
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--t-terra)', wordBreak: 'break-word' }}>
+          {err}
+        </div>
+      )}
+      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+        {beats.map(b => (
+          <BrollBeatTile
+            key={b.id}
+            beat={b}
+            busy={busy}
+            onGenerate={() => generate('both', [b.beat_index])}
+            onAnimate={() => generate('video', [b.beat_index])}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BrollBeatTile({ beat, busy, onGenerate, onAnimate }: {
+  beat: Beat
+  busy: string | null
+  onGenerate: () => void
+  onAnimate: () => void
+}) {
+  const thisBusyImg = busy === `beat ${beat.beat_index}:both` || busy === `beat ${beat.beat_index}:image`
+  const thisBusyVid = busy === `beat ${beat.beat_index}:video`
+  return (
+    <div style={{
+      border: '1px solid var(--line-1)', borderRadius: 8, padding: 8,
+      background: 'var(--bg-2)', display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{
+        aspectRatio: '16 / 9', background: '#000', borderRadius: 4, overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, color: 'var(--fg-4)', position: 'relative',
+      }}>
+        {beat.broll_video_url ? (
+          <video src={beat.broll_video_url} muted playsInline preload="metadata"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
+            onMouseLeave={e => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+          />
+        ) : beat.broll_image_url ? (
+          <img src={beat.broll_image_url} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+        ) : (
+          <span>{beat.broll_status === 'generating' ? 'Generating…' : beat.broll_status === 'failed' ? 'Failed' : 'No b-roll yet'}</span>
+        )}
+      </div>
+      <div style={{
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: 'var(--fg-3)',
+        letterSpacing: 0.5, textTransform: 'uppercase',
+      }}>
+        Beat {beat.beat_index + 1}{beat.broll_video_r2_key ? ' · clip' : beat.broll_image_r2_key ? ' · still' : ''}
+      </div>
+      {beat.broll_prompt && (
+        <div style={{ fontSize: 10.5, color: 'var(--fg-3)', lineHeight: 1.35, maxHeight: 40, overflow: 'hidden' }}>
+          {beat.broll_prompt}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button onClick={onGenerate} disabled={!!busy}
+          className="canon-btn ghost" style={{ fontSize: 10, flex: 1 }}>
+          {thisBusyImg ? '…' : beat.broll_image_r2_key ? 'Re-image' : 'Image'}
+        </button>
+        {beat.broll_image_r2_key && (
+          <button onClick={onAnimate} disabled={!!busy}
+            className="canon-btn ghost" style={{ fontSize: 10, flex: 1 }}>
+            {thisBusyVid ? '…' : beat.broll_video_r2_key ? 'Re-animate' : 'Animate'}
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
