@@ -153,12 +153,15 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     // Voice shape: pull 6 strong, register-varied takes with their verbatim
     // spans. Dropped into the system prompt as STYLE EXAMPLES.
     const { loadVoiceSamples, formatVoiceSamples } = await import('@/lib/voice-shape')
+    const { loadOperatorProfile, formatOperatorProfile } = await import('@/lib/operator-profile')
     const voiceSamples = await loadVoiceSamples(db, operator.id, 6)
     const voiceBlock = formatVoiceSamples(voiceSamples)
+    const profile = await loadOperatorProfile(db, operator.id)
+    const profileBlock = formatOperatorProfile(profile)
 
     sourceContext = `SOURCE: an arbitrary TOPIC the operator wants a piece about. They may have never recorded about this subject before. The substance comes from the topic + their angle + a research brief gathered from the open web; the VOICE comes from the voice-shape samples below.
 Topic: ${t.title}
-${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${t.research_brief ? `\n═══════════════════════════════════════════════════════════════\nRESEARCH BRIEF — substance gathered from the open web. This is your FACT BASE. Use it for claims, quotes, and structure. Do not invent facts that aren't in it; mark uncertain claims [verify: ...].\n═══════════════════════════════════════════════════════════════\n${t.research_brief}\n` : ''}${voiceBlock}
+${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${t.research_brief ? `\n═══════════════════════════════════════════════════════════════\nRESEARCH BRIEF — substance gathered from the open web. This is your FACT BASE. Use it for claims, quotes, and structure. Do not invent facts that aren't in it; mark uncertain claims [verify: ...].\n═══════════════════════════════════════════════════════════════\n${t.research_brief}\n` : ''}${profileBlock}${voiceBlock}
 
 ═══════════════════════════════════════════════════════════════
 HARD RULES for TOPIC pieces (additive to the per-type rules below):

@@ -70,6 +70,13 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
       setSources(d.sources ?? [])
       setProduction(d.production ?? null)
       setUrlsDraft((d.topic?.pasted_urls ?? []).join('\n'))
+      // Instant suggestions: the topic GET now returns the cached
+      // suggestions inline (pre-fired on topic create). If present, the
+      // page renders them immediately with no spinner.
+      if (Array.isArray(d?.suggestions) && d.suggestions.length > 0) {
+        setSuggestions(d.suggestions)
+        setSuggestionsGrounded(!!d?.suggestions_grounded)
+      }
       // Collapse suggestions if operator already typed an angle.
       if ((d.topic?.angle ?? '').trim().length > 20) setShowSuggestions(false)
     } catch (e: any) {
@@ -78,12 +85,13 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
   }, [id])
   useEffect(() => { load() }, [load])
 
-  const fetchSuggestions = useCallback(async () => {
+  const fetchSuggestions = useCallback(async (force = false) => {
     setLoadingSuggestions(true)
     try {
       const r = await fetch(`/api/v2/topics/${id}/suggest-angles`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }, body: '{}',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force }),
       })
       const d: any = await r.json()
       if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
@@ -240,7 +248,7 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={fetchSuggestions} disabled={loadingSuggestions}
+                <button onClick={() => fetchSuggestions(true)} disabled={loadingSuggestions}
                   className="canon-btn ghost" style={{ fontSize: 11 }}>
                   {loadingSuggestions ? 'Thinking…' : 'Regenerate'}
                 </button>

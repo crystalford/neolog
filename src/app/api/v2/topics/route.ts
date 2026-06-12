@@ -20,12 +20,17 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb, findMany, run } from '@/lib/d1'
+import { getDb, findMany, findOne, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
+import { suggestTopicAngles, type ResearchEnv } from '@/lib/research'
+import { loadOperatorProfile, formatOperatorProfile } from '@/lib/operator-profile'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends ResearchEnv {
+  DB: D1Database
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
 
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -72,8 +77,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'title required (min 2 chars)' }, { status: 400 })
   }
   const id = ulid()
+  const db = getDb(env)
   await run(
-    getDb(env),
+    db,
     `INSERT INTO topics (id, operator_id, title, framing, angle, notes, state)
      VALUES (?, ?, ?, ?, ?, ?, 'forming')`,
     id, operator.id, title.slice(0, 200),
@@ -81,5 +87,39 @@ export async function POST(req: NextRequest) {
     (body.angle ?? '').slice(0, 800),
     (body.notes ?? '').slice(0, 4000),
   )
+
+  // INSTANT-SUGGESTIONS: pre-fire angle suggestions in the background.
+  // By the time the operator's browser navigates to /topics/[id] the
+  // suggestions are already on the row — zero perceived wait.
+  const ctx = getRequestContext()
+  ctx.waitUntil((async () => {
+    try {
+      const op = await findOne<{ brave_search_api_key: string | null }>(
+        db, `SELECT brave_search_api_key FROM operator WHERE id = ?`, operator.id,
+      )
+      const profile = await loadOperatorProfile(db, operator.id)
+      const profileBlock = formatOperatorProfile(profile)
+      const out = await suggestTopicAngles(env, {
+        title: title.slice(0, 200),
+        angle: (body.angle ?? '').slice(0, 800),
+        braveKey: op?.brave_search_api_key ?? null,
+        profileBlock,
+      })
+      if (Array.isArray(out.suggestions) && out.suggestions.length > 0) {
+        await run(
+          db,
+          `UPDATE topics SET suggestions_json = ?, suggestions_grounded = ?,
+                             updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+          JSON.stringify(out.suggestions),
+          out.grounded ? 1 : 0,
+          id,
+        )
+      }
+    } catch (err: any) {
+      console.warn(`[topics] background suggestions failed: ${err?.message || err}`)
+    }
+  })())
+
   return NextResponse.json({ ok: true, id }, { headers: { 'Cache-Control': 'no-store' } })
 }

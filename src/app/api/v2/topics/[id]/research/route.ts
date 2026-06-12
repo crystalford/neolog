@@ -18,6 +18,7 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { researchTopic, type ResearchEnv } from '@/lib/research'
+import { loadOperatorProfile, formatOperatorProfile } from '@/lib/operator-profile'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends ResearchEnv {
@@ -61,12 +62,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   await run(db, `UPDATE topics SET research_status = 'researching', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, topicId)
 
   try {
+    const profile = await loadOperatorProfile(db, operator.id)
+    const profileBlock = formatOperatorProfile(profile)
     const result = await researchTopic(env, {
       topicId, operatorId: operator.id,
       title: topic.title, angle: topic.angle, notes: topic.notes,
       pastedUrls,
       braveKey: op?.brave_search_api_key ?? null,
       mode,
+      profileBlock,
     })
     await run(
       db,

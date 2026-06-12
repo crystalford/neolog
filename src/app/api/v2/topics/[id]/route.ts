@@ -28,10 +28,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     notes: string | null; state: string; created_at: string; updated_at: string
     research_brief: string | null; research_status: string | null
     research_at: string | null; pasted_urls_json: string | null
+    suggestions_json: string | null; suggestions_grounded: number | null
   }>(
     getDb(env),
     `SELECT id, title, framing, angle, notes, state, created_at, updated_at,
-            research_brief, research_status, research_at, pasted_urls_json
+            research_brief, research_status, research_at, pasted_urls_json,
+            suggestions_json, suggestions_grounded
        FROM topics
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
@@ -39,6 +41,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   if (!topic) return NextResponse.json({ error: 'not found' }, { status: 404 })
   let pasted_urls: string[] = []
   try { pasted_urls = topic.pasted_urls_json ? JSON.parse(topic.pasted_urls_json) : [] } catch {}
+  let suggestions: any[] = []
+  try { suggestions = topic.suggestions_json ? JSON.parse(topic.suggestions_json) : [] } catch {}
   // Also surface the per-source rows so the operator can audit what was used.
   const sources = await (await import('@/lib/d1')).findMany<{
     id: string; url: string; title: string | null; origin: string | null
@@ -63,6 +67,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     topic: { ...topic, pasted_urls },
     production,
     sources,
+    suggestions,
+    suggestions_grounded: topic.suggestions_grounded === 1,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
 

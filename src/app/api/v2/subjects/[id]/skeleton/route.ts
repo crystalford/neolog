@@ -212,10 +212,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   // the operator's connective tissue cadence (the words between the
   // anchors) so the prose sounds like one person.
   const { loadVoiceSamples, formatVoiceSamples } = await import('@/lib/voice-shape')
+  const { loadOperatorProfile, formatOperatorProfile } = await import('@/lib/operator-profile')
   const voiceSamples = await loadVoiceSamples(db, operator.id, 4)
   const voiceBlock = formatVoiceSamples(voiceSamples)
+  const profile = await loadOperatorProfile(db, operator.id)
+  const profileBlock = formatOperatorProfile(profile)
 
-  const userPrompt = `Locked skeleton — write the prose, beat by beat, in order. Anchor each beat in its verbatim. Output the full script with === separators between beats.\n\n${beatBlock}${voiceBlock}`
+  const userPrompt = `Locked skeleton — write the prose, beat by beat, in order. Anchor each beat in its verbatim. Output the full script with === separators between beats.\n\n${beatBlock}${profileBlock}${voiceBlock}`
 
   let scriptText = ''
   let modelUsed = ''

@@ -387,6 +387,15 @@ export async function buildSubjects(
     console.warn(`[librarian] tension pass failed: ${err?.message || err}`)
   }
 
+  // Auto-rebuild the operator profile after every librarian pass — the
+  // graph just changed; the "knows me" layer should reflect it.
+  try {
+    const { rebuildOperatorProfile } = await import('./operator-profile')
+    await rebuildOperatorProfile(db, operatorId, env)
+  } catch (err: any) {
+    console.warn(`[librarian] profile rebuild failed: ${err?.message || err}`)
+  }
+
   return {
     ok: true,
     topic_keys_considered: topicKeys.length,

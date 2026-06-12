@@ -57,6 +57,8 @@ interface ResearchInput {
   pastedUrls: string[]
   braveKey: string | null
   mode: 'pasted_only' | 'auto_only' | 'both'
+  /** Pre-formatted operator profile block (from formatOperatorProfile). */
+  profileBlock?: string
 }
 
 /**
@@ -137,7 +139,7 @@ export async function researchTopic(env: ResearchEnv, input: ResearchInput): Pro
     const md = obj ? await obj.text() : ''
     return `[${i + 1}] ${s.title ?? s.url}\nURL: ${s.url}\n${md.slice(0, 12000)}`
   }))
-  const userPrompt = `TOPIC: ${input.title}\n${input.angle ? `OPERATOR'S ANGLE: ${input.angle}\n` : ''}${input.notes ? `OPERATOR'S NOTES: ${input.notes}\n` : ''}\nSOURCES:\n\n${briefInput.join('\n\n────────────────────────\n\n')}\n\nNow write the research brief.`
+  const userPrompt = `TOPIC: ${input.title}\n${input.angle ? `OPERATOR'S ANGLE: ${input.angle}\n` : ''}${input.notes ? `OPERATOR'S NOTES: ${input.notes}\n` : ''}\nSOURCES:\n\n${briefInput.join('\n\n────────────────────────\n\n')}${input.profileBlock ?? ''}\n\nNow write the research brief. ${input.profileBlock ? "Where the source material naturally connects to something the operator already cares about (per the profile above), surface that in the framings/tensions section." : ''}`
 
   let brief = ''
   try {
@@ -297,6 +299,13 @@ export async function suggestTopicAngles(
     title: string
     angle?: string | null
     braveKey?: string | null
+    /**
+     * Pre-formatted operator profile block. Pass via
+     * formatOperatorProfile(await loadOperatorProfile(...)). When present,
+     * the suggester knows what the operator already circles and proposes
+     * angles connected to (or deliberately apart from) those.
+     */
+    profileBlock?: string
   },
 ): Promise<{ suggestions: SuggestedAngle[]; grounded: boolean; error?: string }> {
   // Peek at the web if we can — five lightweight results from Brave (title +
@@ -326,7 +335,7 @@ export async function suggestTopicAngles(
     }
   }
 
-  const userPrompt = `TOPIC: ${args.title}${args.angle ? `\nOperator's existing angle (refine around this — don't drop it): ${args.angle}` : ''}${webContext}\n\nPropose 4–6 angles for a video essay on this topic.`
+  const userPrompt = `TOPIC: ${args.title}${args.angle ? `\nOperator's existing angle (refine around this — don't drop it): ${args.angle}` : ''}${webContext}${args.profileBlock ?? ''}\n\nPropose 4–6 angles for a video essay on this topic.${args.profileBlock ? ' At least 1-2 of the angles should connect this topic to something the operator ALREADY circles (use the profile + known subjects above). Surface that connection in the framing. The rest can be fresh directions.' : ''}`
 
   try {
     const r = await callReasoning(env as any, {

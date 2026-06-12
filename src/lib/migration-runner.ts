@@ -723,6 +723,31 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-12_operator_brave_search_api_key',
     sql: `ALTER TABLE operator ADD COLUMN brave_search_api_key TEXT`,
   },
+  // ─── Operator profile (the "knows me" layer) ─────────────────────────────
+  // A synthesized paragraph of WHAT the operator cares about — refreshed
+  // from their vlog corpus + named subjects. Injected into every generator
+  // (librarian, angle suggester, research brief, script writer) so each
+  // act of generation is shaped by the operator's actual mind, not a
+  // stranger's.
+  {
+    name: '2026-06-12_operator_profile_digest',
+    sql: `ALTER TABLE operator ADD COLUMN profile_digest TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_profile_refreshed_at',
+    sql: `ALTER TABLE operator ADD COLUMN profile_refreshed_at TEXT`,
+  },
+  // Cache suggestions per topic so they're INSTANT on revisit. Pre-fired
+  // on topic create via waitUntil() so the detail page renders them as
+  // soon as the page loads, not after a 15s gpt-oss call.
+  {
+    name: '2026-06-12_topics_suggestions_json',
+    sql: `ALTER TABLE topics ADD COLUMN suggestions_json TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_suggestions_grounded',
+    sql: `ALTER TABLE topics ADD COLUMN suggestions_grounded INTEGER NOT NULL DEFAULT 0`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the
