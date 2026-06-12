@@ -34,6 +34,11 @@ export const MODELS = {
   // (Alibaba) as the image-to-video model; exact id may churn so the caller
   // also has a Ken-Burns FFmpeg fallback if the AI call fails.
   IMAGE_TO_VIDEO: '@cf/alibaba/wan-2.7',
+  // Direct text-to-video with native synchronized audio (dialogue, SFX,
+  // ambient). 1-15s per generation, 720p, all aspect ratios. Audio is
+  // ALWAYS on — shape it by mentioning sound in the prompt
+  // ("with ambient city noise", "soft piano underneath").
+  TEXT_TO_VIDEO_AUDIO: '@cf/xai/grok-imagine-video',
 } as const
 
 export type ReasoningEffort = 'low' | 'medium' | 'high'

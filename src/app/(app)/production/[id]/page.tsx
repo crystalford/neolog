@@ -1239,7 +1239,7 @@ function AiBrollPanel({ production, beats, onChanged }: {
   const haveAllImages = beats.length > 0 && beats.every(b => !!b.broll_image_r2_key)
   const haveAllVideos = beats.length > 0 && beats.every(b => !!b.broll_video_r2_key)
 
-  const generate = async (stage: 'image' | 'video' | 'both', beatIndexes?: number[]) => {
+  const generate = async (stage: 'image' | 'video' | 'both' | 'direct_video', beatIndexes?: number[]) => {
     const label = beatIndexes && beatIndexes.length === 1
       ? `beat ${beatIndexes[0]}:${stage}`
       : `${stage}:all`
@@ -1289,7 +1289,7 @@ function AiBrollPanel({ production, beats, onChanged }: {
         <h3>AI b-roll <span className="meta">· Cloudflare Workers AI</span></h3>
       </div>
       <p style={{ fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5, marginTop: 4 }}>
-        Each beat gets a cinematic still from Flux, animated by Wan&nbsp;2.7. No third party.
+        Each beat gets a Kubrick-tier prompt (cinematographer + production-designer + set-builder, never literal), then Flux generates a still and Wan&nbsp;2.7 animates it. Per beat, you can override to <strong>Grok Imagine Video</strong> for direct text-to-video <em>with synchronized native audio</em>. All Cloudflare, no third party.
       </p>
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
         <button
@@ -1304,6 +1304,15 @@ function AiBrollPanel({ production, beats, onChanged }: {
             : !haveAllImages ? 'Finish generating (mixed state)'
             : !haveAllVideos ? 'Animate all stills'
             : 'Regenerate all'}
+        </button>
+        <button
+          className="canon-btn ghost"
+          onClick={() => generate('direct_video')}
+          disabled={!!busy || rendering}
+          style={{ fontSize: 12, color: 'var(--sig)' }}
+          title="Skip stills entirely. Grok Imagine generates each beat's clip with synchronized ambient audio. Costlier and slower than the default; use it for richer beats."
+        >
+          {busy === 'direct_video:all' ? 'Generating (Grok)…' : 'All beats → Grok (with audio)'}
         </button>
         {haveAllVideos && (
           <button
@@ -1329,6 +1338,7 @@ function AiBrollPanel({ production, beats, onChanged }: {
             busy={busy}
             onGenerate={() => generate('both', [b.beat_index])}
             onAnimate={() => generate('video', [b.beat_index])}
+            onDirectVideo={() => generate('direct_video', [b.beat_index])}
           />
         ))}
       </div>
@@ -1336,14 +1346,17 @@ function AiBrollPanel({ production, beats, onChanged }: {
   )
 }
 
-function BrollBeatTile({ beat, busy, onGenerate, onAnimate }: {
+function BrollBeatTile({ beat, busy, onGenerate, onAnimate, onDirectVideo }: {
   beat: Beat
   busy: string | null
   onGenerate: () => void
   onAnimate: () => void
+  onDirectVideo: () => void
 }) {
   const thisBusyImg = busy === `beat ${beat.beat_index}:both` || busy === `beat ${beat.beat_index}:image`
   const thisBusyVid = busy === `beat ${beat.beat_index}:video`
+  const thisBusyDirect = busy === `beat ${beat.beat_index}:direct_video`
+  const isGrok = beat.broll_status === 'video_grok'
   return (
     <div style={{
       border: '1px solid var(--line-1)', borderRadius: 8, padding: 8,
@@ -1369,26 +1382,39 @@ function BrollBeatTile({ beat, busy, onGenerate, onAnimate }: {
       </div>
       <div style={{
         fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: 'var(--fg-3)',
-        letterSpacing: 0.5, textTransform: 'uppercase',
+        letterSpacing: 0.5, textTransform: 'uppercase', display: 'flex', gap: 6, alignItems: 'center',
       }}>
-        Beat {beat.beat_index + 1}{beat.broll_video_r2_key ? ' · clip' : beat.broll_image_r2_key ? ' · still' : ''}
+        <span>Beat {beat.beat_index + 1}{beat.broll_video_r2_key ? ' · clip' : beat.broll_image_r2_key ? ' · still' : ''}</span>
+        {isGrok && (
+          <span style={{ color: 'var(--sig)', border: '1px solid var(--sig)', borderRadius: 4, padding: '1px 5px', letterSpacing: 0.5 }}>
+            Grok · audio
+          </span>
+        )}
       </div>
       {beat.broll_prompt && (
-        <div style={{ fontSize: 10.5, color: 'var(--fg-3)', lineHeight: 1.35, maxHeight: 40, overflow: 'hidden' }}>
+        <div style={{ fontSize: 10.5, color: 'var(--fg-3)', lineHeight: 1.35, maxHeight: 56, overflow: 'hidden' }}>
           {beat.broll_prompt}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         <button onClick={onGenerate} disabled={!!busy}
-          className="canon-btn ghost" style={{ fontSize: 10, flex: 1 }}>
+          className="canon-btn ghost" style={{ fontSize: 10, flex: 1, minWidth: 0 }}
+          title="Generate still (Flux) and animate it (Wan 2.7, Ken-Burns fallback).">
           {thisBusyImg ? '…' : beat.broll_image_r2_key ? 'Re-image' : 'Image'}
         </button>
-        {beat.broll_image_r2_key && (
+        {beat.broll_image_r2_key && !isGrok && (
           <button onClick={onAnimate} disabled={!!busy}
-            className="canon-btn ghost" style={{ fontSize: 10, flex: 1 }}>
+            className="canon-btn ghost" style={{ fontSize: 10, flex: 1, minWidth: 0 }}
+            title="Animate the current still (Wan 2.7, Ken-Burns fallback). Silent.">
             {thisBusyVid ? '…' : beat.broll_video_r2_key ? 'Re-animate' : 'Animate'}
           </button>
         )}
+        <button onClick={onDirectVideo} disabled={!!busy}
+          className="canon-btn ghost"
+          style={{ fontSize: 10, flex: 1, minWidth: 0, color: 'var(--sig)' }}
+          title="Skip the still — Grok Imagine Video generates motion + synchronized ambient audio in one shot. Costlier, slower, richer.">
+          {thisBusyDirect ? '…' : isGrok ? 'Re-Grok' : 'Direct (Grok+audio)'}
+        </button>
       </div>
     </div>
   )

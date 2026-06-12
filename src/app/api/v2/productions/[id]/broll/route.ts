@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import { writeImagePrompt, generateBeatImage, animateBeatImage, type BrollEnv } from '@/lib/broll'
+import { writeImagePrompt, writeVideoPrompt, generateBeatImage, animateBeatImage, generateBeatVideoDirect, type BrollEnv } from '@/lib/broll'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends BrollEnv {
@@ -44,10 +44,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   const { id: productionId } = await ctx.params
   const body = await req.json().catch(() => ({})) as {
-    stage?: 'image' | 'video' | 'both'
+    stage?: 'image' | 'video' | 'both' | 'direct_video'
     beat_indexes?: number[]
+    // Per-beat mode: 'imageanimate' (default, cheap, Flux + Wan + Ken-Burns
+    // fallback) or 'direct_video' (Grok Imagine, slower + costlier but
+    // includes synchronized native audio).
+    mode?: 'imageanimate' | 'direct_video'
   }
-  const stage = body.stage ?? 'both'
+  const stage = body.stage ?? (body.mode === 'direct_video' ? 'direct_video' : 'both')
 
   const db = getDb(env)
   const production = await findOne<{
@@ -120,11 +124,33 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const results: Array<{
     beat_index: number; status: 'image' | 'video' | 'failed'
     image_r2_key?: string; video_r2_key?: string
-    via?: 'wan' | 'kenburns'; error?: string; prompt?: string
+    via?: 'wan' | 'kenburns' | 'grok'; error?: string; prompt?: string
   }> = []
 
   for (const beat of selectedBeats) {
     try {
+      // ── Direct-video stage ─────────────────────────────────────────
+      // Grok Imagine: text → video with native synchronized audio. Skip
+      // the still entirely. Costlier + slower, but the only path that
+      // produces ambient sound under the clip.
+      if (stage === 'direct_video') {
+        const prompt = await writeVideoPrompt(env, beat.beat_text, subjectName)
+        const dur = estimateDuration(beat.beat_text)
+        const videoKey = `${operator.id}/broll/${productionId}/${beat.beat_index}.mp4`
+        const out = await generateBeatVideoDirect(env, prompt, dur, videoKey)
+        await db.prepare(
+          `UPDATE production_beats
+              SET broll_video_r2_key = ?, broll_prompt = ?, broll_status = 'video_grok',
+                  broll_duration_sec = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+        ).bind(out.r2_key, prompt, dur, beat.id).run()
+        results.push({
+          beat_index: beat.beat_index, status: 'video',
+          video_r2_key: out.r2_key, via: 'grok', prompt,
+        })
+        continue
+      }
+
       // ── Image stage ────────────────────────────────────────────────
       let imageKey = beat.broll_image_r2_key
       let prompt = beat.broll_prompt
@@ -141,7 +167,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         ).bind(imageKey, prompt, beat.id).run()
       }
 
-      // ── Video stage ────────────────────────────────────────────────
+      // ── Animate stage (Wan 2.7 image-to-video; Ken-Burns fallback) ─
       if (stage === 'video' || stage === 'both') {
         if (!imageKey) throw new Error('no image to animate')
         const dur = estimateDuration(beat.beat_text)

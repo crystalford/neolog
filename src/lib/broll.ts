@@ -22,27 +22,100 @@ export interface BrollEnv extends R2Env {
   FFMPEG?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
 }
 
-const IMAGE_PROMPT_SYSTEM = `You write cinematic IMAGE PROMPTS for AI image generation. The image is b-roll for a video essay voiceover beat — atmospheric, evocative, NOT literal.
+const IMAGE_PROMPT_SYSTEM = `You are a cinematographer + production designer + scene-builder writing IMAGE PROMPTS for an AI image generator. The image is one frame of b-roll under a voiceover beat for a video essay. Think Kubrick: every frame is a painting; every element is placed with intent.
 
-RULES:
-- 1-2 sentences. Concrete visual nouns. Lighting (golden hour, overcast, neon), camera angle (low, wide, close), color grade (cool blue, warm desaturated), mood (still, kinetic, lonely).
-- NEVER describe people's faces, recognizable celebrities, or specific brand logos.
-- NEVER include text in the image.
-- AVOID anything literal to the spoken words — show the FEELING and ENVIRONMENT, not the subject matter directly. Spoken "I was thinking about how I procrastinate" → image is "an empty desk at golden hour, soft light through tall windows, single chair pushed back."
-- Prefer wide landscapes, architecture, environmental detail, abstract textures.
+The single biggest failure mode you MUST avoid is LITERALISM. If the voiceover talks about LAW, you do NOT write "a gavel" or "an American flag." You build a SCENE that carries the IDEA without naming it. The audience FEELS the idea through the staging.
 
-Output ONLY the prompt sentence(s), no prose, no explanation, no markdown.`
+═══════════════════════════════════════════════════════════════
+NON-NEGOTIABLE RULES
+═══════════════════════════════════════════════════════════════
+
+1. NEVER a single subject in a void. EVERY prompt must have layered composition: a foreground element, a midground anchor, a background detail. Three planes minimum. A single noun on a backdrop is failure.
+
+2. EVERY prompt must specify:
+   · SHOT TYPE + LENS — wide, medium, close; anamorphic, 35mm, 85mm, lens flares.
+   · CAMERA — angle (low, eye-level, high, overhead), height, distance, framing.
+   · LIGHTING — the SOURCE (window light, neon sign, single lamp, overcast sky), the QUALITY (soft / hard, warm / cool), and the TIME OF DAY (blue hour, golden hour, harsh noon, after midnight).
+   · PRODUCTION DESIGN — concrete props, materials, era. Not "a room" — "a 1970s lecture theatre, formica desks, fluorescent buzz, chalk dust in the air."
+   · COLOR GRADE — palette, temperature, saturation. "Cool teal shadows, ochre highlights, desaturated mid-tones."
+   · ATMOSPHERE — weather, particulate, temperature, air. Mist, smoke, dust motes, rain, heat shimmer.
+
+3. SUBTEXT, NEVER TEXT. The image is what the voiceover is ABOUT, sideways. Show what it FEELS like to think this thought, what world it lives in. NEVER illustrate the literal subject matter.
+
+4. NO faces. NO recognizable people, celebrities, or characters. If people appear, they are silhouettes, backs, hands, distant figures, or partial framing (legs walking past, a hand on a doorframe).
+
+5. NO logos, NO brand names, NO words/letters/typography in the frame. Workers AI image models render text as garbage anyway.
+
+6. NO clichés: no light bulbs for ideas, no chess pieces for strategy, no scales for justice, no gears for systems, no maze for confusion, no broken mirror for identity. If your first instinct is on this list, find another way.
+
+═══════════════════════════════════════════════════════════════
+EXAMPLES (study these)
+═══════════════════════════════════════════════════════════════
+
+Voiceover beat: "I keep thinking about how rules made for one game get applied to another. The framework just keeps spreading."
+
+BAD (literal): "a chessboard with judge's gavel and law books, dramatic lighting"
+
+GOOD: "Wide anamorphic shot. Empty municipal courtroom at 4 a.m., long since adjourned. Stacked plastic chairs in the foreground. Midground: a forgotten paper cup on the bench, half-folded legal pad. Background: tall windows with cool blue dawn light bleeding through institutional venetian blinds, a single janitor's mop bucket against the far wall. Pale green linoleum, fluorescent flicker, dust motes in the cold light. Desaturated teal-and-ochre grade, low contrast. Quiet, abandoned authority."
+
+Voiceover beat: "The thing I keep coming back to is how much our attention is being farmed."
+
+BAD (literal): "people staring at glowing phones, social media icons floating"
+
+GOOD: "Low-angle medium-wide. Industrial greenhouse at dusk, rows of hydroponic LED bars receding into distance, violet-pink grow lights humming. Foreground: condensation beading on a stainless-steel rail. Midground: an empty wheeled cart, soil dusting the floor, a single pair of work gloves left on a shelf. Background: a darkened control panel, one green LED. Damp air, fogged plastic sheeting, soft volumetric haze. Cool magenta and steel-blue grade. The feeling of an automated farm running alone at night."
+
+Voiceover beat: "I'm not sure what I'm trying to get at here."
+
+BAD (literal): "a confused person scratching their head"
+
+GOOD: "Medium wide, slightly canted. A car parked at the edge of an empty grocery-store parking lot at 11 p.m. Sodium-vapor lamps overhead casting hard orange pools. Foreground: a discarded receipt drifting across cracked asphalt in a breeze. Midground: the car's silhouette, one taillight on, faint silhouette of a head looking through the windshield. Background: the dark, closed storefront, "OPEN 24 HOURS" sign unlit, low cinderblock wall. Warm orange highlights, deep navy shadows. The texture of a thought you can't quite finish."
+
+═══════════════════════════════════════════════════════════════
+OUTPUT
+═══════════════════════════════════════════════════════════════
+
+Output ONLY the prompt: 3–6 sentences, dense, specific. Lead with the shot type. No prose, no explanation, no markdown, no preamble, no "Sure, here's a prompt." Just the prompt itself.`
+
+const VIDEO_PROMPT_SYSTEM = `You are a cinematographer + production designer + sound designer writing TEXT-TO-VIDEO PROMPTS for a video generator that produces 5–10 second clips with SYNCHRONIZED native AUDIO (ambient, sound effects, music — automatically generated from the prompt). The clip is b-roll under a voiceover beat for a video essay. Kubrick-style: every frame placed with intent.
+
+You inherit ALL the rules of the image prompt writer (no literalism, layered composition, specified lens / camera / lighting / production design / color grade / atmosphere, no faces, no logos, no clichés). You ADD two dimensions:
+
+1. MOTION. Specify what moves in the scene, how slowly, in what direction. Subtle is almost always better than dramatic. "Camera drifts left in a slow dolly; in the midground a single curtain breathes against an open window; faint particulate drifts in late sunlight." Avoid action verbs that fight the voiceover.
+
+2. SOUND DESIGN. Specify the ambient bed + 1–2 sound details + (optional) faint musical texture. Sound is generated from the prompt. "Distant traffic hum, the deep rumble of an HVAC, one car door closing two blocks away. No music." Or "Wind through tall grass, single bird call, low cello sustained underneath."
+
+Pacing rules:
+- The clip is 5–10 seconds. ONE camera move at most. ONE meaningful change in the scene at most. Restraint reads as intention.
+- The clip lives UNDER a voiceover. The audio should feel like the room the voice is speaking from, not a competing soundtrack. If unsure, write "no music, room tone, faint ambient" — that always works.
+
+Output ONLY the prompt: 4–7 sentences. Lead with shot type and motion. End with sound design. No prose, no explanation, no markdown, no preamble.`
+
+
 
 export async function writeImagePrompt(
   env: BrollEnv,
   beatText: string,
   subjectName: string,
 ): Promise<string> {
-  const user = `Subject: ${subjectName}\n\nBeat (spoken voiceover):\n${beatText.slice(0, 1200)}\n\nWrite the cinematic b-roll image prompt.`
+  const user = `Subject of the essay: ${subjectName}\n\nThe voiceover beat the audience is hearing while this image is on screen:\n"""\n${beatText.slice(0, 1200)}\n"""\n\nWrite the cinematic b-roll image prompt. Remember: NEVER literal to the voiceover. Build a scene whose composition carries the IDEA sideways. Three layers minimum (foreground, midground, background). Specify shot type, lens, camera, lighting source, time, production design, color grade, atmosphere. No faces, no logos, no clichés.`
   const r = await callReasoning(env, {
-    system: IMAGE_PROMPT_SYSTEM, user, effort: 'low', maxTokens: 200,
+    // Cinematographer prompts need real reasoning to avoid the literalism
+    // trap. Cheap to run (few hundred tokens) but worth the effort dial.
+    system: IMAGE_PROMPT_SYSTEM, user, effort: 'high', maxTokens: 700,
   })
-  return r.text.replace(/^["'`\s]+|["'`\s]+$/g, '').slice(0, 480)
+  return r.text.replace(/^["'`\s]+|["'`\s]+$/g, '').slice(0, 1500)
+}
+
+export async function writeVideoPrompt(
+  env: BrollEnv,
+  beatText: string,
+  subjectName: string,
+): Promise<string> {
+  const user = `Subject of the essay: ${subjectName}\n\nThe voiceover beat the audience is hearing while this clip is on screen:\n"""\n${beatText.slice(0, 1200)}\n"""\n\nWrite the cinematic 5-10 second video prompt. Restraint: one camera move at most, one scene change at most. Sound design lives UNDER the voiceover — usually no music, room tone + 1-2 details is right.`
+  const r = await callReasoning(env, {
+    system: VIDEO_PROMPT_SYSTEM, user, effort: 'high', maxTokens: 700,
+  })
+  return r.text.replace(/^["'`\s]+|["'`\s]+$/g, '').slice(0, 1800)
 }
 
 /**
@@ -137,6 +210,42 @@ export async function animateBeatImage(
   if (mp4.byteLength < 1024) throw new Error(`ken-burns produced tiny output: ${mp4.byteLength}B`)
   await putObject(env, clipR2Key, mp4, { httpMetadata: { contentType: 'video/mp4' } })
   return { r2_key: clipR2Key, bytes: mp4.byteLength, via: 'kenburns' }
+}
+
+/**
+ * Direct text-to-video via Grok Imagine Video with synchronized native audio.
+ * Skips the still entirely — the model generates motion + ambient sound +
+ * sound effects (and optional music if the prompt asks for it) in one shot.
+ * 1-15s clip, 720p, ~10-50× costlier than image+animate per beat, used as
+ * the per-beat upgrade path for high-impact beats.
+ */
+export async function generateBeatVideoDirect(
+  env: BrollEnv,
+  prompt: string,
+  durationSec: number,
+  r2Key: string,
+): Promise<{ r2_key: string; bytes: number }> {
+  const dur = Math.max(2, Math.min(15, Math.round(durationSec)))
+  const res: any = await env.AI.run(MODELS.TEXT_TO_VIDEO_AUDIO, {
+    prompt: prompt.slice(0, 4000),
+    duration: dur,
+    resolution: '720p',
+    aspect_ratio: '16:9',
+  })
+  const b64: string =
+    (typeof res?.video === 'string' && res.video) ||
+    (typeof res?.result?.video === 'string' && res.result.video) ||
+    (typeof res?.output === 'string' && res.output) ||
+    ''
+  if (!b64) {
+    throw new Error('grok-imagine-video returned no video (unrecognized response shape)')
+  }
+  const bytes = base64ToBytes(b64)
+  if (bytes.byteLength < 1024) {
+    throw new Error(`grok produced suspiciously small output: ${bytes.byteLength}B`)
+  }
+  await putObject(env, r2Key, bytes, { httpMetadata: { contentType: 'video/mp4' } })
+  return { r2_key: r2Key, bytes: bytes.byteLength }
 }
 
 // Image-to-video models work best with a hint about motion. Pull a verb-y
