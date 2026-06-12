@@ -396,6 +396,15 @@ export async function buildSubjects(
     console.warn(`[librarian] profile rebuild failed: ${err?.message || err}`)
   }
 
+  // Same trigger — refresh the spark seeds so the composer reflects the
+  // updated graph. Same effort tier as the profile (medium); cheap.
+  try {
+    const { buildSparkSeeds } = await import('./spark-seeds')
+    await buildSparkSeeds(db, operatorId, env)
+  } catch (err: any) {
+    console.warn(`[librarian] spark seeds rebuild failed: ${err?.message || err}`)
+  }
+
   return {
     ok: true,
     topic_keys_considered: topicKeys.length,

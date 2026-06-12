@@ -56,17 +56,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const db = getDb(env)
   const production = await findOne<{
     id: string; operator_id: string; source_kind: string; source_id: string
-    production_type: string
+    production_type: string; aspect: string | null
   }>(
     db,
-    `SELECT id, operator_id, source_kind, source_id, production_type
+    `SELECT id, operator_id, source_kind, source_id, production_type, aspect
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     productionId, operator.id,
   )
   if (!production) return NextResponse.json({ error: 'production not found' }, { status: 404 })
-  if (production.production_type !== 'video_essay') {
-    return NextResponse.json({ error: 'b-roll only applies to video_essay productions' }, { status: 400 })
+  // Shorts also produce b-roll (vertical 9:16). All other types are
+  // rejected here; clip productions use a different pipeline entirely.
+  const aspect: '16:9' | '9:16' = production.aspect === '9:16' ? '9:16' : '16:9'
+  if (production.production_type !== 'video_essay' && production.production_type !== 'short') {
+    return NextResponse.json({ error: 'b-roll only applies to video_essay or short productions' }, { status: 400 })
   }
 
   // Subject name (for richer prompts) — cluster source only.
@@ -137,7 +140,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         const prompt = await writeVideoPrompt(env, beat.beat_text, subjectName)
         const dur = estimateDuration(beat.beat_text)
         const videoKey = `${operator.id}/broll/${productionId}/${beat.beat_index}.mp4`
-        const out = await generateBeatVideoDirect(env, prompt, dur, videoKey)
+        const out = await generateBeatVideoDirect(env, prompt, dur, videoKey, aspect)
         await db.prepare(
           `UPDATE production_beats
               SET broll_video_r2_key = ?, broll_prompt = ?, broll_status = 'video_grok',
@@ -157,7 +160,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       if (stage === 'image' || stage === 'both' || !imageKey) {
         prompt = await writeImagePrompt(env, beat.beat_text, subjectName)
         const targetKey = `${operator.id}/broll/${productionId}/${beat.beat_index}.jpg`
-        await generateBeatImage(env, prompt, targetKey)
+        await generateBeatImage(env, prompt, targetKey, aspect)
         imageKey = targetKey
         await db.prepare(
           `UPDATE production_beats
@@ -172,7 +175,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         if (!imageKey) throw new Error('no image to animate')
         const dur = estimateDuration(beat.beat_text)
         const videoKey = `${operator.id}/broll/${productionId}/${beat.beat_index}.mp4`
-        const out = await animateBeatImage(env, imageKey, beat.beat_text, dur, videoKey)
+        const out = await animateBeatImage(env, imageKey, beat.beat_text, dur, videoKey, aspect)
         await db.prepare(
           `UPDATE production_beats
               SET broll_video_r2_key = ?, broll_status = 'video',

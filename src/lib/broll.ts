@@ -126,12 +126,15 @@ export async function generateBeatImage(
   env: BrollEnv,
   prompt: string,
   r2Key: string,
+  aspect: '16:9' | '9:16' = '16:9',
 ): Promise<{ r2_key: string; bytes: number }> {
   const seed = Math.floor(Math.random() * 0xffffff)
+  const dims = aspect === '9:16' ? { width: 720, height: 1280 } : { width: 1280, height: 720 }
   const res: any = await env.AI.run(MODELS.IMAGE, {
     prompt: prompt.slice(0, 2000),
     seed,
     steps: 8,
+    ...dims,
   })
   // Workers AI flux returns { image: "<base64>" }. Some catalog versions
   // have returned a ReadableStream or { result: { image: ... } } — handle
@@ -159,9 +162,11 @@ export async function animateBeatImage(
   beatText: string,
   durationSec: number,
   clipR2Key: string,
+  aspect: '16:9' | '9:16' = '16:9',
 ): Promise<{ r2_key: string; bytes: number; via: 'wan' | 'kenburns' }> {
   const targetDuration = Math.max(2, Math.min(15, Math.round(durationSec)))
   const imageUrl = await presignGetUrl(env, imageR2Key, 3600)
+  const dims = aspect === '9:16' ? { width: 720, height: 1280 } : { width: 1280, height: 720 }
 
   // ─── Attempt 1: Wan 2.7 image-to-video on Workers AI ──────────────────
   try {
@@ -169,8 +174,7 @@ export async function animateBeatImage(
       image_url: imageUrl,
       prompt: synthesizeMotionPrompt(beatText),
       duration: targetDuration,
-      width: 1280,
-      height: 720,
+      ...dims,
     })
     const b64: string =
       (typeof res?.video === 'string' && res.video) ||
@@ -198,8 +202,8 @@ export async function animateBeatImage(
     body: JSON.stringify({
       image_url: imageUrl,
       duration_sec: targetDuration,
-      width: 1280,
-      height: 720,
+      width: dims.width,
+      height: dims.height,
     }),
   } as RequestInit)
   if (!ffResp.ok) {
@@ -224,13 +228,14 @@ export async function generateBeatVideoDirect(
   prompt: string,
   durationSec: number,
   r2Key: string,
+  aspect: '16:9' | '9:16' = '16:9',
 ): Promise<{ r2_key: string; bytes: number }> {
   const dur = Math.max(2, Math.min(15, Math.round(durationSec)))
   const res: any = await env.AI.run(MODELS.TEXT_TO_VIDEO_AUDIO, {
     prompt: prompt.slice(0, 4000),
     duration: dur,
     resolution: '720p',
-    aspect_ratio: '16:9',
+    aspect_ratio: aspect,
   })
   const b64: string =
     (typeof res?.video === 'string' && res.video) ||

@@ -477,15 +477,19 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
 
   // Insert the production row.
   const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  // Shorts render vertical 9:16; everything else 16:9. Set at creation
+  // so the b-roll generator + final render both pick up the right aspect.
+  const aspect = body.production_type === 'short' ? '9:16' : '16:9'
   await db.prepare(
     `INSERT INTO productions (
         id, operator_id, production_type, source_kind, source_id, state,
-        script_text, prompt_version, tier
-     ) VALUES (?, ?, ?, ?, ?, 'materializing', ?, ?, 'lo_fi')`,
+        script_text, prompt_version, tier, aspect
+     ) VALUES (?, ?, ?, ?, ?, 'materializing', ?, ?, 'lo_fi', ?)`,
   ).bind(
     id, operator.id, body.production_type, body.source_kind, body.source_id,
     scriptText,
     `production-v1·${modelUsed}${groundingRatio != null ? `·grounded${Math.round(groundingRatio * 100)}%` : ''}`,
+    aspect,
   ).run()
 
   // For video_essay, parse beats from the script ("=== " separator
@@ -506,6 +510,35 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
       } catch (err: any) {
         console.warn(`[production beats] failed to insert beat ${i}: ${err?.message}`)
       }
+    }
+
+    // Auto-synthesize voice for SHORTS when the operator's voice profile
+    // exists. This is the "true one-tap-to-MP4" path — the operator spark-
+    // composes a concept and by the time they land on the production page,
+    // the voiceover is already on its way. Best-effort background work.
+    if (body.production_type === 'short' && beats.length > 0) {
+      try {
+        const op = await findOne<{ voice_profile_r2_key: string | null; voice_synth_mode: string | null }>(
+          db, `SELECT voice_profile_r2_key, voice_synth_mode FROM operator WHERE id = ?`, operator.id,
+        )
+        const hasProfile = !!op?.voice_profile_r2_key
+        const wantsSynth = op?.voice_synth_mode !== 'record'
+        if (hasProfile || wantsSynth) {
+          const ctx = getRequestContext()
+          ctx.waitUntil((async () => {
+            try {
+              const cookie = req.headers.get('cookie') || ''
+              await fetch(`${new URL(req.url).origin}/api/v2/productions/${id}/voiceover/synthesize`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({}),
+              })
+            } catch (err: any) {
+              console.warn(`[shorts auto-synth] failed for ${id}: ${err?.message || err}`)
+            }
+          })())
+        }
+      } catch {}
     }
   }
 

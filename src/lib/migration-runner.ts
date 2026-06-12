@@ -748,6 +748,24 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-06-12_topics_suggestions_grounded',
     sql: `ALTER TABLE topics ADD COLUMN suggestions_grounded INTEGER NOT NULL DEFAULT 0`,
   },
+  // ─── Spark seeds cache (Phase 5 polish) ──────────────────────────────────
+  // Cached on operator so the Spark composer renders concept seeds
+  // instantly. Refreshed on librarian completion (same trigger as the
+  // profile digest).
+  {
+    name: '2026-06-12_operator_spark_seeds_json',
+    sql: `ALTER TABLE operator ADD COLUMN spark_seeds_json TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_spark_seeds_refreshed_at',
+    sql: `ALTER TABLE operator ADD COLUMN spark_seeds_refreshed_at TEXT`,
+  },
+  // Production aspect ratio. Shorts render 9:16; everything else 16:9.
+  // Drives both the b-roll image/video aspect and the FFmpeg render output.
+  {
+    name: '2026-06-12_productions_aspect',
+    sql: `ALTER TABLE productions ADD COLUMN aspect TEXT`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the

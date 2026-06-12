@@ -139,8 +139,10 @@ export default function SubjectsPage() {
 
         {/* Subject list */}
         {loading ? (
-          <div style={{ padding: '40px 0', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-4)', letterSpacing: 1 }}>
-            LOADING&hellip;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 60 }}>
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="neolog-skeleton" style={{ height: 110, opacity: 1 - i * 0.15 }}/>
+            ))}
           </div>
         ) : subjects.length === 0 ? (
           <div style={{
@@ -183,7 +185,7 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
   const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'
   return (
-    <div style={{
+    <div className="neolog-card-lift" style={{
       border: `1px solid ${isAlive ? color : 'var(--line-1)'}`, borderRadius: 14,
       borderLeft: `${isAlive ? 4 : 3}px solid ${color}`,
       background: isAlive ? 'rgba(255,255,255,0.015)' : 'var(--bg-1)', padding: '20px 22px',

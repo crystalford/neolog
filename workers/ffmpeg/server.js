@@ -943,12 +943,15 @@ async function concatAudio(body, res) {
 // Output:
 //   MP4 stream
 async function renderVideoEssay(body, res) {
-  const { voiceover_url, broll_urls } = body
+  const { voiceover_url, broll_urls, aspect } = body
   if (!voiceover_url) return jsonError(res, 400, 'voiceover_url required')
   if (!Array.isArray(broll_urls) || broll_urls.length === 0) {
     return jsonError(res, 400, 'broll_urls (non-empty array) required')
   }
   if (broll_urls.length > 30) return jsonError(res, 400, 'Too many broll clips (cap 30)')
+  // 9:16 vertical for shorts, 16:9 horizontal for everything else.
+  const outW = aspect === '9:16' ? 1080 : 1920
+  const outH = aspect === '9:16' ? 1920 : 1080
 
   const { join } = await import('path')
   const { writeFileSync } = await import('fs')
@@ -991,8 +994,8 @@ async function renderVideoEssay(body, res) {
     const scaleChains = []
     for (let i = 0; i < N; i++) {
       scaleChains.push(
-        `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,` +
-        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
+        `[${i}:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease,` +
+        `pad=${outW}:${outH}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
       )
     }
     const concatInputs = Array.from({ length: N }, (_, i) => `[v${i}]`).join('')

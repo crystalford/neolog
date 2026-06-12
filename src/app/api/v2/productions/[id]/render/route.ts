@@ -60,16 +60,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const db = getDb(env)
   const prod = await findOne<{
     id: string; production_type: string; output_r2_key: string | null; output_metadata: string | null
+    aspect: string | null
   }>(
     db,
-    `SELECT id, production_type, output_r2_key, output_metadata
+    `SELECT id, production_type, output_r2_key, output_metadata, aspect
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,
   )
   if (!prod) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (prod.production_type !== 'video_essay') {
-    return NextResponse.json({ error: 'Render only applies to video_essay productions' }, { status: 400 })
+  if (prod.production_type !== 'video_essay' && prod.production_type !== 'short') {
+    return NextResponse.json({ error: 'Render only applies to video_essay or short productions' }, { status: 400 })
   }
   if (!prod.output_r2_key) {
     return NextResponse.json({ error: 'No voiceover yet. Stitch one first via /voiceover.' }, { status: 400 })
@@ -170,7 +171,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const ffResp = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/render-video-essay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voiceover_url: voiceoverUrl, broll_urls: brollUrls }),
+      body: JSON.stringify({
+        voiceover_url: voiceoverUrl,
+        broll_urls: brollUrls,
+        aspect: prod.aspect === '9:16' ? '9:16' : '16:9',
+      }),
     })
     if (!ffResp.ok) {
       const txt = (await ffResp.text()).slice(0, 500)
