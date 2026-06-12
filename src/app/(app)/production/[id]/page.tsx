@@ -86,6 +86,7 @@ const TYPE_LABELS: Record<string, string> = {
   article: 'Article',
   clip: 'Clip',
   video_essay: 'Video essay',
+  short: 'Short (30–60s)',
   creative_work: 'Creative work',
 }
 

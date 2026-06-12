@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
           ORDER BY p.created_at DESC LIMIT 1) AS production_id
        FROM topics t
       WHERE t.operator_id = ? AND t.deleted_at IS NULL
+        AND t.state != 'spark'
       ORDER BY t.updated_at DESC`,
     operator.id,
   )

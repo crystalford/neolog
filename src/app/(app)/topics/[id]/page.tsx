@@ -164,15 +164,17 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const build = async () => {
-    if (production) { router.push(`/production/${production.id}`); return }
+  const build = async (mode: 'video_essay' | 'short' = 'video_essay') => {
+    if (mode === 'video_essay' && production) { router.push(`/production/${production.id}`); return }
     setBuilding(true)
-    setNote('Drafting the script — brief as substance, your past vlogs as voice…')
+    setNote(mode === 'short'
+      ? 'Drafting a 30-60s short in your voice…'
+      : 'Drafting the script — brief as substance, your past vlogs as voice…')
     try {
       const r = await fetch('/api/v2/productions', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_kind: 'topic', source_id: id, production_type: 'video_essay' }),
+        body: JSON.stringify({ source_kind: 'topic', source_id: id, production_type: mode }),
       })
       const d: any = await r.json()
       if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
@@ -435,8 +437,14 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* Build */}
         <section style={{ display: 'flex', gap: 10, paddingBottom: 64, flexWrap: 'wrap' }}>
-          <button onClick={build} disabled={building || researching} className="canon-btn primary" style={{ fontSize: 13 }}>
+          <button onClick={() => build('video_essay')} disabled={building || researching} className="canon-btn primary" style={{ fontSize: 13 }}>
             {building ? 'Drafting…' : production ? 'Open the script →' : hasBrief ? 'Build the script' : 'Build the script (no research yet)'}
+          </button>
+          <button onClick={() => build('short')} disabled={building || researching}
+            className="canon-btn ghost" style={{ fontSize: 13, color: 'var(--sig)' }}
+            title="Bang out a 30-60s vertical short on this topic. No long-form commitment."
+          >
+            {building ? '…' : '⚡ Make a short'}
           </button>
           <button onClick={deleteTopic} className="canon-btn ghost" style={{ fontSize: 12, color: 'var(--t-terra)' }}>
             Delete topic

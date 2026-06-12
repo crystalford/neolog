@@ -93,6 +93,9 @@ export default function TopicsPage() {
           </p>
         </section>
 
+        {/* Spark a short — the lowest-friction surface */}
+        <SparkComposer/>
+
         {/* New topic composer */}
         <section style={{
           padding: 22, borderRadius: 14, border: '1px solid var(--line-1)',
@@ -197,5 +200,85 @@ export default function TopicsPage() {
         )}
       </div>
     </Shell>
+  )
+}
+
+/**
+ * SparkComposer — the lowest-friction surface in the product.
+ *
+ * One input. Type a concept. Hit Enter. Get a finished short script in
+ * your voice, anchored on your operator profile. Navigate straight to
+ * /production/[id] where you can record/synth and post.
+ */
+function SparkComposer() {
+  const router = useRouter()
+  const [concept, setConcept] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const spark = async () => {
+    if (concept.trim().length < 3) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/v2/shorts/spark', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concept: concept.trim() }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      if (d?.production_id) router.push(`/production/${d.production_id}`)
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section style={{
+      padding: '18px 22px', borderRadius: 14,
+      border: '1px solid var(--sig)',
+      background: 'rgba(91, 141, 246, 0.04)',
+      marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, letterSpacing: 2.4,
+            textTransform: 'uppercase', color: 'var(--sig)',
+          }}>
+            ⚡ Spark a short
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--fg-2)', marginTop: 4, lineHeight: 1.45 }}>
+            Type a concept. Get a 30-60s script in your voice, anchored on what you already care about. For learning-by-creating and quick posts.
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          value={concept}
+          onChange={e => setConcept(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); spark() } }}
+          placeholder="A psychological loop. A specific contradiction. The one thing that surprised you today."
+          disabled={busy}
+          autoFocus
+          style={{
+            flex: 1, fontSize: 15, padding: '10px 14px',
+            background: 'var(--bg-2)', color: 'var(--fg)',
+            border: '1px solid var(--line-2)', borderRadius: 8,
+          }}
+        />
+        <button
+          onClick={spark}
+          disabled={busy || concept.trim().length < 3}
+          className="canon-btn primary"
+          style={{ fontSize: 13, minWidth: 100 }}
+        >
+          {busy ? 'Sparking…' : 'Spark →'}
+        </button>
+      </div>
+      {err && <div style={{ fontSize: 11.5, color: 'var(--t-terra)' }}>{err}</div>}
+    </section>
   )
 }

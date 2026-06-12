@@ -37,17 +37,16 @@ import type { D1Database, Ai } from '@cloudflare/workers-types'
 interface Env { DB: D1Database; AI: Ai; ANTHROPIC_API_KEY: string; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 type SourceKind = 'thread' | 'cluster' | 'topic'
-type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay'
+type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay' | 'short'
 type ModelKey = 'claude' | 'llama70b' | 'kimi' | 'scout'
 
-const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip'])
-// x_post on a cluster: condenses a SUBJECT (multiple recurring moments)
-// into one post. Used by the Subjects screen's "Make a post" deliverable.
-const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_post', 'x_thread', 'article', 'video_essay'])
-// Topic sources: free-text subjects the operator types. The Topics surface
-// generates a video_essay (or article / x_thread) anchored on the topic +
-// voice-shape examples from the operator's past vlogs.
-const VALID_FOR_TOPIC = new Set<ProductionType>(['video_essay', 'article', 'x_thread', 'micro_essay'])
+// 'short' is available from EVERY source type: a tight 30-60s vertical
+// video about a single concept. The "spark a thing, bang it out, post it"
+// mode. Vertical 9:16, voice-synth by default (no per-beat recording), AI
+// b-roll.
+const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip', 'short'])
+const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_post', 'x_thread', 'article', 'video_essay', 'short'])
+const VALID_FOR_TOPIC = new Set<ProductionType>(['video_essay', 'article', 'x_thread', 'micro_essay', 'short'])
 
 export async function POST(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -360,6 +359,36 @@ CLOSE on the operator's sharpest verbatim moment from the source — or the open
 
 Output ONLY the script. No explanation, no preamble.`,
     },
+    short: {
+      maxTokens: 1200,
+      system: `You are writing a SHORT VIDEO script: 30-60 seconds when spoken, 70-140 words total. Vertical format (TikTok / Reels / YouTube Shorts). Single concept, tight, no padding, no filler.
+
+═══════════════════════════════════════════════════════════════
+HARD RULES — break these and the short is unusable
+═══════════════════════════════════════════════════════════════
+
+1. ONE CONCEPT. Not "here are five thoughts." ONE. The whole short lives or dies on whether that one thing lands.
+
+2. NO INTRO FILLER. Do NOT open with "Today I want to talk about…", "There's this thing called…", "So I've been thinking about…", "Quick story…", "Have you ever…". The first sentence must STATE THE THING. The first three words should be substance.
+
+3. STRUCTURE: 1–3 BEATS, separated by lines containing ONLY ===. Each beat is one continuous spoken thought.
+   - 1-beat short: just the concept, hit hard. (~70-90 words.)
+   - 2-beat short: claim + the move that makes it land (a story / a contradiction / a sharp consequence). (~100-130 words.)
+   - 3-beat short: claim → twist → land. (~110-140 words.) Use this only when the concept genuinely needs three moves; otherwise drop a beat.
+   Each beat starts: [BEAT: <short title>] on its own line, then the spoken prose.
+
+4. THE LAST LINE LANDS. The final sentence is the part that gets screenshotted, shared, replayed. It MUST be sharp. No "thanks for watching." No "let me know in the comments." No moralizing summary. No "anyway." The last line is the thing the viewer takes with them.
+
+5. SIMPLY PUT. Plain words. Concrete nouns. No academic distance. If the operator profile says they hedge — keep the hedges; they're voice. But sentences should be short and direct. This is for people scrolling, not reading.
+
+6. VOICE: this is the operator's voice. Use voice-shape examples. Don't impersonate generic short-form essayists.
+
+7. NO TEXT-ON-SCREEN INSTRUCTIONS. (System rule: no captions, no overlays, ever.) The audio carries everything. Don't write "[text appears: …]" or similar.
+
+8. PROFILE-AWARE: if this concept connects to something the operator already circles (per the profile block), name that connection plainly inside the short — that's the "learn by creating" loop the operator wants.
+
+Output ONLY the script. No explanation, no preamble, no preamble about the structure.`,
+    },
   }
 
   const cfg = promptByType[body.production_type]
@@ -462,7 +491,9 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
   // For video_essay, parse beats from the script ("=== " separator
   // with optional "[BEAT: title]" headers) and write each into
   // production_beats. Operator will record voiceover per beat.
-  if (body.production_type === 'video_essay') {
+  // Both video_essay and short use the same === beat separator so the
+  // existing record/synth/render flow handles them identically downstream.
+  if (body.production_type === 'video_essay' || body.production_type === 'short') {
     const beats = parseBeats(scriptText)
     for (let i = 0; i < beats.length; i++) {
       const b = beats[i]

@@ -81,6 +81,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
   const findProd = (type: string) => clusterProds.find(p => p.production_type === type) ?? null
   const scriptProd = findProd('video_essay')
   const postProd = findProd('x_post')
+  const shortProd = findProd('short')
 
   const makeProd = async (production_type: string) => {
     setBusy(production_type)
@@ -199,6 +200,15 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
             actionLabel={postProd ? 'Open' : 'Make a post'}
             busy={busy === 'x_post'}
             onClick={() => postProd ? router.push(`/production/${postProd.id}`) : makeProd('x_post')}
+            color={color}
+          />
+          <DeliverableCard
+            label="Short"
+            sub="30-60s vertical · TikTok / Reels / Shorts"
+            prod={shortProd ? { id: shortProd.id, state: shortProd.state } : null}
+            actionLabel={shortProd ? 'Open the short' : 'Make a short'}
+            busy={busy === 'short'}
+            onClick={() => shortProd ? router.push(`/production/${shortProd.id}`) : makeProd('short')}
             color={color}
           />
           <DeliverableCard
