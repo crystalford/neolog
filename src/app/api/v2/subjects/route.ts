@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
           WHEN 'tension'   THEN 0
           WHEN 'evolution' THEN 1
           WHEN 'open_loop' THEN 2
+          WHEN 'candidate' THEN 4
           ELSE 3
         END,
         c.ripeness_score DESC,

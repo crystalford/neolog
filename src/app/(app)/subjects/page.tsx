@@ -172,13 +172,14 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
   const isTension = s.subject_kind === 'tension'
   const isEvolution = s.subject_kind === 'evolution'
   const isOpenLoop = s.subject_kind === 'open_loop'
+  const isCandidate = s.subject_kind === 'candidate'
   const isAlive = isTension || isEvolution || isOpenLoop
   // Tensions/evolutions/open-loops get distinct treatment — they're the
   // sharpest essay seeds and need to feel different from plain themes.
   const accent = isTension ? 'var(--t-terra)' : isEvolution ? 'var(--t-violet)' : isOpenLoop ? 'var(--t-ochre)' : topicColor(s.name)
   const color = accent
   const dots = Math.max(1, Math.min(5, Math.round(s.ripeness_score / 20)))
-  const kindLabel = isTension ? 'tension' : isEvolution ? 'evolution' : isOpenLoop ? 'open loop' : null
+  const kindLabel = isTension ? 'tension' : isEvolution ? 'evolution' : isOpenLoop ? 'open loop' : isCandidate ? 'candidate · said once' : null
   const formatDate = (iso: string | null) =>
     iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'
   return (

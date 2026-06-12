@@ -30,9 +30,18 @@ const MODELS_HARD_ID = MODELS.HARD
 // How many distinct topic-keys we hand the model in one pass. Recurring
 // subjects rise to the top by thread frequency, so the long tail of
 // one-offs (which aren't "subjects you keep circling" anyway) is dropped.
-const MAX_TOPIC_KEYS = 160
-// Minimum threads for a subject to surface. "Keep circling" needs recurrence.
+const MAX_TOPIC_KEYS = 200
+// Minimum threads for a SUBJECT_KIND='theme' subject (the recurring kind).
+// A sharp one-off is a different kind ('candidate') — see PHASE-5b sharpening.
 const MIN_THREADS_PER_SUBJECT = 2
+// How many of the strongest takes we send to the model with their VERBATIM
+// transcript spans. The librarian's prior bug: it saw only aggregated
+// summaries-of-summaries. Now it sees primary material for the strongest
+// material, which lets it do "you keep describing X — that's actually Y."
+const VERBATIM_ANCHOR_SAMPLES = 25
+// Per-anchor verbatim length cap (chars). Tight enough to keep the prompt
+// under ~6k tokens; long enough to carry the actual mechanism of the take.
+const VERBATIM_ANCHOR_CHARS = 600
 
 export interface LibrarianEnv {
   AI: { run: (model: string, args: unknown) => Promise<any> }
@@ -65,52 +74,62 @@ export interface BuildSubjectsResult {
   error?: string
 }
 
-const SYSTEM_PROMPT = `You are a sharp editor identifying the SPECIFIC IDEAS a creator keeps returning to in their recordings. Not categories — ideas. Not topics — claims, mechanisms, tensions, named concepts.
+const SYSTEM_PROMPT = `You are a CONCEPT-NAMING engine. The creator records themselves thinking out loud; other systems already tagged the surface topics. Your job is harder: behind the topics, find the actual recurring IDEAS — and NAME them precisely. The creator wants the *aha* moment of hearing "what you're circling is actually <X>" — not a wellness-blog category they already knew.
 
-The creator records themselves thinking out loud. Other systems have already tagged their topics. Your job is harder: behind the topics, find the actual recurring IDEAS — and NAME them precisely.
-
-═══════════════════════════════════════════════════════════════
-HARD RULES — read these. The grade comes from how well you follow them.
-═══════════════════════════════════════════════════════════════
-
-1. PUSH for the SPECIFIC mechanism, not the general life-area. Broad categories ARE acceptable as fallback when no sharper concept is actually present, but always try for the sharper name first. "Procrastination as information" beats "Time Management and Productivity." "The latency tax on AI trust" beats "AI and Technology." When the creator's recurring moments really are just generic life themes, fine — name them — but don't pad weak material with generic headers.
-
-2. EVERY name should aspire to one of:
-   (a) A specific term-of-art that exists in a real field — psychology, economics, philosophy, politics, sociology, technology, design, biology, anthropology. Examples: "the principal-agent problem", "loss aversion", "theory of mind", "rent-seeking", "the bystander effect", "moral licensing", "Goodhart's law", "the optimizer's curse", "epistemic learned helplessness", "Chesterton's fence", "the streetlight effect", "phenomenological reduction".
-   (b) A sharp 3-7 word coinage that captures the SPECIFIC angle the creator takes — not the general domain. Examples: "procrastination as information", "the latency tax on AI trust", "audience as compass", "the felt sense before the thought".
-
-3. If your candidate name could fit on Oprah's website AND a sharper concept is actually present in the material, the sharper one wins. Only fall back to the generic category when the sharper concept genuinely isn't there.
-
-4. named_by_system is true ONLY when:
-   - The name is a real term-of-art (existed in the world before the creator)
-   - AND the creator was clearly describing the phenomenon WITHOUT using the term
-   - It is FALSE when you coined a fresh phrase. It is FALSE when the creator was already using a name close to yours.
-   - Default: false. Only set true when you're confident you taught them a real word for something.
-
-5. For each subject, write a one-line FRAMING (second person): "You keep circling this: <the specific claim or tension>, <when it shows up>." The framing must be specific. "You keep circling personal growth" is wrong. "You keep circling whether discipline is upstream or downstream of identity, mostly when you talk about your routines" is right.
-
-6. Aim for 6–12 subjects. Fewer is better than padded. If something is genuinely a one-off, don't force it in. If two of your subjects feel like the same thing wearing different hats, merge them.
-
-7. RETURN ONLY VALID JSON. No prose. No markdown fences. No commentary.
+You are reading TWO things together:
+  · A list of topic-keys with thread/vlog counts (the breadth signal).
+  · A short set of VERBATIM SPANS — the creator's actual spoken words from the strongest takes. These are primary material; they're where the *mechanism* of the idea lives. Read them carefully. The names you propose must reflect what is actually said, not the generic topic-label.
 
 ═══════════════════════════════════════════════════════════════
-EXAMPLES
+HARD RULES — non-negotiable. Failures here ruin the output.
 ═══════════════════════════════════════════════════════════════
 
-BAD (do not do this):
-{"name":"Time Management and Productivity","framing":"You keep circling this: finding ways to manage your time effectively and overcome procrastination.","named_by_system":true,...}
+1. PUSH ALL THE WAY TO THE NAMED CONCEPT. Not the life-area. Not the topic-label. The MECHANISM. Read the verbatim spans; if the creator is describing a phenomenon that already HAS a name in any real field (psychology, economics, philosophy, politics, sociology, technology, design, biology, anthropology, sport psychology, religion, military strategy) — NAME IT. That's the unlock. ("You're circling the principal-agent problem." "That's loss aversion." "That's the streetlight effect." "That's epistemic learned helplessness." "That's the optimizer's curse." "That's Goodhart's law." "That's the bystander effect.")
 
-GOOD (do this):
-{"name":"procrastination as information","framing":"You keep circling this: the suspicion that what you put off is telling you something — that the resistance itself is data, not a flaw to crush.","named_by_system":false,...}
+2. GENERIC CATEGORY HEADERS ARE FAILURES. The following classes of output are REJECTED:
+   · life-area labels: "Personal Growth", "Mental Health", "Emotional Regulation", "Time Management", "Productivity", "Creative Process", "Career Development", "Content Creation", "AI and Technology", "Mindfulness", "Self-Care", "Wellness", "Work-Life Balance", "Relationships", "Communication"
+   · vague concatenations: anything joined by "and" that names two domains ("X and Y")
+   · YouTube-tier umbrella tags: anything that could be a content-platform category
+   These are NOT acceptable. If the verbatim spans only support a category like this, OMIT the subject rather than ship it. Fewer real subjects beat eight categories.
 
-BAD:
-{"name":"AI and Technology","framing":"You keep circling this: the potential and limitations of artificial intelligence...","named_by_system":true,...}
+3. EVERY name must be one of:
+   (a) A real term-of-art that exists in a field (set named_by_system=true). The verbatim spans should clearly describe the phenomenon without the creator using the term itself.
+   (b) A sharp 3–7 word coinage that captures the SPECIFIC angle (set named_by_system=false). Not the general domain; the actual mechanism. "procrastination as information", "the latency tax on AI trust", "audience as compass", "the felt sense before the thought", "the burden of the chosen one", "delegating the work that defines you."
 
-GOOD:
-{"name":"the latency tax on AI trust","framing":"You keep circling this: how long-running AI calls erode your willingness to use the tool, even when the answers are good — the wait teaches you not to ask.","named_by_system":false,...}
+4. named_by_system rules (strict):
+   true ONLY when: the name is a recognized term-of-art AND the creator was clearly describing it WITHOUT using the term in the verbatim spans.
+   false: when you coined the phrase. When the creator already named it. When you're not sure.
 
-GOOD (term-of-art naming):
-{"name":"the principal-agent problem","framing":"You keep circling this: when someone hired to act for you ends up serving themselves instead — managers, executives, anyone whose incentives quietly diverge from the people they're supposed to represent.","named_by_system":true,...}
+5. FRAMING is second person, specific, drawn from the verbatim. Shape: "You keep circling this: <the specific mechanism or tension>, <when/where it shows up in your thinking>." Bad: "You keep circling personal growth." Good: "You keep circling whether discipline is upstream or downstream of identity — it comes up every time you talk about your routines, and you flip on it across recordings."
+
+6. SHARP ONE-OFFS ARE ALLOWED. If one verbatim span contains a single, genuinely sharp framing that has not recurred yet, you may emit it as a subject — but set confidence ≤ 0.6 so the UI can sort it as a candidate, not a confirmed recurring subject. Set member_indexes to that single entry. Do NOT do this for generic categories — only for sharp specific naming.
+
+7. AIM for 5–10 subjects of REAL QUALITY. Fewer is better than padded. An empty subjects list is acceptable if you literally cannot find anything sharp; that signal beats slop.
+
+8. RETURN ONLY VALID JSON. No prose, no markdown, no commentary.
+
+═══════════════════════════════════════════════════════════════
+EXAMPLES (study these — the GOOD ones are the bar)
+═══════════════════════════════════════════════════════════════
+
+VERBATIM input:
+  "every time my agent says he's working for me, the deals he brings back are the ones that make HIM look good to his boss not me. the incentive isn't aligned. it's like, his quarter has to look good, that's the actual metric."
+
+BAD (reject): {"name":"Career Development and Entrepreneurship"} ← life-area, useless.
+BAD (reject): {"name":"Working with agents"} ← topic-label, no concept.
+GOOD: {"name":"the principal-agent problem","framing":"You keep circling this: how someone hired to act for you ends up serving their own metric instead — managers, agents, executives, anyone whose quarter has to look good.","named_by_system":true,"confidence":0.85}
+
+VERBATIM input:
+  "I waited like 30 seconds and I was already not trusting the answer. it's like the lag itself teaches you to expect garbage. by the third time I just stopped asking."
+
+BAD: {"name":"AI and Technology"} ← REJECTED.
+GOOD: {"name":"the latency tax on AI trust","framing":"You keep circling this: how long waits on AI answers erode your willingness to use the tool — the lag itself teaches you to expect garbage.","named_by_system":false,"confidence":0.8}
+
+VERBATIM input (a single sharp one-off):
+  "I felt this thing in my body before I had any words for what it was. the felt sense was already deciding before my head was thinking about it."
+
+BAD: {"name":"Emotional Regulation"} ← REJECTED.
+GOOD: {"name":"the felt sense before the thought","framing":"You named this once, sharply: your body deciding before your head has words for it. Worth pulling on.","named_by_system":false,"confidence":0.55}
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT SHAPE
@@ -182,13 +201,57 @@ export async function buildSubjects(
     }
   })
 
-  // ── 2. Ask the librarian to organize + name ────────────────────────────
+  // ── 2. Pull VERBATIM SPANS for the strongest takes ─────────────────────
+  // The librarian's prior failure mode: it saw aggregated summaries-of-
+  // summaries (one rep-take per topic-key) and rounded to blog categories.
+  // Now it also sees the actual spoken words for the N strongest moments
+  // across the corpus — primary material from which "you keep describing
+  // X — that's actually Y" can be drawn.
+  const anchorRes = await db.prepare(
+    `SELECT t.id, t.vlog_id, t.take,
+            t.transcript_span_start AS span_start,
+            t.transcript_span_end   AS span_end,
+            COALESCE(NULLIF(TRIM(t.abstracted_topic), ''), t.topic) AS subject_key,
+            COALESCE(t.strength, 3) AS strength
+       FROM threads t
+      WHERE t.operator_id = ? AND t.deleted_at IS NULL
+        AND t.take IS NOT NULL AND length(t.take) > 60
+        AND NOT EXISTS (SELECT 1 FROM extraction_runs er WHERE er.id = t.run_id AND er.is_active = 0)
+      ORDER BY strength DESC, length(t.take) DESC
+      LIMIT ?`,
+  ).bind(operatorId, VERBATIM_ANCHOR_SAMPLES).all<{
+    id: string; vlog_id: string; take: string | null; span_start: number | null
+    span_end: number | null; subject_key: string; strength: number
+  }>()
+  const anchors = anchorRes.results ?? []
+  const verbatimByAnchor = new Map<string, string>()
+  for (const a of anchors) {
+    if (a.span_start == null || a.span_end == null) continue
+    const wordRows = await db.prepare(
+      `SELECT word FROM transcript_words
+        WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+        ORDER BY word_index ASC LIMIT 200`,
+    ).bind(a.vlog_id, a.span_start, a.span_end).all<{ word: string }>()
+    const words = wordRows.results ?? []
+    if (words.length > 0) {
+      verbatimByAnchor.set(a.id, words.map(w => w.word).join(' ').slice(0, VERBATIM_ANCHOR_CHARS))
+    }
+  }
+
+  // ── 3. Ask the librarian to organize + name ────────────────────────────
   const inputList = topicKeys.map((t, i) =>
     `${i}. "${t.key}" — ${t.thread_count} thread${t.thread_count === 1 ? '' : 's'}/${t.vlog_count} vlog${t.vlog_count === 1 ? '' : 's'}` +
     (t.sample_take ? ` — e.g. "${t.sample_take.replace(/\s+/g, ' ').trim()}"` : ''),
   ).join('\n')
+  const verbatimBlock = anchors.length === 0 ? '' :
+    `\n\nVERBATIM SPANS — the creator's actual spoken words on their strongest takes. Use these to find the underlying MECHANISM behind each topic-key. The named concept comes from what's literally being described here, not from the topic label.\n\n` +
+    anchors.map((a, i) => {
+      const span = verbatimByAnchor.get(a.id)
+      const text = (span || a.take || '').replace(/\s+/g, ' ').trim()
+      return `[A${i}] under "${a.subject_key}" — "${text.slice(0, VERBATIM_ANCHOR_CHARS)}"`
+    }).join('\n')
 
-  const userPrompt = `Here are the topic-entries extracted from the creator's recordings, most frequent first. Each line is: index. "topic" — counts — sample of what they said.\n\n${inputList}\n\nOrganize these into the subjects the creator keeps returning to. Name the real concept behind each. Return ONLY the JSON.`
+  const userPrompt = `Topic-entries (most frequent first). Each line: index. "topic" — counts — example summary.\n\n${inputList}${verbatimBlock}\n\nFind the named concepts behind these. Push all the way to the mechanism — generic categories are REJECTED. Sharp one-offs are allowed with confidence ≤ 0.6. Return ONLY the JSON.`
 
   // Concept-naming is the hardest-reasoning task in the system → high effort
   // on gpt-oss-120b, with automatic Llama 70B fallback (see src/lib/models.ts).
@@ -249,7 +312,12 @@ export async function buildSubjects(
     }>()
 
     const threads = threadsRes.results ?? []
-    if (threads.length < MIN_THREADS_PER_SUBJECT) continue
+    // Recurrence floor for normal recurring subjects. Sharp one-offs are
+    // allowed through when the model marked them with confidence ≤ 0.6
+    // (the "I can name this even though it appeared once" path). They get
+    // a different subject_kind ('candidate') so the UI can distinguish.
+    const isSharpOneOff = threads.length === 1 && s.confidence > 0 && s.confidence <= 0.6
+    if (threads.length < MIN_THREADS_PER_SUBJECT && !isSharpOneOff) continue
 
     const vlogIds = new Set(threads.map(t => t.vlog_id))
     const avgStrength = threads.reduce((sum, t) => sum + (t.strength ?? 3), 0) / threads.length
@@ -271,12 +339,13 @@ export async function buildSubjects(
     // "You keep circling this:" into a spoken script (we saw that exact
     // bug). framing belongs only on the `framing` column for the UI; the
     // operator's own voice never lived there.
+    const subjectKind = isSharpOneOff ? 'candidate' : 'theme'
     await db.prepare(
       `INSERT INTO clusters
          (id, operator_id, topic, take, abstracted_topic, state, ripeness_score,
           framing, concept_confidence, named_by_system, representative_quote,
           subject_source, subject_kind)
-       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian', 'theme')`,
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'librarian', ?)`,
     ).bind(
       clusterId, operatorId,
       s.name.slice(0, 200),
@@ -286,6 +355,7 @@ export async function buildSubjects(
       clamp01(s.confidence),
       s.named_by_system ? 1 : 0,
       repQuote.slice(0, 500),
+      subjectKind,
     ).run()
 
     // Write cluster_threads (strongest = core, rest supporting).
