@@ -19,6 +19,7 @@ import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { ModelPreferences } from './ModelPreferences'
 import { VoicePreferences } from './VoicePreferences'
+import { BraveKeyRow } from './BraveKeyRow'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
 
@@ -150,6 +151,7 @@ export default async function SettingsPage() {
         <Section title="API keys">
           <Row k="Anthropic" sub="claude-sonnet-4-6 (max tier + chat 'claude' option)" badge="Active" arrow/>
           <Row k="Workers AI" sub="Llama 4 Scout · Kimi K2.6 · Whisper — all native" badge="Active" arrow/>
+          <BraveKeyRow/>
         </Section>
 
         <Section title="Integrations">

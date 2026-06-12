@@ -140,9 +140,10 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     // strongest past takes across the corpus — same person, new subject.
     const t = await findOne<{
       id: string; title: string; framing: string | null; angle: string | null; notes: string | null
+      research_brief: string | null
     }>(
       db,
-      `SELECT id, title, framing, angle, notes
+      `SELECT id, title, framing, angle, notes, research_brief
          FROM topics WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
       body.source_id, operator.id,
     )
@@ -155,9 +156,9 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     const voiceSamples = await loadVoiceSamples(db, operator.id, 6)
     const voiceBlock = formatVoiceSamples(voiceSamples)
 
-    sourceContext = `SOURCE: an arbitrary TOPIC the operator wants a piece about. They may have never recorded about this subject before. The substance comes from the topic + their angle; the VOICE comes from the voice-shape samples below.
+    sourceContext = `SOURCE: an arbitrary TOPIC the operator wants a piece about. They may have never recorded about this subject before. The substance comes from the topic + their angle + a research brief gathered from the open web; the VOICE comes from the voice-shape samples below.
 Topic: ${t.title}
-${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${voiceBlock}
+${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${t.research_brief ? `\n═══════════════════════════════════════════════════════════════\nRESEARCH BRIEF — substance gathered from the open web. This is your FACT BASE. Use it for claims, quotes, and structure. Do not invent facts that aren't in it; mark uncertain claims [verify: ...].\n═══════════════════════════════════════════════════════════════\n${t.research_brief}\n` : ''}${voiceBlock}
 
 ═══════════════════════════════════════════════════════════════
 HARD RULES for TOPIC pieces (additive to the per-type rules below):

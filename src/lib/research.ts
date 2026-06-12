@@ -1,0 +1,270 @@
+/**
+ * Topic research — let the system go gather material from the open web
+ * so video essays no longer depend on the operator uploading vlogs.
+ *
+ * Two source modes, picked per call:
+ *   1. PASTED — operator pasted N URLs into topic.pasted_urls_json.
+ *      We crawl those, no search.
+ *   2. AUTO — Brave Search API finds candidate URLs from the topic +
+ *      angle; we crawl the top K.
+ *   3. BOTH — pasted URLs always win; auto-search only fills the
+ *      remaining slots if any (mode='both').
+ *
+ * The fetched markdown is stored in R2 per source so the operator can
+ * audit what was used. gpt-oss-120b then synthesizes a research brief
+ * (key facts, claims, framings) which becomes topic.research_brief and
+ * feeds the script generator as SUBSTANCE — voice still comes from the
+ * operator's past vlogs.
+ */
+
+import { callReasoning } from './models'
+import { putObject, type R2Env } from './r2'
+import { ulid } from './ulid'
+import type { D1Database } from '@cloudflare/workers-types'
+
+const MAX_TOTAL_SOURCES = 8
+const BROWSER_RUN_CRAWL_URL = 'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/browser-rendering/crawl'
+
+export interface ResearchEnv extends R2Env {
+  DB: D1Database
+  AI: { run: (model: string, args: unknown) => Promise<any> }
+  CLOUDFLARE_API_TOKEN?: string
+}
+
+export interface ResearchedSource {
+  url: string
+  title: string | null
+  summary: string | null
+  origin: 'pasted' | 'auto'
+  content_r2_key: string | null
+  bytes: number
+  error?: string
+}
+
+export interface ResearchResult {
+  brief: string
+  sources: ResearchedSource[]
+  status: 'ok' | 'partial' | 'failed'
+  errors: string[]
+}
+
+interface ResearchInput {
+  topicId: string
+  operatorId: string
+  title: string
+  angle: string | null
+  notes: string | null
+  pastedUrls: string[]
+  braveKey: string | null
+  mode: 'pasted_only' | 'auto_only' | 'both'
+}
+
+/**
+ * Run the research pass for a topic. Writes per-source rows to D1, writes
+ * fetched markdown to R2, returns a synthesized brief.
+ */
+export async function researchTopic(env: ResearchEnv, input: ResearchInput): Promise<ResearchResult> {
+  const errors: string[] = []
+  const sources: ResearchedSource[] = []
+
+  // ── 1. Source URLs ─────────────────────────────────────────────────────
+  const pasted = uniqueUrls(input.pastedUrls).slice(0, MAX_TOTAL_SOURCES)
+  let candidates: { url: string; origin: 'pasted' | 'auto' }[] = pasted.map(url => ({ url, origin: 'pasted' as const }))
+
+  if (input.mode !== 'pasted_only') {
+    const remaining = MAX_TOTAL_SOURCES - candidates.length
+    if (remaining > 0 && input.braveKey) {
+      try {
+        const found = await braveSearch(input.braveKey, input.title, input.angle, remaining)
+        for (const url of found) {
+          if (!candidates.find(c => c.url === url)) {
+            candidates.push({ url, origin: 'auto' })
+          }
+        }
+      } catch (err: any) {
+        errors.push(`brave search failed: ${err?.message || err}`.slice(0, 240))
+      }
+    } else if (remaining > 0 && !input.braveKey && input.mode === 'auto_only') {
+      errors.push('auto-search requested but Brave Search API key not set in Settings.')
+    }
+  }
+  if (candidates.length === 0) {
+    return {
+      brief: '',
+      sources: [],
+      status: 'failed',
+      errors: errors.length > 0 ? errors : ['no source URLs (paste some or set a Brave key in Settings)'],
+    }
+  }
+
+  // ── 2. Crawl each source via Browser Run ───────────────────────────────
+  for (const c of candidates) {
+    try {
+      const out = await crawlOne(env, c.url)
+      const sourceId = ulid()
+      const r2Key = `${input.operatorId}/research/${input.topicId}/${sourceId}.md`
+      await putObject(env, r2Key, new TextEncoder().encode(out.markdown), {
+        httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+      })
+      await env.DB.prepare(
+        `INSERT INTO topic_sources
+           (id, topic_id, operator_id, url, title, summary, origin, content_r2_key, bytes, fetched_at)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      ).bind(sourceId, input.topicId, input.operatorId, c.url, out.title ?? null,
+             c.origin, r2Key, out.markdown.length).run()
+      sources.push({
+        url: c.url, title: out.title ?? null, summary: null,
+        origin: c.origin, content_r2_key: r2Key, bytes: out.markdown.length,
+      })
+    } catch (err: any) {
+      const msg = `${c.url}: ${err?.message || err}`.slice(0, 300)
+      errors.push(msg)
+      sources.push({
+        url: c.url, title: null, summary: null, origin: c.origin,
+        content_r2_key: null, bytes: 0, error: msg,
+      })
+    }
+  }
+
+  const successful = sources.filter(s => !s.error && s.content_r2_key)
+  if (successful.length === 0) {
+    return { brief: '', sources, status: 'failed', errors }
+  }
+
+  // ── 3. Synthesize a research brief from the fetched markdown ───────────
+  const briefInput = await Promise.all(successful.map(async (s, i) => {
+    const obj = await env.VIDEOS.get(s.content_r2_key!)
+    const md = obj ? await obj.text() : ''
+    return `[${i + 1}] ${s.title ?? s.url}\nURL: ${s.url}\n${md.slice(0, 12000)}`
+  }))
+  const userPrompt = `TOPIC: ${input.title}\n${input.angle ? `OPERATOR'S ANGLE: ${input.angle}\n` : ''}${input.notes ? `OPERATOR'S NOTES: ${input.notes}\n` : ''}\nSOURCES:\n\n${briefInput.join('\n\n────────────────────────\n\n')}\n\nNow write the research brief.`
+
+  let brief = ''
+  try {
+    const r = await callReasoning(env as any, {
+      system: BRIEF_SYSTEM,
+      user: userPrompt,
+      effort: 'high',
+      maxTokens: 4096,
+    })
+    brief = r.text
+  } catch (err: any) {
+    errors.push(`brief synthesis failed: ${err?.message || err}`.slice(0, 240))
+    return { brief: '', sources, status: 'failed', errors }
+  }
+
+  return {
+    brief,
+    sources,
+    status: errors.length === 0 ? 'ok' : 'partial',
+    errors,
+  }
+}
+
+// ─── Brave Search ────────────────────────────────────────────────────────
+
+async function braveSearch(apiKey: string, title: string, angle: string | null, count: number): Promise<string[]> {
+  const query = angle ? `${title} — ${angle}` : title
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${Math.min(count * 2, 20)}`
+  const r = await fetch(url, {
+    headers: { Accept: 'application/json', 'X-Subscription-Token': apiKey },
+  })
+  if (!r.ok) throw new Error(`Brave Search ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  const data: any = await r.json()
+  const results = data?.web?.results ?? []
+  const urls: string[] = []
+  for (const result of results) {
+    if (typeof result?.url === 'string' && !isJunkUrl(result.url)) {
+      urls.push(result.url)
+      if (urls.length >= count) break
+    }
+  }
+  return urls
+}
+
+function isJunkUrl(url: string): boolean {
+  // Skip aggregators / login-walled / pure-video that browser-run can't crawl.
+  return /(?:facebook\.com|instagram\.com|tiktok\.com|x\.com\/[^/]+\/status|reddit\.com\/r\/.*\/comments|youtube\.com\/watch|youtu\.be)/i.test(url)
+}
+
+// ─── Cloudflare Browser Run /crawl ──────────────────────────────────────
+
+interface CrawlResult { title: string | null; markdown: string }
+
+async function crawlOne(env: ResearchEnv, url: string): Promise<CrawlResult> {
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID
+  const token = env.CLOUDFLARE_API_TOKEN
+  if (!accountId || !token) {
+    throw new Error('CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN must be set as Worker secrets for Browser Run.')
+  }
+  const endpoint = BROWSER_RUN_CRAWL_URL.replace('{ACCOUNT_ID}', accountId)
+  const r = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ url, response_format: 'markdown' }),
+  })
+  if (!r.ok) {
+    throw new Error(`Browser Run /crawl ${r.status}: ${(await r.text()).slice(0, 200)}`)
+  }
+  const data: any = await r.json()
+  const md: string =
+    (typeof data?.result?.markdown === 'string' && data.result.markdown) ||
+    (typeof data?.markdown === 'string' && data.markdown) ||
+    (typeof data?.result?.content === 'string' && data.result.content) ||
+    ''
+  if (!md || md.length < 200) {
+    throw new Error('Browser Run returned empty/tiny markdown')
+  }
+  const title: string | null =
+    (typeof data?.result?.title === 'string' && data.result.title) ||
+    (typeof data?.title === 'string' && data.title) || null
+  return { title, markdown: md }
+}
+
+// ─── Brief synthesis prompt ──────────────────────────────────────────────
+
+const BRIEF_SYSTEM = `You are a research editor preparing a TIGHT brief for a video essayist. They've handed you a topic, an optional angle, and a set of web sources. Synthesize the substance.
+
+Your output goes straight into the script writer's source context. It is NOT the script — it's the FACT BASE and ARGUMENT BASE the writer will build from.
+
+OUTPUT FORMAT (Markdown):
+
+  ## TL;DR
+  2-4 sentences summarizing what this topic actually is and why it matters. Plain English. No "in this brief…" filler.
+
+  ## Key facts
+  Bullet list of CONCRETE, SOURCED facts. Each bullet ≤ 30 words. Cite source numbers: "(1)", "(3)". Only facts the sources actually support — never fabricate.
+
+  ## Framings and tensions
+  Bullet list of the COMPETING TAKES that exist on this topic — 2-5 of them. Each one ≤ 40 words. Cite sources where relevant.
+
+  ## Quotes worth using
+  2-5 short, sharp verbatim quotes from the sources (NOT the operator). Each ≤ 30 words. Each tagged with source number.
+
+  ## Gaps / what's missing
+  1-3 things the sources DON'T tell us that would matter. Be honest. These help the writer say "[verify: X]" instead of fabricating.
+
+RULES:
+- Stay close to what the sources say. Hedge or skip rather than invent.
+- If sources contradict, surface the contradiction. Don't pick a side.
+- Don't moralize. Don't add "however, it's also true that…" unless a source actually says so.
+- This brief should be readable in under 90 seconds and useful for writing an essay.
+
+Return ONLY the Markdown brief. No preamble.`
+
+function uniqueUrls(arr: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of arr) {
+    const u = (raw ?? '').trim()
+    if (!u) continue
+    if (!/^https?:\/\//i.test(u)) continue
+    if (seen.has(u)) continue
+    seen.add(u)
+    out.push(u)
+  }
+  return out
+}

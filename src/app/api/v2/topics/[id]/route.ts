@@ -26,14 +26,31 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const topic = await findOne<{
     id: string; title: string; framing: string | null; angle: string | null
     notes: string | null; state: string; created_at: string; updated_at: string
+    research_brief: string | null; research_status: string | null
+    research_at: string | null; pasted_urls_json: string | null
   }>(
     getDb(env),
-    `SELECT id, title, framing, angle, notes, state, created_at, updated_at
+    `SELECT id, title, framing, angle, notes, state, created_at, updated_at,
+            research_brief, research_status, research_at, pasted_urls_json
        FROM topics
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
   if (!topic) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  let pasted_urls: string[] = []
+  try { pasted_urls = topic.pasted_urls_json ? JSON.parse(topic.pasted_urls_json) : [] } catch {}
+  // Also surface the per-source rows so the operator can audit what was used.
+  const sources = await (await import('@/lib/d1')).findMany<{
+    id: string; url: string; title: string | null; origin: string | null
+    bytes: number | null; fetched_at: string; error: string | null
+  }>(
+    getDb(env),
+    `SELECT id, url, title, origin, bytes, fetched_at, error
+       FROM topic_sources
+      WHERE topic_id = ?
+      ORDER BY fetched_at DESC`,
+    id,
+  )
   const production = await findOne<{ id: string; state: string }>(
     getDb(env),
     `SELECT id, state FROM productions
@@ -42,7 +59,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       ORDER BY created_at DESC LIMIT 1`,
     id, operator.id,
   )
-  return NextResponse.json({ topic, production }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({
+    topic: { ...topic, pasted_urls },
+    production,
+    sources,
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -56,6 +77,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params
   const patch = await req.json().catch(() => ({})) as {
     title?: string; framing?: string; angle?: string; notes?: string; state?: string
+    pasted_urls?: string[]; research_brief?: string
   }
   const fields: string[] = []
   const vals: unknown[] = []
@@ -64,6 +86,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (typeof patch.angle === 'string') { fields.push('angle = ?'); vals.push(patch.angle.slice(0, 800)) }
   if (typeof patch.notes === 'string') { fields.push('notes = ?'); vals.push(patch.notes.slice(0, 4000)) }
   if (typeof patch.state === 'string') { fields.push('state = ?'); vals.push(patch.state.slice(0, 32)) }
+  if (Array.isArray(patch.pasted_urls)) {
+    const cleaned = patch.pasted_urls.filter(u => typeof u === 'string' && /^https?:\/\//i.test(u)).slice(0, 8)
+    fields.push('pasted_urls_json = ?'); vals.push(JSON.stringify(cleaned))
+  }
+  if (typeof patch.research_brief === 'string') {
+    fields.push('research_brief = ?'); vals.push(patch.research_brief)
+  }
   if (fields.length === 0) return NextResponse.json({ error: 'no fields to update' }, { status: 400 })
   fields.push('updated_at = CURRENT_TIMESTAMP')
   vals.push(id, operator.id)

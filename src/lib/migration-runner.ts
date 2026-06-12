@@ -676,6 +676,53 @@ export const MIGRATIONS: Migration[] = [
             ON topics(operator_id, updated_at DESC)
             WHERE deleted_at IS NULL`,
   },
+  // ─── Topic research (the "system goes and learns" pass) ──────────────────
+  // Per-topic: the synthesized research brief + a list of URLs used.
+  // Sources are stored separately so the operator can audit / remove a
+  // source and re-research without losing the topic.
+  {
+    name: '2026-06-12_topics_research_brief',
+    sql: `ALTER TABLE topics ADD COLUMN research_brief TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_research_status',
+    sql: `ALTER TABLE topics ADD COLUMN research_status TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_research_at',
+    sql: `ALTER TABLE topics ADD COLUMN research_at TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_pasted_urls_json',
+    sql: `ALTER TABLE topics ADD COLUMN pasted_urls_json TEXT`,
+  },
+  {
+    name: '2026-06-12_topic_sources',
+    sql: `CREATE TABLE IF NOT EXISTS topic_sources (
+      id              TEXT PRIMARY KEY,
+      topic_id        TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      url             TEXT NOT NULL,
+      title           TEXT,
+      summary         TEXT,
+      origin          TEXT,
+      content_r2_key  TEXT,
+      bytes           INTEGER,
+      fetched_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      error           TEXT
+    )`,
+  },
+  {
+    name: '2026-06-12_idx_topic_sources_topic',
+    sql: `CREATE INDEX IF NOT EXISTS idx_topic_sources_topic
+            ON topic_sources(topic_id, fetched_at DESC)`,
+  },
+  // Operator setting: Brave Search API key (optional). When present, the
+  // research step auto-searches. When absent, falls back to pasted URLs.
+  {
+    name: '2026-06-12_operator_brave_search_api_key',
+    sql: `ALTER TABLE operator ADD COLUMN brave_search_api_key TEXT`,
+  },
   // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
   // The librarian writes into the existing `clusters` table (so the
   // production→video-essay flow already works). These columns carry the
