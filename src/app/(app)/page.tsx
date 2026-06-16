@@ -309,7 +309,7 @@ function AltChip({ label, busy, onClick }: { label: string; busy?: boolean; onCl
  * Hook: POST /api/v2/productions with the given source + type, navigate
  * to the resulting production page. Returns { run, busy, error }.
  */
-type ProductionKind = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'video_essay' | 'short'
+type ProductionKind = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'video_essay' | 'short' | 'clip'
 function useProduce(router: ReturnType<typeof useRouter>) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -376,6 +376,7 @@ function QuoteCard({ item }: { item: Extract<ReadyItem, { kind: 'quote' }> }) {
       openHref={item.href}
     >
       <PrimaryBtn label={copied ? 'Copied ✓' : 'Copy as X post'} onClick={copy}/>
+      <AltChip label="Clip"        busy={busy === 'clip'}        onClick={() => run('clip',        'thread', item.id, 'clip')}/>
       <AltChip label="Short"       busy={busy === 'short'}       onClick={() => run('short', 'thread', item.id, 'short')}/>
       <AltChip label="Micro essay" busy={busy === 'micro_essay'} onClick={() => run('micro_essay', 'thread', item.id, 'micro_essay')}/>
     </CardFrame>
