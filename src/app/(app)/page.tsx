@@ -383,7 +383,26 @@ function QuoteCard({ item }: { item: Extract<ReadyItem, { kind: 'quote' }> }) {
 }
 
 function ClipCard({ item }: { item: Extract<ReadyItem, { kind: 'clip' }> }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const dur = Math.max(0, Math.round(item.end_time - item.start_time))
+
+  const ship = async () => {
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch(`/api/v2/clip-candidates/${item.id}/ship-as-short`, {
+        method: 'POST', credentials: 'include',
+      })
+      const d: any = await r.json()
+      if (!r.ok || !d?.production_id) throw new Error(d?.error || `HTTP ${r.status}`)
+      router.push(`/production/${d.production_id}`)
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+      setBusy(false)
+    }
+  }
+
   return (
     <CardFrame
       accent="var(--t-rose)"
@@ -393,9 +412,16 @@ function ClipCard({ item }: { item: Extract<ReadyItem, { kind: 'clip' }> }) {
       source={item.vlog_title ? `from ${item.vlog_title}` : null}
       openHref={item.href}
     >
-      <Link href={item.href} className="canon-btn primary" style={{ fontSize: 12, padding: '6px 12px' }}>
-        Review clip
+      <PrimaryBtn label="Ship as short" busy={busy} onClick={ship}/>
+      <Link href={item.href} style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 1.2,
+        textTransform: 'uppercase', color: 'var(--fg-2)',
+        padding: '5px 10px', border: '1px solid var(--line-2)',
+        borderRadius: 100, textDecoration: 'none',
+      }}>
+        Review at source
       </Link>
+      {err && <span style={{ fontSize: 11, color: 'var(--t-terra)' }}>{err}</span>}
     </CardFrame>
   )
 }
