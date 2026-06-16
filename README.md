@@ -50,14 +50,14 @@ The whole pipeline runs on Cloudflare. One bill. No third-party SaaS.
 
 ## What's in the masthead
 
+Two entries. Everything else runs in the background and surfaces on the home page when the system has prepared a draft.
+
 | Surface | What it is |
 |---|---|
-| **Subjects** | Named concepts the librarian surfaced from your vlogs — themes, tensions, evolutions, open-loops. Each → script / post / clips / short. |
-| **Topics** | Spark composer (bang out a short) + the new-topic form for full essays. Topic detail page does the research + drafts the script. |
-| **Vlogs** | Your raw recordings. Upload via four bad-wifi-friendly modes (full / compressed / slideshow / audio-only). |
+| **Log** | The home page. Top half is the recorder + uploader (four bad-wifi-friendly modes: full / compressed / slideshow / audio-only). Bottom half is *Ready to send* — production candidates the system surfaced from your subjects (named concepts the librarian found), topics (typed subjects it researched), and quick-video seeds drawn from your operator profile. |
 | **Published** | The accumulating body of work — anything in `state='published'`. |
 
-Plus **Settings** for voice cloning, model preferences, API keys (incl. optional Brave Search), and the in-house podcast feed.
+Plus **Settings** for voice cloning, model preferences, API keys (incl. optional Brave Search), and the in-house podcast feed. The Subjects, Topics, Studio, Inbox, Chat, and About pages all still route (deep links and old bookmarks don't break) — they're reachable from the avatar dropdown or via the cards the home page lifts onto the *Ready to send* list.
 
 ## Stack — all Cloudflare
 

@@ -155,7 +155,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
               <span style={{
                 marginLeft: 12, color, border: `1px solid ${color}`, borderRadius: 100,
                 padding: '2px 8px', letterSpacing: 1.2,
-              }}>named for you</span>
+              }}>system-named</span>
             )}
           </div>
           <h1 style={{

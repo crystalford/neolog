@@ -17,22 +17,26 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-// Trimmed to the new product shape: Subjects · Vlogs · Productions.
-// The old surfaces (Timeline, Inbox, Clusters-as-Studio, Chat, About) still
-// resolve as routes — deep links and old bookmarks don't break — but they're
-// no longer masthead destinations. The mess goes quiet; the work stays loud.
+// Two-entry masthead. The middle of the system — Subjects, Topics, the
+// quick-video composer — is mechanism, not destination, and runs in the
+// background. The visible product collapses to two acts: drop something
+// in (Log), ship something out (Published). Detail pages for subjects /
+// topics / vlogs all live downstream of Log.
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
-  { label: 'Subjects',  href: '/subjects',  matchPaths: [/^\/$/, /^\/subjects/, /^\/subject\//, /^\/studio/, /^\/clusters/, /^\/cluster\//] },
-  { label: 'Topics',    href: '/topics',    matchPaths: [/^\/topics/, /^\/topic\//] },
-  { label: 'Vlogs',     href: '/vlogs',     matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
-  { label: 'Published', href: '/published', matchPaths: [/^\/published/, /^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/] },
+  { label: 'Log',       href: '/',          matchPaths: [
+    /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
+    /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//,
+  ] },
+  { label: 'Published', href: '/published', matchPaths: [
+    /^\/published/, /^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/,
+  ] },
 ]
 
 export function Masthead() {
   const pathname = usePathname() ?? '/'
   return (
     <header className="canon-masthead">
-      <Link href="/subjects" className="canon-lockup">
+      <Link href="/" className="canon-lockup">
         <span className="mark">
           <svg viewBox="0 0 32 32" fill="none">
             <path d="M 3 16 Q 9 4, 16 16 T 29 16" stroke="currentColor" strokeWidth="1.9" fill="none" strokeLinecap="round"/>

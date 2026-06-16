@@ -208,7 +208,7 @@ function SubjectCard({ s, making, onMake }: { s: Subject; making: boolean; onMak
                 fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase',
                 color: color, border: `1px solid ${color}`, borderRadius: 100, padding: '2px 8px',
               }} title="You were describing this without the term — the system named it.">
-                named for you
+                system-named
               </span>
             )}
           </div>

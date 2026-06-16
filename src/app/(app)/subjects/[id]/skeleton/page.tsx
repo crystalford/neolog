@@ -50,7 +50,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
 
   const propose = useCallback(async () => {
     setProposing(true)
-    setNote('Reading the subject\'s moments and proposing the beat skeleton (~15s)…')
+    setNote('Reading the subject\'s moments and proposing the structure (~15s)…')
     try {
       const r = await fetch(`/api/v2/subjects/${id}/skeleton`, {
         method: 'POST', credentials: 'include',
@@ -62,9 +62,9 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
       setMoments(d.moments ?? [])
       setBeats(d.beats ?? [])
       setModel(d.model ?? null)
-      setNote(`Proposed ${d.beats?.length ?? 0} beats. Re-order or regenerate as needed; then Lock & write.`)
+      setNote(`Proposed ${d.beats?.length ?? 0} beats. Re-order or regenerate as needed; then write the script.`)
     } catch (e: any) {
-      setNote(`Skeleton failed: ${e?.message || e}`)
+      setNote(`Proposing structure failed: ${e?.message || e}`)
     } finally { setProposing(false) }
   }, [id])
 
@@ -83,7 +83,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
 
   const lock = async () => {
     setLocking(true)
-    setNote('Skeleton locked. Writing the full prose script from the locked beats (~45s)…')
+    setNote('Structure locked. Writing the full prose script from the locked beats (~45s)…')
     try {
       const r = await fetch(`/api/v2/subjects/${id}/skeleton`, {
         method: 'POST', credentials: 'include',
@@ -109,7 +109,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 3.2,
             textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 14,
-          }}>Reasoning skeleton</div>
+          }}>Plan the structure</div>
           <h1 style={{
             fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 300, letterSpacing: '-1.5px',
             lineHeight: 1.05, color: 'var(--fg)', margin: 0,
@@ -124,7 +124,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
               {proposing ? 'Re-proposing…' : 'Re-propose'}
             </button>
             <button onClick={lock} disabled={locking || proposing || beats.length === 0} className="canon-btn primary" style={{ fontSize: 12.5 }}>
-              {locking ? 'Writing…' : 'Lock & write the script'}
+              {locking ? 'Writing…' : 'Write the script'}
             </button>
           </div>
         </section>
@@ -134,7 +134,7 @@ export default function SkeletonPage({ params }: { params: Promise<{ id: string 
             padding: '40px 24px', textAlign: 'center', border: '1px dashed var(--line-2)',
             borderRadius: 14, color: 'var(--fg-3)', fontSize: 14,
           }}>
-            {proposing ? 'Working…' : 'No skeleton yet. Hit "Re-propose".'}
+            {proposing ? 'Working…' : 'No structure yet. Hit "Re-propose".'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 60 }}>

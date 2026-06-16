@@ -130,20 +130,19 @@ These are documentary / short film / video essay productions. **Never add captio
 
 ## Surfaces — what actually shipped
 
-The masthead is a **top-horizontal nav, four primary entries**. *"The mess goes quiet; the work stays loud."*
+The masthead is a **top-horizontal nav, two primary entries**. *"Drop something in, ship something out."* Everything else — subjects, topics, the quick-video composer — runs in the background and surfaces on the home page as drafts the system has prepared.
 
 | Label | Route | What it is |
 |---|---|---|
-| **Subjects** | `/subjects` | **Home.** Named concepts the librarian surfaced from your vlogs — themes, tensions (you said X then said the opposite), evolutions (your view matured), open-loops (questions you keep returning to), candidates (sharp one-offs). Each card → Make the script · Make a post · Pull clips · Make a short. |
-| **Topics** | `/topics` | Type any subject (a person, an idea, a fascination). The **Spark composer** sits at the top — type one thought, get a 30–60s short ready to post. Below it, the new-topic form for full essays. Topic detail page generates angle suggestions from your operator profile, researches sources via Cloudflare Browser Run, and drafts the script in your voice. |
-| **Vlogs** | `/vlogs` | Raw archive of recordings. Inline `CapturePanel` for new uploads (four modes: full / compressed / slideshow / audio-only — the bad-wifi ladder). Filter strip + bulk select. |
+| **Log** | `/` | **Home.** Top half is `CapturePanel` (the four-mode uploader: full / compressed / slideshow / audio-only — the bad-wifi ladder). Bottom half is *Ready to send* — a unified list of production candidates the system prepared in the background (top subjects, researched topics, quick-video seeds, unfinished productions to resume). The operator never picks between Subjects/Topics/Spark — the system decides what's ripe and proposes it. |
 | **Published** | `/published` | The accumulating body of work — only productions in `state='published'`. Honest signal if empty. |
 
-**Detail pages** (reached from list pages, not nav directly):
-- `/subjects/[id]` — one subject + all evidence + deliverables (script / post / clips / short).
-- `/subjects/[id]/skeleton` — **the skeleton-first script flow.** Operator approves the beat structure before any prose is written; the model fills in.
-- `/topics/[id]` — angle suggestions, pasted/auto-found sources, editable research brief, build the script (long or short).
+**Detail pages** (reached from home cards or deep-linked, NOT in primary nav — they live downstream of Log):
+- `/vlogs` — raw archive of recordings. The Log nav highlights here. Useful when the home page has too much going on; everything you've recorded.
 - `/vlog/[id]` — one vlog. Includes the **in-podcast toggle**.
+- `/subjects` + `/subjects/[id]` — the librarian's output. Subjects list is reachable as a deep page but no longer linked from primary nav. Use the home page's *Ready to send* list for the curated subset.
+- `/subjects/[id]/skeleton` — **plan-the-structure script flow.** Operator approves the beat structure before any prose is written; the model fills in.
+- `/topics` + `/topics/[id]` — type-a-subject surface. List still works; the home page lifts ready topics out of it.
 - `/production/[id]` — draft production. Edit script, record voiceover per beat (or **synthesize via your cloned voice**), generate AI b-roll per beat (Flux + Wan, optional Grok Imagine direct-video with audio), render to MP4.
 - `/productions/[id]` — project containers (Pack Rats-style).
 - `/p/[id]` — public production view (no auth).
@@ -434,7 +433,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 - **NO CAPTIONS, NO TEXT OVERLAYS** — ever (see the rule section earlier in this doc).
 
 **On the audit & doc reality** (2026-06-12):
-- The 7-entry nav from earlier doc versions is dead. The current nav is **Subjects · Topics · Vlogs · Published**. Studio / Inbox / Chat / About / Timeline still ROUTE but are not destinations.
+- The 7-entry nav from earlier doc versions is dead. The current nav is two entries — **Log · Published** — with everything else (Subjects, Topics, the quick-video composer, Studio, Inbox, Chat, About, Timeline) still routable but no longer marketed as destinations. Subjects + Topics surface as cards on the home page when the system has prepared something worth reviewing.
 - If the operator asks about reviving any of those, they're routable today (no work needed); discoverability is the only thing missing.
 
 ---
