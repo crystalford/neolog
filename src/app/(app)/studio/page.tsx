@@ -42,7 +42,7 @@ type Tab = 'all' | 'ready' | 'ripening' | 'hold' | 'materialized'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'all',          label: 'All' },
   { key: 'ready',        label: 'Ready' },
-  { key: 'ripening',     label: 'Ripening' },
+  { key: 'ripening',     label: 'In progress' },
   { key: 'hold',         label: 'Hold' },
   { key: 'materialized', label: 'Materialized' },
 ]
@@ -129,8 +129,8 @@ export default function StudioListPage() {
           fontSize: 17, lineHeight: 1.55, color: 'var(--fg-2)',
           maxWidth: 620, letterSpacing: '-0.15px', marginBottom: 28,
         }}>
-          Clusters are positions braided across weeks of riffs. When one ripens past 70,
-          it's ready to produce. Identify pattern fills in adjacent thinking; bounce sharpens the gap.
+          Clusters are positions braided across weeks of recordings. When one reaches 70 or higher,
+          it's ready to produce. The identify pass fills in adjacent thinking; the refine pass sharpens the gap.
         </p>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={build} disabled={building} className="canon-btn ghost">

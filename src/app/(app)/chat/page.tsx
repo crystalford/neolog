@@ -217,7 +217,7 @@ export default function ChatPage() {
         }}>
           <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
-          The assistant · in-corpus
+          The assistant · across your vlogs
         </div>
         <h1 style={{
           fontFamily: 'var(--font-body)', fontWeight: 400,

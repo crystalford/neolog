@@ -136,7 +136,7 @@ export default async function SettingsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         <Section title="Identity">
           <Row k="Operator profile" sub="Background, current focus, voice signature — used by the AI" arrow/>
-          <Row k="Voice profile" sub="Operator default · reference corpus auto-populated" arrow/>
+          <Row k="Voice profile" sub="Operator default · reference samples auto-populated" arrow/>
           <Row k="Timezone" v={operator.tz} arrow/>
         </Section>
 

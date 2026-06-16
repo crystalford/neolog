@@ -102,8 +102,8 @@ export default function InboxPage() {
           fontSize: 17, lineHeight: 1.55, color: 'var(--fg-2)',
           maxWidth: 620, letterSpacing: '-0.15px', margin: 0,
         }}>
-          What the system surfaced, what's ripening, what's still processing, what failed,
-          what's drafting. Triage from here.
+          What the system surfaced, what's in progress, what's still processing, what failed,
+          what's drafting. Work through it from here.
         </p>
 
         {data && (
@@ -113,7 +113,7 @@ export default function InboxPage() {
           }}>
             <StatCell n={data.counts.worth_shipping} l="Worth shipping" onClick={() => scrollTo('worth-shipping')}/>
             <StatCell n={data.counts.surfaced}   l="Surfaced"   onClick={() => scrollTo('surfaced')}/>
-            <StatCell n={data.counts.ripening}   l="Ripening"   onClick={() => scrollTo('ripening')}/>
+            <StatCell n={data.counts.ripening}   l="In progress" onClick={() => scrollTo('ripening')}/>
             <StatCell n={data.counts.topics_hot} l="Hot topics"  onClick={() => scrollTo('topics-hot')}/>
             <StatCell n={data.counts.processing} l="Processing" onClick={() => scrollTo('processing')}/>
             <StatCell n={data.counts.failed}     l="Failed"     warn={data.counts.failed > 0} onClick={() => scrollTo('failed')}/>
@@ -201,9 +201,9 @@ export default function InboxPage() {
             </Section>
           )}
 
-          {/* Ripening */}
+          {/* In progress */}
           {data.ripening.length > 0 && (
-            <Section id="ripening" title="Ripening" count={data.ripening.length} meta="65+ ripe · ready or nearly">
+            <Section id="ripening" title="In progress" count={data.ripening.length} meta="score 65+ · ready or nearly">
               <div style={{
                 display: 'grid', gap: 10,
                 gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',

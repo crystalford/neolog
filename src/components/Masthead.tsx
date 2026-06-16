@@ -131,11 +131,11 @@ function AvatarMenu() {
       {open && (
         <div className="canon-dropdown" role="menu">
           <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
-            <span>Drop a vlog</span>
+            <span>Upload a vlog</span>
             <span className="kbd">⌘N</span>
           </Link>
           <Link href="/chat" onClick={() => setOpen(false)}>
-            <span>Chat with your corpus</span>
+            <span>Chat with your vlogs</span>
             <span className="kbd">G C</span>
           </Link>
           <div className="sep"/>
@@ -143,11 +143,11 @@ function AvatarMenu() {
               instead of cluttering the 4-entry masthead. */}
           <Link href="/inbox" onClick={() => setOpen(false)}>
             <span>Inbox</span>
-            <span className="dropdown-sub">triage — failed vlogs, drafts, ripening</span>
+            <span className="dropdown-sub">failed vlogs, in-progress drafts, what needs your attention</span>
           </Link>
           <Link href="/studio" onClick={() => setOpen(false)}>
             <span>Studio (clusters)</span>
-            <span className="dropdown-sub">the deeper cluster-cultivation surface</span>
+            <span className="dropdown-sub">the deeper cluster view — score, threads, refine</span>
           </Link>
           <a href="/podcast.xml" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
             <span>Your podcast feed</span>

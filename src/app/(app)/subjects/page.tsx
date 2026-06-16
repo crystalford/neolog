@@ -76,7 +76,7 @@ export default function SubjectsPage() {
 
   const rebuild = async () => {
     setBuilding(true)
-    setNote('Reading every take across your vlogs… the librarian pass takes ~20–60s.')
+    setNote('Reading every take across your vlogs… this takes ~20–60s.')
     try {
       const r = await fetch('/api/v2/admin/build-subjects', { method: 'POST', credentials: 'include' })
       const d: any = await r.json()
@@ -151,7 +151,7 @@ export default function SubjectsPage() {
             color: 'var(--fg-3)', fontSize: 14, lineHeight: 1.6,
           }}>
             No subjects yet. Hit <strong style={{ color: 'var(--fg-2)' }}>Find my subjects</strong> and
-            the librarian will read across everything you&rsquo;ve recorded and surface the concepts you keep circling.
+            the system will read across everything you&rsquo;ve recorded and surface the concepts you keep circling.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 64 }}>
