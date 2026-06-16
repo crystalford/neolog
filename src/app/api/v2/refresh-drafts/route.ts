@@ -1,21 +1,21 @@
 /**
- * POST /api/v2/system/heartbeat
+ * POST /api/v2/refresh-drafts (GET also accepted for convenience)
  *
- * The autonomous loop's body. Runs the librarian + spark-seeds refresh
- * + draft-prep work that would otherwise only fire when the operator
- * opens /subjects. Idempotent and cheap when nothing changed.
+ * Does the background work that would otherwise only fire when the
+ * operator opens /subjects. Updates the home page's "Ready to send"
+ * list with anything new.
  *
- * Today this is operator-invocable from a Settings button or hit by
- * an external scheduler. Next step: wire as a Cloudflare Cron Trigger
- * (separate worker or wrangler.toml entry on the Pages project) so the
- * home page picks up new drafts overnight without anyone opening it.
+ *   - If >= 5 threads landed since the last librarian run, rebuild the
+ *     subjects. The librarian, on completion, auto-refreshes the
+ *     operator-profile digest + the quick-video seeds, so a single
+ *     librarian pass cascades into all three caches getting fresh.
+ *   - Otherwise: refresh the quick-video seeds only (~5s) so the
+ *     home page's quick-video cards have new suggestions.
  *
- * Steps:
- *   1. If >= 5 new threads since the last librarian run, rebuild
- *      subjects. The librarian itself auto-refreshes operator-profile
- *      + spark-seeds on completion.
- *   2. Otherwise, refresh spark-seeds only (cheap, 5s) so the home
- *      page has fresh quick-video suggestions.
+ * Operator-invocable today. Wireable as a Cloudflare scheduled job
+ * (wrangler.toml `[triggers] crons` or a separate cron worker) so the
+ * home page picks up new drafts overnight without anyone opening the
+ * app.
  *
  * Returns a JSON summary the caller can log.
  */
@@ -39,15 +39,8 @@ interface Env extends LibrarianEnv {
 // Same threshold as /api/v2/subjects (keep them aligned).
 const LIBRARIAN_THRESHOLD = 5
 
-export async function POST(req: NextRequest) {
-  return run(req)
-}
-
-export async function GET(req: NextRequest) {
-  // GET form for convenience — operator can hit the URL from a browser
-  // to trigger a manual pulse without crafting a POST.
-  return run(req)
-}
+export async function POST(req: NextRequest) { return run(req) }
+export async function GET(req: NextRequest)  { return run(req) }
 
 async function run(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -83,8 +76,8 @@ async function run(req: NextRequest) {
     operator_id: operator.id,
     last_librarian_at: staleness?.last_librarian_at,
     new_threads_pending: newThreads,
-    ran_librarian: false,
-    ran_spark_seeds: false,
+    rebuilt_subjects: false,
+    refreshed_quick_video_seeds: false,
     librarian_model: null,
     elapsed_ms: 0,
   }
@@ -92,23 +85,22 @@ async function run(req: NextRequest) {
   if (isFirstRun || newThreads >= LIBRARIAN_THRESHOLD) {
     try {
       const result = await buildSubjects(db, operator.id, env)
-      summary.ran_librarian = true
+      summary.rebuilt_subjects = true
       summary.librarian_model = (result as any)?.model ?? null
       summary.subjects_count = (result as any)?.subjects?.length ?? null
-      // The librarian auto-rebuilds spark-seeds + operator-profile on
+      // The librarian auto-rebuilds quick-video seeds + operator-profile on
       // completion. Don't double-run.
-      summary.ran_spark_seeds = true
+      summary.refreshed_quick_video_seeds = true
     } catch (err: any) {
       summary.librarian_error = err?.message || String(err)
     }
   } else {
-    // Cheap path — refresh spark-seeds only.
     try {
       const seeds = await buildSparkSeeds(db, operator.id, env as any)
-      summary.ran_spark_seeds = true
-      summary.spark_seeds_count = (seeds as any)?.seeds?.length ?? null
+      summary.refreshed_quick_video_seeds = true
+      summary.seeds_count = (seeds as any)?.seeds?.length ?? null
     } catch (err: any) {
-      summary.spark_seeds_error = err?.message || String(err)
+      summary.seeds_error = err?.message || String(err)
     }
   }
 
