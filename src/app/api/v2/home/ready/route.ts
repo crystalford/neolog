@@ -5,14 +5,25 @@
  * production candidates the system has prepared in the background from
  * existing data — no rebuilds, pure SELECT.
  *
- * Five sources, merged into a single typed list:
- *   - Top 2 ripe SUBJECTS (librarian output, tensions/evolutions float)
- *   - Top 1 TOPIC with a finished research_brief and no production yet
- *   - Top 2 quick-video SEEDS from operator.spark_seeds_json
- *   - Most-recent UNFINISHED production (resume work)
+ * The core outputs the operator wants are shorts and long-form video
+ * essays. X posts (verbatim quotes the operator can copy + ship) are
+ * still produced, plus x threads / micro essays / articles / clips off
+ * the same source material.
  *
- * Each item carries a `kind` discriminator and the minimum the home card
- * needs to render: name + framing + href + a small source line.
+ * Card kinds, in render order:
+ *   - RESUME  — most recent in-flight production (script_ready /
+ *               recording / producing / materializing). Top slot.
+ *   - QUOTE   — verbatim strength-4/5 take from a recent thread.
+ *               Primary action: copy as an X post (your own line, no
+ *               LLM rewriting). Spin into a short is one tap from the
+ *               thread page.
+ *   - CLIP    — delivery moment the extractor flagged. Opens the source
+ *               vlog scrubbed to start_time for sanity-check, then ships
+ *               as a short.
+ *   - SUBJECT — librarian-named concept. Video-essay seed.
+ *   - TOPIC   — typed subject with a finished research_brief, no
+ *               production yet.
+ *   - QUICK   — cached short seed from operator.spark_seeds_json.
  */
 
 export const runtime = 'edge'
@@ -26,6 +37,29 @@ import type { D1Database } from '@cloudflare/workers-types'
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 export type ReadyItem =
+  | {
+      kind: 'quote'
+      id: string
+      quote: string
+      take: string | null
+      topic: string
+      strength: number
+      vlog_id: string
+      vlog_title: string | null
+      transcript_span_start: number | null
+      href: string
+    }
+  | {
+      kind: 'clip'
+      id: string
+      headline: string
+      quote: string | null
+      vlog_id: string
+      vlog_title: string | null
+      start_time: number
+      end_time: number
+      href: string
+    }
   | {
       kind: 'subject'
       id: string
@@ -79,7 +113,55 @@ export async function GET(req: NextRequest) {
     catch (err: any) { console.warn(`[home/ready] ${label}: ${err?.message || err}`); return null }
   }
 
-  const [subjects, topic, resume, op] = await Promise.all([
+  const [quotes, clips, subjects, topic, resume, op] = await Promise.all([
+    // Strength 4-5 threads with a usable verbatim quote. Skip ones already
+    // wrapped into a production. The verbatim is the magic: it's the
+    // operator's own line, no LLM in the loop, ready to copy as an X
+    // post or wrap into a short.
+    safe('quotes', () => findMany<{
+      id: string; topic: string; take: string | null
+      key_quotes: string | null; strength: number
+      vlog_id: string; vlog_title: string | null
+      transcript_span_start: number | null; extracted_at: string
+    }>(
+      db,
+      `SELECT t.id, t.topic, t.take, t.key_quotes, t.strength,
+              t.vlog_id, v.title AS vlog_title,
+              t.transcript_span_start, t.extracted_at
+         FROM threads t
+         JOIN extraction_runs er ON er.id = t.run_id AND er.is_active = 1
+         JOIN vlogs v ON v.id = t.vlog_id
+        WHERE t.operator_id = ? AND t.deleted_at IS NULL
+          AND COALESCE(t.strength, 0) >= 4
+          AND COALESCE(t.key_quotes, '') != ''
+          AND NOT EXISTS (
+            SELECT 1 FROM productions p
+             WHERE p.source_kind = 'thread' AND p.source_id = t.id
+               AND p.deleted_at IS NULL
+          )
+        ORDER BY t.strength DESC, t.extracted_at DESC
+        LIMIT 3`,
+      operator.id,
+    )),
+    // Pending clip candidates — flagged delivery moments. Each is a short
+    // wrapped in the operator's own footage; one tap to ship.
+    safe('clips', () => findMany<{
+      id: string; headline: string; quote: string | null
+      vlog_id: string; vlog_title: string | null
+      start_time: number; end_time: number
+    }>(
+      db,
+      `SELECT cc.id, cc.headline, cc.quote,
+              cc.vlog_id, v.title AS vlog_title,
+              cc.start_time, cc.end_time
+         FROM clip_candidates cc
+         JOIN vlogs v ON v.id = cc.vlog_id
+        WHERE cc.operator_id = ? AND cc.deleted_at IS NULL
+          AND cc.status = 'pending'
+        ORDER BY cc.created_at DESC
+        LIMIT 2`,
+      operator.id,
+    )),
     safe('subjects', () => findMany<{
       id: string; name: string; framing: string | null
       subject_kind: string | null
@@ -155,7 +237,6 @@ export async function GET(req: NextRequest) {
 
   const items: ReadyItem[] = []
 
-  // Unfinished production gets the top slot — pick it up where you left off.
   if (resume) {
     items.push({
       kind: 'resume',
@@ -164,6 +245,37 @@ export async function GET(req: NextRequest) {
       state: resume.state,
       production_type: resume.production_type,
       href: `/production/${resume.id}`,
+    })
+  }
+
+  for (const q of quotes) {
+    const verbatim = pickQuote(q.key_quotes) || q.take || ''
+    if (!verbatim) continue
+    items.push({
+      kind: 'quote',
+      id: q.id,
+      quote: verbatim,
+      take: q.take,
+      topic: q.topic,
+      strength: q.strength,
+      vlog_id: q.vlog_id,
+      vlog_title: q.vlog_title,
+      transcript_span_start: q.transcript_span_start,
+      href: `/thread/${q.id}`,
+    })
+  }
+
+  for (const c of clips) {
+    items.push({
+      kind: 'clip',
+      id: c.id,
+      headline: c.headline,
+      quote: c.quote,
+      vlog_id: c.vlog_id,
+      vlog_title: c.vlog_title,
+      start_time: c.start_time,
+      end_time: c.end_time,
+      href: `/vlog/${c.vlog_id}?t=${Math.floor(c.start_time)}`,
     })
   }
 
@@ -192,7 +304,6 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Quick-video seeds — read the cached JSON, take up to 2.
   let seeds: { seed: string; spark_why?: string }[] = []
   if (op?.spark_seeds_json) {
     try {
@@ -206,10 +317,29 @@ export async function GET(req: NextRequest) {
       kind: 'quick_video',
       seed: String(s.seed).trim(),
       why: s.spark_why ? String(s.spark_why).trim() : null,
-      // Pre-fills /topics with the seed text via query param — the page picks it up.
       href: `/topics?quick=${encodeURIComponent(String(s.seed).slice(0, 200))}`,
     })
   }
 
   return NextResponse.json({ items }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
+/**
+ * key_quotes is a JSON array of strings in the canonical shape. Some old
+ * rows are stored as raw strings. Pick the longest readable line.
+ */
+function pickQuote(raw: string | null): string | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      const candidates = parsed.map(x => String(x ?? '').trim()).filter(s => s.length >= 12)
+      candidates.sort((a, b) => b.length - a.length)
+      return candidates[0] || null
+    }
+    if (typeof parsed === 'string' && parsed.trim().length >= 12) return parsed.trim()
+  } catch {
+    if (raw.trim().length >= 12) return raw.trim()
+  }
+  return null
 }

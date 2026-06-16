@@ -20,6 +20,29 @@ import { CapturePanel } from '@/components/CapturePanel'
 
 type ReadyItem =
   | {
+      kind: 'quote'
+      id: string
+      quote: string
+      take: string | null
+      topic: string
+      strength: number
+      vlog_id: string
+      vlog_title: string | null
+      transcript_span_start: number | null
+      href: string
+    }
+  | {
+      kind: 'clip'
+      id: string
+      headline: string
+      quote: string | null
+      vlog_id: string
+      vlog_title: string | null
+      start_time: number
+      end_time: number
+      href: string
+    }
+  | {
       kind: 'subject'
       id: string
       name: string
@@ -169,10 +192,41 @@ export default function HomePage() {
 function ReadyCard({ item }: { item: ReadyItem }) {
   switch (item.kind) {
     case 'resume':      return <ResumeCard item={item}/>
+    case 'quote':       return <QuoteCard item={item}/>
+    case 'clip':        return <ClipCard item={item}/>
     case 'subject':     return <SubjectCard item={item}/>
     case 'topic':       return <TopicCard item={item}/>
     case 'quick_video': return <QuickVideoCard item={item}/>
   }
+}
+
+function QuoteCard({ item }: { item: Extract<ReadyItem, { kind: 'quote' }> }) {
+  return (
+    <CardShell
+      href={item.href}
+      accent="var(--sig)"
+      eyebrow={`Your line · strength ${item.strength}`}
+      title={`"${item.quote}"`}
+      sub={item.topic ? `On ${item.topic}` : null}
+      source={item.vlog_title ? `from ${item.vlog_title}` : null}
+      action="Open"
+    />
+  )
+}
+
+function ClipCard({ item }: { item: Extract<ReadyItem, { kind: 'clip' }> }) {
+  const dur = Math.max(0, Math.round(item.end_time - item.start_time))
+  return (
+    <CardShell
+      href={item.href}
+      accent="var(--t-rose)"
+      eyebrow={`Clip · ${dur}s delivery moment`}
+      title={item.headline}
+      sub={item.quote}
+      source={item.vlog_title ? `from ${item.vlog_title}` : null}
+      action="Review"
+    />
+  )
 }
 
 function CardShell({
