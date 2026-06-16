@@ -15,6 +15,7 @@ export const runtime = 'edge'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 import { CapturePanel } from '@/components/CapturePanel'
 
@@ -200,57 +201,30 @@ function ReadyCard({ item }: { item: ReadyItem }) {
   }
 }
 
-function QuoteCard({ item }: { item: Extract<ReadyItem, { kind: 'quote' }> }) {
-  return (
-    <CardShell
-      href={item.href}
-      accent="var(--sig)"
-      eyebrow={`Your line · strength ${item.strength}`}
-      title={`"${item.quote}"`}
-      sub={item.topic ? `On ${item.topic}` : null}
-      source={item.vlog_title ? `from ${item.vlog_title}` : null}
-      action="Open"
-    />
-  )
-}
-
-function ClipCard({ item }: { item: Extract<ReadyItem, { kind: 'clip' }> }) {
-  const dur = Math.max(0, Math.round(item.end_time - item.start_time))
-  return (
-    <CardShell
-      href={item.href}
-      accent="var(--t-rose)"
-      eyebrow={`Clip · ${dur}s delivery moment`}
-      title={item.headline}
-      sub={item.quote}
-      source={item.vlog_title ? `from ${item.vlog_title}` : null}
-      action="Review"
-    />
-  )
-}
-
-function CardShell({
-  href, accent, eyebrow, title, sub, source, action,
+/** Visual frame for every card. Title block + caller-provided action row. */
+function CardFrame({
+  accent, eyebrow, title, sub, source, openHref, children,
 }: {
-  href: string
   accent: string
   eyebrow: string
   title: string
   sub?: string | null
   source?: string | null
-  action: string
+  openHref: string
+  children: React.ReactNode
 }) {
   return (
-    <Link href={href} className="neolog-card-lift" style={{
-      display: 'flex', alignItems: 'center', gap: 16,
-      textDecoration: 'none', color: 'inherit',
+    <div style={{
       padding: '16px 20px',
       background: 'var(--bg-1)',
       border: '1px solid var(--line-1)',
       borderLeft: `3px solid ${accent}`,
       borderRadius: 12,
+      display: 'flex', flexDirection: 'column', gap: 12,
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <Link href={openHref} style={{
+        display: 'block', textDecoration: 'none', color: 'inherit',
+      }}>
         <div style={{
           fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 2.2,
           textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6,
@@ -276,32 +250,159 @@ function CardShell({
             {source}
           </div>
         )}
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 1.4,
-        textTransform: 'uppercase', color: 'var(--fg-3)',
-        whiteSpace: 'nowrap', flexShrink: 0,
+      </Link>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        paddingTop: 10, borderTop: '1px solid var(--line-1)',
       }}>
-        {action} →
-      </span>
-    </Link>
+        {children}
+        <Link href={openHref} style={{
+          marginLeft: 'auto',
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 1.4,
+          textTransform: 'uppercase', color: 'var(--fg-3)',
+          textDecoration: 'none',
+        }}>
+          Open →
+        </Link>
+      </div>
+    </div>
   )
+}
+
+/** Primary action button used inside CardFrame's action row. */
+function PrimaryBtn({ label, busy, onClick }: { label: string; busy?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className="canon-btn primary"
+      style={{ fontSize: 12, fontWeight: 500, padding: '6px 12px' }}
+    >
+      {busy ? 'Working…' : label}
+    </button>
+  )
+}
+
+/** Secondary "upgrade to a bigger output" chip. */
+function AltChip({ label, busy, onClick }: { label: string; busy?: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        padding: '5px 10px',
+        background: 'transparent',
+        color: 'var(--fg-2)',
+        border: '1px solid var(--line-2)',
+        borderRadius: 100,
+        cursor: busy ? 'wait' : 'pointer',
+      }}
+    >
+      {busy ? '…' : label}
+    </button>
+  )
+}
+
+/**
+ * Hook: POST /api/v2/productions with the given source + type, navigate
+ * to the resulting production page. Returns { run, busy, error }.
+ */
+type ProductionKind = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'video_essay' | 'short'
+function useProduce(router: ReturnType<typeof useRouter>) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const run = useCallback(async (
+    label: string,
+    source_kind: 'thread' | 'cluster' | 'topic',
+    source_id: string,
+    production_type: ProductionKind,
+  ) => {
+    setBusy(label); setError(null)
+    try {
+      const r = await fetch('/api/v2/productions', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_kind, source_id, production_type }),
+      })
+      const d: any = await r.json()
+      if (!r.ok || !d?.id) throw new Error(d?.error || `HTTP ${r.status}`)
+      router.push(`/production/${d.id}`)
+    } catch (e: any) {
+      setError(e?.message || String(e))
+      setBusy(null)
+    }
+  }, [router])
+  return { run, busy, error }
 }
 
 function ResumeCard({ item }: { item: Extract<ReadyItem, { kind: 'resume' }> }) {
   return (
-    <CardShell
-      href={item.href}
+    <CardFrame
       accent="var(--sig)"
       eyebrow={`Resume · ${item.production_type.replace(/_/g, ' ')}`}
       title={item.title}
       source={`State: ${item.state.replace(/_/g, ' ')}`}
-      action="Pick up"
-    />
+      openHref={item.href}
+    >
+      <Link href={item.href} className="canon-btn primary" style={{ fontSize: 12, padding: '6px 12px' }}>
+        Pick up
+      </Link>
+    </CardFrame>
+  )
+}
+
+function QuoteCard({ item }: { item: Extract<ReadyItem, { kind: 'quote' }> }) {
+  const router = useRouter()
+  const { run, busy } = useProduce(router)
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(item.quote)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {}
+  }
+
+  return (
+    <CardFrame
+      accent="var(--sig)"
+      eyebrow={`Your line · strength ${item.strength}`}
+      title={`"${item.quote}"`}
+      sub={item.topic ? `On ${item.topic}` : null}
+      source={item.vlog_title ? `from ${item.vlog_title}` : null}
+      openHref={item.href}
+    >
+      <PrimaryBtn label={copied ? 'Copied ✓' : 'Copy as X post'} onClick={copy}/>
+      <AltChip label="Short"       busy={busy === 'short'}       onClick={() => run('short', 'thread', item.id, 'short')}/>
+      <AltChip label="Micro essay" busy={busy === 'micro_essay'} onClick={() => run('micro_essay', 'thread', item.id, 'micro_essay')}/>
+    </CardFrame>
+  )
+}
+
+function ClipCard({ item }: { item: Extract<ReadyItem, { kind: 'clip' }> }) {
+  const dur = Math.max(0, Math.round(item.end_time - item.start_time))
+  return (
+    <CardFrame
+      accent="var(--t-rose)"
+      eyebrow={`Clip · ${dur}s delivery moment`}
+      title={item.headline}
+      sub={item.quote}
+      source={item.vlog_title ? `from ${item.vlog_title}` : null}
+      openHref={item.href}
+    >
+      <Link href={item.href} className="canon-btn primary" style={{ fontSize: 12, padding: '6px 12px' }}>
+        Review clip
+      </Link>
+    </CardFrame>
   )
 }
 
 function SubjectCard({ item }: { item: Extract<ReadyItem, { kind: 'subject' }> }) {
+  const router = useRouter()
+  const { run, busy } = useProduce(router)
   const kindLabel = item.subject_kind === 'tension' ? 'Tension'
     : item.subject_kind === 'evolution' ? 'Evolution'
     : item.subject_kind === 'open_loop' ? 'Open loop'
@@ -312,43 +413,86 @@ function SubjectCard({ item }: { item: Extract<ReadyItem, { kind: 'subject' }> }
     : item.subject_kind === 'open_loop' ? 'var(--t-ochre)'
     : 'var(--t-teal)'
   const source = `${item.thread_count} ${item.thread_count === 1 ? 'moment' : 'moments'} across ${item.vlog_count} ${item.vlog_count === 1 ? 'vlog' : 'vlogs'}`
+
   return (
-    <CardShell
-      href={item.href}
+    <CardFrame
       accent={accent}
       eyebrow={`${kindLabel} · from your vlogs`}
       title={item.name}
       sub={item.framing}
       source={source}
-      action={item.production_id ? 'Open draft' : 'Make the script'}
-    />
+      openHref={item.href}
+    >
+      {item.production_id ? (
+        <Link href={item.href} className="canon-btn primary" style={{ fontSize: 12, padding: '6px 12px' }}>
+          Open the draft
+        </Link>
+      ) : (
+        <Link href={`/subjects/${item.id}/skeleton`} className="canon-btn primary" style={{ fontSize: 12, padding: '6px 12px' }}>
+          Plan the essay
+        </Link>
+      )}
+      <AltChip label="Article"  busy={busy === 'article'}  onClick={() => run('article',  'cluster', item.id, 'article')}/>
+      <AltChip label="X thread" busy={busy === 'x_thread'} onClick={() => run('x_thread', 'cluster', item.id, 'x_thread')}/>
+      <AltChip label="Short"    busy={busy === 'short'}    onClick={() => run('short',    'cluster', item.id, 'short')}/>
+    </CardFrame>
   )
 }
 
 function TopicCard({ item }: { item: Extract<ReadyItem, { kind: 'topic' }> }) {
+  const router = useRouter()
+  const { run, busy } = useProduce(router)
   return (
-    <CardShell
-      href={item.href}
+    <CardFrame
       accent="var(--t-steel)"
       eyebrow="Topic · researched"
       title={item.title}
       sub={item.framing}
       source="Research brief is ready · script not generated"
-      action="Review brief"
-    />
+      openHref={item.href}
+    >
+      <PrimaryBtn label="Build the essay" busy={busy === 'video_essay'} onClick={() => run('video_essay', 'topic', item.id, 'video_essay')}/>
+      <AltChip label="Article"     busy={busy === 'article'}     onClick={() => run('article',     'topic', item.id, 'article')}/>
+      <AltChip label="X thread"    busy={busy === 'x_thread'}    onClick={() => run('x_thread',    'topic', item.id, 'x_thread')}/>
+      <AltChip label="Short"       busy={busy === 'short'}       onClick={() => run('short',       'topic', item.id, 'short')}/>
+    </CardFrame>
   )
 }
 
 function QuickVideoCard({ item }: { item: Extract<ReadyItem, { kind: 'quick_video' }> }) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const spin = async () => {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/v2/shorts/spark', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concept: item.seed }),
+      })
+      const d: any = await r.json()
+      if (r.ok && d?.production_id) router.push(`/production/${d.production_id}`)
+      else setBusy(false)
+    } catch { setBusy(false) }
+  }
   return (
-    <CardShell
-      href={item.href}
+    <CardFrame
       accent="var(--t-sage)"
       eyebrow="Quick video · drawn from your profile"
       title={item.seed}
       sub={item.why}
-      action="Spin up"
-    />
+      openHref={item.href}
+    >
+      <PrimaryBtn label="Spin up the short" busy={busy} onClick={spin}/>
+      <Link href={item.href} style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 1.2,
+        textTransform: 'uppercase', color: 'var(--fg-2)',
+        padding: '5px 10px', border: '1px solid var(--line-2)',
+        borderRadius: 100, textDecoration: 'none',
+      }}>
+        Upgrade to a full topic
+      </Link>
+    </CardFrame>
   )
 }
 
