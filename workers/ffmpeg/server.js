@@ -809,6 +809,13 @@ async function extractAudioSegment(body, res) {
 // H.264/AAC (stream copy).
 async function extractVideoSegment(body, res) {
   const { input_url, start_sec, duration_sec } = body
+  // Optional aspect param. 'source' (default) keeps the source aspect with
+  // a fast stream-copy path. 'vertical' forces a 9:16 center-crop via
+  // `crop=ih*9/16:ih,setsar=1` and re-encodes (stream copy can't apply
+  // a video filter). Used by the auto-publish pipeline to ship a second
+  // vertical copy alongside the source-aspect clip.
+  const aspect = body.aspect === 'vertical' ? 'vertical' : 'source'
+
   if (!input_url) return jsonError(res, 400, 'input_url required')
   if (!isFinite(start_sec) || start_sec < 0) return jsonError(res, 400, 'start_sec must be a non-negative number')
   if (!isFinite(duration_sec) || duration_sec <= 0) return jsonError(res, 400, 'duration_sec must be positive')
@@ -822,32 +829,17 @@ async function extractVideoSegment(body, res) {
   const outFile = join(dir, 'segment.mp4')
 
   try {
-    // Two-pass strategy:
-    //   1. Try stream copy (no re-encode) — fast, lossless, works when
-    //      the source is already H.264/AAC. -ss before -i for fast seek.
-    //   2. Fall back to re-encode if stream copy produces a broken file
-    //      (some sources need re-encode for clean keyframe seek).
-    try {
+    if (aspect === 'vertical') {
+      // Vertical 9:16 — center-crop the source to a 9:16 aspect and re-encode.
+      // Filter math: width = ih*9/16, height = ih, centered. setsar=1 fixes
+      // square-pixel mode so platforms don't squish it.
       await runFfmpeg(
         [
           '-y',
           '-ss', String(start_sec),
           '-i', inputFile,
           '-t',  String(clipped),
-          '-c',  'copy',
-          '-movflags', '+faststart',
-          outFile,
-        ],
-        outFile,
-      )
-    } catch (copyErr) {
-      // Stream copy failed — try a clean re-encode.
-      await runFfmpeg(
-        [
-          '-y',
-          '-ss', String(start_sec),
-          '-i', inputFile,
-          '-t',  String(clipped),
+          '-vf', 'crop=ih*9/16:ih,setsar=1',
           '-c:v', 'libx264',
           '-preset', 'veryfast',
           '-crf', '23',
@@ -858,6 +850,39 @@ async function extractVideoSegment(body, res) {
         ],
         outFile,
       )
+    } else {
+      // Source-aspect path — fast stream copy when possible, re-encode fallback.
+      try {
+        await runFfmpeg(
+          [
+            '-y',
+            '-ss', String(start_sec),
+            '-i', inputFile,
+            '-t',  String(clipped),
+            '-c',  'copy',
+            '-movflags', '+faststart',
+            outFile,
+          ],
+          outFile,
+        )
+      } catch (copyErr) {
+        await runFfmpeg(
+          [
+            '-y',
+            '-ss', String(start_sec),
+            '-i', inputFile,
+            '-t',  String(clipped),
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            outFile,
+          ],
+          outFile,
+        )
+      }
     }
     streamFile(res, outFile, 'video/mp4')
     res.on('close', () => cleanup(dir))

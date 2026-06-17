@@ -88,14 +88,40 @@ export async function autoPromoteVlog(
   const maxPerVlog = Math.max(1, Math.min(10, op?.auto_publish_max_per_vlog ?? 2))
   const webhookUrl = op?.social_fanout_webhook_url ?? null
 
+  // Per-vlog vertical toggle. When 1, ship a second 9:16 copy of each
+  // clip alongside the source-aspect one. The webhook payload carries
+  // both URLs so the fanout vendor can pick per platform.
+  const vlogRow = await findOne<{ auto_publish_vertical: number | null }>(
+    db,
+    `SELECT auto_publish_vertical FROM vlogs WHERE id = ? AND operator_id = ?`,
+    vlogId, operatorId,
+  )
+  const alsoVertical = vlogRow?.auto_publish_vertical === 1
+
   const candidates = await selectTopClips(env, operatorId, vlogId, maxPerVlog)
   summary.considered = candidates.totalConsidered
   summary.selected = candidates.picks.length
 
   for (const c of candidates.picks) {
     try {
-      const shipped = await shipClip(env, operatorId, c)
+      const shipped = await shipClip(env, operatorId, c, 'source')
       summary.shipped++
+
+      // Optional vertical second-output. Independent shipClip call with
+      // aspect='vertical' → separate R2 key (clip-shorts-vertical/...).
+      // If it fails we still post the source-aspect clip — vertical is
+      // additive, not blocking.
+      let verticalMp4Key: string | null = null
+      let verticalMp4Url: string | null = null
+      if (alsoVertical) {
+        try {
+          const v = await shipClip(env, operatorId, c, 'vertical')
+          verticalMp4Key = v.mp4Key
+          try { verticalMp4Url = await presignGetUrl(env, v.mp4Key, PRESIGN_TTL_SEC) } catch {}
+        } catch (vErr: any) {
+          summary.errors.push({ stage: 'ship-vertical', clip_id: c.id, message: vErr?.message || String(vErr) })
+        }
+      }
 
       const caption = await draftClipCaption(env, c).catch(err => {
         summary.errors.push({ stage: 'caption', clip_id: c.id, message: err?.message || String(err) })
@@ -123,6 +149,7 @@ export async function autoPromoteVlog(
           post_id: postId,
           vlog_id: vlogId,
           mp4_url: mp4Url,
+          mp4_url_vertical: verticalMp4Url,
           mp4_expires_in_sec: PRESIGN_TTL_SEC,
           caption,
           duration_sec: shipped.durationSec,
@@ -313,31 +340,56 @@ interface ShippedClip {
   durationSec: number
 }
 
+type ShipAspect = 'source' | 'vertical'
+
 /**
- * Slice the segment, cache in R2, write the production row. Mirrors
- * the logic in /api/v2/clip-candidates/[id]/ship-as-short so a manual
- * ship and an auto-ship hit the same R2 key.
+ * Slice the segment, cache in R2, write/update the production row.
+ *
+ * `aspect='source'` (default) keeps the source aspect via the FFmpeg
+ * stream-copy fast path; cached at {op}/clip-shorts/{clip}.mp4 and
+ * tracked on productions.output_r2_key.
+ *
+ * `aspect='vertical'` runs a 9:16 center-crop via FFmpeg crop=ih*9/16:ih
+ * (forces re-encode); cached at {op}/clip-shorts-vertical/{clip}.mp4.
+ * Stored on the same production row's output_metadata.vertical_r2_key
+ * so the source-aspect clip stays the canonical artifact and the
+ * vertical is "also available".
  */
 async function shipClip(
   env: AutoPromoteEnv,
   operatorId: string,
   clip: PickedClip,
+  aspect: ShipAspect = 'source',
 ): Promise<ShippedClip> {
   const db = getDb(env)
+  const durationSec = Math.min(MAX_SEGMENT_SEC, clip.end_time - clip.start_time)
+  const cacheKey = aspect === 'vertical'
+    ? `${operatorId}/clip-shorts-vertical/${clip.id}.mp4`
+    : `${operatorId}/clip-shorts/${clip.id}.mp4`
 
-  const existing = await findOne<{ id: string; output_r2_key: string | null }>(
+  const existing = await findOne<{ id: string; output_r2_key: string | null; output_metadata: string | null }>(
     db,
-    `SELECT id, output_r2_key FROM productions
+    `SELECT id, output_r2_key, output_metadata FROM productions
       WHERE operator_id = ? AND source_kind = 'clip_candidate' AND source_id = ?
         AND deleted_at IS NULL
       ORDER BY created_at DESC LIMIT 1`,
     operatorId, clip.id,
   )
-  const durationSec = Math.min(MAX_SEGMENT_SEC, clip.end_time - clip.start_time)
-  const cacheKey = `${operatorId}/clip-shorts/${clip.id}.mp4`
 
-  if (existing && existing.output_r2_key) {
-    return { productionId: existing.id, mp4Key: existing.output_r2_key, durationSec }
+  // Idempotent shortcut — for source aspect we look at output_r2_key;
+  // for vertical we look at the metadata.vertical_r2_key sub-field.
+  if (existing) {
+    if (aspect === 'source' && existing.output_r2_key) {
+      return { productionId: existing.id, mp4Key: existing.output_r2_key, durationSec }
+    }
+    if (aspect === 'vertical' && existing.output_metadata) {
+      try {
+        const meta = JSON.parse(existing.output_metadata)
+        if (meta?.vertical_r2_key) {
+          return { productionId: existing.id, mp4Key: meta.vertical_r2_key, durationSec }
+        }
+      } catch {}
+    }
   }
 
   let segmentExists = false
@@ -356,6 +408,7 @@ async function shipClip(
         input_url: sourceUrl,
         start_sec: clip.start_time,
         duration_sec: durationSec,
+        aspect,
       }),
     })
     if (!ffResp.ok) {
@@ -366,17 +419,35 @@ async function shipClip(
     await putObject(env, cacheKey, bytes, { httpMetadata: { contentType: 'video/mp4' } })
   }
 
+  // Production row write/update — depends on whether one already exists
+  // and which aspect this call is producing.
   let productionId: string
   if (existing) {
     productionId = existing.id
-    await run(
-      db,
-      `UPDATE productions SET output_r2_key = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
-      cacheKey, existing.id,
-    )
+    if (aspect === 'source') {
+      await run(
+        db,
+        `UPDATE productions SET output_r2_key = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+        cacheKey, existing.id,
+      )
+    } else {
+      // Merge vertical_r2_key into the existing metadata JSON.
+      let meta: any = {}
+      if (existing.output_metadata) {
+        try { meta = JSON.parse(existing.output_metadata) } catch {}
+      }
+      meta.vertical_r2_key = cacheKey
+      await run(
+        db,
+        `UPDATE productions SET output_metadata = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+        JSON.stringify(meta), existing.id,
+      )
+    }
   } else {
     productionId = ulid()
+    const isVertical = aspect === 'vertical'
     await run(
       db,
       `INSERT INTO productions (
@@ -385,7 +456,8 @@ async function shipClip(
           prompt_version, tier, produced_at
        ) VALUES (?, ?, 'clip', 'clip_candidate', ?, 'produced',
                  NULL, ?, ?, 'clip-v1·auto-promote', 'lo_fi', CURRENT_TIMESTAMP)`,
-      productionId, operatorId, clip.id, cacheKey,
+      productionId, operatorId, clip.id,
+      isVertical ? null : cacheKey,
       JSON.stringify({
         duration_sec: durationSec,
         start_sec: clip.start_time,
@@ -393,16 +465,21 @@ async function shipClip(
         source_vlog_id: clip.vlog_id,
         headline: clip.headline,
         mime: 'video/mp4',
+        ...(isVertical ? { vertical_r2_key: cacheKey } : {}),
       }),
     )
   }
 
-  await run(
-    db,
-    `UPDATE clip_candidates SET status = 'approved', updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND operator_id = ?`,
-    clip.id, operatorId,
-  )
+  // Only mark approved once — gated to the source-aspect ship so a
+  // vertical-only re-run doesn't redundantly flip state.
+  if (aspect === 'source') {
+    await run(
+      db,
+      `UPDATE clip_candidates SET status = 'approved', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND operator_id = ?`,
+      clip.id, operatorId,
+    )
+  }
 
   return { productionId, mp4Key: cacheKey, durationSec }
 }
