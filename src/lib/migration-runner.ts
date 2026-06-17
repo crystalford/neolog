@@ -834,6 +834,43 @@ export const MIGRATIONS: Migration[] = [
             ON vlogs(operator_id, auto_publish_pending)
             WHERE deleted_at IS NULL AND auto_publish_pending = 1`,
   },
+  // Optional 9:16 second-output on the auto-publish pipeline. Default 0
+  // (off). When 1, the auto-promote step ALSO renders a vertical copy of
+  // each shipped clip (FFmpeg crop=ih*9/16:ih,setsar=1) so the same clip
+  // can fan out to vertical feeds without a separate manual step.
+  {
+    name: '2026-06-16_vlogs_auto_publish_vertical',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_vertical INTEGER NOT NULL DEFAULT 0`,
+  },
+  // ─── Clip-quality judge (2026-06-16) ─────────────────────────────────────
+  // Each clip_candidate gets a 1–5 "would this travel as a standalone short"
+  // score from a second LLM pass that reads the clip + 30s of pre/post
+  // transcript context. Auto-promote requires score >= 4 to ship, so dull
+  // candidates never auto-post even if the extractor flagged them.
+  // Persisted so re-runs of the sweep don't re-judge — judging is the
+  // expensive step (one gpt-oss low-effort call per candidate).
+  {
+    name: '2026-06-16_clip_candidates_clippability_score',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_score INTEGER`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_clippability_judged_at',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_judged_at TEXT`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_clippability_verdict',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_verdict TEXT`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_suggested_caption_hook',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN suggested_caption_hook TEXT`,
+  },
+  {
+    name: '2026-06-16_idx_clip_candidates_clippability_score',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clip_candidates_clippability_score
+            ON clip_candidates(operator_id, vlog_id, clippability_score DESC)
+            WHERE deleted_at IS NULL AND status = 'pending'`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

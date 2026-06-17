@@ -20,6 +20,7 @@ import { presignGetUrl, getObject, putObject, type R2Env } from './r2'
 import { ulid } from './ulid'
 import { callReasoning } from './models'
 import { loadVoiceSamples, formatVoiceSamples } from './voice-shape'
+import { judgeUnscoredClipsForVlog, SCORE_FLOOR_FOR_AUTO_PUBLISH } from './clip-judge'
 
 export interface AutoPromoteEnv extends R2Env {
   DB: D1Database
@@ -219,9 +220,14 @@ interface PickedClip {
 }
 
 /**
- * Pure heuristic — no model call. Filters validated clips and ranks by
- * a length+duration sweet spot. Returns up to `limit` clips plus the
- * total candidates considered (for the summary).
+ * Filter candidates → judge any un-scored ones via the clip-quality
+ * pass → rank by clippability_score → return up to `limit` picks.
+ *
+ * The hard filter (length / duration / validated=1) cuts the obvious
+ * non-starters before judging — judging is the expensive step
+ * (~1-2s per candidate). The judge then assigns a 1-5 clippability
+ * score that we threshold at SCORE_FLOOR_FOR_AUTO_PUBLISH so only
+ * "would actually travel" clips get auto-shipped.
  */
 export async function selectTopClips(
   env: AutoPromoteEnv,
@@ -230,11 +236,23 @@ export async function selectTopClips(
   limit: number,
 ): Promise<{ totalConsidered: number; picks: PickedClip[] }> {
   const db = getDb(env)
-  const rows = await findMany<PickedClip & { validated: number | null; status: string }>(
+
+  // First — judge any un-scored eligible candidates. Bounded so a backlog
+  // doesn't blow the wall-clock. Persisted, so re-runs of the sweep are
+  // free.
+  try {
+    await judgeUnscoredClipsForVlog({ AI: env.AI, DB: db } as any, operatorId, vlogId, 8)
+  } catch (err: any) {
+    console.warn(`[auto-promote] judging failed for vlog ${vlogId}: ${err?.message || err}`)
+  }
+
+  const rows = await findMany<PickedClip & {
+    validated: number | null; status: string; clippability_score: number | null
+  }>(
     db,
     `SELECT cc.id, cc.vlog_id, cc.start_time, cc.end_time,
             cc.headline, cc.quote, cc.why_clippable,
-            cc.validated, cc.status,
+            cc.validated, cc.status, cc.clippability_score,
             v.recorded_at AS vlog_recorded_at,
             v.r2_key AS vlog_r2_key,
             v.transcoded_r2_key AS vlog_transcoded_r2_key
@@ -254,17 +272,21 @@ export async function selectTopClips(
     if (ql < MIN_QUOTE_CHARS || ql > MAX_QUOTE_CHARS) return false
     const dur = r.end_time - r.start_time
     if (dur < MIN_DURATION_SEC || dur > MAX_DURATION_SEC) return false
+    // Hard floor — un-judged or low-judged clips never auto-post.
+    if (r.clippability_score == null) return false
+    if (r.clippability_score < SCORE_FLOOR_FOR_AUTO_PUBLISH) return false
     return true
   })
 
-  // Rank: prefer mid-range quote length (~180 chars sweet spot) and
-  // mid-range duration (~25s). Closer to the sweet spot ⇒ higher score.
+  // Rank by the judge's score (primary). Break ties on the length/duration
+  // sweet-spot so "all 4s" picks the most-shareable lengths first.
   const scored = eligible.map(r => {
     const ql = (r.quote || '').length
     const dur = r.end_time - r.start_time
+    const judge = r.clippability_score ?? 0
     const qScore = 1 - Math.abs(ql - 180) / 200
     const dScore = 1 - Math.abs(dur - 25) / 60
-    return { row: r, score: qScore + dScore }
+    return { row: r, score: judge * 100 + qScore + dScore }
   })
   scored.sort((a, b) => b.score - a.score)
 

@@ -77,10 +77,18 @@ type ReadyItem =
       href: string
     }
 
+interface AutoShippedRecent {
+  id: string
+  produced_at: string
+  headline: string | null
+  vlog_id: string | null
+}
+
 export default function HomePage() {
   const [authState, setAuthState] = useState<'checking' | 'authed' | 'public'>('checking')
   const [publicProductions, setPublicProductions] = useState<any[]>([])
   const [items, setItems] = useState<ReadyItem[] | null>(null)
+  const [autoShipped, setAutoShipped] = useState<AutoShippedRecent[]>([])
 
   const loadReady = useCallback(async () => {
     try {
@@ -88,6 +96,7 @@ export default function HomePage() {
       if (r.status === 401) return null
       const d: any = await r.json()
       setItems(Array.isArray(d?.items) ? d.items : [])
+      setAutoShipped(Array.isArray(d?.auto_shipped_recent) ? d.auto_shipped_recent : [])
       return true
     } catch {
       setItems([])
@@ -109,6 +118,7 @@ export default function HomePage() {
       }
       const d: any = await r.json()
       setItems(Array.isArray(d?.items) ? d.items : [])
+      setAutoShipped(Array.isArray(d?.auto_shipped_recent) ? d.auto_shipped_recent : [])
       setAuthState('authed')
     })().catch(() => setAuthState('public'))
   }, [])
@@ -128,6 +138,8 @@ export default function HomePage() {
   return (
     <Shell>
       <div style={{ maxWidth: 980, margin: '0 auto', padding: '0 4px' }}>
+        {autoShipped.length > 0 && <AutoShippedRibbon items={autoShipped}/>}
+
         {/* TOP — Record / Log something */}
         <section className="canon-reveal d1" style={{ padding: '40px 0 24px' }}>
           <div style={{
@@ -186,6 +198,73 @@ export default function HomePage() {
       </div>
     </Shell>
   )
+}
+
+// ─── Auto-shipped ribbon ─────────────────────────────────────────────────
+
+function AutoShippedRibbon({ items }: { items: AutoShippedRecent[] }) {
+  // Group by vlog so the message reads naturally when multiple clips
+  // came from the same recording.
+  const byVlog = new Map<string, AutoShippedRecent[]>()
+  for (const it of items) {
+    const k = it.vlog_id || 'unknown'
+    if (!byVlog.has(k)) byVlog.set(k, [])
+    byVlog.get(k)!.push(it)
+  }
+  const groups = Array.from(byVlog.entries())
+  const total = items.length
+  const sinceLabel = relativeDate(items[0]?.produced_at) || 'recently'
+
+  return (
+    <div style={{
+      marginTop: 18, padding: '12px 18px',
+      background: 'color-mix(in srgb, var(--sig) 8%, transparent)',
+      border: '1px solid color-mix(in srgb, var(--sig) 40%, transparent)',
+      borderRadius: 10,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%', background: 'var(--sig)',
+          boxShadow: '0 0 8px var(--sig-glow)',
+        }}/>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
+            textTransform: 'uppercase', color: 'var(--sig)',
+          }}>
+            Auto-published
+          </div>
+          <div style={{ fontSize: 13.5, color: 'var(--fg-1)', marginTop: 2 }}>
+            Posted <strong>{total} {total === 1 ? 'clip' : 'clips'}</strong> {sinceLabel}
+            {groups.length === 1 && groups[0][0] !== 'unknown' ? ' from one vlog' : groups.length > 1 ? ` from ${groups.length} vlogs` : ''}
+            {' · webhook fired to your fanout vendor'}
+          </div>
+        </div>
+      </div>
+      <Link href="/published" style={{
+        fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 1.4,
+        textTransform: 'uppercase', color: 'var(--sig)',
+        textDecoration: 'none', whiteSpace: 'nowrap',
+      }}>
+        Review →
+      </Link>
+    </div>
+  )
+}
+
+function relativeDate(iso?: string | null): string {
+  if (!iso) return ''
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const deltaMs = Date.now() - t
+  const mins = Math.round(deltaMs / 60000)
+  if (mins < 2) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  return `${days}d ago`
 }
 
 // ─── Ready cards ─────────────────────────────────────────────────────────

@@ -339,7 +339,31 @@ export async function GET(req: NextRequest) {
     )
   } catch {}
 
-  return NextResponse.json({ items }, { headers: { 'Cache-Control': 'no-store' } })
+  // Auto-published ribbon: recent clip-productions (last 7 days) tied to
+  // a clip_candidate source. The ribbon component shows e.g. "Posted 3
+  // clips from yesterday's vlog → review" so the operator gets feedback
+  // without ever pressing approve.
+  const recentAutoShipped = await safe('recent_auto_shipped', () => findMany<{
+    id: string; produced_at: string; headline: string | null; vlog_id: string | null
+  }>(
+    db,
+    `SELECT p.id, p.produced_at,
+            json_extract(p.output_metadata, '$.headline') AS headline,
+            json_extract(p.output_metadata, '$.source_vlog_id') AS vlog_id
+       FROM productions p
+      WHERE p.operator_id = ?
+        AND p.source_kind = 'clip_candidate'
+        AND p.deleted_at IS NULL
+        AND p.produced_at >= datetime('now', '-7 days')
+      ORDER BY p.produced_at DESC
+      LIMIT 10`,
+    operator.id,
+  ))
+
+  return NextResponse.json({
+    items,
+    auto_shipped_recent: recentAutoShipped,
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 /**

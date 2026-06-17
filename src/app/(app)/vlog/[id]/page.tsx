@@ -56,6 +56,9 @@ interface VlogDetail {
   pipeline_status: string
   pipeline_error: string | null
   is_podcast?: number | boolean | null
+  auto_publish_clips?: number | boolean | null
+  auto_publish_vertical?: number | boolean | null
+  auto_publish_pending?: number | boolean | null
   playback_url: string | null
   audio_url?: string | null
   audio_chunk_urls?: string[] | null
@@ -169,6 +172,49 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
       const r = await fetch(`/api/v2/vlogs/${params.id}/mark-broll`, { method: 'POST', credentials: 'include' })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       setActionNote('Marked as B-roll.')
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
+  const toggleAutoPublish = async (next: boolean, vertical?: boolean) => {
+    if (!vlog) return
+    setActionNote(next ? 'Turning auto-publish on…' : 'Turning auto-publish off…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-toggle`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_publish_clips: next,
+          ...(vertical !== undefined ? { auto_publish_vertical: vertical } : {}),
+        }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setActionNote(next
+        ? 'Auto-publish on. Top scored clips from this vlog will ship next sweep.'
+        : 'Auto-publish off.')
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
+  const runAutoPublishNow = async () => {
+    if (!vlog) return
+    setActionNote('Auto-publishing now — judging clips, slicing, firing webhook…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-now`, {
+        method: 'POST', credentials: 'include',
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      const parts = [
+        `${d.considered ?? 0} candidates · ${d.selected ?? 0} selected`,
+        `${d.shipped ?? 0} shipped`,
+        d.webhook_fired ? `posted to fanout` : 'no fanout webhook set',
+      ]
+      setActionNote(parts.join(' · '))
       load()
     } catch (e: any) {
       setActionNote(`Failed: ${e?.message || String(e)}`)
@@ -320,6 +366,36 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             >
               {vlog.is_podcast ? 'In podcast ✓' : 'Add to podcast'}
             </button>
+            <button
+              className="action"
+              onClick={() => toggleAutoPublish(!vlog.auto_publish_clips)}
+              style={vlog.auto_publish_clips ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+              title={vlog.auto_publish_clips
+                ? 'Auto-publish on — the sweep will ship top-scored clips and fire your fanout webhook'
+                : 'Turn on to auto-publish top clips from this vlog without approval'}
+            >
+              {vlog.auto_publish_clips ? 'Auto-publish ✓' : 'Auto-publish'}
+              {vlog.auto_publish_pending ? <span style={{ marginLeft: 6, color: 'var(--t-ochre)' }}>· pending</span> : null}
+            </button>
+            {vlog.auto_publish_clips ? (
+              <button
+                className="action"
+                onClick={() => toggleAutoPublish(true, !vlog.auto_publish_vertical)}
+                style={vlog.auto_publish_vertical ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+                title="Also output a 9:16 vertical copy of each shipped clip (FFmpeg crop)"
+              >
+                {vlog.auto_publish_vertical ? 'Vertical too ✓' : 'Source aspect only'}
+              </button>
+            ) : null}
+            {vlog.auto_publish_clips ? (
+              <button
+                className="action"
+                onClick={runAutoPublishNow}
+                title="Run the auto-publish sweep on this vlog now"
+              >
+                Auto-publish now →
+              </button>
+            ) : null}
             {vlog.playback_url && (
               <a className="action" href={vlog.playback_url} target="_blank" rel="noreferrer">
                 Open original

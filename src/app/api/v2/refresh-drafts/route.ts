@@ -35,6 +35,12 @@ interface Env extends LibrarianEnv, AutoPromoteEnv {
   DB: D1Database
   AI: Ai
   NEOLOG_DEV_OPERATOR_EMAIL?: string
+  // Shared with the auto-publish-cron worker. When the request carries
+  // X-Cron-Secret matching this AND ?operator_id=..., we skip the
+  // Cloudflare Access JWT check and impersonate that operator. Single-
+  // operator app — this is fine. Set via `wrangler secret put CRON_SECRET`
+  // on both the Pages project and the cron worker.
+  CRON_SECRET?: string
 }
 
 // Same threshold as /api/v2/subjects (keep them aligned).
@@ -45,11 +51,21 @@ export async function GET(req: NextRequest)  { return run(req) }
 
 async function run(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
-  let operator
-  try { operator = await requireOperator(req, env) }
-  catch (e) {
-    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
-    throw e
+
+  // Cron-bypass path: header-secret + operator_id query → skip Access JWT.
+  let operator: { id: string } | null = null
+  const cronSecret = req.headers.get('x-cron-secret')
+  const operatorIdParam = new URL(req.url).searchParams.get('operator_id')
+  if (cronSecret && env.CRON_SECRET && cronSecret === env.CRON_SECRET && operatorIdParam) {
+    operator = { id: operatorIdParam }
+  }
+
+  if (!operator) {
+    try { operator = await requireOperator(req, env) }
+    catch (e) {
+      if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+      throw e
+    }
   }
   const db = getDb(env)
   const started = Date.now()
