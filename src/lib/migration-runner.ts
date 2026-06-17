@@ -798,6 +798,42 @@ export const MIGRATIONS: Migration[] = [
             ON clusters(operator_id, subject_source, ripeness_score DESC)
             WHERE deleted_at IS NULL`,
   },
+  // ─── Auto-publish pipeline (2026-06-16) ──────────────────────────────────
+  // Per-vlog toggle: when 1, the post-upload workflow auto-promotes the
+  // top-N validated clip_candidates into shorts and fires the operator's
+  // social-fanout webhook (Make.com / Buffer / etc.). Off by default so
+  // existing vlogs don't suddenly start posting.
+  {
+    name: '2026-06-16_vlogs_auto_publish_clips',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_clips INTEGER NOT NULL DEFAULT 0`,
+  },
+  // Operator settings for auto-publish defaults.
+  {
+    name: '2026-06-16_operator_social_fanout_webhook_url',
+    sql: `ALTER TABLE operator ADD COLUMN social_fanout_webhook_url TEXT`,
+  },
+  {
+    name: '2026-06-16_operator_auto_publish_default',
+    sql: `ALTER TABLE operator ADD COLUMN auto_publish_default INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-16_operator_auto_publish_max_per_vlog',
+    sql: `ALTER TABLE operator ADD COLUMN auto_publish_max_per_vlog INTEGER NOT NULL DEFAULT 2`,
+  },
+  // Flag set by the post-upload workflow when extraction finishes on an
+  // auto-publish-eligible vlog. The Pages app (refresh-drafts cron or
+  // home-page visit via ctx.waitUntil) scans for pending=1 and runs
+  // autoPromoteVlog. Cleared on success.
+  {
+    name: '2026-06-16_vlogs_auto_publish_pending',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_pending INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-16_idx_vlogs_auto_publish_pending',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_auto_publish_pending
+            ON vlogs(operator_id, auto_publish_pending)
+            WHERE deleted_at IS NULL AND auto_publish_pending = 1`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

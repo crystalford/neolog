@@ -32,9 +32,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, findOne } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import type { D1Database } from '@cloudflare/workers-types'
+import { sweepPendingAutoPublish, type AutoPromoteEnv } from '@/lib/auto-promote'
+import type { D1Database, Ai } from '@cloudflare/workers-types'
 
-interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends AutoPromoteEnv {
+  DB: D1Database
+  AI: Ai
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
 
 export type ReadyItem =
   | {
@@ -320,6 +325,19 @@ export async function GET(req: NextRequest) {
       href: `/topics?quick=${encodeURIComponent(String(s.seed).slice(0, 200))}`,
     })
   }
+
+  // Background: if any vlogs are flagged auto_publish_pending=1, run the
+  // auto-promote sweep in waitUntil so the home-page response isn't
+  // blocked. Visits to the home page effectively act as a heartbeat for
+  // the publish queue.
+  try {
+    const ctx = getRequestContext()
+    ctx.waitUntil(
+      sweepPendingAutoPublish(env, operator.id, 3).catch(err => {
+        console.warn(`[home/ready] sweep failed: ${err?.message || err}`)
+      }),
+    )
+  } catch {}
 
   return NextResponse.json({ items }, { headers: { 'Cache-Control': 'no-store' } })
 }

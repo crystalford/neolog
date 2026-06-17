@@ -22,6 +22,7 @@ import { VoicePreferences } from './VoicePreferences'
 import { BraveKeyRow } from './BraveKeyRow'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
+import { AutoPublishSettings } from './AutoPublishSettings'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -170,6 +171,11 @@ export default async function SettingsPage() {
           <Row k="Riff confidence threshold" v="0.85" sub="Cosine similarity for auto-link" arrow/>
           <Row k="Transcription provider" v="Workers AI Whisper" sub="Switch to Claude per-vlog when available" arrow/>
           <Row k="Voice preservation hard check" v="On" sub="Each thread must contain a verbatim 4-word substring" arrow/>
+        </Section>
+
+        <Section title="Auto-publishing">
+          <Row k="Fanout webhook URL" sub="Paste the webhook URL from Make.com / Buffer / Zapier / your own worker. When set, every shipped clip is POSTed to this URL with mp4_url + caption + metadata; your fanout vendor handles per-platform posting. Test with the button below."/>
+          <AutoPublishSettings/>
         </Section>
 
         <Section title="Maintenance">

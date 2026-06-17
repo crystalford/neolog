@@ -28,9 +28,10 @@ import { getDb, findOne } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { buildSubjects, type LibrarianEnv } from '@/lib/librarian'
 import { buildSparkSeeds } from '@/lib/spark-seeds'
+import { sweepPendingAutoPublish, type AutoPromoteEnv } from '@/lib/auto-promote'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
 
-interface Env extends LibrarianEnv {
+interface Env extends LibrarianEnv, AutoPromoteEnv {
   DB: D1Database
   AI: Ai
   NEOLOG_DEV_OPERATOR_EMAIL?: string
@@ -102,6 +103,17 @@ async function run(req: NextRequest) {
     } catch (err: any) {
       summary.seeds_error = err?.message || String(err)
     }
+  }
+
+  // Sweep any vlogs flagged auto_publish_pending=1 — the post-upload
+  // workflow sets this flag; this is the cron-triggerable side that
+  // actually slices the clips and fires the social-fanout webhook.
+  try {
+    const sweep = await sweepPendingAutoPublish(env, operator.id, 3)
+    summary.auto_publish_swept = sweep.swept
+    summary.auto_publish_summaries = sweep.summaries
+  } catch (err: any) {
+    summary.auto_publish_error = err?.message || String(err)
   }
 
   summary.elapsed_ms = Date.now() - started
