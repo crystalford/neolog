@@ -92,9 +92,28 @@ function HealthPill() {
         if (!cancelled) setState('warn')
       }
     }
-    check()
-    const id = setInterval(check, 60_000)
-    return () => { cancelled = true; clearInterval(id) }
+    // Poll at 5 min (was 60s) and ONLY when the tab is visible. The status
+    // check is cheap now that the FFmpeg probe is passive, but there's no
+    // reason to hammer it from a backgrounded tab. visibilitychange resumes
+    // an immediate check when the operator returns to the tab.
+    let id: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (id != null) return
+      check()
+      id = setInterval(check, 300_000)
+    }
+    const stop = () => { if (id != null) { clearInterval(id); id = null } }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      cancelled = true
+      stop()
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [])
 
   const label = state === 'err' ? 'degraded' : state === 'warn' ? 'checking' : 'all healthy'
