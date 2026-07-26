@@ -1,10 +1,9 @@
 /**
  * GET /api/v2/media?type=all|photo|video&limit=500
  *
- * The unified vault timeline — photos + vlogs merged, newest-capture first.
- * This is the "one chronological archive of everything" surface (the Google
- * Photos replacement). Each row is normalized so the client renders a single
- * grid regardless of media kind.
+ * The unified archive — photos + vlogs merged, newest-capture first. One
+ * chronological feed of everything captured. Each row is normalized so the
+ * client renders a single grid regardless of media kind.
  *
  * Photos come from the photos table; videos from vlogs. Ordered by capture
  * time (taken_at / recorded_at), falling back to created/uploaded time.

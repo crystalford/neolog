@@ -1,5 +1,5 @@
 /**
- * Photos — the vault's still-image half.
+ * Photos — the still-image half of the archive.
  *
  *   GET  → list the operator's photos, newest-taken first
  *   POST → register an uploaded photo (row insert + thumbnail store + kick

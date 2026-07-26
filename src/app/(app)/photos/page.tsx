@@ -1,16 +1,16 @@
 'use client'
 
 /**
- * The vault — one chronological archive of everything you've captured:
- * photos + videos, newest-capture first, day-banded. The Google Photos
- * replacement (owned, permanent). Filter by All / Photos / Videos.
+ * Photos & videos — one chronological archive of everything you've captured,
+ * newest-capture first, day-banded. Owned, permanent. Filter by All /
+ * Photos / Videos.
  *
- * Also hosts the progress-video engine: detected photo series (a vision tag
+ * Also hosts the progress-video builder: detected photo series (a vision tag
  * recurring across days) can be turned into a time-lapse or before/after
  * with one tap, and the built videos live in their own strip.
  *
  * Photos upload here; video uploads still go through /vlogs and the home
- * recorder. Both show in the merged timeline via /api/v2/media.
+ * recorder. Both show in the merged archive via /api/v2/media.
  */
 
 export const runtime = 'edge'
@@ -41,7 +41,7 @@ interface ProgressVideo {
 
 type Filter = 'all' | 'photo' | 'video'
 
-export default function VaultPage() {
+export default function PhotosVideosPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [media, setMedia] = useState<MediaItem[] | null>(null)
   const [series, setSeries] = useState<Series[]>([])
@@ -111,14 +111,14 @@ export default function VaultPage() {
           }}>
             <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
-            The vault · everything you&rsquo;ve captured
+            Photos &amp; videos · your archive
           </div>
           <h1 style={{
             fontFamily: 'var(--font-body)', fontWeight: 400,
             fontSize: 56, lineHeight: 1.0, letterSpacing: '-2.2px',
             color: 'var(--fg)', margin: '0 0 14px', textWrap: 'balance',
           }}>
-            Your timeline<span style={{ color: 'var(--sig)' }}>.</span>
+            Photos &amp; videos<span style={{ color: 'var(--sig)' }}>.</span>
           </h1>
           <p style={{ fontSize: 16, lineHeight: 1.55, color: 'var(--fg-2)', maxWidth: 620, margin: '0 0 18px' }}>
             Photos and videos, owned and permanent, in the order you lived them.

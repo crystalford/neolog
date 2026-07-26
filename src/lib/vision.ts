@@ -1,7 +1,7 @@
 /**
  * Vision tagging — describe a photo with a Workers-AI multimodal model.
  *
- * The photo vault's "understand without labeling" step, parallel to Whisper
+ * The photo archive's "understand without labeling" step, parallel to Whisper
  * for videos. For each uploaded photo we produce a one-line description + a
  * handful of tags so the archive is searchable and the graph can link photos
  * to subjects (e.g. every "strength training" photo + every vlog where the
@@ -10,7 +10,7 @@
  * Runs on Workers AI (Llama 4 Scout — multimodal, cheap, in-house) via the
  * existing callChat abstraction. The image is fed as a base64 data URI read
  * from R2. On any error the caller records vision_status='failed' and moves
- * on — a photo lands in the vault whether or not tagging succeeded; tagging
+ * on — a photo lands in the photo archive whether or not tagging succeeded; tagging
  * is enhancement, never a gate.
  */
 

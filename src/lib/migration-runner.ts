@@ -871,7 +871,7 @@ export const MIGRATIONS: Migration[] = [
             ON clip_candidates(operator_id, vlog_id, clippability_score DESC)
             WHERE deleted_at IS NULL AND status = 'pending'`,
   },
-  // ─── Photo vault (2026-06-29) ────────────────────────────────────────────
+  // ─── Photos archive (2026-06-29) ────────────────────────────────────────────
   // First-class photos, parallel to vlogs, so the video pipeline stays
   // untouched. Photos are the "replace Google Photos" half of neolog: an
   // owned, permanent, chronological archive. Ingestion: the browser converts
