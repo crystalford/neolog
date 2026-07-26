@@ -917,6 +917,36 @@ export const MIGRATIONS: Migration[] = [
             ON photos(operator_id, vision_status)
             WHERE deleted_at IS NULL`,
   },
+  // ─── Progress videos (2026-06-29) ────────────────────────────────────────
+  // Time-lapse / before-after MP4s assembled from an ordered photo series
+  // (the strength-training payoff). Built by the FFmpeg container's
+  // /images-to-video endpoint. photo_ids_json records the ordered series so
+  // the video can be rebuilt if new photos land.
+  {
+    name: '2026-06-29_progress_videos_table',
+    sql: `CREATE TABLE IF NOT EXISTS progress_videos (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL,
+      title           TEXT,
+      series_tag      TEXT,
+      kind            TEXT NOT NULL DEFAULT 'timelapse',
+      photo_ids_json  TEXT,
+      photo_count     INTEGER,
+      r2_key          TEXT,
+      status          TEXT NOT NULL DEFAULT 'building',
+      error           TEXT,
+      visibility      TEXT NOT NULL DEFAULT 'private',
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-29_idx_progress_videos_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_progress_videos_operator
+            ON progress_videos(operator_id, created_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

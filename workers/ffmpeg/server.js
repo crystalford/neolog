@@ -1108,6 +1108,75 @@ async function kenBurns(body, res) {
   }
 }
 
+// ── endpoint: /images-to-video ─────────────────────────────────────────
+// Assemble an ordered list of photos into an MP4 — the progress-video
+// engine (strength-training time-lapse, before/after). Each image is
+// normalized (scaled + letterbox-padded to a uniform target size, so a
+// mix of portrait/landscape phone photos assembles cleanly) then held for
+// `seconds_per_image`. No captions, no text overlays (house rule).
+//
+// Body: {
+//   image_urls: string[],           // ordered, oldest → newest
+//   mode?: 'timelapse' | 'before_after',
+//   seconds_per_image?: number,     // default 0.4 timelapse / 1.8 before_after
+//   width?, height?                 // target canvas, default 1080x1350 (4:5 portrait)
+// }
+async function imagesToVideo(body, res) {
+  const urls = Array.isArray(body.image_urls) ? body.image_urls.filter(u => typeof u === 'string') : []
+  if (urls.length < 2) return jsonError(res, 400, 'image_urls needs at least 2 entries')
+  const mode = body.mode === 'before_after' ? 'before_after' : 'timelapse'
+  const list = mode === 'before_after' ? [urls[0], urls[urls.length - 1]] : urls.slice(0, 240)
+  const spi = Number(body.seconds_per_image) > 0
+    ? Number(body.seconds_per_image)
+    : (mode === 'before_after' ? 1.8 : 0.4)
+  const W = Math.max(240, Math.min(2160, parseInt(body.width, 10) || 1080))
+  const H = Math.max(240, Math.min(2160, parseInt(body.height, 10) || 1350))
+
+  const dir = mkdtempSync(join(tmpdir(), 'neolog-ffmpeg-img2vid-'))
+  try {
+    // Download + normalize each image to a uniform WxH frame, named
+    // sequentially so the assembler reads them as an image sequence.
+    for (let i = 0; i < list.length; i++) {
+      const srcResp = await fetch(list[i])
+      if (!srcResp.ok || !srcResp.body) throw new Error(`fetch image ${i} failed: HTTP ${srcResp.status}`)
+      const rawFile = join(dir, `raw_${i}`)
+      await pipeline(Readable.fromWeb(srcResp.body), createWriteStream(rawFile))
+      const frameFile = join(dir, `frame_${String(i).padStart(4, '0')}.jpg`)
+      await runFfmpeg(
+        [
+          '-y', '-i', rawFile,
+          '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`,
+          '-frames:v', '1',
+          frameFile,
+        ],
+        frameFile,
+      )
+    }
+
+    const outFile = join(dir, 'out.mp4')
+    await runFfmpeg(
+      [
+        '-y',
+        '-framerate', `1/${spi}`,
+        '-i', join(dir, 'frame_%04d.jpg'),
+        '-r', '30',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '21',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /images-to-video failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -1118,6 +1187,7 @@ const routes = {
   '/concat-audio': concatAudio,
   '/render-video-essay': renderVideoEssay,
   '/ken-burns': kenBurns,
+  '/images-to-video': imagesToVideo,
   '/trim':           trim,
   '/concat':         concat,
 }
@@ -1126,7 +1196,7 @@ const routes = {
 // /health returns this so the operator can verify which version is live.
 // If you push a workers/ffmpeg change and /health still shows the old build,
 // deploy-workers.yml didn't actually deploy.
-const BUILD_VERSION = 'rebuild-2026-05-18-brace-fix-boot-guards'
+const BUILD_VERSION = 'rebuild-2026-06-29-images-to-video-plus-vertical-crop'
 
 const SERVER_BOOT_AT = Date.now()
 
