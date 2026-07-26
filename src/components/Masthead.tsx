@@ -25,6 +25,7 @@ import { usePathname } from 'next/navigation'
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Log',       href: '/',          matchPaths: [
     /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
+    /^\/photos/, /^\/photo\//,
     /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//,
   ] },
   { label: 'Published', href: '/published', matchPaths: [
@@ -152,6 +153,10 @@ function AvatarMenu() {
           <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
             <span>Upload a vlog</span>
             <span className="kbd">⌘N</span>
+          </Link>
+          <Link href="/photos" onClick={() => setOpen(false)}>
+            <span>Photos</span>
+            <span className="dropdown-sub">your owned camera roll — dump it here</span>
           </Link>
           <Link href="/chat" onClick={() => setOpen(false)}>
             <span>Chat with your vlogs</span>

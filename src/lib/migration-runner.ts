@@ -871,6 +871,52 @@ export const MIGRATIONS: Migration[] = [
             ON clip_candidates(operator_id, vlog_id, clippability_score DESC)
             WHERE deleted_at IS NULL AND status = 'pending'`,
   },
+  // ─── Photo vault (2026-06-29) ────────────────────────────────────────────
+  // First-class photos, parallel to vlogs, so the video pipeline stays
+  // untouched. Photos are the "replace Google Photos" half of neolog: an
+  // owned, permanent, chronological archive. Ingestion: the browser converts
+  // HEIC→JPEG on a canvas (drops us out of server-side HEIC hell), reads EXIF
+  // taken_at + orientation, uploads the display JPEG + a thumbnail to R2. A
+  // Workers-AI vision pass writes a one-line description + tags so the archive
+  // is searchable without manual labeling.
+  {
+    name: '2026-06-29_photos_table',
+    sql: `CREATE TABLE IF NOT EXISTS photos (
+      id                  TEXT PRIMARY KEY,
+      operator_id         TEXT NOT NULL,
+      r2_key              TEXT NOT NULL,
+      thumbnail_r2_key    TEXT,
+      original_filename   TEXT,
+      mime_type           TEXT,
+      file_size_bytes     INTEGER,
+      width               INTEGER,
+      height              INTEGER,
+      taken_at            TEXT,
+      taken_at_source     TEXT,
+      caption             TEXT,
+      vision_description  TEXT,
+      vision_tags         TEXT,
+      vision_model        TEXT,
+      vision_status       TEXT NOT NULL DEFAULT 'pending',
+      visibility          TEXT NOT NULL DEFAULT 'private',
+      deleted_at          TEXT,
+      created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      uploaded_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-29_idx_photos_operator_taken',
+    sql: `CREATE INDEX IF NOT EXISTS idx_photos_operator_taken
+            ON photos(operator_id, taken_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  {
+    name: '2026-06-29_idx_photos_vision_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_photos_vision_status
+            ON photos(operator_id, vision_status)
+            WHERE deleted_at IS NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
