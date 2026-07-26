@@ -111,14 +111,14 @@ export default function PhotosVideosPage() {
           }}>
             <span style={{ width: 28, height: 1, background: 'var(--line-3)' }}/>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sig)', boxShadow: '0 0 8px var(--sig-glow)' }}/>
-            Photos &amp; videos · your archive
+            Storage · your photos and videos
           </div>
           <h1 style={{
             fontFamily: 'var(--font-body)', fontWeight: 400,
             fontSize: 56, lineHeight: 1.0, letterSpacing: '-2.2px',
             color: 'var(--fg)', margin: '0 0 14px', textWrap: 'balance',
           }}>
-            Photos &amp; videos<span style={{ color: 'var(--sig)' }}>.</span>
+            Storage<span style={{ color: 'var(--sig)' }}>.</span>
           </h1>
           <p style={{ fontSize: 16, lineHeight: 1.55, color: 'var(--fg-2)', maxWidth: 620, margin: '0 0 18px' }}>
             Photos and videos, owned and permanent, in the order you lived them.

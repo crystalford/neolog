@@ -155,8 +155,8 @@ function AvatarMenu() {
             <span className="kbd">⌘N</span>
           </Link>
           <Link href="/photos" onClick={() => setOpen(false)}>
-            <span>Photos &amp; videos</span>
-            <span className="dropdown-sub">your archive, in date order</span>
+            <span>Storage</span>
+            <span className="dropdown-sub">your photos and videos, in date order</span>
           </Link>
           <Link href="/chat" onClick={() => setOpen(false)}>
             <span>Chat with your vlogs</span>
