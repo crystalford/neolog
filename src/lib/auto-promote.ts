@@ -28,11 +28,18 @@ export interface AutoPromoteEnv extends R2Env {
   FFMPEG?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
 }
 
-const MAX_SEGMENT_SEC = 90       // hard cap per clip
+// Length is NOT the quality signal — the clip-quality judge already scores
+// completeness/memorability/conviction regardless of duration. These bounds
+// exist only to reject fragments (too short to be a real moment) and to keep
+// a "short" from becoming a mini-episode. A tight 4-line moment and a full
+// multi-beat rant that stays sharp the whole way through are BOTH valid —
+// the judge's score decides which; duration doesn't gate one out in favor
+// of the other.
+const MAX_SEGMENT_SEC = 180      // hard cap per clip — matches the extraction ceiling
 const MIN_QUOTE_CHARS = 80
 const MAX_QUOTE_CHARS = 280
 const MIN_DURATION_SEC = 8
-const MAX_DURATION_SEC = 60
+const MAX_DURATION_SEC = 180
 const PRESIGN_TTL_SEC = 7 * 24 * 3600  // long-lived so the fanout vendor doesn't expire mid-queue
 
 export interface AutoPromoteSummary {

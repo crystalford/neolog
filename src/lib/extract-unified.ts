@@ -222,7 +222,7 @@ If any answer is no, fix or omit the thread.
       "quote": "<verbatim ≥6 word substring from the transcript — the punch line of the clip>",
       "why_clippable": "<one plain-text sentence explaining why this moment is shippable as a standalone clip. NOT JSON. NOT wrapped in braces. Plain English only.>",
       "start_time_sec": <integer seconds — the start of the clip's span in the transcript. Estimate by counting words: ~2.6 words/sec.>,
-      "end_time_sec": <integer seconds — the end of the clip's span. Must satisfy end_time_sec > start_time_sec AND (end_time_sec - start_time_sec) between 5 and 120 seconds.>
+      "end_time_sec": <integer seconds — the end of the clip's span. Must satisfy end_time_sec > start_time_sec AND (end_time_sec - start_time_sec) between 5 and 180 seconds.>
     }
   ],
   "creative_elements": [
@@ -238,7 +238,8 @@ If any answer is no, fix or omit the thread.
 }
 
 CLIP RULES:
-- Only emit a clip if there's a genuine PUNCHY DELIVERY MOMENT — a take the operator nailed in 10-90 seconds, quotable on its own. If nothing meets that bar, return clips: [].
+- Only emit a clip if there's a genuine PUNCHY DELIVERY MOMENT, quotable on its own. If nothing meets that bar, return clips: [].
+- MATCH THE SPAN TO THE MOMENT, not a fixed target length. A tight, complete thought might be 8-20 seconds — don't pad it out. A genuine multi-beat rant that stays sharp and builds the WHOLE way through should run its full length, up to 180 seconds — don't cut a rant short at an arbitrary point just to keep it brief. The test is completeness: does the span capture the whole delivery, start to landing, with nothing essential missing at either end?
 - start_time_sec / end_time_sec are REQUIRED. Compute by counting words from the start of the transcript at ~2.6 words per second. Don't emit a clip without real timecodes.
 - why_clippable is a PLAIN ENGLISH SENTENCE. Not {"reason":"…"}. Not JSON. Just a sentence.
 - 0-2 clips per vlog is normal. 5+ is suspicious — you're probably emitting takes that aren't clip-grade.
