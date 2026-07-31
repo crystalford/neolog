@@ -128,7 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // the production page knows this is a voiceover (vs final render).
   const meta = JSON.stringify({
     kind: 'voiceover',
-    beat_count: recorded.length,
+    beat_count: ready.length,
     mime: 'audio/mpeg',
     stitched_at: new Date().toISOString(),
   })
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const url = await presignGetUrl(env, r2Key, 4 * 3600)
   return NextResponse.json({
     url, r2_key: r2Key,
-    beat_count: recorded.length,
+    beat_count: ready.length,
     bytes: stitchedBytes.length,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

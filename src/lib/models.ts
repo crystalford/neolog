@@ -53,7 +53,7 @@ export const MODELS = {
 export type ReasoningEffort = 'low' | 'medium' | 'high'
 
 export interface ReasoningEnv {
-  AI: { run: (model: string, args: unknown) => Promise<any> }
+  AI: { run: (model: any, args: unknown) => Promise<any> }
 }
 
 export interface ReasoningResult {

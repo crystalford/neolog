@@ -44,7 +44,7 @@ const VERBATIM_ANCHOR_SAMPLES = 25
 const VERBATIM_ANCHOR_CHARS = 600
 
 export interface LibrarianEnv {
-  AI: { run: (model: string, args: unknown) => Promise<any> }
+  AI: { run: (model: any, args: unknown) => Promise<any> }
 }
 
 interface TopicKey {

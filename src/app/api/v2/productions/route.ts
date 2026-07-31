@@ -420,7 +420,7 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
       })
       return { text: (resp.text || '').trim(), model: resp.model || modelKey }
     }
-    const r = await callReasoning(env, {
+    const r = await callReasoning(env as any, {
       system: cfg.system,
       user: userMsg,
       effort,
@@ -524,7 +524,7 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
         const hasProfile = !!op?.voice_profile_r2_key
         const wantsSynth = op?.voice_synth_mode !== 'record'
         if (hasProfile || wantsSynth) {
-          const ctx = getRequestContext()
+          const { ctx } = getRequestContext()
           ctx.waitUntil((async () => {
             try {
               const cookie = req.headers.get('cookie') || ''

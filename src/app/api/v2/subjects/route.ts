@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
   const isStale = !isFirstRun && newThreads >= STALENESS_THRESHOLD_THREADS
 
   if (isStale) {
-    const ctx = getRequestContext()
+    const { ctx } = getRequestContext()
     // waitUntil keeps the worker alive past the response so the rebuild
     // completes. Swallow errors — a failed background rebuild must NOT
     // affect the GET response.

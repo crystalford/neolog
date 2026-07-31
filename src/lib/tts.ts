@@ -19,7 +19,7 @@ import { MODELS } from './models'
 import { putObject, presignGetUrl, type R2Env } from './r2'
 
 export interface TtsEnv extends R2Env {
-  AI: { run: (model: string, args: unknown) => Promise<any> }
+  AI: { run: (model: any, args: unknown) => Promise<any> }
 }
 
 export interface SynthArgs {

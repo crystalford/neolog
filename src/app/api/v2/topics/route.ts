@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
   // INSTANT-SUGGESTIONS: pre-fire angle suggestions in the background.
   // By the time the operator's browser navigates to /topics/[id] the
   // suggestions are already on the row — zero perceived wait.
-  const ctx = getRequestContext()
+  const { ctx } = getRequestContext()
   ctx.waitUntil((async () => {
     try {
       const op = await findOne<{ brave_search_api_key: string | null }>(

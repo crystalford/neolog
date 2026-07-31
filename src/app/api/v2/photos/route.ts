@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
   )
 
   // Vision tagging in the background — registration returns immediately.
-  const ctx = getRequestContext()
+  const { ctx } = getRequestContext()
   ctx.waitUntil((async () => {
     try {
       const result = await describeImageFromR2(env, r2Key, 'image/jpeg')

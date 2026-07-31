@@ -331,7 +331,7 @@ export async function GET(req: NextRequest) {
   // blocked. Visits to the home page effectively act as a heartbeat for
   // the publish queue.
   try {
-    const ctx = getRequestContext()
+    const { ctx } = getRequestContext()
     ctx.waitUntil(
       sweepPendingAutoPublish(env, operator.id, 3).catch(err => {
         console.warn(`[home/ready] sweep failed: ${err?.message || err}`)

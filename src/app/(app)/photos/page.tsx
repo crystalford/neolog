@@ -60,7 +60,7 @@ export default function PhotosVideosPage() {
 
   const loadSeries = useCallback(async () => {
     try {
-      const [s, v] = await Promise.all([
+      const [s, v]: [any, any] = await Promise.all([
         fetch('/api/v2/photos/series', { credentials: 'include' }).then(r => r.json()),
         fetch('/api/v2/photos/progress-video', { credentials: 'include' }).then(r => r.json()),
       ])

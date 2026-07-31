@@ -27,7 +27,7 @@ const BROWSER_RUN_CRAWL_URL = 'https://api.cloudflare.com/client/v4/accounts/{AC
 
 export interface ResearchEnv extends R2Env {
   DB: D1Database
-  AI: { run: (model: string, args: unknown) => Promise<any> }
+  AI: { run: (model: any, args: unknown) => Promise<any> }
   CLOUDFLARE_API_TOKEN?: string
 }
 

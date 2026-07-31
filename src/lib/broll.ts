@@ -18,7 +18,7 @@ import { callReasoning, MODELS, extractText } from './models'
 import { putObject, presignGetUrl, type R2Env } from './r2'
 
 export interface BrollEnv extends R2Env {
-  AI: { run: (model: string, args: unknown) => Promise<any> }
+  AI: { run: (model: any, args: unknown) => Promise<any> }
   FFMPEG?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
 }
 
