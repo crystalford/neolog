@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/clips?min_score=1&limit=15", "nonce": "clips-diagnose-2-postfix" }
+{ "method": "GET", "path": "/api/v2/clips?min_score=1&limit=15", "nonce": "clips-final-check" }
