@@ -35,6 +35,10 @@ export async function GET(req: NextRequest) {
     throw e
   }
   const db = getDb(env)
+  try {
+    const { ensureMigrationsOnce } = await import('@/lib/migration-runner')
+    await ensureMigrationsOnce(db)
+  } catch {}
 
   let rows: { tag: string; n: number; days: number }[] = []
   try {

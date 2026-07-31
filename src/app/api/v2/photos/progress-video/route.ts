@@ -41,25 +41,33 @@ export async function GET(req: NextRequest) {
     throw e
   }
   const db = getDb(env)
-  const rows = await findMany<{
-    id: string; title: string | null; series_tag: string | null
-    kind: string; photo_count: number | null; r2_key: string | null
-    status: string; error: string | null; created_at: string
-  }>(
-    db,
-    `SELECT id, title, series_tag, kind, photo_count, r2_key, status, error, created_at
-       FROM progress_videos
-      WHERE operator_id = ? AND deleted_at IS NULL
-      ORDER BY created_at DESC
-      LIMIT 100`,
-    operator.id,
-  )
-  const videos = await Promise.all(rows.map(async r => {
-    let play_url: string | null = null
-    if (r.r2_key) { try { play_url = await presignGetUrl(env, r.r2_key, 24 * 3600) } catch {} }
-    return { ...r, play_url }
-  }))
-  return NextResponse.json({ videos }, { headers: { 'Cache-Control': 'no-store' } })
+  try {
+    const { ensureMigrationsOnce } = await import('@/lib/migration-runner')
+    await ensureMigrationsOnce(db)
+
+    const rows = await findMany<{
+      id: string; title: string | null; series_tag: string | null
+      kind: string; photo_count: number | null; r2_key: string | null
+      status: string; error: string | null; created_at: string
+    }>(
+      db,
+      `SELECT id, title, series_tag, kind, photo_count, r2_key, status, error, created_at
+         FROM progress_videos
+        WHERE operator_id = ? AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT 100`,
+      operator.id,
+    )
+    const videos = await Promise.all(rows.map(async r => {
+      let play_url: string | null = null
+      if (r.r2_key) { try { play_url = await presignGetUrl(env, r.r2_key, 24 * 3600) } catch {} }
+      return { ...r, play_url }
+    }))
+    return NextResponse.json({ videos }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (err: any) {
+    console.error(`[photos/progress-video] GET failed: ${err?.stack || err?.message || err}`)
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
 }
 
 export async function POST(req: NextRequest) {

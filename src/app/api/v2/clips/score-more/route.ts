@@ -23,6 +23,7 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getDb } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { judgeClipBacklog } from '@/lib/clip-judge'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
@@ -38,9 +39,21 @@ export async function POST(req: NextRequest) {
     throw e
   }
   const body = await req.json().catch(() => ({})) as { max_vlogs?: number; max_per_vlog?: number }
-  const result = await judgeClipBacklog(env as any, operator.id, {
-    maxVlogs: body.max_vlogs,
-    maxPerVlog: body.max_per_vlog,
-  })
-  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
+  try {
+    // This route calls judgeClipBacklog directly with env.DB, bypassing
+    // getDb()'s usual migration trigger. Ensure migrations explicitly so a
+    // cold isolate doesn't crash on a column that hasn't landed yet.
+    const db = getDb(env)
+    const { ensureMigrationsOnce } = await import('@/lib/migration-runner')
+    await ensureMigrationsOnce(db)
+
+    const result = await judgeClipBacklog(env as any, operator.id, {
+      maxVlogs: body.max_vlogs,
+      maxPerVlog: body.max_per_vlog,
+    })
+    return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (err: any) {
+    console.error(`[clips/score-more] failed: ${err?.stack || err?.message || err}`)
+    return NextResponse.json({ error: err?.message || String(err) }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
 }
