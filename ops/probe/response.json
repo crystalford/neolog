@@ -1,16 +1,13 @@
 {
-  "requested_at": "2026-07-31T01:34:34Z",
-  "method": "GET",
-  "path": "/api/v2/clips?min_score=1&limit=15",
+  "requested_at": "2026-07-31T01:35:58Z",
+  "method": "POST",
+  "path": "/api/v2/clips/score-more",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a238dc53ead132f4-ORD\r|",
-  "body": "{\"lines\":[],\"coverage\":{\"total\":419,\"judged\":0,\"eligible_unjudged\":409}}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a238de71cfb4583a-LAX\r|",
+  "body": "{\"vlogs_processed\":1,\"judged\":1,\"errors\":0}",
   "body_json": {
-    "lines": [],
-    "coverage": {
-      "total": 419,
-      "judged": 0,
-      "eligible_unjudged": 409
-    }
+    "vlogs_processed": 1,
+    "judged": 1,
+    "errors": 0
   }
 }
