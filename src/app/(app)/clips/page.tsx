@@ -21,6 +21,7 @@
 export const runtime = 'edge'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 
@@ -265,14 +266,23 @@ function ClipLineCard({ line, onCut, shipping }: { line: ClipLine; onCut: (id: s
           {line.clippability_verdict}
         </div>
       )}
-      <button
-        onClick={() => onCut(line.id)}
-        disabled={shipping}
-        className="canon-btn primary"
-        style={{ fontSize: 12.5, padding: '6px 14px' }}
-      >
-        {shipping ? 'Cutting…' : 'Cut clip →'}
-      </button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={() => onCut(line.id)}
+          disabled={shipping}
+          className="canon-btn primary"
+          style={{ fontSize: 12.5, padding: '6px 14px' }}
+        >
+          {shipping ? 'Cutting…' : 'Cut clip →'}
+        </button>
+        <Link
+          href={`/clips/${line.id}/edit`}
+          className="canon-btn"
+          style={{ fontSize: 12.5, padding: '6px 14px', textDecoration: 'none' }}
+        >
+          Extend / trim
+        </Link>
+      </div>
     </div>
   )
 }

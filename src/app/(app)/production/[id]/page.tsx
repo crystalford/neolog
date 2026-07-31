@@ -71,13 +71,23 @@ interface ThreadSource {
   id: string; topic: string; take: string | null; abstracted_topic: string | null
   strength: number | null; transcript_span_start: number | null; transcript_span_end: number | null
   vlog_id: string; vlog_filename: string | null
+  vlog_title?: string | null; vlog_recorded_at?: string | null
+  transcript?: string
 }
 interface ClusterSource {
   id: string; topic: string; abstracted_topic: string | null
   take: string | null; ripeness_score: number; state: string
   threads: { id: string; topic: string; take: string | null; strength: number | null }[]
 }
-type Source = ThreadSource | ClusterSource | null
+interface ClipCandidateSource {
+  id: string; vlog_id: string; headline: string; quote: string | null
+  why_clippable: string | null
+  clippability_score: number | null; clippability_verdict: string | null
+  start_time: number; end_time: number
+  vlog_title: string | null; vlog_recorded_at: string | null
+  transcript: string
+}
+type Source = ThreadSource | ClusterSource | ClipCandidateSource | null
 
 const TYPE_LABELS: Record<string, string> = {
   x_post: 'X post',
@@ -321,6 +331,70 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
                     Clip video isn't available — R2 fetch may have failed. Try regenerating.
                   </div>
                 )}
+              </section>
+            )}
+
+            {/* CLIP CONTEXT — where this came from: source vlog, verdict, transcript */}
+            {p.production_type === 'clip' && data.source && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>Where this came from</h2>
+                  {'vlog_id' in data.source && (
+                    <Link href={`/vlog/${(data.source as any).vlog_id}`} className="meta" style={{ textDecoration: 'none' }}>
+                      Open source vlog →
+                    </Link>
+                  )}
+                </div>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 10, background: 'var(--bg-1)',
+                  border: '1px solid var(--line-1)', display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  {'vlog_title' in data.source && data.source.vlog_title && (
+                    <div style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                      From <strong style={{ color: 'var(--fg)' }}>{data.source.vlog_title}</strong>
+                      {'vlog_recorded_at' in data.source && data.source.vlog_recorded_at && (
+                        <> · {new Date(data.source.vlog_recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                      )}
+                    </div>
+                  )}
+                  {'clippability_score' in data.source && data.source.clippability_score != null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {[1,2,3,4,5].map(i => (
+                          <span key={i} style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: i <= (data.source as ClipCandidateSource).clippability_score! ? color : 'var(--bg-4)',
+                          }}/>
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                        {(data.source as ClipCandidateSource).clippability_verdict}
+                      </span>
+                    </div>
+                  )}
+                  {'transcript' in data.source && data.source.transcript && (
+                    <div>
+                      <div style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.2,
+                        textTransform: 'uppercase', color: 'var(--fg-4)', marginBottom: 6,
+                      }}>
+                        Full transcript of this span
+                      </div>
+                      <div style={{ fontSize: 14.5, lineHeight: 1.6, color: 'var(--fg-1)', fontStyle: 'italic' }}>
+                        &ldquo;{data.source.transcript}&rdquo;
+                      </div>
+                    </div>
+                  )}
+                  {p.source_kind === 'clip_candidate' && (
+                    <Link
+                      href={`/clips/${p.source_id}/edit`}
+                      className="canon-btn"
+                      style={{ fontSize: 12, padding: '6px 12px', textDecoration: 'none', alignSelf: 'flex-start' }}
+                    >
+                      Extend / trim this clip
+                    </Link>
+                  )}
+                </div>
               </section>
             )}
 

@@ -127,16 +127,64 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   let source: any = null
   try {
     if (prod.source_kind === 'thread') {
-      source = await findOne<any>(
+      const t = await findOne<any>(
         db,
         `SELECT t.id, t.topic, t.take, t.abstracted_topic, t.strength, t.transcript_span_start,
                 t.transcript_span_end, t.vlog_id,
-                v.original_filename AS vlog_filename
+                v.original_filename AS vlog_filename, v.title AS vlog_title, v.recorded_at AS vlog_recorded_at
            FROM threads t
            JOIN vlogs v ON v.id = t.vlog_id
           WHERE t.id = ? AND t.operator_id = ?`,
         prod.source_id, operator.id,
       )
+      if (t && t.transcript_span_start != null && t.transcript_span_end != null) {
+        try {
+          const words = await findMany<{ word: string }>(
+            db,
+            `SELECT word FROM transcript_words
+              WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+              ORDER BY word_index ASC LIMIT 600`,
+            t.vlog_id, t.transcript_span_start, t.transcript_span_end,
+          )
+          t.transcript = words.map((w: any) => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+        } catch { t.transcript = '' }
+      }
+      source = t
+    } else if (prod.source_kind === 'clip_candidate') {
+      const cc = await findOne<{
+        id: string; vlog_id: string; headline: string; quote: string | null
+        why_clippable: string | null
+        clippability_score: number | null; clippability_verdict: string | null
+        start_time: number; end_time: number
+        vlog_title: string | null; vlog_recorded_at: string | null
+      }>(
+        db,
+        `SELECT cc.id, cc.vlog_id, cc.headline, cc.quote, cc.why_clippable,
+                cc.clippability_score, cc.clippability_verdict,
+                cc.start_time, cc.end_time,
+                v.title AS vlog_title, v.recorded_at AS vlog_recorded_at
+           FROM clip_candidates cc
+           JOIN vlogs v ON v.id = cc.vlog_id
+          WHERE cc.id = ? AND cc.operator_id = ?`,
+        prod.source_id, operator.id,
+      )
+      if (cc) {
+        // Full verbatim transcript for the clipped span (not just the
+        // punchline `quote`) — this is the "where did this come from"
+        // context the clip view was missing.
+        let transcript = ''
+        try {
+          const words = await findMany<{ word: string }>(
+            db,
+            `SELECT word FROM transcript_words
+              WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+              ORDER BY word_index ASC LIMIT 600`,
+            cc.vlog_id, cc.start_time, cc.end_time,
+          )
+          transcript = words.map(w => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+        } catch {}
+        source = { ...cc, transcript }
+      }
     } else if (prod.source_kind === 'cluster') {
       const c = await findOne<any>(
         db,
