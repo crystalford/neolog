@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/clips?min_score=1&limit=15", "nonce": "clips-final-check" }
+{ "method": "POST", "path": "/api/v2/clips/score-more", "body": { "max_vlogs": 1, "max_per_vlog": 3 }, "nonce": "clips-score-test-1" }
