@@ -1,9 +1,16 @@
 {
-  "requested_at": "2026-07-31T01:25:20Z",
+  "requested_at": "2026-07-31T01:34:34Z",
   "method": "GET",
   "path": "/api/v2/clips?min_score=1&limit=15",
-  "http_status": 500,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a238cefacc260d77-LAX\r|",
-  "body": "Internal Server Error",
-  "body_json": null
+  "http_status": 200,
+  "access_headers": "set-cookie: <redacted>|cf-ray: a238dc53ead132f4-ORD\r|",
+  "body": "{\"lines\":[],\"coverage\":{\"total\":419,\"judged\":0,\"eligible_unjudged\":409}}",
+  "body_json": {
+    "lines": [],
+    "coverage": {
+      "total": 419,
+      "judged": 0,
+      "eligible_unjudged": 409
+    }
+  }
 }
