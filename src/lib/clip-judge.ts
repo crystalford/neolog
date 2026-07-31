@@ -239,4 +239,54 @@ export async function judgeUnscoredClipsForVlog(
   return { judged, errors }
 }
 
+/**
+ * Works through the whole judging backlog for an operator — every vlog
+ * that has eligible-but-unjudged clip_candidates, not just ones opted into
+ * auto-publish. This is what powers "just open /clips and it fills in on
+ * its own": the page calls this in a loop, and the cron-fired
+ * refresh-drafts endpoint calls it too, so the backlog drains whether or
+ * not anyone has the page open.
+ *
+ * Bounded per call (default 5 vlogs x 8 candidates = up to 40 judged) so
+ * a single call stays fast; callers loop or re-invoke on a schedule to
+ * cover hundreds of vlogs over time. Oldest-queued-first so repeated
+ * calls make steady, non-overlapping progress.
+ */
+export async function judgeClipBacklog(
+  env: JudgeEnv,
+  operatorId: string,
+  opts?: { maxVlogs?: number; maxPerVlog?: number },
+): Promise<{ vlogs_processed: number; judged: number; errors: number }> {
+  const db = env.DB!
+  const maxVlogs = Math.max(1, Math.min(20, opts?.maxVlogs ?? 5))
+  const maxPerVlog = Math.max(1, Math.min(20, opts?.maxPerVlog ?? 8))
+
+  const vlogs = await findMany<{ vlog_id: string; oldest: string }>(
+    db,
+    `SELECT vlog_id, MIN(created_at) AS oldest
+       FROM clip_candidates
+      WHERE operator_id = ? AND deleted_at IS NULL
+        AND status = 'pending' AND validated = 1
+        AND clippability_score IS NULL
+      GROUP BY vlog_id
+      ORDER BY oldest ASC
+      LIMIT ?`,
+    operatorId, maxVlogs,
+  )
+
+  let judged = 0
+  let errors = 0
+  for (const v of vlogs) {
+    try {
+      const r = await judgeUnscoredClipsForVlog(env, operatorId, v.vlog_id, maxPerVlog)
+      judged += r.judged
+      errors += r.errors
+    } catch (err: any) {
+      console.warn(`[clip-judge] backlog vlog ${v.vlog_id} failed: ${err?.message || err}`)
+      errors++
+    }
+  }
+  return { vlogs_processed: vlogs.length, judged, errors }
+}
+
 export { SCORE_FLOOR_FOR_AUTO_PUBLISH }

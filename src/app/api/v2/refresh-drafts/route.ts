@@ -29,6 +29,7 @@ import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { buildSubjects, type LibrarianEnv } from '@/lib/librarian'
 import { buildSparkSeeds } from '@/lib/spark-seeds'
 import { sweepPendingAutoPublish, type AutoPromoteEnv } from '@/lib/auto-promote'
+import { judgeClipBacklog } from '@/lib/clip-judge'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env extends LibrarianEnv, AutoPromoteEnv {
@@ -130,6 +131,19 @@ async function run(req: NextRequest) {
     summary.auto_publish_summaries = sweep.summaries
   } catch (err: any) {
     summary.auto_publish_error = err?.message || String(err)
+  }
+
+  // Work through the clip-quality judging backlog — EVERY vlog's
+  // unscored clip_candidates, not just ones opted into auto-publish. This
+  // is what makes /clips fill in on its own even when nobody has the page
+  // open: the cron (every 10 min via workers/auto-publish-cron) calls this
+  // endpoint, which chews a few more vlogs each tick.
+  try {
+    const backlog = await judgeClipBacklog(env as any, operator.id, { maxVlogs: 3, maxPerVlog: 8 })
+    summary.clip_backlog_vlogs_processed = backlog.vlogs_processed
+    summary.clip_backlog_judged = backlog.judged
+  } catch (err: any) {
+    summary.clip_backlog_error = err?.message || String(err)
   }
 
   summary.elapsed_ms = Date.now() - started
