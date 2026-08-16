@@ -87,7 +87,11 @@ interface ClipCandidateSource {
   vlog_title: string | null; vlog_recorded_at: string | null
   transcript: string
 }
-type Source = ThreadSource | ClusterSource | ClipCandidateSource | null
+interface VlogEditSource {
+  vlog_id: string; vlog_title: string | null; vlog_recorded_at: string | null
+  cut_count: number; cut_seconds_total: number
+}
+type Source = ThreadSource | ClusterSource | ClipCandidateSource | VlogEditSource | null
 
 const TYPE_LABELS: Record<string, string> = {
   x_post: 'X post',
@@ -98,6 +102,7 @@ const TYPE_LABELS: Record<string, string> = {
   video_essay: 'Video essay',
   short: 'Short (30–60s)',
   creative_work: 'Creative work',
+  coherent_edit: 'Coherent edit',
 }
 
 export default function ProductionDraftPage({ params }: { params: { id: string } }) {
@@ -334,6 +339,83 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
               </section>
             )}
 
+            {/* COHERENT EDIT — the whole-vlog click-to-cut render, no editor here */}
+            {p.production_type === 'coherent_edit' && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>The edit</h2>
+                  <div className="meta">
+                    {(() => {
+                      try { const m = JSON.parse(p.output_metadata || '{}'); return m.duration_sec ? `${Math.round(m.duration_sec)}s` : '' }
+                      catch { return '' }
+                    })()}
+                  </div>
+                </div>
+                {p.output_url ? (
+                  (() => {
+                    let isAudio = false
+                    try { isAudio = (JSON.parse(p.output_metadata || '{}').mime || '').startsWith('audio/') } catch {}
+                    return isAudio ? (
+                      <audio src={p.output_url} controls style={{ width: '100%' }}/>
+                    ) : (
+                      <video
+                        src={p.output_url}
+                        controls
+                        style={{
+                          width: '100%', maxHeight: 540,
+                          background: '#000',
+                          border: `1px solid var(--line-1)`,
+                          borderLeft: `2px solid ${color}`,
+                          borderRadius: '0 12px 12px 0',
+                          display: 'block',
+                        }}
+                      />
+                    )
+                  })()
+                ) : (
+                  <div className="canon-empty-hint">
+                    Edited output isn't available — R2 fetch may have failed. Try rendering again.
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* COHERENT EDIT CONTEXT — where this came from */}
+            {p.production_type === 'coherent_edit' && data.source && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>Where this came from</h2>
+                  <Link href={`/vlog/${(data.source as VlogEditSource).vlog_id}`} className="meta" style={{ textDecoration: 'none' }}>
+                    Open source vlog →
+                  </Link>
+                </div>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 10, background: 'var(--bg-1)',
+                  border: '1px solid var(--line-1)', display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  {(data.source as VlogEditSource).vlog_title && (
+                    <div style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                      From <strong style={{ color: 'var(--fg)' }}>{(data.source as VlogEditSource).vlog_title}</strong>
+                      {(data.source as VlogEditSource).vlog_recorded_at && (
+                        <> · {new Date((data.source as VlogEditSource).vlog_recorded_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                    {(data.source as VlogEditSource).cut_count} span{(data.source as VlogEditSource).cut_count === 1 ? '' : 's'} cut
+                    {' · '}{Math.round((data.source as VlogEditSource).cut_seconds_total)}s removed
+                  </div>
+                  <Link
+                    href={`/vlog/${(data.source as VlogEditSource).vlog_id}`}
+                    className="canon-btn"
+                    style={{ fontSize: 12, padding: '6px 12px', textDecoration: 'none', alignSelf: 'flex-start' }}
+                  >
+                    Edit cuts again
+                  </Link>
+                </div>
+              </section>
+            )}
+
             {/* CLIP CONTEXT — where this came from: source vlog, verdict, transcript */}
             {p.production_type === 'clip' && data.source && (
               <section className="canon-section">
@@ -449,7 +531,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             )}
 
             {/* TEXT — default editor for x_post / x_thread / micro_essay / article */}
-            {p.production_type !== 'clip' && p.production_type !== 'video_essay' && (
+            {p.production_type !== 'clip' && p.production_type !== 'video_essay' && p.production_type !== 'coherent_edit' && (
               <section className="canon-section">
                 <div className="canon-section-head">
                   <h2>Draft</h2>

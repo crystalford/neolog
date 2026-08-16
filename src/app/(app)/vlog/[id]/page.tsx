@@ -17,12 +17,18 @@
  *   4. Session digest      — 4-cell strip (threads / clips / entities / clusters)
  *   5. Player + timeline   — 16:9 video + MultiTrackTimeline (audio /
  *                            threads / clips / entities)
- *   6. Body grid           — main: Threads / Clips / Creative / Entities /
- *                            Transcript / System actions disclosure
+ *   6. Transcript editor   — VlogTranscriptEditor (src/components), the
+ *                            whole-vlog click-to-cut editor. Sits right
+ *                            after the player so it's not buried below
+ *                            Threads/Clips/Creative. Falls back to a
+ *                            read-only transcript block when the vlog
+ *                            has no word-level timestamps.
+ *   7. Body grid           — main: Threads / Clips / Creative /
+ *                            System actions disclosure
  *                            rail: re-extract panel, diagnosis if pipeline
  *                            failure, raw extraction_outcomes
- *   7. Provenance grid     — 8 cells
- *   8. Footer              — colophon + j/k hints
+ *   8. Provenance grid     — 8 cells
+ *   9. Footer              — colophon + j/k hints
  *
  * Data: /api/v2/vlogs/[id]. Same payload as before; reused as-is.
  * Reuses: MultiTrackTimeline, LivePipeline (pipeline status realtime).
@@ -40,6 +46,7 @@ import {
   type MultiTrackBand, type MultiTrackMark,
 } from '@/components/threadkit'
 import LivePipeline from '../../timeline/[id]/live-pipeline'
+import VlogTranscriptEditor from '@/components/VlogTranscriptEditor'
 
 interface VlogDetail {
   id: string
@@ -65,6 +72,7 @@ interface VlogDetail {
   slideshow_frames?: Array<{ url: string; time_sec: number }> | null
   is_audio_only?: boolean
   has_transcoded?: boolean
+  has_word_timestamps?: boolean
   extraction_outcomes: string | null
   updated_at: string | null
   visibility?: string
@@ -515,6 +523,18 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
           </section>
         )}
 
+        {/* Whole-vlog click-to-cut editor — sits right after the player,
+            ahead of Threads/Clips/Creative, so it's not buried below the
+            fold. Falls back to a read-only transcript block when this
+            vlog has no word-level timestamps. */}
+        <VlogTranscriptEditor
+          vlogId={vlog.id}
+          hasWordTimestamps={!!vlog.has_word_timestamps}
+          fallbackText={vlog.transcript_text}
+          currentT={currentT}
+          seek={seek}
+        />
+
         {/* Body grid: main + rail */}
         <div className="canon-detail-body">
           <div className="canon-detail-main">
@@ -640,19 +660,6 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                       <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}>{ce.content}</div>
                     </div>
                   ))}
-                </div>
-              </section>
-            )}
-
-            {/* Transcript */}
-            {vlog.transcript_text && (
-              <section className="canon-section">
-                <div className="canon-section-head">
-                  <h2>Transcript <span className="meta">· {wordCount.toLocaleString()} words</span></h2>
-                  <div className="meta">{vlog.transcript_text && 'word-timestamped · whisper v3'}</div>
-                </div>
-                <div className="canon-transcript-flow" style={{ ['--topic' as any]: 'var(--fg-3)' } as React.CSSProperties}>
-                  {vlog.transcript_text}
                 </div>
               </section>
             )}

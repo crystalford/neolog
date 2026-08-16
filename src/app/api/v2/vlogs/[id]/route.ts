@@ -186,7 +186,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // INNER JOIN with er.is_active=1 means: only return rows whose run_id
   // matches the operator's current active run. Old run rows simply
   // disappear from the API response.
-  const [threads, clips, creative_elements, entities] = await Promise.all([
+  const [threads, clips, creative_elements, entities, wordTimestampRows] = await Promise.all([
     safe('threads', () => findMany<{
       id: string
       topic: string
@@ -300,7 +300,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       }
       return rows.map(r => ({ ...r, vlog_quotes: quotesByEntity.get(r.id) ?? [] }))
     }),
+    // Existence check only (not the full word array — the transcript
+    // editor lazy-fetches that itself from the dedicated
+    // /transcript-words route) — gates whether VlogTranscriptEditor
+    // mounts or falls back to the old read-only transcript_text block.
+    safe('word_timestamps', () => findMany<{ present: number }>(
+      db,
+      `SELECT 1 AS present FROM transcript_words WHERE vlog_id = ? LIMIT 1`,
+      params.id,
+    )),
   ])
+  const hasWordTimestamps = wordTimestampRows.length > 0
 
   // Strip internal R2 keys before sending to the client, but expose a
   // boolean so the vlog page can show a "Transcode missing — playback
@@ -398,6 +408,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       slideshow_frames: slideshowFrames,
       is_audio_only: isAudioOnly,
       has_transcoded: hasTranscoded,
+      has_word_timestamps: hasWordTimestamps,
     },
     video_url: videoUrl,
     audio_url: audioUrl,

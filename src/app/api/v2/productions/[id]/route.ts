@@ -185,6 +185,33 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         } catch {}
         source = { ...cc, transcript }
       }
+    } else if (prod.source_kind === 'vlog') {
+      const v = await findOne<{ id: string; title: string | null; recorded_at: string | null }>(
+        db,
+        `SELECT id, title, recorded_at FROM vlogs WHERE id = ? AND operator_id = ?`,
+        prod.source_id, operator.id,
+      )
+      if (v) {
+        // output_metadata (written by render-edit) already carries
+        // cut_count / cut_seconds_total pre-computed — no need to
+        // re-derive from word timestamps here.
+        let cutCount = 0
+        let cutSecondsTotal = 0
+        if (prod.output_metadata) {
+          try {
+            const meta = JSON.parse(prod.output_metadata)
+            cutCount = typeof meta?.cut_count === 'number' ? meta.cut_count : 0
+            cutSecondsTotal = typeof meta?.cut_seconds_total === 'number' ? meta.cut_seconds_total : 0
+          } catch {}
+        }
+        source = {
+          vlog_id: v.id,
+          vlog_title: v.title,
+          vlog_recorded_at: v.recorded_at,
+          cut_count: cutCount,
+          cut_seconds_total: cutSecondsTotal,
+        }
+      }
     } else if (prod.source_kind === 'cluster') {
       const c = await findOne<any>(
         db,

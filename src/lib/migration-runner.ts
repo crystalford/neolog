@@ -978,6 +978,104 @@ export const MIGRATIONS: Migration[] = [
             ON vlogs(operator_id, vision_status)
             WHERE deleted_at IS NULL AND thumbnail_r2_key IS NOT NULL`,
   },
+
+  // Whole-vlog click-to-cut editor: one draft edit per vlog, stored as a
+  // JSON column on vlogs (matches the existing per-vlog JSON-state
+  // convention — audio_chunks_json, slideshow_frames_json, vision_tags).
+  {
+    name: '2026-08-16_vlogs_cut_ranges_json',
+    sql: `ALTER TABLE vlogs ADD COLUMN cut_ranges_json TEXT`,
+  },
+  {
+    name: '2026-08-16_vlogs_cut_ranges_updated_at',
+    sql: `ALTER TABLE vlogs ADD COLUMN cut_ranges_updated_at TEXT`,
+  },
+
+  // productions.production_type / source_kind CHECK constraints don't allow
+  // 'coherent_edit' / 'vlog' yet, and SQLite can't ALTER...DROP CONSTRAINT —
+  // rebuild the table with widened CHECK lists, same shape as the
+  // 2026-05-22_threads_rebuild_* migrations above.
+  {
+    name: '2026-08-16_productions_rebuild_create_new',
+    sql: `CREATE TABLE IF NOT EXISTS productions_new (
+      id                       TEXT PRIMARY KEY,
+      operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      production_type          TEXT NOT NULL CHECK (production_type IN ('video_essay','article','x_post','x_thread','clip','creative_work','coherent_edit')),
+      source_kind              TEXT NOT NULL CHECK (source_kind IN ('cluster','macro_cluster','project','thread','clip_candidate','vlog')),
+      source_id                TEXT NOT NULL,
+      state                    TEXT NOT NULL DEFAULT 'materializing' CHECK (state IN ('materializing','script_ready','recording','producing','produced','published','archived')),
+      state_changed_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      voice_profile_id         TEXT REFERENCES voice_profiles(id),
+      form                     TEXT,
+      length_magnitude         TEXT,
+      forensic_mode            INTEGER NOT NULL DEFAULT 0,
+      tier                     TEXT NOT NULL DEFAULT 'lo_fi' CHECK (tier IN ('lo_fi')),
+      script_text              TEXT,
+      script_version           INTEGER NOT NULL DEFAULT 1,
+      output_r2_key            TEXT,
+      output_metadata          TEXT,
+      published_to             TEXT,
+      engagement               TEXT,
+      produced_at              TEXT,
+      prompt_version           TEXT,
+      visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+      estimated_cost_cents     INTEGER,
+      user_approved_cost       INTEGER,
+      deleted_at               TEXT,
+      created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reasoning_skeleton_json  TEXT,
+      skeleton_locked          INTEGER NOT NULL DEFAULT 0,
+      render_status            TEXT,
+      render_started_at        TEXT,
+      aspect                   TEXT
+    )`,
+  },
+  {
+    // Every column added to `productions` by a later ALTER TABLE migration
+    // (2026-06-11/12) MUST be listed here too, or this rebuild silently
+    // drops it. Cross-checked against every `ALTER TABLE productions ADD
+    // COLUMN` in this file at the time this migration was written:
+    // reasoning_skeleton_json, skeleton_locked, render_status,
+    // render_started_at, aspect.
+    name: '2026-08-16_productions_rebuild_copy',
+    sql: `INSERT OR IGNORE INTO productions_new
+      (id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
+       voice_profile_id, form, length_magnitude, forensic_mode, tier, script_text, script_version,
+       output_r2_key, output_metadata, published_to, engagement, produced_at, prompt_version,
+       visibility, estimated_cost_cents, user_approved_cost, deleted_at, created_at, updated_at,
+       reasoning_skeleton_json, skeleton_locked, render_status, render_started_at, aspect)
+      SELECT id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
+             voice_profile_id, form, length_magnitude, forensic_mode, tier, script_text, script_version,
+             output_r2_key, output_metadata, published_to, engagement, produced_at, prompt_version,
+             visibility, estimated_cost_cents, user_approved_cost, deleted_at, created_at, updated_at,
+             reasoning_skeleton_json, skeleton_locked, render_status, render_started_at, aspect
+        FROM productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_drop_old',
+    sql: `DROP TABLE IF EXISTS productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_rename',
+    sql: `ALTER TABLE productions_new RENAME TO productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_operator ON productions(operator_id)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_source',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_source ON productions(source_kind, source_id)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_state',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_state ON productions(operator_id, state)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_type',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_type ON productions(production_type)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
