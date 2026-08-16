@@ -141,7 +141,7 @@ export default function SubjectDetailPage({ params }: { params: Promise<{ id: st
       <div style={{ maxWidth: 980, margin: '0 auto', padding: '0 4px' }}>
         {/* Crumb */}
         <div style={{ padding: '24px 0 8px', fontSize: 12, color: 'var(--fg-3)' }}>
-          <Link href="/subjects" style={{ color: 'inherit', textDecoration: 'none' }}>← Subjects</Link>
+          <Link href="/drafts?tab=subjects" style={{ color: 'inherit', textDecoration: 'none' }}>← Subjects</Link>
         </div>
 
         {/* Hero */}

@@ -74,7 +74,7 @@ export default function PublishedPage() {
             border: '1px dashed var(--line-2)', borderRadius: 14,
             color: 'var(--fg-3)', fontSize: 14, lineHeight: 1.6,
           }}>
-            Nothing published yet. Open a <Link href="/subjects" style={{ color: 'var(--sig)' }}>subject</Link>,
+            Nothing published yet. Open a <Link href="/drafts?tab=subjects" style={{ color: 'var(--sig)' }}>subject</Link>,
             make a script or a post, ship it &mdash; it&rsquo;ll show up here.
           </div>
         ) : (

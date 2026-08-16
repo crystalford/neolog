@@ -3,7 +3,7 @@
 /**
  * Production detail (singular /production/[id]) — the draft view.
  *
- * Distinct from /productions/[id] which serves Pack Rats-style
+ * Distinct from /projects/[id] which serves Pack Rats-style
  * project containers from the `projects` table. This route serves
  * actual production artifacts from the `productions` table — the
  * output of the production engine.
@@ -183,7 +183,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
         method: 'DELETE', credentials: 'include',
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      router.push('/productions')
+      router.push('/published')
     } catch (e: any) {
       alert(`Delete failed: ${e?.message || e}`)
     }
@@ -191,13 +191,13 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
 
   if (error) return (
     <Shell>
-      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Productions', href: '/productions' }, 'Error']}/>
+      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Published', href: '/published' }, 'Error']}/>
       <div style={{ padding: 40, color: 'var(--t-terra)' }}>Error: {error}</div>
     </Shell>
   )
   if (!data) return (
     <Shell>
-      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Productions', href: '/productions' }, '…']}/>
+      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Published', href: '/published' }, '…']}/>
       <div style={{ padding: 40, color: 'var(--fg-3)' }}>Loading…</div>
     </Shell>
   )
@@ -217,7 +217,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
         <Crumbs
           trail={[
             { label: 'Timeline', href: '/' },
-            { label: 'Productions', href: '/productions' },
+            { label: 'Published', href: '/published' },
             { label: truncate(`${typeLabel} · ${topicName}`, 60) },
           ]}
         />

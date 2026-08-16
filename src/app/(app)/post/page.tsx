@@ -1,3 +1,3 @@
 import { redirect } from 'next/navigation'
 export const runtime = 'edge'
-export default function PostRedirect() { redirect('/productions') }
+export default function PostRedirect() { redirect('/projects') }

@@ -203,7 +203,7 @@ export default function TopicDetailPage({ params }: { params: Promise<{ id: stri
     <Shell>
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 4px' }}>
         <div style={{ padding: '24px 0 8px', fontSize: 12, color: 'var(--fg-3)' }}>
-          <Link href="/topics" style={{ color: 'inherit', textDecoration: 'none' }}>← Topics</Link>
+          <Link href="/drafts?tab=topics" style={{ color: 'inherit', textDecoration: 'none' }}>← Topics</Link>
         </div>
 
         <section style={{ paddingBottom: 24 }}>

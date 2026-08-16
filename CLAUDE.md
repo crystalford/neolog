@@ -130,40 +130,45 @@ These are documentary / short film / video essay productions. **Never add captio
 
 ## Surfaces — what actually shipped
 
-The masthead is a **top-horizontal nav, two primary entries**. *"Drop something in, ship something out."* Everything else — subjects, topics, the quick-video composer — runs in the background and surfaces on the home page as drafts the system has prepared.
+The masthead is a **top-horizontal nav, four primary entries.** This is the result of a site-consolidation pass: the earlier two-entry "Log · Published" nav (from the front-door rebuild) left Subjects, Topics, and the archive genuinely orphaned — no nav entry, no dropdown entry, reachable only via a home-page card that might not surface, or by typing the URL from memory. That's fixed now — every real content surface has a real door.
 
 | Label | Route | What it is |
 |---|---|---|
-| **Log** | `/` | **Home.** Top half is `CapturePanel` (the four-mode uploader: full / compressed / slideshow / audio-only — the bad-wifi ladder). Bottom half is *Ready to send* — a unified list of production candidates the system prepared in the background (top subjects, researched topics, quick-video seeds, unfinished productions to resume). The operator never picks between Subjects/Topics/Spark — the system decides what's ripe and proposes it. |
+| **Log** | `/` | **Home.** Top half is `CapturePanel` (the four-mode uploader: full / compressed / slideshow / audio-only — the bad-wifi ladder). Bottom half is *Ready to send* — a unified list of production candidates the system prepared in the background (top subjects, researched topics, quick-video seeds, unfinished productions to resume). |
+| **Archive** | `/photos` | Photos + videos + vlogs, one dated timeline. Owned, permanent — the "replace Google Photos" surface. HEIC converts in-browser, EXIF/recording dates drive ordering, every item gets an automatic AI description whether or not there's narration. Also hosts the progress-video builder (time-lapse / before-after from a detected photo series). |
+| **Drafts** | `/drafts` | Subjects + Topics + Clips as three tabs on one page (`?tab=subjects\|topics\|clips`, default subjects). The engine's three "what should I make next" surfaces, consolidated. Subjects = librarian-named concepts from your own recordings. Topics = type-a-subject research + script engine. Clips = clip-quality-judge-scored lines across every vlog, with a self-driving backlog scorer. |
 | **Published** | `/published` | The accumulating body of work — only productions in `state='published'`. Honest signal if empty. |
 
-**Detail pages** (reached from home cards or deep-linked, NOT in primary nav — they live downstream of Log):
-- `/vlogs` — raw archive of recordings. The Log nav highlights here. Useful when the home page has too much going on; everything you've recorded.
-- `/vlog/[id]` — one vlog. Includes the **in-podcast toggle**.
-- `/subjects` + `/subjects/[id]` — the librarian's output. Subjects list is reachable as a deep page but no longer linked from primary nav. Use the home page's *Ready to send* list for the curated subset.
-- `/subjects/[id]/skeleton` — **plan-the-structure script flow.** Operator approves the beat structure before any prose is written; the model fills in.
-- `/topics` + `/topics/[id]` — type-a-subject surface. List still works; the home page lifts ready topics out of it.
-- `/production/[id]` — draft production. Edit script, record voiceover per beat (or **synthesize via your cloned voice**), generate AI b-roll per beat (Flux + Wan, optional Grok Imagine direct-video with audio), render to MP4.
-- `/productions/[id]` — project containers (Pack Rats-style).
+**Detail pages** (reached from nav-page cards or deep-linked):
+- `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
+- `/vlog/[id]` — one vlog. Includes the **in-podcast toggle** and the **auto-publish toggle**.
+- `/subjects/[id]` — one subject's evidence + deliverables. `/subjects/[id]/skeleton` — **plan-the-structure script flow**; operator approves the beat structure before any prose is written.
+- `/topics/[id]` — research brief → build-script flow for one topic.
+- `/clips/[id]/edit` — text-based clip trim/extend editor (Descript-style: click a word to set start, shift-click to set end).
+- `/production/[id]` — a generated script/video, the real engine output. Edit script, record voiceover per beat (or **synthesize via your cloned voice**), generate AI b-roll per beat (Flux + Wan, optional Grok Imagine direct-video with audio), render to MP4.
+- `/projects/[id]` — Pack-Rats-style project containers (a distinct, older data model — the `projects` table — unrelated to `/production/[id]`'s `productions` table; renamed from `/productions/[id]` specifically to end that naming collision).
 - `/p/[id]` — public production view (no auth).
 
-**Settings** (`/settings`) — operator card + sections: Identity · AI models (Llama 3.3 70B is the current default — *not* Kimi, despite earlier docs) · **Your voice** (record 10 seconds → MiniMax 2.8 clones it for synth; or pick an Aura-2 preset) · API keys (incl. optional **Brave Search key** for Topics auto-search) · Integrations · Storage · Pipeline.
+**Settings** (`/settings`) — operator card + sections: Identity · AI models (Llama 3.3 70B is the current default — *not* Kimi, despite earlier docs) · **Your voice** (record 10 seconds → MiniMax 2.8 clones it for synth; or pick an Aura-2 preset) · API keys (incl. optional **Brave Search key** for Topics auto-search) · Integrations · Storage · Pipeline · Auto-publishing (fanout webhook URL, default-on toggle).
 
-**Secondary surfaces — still functional, no longer in primary nav** (avatar dropdown is the discoverable path going forward):
+**Secondary surfaces — still functional, avatar dropdown only:**
 
 | Surface | Route | Status |
 |---|---|---|
-| **Studio** (clusters/cultivation) | `/studio` + `/studio/[id]` | Fully functional. Ripeness gauge, riff timeline, bounce panel, insight CRUD. Subjects is the new default but Studio remains the deeper cultivation surface. |
-| **Inbox** (triage) | `/inbox` | Fully functional. Failed vlogs, ripening clusters, drafts, surfaced cards. Useful for "what needs my attention." |
-| **Chat** | `/chat` | Fully functional in-app assistant with tool calls into your corpus (search vlogs, fetch threads/clusters, draft posts). |
-| **Timeline** (the old FYP) | `/timeline` redirects to `/` | Still routes; not a destination. |
-| **About** | `/about` | System explanation. Linked from avatar dropdown. |
-| **Podcast feed** | `/podcast.xml` | **Fully built RSS 2.0 + iTunes namespace feed.** Per-vlog `is_podcast` toggle on `/vlog/[id]` controls inclusion. Public bypass on Cloudflare Access for podcast clients. Linked from Settings → Integrations. |
-| **Entity hubs** | `/entity/[id]` + `/graph` | Routes resolve so entity-chip deep links work. No primary nav entry; this is intentional. |
-| **System / health** | `/system` | Debug/health surface. Reach via Settings if needed. |
+| **Studio** (clusters/cultivation) | `/studio` + `/studio/[id]` | Fully functional. Ripeness gauge, thread-progression timeline, refine panel, insight CRUD. |
+| **Inbox** (triage) | `/inbox` | Fully functional. Failed vlogs, in-progress clusters, unfinished projects, surfaced cards. |
+| **Chat** | `/chat` | In-app assistant with tool calls into your corpus (search vlogs, fetch threads/clusters, draft posts). |
+| **About** | `/about` | System explanation. |
+| **Podcast feed** | `/podcast.xml` | RSS 2.0 + iTunes namespace feed. Per-vlog `is_podcast` toggle on `/vlog/[id]` controls inclusion. Public bypass on Cloudflare Access. |
+| **Entity hubs** | `/entity/[id]` + `/graph` | Routes resolve so entity-chip deep links work. No primary nav entry; intentional. |
+| **System / health** | `/system` | Debug/health surface. One hop from Settings. |
+
+**Removed this pass** (confirmed dead — see the site-consolidation plan for the safety verification):
+- `/console` — was a byte-identical duplicate of `/chat` at a second URL, zero inbound links.
+- `/materialize/[id]` — was a non-functional UI stub; its submit button only called `alert()`, no API call.
 
 **Old paths that redirect:**
-`/clusters` → `/studio` · `/cluster/[id]` → `/studio/[id]` · `/timeline/[id]` → `/vlog/[id]` · `/projects` → `/productions` · `/console` → `/chat` · `/capture` → `/vlogs?capture=open` · `/uploads` → `/vlogs` · `/library` → `/productions` · `/transcript` → `/?filter=thread` · `/states` → `/` · `/post` → `/productions` · `/clip/[id]` → `/thread/[id]` · `/article/[id]` → `/productions` · `/attachment/[id]` → `/` · `/broll/[id]` → `/vlog/[id]` · `/landing` → `/` · `/[handle]` → `/`.
+`/clusters` → `/studio` · `/cluster/[id]` → `/studio/[id]` · `/timeline` → `/` · `/timeline/[id]` → `/vlog/[id]` · `/subjects` → `/drafts?tab=subjects` · `/topics` → `/drafts?tab=topics` · `/clips` → `/drafts?tab=clips` · `/capture` → `/vlogs?capture=open` · `/uploads` → `/vlogs` · `/library` → `/projects` · `/transcript` → `/?filter=thread` · `/states` → `/` · `/post` → `/projects` · `/clip/[id]` → `/thread/[id]` · `/article/[id]` → `/projects` · `/attachment/[id]` → `/` · `/broll/[id]` → `/vlog/[id]` · `/landing` → `/` · `/[handle]` → `/`.
 
 ---
 

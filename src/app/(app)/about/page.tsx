@@ -55,9 +55,9 @@ const SURFACES = [
   },
   {
     n: '06', tag: 'Creative · longform', c: '--t-plum',
-    href: '/productions', title: 'Productions',
+    href: '/projects', title: 'Projects',
     blurb: 'A long-running creative work as accumulating artifact — characters, scene fragments, themes, dialogue captures, tonal references. Generation pipeline for treatment / sizzle / moodboard. Linked threads that contributed.',
-    file: 'productions/[id]',
+    file: 'projects/[id]',
   },
 ]
 

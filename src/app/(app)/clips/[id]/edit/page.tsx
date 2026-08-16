@@ -135,7 +135,7 @@ export default function ClipEditPage({ params }: { params: Promise<{ id: string 
     <Shell>
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 4px' }}>
         <div style={{ padding: '24px 0 8px', fontSize: 12, color: 'var(--fg-3)' }}>
-          <Link href="/clips" style={{ color: 'inherit', textDecoration: 'none' }}>← Clips</Link>
+          <Link href="/drafts?tab=clips" style={{ color: 'inherit', textDecoration: 'none' }}>← Clips</Link>
         </div>
         <section style={{ paddingBottom: 20 }}>
           <div style={{

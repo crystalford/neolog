@@ -117,7 +117,7 @@ export default function InboxPage() {
             <StatCell n={data.counts.topics_hot} l="Hot topics"  onClick={() => scrollTo('topics-hot')}/>
             <StatCell n={data.counts.processing} l="Processing" onClick={() => scrollTo('processing')}/>
             <StatCell n={data.counts.failed}     l="Failed"     warn={data.counts.failed > 0} onClick={() => scrollTo('failed')}/>
-            <StatCell n={data.counts.drafts}     l="Drafts"     onClick={() => scrollTo('drafts')}/>
+            <StatCell n={data.counts.drafts}     l="Unfinished" onClick={() => scrollTo('drafts')}/>
           </div>
         )}
       </section>
@@ -231,9 +231,9 @@ export default function InboxPage() {
             </Section>
           )}
 
-          {/* Drafts */}
+          {/* Unfinished projects (Pack-Rats-style containers, /projects) */}
           {data.drafts.length > 0 && (
-            <Section id="drafts" title="Drafts" count={data.drafts.length} meta="in progress">
+            <Section id="drafts" title="Unfinished projects" count={data.drafts.length} meta="in progress">
               <div style={{
                 display: 'grid', gap: 10,
                 gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
@@ -465,7 +465,7 @@ function FailedRowCard({ vlog }: { vlog: FailedRow }) {
 
 function DraftCard({ draft }: { draft: DraftRow }) {
   return (
-    <Link href={`/productions/${draft.id}`} className="tcard" style={{
+    <Link href={`/projects/${draft.id}`} className="tcard" style={{
       '--topic': 'var(--t-plum)',
       '--topic-soft': 'color-mix(in srgb, var(--t-plum) 8%, transparent)',
       borderLeft: '3px solid var(--t-plum)',

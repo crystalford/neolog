@@ -17,19 +17,26 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-// Two-entry masthead. The middle of the system — Subjects, Topics, the
-// quick-video composer — is mechanism, not destination, and runs in the
-// background. The visible product collapses to two acts: drop something
-// in (Log), ship something out (Published). Detail pages for subjects /
-// topics / vlogs all live downstream of Log.
+// Four-entry masthead — the site-consolidation pass. Two ends were always
+// covered (Log: drop something in · Published: what shipped); this adds
+// real doors for the two things in between that never had one:
+//   Archive — the owned, dated photo/video/vlog timeline (was
+//             dropdown-only as "Storage").
+//   Drafts  — Subjects + Topics + Clips as one tabbed page (were fully
+//             orphaned: no nav entry, no dropdown entry, reachable only
+//             by luck via a home-page card or typing the URL).
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Log',       href: '/',          matchPaths: [
     /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
-    /^\/photos/, /^\/photo\//, /^\/clips/,
-    /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//,
+  ] },
+  { label: 'Archive',   href: '/photos',    matchPaths: [
+    /^\/photos/, /^\/photo\//,
+  ] },
+  { label: 'Drafts',    href: '/drafts',    matchPaths: [
+    /^\/drafts/, /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//, /^\/clips/,
   ] },
   { label: 'Published', href: '/published', matchPaths: [
-    /^\/published/, /^\/productions/, /^\/production\//, /^\/projects/, /^\/materialize/, /^\/library/,
+    /^\/published/, /^\/production\//, /^\/projects/, /^\/library/,
   ] },
 ]
 
@@ -154,24 +161,17 @@ function AvatarMenu() {
             <span>Upload a vlog</span>
             <span className="kbd">⌘N</span>
           </Link>
-          <Link href="/photos" onClick={() => setOpen(false)}>
-            <span>Storage</span>
-            <span className="dropdown-sub">your photos and videos, in date order</span>
-          </Link>
-          <Link href="/clips" onClick={() => setOpen(false)}>
-            <span>Clips</span>
-            <span className="dropdown-sub">scored lines worth cutting, across all your vlogs</span>
-          </Link>
           <Link href="/chat" onClick={() => setOpen(false)}>
             <span>Chat with your vlogs</span>
             <span className="kbd">G C</span>
           </Link>
           <div className="sep"/>
-          {/* Lost-but-good surfaces — fully functional, brought back via dropdown
-              instead of cluttering the 4-entry masthead. */}
+          {/* Utility/admin surfaces — everything that's a real content
+              surface got promoted into the top nav during the site
+              consolidation pass. This stays admin-only. */}
           <Link href="/inbox" onClick={() => setOpen(false)}>
             <span>Inbox</span>
-            <span className="dropdown-sub">failed vlogs, in-progress drafts, what needs your attention</span>
+            <span className="dropdown-sub">failed vlogs, unfinished projects, what needs your attention</span>
           </Link>
           <Link href="/studio" onClick={() => setOpen(false)}>
             <span>Studio (clusters)</span>
