@@ -337,6 +337,14 @@ export async function GET(req: NextRequest) {
         console.warn(`[home/ready] sweep failed: ${err?.message || err}`)
       }),
     )
+    // Same idea for the video vision-tagging backlog — a home-page visit
+    // nudges a few more vlogs through description each time, on top of
+    // the 10-minute cron.
+    ctx.waitUntil(
+      import('@/lib/vision').then(m => m.visionTagVlogBacklog(env as any, operator.id, 5)).catch(err => {
+        console.warn(`[home/ready] vision sweep failed: ${err?.message || err}`)
+      }),
+    )
   } catch {}
 
   // Auto-published ribbon: recent clip-productions (last 7 days) tied to

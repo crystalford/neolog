@@ -70,10 +70,11 @@ export async function GET(req: NextRequest) {
       thumbnail_r2_key: string | null; thumbnail_url: string | null
       duration_seconds: number | null
       recorded_at: string | null; created_at: string
+      vision_description: string | null
     }>(
       db,
       `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
-              duration_seconds, recorded_at, created_at
+              duration_seconds, recorded_at, created_at, vision_description
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(recorded_at, created_at) DESC
@@ -111,7 +112,7 @@ export async function GET(req: NextRequest) {
       thumb_url: thumb,
       at: v.recorded_at || v.created_at,
       title: v.title || v.original_filename || 'Untitled vlog',
-      subtitle: null,
+      subtitle: v.vision_description || null,
       href: `/vlog/${v.id}`,
       width: null, height: null,
       duration_seconds: v.duration_seconds,

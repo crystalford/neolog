@@ -947,6 +947,37 @@ export const MIGRATIONS: Migration[] = [
             ON progress_videos(operator_id, created_at DESC)
             WHERE deleted_at IS NULL`,
   },
+  // ─── Video vision-tagging (2026-07-31) ───────────────────────────────────
+  // Photos already get an automatic LLM description via the thumbnail's
+  // frame. Vlogs (talking-head recordings AND raw silent camera-roll clips)
+  // only got speech-based analysis — a silent clip with no narration got
+  // nothing. This extends the exact same vision pass to every vlog's
+  // existing thumbnail frame, so "what's actually in this footage" is
+  // answered regardless of whether anyone talked. Reuses
+  // describeImageFromR2() unchanged — a vlog thumbnail is just another JPEG
+  // in R2 from the model's point of view.
+  {
+    name: '2026-07-31_vlogs_vision_description',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_description TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_tags',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_tags TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_model',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_model TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_status',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_status TEXT NOT NULL DEFAULT 'pending'`,
+  },
+  {
+    name: '2026-07-31_idx_vlogs_vision_backlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_vision_backlog
+            ON vlogs(operator_id, vision_status)
+            WHERE deleted_at IS NULL AND thumbnail_r2_key IS NOT NULL`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

@@ -30,6 +30,7 @@ import { buildSubjects, type LibrarianEnv } from '@/lib/librarian'
 import { buildSparkSeeds } from '@/lib/spark-seeds'
 import { sweepPendingAutoPublish, type AutoPromoteEnv } from '@/lib/auto-promote'
 import { judgeClipBacklog } from '@/lib/clip-judge'
+import { visionTagVlogBacklog } from '@/lib/vision'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env extends LibrarianEnv, AutoPromoteEnv {
@@ -144,6 +145,17 @@ async function run(req: NextRequest) {
     summary.clip_backlog_judged = backlog.judged
   } catch (err: any) {
     summary.clip_backlog_error = err?.message || String(err)
+  }
+
+  // Work through the video vision-tagging backlog — every vlog whose
+  // thumbnail exists but hasn't been visually described yet. Same shape as
+  // the clip backlog above: bounded per call, drains on its own via cron.
+  try {
+    const visionBacklog = await visionTagVlogBacklog(env as any, operator.id, 8)
+    summary.vlog_vision_tagged = visionBacklog.tagged
+    summary.vlog_vision_errors = visionBacklog.errors
+  } catch (err: any) {
+    summary.vlog_vision_error = err?.message || String(err)
   }
 
   summary.elapsed_ms = Date.now() - started

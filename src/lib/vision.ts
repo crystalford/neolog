@@ -14,12 +14,14 @@
  * is enhancement, never a gate.
  */
 
-import type { Ai } from '@cloudflare/workers-types'
+import type { Ai, D1Database } from '@cloudflare/workers-types'
 import { callChat } from './llm'
 import { getObject, type R2Env } from './r2'
+import { findMany, run } from './d1'
 
 export interface VisionEnv extends R2Env {
   AI: Ai
+  DB?: D1Database
   ANTHROPIC_API_KEY?: string
 }
 
@@ -99,6 +101,59 @@ function parseVision(raw: string): { description: string; tags: string[] } | nul
     ? obj.tags.map((t: any) => String(t ?? '').trim().toLowerCase()).filter(Boolean).slice(0, 8)
     : []
   return { description, tags }
+}
+
+/**
+ * Works through the video vision-tagging backlog — every vlog whose
+ * thumbnail exists but hasn't been described yet. Mirrors
+ * judgeClipBacklog's shape exactly (src/lib/clip-judge.ts): bounded per
+ * call, called from both the cron-fired refresh-drafts endpoint and a
+ * page-visit waitUntil, so the backlog drains on its own without the
+ * operator doing anything. Reuses describeImageFromR2 unchanged — a vlog
+ * thumbnail is just another JPEG in R2.
+ */
+export async function visionTagVlogBacklog(
+  env: VisionEnv,
+  operatorId: string,
+  max = 8,
+): Promise<{ tagged: number; errors: number }> {
+  const db = env.DB!
+  const rows = await findMany<{ id: string; thumbnail_r2_key: string }>(
+    db,
+    `SELECT id, thumbnail_r2_key FROM vlogs
+      WHERE operator_id = ? AND deleted_at IS NULL
+        AND thumbnail_r2_key IS NOT NULL
+        AND vision_status = 'pending'
+      ORDER BY created_at ASC
+      LIMIT ?`,
+    operatorId, max,
+  )
+
+  let tagged = 0
+  let errors = 0
+  for (const r of rows) {
+    try {
+      const result = await describeImageFromR2(env, r.thumbnail_r2_key, 'image/jpeg')
+      if (result) {
+        await run(
+          db,
+          `UPDATE vlogs SET vision_description = ?, vision_tags = ?, vision_model = ?,
+                            vision_status = 'done', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+          result.description, JSON.stringify(result.tags), result.model, r.id,
+        )
+        tagged++
+      } else {
+        await run(db, `UPDATE vlogs SET vision_status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, r.id)
+        errors++
+      }
+    } catch (err: any) {
+      console.warn(`[vision] vlog backlog failed for ${r.id}: ${err?.message || err}`)
+      try { await run(db, `UPDATE vlogs SET vision_status = 'failed' WHERE id = ?`, r.id) } catch {}
+      errors++
+    }
+  }
+  return { tagged, errors }
 }
 
 /** Chunked base64 encode — avoids call-stack limits on large buffers. */
