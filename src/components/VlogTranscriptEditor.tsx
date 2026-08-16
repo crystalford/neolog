@@ -63,6 +63,7 @@ export default function VlogTranscriptEditor({
   const [selEnd, setSelEnd] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [rendering, setRendering] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   const [playEdited, setPlayEdited] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -131,6 +132,26 @@ export default function VlogTranscriptEditor({
     } catch (e: any) {
       setNote(`Save failed: ${e?.message || e}`)
     } finally { setSaving(false) }
+  }
+
+  const suggestCutsFromAi = async () => {
+    setSuggesting(true); setNote(null)
+    try {
+      const r = await fetch(`/api/v2/vlogs/${vlogId}/suggest-cuts`, { method: 'POST', credentials: 'include' })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      const suggested: CutRange[] = (d.cuts || []).map((c: any) => ({
+        start_word_index: c.start_word_index, end_word_index: c.end_word_index,
+      }))
+      if (suggested.length === 0) {
+        setNote('No confident suggestions — nothing added. Nothing was cut, review manually if you like.')
+      } else {
+        setCutRanges(prev => mergeRanges([...prev, ...suggested]))
+        setNote(`Added ${suggested.length} suggested cut${suggested.length === 1 ? '' : 's'} — review below (click any to undo), then Save/Render when ready.`)
+      }
+    } catch (e: any) {
+      setNote(`Suggestion failed: ${e?.message || e}`)
+    } finally { setSuggesting(false) }
   }
 
   const renderEdit = async () => {
@@ -223,6 +244,15 @@ export default function VlogTranscriptEditor({
           style={{ fontSize: 12.5, padding: '6px 14px' }}
         >
           {playEdited ? 'Playing edited ✓' : 'Play edited'}
+        </button>
+        <button
+          onClick={suggestCutsFromAi}
+          disabled={suggesting || saving || rendering}
+          className="canon-btn ghost"
+          style={{ fontSize: 12.5, padding: '6px 14px' }}
+          title="One AI pass proposes tangents/repeats/filler to cut — review and undo any before saving, nothing is cut without you saving or rendering"
+        >
+          {suggesting ? 'Reading transcript…' : 'Auto-suggest cuts'}
         </button>
         <button onClick={saveDraft} disabled={saving || rendering} className="canon-btn ghost" style={{ fontSize: 12.5, padding: '6px 14px' }}>
           {saving ? 'Saving…' : 'Save draft'}
