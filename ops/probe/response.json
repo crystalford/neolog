@@ -1,32 +1,9 @@
 {
-  "requested_at": "2026-07-31T01:36:57Z",
+  "requested_at": "2026-08-31T00:53:15Z",
   "method": "GET",
-  "path": "/api/v2/clips?min_score=1&limit=5",
-  "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a238e0049c26cc9f-LAX\r|",
-  "body": "{\"lines\":[{\"id\":\"01KS7Z11654QJS42XRFW1RHBGA\",\"vlog_id\":\"01KS6X2ZHCK2G7PFWDWJ6PB00T\",\"vlog_title\":null,\"vlog_recorded_at\":\"2026-05-19T16:31:32.000Z\",\"start_time\":0,\"end_time\":10,\"headline\":\"Unique Angles Made Easy\",\"quote\":\"you can get like really good angles right\",\"clippability_score\":1,\"clippability_verdict\":\"The line is a fragment and lacks context, making it unsuitable as a standalone clip.\",\"suggested_caption_hook\":\"\",\"status\":\"pending\",\"validated\":1}],\"coverage\":{\"total\":419,\"judged\":1,\"eligible_unjudged\":408}}",
-  "body_json": {
-    "lines": [
-      {
-        "id": "01KS7Z11654QJS42XRFW1RHBGA",
-        "vlog_id": "01KS6X2ZHCK2G7PFWDWJ6PB00T",
-        "vlog_title": null,
-        "vlog_recorded_at": "2026-05-19T16:31:32.000Z",
-        "start_time": 0,
-        "end_time": 10,
-        "headline": "Unique Angles Made Easy",
-        "quote": "you can get like really good angles right",
-        "clippability_score": 1,
-        "clippability_verdict": "The line is a fragment and lacks context, making it unsuitable as a standalone clip.",
-        "suggested_caption_hook": "",
-        "status": "pending",
-        "validated": 1
-      }
-    ],
-    "coverage": {
-      "total": 419,
-      "judged": 1,
-      "eligible_unjudged": 408
-    }
-  }
+  "path": "/api/v2/admin/corpus-read?mark=corpusread-01",
+  "http_status": 502,
+  "access_headers": "cf-ray: a3380e987b2c8b0a-DFW\r|",
+  "body": "error code: 502\n",
+  "body_json": null
 }
