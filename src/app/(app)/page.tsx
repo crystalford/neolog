@@ -84,14 +84,28 @@ interface AutoShippedRecent {
   vlog_id: string | null
 }
 
-interface LogEntry { id: string; text: string; occurred_at: string; created_at: string }
+// One item per activity — a typed entry, a recorded vlog, or an added
+// photo. Same shape /api/v2/media already merges for Archive; Home's
+// "Your log" is that same feed, not a separate text-only one, because
+// recording a vlog is exactly as much a logged activity as typing a
+// sentence is.
+interface ActivityItem {
+  id: string
+  kind: 'photo' | 'video' | 'update'
+  thumb_url: string | null
+  at: string
+  title: string | null
+  subtitle: string | null
+  href: string
+  duration_seconds: number | null
+}
 
 export default function HomePage() {
   const [authState, setAuthState] = useState<'checking' | 'authed' | 'public'>('checking')
   const [publicProductions, setPublicProductions] = useState<any[]>([])
   const [items, setItems] = useState<ReadyItem[] | null>(null)
   const [autoShipped, setAutoShipped] = useState<AutoShippedRecent[]>([])
-  const [feed, setFeed] = useState<LogEntry[] | null>(null)
+  const [feed, setFeed] = useState<ActivityItem[] | null>(null)
   const [composeText, setComposeText] = useState('')
   const [composeDate, setComposeDate] = useState('')
   const [posting, setPosting] = useState(false)
@@ -99,10 +113,10 @@ export default function HomePage() {
 
   const loadFeed = useCallback(async () => {
     try {
-      const r = await fetch('/api/v2/log-entries?limit=50', { credentials: 'include' })
+      const r = await fetch('/api/v2/media?type=all&limit=50', { credentials: 'include' })
       if (!r.ok) { setFeed([]); return }
       const d: any = await r.json()
-      setFeed(Array.isArray(d?.entries) ? d.entries : [])
+      setFeed(Array.isArray(d?.items) ? d.items : [])
     } catch { setFeed([]) }
   }, [])
 
@@ -275,35 +289,12 @@ export default function HomePage() {
               padding: '24px 24px', border: '1px dashed var(--line-2)', borderRadius: 12,
               color: 'var(--fg-3)', fontSize: 14, lineHeight: 1.55,
             }}>
-              Nothing typed in yet. Use the box above — even one line, like "got a job today," is enough to start.
+              Nothing logged yet. Type a line above, or record/upload something — either way it lands here.
             </div>
           )}
           {feed !== null && feed.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {feed.map(e => (
-                <div key={e.id} style={{
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                  padding: '12px 16px', borderRadius: 10,
-                  background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderLeft: '2px solid var(--sig)',
-                }}>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 0.8,
-                    color: 'var(--fg-4)',
-                  }}>
-                    {fmtLogDate(e.occurred_at)}
-                  </span>
-                  {/* Long entries (a chapter, not a one-liner) keep their
-                      line breaks and clip visually rather than blowing up
-                      the feed — the full text is still stored and still
-                      searchable, just not fully unrolled here. */}
-                  <span style={{
-                    fontSize: 14.5, lineHeight: 1.55, color: 'var(--fg-1)', whiteSpace: 'pre-wrap',
-                    display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                  }}>
-                    {e.text}
-                  </span>
-                </div>
-              ))}
+              {feed.map(e => <ActivityRow key={`${e.kind}-${e.id}`} item={e}/>)}
             </div>
           )}
         </section>
@@ -391,6 +382,89 @@ function AutoShippedRibbon({ items }: { items: AutoShippedRecent[] }) {
       </Link>
     </div>
   )
+}
+
+/**
+ * One row in "Your log," any kind. A typed entry, a recorded vlog, or a
+ * photo are all the same kind of thing here — something that happened,
+ * with a time — just rendered with the phrasing appropriate to what it
+ * actually is. The activity line is system-derived (never edited by the
+ * operator); the logline under it is the AI's own reframe of the vlog
+ * (`vlogs.summary`, already produced by the standard extraction pass) —
+ * distinct from the operator's own words the way the whole night's
+ * "raw vs. derived" rule requires.
+ */
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const dateLabel = fmtLogDate(item.at)
+
+  if (item.kind === 'update') {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: '12px 16px', borderRadius: 10,
+        background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderLeft: '2px solid var(--sig)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 0.8, color: 'var(--fg-4)' }}>
+          {dateLabel}
+        </span>
+        {/* Long entries (a chapter, not a one-liner) keep their line
+            breaks and clip visually rather than blowing up the feed —
+            the full text is still stored, just not fully unrolled here. */}
+        <span style={{
+          fontSize: 14.5, lineHeight: 1.55, color: 'var(--fg-1)', whiteSpace: 'pre-wrap',
+          display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {item.subtitle}
+        </span>
+      </div>
+    )
+  }
+
+  const activityLabel = item.kind === 'video'
+    ? `Recorded a video${item.duration_seconds != null ? ` · ${fmtDur(item.duration_seconds)}` : ''}`
+    : 'Added a photo'
+  const borderColor = item.kind === 'video' ? 'var(--t-terra)' : 'var(--t-sage)'
+
+  const inner = (
+    <div style={{
+      display: 'flex', gap: 12, alignItems: 'center',
+      padding: '10px 16px', borderRadius: 10,
+      background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderLeft: `2px solid ${borderColor}`,
+    }}>
+      {item.thumb_url && (
+        <img
+          src={item.thumb_url} alt=""
+          style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', flexShrink: 0, background: 'var(--bg-2)' }}
+        />
+      )}
+      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 0.8, color: 'var(--fg-4)' }}>
+            {dateLabel}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: borderColor,
+          }}>
+            {activityLabel}
+          </span>
+        </div>
+        {/* The AI's own succinct reframe of the vlog — vlogs.summary —
+            not the operator's words, shown as the vlog's logline. */}
+        <span style={{
+          fontSize: 14, lineHeight: 1.45, color: 'var(--fg-1)',
+          overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        }}>
+          {item.subtitle || item.title || (item.kind === 'video' ? 'Not extracted yet' : '')}
+        </span>
+      </div>
+    </div>
+  )
+  return item.href ? <Link href={item.href} style={{ textDecoration: 'none', display: 'block' }}>{inner}</Link> : inner
+}
+
+function fmtDur(sec: number): string {
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 /** Recent → relative ("2h ago"); older or backdated → an absolute date, so a

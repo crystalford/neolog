@@ -73,11 +73,11 @@ export async function GET(req: NextRequest) {
       thumbnail_r2_key: string | null; thumbnail_url: string | null
       duration_seconds: number | null
       recorded_at: string | null; created_at: string
-      vision_description: string | null
+      summary: string | null; vision_description: string | null
     }>(
       db,
       `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
-              duration_seconds, recorded_at, created_at, vision_description
+              duration_seconds, recorded_at, created_at, summary, vision_description
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(recorded_at, created_at) DESC
@@ -123,7 +123,11 @@ export async function GET(req: NextRequest) {
       thumb_url: thumb,
       at: v.recorded_at || v.created_at,
       title: v.title || v.original_filename || 'Untitled vlog',
-      subtitle: v.vision_description || null,
+      // Prefer the extraction-derived summary (what was actually SAID —
+      // a 2-3 sentence reframe from the analytical pass) over the vision
+      // description, which only exists as a fallback for silent/no-
+      // narration footage.
+      subtitle: v.summary || v.vision_description || null,
       href: `/vlog/${v.id}`,
       width: null, height: null,
       duration_seconds: v.duration_seconds,
