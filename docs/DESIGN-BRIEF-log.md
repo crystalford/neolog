@@ -43,13 +43,20 @@ at the expense of the other.
 ## Ground truth — already live, refine this, don't reinvent it
 
 - **`src/app/(app)/page.tsx`** (route `/`, "Log") — top of the page is
-  now a compose box: starts as one line, auto-grows as you type (so
-  "got a job" and a full autobiographical chapter use the same box),
-  with an optional backdate field and a submit button. Below it, a new
-  **"Your log"** section — a reverse-chronological feed of everything
-  typed in, card-style, relative time under two weeks old ("2h ago"),
-  absolute date beyond that. Below *that*, the existing "Ready to send"
-  section (system-drafted productions) is unchanged.
+  a compose box: starts as one line, auto-grows as you type (so "got a
+  job" and a full autobiographical chapter use the same box), with an
+  optional backdate field and a submit button. Below it, **"Your log"**
+  — a reverse-chronological feed, but **not text-only**: it's the same
+  merged activity feed Archive uses (typed entries, recorded vlogs,
+  photos), because recording a vlog is exactly as much a logged
+  activity as typing a sentence. Each kind gets its own phrasing rather
+  than one shared template — a typed entry shows as-is; a vlog shows
+  "Recorded a video · 4:12" with its AI-derived summary underneath as
+  a logline (`vlogs.summary` — a 2-3 sentence reframe the standard
+  extraction pass already writes, previously surfaced nowhere); a photo
+  shows "Added a photo" with its thumbnail. Below all of that, the
+  existing "Ready to send" section (system-drafted productions) is
+  unchanged.
 - **`src/app/(app)/photos/page.tsx`** (route `/photos`, "Archive") —
   the existing day-grouped photo/video timeline now also shows these
   same log entries, read-only, as text rows above the visual grid for
@@ -62,6 +69,27 @@ at the expense of the other.
 These three surfaces are the actual design target. Everything else in
 the app (production engine, Studio, Drafts, clip editor) is unchanged
 and out of scope for this pass.
+
+### The feed's kind list will keep growing — design for that
+
+The principle behind merging vlogs and photos in: **any system event
+that already has a timestamp is a free log entry** — no new capture UI
+needed, just surface what's already there. Two more of these are known
+and real, just not built yet, so the feed shouldn't be designed as if
+three kinds (`update` / `video` / `photo`) is the permanent, final set:
+
+- **A production getting published** — `productions.produced_at` /
+  `published_to` already exist and are already timestamped. "Published:
+  {title}" as a fourth activity kind is a small addition later, not
+  part of this pass.
+- **Location** — genuinely wanted, genuinely not free: no GPS is
+  currently pulled from photo/video EXIF or stored anywhere. A real
+  feature (parse EXIF GPS, reverse-geocode to a place name), not a
+  surfacing job like the others. Don't design as if it exists yet.
+- Further out: git commits, ingested AI chat sessions — same
+  "already-timestamped, just needs ingesting" pattern, explicitly
+  deferred (see the Claude-session/git-history idea earlier in the
+  product conversation this brief comes from).
 
 ## Design system — reuse, don't redefine
 
@@ -154,13 +182,17 @@ existing markup:
    from a one-line quick capture to a full chapter actually be —
    does the rest of the page make room for it, does it take over, does
    the "Ready to send" section beneath it need to yield space?
-2. **How a long entry reads in the feed vs. a short one.** Currently
-   every entry gets identical card treatment, clipped at 8 lines. A
-   one-line "got a job" and a 900-word memory of 2008 are extremely
-   different objects and might deserve different visual weight in the
-   feed — without introducing a stored "type" (see constraints above;
+2. **How a long entry reads in the feed vs. a short one.** Typed
+   entries currently get one shared card treatment, clipped at 8 lines
+   regardless of length — a one-line "got a job" and a 900-word memory
+   of 2008 look identical except for how much they clip. They're
+   extremely different objects and might deserve different visual
+   weight — without introducing a stored "type" (see constraints above;
    any distinction should come from the content's actual length, not a
-   new field).
+   new field). Separately, vlogs and photos now get their own
+   kind-specific rows (an activity label, a thumbnail, the vlog's AI
+   summary as a logline) rather than sharing the text card — that
+   split is a first functional pass, not a resolved design.
 3. **Home as a whole — and specifically, the seam between "Your log"
    and "Ready to send."** These aren't two views of the same kind of
    content: "Your log" is human-authored, exactly what the operator
