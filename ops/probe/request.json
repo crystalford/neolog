@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/admin/corpus-read?raw=1&mark=corpusread-02", "nonce": "corpusread-02" }
+{ "method": "GET", "path": "/api/v2/admin/corpus-read?dry=1&source=transcript&mark=transcript-stats-01", "nonce": "transcript-stats-01" }
