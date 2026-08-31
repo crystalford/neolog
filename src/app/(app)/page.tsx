@@ -13,7 +13,7 @@
 
 export const runtime = 'edge'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
@@ -95,6 +95,7 @@ export default function HomePage() {
   const [composeText, setComposeText] = useState('')
   const [composeDate, setComposeDate] = useState('')
   const [posting, setPosting] = useState(false)
+  const composeRef = useRef<HTMLTextAreaElement | null>(null)
 
   const loadFeed = useCallback(async () => {
     try {
@@ -120,6 +121,7 @@ export default function HomePage() {
       })
       if (!r.ok) { const d: any = await r.json().catch(() => ({})); throw new Error(d?.error || `HTTP ${r.status}`) }
       setComposeText(''); setComposeDate('')
+      if (composeRef.current) composeRef.current.style.height = 'auto'
       loadFeed()
     } catch {
       // Inline error would need its own slot; keep this cheap and just leave
@@ -205,36 +207,51 @@ export default function HomePage() {
           </p>
 
           {/* The cheapest door: a sentence and a date, nothing else
-              required. Backdate it for anything that already happened. */}
+              required. Backdate it for anything that already happened.
+              Starts one line tall for a quick update, grows as you write —
+              same box works for "got a job" and for an actual chapter. */}
           <div style={{
-            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+            display: 'flex', flexDirection: 'column', gap: 8,
             padding: '10px 12px', marginBottom: 14,
             background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 10,
           }}>
-            <input
-              type="text"
+            <textarea
+              ref={composeRef}
               value={composeText}
-              onChange={e => setComposeText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postEntry() } }}
-              placeholder="What happened? (e.g. got a job at the mushroom farm)"
+              onChange={e => {
+                setComposeText(e.target.value)
+                const el = e.target
+                el.style.height = 'auto'
+                el.style.height = `${el.scrollHeight}px`
+              }}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postEntry() } }}
+              placeholder="What happened? A line is enough — or write the whole thing. (e.g. got a job at the mushroom farm / 2008 was a huge year...)"
+              rows={1}
               style={{
-                flex: '1 1 260px', minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-                color: 'var(--fg)', fontSize: 14.5, fontFamily: 'var(--font-body)', padding: '6px 4px',
+                width: '100%', resize: 'none', overflow: 'hidden',
+                background: 'transparent', border: 'none', outline: 'none',
+                color: 'var(--fg)', fontSize: 14.5, fontFamily: 'var(--font-body)',
+                lineHeight: 1.6, padding: '6px 4px',
               }}
             />
-            <input
-              type="date"
-              value={composeDate}
-              onChange={e => setComposeDate(e.target.value)}
-              title="Backdate this — leave blank for today"
-              style={{
-                background: 'var(--bg-2)', border: '1px solid var(--line-1)', borderRadius: 6,
-                color: 'var(--fg-2)', fontSize: 12.5, fontFamily: 'var(--font-mono)', padding: '5px 8px',
-              }}
-            />
-            <button onClick={postEntry} disabled={!composeText.trim() || posting} className="canon-btn primary" style={{ fontSize: 12.5, padding: '6px 14px' }}>
-              {posting ? 'Logging…' : 'Log it'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="date"
+                value={composeDate}
+                onChange={e => setComposeDate(e.target.value)}
+                title="Backdate this — leave blank for today. For a whole year like '2008', pick any day in it."
+                style={{
+                  background: 'var(--bg-2)', border: '1px solid var(--line-1)', borderRadius: 6,
+                  color: 'var(--fg-2)', fontSize: 12.5, fontFamily: 'var(--font-mono)', padding: '5px 8px',
+                }}
+              />
+              <button onClick={postEntry} disabled={!composeText.trim() || posting} className="canon-btn primary" style={{ fontSize: 12.5, padding: '6px 14px' }}>
+                {posting ? 'Logging…' : 'Log it'}
+              </button>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-4)', marginLeft: 'auto' }}>
+                ⌘/Ctrl + Enter to log
+              </span>
+            </div>
           </div>
 
           <CapturePanel onUploaded={loadReady}/>
@@ -265,17 +282,26 @@ export default function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {feed.map(e => (
                 <div key={e.id} style={{
-                  display: 'flex', gap: 14, alignItems: 'baseline',
+                  display: 'flex', flexDirection: 'column', gap: 6,
                   padding: '12px 16px', borderRadius: 10,
                   background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderLeft: '2px solid var(--sig)',
                 }}>
                   <span style={{
                     fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 0.8,
-                    color: 'var(--fg-4)', whiteSpace: 'nowrap', flexShrink: 0,
+                    color: 'var(--fg-4)',
                   }}>
                     {fmtLogDate(e.occurred_at)}
                   </span>
-                  <span style={{ fontSize: 14.5, lineHeight: 1.5, color: 'var(--fg-1)' }}>{e.text}</span>
+                  {/* Long entries (a chapter, not a one-liner) keep their
+                      line breaks and clip visually rather than blowing up
+                      the feed — the full text is still stored and still
+                      searchable, just not fully unrolled here. */}
+                  <span style={{
+                    fontSize: 14.5, lineHeight: 1.55, color: 'var(--fg-1)', whiteSpace: 'pre-wrap',
+                    display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                  }}>
+                    {e.text}
+                  </span>
                 </div>
               ))}
             </div>
