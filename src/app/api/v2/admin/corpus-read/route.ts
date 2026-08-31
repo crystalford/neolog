@@ -14,14 +14,23 @@
  * but the extracted takes are ~40-80K tokens and fit in any current model.
  *
  * Query params:
+ *   - source: 'takes' (default) reads the extracted threads.take field —
+ *             an LLM-mediated compression of each vlog, small and cheap.
+ *             'transcript' reads vlogs.transcript_text directly — the raw
+ *             Whisper output, nothing summarized, nothing dropped, at
+ *             whatever size that actually is (use dry=1 to find out before
+ *             committing to a real LLM call at that size).
  *   - raw: '1' to return the assembled corpus and skip inference entirely.
  *          Use this for a full-corpus read — the in-Worker call below 502s
  *          on the whole record (see the note at that branch).
  *   - dry: '1' to return corpus stats + a sample without calling the LLM
- *   - max_takes: cap (default 4000). Response reports whether it truncated.
+ *   - max_takes: cap on rows fetched (default 4000, applies to either
+ *     source — a "row" is one take or one vlog depending on source).
+ *     Response reports whether it truncated.
  *   - model: override (default claude-opus-5 — 1M context, best available;
  *            this is a once-in-a-while read, quality beats cost here)
- *   - min_strength: only include takes at/above this strength (default 0)
+ *   - min_strength: only include takes at/above this strength (default 0,
+ *     ignored for source=transcript — vlogs don't have a strength score)
  *
  * Read-only. Writes nothing. Safe to re-run.
  */
@@ -93,77 +102,107 @@ export async function GET(req: NextRequest) {
   const model = url.searchParams.get('model') || DEFAULT_MODEL
   const dry = url.searchParams.get('dry') === '1'
   const minStrength = parseInt(url.searchParams.get('min_strength') || '0', 10) || 0
+  const source = url.searchParams.get('source') === 'transcript' ? 'transcript' : 'takes'
 
   const db = getDb(env)
 
-  // Every take, chronological by when it was RECORDED (not extracted) —
-  // the arc is a property of when he said things, not when we processed
-  // them. Only rows from the active extraction run, so re-extracted vlogs
-  // don't double-count.
-  let takes: Array<{
-    recorded_at: string | null
-    topic: string
-    take: string | null
-    strength: number | null
-    abstracted_topic: string | null
-    vlog_id: string
-  }> = []
-  let queryError: string | null = null
-  try {
-    takes = await findMany(
-      db,
-      `SELECT v.recorded_at, t.topic, t.take, t.strength, t.abstracted_topic, t.vlog_id
-         FROM threads t
-         JOIN vlogs v ON v.id = t.vlog_id
-         JOIN extraction_runs er ON er.id = t.run_id
-        WHERE t.operator_id = ?
-          AND t.deleted_at IS NULL
-          AND v.deleted_at IS NULL
-          AND er.is_active = 1
-          AND COALESCE(t.strength, 0) >= ?
-        ORDER BY v.recorded_at ASC, t.transcript_span_start ASC
-        LIMIT ?`,
-      operator.id, minStrength, maxTakes,
-    )
-  } catch (err: any) {
-    queryError = err?.message || String(err)
+  let lines: string[] = []
+  let spanStart: string | null = null
+  let spanEnd: string | null = null
+  let distinctVlogs = 0
+  let rowsFetched = 0
+
+  if (source === 'transcript') {
+    // Raw Whisper output, one vlog per block, nothing summarized. Ordered
+    // by recorded_at like the takes path, so the two are comparable.
+    let vlogRows: Array<{ recorded_at: string | null; transcript_text: string | null; id: string }> = []
+    try {
+      vlogRows = await findMany(
+        db,
+        `SELECT id, recorded_at, transcript_text FROM vlogs
+          WHERE operator_id = ? AND deleted_at IS NULL
+            AND transcript_text IS NOT NULL AND transcript_text != ''
+          ORDER BY recorded_at ASC LIMIT ?`,
+        operator.id, maxTakes,
+      )
+    } catch (err: any) {
+      return NextResponse.json({ error: `corpus query failed: ${err?.message || err}` }, { status: 500 })
+    }
+    if (vlogRows.length === 0) {
+      return NextResponse.json({ error: 'No transcripts found.', operator_id: operator.id }, { status: 404 })
+    }
+    for (const v of vlogRows) {
+      const date = (v.recorded_at || '').slice(0, 10) || 'undated'
+      const body = (v.transcript_text || '').replace(/\s+/g, ' ').trim()
+      if (!body) continue
+      lines.push(`--- ${date} ---\n${body}`)
+    }
+    spanStart = vlogRows.find(v => v.recorded_at)?.recorded_at ?? null
+    spanEnd = [...vlogRows].reverse().find(v => v.recorded_at)?.recorded_at ?? null
+    distinctVlogs = vlogRows.length
+    rowsFetched = vlogRows.length
+  } else {
+    // Every take, chronological by when it was RECORDED (not extracted) —
+    // the arc is a property of when he said things, not when we processed
+    // them. Only rows from the active extraction run, so re-extracted vlogs
+    // don't double-count.
+    let takes: Array<{
+      recorded_at: string | null
+      topic: string
+      take: string | null
+      strength: number | null
+      abstracted_topic: string | null
+      vlog_id: string
+    }> = []
+    try {
+      takes = await findMany(
+        db,
+        `SELECT v.recorded_at, t.topic, t.take, t.strength, t.abstracted_topic, t.vlog_id
+           FROM threads t
+           JOIN vlogs v ON v.id = t.vlog_id
+           JOIN extraction_runs er ON er.id = t.run_id
+          WHERE t.operator_id = ?
+            AND t.deleted_at IS NULL
+            AND v.deleted_at IS NULL
+            AND er.is_active = 1
+            AND COALESCE(t.strength, 0) >= ?
+          ORDER BY v.recorded_at ASC, t.transcript_span_start ASC
+          LIMIT ?`,
+        operator.id, minStrength, maxTakes,
+      )
+    } catch (err: any) {
+      return NextResponse.json({ error: `corpus query failed: ${err?.message || err}` }, { status: 500 })
+    }
+    if (takes.length === 0) {
+      return NextResponse.json({
+        error: 'No takes found. Either nothing has been extracted, or no extraction_run is marked active.',
+        operator_id: operator.id,
+      }, { status: 404 })
+    }
+    for (const t of takes) {
+      const date = (t.recorded_at || '').slice(0, 10) || 'undated'
+      const body = (t.take || t.topic || '').replace(/\s+/g, ' ').trim()
+      if (!body) continue
+      const topicTag = t.abstracted_topic && !body.toLowerCase().includes(t.abstracted_topic.toLowerCase())
+        ? ` [${t.abstracted_topic}]`
+        : ''
+      const str = t.strength != null ? ` (${t.strength}/5)` : ''
+      lines.push(`${date}${str}${topicTag} ${body}`)
+    }
+    spanStart = takes.find(t => t.recorded_at)?.recorded_at ?? null
+    spanEnd = [...takes].reverse().find(t => t.recorded_at)?.recorded_at ?? null
+    distinctVlogs = new Set(takes.map(t => t.vlog_id)).size
+    rowsFetched = takes.length
   }
 
-  if (queryError) {
-    return NextResponse.json({ error: `corpus query failed: ${queryError}` }, { status: 500 })
-  }
-  if (takes.length === 0) {
-    return NextResponse.json({
-      error: 'No takes found. Either nothing has been extracted, or no extraction_run is marked active.',
-      operator_id: operator.id,
-    }, { status: 404 })
-  }
-
-  // Render the reduced corpus. One line per take, date-prefixed so the
-  // model can cite. Topic is included only when it adds something the
-  // take doesn't already say.
-  const lines: string[] = []
-  for (const t of takes) {
-    const date = (t.recorded_at || '').slice(0, 10) || 'undated'
-    const body = (t.take || t.topic || '').replace(/\s+/g, ' ').trim()
-    if (!body) continue
-    const topicTag = t.abstracted_topic && !body.toLowerCase().includes(t.abstracted_topic.toLowerCase())
-      ? ` [${t.abstracted_topic}]`
-      : ''
-    const str = t.strength != null ? ` (${t.strength}/5)` : ''
-    lines.push(`${date}${str}${topicTag} ${body}`)
-  }
   const corpus = lines.join('\n')
 
-  const spanStart = takes.find(t => t.recorded_at)?.recorded_at ?? null
-  const spanEnd = [...takes].reverse().find(t => t.recorded_at)?.recorded_at ?? null
-  const distinctVlogs = new Set(takes.map(t => t.vlog_id)).size
-
   const stats = {
+    source,
     takes_used: lines.length,
-    takes_fetched: takes.length,
+    takes_fetched: rowsFetched,
     distinct_vlogs: distinctVlogs,
-    truncated: takes.length >= maxTakes,
+    truncated: rowsFetched >= maxTakes,
     corpus_chars: corpus.length,
     corpus_tokens_est: Math.round(corpus.length / 4),
     span_start: spanStart,
