@@ -1,12 +1,14 @@
 /**
- * GET /api/v2/media?type=all|photo|video&limit=500
+ * GET /api/v2/media?type=all|photo|video|update&limit=500
  *
- * The unified archive — photos + vlogs merged, newest-capture first. One
- * chronological feed of everything captured. Each row is normalized so the
- * client renders a single grid regardless of media kind.
+ * The unified archive — photos + vlogs + status updates merged, newest-
+ * capture first. One chronological feed of everything captured. Each row
+ * is normalized so the client renders a single timeline regardless of kind.
  *
- * Photos come from the photos table; videos from vlogs. Ordered by capture
- * time (taken_at / recorded_at), falling back to created/uploaded time.
+ * Photos come from the photos table; videos from vlogs; updates from
+ * log_entries (the plain typed/backdated status-update capture — no
+ * thumbnail, text is the content). Ordered by capture time (taken_at /
+ * recorded_at / occurred_at), falling back to created/uploaded time.
  */
 
 export const runtime = 'edge'
@@ -22,7 +24,7 @@ interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string
 
 interface MediaItem {
   id: string
-  kind: 'photo' | 'video'
+  kind: 'photo' | 'video' | 'update'
   thumb_url: string | null
   at: string
   title: string | null
@@ -48,8 +50,9 @@ export async function GET(req: NextRequest) {
 
   const wantPhotos = type === 'all' || type === 'photo'
   const wantVideos = type === 'all' || type === 'video'
+  const wantUpdates = type === 'all' || type === 'update'
 
-  const [photoRows, vlogRows] = await Promise.all([
+  const [photoRows, vlogRows, updateRows] = await Promise.all([
     wantPhotos ? findMany<{
       id: string; thumbnail_r2_key: string | null; r2_key: string
       caption: string | null; vision_description: string | null
@@ -78,6 +81,14 @@ export async function GET(req: NextRequest) {
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(recorded_at, created_at) DESC
+        LIMIT ?`,
+      operator.id, limit,
+    ) : Promise.resolve([]),
+    wantUpdates ? findMany<{ id: string; text: string; occurred_at: string; created_at: string }>(
+      db,
+      `SELECT id, text, occurred_at, created_at FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL
+        ORDER BY occurred_at DESC
         LIMIT ?`,
       operator.id, limit,
     ) : Promise.resolve([]),
@@ -116,6 +127,20 @@ export async function GET(req: NextRequest) {
       href: `/vlog/${v.id}`,
       width: null, height: null,
       duration_seconds: v.duration_seconds,
+    })
+  }
+
+  for (const u of updateRows) {
+    items.push({
+      id: u.id,
+      kind: 'update',
+      thumb_url: null,
+      at: u.occurred_at || u.created_at,
+      title: null,
+      subtitle: u.text,
+      href: '',
+      width: null, height: null,
+      duration_seconds: null,
     })
   }
 

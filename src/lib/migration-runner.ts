@@ -1076,6 +1076,29 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-08-16_productions_rebuild_idx_type',
     sql: `CREATE INDEX IF NOT EXISTS idx_productions_type ON productions(production_type)`,
   },
+
+  // Status updates — the simplest possible capture: type a sentence, it
+  // lands on the timeline with a date. Deliberately minimal: text +
+  // occurred_at (editable so backlogging "got a job last Thursday" with
+  // last Thursday's date just works). No type/category taxonomy — that's
+  // unproven structure, not a necessity, and it's cheaper to add a column
+  // later than to have shipped one nobody asked for.
+  {
+    name: '2026-08-31_log_entries',
+    sql: `CREATE TABLE IF NOT EXISTS log_entries (
+      id           TEXT PRIMARY KEY,
+      operator_id  TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      text         TEXT NOT NULL,
+      occurred_at  TEXT NOT NULL,
+      deleted_at   TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-08-31_idx_log_entries_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_operator ON log_entries(operator_id, occurred_at DESC)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
