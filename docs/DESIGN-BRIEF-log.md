@@ -19,6 +19,27 @@ has nothing to do with video. Design's job now is to give that surface
 — and the home page it lives on — a real visual identity, not to
 invent new structure.
 
+## Two real scenarios to design against
+
+Not hypotheticals — these are the two actual ways this gets used, named
+directly in conversation, and they pull in different directions:
+
+1. **Real-time, in-the-moment logging.** "I got a job at a mushroom
+   farm last Thursday" — typed or dictated in seconds, today's date or
+   a near-today backdate, done. This is the X/Threads/Facebook-status
+   register: fast, low-friction, a single thought.
+2. **Retrospective autobiography.** "2008 was a huge year — a lot
+   happened" — sitting down specifically to get years of un-recorded
+   life into the record before it's lost. Long, possibly written over
+   multiple sessions, backdated to a rough period rather than a precise
+   day, closer in spirit to journaling or writing a memoir chapter than
+   to posting a status update.
+
+Both go through the *same* compose box today (see Constraints below on
+why that's deliberate), but they're emotionally and functionally
+different acts, and the design should hold both without favoring one
+at the expense of the other.
+
 ## Ground truth — already live, refine this, don't reinvent it
 
 - **`src/app/(app)/page.tsx`** (route `/`, "Log") — top of the page is
@@ -90,6 +111,20 @@ product actually does:
   implies one exists (icon pickers, type dropdowns, colored tags by
   kind) — it would be designing ahead of a decision that was
   deliberately left open.
+- **Register: journal, not social feed, even though the layout
+  borrows from one.** X/Threads/Facebook were named as the closest
+  reference for the *mechanic* — type a line, it's on a timeline — but
+  the actual purpose is closer to therapeutic journaling: getting
+  things down so they stop circling, not performing for an audience or
+  chasing engagement. No like counts, no streaks, no gamification, no
+  visible metrics of any kind. It's private by default and it should
+  feel private — calm, not stimulating.
+- **Most of this will arrive as rough dictation, not clean prose.**
+  The operator's stated working method is voice-to-text while driving —
+  run-on, self-correcting, sometimes hard to parse on first read. The
+  compose and display experience shouldn't assume tidy typed sentences;
+  don't design typography or formatting that would make rough,
+  unpunctuated dictation look broken or wrong.
 
 ## Explicitly out of scope — don't design these yet
 
@@ -126,17 +161,28 @@ existing markup:
    feed — without introducing a stored "type" (see constraints above;
    any distinction should come from the content's actual length, not a
    new field).
-3. **Home as a whole.** Three stacked sections (compose+feed, ready-to-
-   send, and the auto-shipped ribbon when present) currently just sit
-   in sequence. Does "Your log" deserve to be visually primary, with
-   "Ready to send" reading as a secondary/system-generated tier beneath
-   it? The product's center of gravity just shifted from the
-   production engine to the personal record — the page hasn't
-   caught up to that yet.
+3. **Home as a whole — and specifically, the seam between "Your log"
+   and "Ready to send."** These aren't two views of the same kind of
+   content: "Your log" is human-authored, exactly what the operator
+   said; "Ready to send" is system-generated, the machine's suggestions
+   drawn from the record. Stacking them as equal-weight sections
+   blurs that distinction. Does the record need to visually read as
+   primary and the machine's suggestions as clearly secondary/derived —
+   and if so, what makes that legible at a glance, not just via section
+   order?
 4. **Archive's mixed day view.** Text rows above a photo/video grid,
    per day, is the current mechanical solution. Is there a better way
    to show "here's everything from this day" when it's a mix of a
    sentence, a photo, and a 20-minute recording?
+5. **Date precision for retrospective entries.** The backdate control
+   is a native day-precision date picker. "2008 was a huge year"
+   doesn't have a specific day — right now the honest option is picking
+   an arbitrary day in 2008 and eating the slight inaccuracy in how
+   it's displayed later. Is there a lightweight way to capture "just
+   2008" or "sometime that spring" without inventing a whole precision
+   field/schema? (This is a real unresolved question, not a solved one
+   with an obvious answer — worth sitting with rather than papering
+   over.)
 
 Ground every exploration in real content — pull actual entries and
 vlog titles from the live app rather than placeholder text; the voice
