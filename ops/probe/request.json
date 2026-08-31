@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/clips?min_score=1&limit=5", "nonce": "clips-verify-persisted-score" }
+{ "method": "GET", "path": "/api/v2/admin/corpus-read?mark=corpusread-01", "nonce": "corpusread-01" }
