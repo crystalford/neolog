@@ -14,10 +14,13 @@
  * but the extracted takes are ~40-80K tokens and fit in any current model.
  *
  * Query params:
+ *   - raw: '1' to return the assembled corpus and skip inference entirely.
+ *          Use this for a full-corpus read — the in-Worker call below 502s
+ *          on the whole record (see the note at that branch).
+ *   - dry: '1' to return corpus stats + a sample without calling the LLM
  *   - max_takes: cap (default 4000). Response reports whether it truncated.
  *   - model: override (default claude-opus-5 — 1M context, best available;
  *            this is a once-in-a-while read, quality beats cost here)
- *   - dry: '1' to return corpus stats + a sample without calling the LLM
  *   - min_strength: only include takes at/above this strength (default 0)
  *
  * Read-only. Writes nothing. Safe to re-run.
@@ -175,6 +178,23 @@ export async function GET(req: NextRequest) {
       stats,
       sample_head: lines.slice(0, 12),
       sample_tail: lines.slice(-12),
+    }, { headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  // raw=1 returns the rendered corpus and does no inference.
+  //
+  // The in-Worker LLM call (below) 502s on a full corpus: an ~80K-token
+  // request to Claude takes longer than a Pages Function's budget allows,
+  // and Cloudflare kills the isolate. Rather than chunk the analysis and
+  // lose the whole point — that the arc is only visible when the record is
+  // read ALL AT ONCE — this mode hands the assembled corpus to a caller
+  // that has no such time limit and a large enough context to hold it.
+  // Same corpus, same ordering, no truncation; only the inference moves.
+  if (url.searchParams.get('raw') === '1') {
+    return NextResponse.json({
+      raw: true,
+      stats,
+      corpus,
     }, { headers: { 'Cache-Control': 'no-store' } })
   }
 
