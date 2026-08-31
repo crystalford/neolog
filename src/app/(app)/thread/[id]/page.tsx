@@ -444,7 +444,7 @@ export default function ThreadDetailPage({ params }: { params: { id: string } })
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {productions_used_in.slice(0, 4).map(p => (
-                    <Link key={p.id} href={`/productions/${p.id}`} style={{
+                    <Link key={p.id} href={`/projects/${p.id}`} style={{
                       display: 'block',
                       padding: '10px 12px',
                       borderRadius: 8,

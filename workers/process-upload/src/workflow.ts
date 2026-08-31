@@ -944,6 +944,26 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       console.log(`[process-upload] no transcript text for vlog ${vlog_id} — skipping extraction`)
     }
 
+    // ── Auto-publish flag ────────────────────────────────────────────────────
+    // If the operator opted this vlog in to auto-publish (vlogs.auto_publish_clips=1),
+    // flag it pending so refresh-drafts (cron) or the next home-page visit
+    // (via ctx.waitUntil) picks it up and runs the auto-promote pipeline:
+    // slice top clips → caption → fire fanout webhook → social posts go out.
+    // We don't run the auto-promote logic here because it lives in the Pages
+    // app (src/lib/auto-promote.ts) and the worker can't import it.
+    await softStep('flag-auto-publish', { retries: { limit: 2, delay: '5 seconds' }, timeout: '15 seconds' }, async () => {
+      const row = await env.DB.prepare(
+        `SELECT auto_publish_clips FROM vlogs WHERE id = ? AND operator_id = ?`,
+      ).bind(vlog_id, operator_id).first<{ auto_publish_clips: number | null }>()
+      if (row?.auto_publish_clips === 1) {
+        await env.DB.prepare(
+          `UPDATE vlogs SET auto_publish_pending = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND operator_id = ?`,
+        ).bind(vlog_id, operator_id).run()
+      }
+      return { flagged: row?.auto_publish_clips === 1 }
+    })
+
     // ── Final: mark complete ─────────────────────────────────────────────────
     await step.do('mark-complete', async () => reportStatus('complete'))
 

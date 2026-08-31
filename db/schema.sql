@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS vlogs (
   pipeline_error           TEXT,
   extraction_outcomes      TEXT,
   visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+  is_podcast               INTEGER NOT NULL DEFAULT 0,
+  slideshow_frames_json    TEXT,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -94,6 +96,9 @@ CREATE INDEX IF NOT EXISTS idx_vlogs_operator ON vlogs(operator_id);
 CREATE INDEX IF NOT EXISTS idx_vlogs_recorded_at ON vlogs(recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_vlogs_pipeline_status ON vlogs(pipeline_status);
 CREATE INDEX IF NOT EXISTS idx_vlogs_r2_key ON vlogs(r2_key);
+CREATE INDEX IF NOT EXISTS idx_vlogs_is_podcast
+  ON vlogs(operator_id, is_podcast, recorded_at DESC)
+  WHERE is_podcast = 1 AND deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS transcript_words (
   id                       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +169,7 @@ CREATE TABLE IF NOT EXISTS threads (
   key_quotes                  TEXT,
   questions_raised            TEXT,
   register                    TEXT CHECK (register IN ('riff','observation','argument','story','aside','question')),
+  utterance_kind              TEXT,
   strength                    INTEGER CHECK (strength BETWEEN 1 AND 5),
   transcript_span_start       REAL,
   transcript_span_end         REAL,
@@ -292,6 +298,16 @@ CREATE TABLE IF NOT EXISTS clusters (
   last_viewed_at              TEXT,
   gap_question                TEXT,
   topic_color                 TEXT,
+  framing                     TEXT,
+  concept_confidence          REAL,
+  named_by_system             INTEGER NOT NULL DEFAULT 0,
+  representative_quote        TEXT,
+  subject_source              TEXT,
+  subject_kind                TEXT,
+  pole_a                      TEXT,
+  pole_b                      TEXT,
+  pole_a_at                   TEXT,
+  pole_b_at                   TEXT,
   deleted_at                  TEXT,
   created_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

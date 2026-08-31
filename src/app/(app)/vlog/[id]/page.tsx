@@ -17,12 +17,18 @@
  *   4. Session digest      — 4-cell strip (threads / clips / entities / clusters)
  *   5. Player + timeline   — 16:9 video + MultiTrackTimeline (audio /
  *                            threads / clips / entities)
- *   6. Body grid           — main: Threads / Clips / Creative / Entities /
- *                            Transcript / System actions disclosure
+ *   6. Transcript editor   — VlogTranscriptEditor (src/components), the
+ *                            whole-vlog click-to-cut editor. Sits right
+ *                            after the player so it's not buried below
+ *                            Threads/Clips/Creative. Falls back to a
+ *                            read-only transcript block when the vlog
+ *                            has no word-level timestamps.
+ *   7. Body grid           — main: Threads / Clips / Creative /
+ *                            System actions disclosure
  *                            rail: re-extract panel, diagnosis if pipeline
  *                            failure, raw extraction_outcomes
- *   7. Provenance grid     — 8 cells
- *   8. Footer              — colophon + j/k hints
+ *   8. Provenance grid     — 8 cells
+ *   9. Footer              — colophon + j/k hints
  *
  * Data: /api/v2/vlogs/[id]. Same payload as before; reused as-is.
  * Reuses: MultiTrackTimeline, LivePipeline (pipeline status realtime).
@@ -40,6 +46,7 @@ import {
   type MultiTrackBand, type MultiTrackMark,
 } from '@/components/threadkit'
 import LivePipeline from '../../timeline/[id]/live-pipeline'
+import VlogTranscriptEditor from '@/components/VlogTranscriptEditor'
 
 interface VlogDetail {
   id: string
@@ -55,10 +62,17 @@ interface VlogDetail {
   summary: string | null
   pipeline_status: string
   pipeline_error: string | null
+  is_podcast?: number | boolean | null
+  auto_publish_clips?: number | boolean | null
+  auto_publish_vertical?: number | boolean | null
+  auto_publish_pending?: number | boolean | null
   playback_url: string | null
   audio_url?: string | null
+  audio_chunk_urls?: string[] | null
+  slideshow_frames?: Array<{ url: string; time_sec: number }> | null
   is_audio_only?: boolean
   has_transcoded?: boolean
+  has_word_timestamps?: boolean
   extraction_outcomes: string | null
   updated_at: string | null
   visibility?: string
@@ -172,6 +186,77 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
     }
   }
 
+  const toggleAutoPublish = async (next: boolean, vertical?: boolean) => {
+    if (!vlog) return
+    setActionNote(next ? 'Turning auto-publish on…' : 'Turning auto-publish off…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-toggle`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_publish_clips: next,
+          ...(vertical !== undefined ? { auto_publish_vertical: vertical } : {}),
+        }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      setActionNote(next
+        ? 'Auto-publish on. Top scored clips from this vlog will ship next sweep.'
+        : 'Auto-publish off.')
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
+  const runAutoPublishNow = async () => {
+    if (!vlog) return
+    setActionNote('Auto-publishing now — judging clips, slicing, firing webhook…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-now`, {
+        method: 'POST', credentials: 'include',
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      const parts = [
+        `${d.considered ?? 0} candidates · ${d.selected ?? 0} selected`,
+        `${d.shipped ?? 0} shipped`,
+        d.webhook_fired ? `posted to fanout` : 'no fanout webhook set',
+      ]
+      setActionNote(parts.join(' · '))
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
+  const togglePodcast = async () => {
+    if (!vlog) return
+    const next = !vlog.is_podcast
+    setActionNote(next ? 'Adding to podcast feed…' : 'Removing from podcast feed…')
+    try {
+      const r = await fetch(`/api/v2/vlogs/${params.id}/podcast`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ include: next }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data: any = await r.json().catch(() => ({}))
+      const feedUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/podcast.xml`
+      if (next) {
+        setActionNote(
+          data.stitch_triggered
+            ? `Added — stitching MP3 now (refresh in ~30s). Feed URL: ${feedUrl}`
+            : `In podcast feed. Feed URL: ${feedUrl}`
+        )
+      } else {
+        setActionNote('Removed from podcast feed.')
+      }
+      load()
+    } catch (e: any) {
+      setActionNote(`Failed: ${e?.message || String(e)}`)
+    }
+  }
+
   const deleteVlog = async () => {
     if (!confirm('Delete this vlog? This removes the R2 bytes too. Cannot be undone.')) return
     try {
@@ -219,13 +304,7 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
 
   // Prefer the AI-derived title from extraction. Falls back to the
   // de-uglified DJI filename only when extraction hasn't run yet.
-  // Title precedence: AI-derived (vlog.title) → anchor thread's take →
-  // deuglified filename. The anchor-take fallback rescues short vlogs where
-  // the LLM didn't synthesize a usable title (e.g. "I don't know what to do.").
-  const anchorTitle = anchorThread?.take?.trim() || anchorThread?.topic?.trim() || ''
-  const title = (vlog.title && vlog.title.trim())
-    || (anchorTitle ? truncate(anchorTitle, 80) : '')
-    || deriveVlogTitle(vlog.original_filename)
+  const title = (vlog.title && vlog.title.trim()) || deriveVlogTitle(vlog.original_filename)
   const status = vlog.pipeline_status
   const isBroll = status === 'archived'
   const isProcessing = ['uploaded', 'transcoding', 'thumbnail_pending', 'transcribing', 'extracting'].includes(status)
@@ -287,6 +366,44 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 Mark as B-roll
               </button>
             )}
+            <button
+              className="action"
+              onClick={togglePodcast}
+              style={vlog.is_podcast ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+              title={vlog.is_podcast ? 'In /podcast.xml — click to remove' : 'Add to /podcast.xml feed'}
+            >
+              {vlog.is_podcast ? 'In podcast ✓' : 'Add to podcast'}
+            </button>
+            <button
+              className="action"
+              onClick={() => toggleAutoPublish(!vlog.auto_publish_clips)}
+              style={vlog.auto_publish_clips ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+              title={vlog.auto_publish_clips
+                ? 'Auto-publish on — the sweep will ship top-scored clips and fire your fanout webhook'
+                : 'Turn on to auto-publish top clips from this vlog without approval'}
+            >
+              {vlog.auto_publish_clips ? 'Auto-publish ✓' : 'Auto-publish'}
+              {vlog.auto_publish_pending ? <span style={{ marginLeft: 6, color: 'var(--t-ochre)' }}>· pending</span> : null}
+            </button>
+            {vlog.auto_publish_clips ? (
+              <button
+                className="action"
+                onClick={() => toggleAutoPublish(true, !vlog.auto_publish_vertical)}
+                style={vlog.auto_publish_vertical ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
+                title="Also output a 9:16 vertical copy of each shipped clip (FFmpeg crop)"
+              >
+                {vlog.auto_publish_vertical ? 'Vertical too ✓' : 'Source aspect only'}
+              </button>
+            ) : null}
+            {vlog.auto_publish_clips ? (
+              <button
+                className="action"
+                onClick={runAutoPublishNow}
+                title="Run the auto-publish sweep on this vlog now"
+              >
+                Auto-publish now →
+              </button>
+            ) : null}
             {vlog.playback_url && (
               <a className="action" href={vlog.playback_url} target="_blank" rel="noreferrer">
                 Open original
@@ -356,13 +473,14 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
                 }}>
                   Audio-only upload · drop the original file in later to attach the video
                 </div>
+                {vlog.slideshow_frames && vlog.slideshow_frames.length > 0 && (
+                  <SlideshowStage frames={vlog.slideshow_frames} currentT={currentT}/>
+                )}
                 {vlog.audio_url ? (
-                  <audio
-                    src={vlog.audio_url}
-                    controls
-                    preload="metadata"
-                    onTimeUpdate={(e) => setCurrentT((e.target as HTMLAudioElement).currentTime)}
-                    style={{ width: '100%' }}
+                  <AudioOnlyPlayer
+                    audioUrl={vlog.audio_url}
+                    chunkUrls={vlog.audio_chunk_urls ?? null}
+                    onTime={t => setCurrentT(t)}
                   />
                 ) : (
                   <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
@@ -404,6 +522,18 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             />
           </section>
         )}
+
+        {/* Whole-vlog click-to-cut editor — sits right after the player,
+            ahead of Threads/Clips/Creative, so it's not buried below the
+            fold. Falls back to a read-only transcript block when this
+            vlog has no word-level timestamps. */}
+        <VlogTranscriptEditor
+          vlogId={vlog.id}
+          hasWordTimestamps={!!vlog.has_word_timestamps}
+          fallbackText={vlog.transcript_text}
+          currentT={currentT}
+          seek={seek}
+        />
 
         {/* Body grid: main + rail */}
         <div className="canon-detail-body">
@@ -534,19 +664,6 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
               </section>
             )}
 
-            {/* Transcript */}
-            {vlog.transcript_text && (
-              <section className="canon-section">
-                <div className="canon-section-head">
-                  <h2>Transcript <span className="meta">· {wordCount.toLocaleString()} words</span></h2>
-                  <div className="meta">{vlog.transcript_text && 'word-timestamped · whisper v3'}</div>
-                </div>
-                <div className="canon-transcript-flow" style={{ ['--topic' as any]: 'var(--fg-3)' } as React.CSSProperties}>
-                  {vlog.transcript_text}
-                </div>
-              </section>
-            )}
-
             {/* System actions disclosure */}
             <section className="canon-section">
               <button
@@ -650,11 +767,15 @@ export default function VlogDetailPage({ params }: { params: { id: string } }) {
             )}
 
             {isFailed && vlog.pipeline_error && (
-              <div className="rail-card" style={{ borderLeft: '2px solid var(--t-terra)' }}>
+              <div className="rail-card" style={{ borderLeft: '2px solid var(--t-terra)', minWidth: 0, overflow: 'hidden' }}>
                 <div className="rc-head">
                   <h3>Pipeline failed</h3>
                 </div>
-                <div style={{ fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.55, fontFamily: 'var(--font-mono)' }}>
+                <div style={{
+                  fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.55, fontFamily: 'var(--font-mono)',
+                  overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                  maxHeight: 240, overflowY: 'auto',
+                }}>
                   {vlog.pipeline_error}
                 </div>
                 <button onClick={() => reExtract()} className="canon-btn primary" style={{ marginTop: 12, width: '100%', fontSize: 12 }}>
@@ -786,6 +907,92 @@ function deriveVlogTitle(filename: string | null): string {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, ch => ch.toUpperCase()) || 'Untitled vlog'
+}
+
+/**
+ * AudioOnlyPlayer — wraps <audio> and auto-advances through chunk URLs
+ * when the upload was browser-chunked into N pieces (audio-only mode
+ * with bad-wifi multi-chunk extraction). Single-chunk uploads behave
+ * exactly like a plain <audio> tag.
+ *
+ * Scrubbing inside the current chunk works natively. Scrubbing across
+ * chunks isn't supported — chunk boundaries advance only by `ended`.
+ * In practice audio-only chunks are ~5min each, so this rarely bites
+ * for normal listening; the next polish pass can stitch server-side
+ * into a single mp3.full and retire this wrapper.
+ */
+function AudioOnlyPlayer({
+  audioUrl, chunkUrls, onTime,
+}: {
+  audioUrl: string
+  chunkUrls: string[] | null
+  onTime: (t: number) => void
+}) {
+  const list = chunkUrls && chunkUrls.length > 0 ? chunkUrls : [audioUrl]
+  const [idx, setIdx] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  useEffect(() => { setIdx(0) }, [chunkUrls?.length])
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <audio
+        ref={audioRef}
+        src={list[idx]}
+        controls
+        autoPlay={idx > 0}
+        preload="metadata"
+        onTimeUpdate={e => onTime((e.target as HTMLAudioElement).currentTime)}
+        onEnded={() => {
+          if (idx + 1 < list.length) setIdx(idx + 1)
+        }}
+        style={{ width: '100%' }}
+      />
+      {list.length > 1 && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+          letterSpacing: 1.2, textTransform: 'uppercase',
+        }}>
+          Part {idx + 1} of {list.length}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * SlideshowStage — picks the latest frame whose time_sec ≤ currentT and
+ * renders it. Frames must already be sorted by time_sec asc (the API
+ * builds them in that order).
+ */
+function SlideshowStage({
+  frames, currentT,
+}: {
+  frames: Array<{ url: string; time_sec: number }>
+  currentT: number
+}) {
+  const active = useMemo(() => {
+    let pick = frames[0]
+    for (const f of frames) {
+      if (f.time_sec <= currentT) pick = f
+      else break
+    }
+    return pick
+  }, [frames, currentT])
+  return (
+    <div style={{
+      width: '100%', aspectRatio: '16 / 9',
+      background: '#050505', borderRadius: 10, overflow: 'hidden',
+      border: '1px solid var(--line-1)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {active && (
+        <img
+          src={active.url}
+          alt=""
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      )}
+    </div>
+  )
 }
 
 function fmtSize(bytes: number): string {

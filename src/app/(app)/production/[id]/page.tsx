@@ -3,7 +3,7 @@
 /**
  * Production detail (singular /production/[id]) — the draft view.
  *
- * Distinct from /productions/[id] which serves Pack Rats-style
+ * Distinct from /projects/[id] which serves Pack Rats-style
  * project containers from the `projects` table. This route serves
  * actual production artifacts from the `productions` table — the
  * output of the production engine.
@@ -56,19 +56,42 @@ interface Beat {
   take_number: number
   recorded_at: string | null
   visual_treatment: string | null
+  broll_image_r2_key: string | null
+  broll_image_url: string | null
+  broll_video_r2_key: string | null
+  broll_video_url: string | null
+  broll_prompt: string | null
+  broll_status: string | null
+  synth_audio_r2_key: string | null
+  synth_audio_url: string | null
+  synth_voice_id: string | null
 }
 
 interface ThreadSource {
   id: string; topic: string; take: string | null; abstracted_topic: string | null
   strength: number | null; transcript_span_start: number | null; transcript_span_end: number | null
   vlog_id: string; vlog_filename: string | null
+  vlog_title?: string | null; vlog_recorded_at?: string | null
+  transcript?: string
 }
 interface ClusterSource {
   id: string; topic: string; abstracted_topic: string | null
   take: string | null; ripeness_score: number; state: string
   threads: { id: string; topic: string; take: string | null; strength: number | null }[]
 }
-type Source = ThreadSource | ClusterSource | null
+interface ClipCandidateSource {
+  id: string; vlog_id: string; headline: string; quote: string | null
+  why_clippable: string | null
+  clippability_score: number | null; clippability_verdict: string | null
+  start_time: number; end_time: number
+  vlog_title: string | null; vlog_recorded_at: string | null
+  transcript: string
+}
+interface VlogEditSource {
+  vlog_id: string; vlog_title: string | null; vlog_recorded_at: string | null
+  cut_count: number; cut_seconds_total: number
+}
+type Source = ThreadSource | ClusterSource | ClipCandidateSource | VlogEditSource | null
 
 const TYPE_LABELS: Record<string, string> = {
   x_post: 'X post',
@@ -77,7 +100,9 @@ const TYPE_LABELS: Record<string, string> = {
   article: 'Article',
   clip: 'Clip',
   video_essay: 'Video essay',
+  short: 'Short (30–60s)',
   creative_work: 'Creative work',
+  coherent_edit: 'Coherent edit',
 }
 
 export default function ProductionDraftPage({ params }: { params: { id: string } }) {
@@ -163,7 +188,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
         method: 'DELETE', credentials: 'include',
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      router.push('/productions')
+      router.push('/published')
     } catch (e: any) {
       alert(`Delete failed: ${e?.message || e}`)
     }
@@ -171,13 +196,13 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
 
   if (error) return (
     <Shell>
-      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Productions', href: '/productions' }, 'Error']}/>
+      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Published', href: '/published' }, 'Error']}/>
       <div style={{ padding: 40, color: 'var(--t-terra)' }}>Error: {error}</div>
     </Shell>
   )
   if (!data) return (
     <Shell>
-      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Productions', href: '/productions' }, '…']}/>
+      <Crumbs trail={[{ label: 'Timeline', href: '/' }, { label: 'Published', href: '/published' }, '…']}/>
       <div style={{ padding: 40, color: 'var(--fg-3)' }}>Loading…</div>
     </Shell>
   )
@@ -197,7 +222,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
         <Crumbs
           trail={[
             { label: 'Timeline', href: '/' },
-            { label: 'Productions', href: '/productions' },
+            { label: 'Published', href: '/published' },
             { label: truncate(`${typeLabel} · ${topicName}`, 60) },
           ]}
         />
@@ -245,15 +270,28 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
                 Mark produced
               </button>
             )}
-            {p.state === 'produced' && (
-              <button className="action primary" onClick={togglePublish}>
-                {isPublic ? 'Unpublish' : 'Publish'}
+            {(p.state === 'produced' || p.state === 'script_ready' || p.state === 'materializing') && (
+              <button
+                className="action primary"
+                onClick={() => setState('published')}
+                title="Mark this as shipped — it'll appear on the Published page."
+              >
+                Mark published
               </button>
             )}
             {p.state === 'published' && (
-              <a className="action primary" href={`/p/${p.id}`} target="_blank" rel="noreferrer">
-                View public
-              </a>
+              <>
+                <a className="action primary" href={`/p/${p.id}`} target="_blank" rel="noreferrer">
+                  View public
+                </a>
+                <button
+                  className="action"
+                  onClick={() => setState('produced')}
+                  title="Move back to produced state."
+                >
+                  Un-publish
+                </button>
+              </>
             )}
             <button className="action" onClick={togglePublish}>
               {isPublic ? 'Set private' : 'Set public'}
@@ -301,10 +339,152 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
               </section>
             )}
 
+            {/* COHERENT EDIT — the whole-vlog click-to-cut render, no editor here */}
+            {p.production_type === 'coherent_edit' && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>The edit</h2>
+                  <div className="meta">
+                    {(() => {
+                      try { const m = JSON.parse(p.output_metadata || '{}'); return m.duration_sec ? `${Math.round(m.duration_sec)}s` : '' }
+                      catch { return '' }
+                    })()}
+                  </div>
+                </div>
+                {p.output_url ? (
+                  (() => {
+                    let isAudio = false
+                    try { isAudio = (JSON.parse(p.output_metadata || '{}').mime || '').startsWith('audio/') } catch {}
+                    return isAudio ? (
+                      <audio src={p.output_url} controls style={{ width: '100%' }}/>
+                    ) : (
+                      <video
+                        src={p.output_url}
+                        controls
+                        style={{
+                          width: '100%', maxHeight: 540,
+                          background: '#000',
+                          border: `1px solid var(--line-1)`,
+                          borderLeft: `2px solid ${color}`,
+                          borderRadius: '0 12px 12px 0',
+                          display: 'block',
+                        }}
+                      />
+                    )
+                  })()
+                ) : (
+                  <div className="canon-empty-hint">
+                    Edited output isn't available — R2 fetch may have failed. Try rendering again.
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* COHERENT EDIT CONTEXT — where this came from */}
+            {p.production_type === 'coherent_edit' && data.source && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>Where this came from</h2>
+                  <Link href={`/vlog/${(data.source as VlogEditSource).vlog_id}`} className="meta" style={{ textDecoration: 'none' }}>
+                    Open source vlog →
+                  </Link>
+                </div>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 10, background: 'var(--bg-1)',
+                  border: '1px solid var(--line-1)', display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  {(data.source as VlogEditSource).vlog_title && (
+                    <div style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                      From <strong style={{ color: 'var(--fg)' }}>{(data.source as VlogEditSource).vlog_title}</strong>
+                      {(data.source as VlogEditSource).vlog_recorded_at && (
+                        <> · {new Date((data.source as VlogEditSource).vlog_recorded_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                    {(data.source as VlogEditSource).cut_count} span{(data.source as VlogEditSource).cut_count === 1 ? '' : 's'} cut
+                    {' · '}{Math.round((data.source as VlogEditSource).cut_seconds_total)}s removed
+                  </div>
+                  <Link
+                    href={`/vlog/${(data.source as VlogEditSource).vlog_id}`}
+                    className="canon-btn"
+                    style={{ fontSize: 12, padding: '6px 12px', textDecoration: 'none', alignSelf: 'flex-start' }}
+                  >
+                    Edit cuts again
+                  </Link>
+                </div>
+              </section>
+            )}
+
+            {/* CLIP CONTEXT — where this came from: source vlog, verdict, transcript */}
+            {p.production_type === 'clip' && data.source && (
+              <section className="canon-section">
+                <div className="canon-section-head">
+                  <h2>Where this came from</h2>
+                  {'vlog_id' in data.source && (
+                    <Link href={`/vlog/${(data.source as any).vlog_id}`} className="meta" style={{ textDecoration: 'none' }}>
+                      Open source vlog →
+                    </Link>
+                  )}
+                </div>
+                <div style={{
+                  padding: '16px 18px', borderRadius: 10, background: 'var(--bg-1)',
+                  border: '1px solid var(--line-1)', display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  {'vlog_title' in data.source && data.source.vlog_title && (
+                    <div style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+                      From <strong style={{ color: 'var(--fg)' }}>{data.source.vlog_title}</strong>
+                      {'vlog_recorded_at' in data.source && data.source.vlog_recorded_at && (
+                        <> · {new Date(data.source.vlog_recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                      )}
+                    </div>
+                  )}
+                  {'clippability_score' in data.source && data.source.clippability_score != null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {[1,2,3,4,5].map(i => (
+                          <span key={i} style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: i <= (data.source as ClipCandidateSource).clippability_score! ? color : 'var(--bg-4)',
+                          }}/>
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--fg-3)' }}>
+                        {(data.source as ClipCandidateSource).clippability_verdict}
+                      </span>
+                    </div>
+                  )}
+                  {'transcript' in data.source && data.source.transcript && (
+                    <div>
+                      <div style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.2,
+                        textTransform: 'uppercase', color: 'var(--fg-4)', marginBottom: 6,
+                      }}>
+                        Full transcript of this span
+                      </div>
+                      <div style={{ fontSize: 14.5, lineHeight: 1.6, color: 'var(--fg-1)', fontStyle: 'italic' }}>
+                        &ldquo;{data.source.transcript}&rdquo;
+                      </div>
+                    </div>
+                  )}
+                  {p.source_kind === 'clip_candidate' && (
+                    <Link
+                      href={`/clips/${p.source_id}/edit`}
+                      className="canon-btn"
+                      style={{ fontSize: 12, padding: '6px 12px', textDecoration: 'none', alignSelf: 'flex-start' }}
+                    >
+                      Extend / trim this clip
+                    </Link>
+                  )}
+                </div>
+              </section>
+            )}
+
             {/* VIDEO ESSAY — beats list with per-beat record affordance */}
             {p.production_type === 'video_essay' && (
               <>
                 <VoiceoverPanel production={p} beats={data.beats ?? []} onStitched={load}/>
+                <AiBrollPanel production={p} beats={data.beats ?? []} onChanged={load}/>
                 <BrollRenderPanel production={p} onRendered={load}/>
                 <section className="canon-section">
                   <div className="canon-section-head">
@@ -351,7 +531,7 @@ export default function ProductionDraftPage({ params }: { params: { id: string }
             )}
 
             {/* TEXT — default editor for x_post / x_thread / micro_essay / article */}
-            {p.production_type !== 'clip' && p.production_type !== 'video_essay' && (
+            {p.production_type !== 'clip' && p.production_type !== 'video_essay' && p.production_type !== 'coherent_edit' && (
               <section className="canon-section">
                 <div className="canon-section-head">
                   <h2>Draft</h2>
@@ -568,8 +748,30 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
   const [error, setError] = useState<string | null>(null)
   const [localBlob, setLocalBlob] = useState<Blob | null>(null)
   const [localUrl, setLocalUrl] = useState<string | null>(null)
+  const [synthesizing, setSynthesizing] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
+
+  const synthesize = async () => {
+    setSynthesizing(true)
+    setError(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${productionId}/voiceover/synthesize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beat_indexes: [beat.beat_index] }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      const result = d.results?.[0]
+      if (result?.status === 'failed') throw new Error(result.error || 'synth failed')
+      onUpdated()
+    } catch (e: any) {
+      setError(e?.message || String(e))
+    } finally {
+      setSynthesizing(false)
+    }
+  }
   const streamRef = useRef<MediaStream | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -741,14 +943,48 @@ function BeatCard({ beat, color, productionId, onUpdated }: {
           </>
         )}
 
-        {/* No recording at all */}
-        {!hasRemote && !hasLocal && !recording && (
-          <button onClick={start} className="canon-btn primary" style={{ fontSize: 12 }}>
-            <span className="ico">
-              <svg viewBox="0 0 14 14"><rect x="5" y="2" width="4" height="7" rx="2"/><path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/></svg>
-            </span>
-            Record beat
-          </button>
+        {/* Synthesized take exists but no operator recording */}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <audio src={beat.synth_audio_url} controls
+            style={{ height: 32, flex: 1, minWidth: 200 }}/>
+        )}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <span style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: 1,
+            color: 'var(--sig)', border: '1px solid var(--sig)', borderRadius: 4, padding: '2px 6px',
+          }}>SYNTH</span>
+        )}
+
+        {/* No audio at all — offer both paths */}
+        {!hasRemote && !hasLocal && !recording && !beat.synth_audio_url && (
+          <>
+            <button onClick={start} className="canon-btn primary" style={{ fontSize: 12 }}>
+              <span className="ico">
+                <svg viewBox="0 0 14 14"><rect x="5" y="2" width="4" height="7" rx="2"/><path d="M3 7 Q3 11 7 11 Q11 11 11 7 M7 11 L7 13"/></svg>
+              </span>
+              Record beat
+            </button>
+            <button onClick={synthesize} className="canon-btn ghost"
+              disabled={synthesizing}
+              title="Generate this beat with Cloudflare TTS (MiniMax 2.8 if your voice profile is set, Aura-2 preset otherwise)."
+              style={{ fontSize: 12, color: 'var(--sig)' }}>
+              {synthesizing ? 'Synthesizing…' : 'Synthesize'}
+            </button>
+          </>
+        )}
+
+        {/* Synthesized exists — show Re-synth + Record-instead */}
+        {!hasRemote && !hasLocal && !recording && beat.synth_audio_url && (
+          <>
+            <button onClick={synthesize} className="canon-btn ghost"
+              disabled={synthesizing}
+              style={{ fontSize: 11, color: 'var(--sig)' }}>
+              {synthesizing ? '…' : 'Re-synthesize'}
+            </button>
+            <button onClick={start} className="canon-btn ghost" style={{ fontSize: 11 }}>
+              Record instead
+            </button>
+          </>
         )}
 
         {error && (
@@ -855,11 +1091,47 @@ function VoiceoverPanel({ production, beats, onStitched }: {
   onStitched: () => void
 }) {
   const [stitching, setStitching] = useState(false)
+  const [synthAllProgress, setSynthAllProgress] = useState<{ done: number; total: number; current?: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const recordedCount = beats.filter(b => b.audio_r2_key).length
+  const synthCount = beats.filter(b => !b.audio_r2_key && b.synth_audio_r2_key).length
   const totalCount = beats.length
+  const audibleCount = recordedCount + synthCount
+  const allAudible = totalCount > 0 && audibleCount === totalCount
   const allRecorded = totalCount > 0 && recordedCount === totalCount
+
+  // Sequential per-beat synthesis so the progress UI reflects real per-tile
+  // state. Total wall-clock matches a batch POST; granularity is the win.
+  const synthesizeAll = async () => {
+    const pending = beats.filter(b => !b.audio_r2_key && !b.synth_audio_r2_key)
+    if (pending.length === 0) return
+    setSynthAllProgress({ done: 0, total: pending.length })
+    setError(null)
+    let failures = 0
+    for (let i = 0; i < pending.length; i++) {
+      const beat = pending[i]
+      setSynthAllProgress({ done: i, total: pending.length, current: beat.beat_index })
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}/voiceover/synthesize`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beat_indexes: [beat.beat_index] }),
+        })
+        const d: any = await r.json()
+        const result = d?.results?.[0]
+        if (!r.ok || result?.status === 'failed') {
+          failures++
+          if (failures === 1) setError(`beat ${beat.beat_index}: ${result?.error || d?.error || 'failed'}`)
+        }
+      } catch (e: any) {
+        failures++
+        if (failures === 1) setError(`beat ${beat.beat_index}: ${e?.message || String(e)}`)
+      }
+      onStitched() // refresh production state for each tile
+    }
+    setSynthAllProgress(null)
+  }
 
   // Determine if the existing output is a stitched voiceover (vs a
   // future final-render artifact).
@@ -890,7 +1162,14 @@ function VoiceoverPanel({ production, beats, onStitched }: {
     <section className="canon-section">
       <div className="canon-section-head">
         <h2>Voiceover {hasVoiceover && <span className="meta">· stitched from {(() => { try { return JSON.parse(production.output_metadata || '{}').beat_count } catch { return recordedCount } })()} beats</span>}</h2>
-        <div className="meta">{recordedCount}/{totalCount} beats recorded</div>
+        <div className="meta">
+          {recordedCount} recorded{synthCount > 0 ? `, ${synthCount} synth` : ''} / {totalCount} beats
+          {synthAllProgress && (
+            <span style={{ marginLeft: 8, color: 'var(--sig)' }}>
+              · synthesizing {synthAllProgress.done + 1}/{synthAllProgress.total}{synthAllProgress.current != null ? ` (beat ${synthAllProgress.current + 1})` : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {hasVoiceover && production.output_url && (
@@ -940,16 +1219,29 @@ function VoiceoverPanel({ production, beats, onStitched }: {
           display: 'flex', flexDirection: 'column', gap: 12,
         }}>
           <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-            {allRecorded
-              ? 'All beats recorded. Stitch them into a single voiceover MP3.'
-              : `Record voiceover for ${totalCount - recordedCount} more beat${totalCount - recordedCount === 1 ? '' : 's'} below, then stitch.`}
+            {allAudible
+              ? `All beats have audio (${recordedCount} recorded${synthCount > 0 ? `, ${synthCount} synthesized` : ''}). Stitch into the final voiceover.`
+              : `${totalCount - audibleCount} beat${totalCount - audibleCount === 1 ? '' : 's'} need${totalCount - audibleCount === 1 ? 's' : ''} audio. Record below, or synthesize all remaining at once.`}
           </div>
-          <div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!allAudible && (
+              <button
+                onClick={synthesizeAll}
+                disabled={!!synthAllProgress || stitching}
+                className="canon-btn ghost"
+                style={{ fontSize: 12, color: 'var(--sig)' }}
+                title="Synthesize every un-audio beat with Cloudflare TTS (MiniMax 2.8 if your voice profile is set, Aura-2 preset otherwise)."
+              >
+                {synthAllProgress
+                  ? `Synthesizing ${synthAllProgress.done + 1}/${synthAllProgress.total}…`
+                  : `Synthesize ${totalCount - audibleCount} remaining`}
+              </button>
+            )}
             <button
               onClick={stitch}
-              disabled={stitching || !allRecorded}
+              disabled={stitching || !allAudible || !!synthAllProgress}
               className="canon-btn primary"
-              style={{ fontSize: 12, opacity: !allRecorded ? 0.5 : 1 }}
+              style={{ fontSize: 12, opacity: !allAudible ? 0.5 : 1 }}
             >
               {stitching ? 'Stitching…' : 'Stitch voiceover'}
             </button>
@@ -993,6 +1285,8 @@ function BrollRenderPanel({ production, onRendered }: {
   const [picked, setPicked] = useState<string[]>([])
   const [loadingBroll, setLoadingBroll] = useState(true)
   const [rendering, setRendering] = useState(false)
+  const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [renderElapsed, setRenderElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   // Check if a voiceover exists (must come before render).
@@ -1010,6 +1304,26 @@ function BrollRenderPanel({ production, onRendered }: {
       .then((d: any) => { setBroll(d.broll ?? []); setLoadingBroll(false) })
       .catch(() => setLoadingBroll(false))
   }, [])
+
+  // Render heartbeat — while a render is in flight, poll the production
+  // every 3 seconds and surface render_status (the server updates this
+  // between substeps: presigning → ffmpeg → uploading → done). Also tick
+  // an elapsed-seconds counter for the ETA line.
+  useEffect(() => {
+    if (!rendering) { setRenderStatus(null); setRenderElapsed(0); return }
+    const started = Date.now()
+    const tick = setInterval(() => setRenderElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}`, { credentials: 'include' })
+        if (!r.ok) return
+        const d: any = await r.json()
+        const status = d?.production?.render_status
+        if (typeof status === 'string') setRenderStatus(status)
+      } catch {}
+    }, 3000)
+    return () => { clearInterval(tick); clearInterval(poll) }
+  }, [rendering, production.id])
 
   const toggle = (id: string) => {
     setPicked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -1176,7 +1490,11 @@ function BrollRenderPanel({ production, onRendered }: {
                   className="canon-btn primary"
                   style={{ marginLeft: 'auto', fontSize: 12, opacity: picked.length === 0 ? 0.5 : 1 }}
                 >
-                  {rendering ? 'Rendering… (may take a minute)' : isFinalRender ? 'Re-render' : 'Render final MP4'}
+                  {rendering
+                    ? renderStatus
+                      ? `${renderStatus} · ${renderElapsed}s`
+                      : `Rendering… ${renderElapsed}s`
+                    : isFinalRender ? 'Re-render' : 'Render final MP4'}
                 </button>
               </div>
 
@@ -1193,4 +1511,283 @@ function BrollRenderPanel({ production, onRendered }: {
       )}
     </section>
   )
+}
+
+/**
+ * AiBrollPanel — Cloudflare-native AI b-roll for video essays.
+ *
+ * For each beat: gpt-oss writes a cinematic image prompt → Flux 1 Schnell
+ * generates a 1024×1024 still → Wan 2.7 animates it into a 5-10s clip
+ * (FFmpeg Ken Burns fallback if Wan errors). All Workers AI + R2, no third
+ * party. Then "Render with AI b-roll" calls /render with use_ai_broll=true.
+ *
+ * The operator can regenerate per-beat (single image or single clip)
+ * without re-running the whole production.
+ */
+function AiBrollPanel({ production, beats, onChanged }: {
+  production: Production
+  beats: Beat[]
+  onChanged: () => void
+}) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; current: number; stage: string } | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [rendering, setRendering] = useState(false)
+  const [renderStatus, setRenderStatus] = useState<string | null>(null)
+  const [renderElapsed, setRenderElapsed] = useState(0)
+
+  useEffect(() => {
+    if (!rendering) { setRenderStatus(null); setRenderElapsed(0); return }
+    const started = Date.now()
+    const tick = setInterval(() => setRenderElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}`, { credentials: 'include' })
+        if (!r.ok) return
+        const d: any = await r.json()
+        const status = d?.production?.render_status
+        if (typeof status === 'string') setRenderStatus(status)
+      } catch {}
+    }, 3000)
+    return () => { clearInterval(tick); clearInterval(poll) }
+  }, [rendering, production.id])
+
+  const haveAnyImages = beats.some(b => !!b.broll_image_r2_key)
+  const haveAllImages = beats.length > 0 && beats.every(b => !!b.broll_image_r2_key)
+  const haveAllVideos = beats.length > 0 && beats.every(b => !!b.broll_video_r2_key)
+
+  // Sequential per-beat generation: one POST per beat so each tile reflects
+  // its real state (prompting/Flux/Wan/Grok/done/failed) instead of a single
+  // "..." across the whole panel. Same total wall-clock; better feedback.
+  const generate = async (stage: 'image' | 'video' | 'both' | 'direct_video', beatIndexes?: number[]) => {
+    const targets = beatIndexes && beatIndexes.length > 0
+      ? beatIndexes
+      : beats.map(b => b.beat_index)
+    const isBulk = !beatIndexes || beatIndexes.length > 1
+    if (isBulk) setBulkProgress({ done: 0, total: targets.length, current: targets[0], stage })
+    setErr(null)
+    let failures = 0
+    for (let i = 0; i < targets.length; i++) {
+      const idx = targets[i]
+      setBusy(`beat ${idx}:${stage}`)
+      if (isBulk) setBulkProgress({ done: i, total: targets.length, current: idx, stage })
+      try {
+        const r = await fetch(`/api/v2/productions/${production.id}/broll`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stage, beat_indexes: [idx] }),
+        })
+        const d: any = await r.json()
+        if (!r.ok) {
+          failures++
+          if (failures === 1) setErr(d?.error || `HTTP ${r.status}`)
+        } else if (d.failures > 0) {
+          failures++
+          const detail = d.results?.find((x: any) => x.status === 'failed')?.error
+          if (failures === 1) setErr(`beat ${idx}: ${detail || 'failed'}`)
+        }
+        onChanged()
+      } catch (e: any) {
+        failures++
+        if (failures === 1) setErr(`beat ${idx}: ${e?.message || String(e)}`)
+      }
+    }
+    setBusy(null)
+    if (isBulk) setBulkProgress(null)
+  }
+
+  const render = async () => {
+    setRendering(true)
+    setErr(null)
+    try {
+      const r = await fetch(`/api/v2/productions/${production.id}/render`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_ai_broll: true }),
+      })
+      const d: any = await r.json()
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
+      onChanged()
+    } catch (e: any) {
+      setErr(e?.message || String(e))
+    } finally {
+      setRendering(false)
+    }
+  }
+
+  if (beats.length === 0) return null
+
+  return (
+    <section className="rail-card" style={{ marginTop: 16 }}>
+      <div className="rc-head">
+        <h3>AI b-roll <span className="meta">· Cloudflare Workers AI</span></h3>
+      </div>
+      <p style={{ fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5, marginTop: 4 }}>
+        Each beat gets a Kubrick-tier prompt (cinematographer + production-designer + set-builder, never literal), then Flux generates a still and Wan&nbsp;2.7 animates it. Per beat, you can override to <strong>Grok Imagine Video</strong> for direct text-to-video <em>with synchronized native audio</em>. All Cloudflare, no third party.
+      </p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <button
+          className="canon-btn primary"
+          onClick={() => generate(haveAllImages ? 'video' : 'both')}
+          disabled={!!busy || rendering}
+          style={{ fontSize: 12 }}
+        >
+          {busy === 'both:all' ? 'Generating…'
+            : busy === 'video:all' ? 'Animating…'
+            : !haveAnyImages ? 'Generate b-roll for all beats'
+            : !haveAllImages ? 'Finish generating (mixed state)'
+            : !haveAllVideos ? 'Animate all stills'
+            : 'Regenerate all'}
+        </button>
+        <button
+          className="canon-btn ghost"
+          onClick={() => generate('direct_video')}
+          disabled={!!busy || rendering}
+          style={{ fontSize: 12, color: 'var(--sig)' }}
+          title="Skip stills entirely. Grok Imagine generates each beat's clip with synchronized ambient audio. Costlier and slower than the default; use it for richer beats."
+        >
+          {busy === 'direct_video:all' ? 'Generating (Grok)…' : 'All beats → Grok (with audio)'}
+        </button>
+        {haveAllVideos && (
+          <button
+            className="canon-btn primary"
+            onClick={render}
+            disabled={!!busy || rendering}
+            style={{ fontSize: 12 }}
+          >
+            {rendering
+              ? renderStatus
+                ? `${renderStatus} · ${renderElapsed}s`
+                : `Rendering… ${renderElapsed}s`
+              : 'Render with AI b-roll'}
+          </button>
+        )}
+      </div>
+      {bulkProgress && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, letterSpacing: 1,
+            color: 'var(--fg-3)', marginBottom: 4, display: 'flex', justifyContent: 'space-between',
+          }}>
+            <span>
+              {bulkProgress.stage.toUpperCase()} · BEAT {bulkProgress.done + 1}/{bulkProgress.total}{bulkProgress.current != null ? ` (#${bulkProgress.current + 1})` : ''}
+            </span>
+            <span>
+              ~{estimateBrollRemaining(bulkProgress)}s remaining
+            </span>
+          </div>
+          <div style={{
+            height: 4, background: 'var(--bg-3)', borderRadius: 2, overflow: 'hidden',
+          }}>
+            <div style={{
+              height: '100%', width: `${(bulkProgress.done / bulkProgress.total) * 100}%`,
+              background: 'var(--sig)', transition: 'width 0.3s',
+            }}/>
+          </div>
+        </div>
+      )}
+      {err && (
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--t-terra)', wordBreak: 'break-word' }}>
+          {err}
+        </div>
+      )}
+      <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+        {beats.map(b => (
+          <BrollBeatTile
+            key={b.id}
+            beat={b}
+            busy={busy}
+            onGenerate={() => generate('both', [b.beat_index])}
+            onAnimate={() => generate('video', [b.beat_index])}
+            onDirectVideo={() => generate('direct_video', [b.beat_index])}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function BrollBeatTile({ beat, busy, onGenerate, onAnimate, onDirectVideo }: {
+  beat: Beat
+  busy: string | null
+  onGenerate: () => void
+  onAnimate: () => void
+  onDirectVideo: () => void
+}) {
+  const thisBusyImg = busy === `beat ${beat.beat_index}:both` || busy === `beat ${beat.beat_index}:image`
+  const thisBusyVid = busy === `beat ${beat.beat_index}:video`
+  const thisBusyDirect = busy === `beat ${beat.beat_index}:direct_video`
+  const isGrok = beat.broll_status === 'video_grok'
+  return (
+    <div style={{
+      border: '1px solid var(--line-1)', borderRadius: 8, padding: 8,
+      background: 'var(--bg-2)', display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{
+        aspectRatio: '16 / 9', background: '#000', borderRadius: 4, overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, color: 'var(--fg-4)', position: 'relative',
+      }}>
+        {beat.broll_video_url ? (
+          <video src={beat.broll_video_url} muted playsInline preload="metadata"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
+            onMouseLeave={e => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+          />
+        ) : beat.broll_image_url ? (
+          <img src={beat.broll_image_url} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+        ) : (
+          <span>{beat.broll_status === 'generating' ? 'Generating…' : beat.broll_status === 'failed' ? 'Failed' : 'No b-roll yet'}</span>
+        )}
+      </div>
+      <div style={{
+        fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, color: 'var(--fg-3)',
+        letterSpacing: 0.5, textTransform: 'uppercase', display: 'flex', gap: 6, alignItems: 'center',
+      }}>
+        <span>Beat {beat.beat_index + 1}{beat.broll_video_r2_key ? ' · clip' : beat.broll_image_r2_key ? ' · still' : ''}</span>
+        {isGrok && (
+          <span style={{ color: 'var(--sig)', border: '1px solid var(--sig)', borderRadius: 4, padding: '1px 5px', letterSpacing: 0.5 }}>
+            Grok · audio
+          </span>
+        )}
+      </div>
+      {beat.broll_prompt && (
+        <div style={{ fontSize: 10.5, color: 'var(--fg-3)', lineHeight: 1.35, maxHeight: 56, overflow: 'hidden' }}>
+          {beat.broll_prompt}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <button onClick={onGenerate} disabled={!!busy}
+          className="canon-btn ghost" style={{ fontSize: 10, flex: 1, minWidth: 0 }}
+          title="Generate still (Flux) and animate it (Wan 2.7, Ken-Burns fallback).">
+          {thisBusyImg ? '…' : beat.broll_image_r2_key ? 'Re-image' : 'Image'}
+        </button>
+        {beat.broll_image_r2_key && !isGrok && (
+          <button onClick={onAnimate} disabled={!!busy}
+            className="canon-btn ghost" style={{ fontSize: 10, flex: 1, minWidth: 0 }}
+            title="Animate the current still (Wan 2.7, Ken-Burns fallback). Silent.">
+            {thisBusyVid ? '…' : beat.broll_video_r2_key ? 'Re-animate' : 'Animate'}
+          </button>
+        )}
+        <button onClick={onDirectVideo} disabled={!!busy}
+          className="canon-btn ghost"
+          style={{ fontSize: 10, flex: 1, minWidth: 0, color: 'var(--sig)' }}
+          title="Skip the still — Grok Imagine Video generates motion + synchronized ambient audio in one shot. Costlier, slower, richer.">
+          {thisBusyDirect ? '…' : isGrok ? 'Re-Grok' : 'Direct (Grok+audio)'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Rough seconds-per-beat for each broll stage. Used purely for the user-
+// facing ETA on the progress bar — never for billing or scheduling.
+function estimateBrollRemaining(p: { done: number; total: number; stage: string }): number {
+  const perBeat = p.stage === 'direct_video' ? 60
+    : p.stage === 'video' ? 25
+    : p.stage === 'image' ? 10
+    : 35 // 'both' = image + video
+  const remaining = p.total - p.done
+  return Math.max(0, remaining * perBeat)
 }

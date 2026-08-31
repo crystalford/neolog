@@ -34,12 +34,19 @@ type ProductionRow = {
   published_to: string | null; engagement: string | null
   produced_at: string | null
   output_r2_key: string | null; output_metadata: string | null
+  render_status: string | null; render_started_at: string | null
   created_at: string; updated_at: string
 }
 type BeatRow = {
   id: string; beat_index: number; beat_text: string; cue: string | null
   audio_r2_key: string | null; take_number: number; recorded_at: string | null
   visual_treatment: string | null
+  broll_image_r2_key: string | null
+  broll_video_r2_key: string | null
+  broll_prompt: string | null
+  broll_status: string | null
+  synth_audio_r2_key: string | null
+  synth_voice_id: string | null
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -57,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     `SELECT id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
             script_text, script_version, voice_profile_id, form, length_magnitude,
             prompt_version, visibility, published_to, engagement, produced_at,
-            output_r2_key, output_metadata,
+            output_r2_key, output_metadata, render_status, render_started_at,
             created_at, updated_at
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
@@ -76,12 +83,19 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Load beats for video_essay productions. Each beat has its own
   // index, text, optional cue (title), and optional audio_r2_key
   // once the operator records voiceover.
-  let beats: (BeatRow & { audio_url: string | null })[] = []
+  let beats: (BeatRow & {
+    audio_url: string | null
+    synth_audio_url: string | null
+    broll_image_url: string | null
+    broll_video_url: string | null
+  })[] = []
   if (prod.production_type === 'video_essay') {
     try {
       const rows = await findMany<BeatRow>(
         db,
-        `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment
+        `SELECT id, beat_index, beat_text, cue, audio_r2_key, take_number, recorded_at, visual_treatment,
+                broll_image_r2_key, broll_video_r2_key, broll_prompt, broll_status,
+                synth_audio_r2_key, synth_voice_id
            FROM production_beats
           WHERE production_id = ?
           ORDER BY beat_index ASC`,
@@ -89,10 +103,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       )
       beats = await Promise.all(rows.map(async b => {
         let audio_url: string | null = null
+        let synth_audio_url: string | null = null
+        let broll_image_url: string | null = null
+        let broll_video_url: string | null = null
         if (b.audio_r2_key) {
           try { audio_url = await presignGetUrl(env, b.audio_r2_key, 4 * 3600) } catch {}
         }
-        return { ...b, audio_url }
+        if (b.synth_audio_r2_key) {
+          try { synth_audio_url = await presignGetUrl(env, b.synth_audio_r2_key, 4 * 3600) } catch {}
+        }
+        if (b.broll_image_r2_key) {
+          try { broll_image_url = await presignGetUrl(env, b.broll_image_r2_key, 4 * 3600) } catch {}
+        }
+        if (b.broll_video_r2_key) {
+          try { broll_video_url = await presignGetUrl(env, b.broll_video_r2_key, 4 * 3600) } catch {}
+        }
+        return { ...b, audio_url, synth_audio_url, broll_image_url, broll_video_url }
       }))
     } catch {}
   }
@@ -101,16 +127,91 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   let source: any = null
   try {
     if (prod.source_kind === 'thread') {
-      source = await findOne<any>(
+      const t = await findOne<any>(
         db,
         `SELECT t.id, t.topic, t.take, t.abstracted_topic, t.strength, t.transcript_span_start,
                 t.transcript_span_end, t.vlog_id,
-                v.original_filename AS vlog_filename
+                v.original_filename AS vlog_filename, v.title AS vlog_title, v.recorded_at AS vlog_recorded_at
            FROM threads t
            JOIN vlogs v ON v.id = t.vlog_id
           WHERE t.id = ? AND t.operator_id = ?`,
         prod.source_id, operator.id,
       )
+      if (t && t.transcript_span_start != null && t.transcript_span_end != null) {
+        try {
+          const words = await findMany<{ word: string }>(
+            db,
+            `SELECT word FROM transcript_words
+              WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+              ORDER BY word_index ASC LIMIT 600`,
+            t.vlog_id, t.transcript_span_start, t.transcript_span_end,
+          )
+          t.transcript = words.map((w: any) => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+        } catch { t.transcript = '' }
+      }
+      source = t
+    } else if (prod.source_kind === 'clip_candidate') {
+      const cc = await findOne<{
+        id: string; vlog_id: string; headline: string; quote: string | null
+        why_clippable: string | null
+        clippability_score: number | null; clippability_verdict: string | null
+        start_time: number; end_time: number
+        vlog_title: string | null; vlog_recorded_at: string | null
+      }>(
+        db,
+        `SELECT cc.id, cc.vlog_id, cc.headline, cc.quote, cc.why_clippable,
+                cc.clippability_score, cc.clippability_verdict,
+                cc.start_time, cc.end_time,
+                v.title AS vlog_title, v.recorded_at AS vlog_recorded_at
+           FROM clip_candidates cc
+           JOIN vlogs v ON v.id = cc.vlog_id
+          WHERE cc.id = ? AND cc.operator_id = ?`,
+        prod.source_id, operator.id,
+      )
+      if (cc) {
+        // Full verbatim transcript for the clipped span (not just the
+        // punchline `quote`) — this is the "where did this come from"
+        // context the clip view was missing.
+        let transcript = ''
+        try {
+          const words = await findMany<{ word: string }>(
+            db,
+            `SELECT word FROM transcript_words
+              WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+              ORDER BY word_index ASC LIMIT 600`,
+            cc.vlog_id, cc.start_time, cc.end_time,
+          )
+          transcript = words.map(w => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+        } catch {}
+        source = { ...cc, transcript }
+      }
+    } else if (prod.source_kind === 'vlog') {
+      const v = await findOne<{ id: string; title: string | null; recorded_at: string | null }>(
+        db,
+        `SELECT id, title, recorded_at FROM vlogs WHERE id = ? AND operator_id = ?`,
+        prod.source_id, operator.id,
+      )
+      if (v) {
+        // output_metadata (written by render-edit) already carries
+        // cut_count / cut_seconds_total pre-computed — no need to
+        // re-derive from word timestamps here.
+        let cutCount = 0
+        let cutSecondsTotal = 0
+        if (prod.output_metadata) {
+          try {
+            const meta = JSON.parse(prod.output_metadata)
+            cutCount = typeof meta?.cut_count === 'number' ? meta.cut_count : 0
+            cutSecondsTotal = typeof meta?.cut_seconds_total === 'number' ? meta.cut_seconds_total : 0
+          } catch {}
+        }
+        source = {
+          vlog_id: v.id,
+          vlog_title: v.title,
+          vlog_recorded_at: v.recorded_at,
+          cut_count: cutCount,
+          cut_seconds_total: cutSecondsTotal,
+        }
+      }
     } else if (prod.source_kind === 'cluster') {
       const c = await findOne<any>(
         db,

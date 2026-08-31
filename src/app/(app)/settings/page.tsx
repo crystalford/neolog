@@ -18,8 +18,11 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { ModelPreferences } from './ModelPreferences'
+import { VoicePreferences } from './VoicePreferences'
+import { BraveKeyRow } from './BraveKeyRow'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
+import { AutoPublishSettings } from './AutoPublishSettings'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -134,7 +137,7 @@ export default async function SettingsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         <Section title="Identity">
           <Row k="Operator profile" sub="Background, current focus, voice signature — used by the AI" arrow/>
-          <Row k="Voice profile" sub="Operator default · reference corpus auto-populated" arrow/>
+          <Row k="Voice profile" sub="Operator default · reference samples auto-populated" arrow/>
           <Row k="Timezone" v={operator.tz} arrow/>
         </Section>
 
@@ -142,12 +145,18 @@ export default async function SettingsPage() {
           <ModelPreferences/>
         </Section>
 
+        <Section title="Your voice">
+          <VoicePreferences/>
+        </Section>
+
         <Section title="API keys">
           <Row k="Anthropic" sub="claude-sonnet-4-6 (max tier + chat 'claude' option)" badge="Active" arrow/>
           <Row k="Workers AI" sub="Llama 4 Scout · Kimi K2.6 · Whisper — all native" badge="Active" arrow/>
+          <BraveKeyRow/>
         </Section>
 
         <Section title="Integrations">
+          <Row k="Your podcast feed" sub="In-house RSS · paste /podcast.xml into Apple Podcasts / Overcast / Spotify · per-vlog opt-in on /vlog/[id]" badge="Active" arrow/>
           <Row k="X / Twitter" sub="For shipping posts" badge="Not connected" badgeKind="empty" arrow/>
           <Row k="Cloudflare Access" sub={`${operator.email} · OTP via email`} badge="Active" arrow/>
         </Section>
@@ -162,6 +171,11 @@ export default async function SettingsPage() {
           <Row k="Riff confidence threshold" v="0.85" sub="Cosine similarity for auto-link" arrow/>
           <Row k="Transcription provider" v="Workers AI Whisper" sub="Switch to Claude per-vlog when available" arrow/>
           <Row k="Voice preservation hard check" v="On" sub="Each thread must contain a verbatim 4-word substring" arrow/>
+        </Section>
+
+        <Section title="Auto-publishing">
+          <Row k="Fanout webhook URL" sub="Paste the webhook URL from Make.com / Buffer / Zapier / your own worker. When set, every shipped clip is POSTed to this URL with mp4_url + caption + metadata; your fanout vendor handles per-platform posting. Test with the button below."/>
+          <AutoPublishSettings/>
         </Section>
 
         <Section title="Maintenance">

@@ -4,7 +4,8 @@
  * Single source of truth for "is the system healthy right now."
  *
  * Returns:
- *   - dependency health: D1, R2, FFmpeg container (/boot-info), Workers AI,
+ *   - dependency health: D1, R2, FFmpeg container (/__alive passive probe — does
+ *     NOT boot the container, so health checks don't pin it awake), Workers AI,
  *     PROCESS_UPLOAD workflow dispatch
  *   - per-row counts: vlogs by status, threads, clusters, prompts
  *   - recent pipeline failures (last 24h, untruncated error_full_text)
@@ -109,7 +110,14 @@ async function pingFfmpegContainer(env: Env): Promise<DependencyResult> {
     const ctl = new AbortController()
     const timer = setTimeout(() => ctl.abort(), 8000)
     try {
-      const r = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/boot-info', {
+      // PASSIVE probe — /__alive reports running state WITHOUT booting the
+      // container (handled at the worker layer in workers/ffmpeg/src/worker.ts).
+      // This is deliberate: the old /boot-info probe booted the container on
+      // every health check, and the 60s health-pill poll then pinned it awake
+      // 24/7 → Container Memory billed all day. "idle" is a HEALTHY state — the
+      // container scales to zero and boots on real demand. Only a thrown error
+      // or missing binding is unhealthy here.
+      const r = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/__alive', {
         method: 'GET',
         signal: ctl.signal,
       } as RequestInit)
@@ -119,7 +127,9 @@ async function pingFfmpegContainer(env: Env): Promise<DependencyResult> {
         return { ok: false, ms: Date.now() - t0, error: `HTTP ${r.status}: ${body}` }
       }
       const body = await r.text()
-      return { ok: true, ms: Date.now() - t0, detail: body.slice(0, 300) }
+      let state = 'idle'
+      try { state = (JSON.parse(body)?.running ? 'running' : 'idle') } catch {}
+      return { ok: true, ms: Date.now() - t0, detail: `container ${state} (scales to zero)` }
     } finally {
       clearTimeout(timer)
     }

@@ -809,6 +809,13 @@ async function extractAudioSegment(body, res) {
 // H.264/AAC (stream copy).
 async function extractVideoSegment(body, res) {
   const { input_url, start_sec, duration_sec } = body
+  // Optional aspect param. 'source' (default) keeps the source aspect with
+  // a fast stream-copy path. 'vertical' forces a 9:16 center-crop via
+  // `crop=ih*9/16:ih,setsar=1` and re-encodes (stream copy can't apply
+  // a video filter). Used by the auto-publish pipeline to ship a second
+  // vertical copy alongside the source-aspect clip.
+  const aspect = body.aspect === 'vertical' ? 'vertical' : 'source'
+
   if (!input_url) return jsonError(res, 400, 'input_url required')
   if (!isFinite(start_sec) || start_sec < 0) return jsonError(res, 400, 'start_sec must be a non-negative number')
   if (!isFinite(duration_sec) || duration_sec <= 0) return jsonError(res, 400, 'duration_sec must be positive')
@@ -822,32 +829,17 @@ async function extractVideoSegment(body, res) {
   const outFile = join(dir, 'segment.mp4')
 
   try {
-    // Two-pass strategy:
-    //   1. Try stream copy (no re-encode) — fast, lossless, works when
-    //      the source is already H.264/AAC. -ss before -i for fast seek.
-    //   2. Fall back to re-encode if stream copy produces a broken file
-    //      (some sources need re-encode for clean keyframe seek).
-    try {
+    if (aspect === 'vertical') {
+      // Vertical 9:16 — center-crop the source to a 9:16 aspect and re-encode.
+      // Filter math: width = ih*9/16, height = ih, centered. setsar=1 fixes
+      // square-pixel mode so platforms don't squish it.
       await runFfmpeg(
         [
           '-y',
           '-ss', String(start_sec),
           '-i', inputFile,
           '-t',  String(clipped),
-          '-c',  'copy',
-          '-movflags', '+faststart',
-          outFile,
-        ],
-        outFile,
-      )
-    } catch (copyErr) {
-      // Stream copy failed — try a clean re-encode.
-      await runFfmpeg(
-        [
-          '-y',
-          '-ss', String(start_sec),
-          '-i', inputFile,
-          '-t',  String(clipped),
+          '-vf', 'crop=ih*9/16:ih,setsar=1',
           '-c:v', 'libx264',
           '-preset', 'veryfast',
           '-crf', '23',
@@ -858,6 +850,39 @@ async function extractVideoSegment(body, res) {
         ],
         outFile,
       )
+    } else {
+      // Source-aspect path — fast stream copy when possible, re-encode fallback.
+      try {
+        await runFfmpeg(
+          [
+            '-y',
+            '-ss', String(start_sec),
+            '-i', inputFile,
+            '-t',  String(clipped),
+            '-c',  'copy',
+            '-movflags', '+faststart',
+            outFile,
+          ],
+          outFile,
+        )
+      } catch (copyErr) {
+        await runFfmpeg(
+          [
+            '-y',
+            '-ss', String(start_sec),
+            '-i', inputFile,
+            '-t',  String(clipped),
+            '-c:v', 'libx264',
+            '-preset', 'veryfast',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            outFile,
+          ],
+          outFile,
+        )
+      }
     }
     streamFile(res, outFile, 'video/mp4')
     res.on('close', () => cleanup(dir))
@@ -943,12 +968,15 @@ async function concatAudio(body, res) {
 // Output:
 //   MP4 stream
 async function renderVideoEssay(body, res) {
-  const { voiceover_url, broll_urls } = body
+  const { voiceover_url, broll_urls, aspect } = body
   if (!voiceover_url) return jsonError(res, 400, 'voiceover_url required')
   if (!Array.isArray(broll_urls) || broll_urls.length === 0) {
     return jsonError(res, 400, 'broll_urls (non-empty array) required')
   }
   if (broll_urls.length > 30) return jsonError(res, 400, 'Too many broll clips (cap 30)')
+  // 9:16 vertical for shorts, 16:9 horizontal for everything else.
+  const outW = aspect === '9:16' ? 1080 : 1920
+  const outH = aspect === '9:16' ? 1920 : 1080
 
   const { join } = await import('path')
   const { writeFileSync } = await import('fs')
@@ -991,8 +1019,8 @@ async function renderVideoEssay(body, res) {
     const scaleChains = []
     for (let i = 0; i < N; i++) {
       scaleChains.push(
-        `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,` +
-        `pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
+        `[${i}:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease,` +
+        `pad=${outW}:${outH}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[v${i}]`,
       )
     }
     const concatInputs = Array.from({ length: N }, (_, i) => `[v${i}]`).join('')
@@ -1028,6 +1056,127 @@ async function renderVideoEssay(body, res) {
   }
 }
 
+// ── endpoint: /ken-burns ───────────────────────────────────────────────
+// Turn a single still image into a video clip with a slow zoom + pan
+// (Ken Burns effect). Used as the b-roll fallback when Wan 2.7 errors —
+// keeps the essay shippable even when image-to-video isn't reachable.
+// Input:  { image_url: string, duration_sec: number, width?, height? }
+// Output: MP4 video stream.
+async function kenBurns(body, res) {
+  const { image_url, duration_sec } = body
+  const width = body.width || 1280
+  const height = body.height || 720
+  if (!image_url || typeof image_url !== 'string') {
+    return jsonError(res, 400, 'image_url required')
+  }
+  const dur = Math.max(1, Math.min(30, Number(duration_sec) || 6))
+  const { join } = await import('path')
+  const { dir, file: inputFile } = await downloadToTmp(image_url, 'kenburns')
+  const outFile = join(dir, 'out.mp4')
+  try {
+    const fps = 30
+    const totalFrames = Math.round(dur * fps)
+    // Slow zoom from 1.0 → 1.12 with a tiny rightward pan. Scale source to a
+    // big intermediate so zoompan has resolution headroom, then downscale.
+    const filter = [
+      `scale=${width * 2}:${height * 2}:flags=lanczos`,
+      `zoompan=z='min(zoom+0.0008,1.12)':d=${totalFrames}:x='iw/2-(iw/zoom/2)+(on*0.2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}:fps=${fps}`,
+      `format=yuv420p`,
+    ].join(',')
+    await runFfmpeg(
+      [
+        '-y',
+        '-loop', '1',
+        '-i', inputFile,
+        '-vf', filter,
+        '-t', String(dur),
+        '-r', String(fps),
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-movflags', '+faststart',
+        '-an',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /ken-burns failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
+// ── endpoint: /images-to-video ─────────────────────────────────────────
+// Assemble an ordered list of photos into an MP4 — the progress-video
+// engine (strength-training time-lapse, before/after). Each image is
+// normalized (scaled + letterbox-padded to a uniform target size, so a
+// mix of portrait/landscape phone photos assembles cleanly) then held for
+// `seconds_per_image`. No captions, no text overlays (house rule).
+//
+// Body: {
+//   image_urls: string[],           // ordered, oldest → newest
+//   mode?: 'timelapse' | 'before_after',
+//   seconds_per_image?: number,     // default 0.4 timelapse / 1.8 before_after
+//   width?, height?                 // target canvas, default 1080x1350 (4:5 portrait)
+// }
+async function imagesToVideo(body, res) {
+  const urls = Array.isArray(body.image_urls) ? body.image_urls.filter(u => typeof u === 'string') : []
+  if (urls.length < 2) return jsonError(res, 400, 'image_urls needs at least 2 entries')
+  const mode = body.mode === 'before_after' ? 'before_after' : 'timelapse'
+  const list = mode === 'before_after' ? [urls[0], urls[urls.length - 1]] : urls.slice(0, 240)
+  const spi = Number(body.seconds_per_image) > 0
+    ? Number(body.seconds_per_image)
+    : (mode === 'before_after' ? 1.8 : 0.4)
+  const W = Math.max(240, Math.min(2160, parseInt(body.width, 10) || 1080))
+  const H = Math.max(240, Math.min(2160, parseInt(body.height, 10) || 1350))
+
+  const dir = mkdtempSync(join(tmpdir(), 'neolog-ffmpeg-img2vid-'))
+  try {
+    // Download + normalize each image to a uniform WxH frame, named
+    // sequentially so the assembler reads them as an image sequence.
+    for (let i = 0; i < list.length; i++) {
+      const srcResp = await fetch(list[i])
+      if (!srcResp.ok || !srcResp.body) throw new Error(`fetch image ${i} failed: HTTP ${srcResp.status}`)
+      const rawFile = join(dir, `raw_${i}`)
+      await pipeline(Readable.fromWeb(srcResp.body), createWriteStream(rawFile))
+      const frameFile = join(dir, `frame_${String(i).padStart(4, '0')}.jpg`)
+      await runFfmpeg(
+        [
+          '-y', '-i', rawFile,
+          '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`,
+          '-frames:v', '1',
+          frameFile,
+        ],
+        frameFile,
+      )
+    }
+
+    const outFile = join(dir, 'out.mp4')
+    await runFfmpeg(
+      [
+        '-y',
+        '-framerate', `1/${spi}`,
+        '-i', join(dir, 'frame_%04d.jpg'),
+        '-r', '30',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '21',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        outFile,
+      ],
+      outFile,
+    )
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /images-to-video failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
   '/extract-thumb':  extractThumb,
@@ -1037,6 +1186,8 @@ const routes = {
   '/extract-video-segment': extractVideoSegment,
   '/concat-audio': concatAudio,
   '/render-video-essay': renderVideoEssay,
+  '/ken-burns': kenBurns,
+  '/images-to-video': imagesToVideo,
   '/trim':           trim,
   '/concat':         concat,
 }
@@ -1045,7 +1196,7 @@ const routes = {
 // /health returns this so the operator can verify which version is live.
 // If you push a workers/ffmpeg change and /health still shows the old build,
 // deploy-workers.yml didn't actually deploy.
-const BUILD_VERSION = 'rebuild-2026-05-18-brace-fix-boot-guards'
+const BUILD_VERSION = 'rebuild-2026-06-29-images-to-video-plus-vertical-crop'
 
 const SERVER_BOOT_AT = Date.now()
 

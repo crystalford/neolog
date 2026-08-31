@@ -759,6 +759,17 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   border-radius: 4px;
   background: var(--bg-2);
 }
+/* Subtitle line below a dropdown-item label — used to surface
+   lost-but-good destinations (Inbox, Studio, Podcast) with a one-liner
+   explanation so the operator knows what they are. */
+.canon-dropdown .dropdown-sub {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--fg-4);
+  font-style: italic;
+  text-align: right;
+  max-width: 50%;
+}
 
 @media (max-width: 960px) {
   .canon-wrap { padding: 0 24px; }
@@ -2364,4 +2375,46 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 
 @media (max-width: 960px) {
   .canon-surface-card { min-height: 0; }
+}
+
+/* ─── Polish (2026-06-12) ─── */
+
+/* Skeleton loader — replaces "LOADING…" mono text on the big list pages.
+   Uses the existing bg-* tokens so it sits in dark mode without surprises. */
+@keyframes neolog-shimmer {
+  0%   { background-position: -160% 0; }
+  100% { background-position:  160% 0; }
+}
+.neolog-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-2) 0%,
+    var(--bg-3) 50%,
+    var(--bg-2) 100%
+  );
+  background-size: 220% 100%;
+  animation: neolog-shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Card-lift hover — applied to .neolog-card-lift; subtle, doesn't pop. */
+.neolog-card-lift {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 180ms ease;
+}
+.neolog-card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.5);
+}
+
+/* Subtle reveal-on-mount — applied to .neolog-fade-in; useful for
+   content that loads asynchronously so the page doesn't pop. */
+@keyframes neolog-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.neolog-fade-in {
+  animation: neolog-fade-in 240ms ease both;
 }

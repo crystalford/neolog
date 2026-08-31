@@ -506,6 +506,576 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-05-22_vlogs_title',
     sql: `ALTER TABLE vlogs ADD COLUMN title TEXT`,
   },
+  // ─── podcast feed inclusion (2026-06-04) ─────────────────────────────────
+  // Per-vlog opt-in flag for /podcast.xml. Independent of visibility=public
+  // so the operator can curate the podcast feed separately from the web
+  // archive (e.g. include audio-only quick takes that aren't web-public).
+  {
+    name: '2026-06-04_vlogs_is_podcast',
+    sql: `ALTER TABLE vlogs ADD COLUMN is_podcast INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-04_idx_vlogs_is_podcast',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_is_podcast
+            ON vlogs(operator_id, is_podcast, recorded_at DESC)
+            WHERE is_podcast = 1 AND deleted_at IS NULL`,
+  },
+  // ─── slideshow upload mode (2026-06-04) ──────────────────────────────────
+  // Bad-wifi mode #3: client extracts N still frames (every ~5s) + the
+  // streaming audio; vlog page renders the stills timed to the audio. No
+  // video upload. JSON shape: [{ r2_key, time_sec }]
+  {
+    name: '2026-06-04_vlogs_slideshow_frames_json',
+    sql: `ALTER TABLE vlogs ADD COLUMN slideshow_frames_json TEXT`,
+  },
+  // ─── Typed utterances (2026-06-11, Phase 2) ──────────────────────────────
+  // Each thread carries a structural kind so scripts can compose a real arc
+  // (claim → story → open_question) instead of a flat collage of takes.
+  // Distinct from `register` (voice mode). Old rows stay NULL and are
+  // treated as 'observation' by downstream consumers.
+  {
+    name: '2026-06-11_threads_utterance_kind',
+    sql: `ALTER TABLE threads ADD COLUMN utterance_kind TEXT`,
+  },
+  {
+    name: '2026-06-11_idx_threads_utterance_kind',
+    sql: `CREATE INDEX IF NOT EXISTS idx_threads_utterance_kind
+            ON threads(operator_id, utterance_kind)
+            WHERE utterance_kind IS NOT NULL AND deleted_at IS NULL`,
+  },
+  // ─── Subject kinds: theme / tension / evolution / open_loop (Phase 3) ────
+  // Tensions and evolutions are FIRST-CLASS subjects alongside themes — the
+  // contradictions and changes-of-mind the operator lives are the best
+  // essay seeds. pole_a/pole_b carry the two sides (with dates) so the
+  // subject card and script generator can render "on {date_a} you said X;
+  // on {date_b} the opposite."
+  {
+    name: '2026-06-11_clusters_subject_kind',
+    sql: `ALTER TABLE clusters ADD COLUMN subject_kind TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_a',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_a TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_b',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_b TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_a_at',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_a_at TEXT`,
+  },
+  {
+    name: '2026-06-11_clusters_pole_b_at',
+    sql: `ALTER TABLE clusters ADD COLUMN pole_b_at TEXT`,
+  },
+  {
+    name: '2026-06-11_idx_clusters_subject_kind',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clusters_subject_kind
+            ON clusters(operator_id, subject_kind, ripeness_score DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Phase 4: reasoning skeleton on productions ──────────────────────────
+  // Before writing full prose, the system proposes a BEAT STRUCTURE (a
+  // skeleton). Operator reviews/locks it, then prose is generated from the
+  // locked skeleton. Stored as JSON on productions so the same skeleton can
+  // fan out to multiple deliverables (essay → article → post).
+  {
+    name: '2026-06-11_productions_reasoning_skeleton_json',
+    sql: `ALTER TABLE productions ADD COLUMN reasoning_skeleton_json TEXT`,
+  },
+  {
+    name: '2026-06-11_productions_skeleton_locked',
+    sql: `ALTER TABLE productions ADD COLUMN skeleton_locked INTEGER NOT NULL DEFAULT 0`,
+  },
+  // ─── AI b-roll per beat (2026-06-12) ─────────────────────────────────────
+  // For each beat: a Flux still + a Wan-2.7 (or Ken-Burns-fallback) clip.
+  // broll_status: null → 'image' → 'video' → 'failed'. broll_prompt is
+  // stored so regeneration uses the operator's edits and we can audit drift.
+  {
+    name: '2026-06-12_production_beats_broll_image_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_image_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_video_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_video_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_prompt',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_prompt TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_status',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_status TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_broll_duration_sec',
+    sql: `ALTER TABLE production_beats ADD COLUMN broll_duration_sec REAL`,
+  },
+  // ─── Voice synthesis (Phase 5) ───────────────────────────────────────────
+  // Operator can either record each beat OR synthesize via Cloudflare TTS.
+  // MiniMax 2.8 Turbo clones from a 10s reference; Aura-2 / Grok use presets.
+  // synth_audio_r2_key lives next to audio_r2_key; stitch picks whichever
+  // exists (recorded wins ties — operator's actual voice trumps clone).
+  {
+    name: '2026-06-12_production_beats_synth_audio_r2_key',
+    sql: `ALTER TABLE production_beats ADD COLUMN synth_audio_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_production_beats_synth_voice_id',
+    sql: `ALTER TABLE production_beats ADD COLUMN synth_voice_id TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_profile_r2_key',
+    sql: `ALTER TABLE operator ADD COLUMN voice_profile_r2_key TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_synth_mode',
+    sql: `ALTER TABLE operator ADD COLUMN voice_synth_mode TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_voice_synth_voice_id',
+    sql: `ALTER TABLE operator ADD COLUMN voice_synth_voice_id TEXT`,
+  },
+  // Render heartbeat: the render step writes intermediate substeps here so
+  // the client poll surfaces "concating audio" / "rendering" / "uploading"
+  // instead of a 5-minute silent spinner.
+  {
+    name: '2026-06-12_productions_render_status',
+    sql: `ALTER TABLE productions ADD COLUMN render_status TEXT`,
+  },
+  {
+    name: '2026-06-12_productions_render_started_at',
+    sql: `ALTER TABLE productions ADD COLUMN render_started_at TEXT`,
+  },
+  // ─── Topics surface — essays on arbitrary subjects, in your voice ────────
+  // A 'topic' is a free-text subject the operator types (a person, an idea,
+  // a fascination). Distinct from 'clusters' which are auto-surfaced from
+  // the operator's own vlogs. Stored as its own table so the Subjects screen
+  // stays cleanly about reflection while Topics is the create-from-scratch
+  // surface. Same production downstream — a Topic generates a video_essay
+  // with source_kind='topic', source_id=<topic id>.
+  {
+    name: '2026-06-12_topics',
+    sql: `CREATE TABLE IF NOT EXISTS topics (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      title           TEXT NOT NULL,
+      framing         TEXT,
+      angle           TEXT,
+      notes           TEXT,
+      state           TEXT NOT NULL DEFAULT 'forming',
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-12_idx_topics_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_topics_operator
+            ON topics(operator_id, updated_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Topic research (the "system goes and learns" pass) ──────────────────
+  // Per-topic: the synthesized research brief + a list of URLs used.
+  // Sources are stored separately so the operator can audit / remove a
+  // source and re-research without losing the topic.
+  {
+    name: '2026-06-12_topics_research_brief',
+    sql: `ALTER TABLE topics ADD COLUMN research_brief TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_research_status',
+    sql: `ALTER TABLE topics ADD COLUMN research_status TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_research_at',
+    sql: `ALTER TABLE topics ADD COLUMN research_at TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_pasted_urls_json',
+    sql: `ALTER TABLE topics ADD COLUMN pasted_urls_json TEXT`,
+  },
+  {
+    name: '2026-06-12_topic_sources',
+    sql: `CREATE TABLE IF NOT EXISTS topic_sources (
+      id              TEXT PRIMARY KEY,
+      topic_id        TEXT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      url             TEXT NOT NULL,
+      title           TEXT,
+      summary         TEXT,
+      origin          TEXT,
+      content_r2_key  TEXT,
+      bytes           INTEGER,
+      fetched_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      error           TEXT
+    )`,
+  },
+  {
+    name: '2026-06-12_idx_topic_sources_topic',
+    sql: `CREATE INDEX IF NOT EXISTS idx_topic_sources_topic
+            ON topic_sources(topic_id, fetched_at DESC)`,
+  },
+  // Operator setting: Brave Search API key (optional). When present, the
+  // research step auto-searches. When absent, falls back to pasted URLs.
+  {
+    name: '2026-06-12_operator_brave_search_api_key',
+    sql: `ALTER TABLE operator ADD COLUMN brave_search_api_key TEXT`,
+  },
+  // ─── Operator profile (the "knows me" layer) ─────────────────────────────
+  // A synthesized paragraph of WHAT the operator cares about — refreshed
+  // from their vlog corpus + named subjects. Injected into every generator
+  // (librarian, angle suggester, research brief, script writer) so each
+  // act of generation is shaped by the operator's actual mind, not a
+  // stranger's.
+  {
+    name: '2026-06-12_operator_profile_digest',
+    sql: `ALTER TABLE operator ADD COLUMN profile_digest TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_profile_refreshed_at',
+    sql: `ALTER TABLE operator ADD COLUMN profile_refreshed_at TEXT`,
+  },
+  // Cache suggestions per topic so they're INSTANT on revisit. Pre-fired
+  // on topic create via waitUntil() so the detail page renders them as
+  // soon as the page loads, not after a 15s gpt-oss call.
+  {
+    name: '2026-06-12_topics_suggestions_json',
+    sql: `ALTER TABLE topics ADD COLUMN suggestions_json TEXT`,
+  },
+  {
+    name: '2026-06-12_topics_suggestions_grounded',
+    sql: `ALTER TABLE topics ADD COLUMN suggestions_grounded INTEGER NOT NULL DEFAULT 0`,
+  },
+  // ─── Spark seeds cache (Phase 5 polish) ──────────────────────────────────
+  // Cached on operator so the Spark composer renders concept seeds
+  // instantly. Refreshed on librarian completion (same trigger as the
+  // profile digest).
+  {
+    name: '2026-06-12_operator_spark_seeds_json',
+    sql: `ALTER TABLE operator ADD COLUMN spark_seeds_json TEXT`,
+  },
+  {
+    name: '2026-06-12_operator_spark_seeds_refreshed_at',
+    sql: `ALTER TABLE operator ADD COLUMN spark_seeds_refreshed_at TEXT`,
+  },
+  // Production aspect ratio. Shorts render 9:16; everything else 16:9.
+  // Drives both the b-roll image/video aspect and the FFmpeg render output.
+  {
+    name: '2026-06-12_productions_aspect',
+    sql: `ALTER TABLE productions ADD COLUMN aspect TEXT`,
+  },
+  // ─── Subjects / librarian pass (2026-06-04) ──────────────────────────────
+  // The librarian writes into the existing `clusters` table (so the
+  // production→video-essay flow already works). These columns carry the
+  // concept-naming layer: the system identifies the underlying concept a
+  // creator keeps circling — even when they never used the term — and
+  // records how it named it.
+  {
+    name: '2026-06-04_clusters_framing',
+    sql: `ALTER TABLE clusters ADD COLUMN framing TEXT`,
+  },
+  {
+    name: '2026-06-04_clusters_concept_confidence',
+    sql: `ALTER TABLE clusters ADD COLUMN concept_confidence REAL`,
+  },
+  {
+    name: '2026-06-04_clusters_named_by_system',
+    sql: `ALTER TABLE clusters ADD COLUMN named_by_system INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-04_clusters_representative_quote',
+    sql: `ALTER TABLE clusters ADD COLUMN representative_quote TEXT`,
+  },
+  {
+    name: '2026-06-04_clusters_subject_source',
+    sql: `ALTER TABLE clusters ADD COLUMN subject_source TEXT`,
+  },
+  {
+    name: '2026-06-04_idx_clusters_subject_source',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clusters_subject_source
+            ON clusters(operator_id, subject_source, ripeness_score DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Auto-publish pipeline (2026-06-16) ──────────────────────────────────
+  // Per-vlog toggle: when 1, the post-upload workflow auto-promotes the
+  // top-N validated clip_candidates into shorts and fires the operator's
+  // social-fanout webhook (Make.com / Buffer / etc.). Off by default so
+  // existing vlogs don't suddenly start posting.
+  {
+    name: '2026-06-16_vlogs_auto_publish_clips',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_clips INTEGER NOT NULL DEFAULT 0`,
+  },
+  // Operator settings for auto-publish defaults.
+  {
+    name: '2026-06-16_operator_social_fanout_webhook_url',
+    sql: `ALTER TABLE operator ADD COLUMN social_fanout_webhook_url TEXT`,
+  },
+  {
+    name: '2026-06-16_operator_auto_publish_default',
+    sql: `ALTER TABLE operator ADD COLUMN auto_publish_default INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-16_operator_auto_publish_max_per_vlog',
+    sql: `ALTER TABLE operator ADD COLUMN auto_publish_max_per_vlog INTEGER NOT NULL DEFAULT 2`,
+  },
+  // Flag set by the post-upload workflow when extraction finishes on an
+  // auto-publish-eligible vlog. The Pages app (refresh-drafts cron or
+  // home-page visit via ctx.waitUntil) scans for pending=1 and runs
+  // autoPromoteVlog. Cleared on success.
+  {
+    name: '2026-06-16_vlogs_auto_publish_pending',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_pending INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    name: '2026-06-16_idx_vlogs_auto_publish_pending',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_auto_publish_pending
+            ON vlogs(operator_id, auto_publish_pending)
+            WHERE deleted_at IS NULL AND auto_publish_pending = 1`,
+  },
+  // Optional 9:16 second-output on the auto-publish pipeline. Default 0
+  // (off). When 1, the auto-promote step ALSO renders a vertical copy of
+  // each shipped clip (FFmpeg crop=ih*9/16:ih,setsar=1) so the same clip
+  // can fan out to vertical feeds without a separate manual step.
+  {
+    name: '2026-06-16_vlogs_auto_publish_vertical',
+    sql: `ALTER TABLE vlogs ADD COLUMN auto_publish_vertical INTEGER NOT NULL DEFAULT 0`,
+  },
+  // ─── Clip-quality judge (2026-06-16) ─────────────────────────────────────
+  // Each clip_candidate gets a 1–5 "would this travel as a standalone short"
+  // score from a second LLM pass that reads the clip + 30s of pre/post
+  // transcript context. Auto-promote requires score >= 4 to ship, so dull
+  // candidates never auto-post even if the extractor flagged them.
+  // Persisted so re-runs of the sweep don't re-judge — judging is the
+  // expensive step (one gpt-oss low-effort call per candidate).
+  {
+    name: '2026-06-16_clip_candidates_clippability_score',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_score INTEGER`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_clippability_judged_at',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_judged_at TEXT`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_clippability_verdict',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN clippability_verdict TEXT`,
+  },
+  {
+    name: '2026-06-16_clip_candidates_suggested_caption_hook',
+    sql: `ALTER TABLE clip_candidates ADD COLUMN suggested_caption_hook TEXT`,
+  },
+  {
+    name: '2026-06-16_idx_clip_candidates_clippability_score',
+    sql: `CREATE INDEX IF NOT EXISTS idx_clip_candidates_clippability_score
+            ON clip_candidates(operator_id, vlog_id, clippability_score DESC)
+            WHERE deleted_at IS NULL AND status = 'pending'`,
+  },
+  // ─── Photos archive (2026-06-29) ────────────────────────────────────────────
+  // First-class photos, parallel to vlogs, so the video pipeline stays
+  // untouched. Photos are the "replace Google Photos" half of neolog: an
+  // owned, permanent, chronological archive. Ingestion: the browser converts
+  // HEIC→JPEG on a canvas (drops us out of server-side HEIC hell), reads EXIF
+  // taken_at + orientation, uploads the display JPEG + a thumbnail to R2. A
+  // Workers-AI vision pass writes a one-line description + tags so the archive
+  // is searchable without manual labeling.
+  {
+    name: '2026-06-29_photos_table',
+    sql: `CREATE TABLE IF NOT EXISTS photos (
+      id                  TEXT PRIMARY KEY,
+      operator_id         TEXT NOT NULL,
+      r2_key              TEXT NOT NULL,
+      thumbnail_r2_key    TEXT,
+      original_filename   TEXT,
+      mime_type           TEXT,
+      file_size_bytes     INTEGER,
+      width               INTEGER,
+      height              INTEGER,
+      taken_at            TEXT,
+      taken_at_source     TEXT,
+      caption             TEXT,
+      vision_description  TEXT,
+      vision_tags         TEXT,
+      vision_model        TEXT,
+      vision_status       TEXT NOT NULL DEFAULT 'pending',
+      visibility          TEXT NOT NULL DEFAULT 'private',
+      deleted_at          TEXT,
+      created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      uploaded_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-29_idx_photos_operator_taken',
+    sql: `CREATE INDEX IF NOT EXISTS idx_photos_operator_taken
+            ON photos(operator_id, taken_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  {
+    name: '2026-06-29_idx_photos_vision_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_photos_vision_status
+            ON photos(operator_id, vision_status)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Progress videos (2026-06-29) ────────────────────────────────────────
+  // Time-lapse / before-after MP4s assembled from an ordered photo series
+  // (the strength-training payoff). Built by the FFmpeg container's
+  // /images-to-video endpoint. photo_ids_json records the ordered series so
+  // the video can be rebuilt if new photos land.
+  {
+    name: '2026-06-29_progress_videos_table',
+    sql: `CREATE TABLE IF NOT EXISTS progress_videos (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL,
+      title           TEXT,
+      series_tag      TEXT,
+      kind            TEXT NOT NULL DEFAULT 'timelapse',
+      photo_ids_json  TEXT,
+      photo_count     INTEGER,
+      r2_key          TEXT,
+      status          TEXT NOT NULL DEFAULT 'building',
+      error           TEXT,
+      visibility      TEXT NOT NULL DEFAULT 'private',
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-06-29_idx_progress_videos_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_progress_videos_operator
+            ON progress_videos(operator_id, created_at DESC)
+            WHERE deleted_at IS NULL`,
+  },
+  // ─── Video vision-tagging (2026-07-31) ───────────────────────────────────
+  // Photos already get an automatic LLM description via the thumbnail's
+  // frame. Vlogs (talking-head recordings AND raw silent camera-roll clips)
+  // only got speech-based analysis — a silent clip with no narration got
+  // nothing. This extends the exact same vision pass to every vlog's
+  // existing thumbnail frame, so "what's actually in this footage" is
+  // answered regardless of whether anyone talked. Reuses
+  // describeImageFromR2() unchanged — a vlog thumbnail is just another JPEG
+  // in R2 from the model's point of view.
+  {
+    name: '2026-07-31_vlogs_vision_description',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_description TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_tags',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_tags TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_model',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_model TEXT`,
+  },
+  {
+    name: '2026-07-31_vlogs_vision_status',
+    sql: `ALTER TABLE vlogs ADD COLUMN vision_status TEXT NOT NULL DEFAULT 'pending'`,
+  },
+  {
+    name: '2026-07-31_idx_vlogs_vision_backlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_vlogs_vision_backlog
+            ON vlogs(operator_id, vision_status)
+            WHERE deleted_at IS NULL AND thumbnail_r2_key IS NOT NULL`,
+  },
+
+  // Whole-vlog click-to-cut editor: one draft edit per vlog, stored as a
+  // JSON column on vlogs (matches the existing per-vlog JSON-state
+  // convention — audio_chunks_json, slideshow_frames_json, vision_tags).
+  {
+    name: '2026-08-16_vlogs_cut_ranges_json',
+    sql: `ALTER TABLE vlogs ADD COLUMN cut_ranges_json TEXT`,
+  },
+  {
+    name: '2026-08-16_vlogs_cut_ranges_updated_at',
+    sql: `ALTER TABLE vlogs ADD COLUMN cut_ranges_updated_at TEXT`,
+  },
+
+  // productions.production_type / source_kind CHECK constraints don't allow
+  // 'coherent_edit' / 'vlog' yet, and SQLite can't ALTER...DROP CONSTRAINT —
+  // rebuild the table with widened CHECK lists, same shape as the
+  // 2026-05-22_threads_rebuild_* migrations above.
+  {
+    name: '2026-08-16_productions_rebuild_create_new',
+    sql: `CREATE TABLE IF NOT EXISTS productions_new (
+      id                       TEXT PRIMARY KEY,
+      operator_id              TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      production_type          TEXT NOT NULL CHECK (production_type IN ('video_essay','article','x_post','x_thread','clip','creative_work','coherent_edit')),
+      source_kind              TEXT NOT NULL CHECK (source_kind IN ('cluster','macro_cluster','project','thread','clip_candidate','vlog')),
+      source_id                TEXT NOT NULL,
+      state                    TEXT NOT NULL DEFAULT 'materializing' CHECK (state IN ('materializing','script_ready','recording','producing','produced','published','archived')),
+      state_changed_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      voice_profile_id         TEXT REFERENCES voice_profiles(id),
+      form                     TEXT,
+      length_magnitude         TEXT,
+      forensic_mode            INTEGER NOT NULL DEFAULT 0,
+      tier                     TEXT NOT NULL DEFAULT 'lo_fi' CHECK (tier IN ('lo_fi')),
+      script_text              TEXT,
+      script_version           INTEGER NOT NULL DEFAULT 1,
+      output_r2_key            TEXT,
+      output_metadata          TEXT,
+      published_to             TEXT,
+      engagement               TEXT,
+      produced_at              TEXT,
+      prompt_version           TEXT,
+      visibility               TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+      estimated_cost_cents     INTEGER,
+      user_approved_cost       INTEGER,
+      deleted_at               TEXT,
+      created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reasoning_skeleton_json  TEXT,
+      skeleton_locked          INTEGER NOT NULL DEFAULT 0,
+      render_status            TEXT,
+      render_started_at        TEXT,
+      aspect                   TEXT
+    )`,
+  },
+  {
+    // Every column added to `productions` by a later ALTER TABLE migration
+    // (2026-06-11/12) MUST be listed here too, or this rebuild silently
+    // drops it. Cross-checked against every `ALTER TABLE productions ADD
+    // COLUMN` in this file at the time this migration was written:
+    // reasoning_skeleton_json, skeleton_locked, render_status,
+    // render_started_at, aspect.
+    name: '2026-08-16_productions_rebuild_copy',
+    sql: `INSERT OR IGNORE INTO productions_new
+      (id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
+       voice_profile_id, form, length_magnitude, forensic_mode, tier, script_text, script_version,
+       output_r2_key, output_metadata, published_to, engagement, produced_at, prompt_version,
+       visibility, estimated_cost_cents, user_approved_cost, deleted_at, created_at, updated_at,
+       reasoning_skeleton_json, skeleton_locked, render_status, render_started_at, aspect)
+      SELECT id, operator_id, production_type, source_kind, source_id, state, state_changed_at,
+             voice_profile_id, form, length_magnitude, forensic_mode, tier, script_text, script_version,
+             output_r2_key, output_metadata, published_to, engagement, produced_at, prompt_version,
+             visibility, estimated_cost_cents, user_approved_cost, deleted_at, created_at, updated_at,
+             reasoning_skeleton_json, skeleton_locked, render_status, render_started_at, aspect
+        FROM productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_drop_old',
+    sql: `DROP TABLE IF EXISTS productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_rename',
+    sql: `ALTER TABLE productions_new RENAME TO productions`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_operator ON productions(operator_id)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_source',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_source ON productions(source_kind, source_id)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_state',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_state ON productions(operator_id, state)`,
+  },
+  {
+    name: '2026-08-16_productions_rebuild_idx_type',
+    sql: `CREATE INDEX IF NOT EXISTS idx_productions_type ON productions(production_type)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

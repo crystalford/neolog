@@ -30,16 +30,23 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { callChat, type ChatMessage } from '@/lib/llm'
+import { callReasoning } from '@/lib/models'
+import { buildTranscriptFourGrams, isGrounded } from '@/lib/validator'
 import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env { DB: D1Database; AI: Ai; ANTHROPIC_API_KEY: string; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
-type SourceKind = 'thread' | 'cluster'
-type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay'
+type SourceKind = 'thread' | 'cluster' | 'topic'
+type ProductionType = 'x_post' | 'x_thread' | 'micro_essay' | 'article' | 'clip' | 'video_essay' | 'short'
 type ModelKey = 'claude' | 'llama70b' | 'kimi' | 'scout'
 
-const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip'])
-const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_thread', 'article', 'video_essay'])
+// 'short' is available from EVERY source type: a tight 30-60s vertical
+// video about a single concept. The "spark a thing, bang it out, post it"
+// mode. Vertical 9:16, voice-synth by default (no per-beat recording), AI
+// b-roll.
+const VALID_FOR_THREAD = new Set<ProductionType>(['x_post', 'micro_essay', 'clip', 'short'])
+const VALID_FOR_CLUSTER = new Set<ProductionType>(['x_post', 'x_thread', 'article', 'video_essay', 'short'])
+const VALID_FOR_TOPIC = new Set<ProductionType>(['video_essay', 'article', 'x_thread', 'micro_essay', 'short'])
 
 export async function POST(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -66,6 +73,9 @@ export async function POST(req: NextRequest) {
   if (body.source_kind === 'cluster' && !VALID_FOR_CLUSTER.has(body.production_type)) {
     return NextResponse.json({ error: `cluster sources can only produce: ${Array.from(VALID_FOR_CLUSTER).join(', ')}` }, { status: 400 })
   }
+  if (body.source_kind === 'topic' && !VALID_FOR_TOPIC.has(body.production_type)) {
+    return NextResponse.json({ error: `topic sources can only produce: ${Array.from(VALID_FOR_TOPIC).join(', ')}` }, { status: 400 })
+  }
 
   // CLIP: no LLM. Calls the video-segment endpoint internally to slice
   // the parent vlog at the thread's span, then stores the R2 key on
@@ -82,6 +92,10 @@ export async function POST(req: NextRequest) {
   // Build source context — different prompt shape per source kind.
   let sourceContext = ''
   let topicHint = ''
+  // Concatenated verbatim transcript spans for the subject — used to
+  // mechanically verify the generated script anchors on the operator's real
+  // words (canopticon Part 8). Populated in the cluster branch.
+  let verbatimCorpus = ''
   if (body.source_kind === 'thread') {
     const t = await findOne<{
       id: string; topic: string; take: string | null; abstracted_topic: string | null
@@ -116,15 +130,58 @@ ${quotes.map((q, i) => `  ${i + 1}. "${q}"`).join('\n') || '  (none)'}
 Open questions the operator raised:
 ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
 `
+  } else if (body.source_kind === 'topic') {
+    // ── Topic source: type-a-subject → video essay in operator's voice ────
+    // No verbatim spans from the operator's past vlogs about THIS topic
+    // (they may have never recorded about it). The substance comes from
+    // the operator's typed angle/notes + the topic name. The VOICE is
+    // taught to the model via voice-shape samples drawn from their
+    // strongest past takes across the corpus — same person, new subject.
+    const t = await findOne<{
+      id: string; title: string; framing: string | null; angle: string | null; notes: string | null
+      research_brief: string | null
+    }>(
+      db,
+      `SELECT id, title, framing, angle, notes, research_brief
+         FROM topics WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+      body.source_id, operator.id,
+    )
+    if (!t) return NextResponse.json({ error: 'Topic not found' }, { status: 404 })
+    topicHint = t.title
+
+    // Voice shape: pull 6 strong, register-varied takes with their verbatim
+    // spans. Dropped into the system prompt as STYLE EXAMPLES.
+    const { loadVoiceSamples, formatVoiceSamples } = await import('@/lib/voice-shape')
+    const { loadOperatorProfile, formatOperatorProfile } = await import('@/lib/operator-profile')
+    const voiceSamples = await loadVoiceSamples(db, operator.id, 6)
+    const voiceBlock = formatVoiceSamples(voiceSamples)
+    const profile = await loadOperatorProfile(db, operator.id)
+    const profileBlock = formatOperatorProfile(profile)
+
+    sourceContext = `SOURCE: an arbitrary TOPIC the operator wants a piece about. They may have never recorded about this subject before. The substance comes from the topic + their angle + a research brief gathered from the open web; the VOICE comes from the voice-shape samples below.
+Topic: ${t.title}
+${t.angle ? `Operator's angle / thesis: ${t.angle}\n` : ''}${t.framing ? `Framing the operator wrote: ${t.framing}\n` : ''}${t.notes ? `Operator's notes (use as raw material, don't quote literally):\n${t.notes}\n` : ''}${t.research_brief ? `\n═══════════════════════════════════════════════════════════════\nRESEARCH BRIEF — substance gathered from the open web. This is your FACT BASE. Use it for claims, quotes, and structure. Do not invent facts that aren't in it; mark uncertain claims [verify: ...].\n═══════════════════════════════════════════════════════════════\n${t.research_brief}\n` : ''}${profileBlock}${voiceBlock}
+
+═══════════════════════════════════════════════════════════════
+HARD RULES for TOPIC pieces (additive to the per-type rules below):
+═══════════════════════════════════════════════════════════════
+- The new piece is ABOUT the topic, not about the operator's existing vlogs. Do NOT reference, summarize, or quote the voice samples — they are STYLE references only. Pretend the operator just sat down to write this fresh.
+- The voice should read like the SAME PERSON wrote both the samples and the new piece. Match their cadence, their hedges, their landing rhythm, their move-by-move way of building a thought. Don't impersonate a generic essay LLM.
+- If the operator's typed angle/notes contradict your default approach, defer to the angle. They are the editor.
+- If facts beyond the operator's angle/notes are needed and you don't know them with confidence, say so plainly (e.g. "[verify: when did X happen?]"). Don't fabricate facts.`
   } else {
     // cluster
     const c = await findOne<{
       id: string; topic: string; abstracted_topic: string | null
       take: string | null; ripeness_score: number; gap_question: string | null
       form: string | null; length_magnitude: string | null
+      subject_kind: string | null
+      pole_a: string | null; pole_b: string | null
+      pole_a_at: string | null; pole_b_at: string | null
     }>(
       db,
-      `SELECT id, topic, abstracted_topic, take, ripeness_score, gap_question, form, length_magnitude
+      `SELECT id, topic, abstracted_topic, take, ripeness_score, gap_question, form, length_magnitude,
+              subject_kind, pole_a, pole_b, pole_a_at, pole_b_at
          FROM clusters
         WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
       body.source_id, operator.id,
@@ -133,18 +190,47 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     topicHint = c.abstracted_topic || c.topic
 
     const threads = await findMany<{
-      topic: string; take: string | null; key_quotes: string | null; strength: number | null
+      thread_id: string; topic: string; take: string | null; key_quotes: string | null
+      strength: number | null; vlog_id: string
+      span_start: number | null; span_end: number | null
+      utterance_kind: string | null
     }>(
       db,
-      `SELECT t.topic, t.take, t.key_quotes, t.strength
+      `SELECT t.id AS thread_id, t.topic, t.take, t.key_quotes, t.strength, t.vlog_id,
+              t.transcript_span_start AS span_start,
+              t.transcript_span_end   AS span_end,
+              t.utterance_kind        AS utterance_kind
          FROM threads t
          JOIN cluster_threads ct ON ct.thread_id = t.id
-         JOIN extraction_runs er ON er.id = t.run_id AND er.is_active = 1
+         LEFT JOIN extraction_runs er ON er.id = t.run_id
         WHERE ct.cluster_id = ? AND t.operator_id = ? AND t.deleted_at IS NULL
-        ORDER BY t.strength DESC, t.extracted_at ASC
-        LIMIT 20`,
+          AND (er.id IS NULL OR er.is_active = 1)
+        ORDER BY COALESCE(t.strength, 3) DESC, t.extracted_at ASC
+        LIMIT 8`,
       body.source_id, operator.id,
     )
+
+    // CRITICAL — fetch the ACTUAL verbatim transcript words for each
+    // thread's span. The old code fed the LLM only summaries-of-summaries
+    // (take + one quote), which is why the script came out in the LLM's
+    // generic voice instead of the operator's. With real spoken material
+    // anchored to each thread, the LLM has something to preserve.
+    const verbatimByThread = new Map<string, string>()
+    for (const t of threads) {
+      if (t.span_start == null || t.span_end == null) continue
+      const words = await findMany<{ word: string }>(
+        db,
+        `SELECT word FROM transcript_words
+          WHERE vlog_id = ? AND start_time >= ? AND end_time <= ?
+          ORDER BY word_index ASC
+          LIMIT 400`,
+        t.vlog_id, t.span_start, t.span_end,
+      )
+      if (words.length > 0) {
+        verbatimByThread.set(t.thread_id, words.map(w => w.word).join(' '))
+      }
+    }
+    verbatimCorpus = Array.from(verbatimByThread.values()).join('\n')
     const insights = await findMany<{
       kind: string; body: string; source_label: string | null; source_url: string | null
     }>(
@@ -159,20 +245,58 @@ ${questions.map((q, i) => `  ${i + 1}. ${q}`).join('\n') || '  (none)'}
     const operatorNotes = insights.filter(i => i.source_label === 'operator')
     const cultivateInsights = insights.filter(i => i.source_label !== 'operator' || !i.source_label)
 
-    sourceContext = `SOURCE: a cluster — a position braided across multiple vlogs.
-Topic: ${topicHint}
-Ripeness: ${Math.round(c.ripeness_score)}/100
-${c.take ? `Cluster take: ${c.take}\n` : ''}${c.gap_question ? `Gap question: ${c.gap_question}\n` : ''}
-Member threads (operator's verbatim takes across ${threads.length} moments):
+    // Tension/evolution subjects get a different opening frame — the
+    // contradiction or change-of-mind IS the spine of the script, not a
+    // recurring theme. The poles + their dates set the shape.
+    const kindHeader = (() => {
+      if (c.subject_kind === 'tension') {
+        return `THIS SUBJECT IS A TENSION — the operator has held OPPOSING positions on this idea across time. The script's spine is the contradiction itself, lived honestly. Don't resolve it artificially.\n` +
+          (c.pole_a ? `Position A (${c.pole_a_at ?? '?'}): ${c.pole_a}\n` : '') +
+          (c.pole_b ? `Position B (${c.pole_b_at ?? '?'}): ${c.pole_b}\n` : '') +
+          `Build the script so it surfaces and SITS WITH the tension — no false reconciliation, no "the real answer is somewhere in the middle" pap.\n\n`
+      }
+      if (c.subject_kind === 'evolution') {
+        return `THIS SUBJECT IS AN EVOLUTION — the operator's view on this matured / shifted in one direction over time. The script's spine is the change itself, traced honestly.\n` +
+          (c.pole_a ? `Earlier (${c.pole_a_at ?? '?'}): ${c.pole_a}\n` : '') +
+          (c.pole_b ? `Later (${c.pole_b_at ?? '?'}): ${c.pole_b}\n` : '') +
+          `Open in the earlier position (without condescending to it); walk what shifted; land on the matured view.\n\n`
+      }
+      if (c.subject_kind === 'open_loop') {
+        return `THIS SUBJECT IS AN OPEN LOOP — an unresolved question the operator keeps returning to. The script doesn't answer it. The script sits inside the question and lets the audience feel why it stays open.\n\n`
+      }
+      return ''
+    })()
+    sourceContext = `SOURCE: a cluster of moments where the operator returns to one subject.
+Subject: ${topicHint}
+${c.gap_question ? `Open question: ${c.gap_question}\n` : ''}
+${kindHeader}═══════════════════════════════════════════════════════════════
+PRIMARY MATERIAL — verbatim transcript spans. THIS IS THE OPERATOR'S
+ACTUAL VOICE. The script you write must be built FROM these spans, not
+in addition to them. Quote, weave, compress — never paraphrase. If a
+beat doesn't have an anchor sentence drawn from these spans, drop it.
+═══════════════════════════════════════════════════════════════
+
 ${threads.map((t, i) => {
+  const span = verbatimByThread.get(t.thread_id)
   const quotes = parseJsonArr(t.key_quotes)
-  const q = quotes.length > 0 ? `\n     Quote: "${quotes[0]}"` : ''
-  return `  ${i + 1}. [${t.strength ?? '?'}/5] ${t.take || t.topic}${q}`
+  const kind = t.utterance_kind || 'observation'
+  return `[MOMENT ${i + 1}] kind: ${kind} · ${t.topic}\n` +
+    (span ? `Verbatim span:\n  "${span.trim().replace(/\s+/g, ' ').slice(0, 1800)}"\n`
+          : `(no transcript span — use the key quotes only)\n`) +
+    (quotes.length > 0 ? `Key quotes: ${quotes.slice(0, 3).map(q => `"${q}"`).join(' · ')}\n` : '')
 }).join('\n')}
 
-${operatorNotes.length > 0 ? `Operator's own framing of this cluster:
+ARC GUIDANCE (use the kind label on each moment to compose a real essay arc, not a flat list):
+  · open a claim moment as the position
+  · ground it in a story moment (something that actually happened)
+  · land on an open_question moment (the unresolved tension) — that's the strongest close
+  · observation/feeling moments are colour beats, not load-bearing structure
+  · intention moments can close if no open_question is present
+  If kind is missing for a moment, infer it from the span itself.
+
+${operatorNotes.length > 0 ? `Operator's own framing of this subject (use sparingly — these are notes, not voice):
 ${operatorNotes.map((n, i) => `  ${i + 1}. ${n.body}`).join('\n')}
-` : ''}${cultivateInsights.length > 0 ? `Surfaced insights (system + external references):
+` : ''}${cultivateInsights.length > 0 ? `External references (cite if useful, but the operator's verbatim spans come first):
 ${cultivateInsights.map((n, i) => `  ${i + 1}. [${n.kind}${n.source_label ? ' · ' + n.source_label : ''}] ${n.body}${n.source_url ? ` (${n.source_url})` : ''}`).join('\n')}
 ` : ''}`
   }
@@ -203,17 +327,67 @@ ${cultivateInsights.map((n, i) => `  ${i + 1}. [${n.kind}${n.source_label ? ' ·
     },
     video_essay: {
       maxTokens: 6000,
-      system: `You are drafting a video essay script (~10-15 minutes spoken, ~1500-2200 words) in the operator's own voice, building from a cluster of takes. This is a voiceover script — the operator will record their voice reading it, then pair it with B-roll footage from their vlogs.
+      system: `You are drafting a video essay voiceover script (~10-15 minutes spoken, ~1500-2200 words) BUILT FROM the operator's verbatim transcript spans. The operator will record their voice reading this script.
 
-STRUCTURE — break the script into BEATS. Each beat is one continuous spoken thought, 30-90 seconds when read aloud (75-225 words). Output beats separated by lines containing ONLY === on their own line.
+═══════════════════════════════════════════════════════════════
+HARD RULES — do not violate. Failures here ruin the script.
+═══════════════════════════════════════════════════════════════
 
-Each beat starts with a short directive header on its own line in brackets: [BEAT: <one-line title>]. Then the spoken prose follows. No stage directions inside the prose. No "next beat" or "in this beat" meta-commentary. Just the words the operator will speak.
+1. ANCHOR EVERY BEAT IN VERBATIM. Every beat must contain at least one sentence that is a verbatim 4+ word substring from the PRIMARY MATERIAL (the transcript spans). If you can't anchor a beat on verbatim, drop it. Building beats around general thoughts that aren't actually in the source = failure.
 
-VOICE — preserve the operator's verbatim takes as anchors. Their hesitations stay. Don't sanitize. Don't moralize. Read out loud as one continuous flow even though it's segmented into beats — the segmentation is for recording control, not for the listener.
+2. NEVER include "framing" language in the script. The script is what the operator SPEAKS — second person ("you keep circling…") is for UI surfaces, not voiceover. If you see phrases like "You keep circling this:" anywhere in the source material, do NOT carry them into the script. The operator does not refer to themselves in the second person.
 
-OPEN with the operator's strongest verbatim take or a verbatim quote. DEVELOP across 6-12 beats. CLOSE on the cluster's gap question turned into a clarifying statement — not a CTA, not a "thanks for watching."
+3. NEVER open with throat-clearing transcript noise — "we should have…", "I just said it all", "yeah I guess…" Those are pre-talk warmups, not substance. Find a moment in the verbatim where the operator says something with shape, and open there.
+
+4. NEVER write generic essay filler: "I mean, that's what we need, right?", "And that's what people are looking for", "Let me tell you something", "Now, here's the thing." If a sentence sounds like it could appear in any LLM-generated YouTube essay, cut it.
+
+5. The operator's hesitations, contradictions, and rough edges stay. Don't smooth them into clean prose. Roughness is signal.
+
+═══════════════════════════════════════════════════════════════
+STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+Break the script into BEATS. Each beat = one continuous spoken thought, 30-90 seconds when read (75-225 words). Output beats separated by lines containing ONLY === on their own line.
+
+Each beat starts with a short directive header on its own line in brackets: [BEAT: <one-line title>]. Then the spoken prose. No stage directions inside the prose. No "in this next beat" meta-commentary.
+
+OPEN with a verbatim sentence (or compressed-from-verbatim sentence) that puts the subject's specific tension on the table. Not an abstract statement of theme — the operator's actual angle.
+
+DEVELOP across 6-10 beats. Each beat takes one moment from the verbatim, anchors on it, and adds the minimum surrounding prose needed to make it land. Don't over-write. Better five tight beats than ten padded ones.
+
+CLOSE on the operator's sharpest verbatim moment from the source — or the open question turned into a statement they could plausibly say. Never "thanks for watching", never a CTA, never a moralizing summary.
 
 Output ONLY the script. No explanation, no preamble.`,
+    },
+    short: {
+      maxTokens: 1200,
+      system: `You are writing a SHORT VIDEO script: 30-60 seconds when spoken, 70-140 words total. Vertical format (TikTok / Reels / YouTube Shorts). Single concept, tight, no padding, no filler.
+
+═══════════════════════════════════════════════════════════════
+HARD RULES — break these and the short is unusable
+═══════════════════════════════════════════════════════════════
+
+1. ONE CONCEPT. Not "here are five thoughts." ONE. The whole short lives or dies on whether that one thing lands.
+
+2. NO INTRO FILLER. Do NOT open with "Today I want to talk about…", "There's this thing called…", "So I've been thinking about…", "Quick story…", "Have you ever…". The first sentence must STATE THE THING. The first three words should be substance.
+
+3. STRUCTURE: 1–3 BEATS, separated by lines containing ONLY ===. Each beat is one continuous spoken thought.
+   - 1-beat short: just the concept, hit hard. (~70-90 words.)
+   - 2-beat short: claim + the move that makes it land (a story / a contradiction / a sharp consequence). (~100-130 words.)
+   - 3-beat short: claim → twist → land. (~110-140 words.) Use this only when the concept genuinely needs three moves; otherwise drop a beat.
+   Each beat starts: [BEAT: <short title>] on its own line, then the spoken prose.
+
+4. THE LAST LINE LANDS. The final sentence is the part that gets screenshotted, shared, replayed. It MUST be sharp. No "thanks for watching." No "let me know in the comments." No moralizing summary. No "anyway." The last line is the thing the viewer takes with them.
+
+5. SIMPLY PUT. Plain words. Concrete nouns. No academic distance. If the operator profile says they hedge — keep the hedges; they're voice. But sentences should be short and direct. This is for people scrolling, not reading.
+
+6. VOICE: this is the operator's voice. Use voice-shape examples. Don't impersonate generic short-form essayists.
+
+7. NO TEXT-ON-SCREEN INSTRUCTIONS. (System rule: no captions, no overlays, ever.) The audio carries everything. Don't write "[text appears: …]" or similar.
+
+8. PROFILE-AWARE: if this concept connects to something the operator already circles (per the profile block), name that connection plainly inside the short — that's the "learn by creating" loop the operator wants.
+
+Output ONLY the script. No explanation, no preamble, no preamble about the structure.`,
     },
   }
 
@@ -227,18 +401,70 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
 - No moralizing summary at the end.
 `
 
+  // Reasoning effort dial (canopticon Part 16): the long-form synthesis types
+  // get high effort; the short compressions get medium.
+  const effort: 'high' | 'medium' =
+    (body.production_type === 'video_essay' || body.production_type === 'article') ? 'high' : 'medium'
+
+  // generate() runs one draft. Claude stays the paid opt-in (via callChat);
+  // everything else routes through callReasoning → gpt-oss-120b with a Llama
+  // 70B fallback. Returns the text + which model actually answered.
+  const generate = async (userMsg: string): Promise<{ text: string; model: string }> => {
+    if (modelKey === 'claude') {
+      const resp = await callChat(env, {
+        model: modelKey,
+        system: cfg.system,
+        messages: [{ role: 'user', content: userMsg } as ChatMessage],
+        maxTokens: cfg.maxTokens,
+        temperature: 0.7,
+      })
+      return { text: (resp.text || '').trim(), model: resp.model || modelKey }
+    }
+    const r = await callReasoning(env as any, {
+      system: cfg.system,
+      user: userMsg,
+      effort,
+      maxTokens: cfg.maxTokens,
+    })
+    return { text: r.text.trim(), model: r.fellBack ? `${r.model} (fallback)` : r.model }
+  }
+
   let scriptText = ''
   let modelUsed: string = modelKey
+  let groundingRatio: number | null = null
   try {
-    const resp = await callChat(env, {
-      model: modelKey,
-      system: cfg.system,
-      messages: [{ role: 'user', content: userPrompt } as ChatMessage],
-      maxTokens: cfg.maxTokens,
-      temperature: 0.7,
-    })
-    scriptText = (resp.text || '').trim()
-    modelUsed = resp.model || modelKey
+    const first = await generate(userPrompt)
+    scriptText = first.text
+    modelUsed = first.model
+
+    // (canopticon Part 8) Mechanical verification — for video essays, check
+    // the script actually anchors on the operator's verbatim words. Beats
+    // with zero 4-gram overlap with the transcript spans are LLM filler.
+    // If too many drift, retry ONCE with a hardened reminder. Flag, never
+    // gate (operator approves).
+    if (body.production_type === 'video_essay' && verbatimCorpus.length > 40) {
+      const fourGrams = buildTranscriptFourGrams(verbatimCorpus)
+      const ratioOf = (script: string): number => {
+        const beats = script.split(/^\s*=+\s*$/m).map(b => b.trim()).filter(Boolean)
+        if (beats.length === 0) return 0
+        const anchored = beats.filter(b => isGrounded(b.replace(/^\s*\[BEAT:[^\]]*\]/i, ''), fourGrams)).length
+        return anchored / beats.length
+      }
+      groundingRatio = ratioOf(scriptText)
+      if (groundingRatio < 0.5) {
+        const harderPrompt = userPrompt +
+          `\n\n⚠️ CRITICAL: your previous attempt drifted off the source. EVERY beat MUST contain a literal 4+ word run copied from the PRIMARY MATERIAL above. Do not write a single sentence that isn't anchored in the operator's actual transcribed words. Rewrite.`
+        try {
+          const retry = await generate(harderPrompt)
+          const retryRatio = ratioOf(retry.text)
+          if (retry.text && retryRatio >= groundingRatio) {
+            scriptText = retry.text
+            modelUsed = retry.model
+            groundingRatio = retryRatio
+          }
+        } catch { /* keep the first draft if the retry errors */ }
+      }
+    }
   } catch (err: any) {
     return NextResponse.json({
       error: `LLM call failed: ${err?.message || String(err)}`,
@@ -251,20 +477,27 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
 
   // Insert the production row.
   const id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  // Shorts render vertical 9:16; everything else 16:9. Set at creation
+  // so the b-roll generator + final render both pick up the right aspect.
+  const aspect = body.production_type === 'short' ? '9:16' : '16:9'
   await db.prepare(
     `INSERT INTO productions (
         id, operator_id, production_type, source_kind, source_id, state,
-        script_text, prompt_version, tier
-     ) VALUES (?, ?, ?, ?, ?, 'materializing', ?, ?, 'lo_fi')`,
+        script_text, prompt_version, tier, aspect
+     ) VALUES (?, ?, ?, ?, ?, 'materializing', ?, ?, 'lo_fi', ?)`,
   ).bind(
     id, operator.id, body.production_type, body.source_kind, body.source_id,
-    scriptText, `production-v1·${modelUsed}`,
+    scriptText,
+    `production-v1·${modelUsed}${groundingRatio != null ? `·grounded${Math.round(groundingRatio * 100)}%` : ''}`,
+    aspect,
   ).run()
 
   // For video_essay, parse beats from the script ("=== " separator
   // with optional "[BEAT: title]" headers) and write each into
   // production_beats. Operator will record voiceover per beat.
-  if (body.production_type === 'video_essay') {
+  // Both video_essay and short use the same === beat separator so the
+  // existing record/synth/render flow handles them identically downstream.
+  if (body.production_type === 'video_essay' || body.production_type === 'short') {
     const beats = parseBeats(scriptText)
     for (let i = 0; i < beats.length; i++) {
       const b = beats[i]
@@ -277,6 +510,35 @@ Now draft the ${body.production_type.replace(/_/g, ' ')}. Voice rules:
       } catch (err: any) {
         console.warn(`[production beats] failed to insert beat ${i}: ${err?.message}`)
       }
+    }
+
+    // Auto-synthesize voice for SHORTS when the operator's voice profile
+    // exists. This is the "true one-tap-to-MP4" path — the operator spark-
+    // composes a concept and by the time they land on the production page,
+    // the voiceover is already on its way. Best-effort background work.
+    if (body.production_type === 'short' && beats.length > 0) {
+      try {
+        const op = await findOne<{ voice_profile_r2_key: string | null; voice_synth_mode: string | null }>(
+          db, `SELECT voice_profile_r2_key, voice_synth_mode FROM operator WHERE id = ?`, operator.id,
+        )
+        const hasProfile = !!op?.voice_profile_r2_key
+        const wantsSynth = op?.voice_synth_mode !== 'record'
+        if (hasProfile || wantsSynth) {
+          const { ctx } = getRequestContext()
+          ctx.waitUntil((async () => {
+            try {
+              const cookie = req.headers.get('cookie') || ''
+              await fetch(`${new URL(req.url).origin}/api/v2/productions/${id}/voiceover/synthesize`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({}),
+              })
+            } catch (err: any) {
+              console.warn(`[shorts auto-synth] failed for ${id}: ${err?.message || err}`)
+            }
+          })())
+        }
+      } catch {}
     }
   }
 

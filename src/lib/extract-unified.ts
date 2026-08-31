@@ -49,6 +49,14 @@ export interface ExtractedThread {
   questions_raised?: string[]
   register: 'riff' | 'observation' | 'argument' | 'story' | 'aside' | 'question'
   /**
+   * The KIND of utterance — what shape of thought this is. Used by the
+   * librarian and script generator to build essays with a real ARC
+   * (claim → story → open question) instead of a flat collage of takes.
+   * Distinct from `register`, which is the voice mode; `utterance_kind`
+   * is the structural role the thought plays.
+   */
+  utterance_kind?: 'claim' | 'story' | 'open_question' | 'observation' | 'intention' | 'feeling'
+  /**
    * Generalized pattern this topic represents. The clustering engine
    * groups threads across vlogs by lower(abstracted_topic). E.g.
    * "the YouTube For You page" and "Twitter's algorithm" both abstract
@@ -162,6 +170,14 @@ A thread is ONE ATOMIC IDEA — one coherent argument or observation — that th
 - key_phrases: 2-6 short verbatim phrases (2-8 words each) that are the punchiest fragments inside the take. These get marker-highlighted in the rendered thread.
 - questions_raised: 1-3 open questions the thread raises that AREN'T answered in the vlog. Future-facing — what would the operator need to think about next?
 - register: one of riff|observation|argument|story|aside|question — what voice mode is the operator in?
+- utterance_kind: the SHAPE of the thought, one of: claim · story · open_question · observation · intention · feeling. This is structural, distinct from register:
+  · claim       — a position or assertion the operator is taking ("X is true / the right way / matters because Y")
+  · story       — a recounted experience or anecdote ("this happened, then this, then this")
+  · open_question — something the operator is wondering about and HASN'T resolved ("I'm not sure what I'm trying to get at"; ends in a real unresolved tension)
+  · observation — noticing something out loud without taking a position ("the cars are louder here", "everyone in this coffee shop is on their laptop")
+  · intention   — a stated plan, decision, or commitment ("I'm going to start doing X", "we should switch to Y")
+  · feeling     — an emotional state named directly ("I felt the fear go down like a nerve", "I'm tired")
+  Pick the closest fit. This drives essay arc structure later; it doesn't need to be exact, but err toward open_question for genuinely unresolved material — those are the most valuable downstream.
 - abstracted_topic: the GENERALIZED pattern this thread is about, used to cluster across vlogs. E.g. both "YouTube's For You page" and "Twitter's algorithm" abstract to "recommender systems failing despite explicit user signals". Aim for the underlying idea, not the surface example.
 
 # HARD RULES — voice grounding
@@ -196,6 +212,7 @@ If any answer is no, fix or omit the thread.
       "key_phrases": ["<verbatim 2-8 word phrase>", "<another>", ...],
       "questions_raised": ["<open question this thread raises>", ...],
       "register": "riff|observation|argument|story|aside|question",
+      "utterance_kind": "claim|story|open_question|observation|intention|feeling",
       "abstracted_topic": "<generalized pattern for cross-vlog clustering>"
     }
   ],
@@ -205,7 +222,7 @@ If any answer is no, fix or omit the thread.
       "quote": "<verbatim ≥6 word substring from the transcript — the punch line of the clip>",
       "why_clippable": "<one plain-text sentence explaining why this moment is shippable as a standalone clip. NOT JSON. NOT wrapped in braces. Plain English only.>",
       "start_time_sec": <integer seconds — the start of the clip's span in the transcript. Estimate by counting words: ~2.6 words/sec.>,
-      "end_time_sec": <integer seconds — the end of the clip's span. Must satisfy end_time_sec > start_time_sec AND (end_time_sec - start_time_sec) between 5 and 120 seconds.>
+      "end_time_sec": <integer seconds — the end of the clip's span. Must satisfy end_time_sec > start_time_sec AND (end_time_sec - start_time_sec) between 5 and 180 seconds.>
     }
   ],
   "creative_elements": [
@@ -221,7 +238,8 @@ If any answer is no, fix or omit the thread.
 }
 
 CLIP RULES:
-- Only emit a clip if there's a genuine PUNCHY DELIVERY MOMENT — a take the operator nailed in 10-90 seconds, quotable on its own. If nothing meets that bar, return clips: [].
+- Only emit a clip if there's a genuine PUNCHY DELIVERY MOMENT, quotable on its own. If nothing meets that bar, return clips: [].
+- MATCH THE SPAN TO THE MOMENT, not a fixed target length. A tight, complete thought might be 8-20 seconds — don't pad it out. A genuine multi-beat rant that stays sharp and builds the WHOLE way through should run its full length, up to 180 seconds — don't cut a rant short at an arbitrary point just to keep it brief. The test is completeness: does the span capture the whole delivery, start to landing, with nothing essential missing at either end?
 - start_time_sec / end_time_sec are REQUIRED. Compute by counting words from the start of the transcript at ~2.6 words per second. Don't emit a clip without real timecodes.
 - why_clippable is a PLAIN ENGLISH SENTENCE. Not {"reason":"…"}. Not JSON. Just a sentence.
 - 0-2 clips per vlog is normal. 5+ is suspicious — you're probably emitting takes that aren't clip-grade.

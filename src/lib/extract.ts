@@ -162,9 +162,9 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
     inserts.push({
       sql: `INSERT INTO threads (
               id, operator_id, vlog_id, topic, take, key_quotes, questions_raised,
-              register, strength, transcript_span_start, transcript_span_end,
+              register, utterance_kind, strength, transcript_span_start, transcript_span_end,
               abstracted_topic, extraction_prompt_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       binds: [
         ulid(),
         ctx.operator_id,
@@ -174,6 +174,8 @@ export async function extractThreads(env: ExtractEnv, ctx: VlogContext): Promise
         JSON.stringify(keyQuotes),
         JSON.stringify(Array.isArray(t.questions_raised) ? t.questions_raised : []),
         ['riff','observation','argument','story','aside','question'].includes(t.register) ? t.register : null,
+        ['claim','story','open_question','observation','intention','feeling'].includes(String((t as any).utterance_kind || '').toLowerCase())
+          ? String((t as any).utterance_kind).toLowerCase() : null,
         Number.isInteger(t.strength) && t.strength >= 1 && t.strength <= 5 ? t.strength : null,
         typeof t.transcript_span_start === 'number' ? t.transcript_span_start : null,
         typeof t.transcript_span_end === 'number' ? t.transcript_span_end : null,

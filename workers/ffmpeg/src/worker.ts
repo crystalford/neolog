@@ -37,6 +37,29 @@ export class FfmpegContainer extends ContainerBase {
   // tcpPort.fetch(). startAndWaitForPorts() is idempotent (no-op when already
   // running) and pings the actual port, so it self-heals stale state.
   async fetch(request: Request) {
+    // PASSIVE liveness probe — MUST NOT boot the container.
+    //
+    // The routine health pill (Masthead, every 60s while a tab is open) used
+    // to hit /boot-info, which boots the container. With sleepAfter=5m and a
+    // 60s poll, the container never slept → Container Memory billed 24/7
+    // (~$0.7/day) just to answer "are you alive?". A health check that wakes
+    // a sleeping container is self-defeating. This path reports the current
+    // running state WITHOUT calling startAndWaitForPorts(), so monitoring is
+    // free and the container is allowed to scale to zero when idle. Real work
+    // paths (transcode, extract-*, render) still boot on demand below.
+    const url = new URL(request.url)
+    if (url.pathname === '/__alive') {
+      let running = false
+      try {
+        const self = this as any
+        running = !!(self.ctx?.container?.running ?? self.container?.running)
+      } catch { /* default false → "idle" */ }
+      return new Response(
+        JSON.stringify({ ok: true, running, state: running ? 'running' : 'idle', probe: 'passive' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
     try {
       await this.startAndWaitForPorts()
     } catch (err) {

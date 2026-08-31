@@ -17,14 +17,27 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+// Four-entry masthead — the site-consolidation pass. Two ends were always
+// covered (Log: drop something in · Published: what shipped); this adds
+// real doors for the two things in between that never had one:
+//   Archive — the owned, dated photo/video/vlog timeline (was
+//             dropdown-only as "Storage").
+//   Drafts  — Subjects + Topics + Clips as one tabbed page (were fully
+//             orphaned: no nav entry, no dropdown entry, reachable only
+//             by luck via a home-page card or typing the URL).
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
-  { label: 'Timeline',    href: '/',            matchPaths: [/^\/$/, /^\/timeline/, /^\/threads/, /^\/thread\//] },
-  { label: 'Inbox',       href: '/inbox',       matchPaths: [/^\/inbox/] },
-  { label: 'Vlogs',       href: '/vlogs',       matchPaths: [/^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/] },
-  { label: 'Clusters',    href: '/studio',      matchPaths: [/^\/studio/, /^\/clusters/, /^\/cluster\//] },
-  { label: 'Productions', href: '/productions', matchPaths: [/^\/productions/, /^\/projects/, /^\/materialize/, /^\/library/, /^\/entity/, /^\/graph/] },
-  { label: 'Chat',        href: '/chat',        matchPaths: [/^\/chat/, /^\/console/] },
-  { label: 'About',       href: '/about',       matchPaths: [/^\/about/] },
+  { label: 'Log',       href: '/',          matchPaths: [
+    /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
+  ] },
+  { label: 'Archive',   href: '/photos',    matchPaths: [
+    /^\/photos/, /^\/photo\//,
+  ] },
+  { label: 'Drafts',    href: '/drafts',    matchPaths: [
+    /^\/drafts/, /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//, /^\/clips/,
+  ] },
+  { label: 'Published', href: '/published', matchPaths: [
+    /^\/published/, /^\/production\//, /^\/projects/, /^\/library/,
+  ] },
 ]
 
 export function Masthead() {
@@ -87,9 +100,28 @@ function HealthPill() {
         if (!cancelled) setState('warn')
       }
     }
-    check()
-    const id = setInterval(check, 60_000)
-    return () => { cancelled = true; clearInterval(id) }
+    // Poll at 5 min (was 60s) and ONLY when the tab is visible. The status
+    // check is cheap now that the FFmpeg probe is passive, but there's no
+    // reason to hammer it from a backgrounded tab. visibilitychange resumes
+    // an immediate check when the operator returns to the tab.
+    let id: ReturnType<typeof setInterval> | null = null
+    const start = () => {
+      if (id != null) return
+      check()
+      id = setInterval(check, 300_000)
+    }
+    const stop = () => { if (id != null) { clearInterval(id); id = null } }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      cancelled = true
+      stop()
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [])
 
   const label = state === 'err' ? 'degraded' : state === 'warn' ? 'checking' : 'all healthy'
@@ -125,16 +157,36 @@ function AvatarMenu() {
       </button>
       {open && (
         <div className="canon-dropdown" role="menu">
-          <Link href="/chat" onClick={() => setOpen(false)}>
-            <span>Chat</span>
-            <span className="kbd">G C</span>
-          </Link>
           <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
-            <span>Drop a vlog</span>
+            <span>Upload a vlog</span>
             <span className="kbd">⌘N</span>
           </Link>
+          <Link href="/chat" onClick={() => setOpen(false)}>
+            <span>Chat with your vlogs</span>
+            <span className="kbd">G C</span>
+          </Link>
+          <div className="sep"/>
+          {/* Utility/admin surfaces — everything that's a real content
+              surface got promoted into the top nav during the site
+              consolidation pass. This stays admin-only. */}
+          <Link href="/inbox" onClick={() => setOpen(false)}>
+            <span>Inbox</span>
+            <span className="dropdown-sub">failed vlogs, unfinished projects, what needs your attention</span>
+          </Link>
+          <Link href="/studio" onClick={() => setOpen(false)}>
+            <span>Studio (clusters)</span>
+            <span className="dropdown-sub">the deeper cluster view — score, threads, refine</span>
+          </Link>
+          <a href="/podcast.xml" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+            <span>Your podcast feed</span>
+            <span className="dropdown-sub">RSS · paste into Apple/Overcast/Spotify</span>
+          </a>
+          <div className="sep"/>
           <Link href="/settings" onClick={() => setOpen(false)}>
             <span>Settings</span>
+          </Link>
+          <Link href="/about" onClick={() => setOpen(false)}>
+            <span>About neolog</span>
           </Link>
           <div className="sep"/>
           <a href="/cdn-cgi/access/logout">

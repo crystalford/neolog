@@ -61,6 +61,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     pipeline_error: string | null
     extraction_outcomes: string | null
     visibility: string
+    is_podcast: number | null
+    audio_chunks_json: string | null
+    slideshow_frames_json: string | null
     created_at: string
     updated_at: string
   }>(
@@ -70,44 +73,53 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   )
   if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Presign playback URL.
-  //   1. Audio-only upload (mime_type 'audio/*'): no video file. Prefer the
-  //      stitched MP3 if it exists; otherwise fall back to the first browser-
-  //      uploaded WAV chunk (most audio-only vlogs are short enough to fit in
-  //      one chunk). Returns a list of chunk URLs for multi-chunk playback.
+  // Presign playback URL. Three cases:
+  //   1. Audio-only upload (mime_type 'audio/*'): no video file ever uploaded
+  //      — return the stitched MP3 the pipeline produces (or null if it
+  //      hasn't run yet). Client renders an <audio> player.
   //   2. Video with a transcoded H.264 copy: prefer that (always browser-decodable).
   //   3. Video without transcode: presign the original.
   const isAudioOnly = (vlog.mime_type ?? '').startsWith('audio/')
   let videoUrl: string | null = null
   let audioUrl: string | null = null
   let audioChunkUrls: string[] | null = null
+  let audioBytesTotal: number | null = null
+  let slideshowFrames: Array<{ url: string; time_sec: number }> | null = null
   if (isAudioOnly) {
+    // Try the stitched MP3 written by the transcribe step.
     const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
     try {
       const head = await env.VIDEOS.head(mp3Key)
       if (head) audioUrl = await presignGetUrl(env, mp3Key, 3600)
     } catch (err: any) {
-      console.warn(`[vlogs/[id]] audio-only mp3 head/presign failed: ${err?.message}`)
+      console.warn(`[vlogs/[id]] audio-only mp3 presign failed: ${err?.message}`)
     }
-    if (!audioUrl) {
-      // Fall back to the browser-uploaded WAV chunks. Parse the manifest, head-
-      // check each (a chunk may have failed to upload), presign the ones that
-      // exist. Single-chunk vlogs (short recordings) end up with one URL the
-      // <audio> element plays directly; multi-chunk needs client-side queueing.
+
+    // Fallback: serve the browser-uploaded WAV chunks. Single chunk plays
+    // straight from <audio>; multi-chunk needs the client to advance.
+    // (Future: pipeline writes a stitched mp3.full so this path stops
+    // mattering — but keep it as a belt for any vlog that didn't get
+    // stitched.)
+    if (!audioUrl && vlog.audio_chunks_json) {
       try {
-        const manifest = vlog.audio_chunks_json
-          ? JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; start_sec: number; end_sec: number }>
-          : []
-        const urls: string[] = []
-        for (const c of manifest) {
-          try {
-            const h = await env.VIDEOS.head(c.r2_key)
-            if (h) urls.push(await presignGetUrl(env, c.r2_key, 3600))
-          } catch { /* skip missing chunk */ }
-        }
-        if (urls.length > 0) {
-          audioChunkUrls = urls
-          audioUrl = urls[0]   // <audio src=...> plays the first chunk by default
+        const manifest = JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; bytes?: number }>
+        if (Array.isArray(manifest) && manifest.length > 0) {
+          const urls: string[] = []
+          let total = 0
+          for (const c of manifest) {
+            try {
+              const head = await env.VIDEOS.head(c.r2_key)
+              if (head) {
+                urls.push(await presignGetUrl(env, c.r2_key, 3600))
+                total += typeof c.bytes === 'number' ? c.bytes : (head.size ?? 0)
+              }
+            } catch {}
+          }
+          if (urls.length > 0) {
+            audioChunkUrls = urls
+            audioUrl = urls[0]
+            audioBytesTotal = total > 0 ? total : null
+          }
         }
       } catch (err: any) {
         console.warn(`[vlogs/[id]] audio chunks fallback failed: ${err?.message}`)
@@ -119,6 +131,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       videoUrl = await presignGetUrl(env, playbackKey, 3600)
     } catch (err: any) {
       console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
+    }
+  }
+
+  // Slideshow mode: presign each stored frame for the in-page renderer.
+  if (vlog.slideshow_frames_json) {
+    try {
+      const manifest = JSON.parse(vlog.slideshow_frames_json) as Array<{ r2_key: string; time_sec: number }>
+      if (Array.isArray(manifest) && manifest.length > 0) {
+        const arr: Array<{ url: string; time_sec: number }> = []
+        for (const f of manifest) {
+          try {
+            const url = await presignGetUrl(env, f.r2_key, 3600)
+            arr.push({ url, time_sec: f.time_sec })
+          } catch {}
+        }
+        if (arr.length > 0) slideshowFrames = arr
+      }
+    } catch (err: any) {
+      console.warn(`[vlogs/[id]] slideshow presign failed: ${err?.message}`)
     }
   }
 
@@ -155,7 +186,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // INNER JOIN with er.is_active=1 means: only return rows whose run_id
   // matches the operator's current active run. Old run rows simply
   // disappear from the API response.
-  const [threads, clips, creative_elements, entities] = await Promise.all([
+  const [threads, clips, creative_elements, entities, wordTimestampRows] = await Promise.all([
     safe('threads', () => findMany<{
       id: string
       topic: string
@@ -269,7 +300,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       }
       return rows.map(r => ({ ...r, vlog_quotes: quotesByEntity.get(r.id) ?? [] }))
     }),
+    // Existence check only (not the full word array — the transcript
+    // editor lazy-fetches that itself from the dedicated
+    // /transcript-words route) — gates whether VlogTranscriptEditor
+    // mounts or falls back to the old read-only transcript_text block.
+    safe('word_timestamps', () => findMany<{ present: number }>(
+      db,
+      `SELECT 1 AS present FROM transcript_words WHERE vlog_id = ? LIMIT 1`,
+      params.id,
+    )),
   ])
+  const hasWordTimestamps = wordTimestampRows.length > 0
 
   // Strip internal R2 keys before sending to the client, but expose a
   // boolean so the vlog page can show a "Transcode missing — playback
@@ -281,8 +322,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     r2_key: _r2,
     transcoded_r2_key: _tr2,
     thumbnail_r2_key: _thumbr2,
+    audio_chunks_json: _acj,
+    slideshow_frames_json: _sfj,
     ...safeVlog
   } = vlog
+  // For audio-only uploads, file_size_bytes on the row is the source video
+  // size (we never uploaded the video, just keep the original for dedup).
+  // Display the actual extracted audio size so the operator doesn't see
+  // "1.92 GB" on a 1-minute audio clip.
+  if (isAudioOnly && audioBytesTotal != null) {
+    safeVlog.file_size_bytes = audioBytesTotal
+  }
   // ── Extra fields for the comprehensive Vlog detail page ──────────
   // navigation: prev/next vlog by recorded_at; anchor thread = the
   // strongest thread for this vlog; entity_mention_times = timestamps
@@ -349,10 +399,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   ])
 
   return NextResponse.json({
-    vlog: { ...safeVlog, thumbnail_url: thumbnailUrl, playback_url: videoUrl, audio_url: audioUrl, audio_chunk_urls: audioChunkUrls, is_audio_only: isAudioOnly, has_transcoded: hasTranscoded },
+    vlog: {
+      ...safeVlog,
+      thumbnail_url: thumbnailUrl,
+      playback_url: videoUrl,
+      audio_url: audioUrl,
+      audio_chunk_urls: audioChunkUrls,
+      slideshow_frames: slideshowFrames,
+      is_audio_only: isAudioOnly,
+      has_transcoded: hasTranscoded,
+      has_word_timestamps: hasWordTimestamps,
+    },
     video_url: videoUrl,
     audio_url: audioUrl,
     audio_chunk_urls: audioChunkUrls,
+    slideshow_frames: slideshowFrames,
     threads,
     clips,
     creative_elements,

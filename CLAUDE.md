@@ -1,8 +1,16 @@
 # Neolog
 
-A personal life graph and creative production system. The operator vlogs in real conditions and the system refracts those vlogs into threads, clusters, and multi-output productions (video essays, articles, X posts and threads, video clips).
+**An AI video-essay studio you talk into.** Three doors into making something:
 
-The graph is the artifact. Productions are downstream.
+- **Subjects** — concepts the system finds you keep circling in your own recordings, *named for you* (often using terms-of-art you didn't have a word for). You make essays about your own mind.
+- **Topics** — anything you want to make a video about, regardless of whether you've recorded about it. The system researches the topic via Cloudflare Browser Run, drafts a script in your voice, ready to record.
+- **Spark** — type one thought; get a 30–60 second vertical short ready to post. The "learn by creating" loop.
+
+Every output is written in your voice. Two layers learn you: **how you write** (cadence, register, intellectual moves — `voice-shape`) and **what you care about** (recurring fascinations, the lens you bring — `operator-profile`). Both refresh automatically from your past vlogs. **After your first batch of recordings you can stop uploading entirely** — your existing corpus is voice training forever, and the open web supplies any new substance.
+
+The whole pipeline runs on Cloudflare. Workers AI for every model (Llama / gpt-oss / Flux / Wan 2.7 / Grok Imagine / MiniMax cloning / Aura-2 / Whisper). R2 for storage. D1 for state. FFmpeg in a Container Worker for final render. One bill, no third party (Brave Search is optional, for web research).
+
+> *Earlier doc versions called this "a personal life graph" with a 7-entry nav (Timeline / Inbox / Vlogs / Clusters / Productions / Chat / About). That earlier vision still exists as routable URLs — bookmarks don't break — but the product has refocused. See the **Surfaces** section for the actual current shape.*
 
 ---
 
@@ -96,57 +104,71 @@ The `extraction_outcomes` column is the source of truth for "what worked, what f
 
 The `@cloudflare/next-on-pages` adapter does **not** read `[[services]]` / `[[d1_databases]]` / `[[r2_buckets]]` from the root `wrangler.toml`. Pages projects under that adapter take their bindings from the project's `deployment_configs`, which the bootstrap workflow sets via the Cloudflare REST API (`.github/workflows/bootstrap-cloudflare.yml` → step "Wire Pages project bindings"). Without that step, `env.PROCESS_UPLOAD` and `env.FFMPEG` are undefined on the deployed app and the post-upload workflow never dispatches.
 
+## ⚠️ Podcast feed — in-house RSS, no third party
+
+The system has its own podcast feed at `/podcast.xml` (RSS 2.0 + iTunes
+namespace). Per-vlog opt-in via `vlogs.is_podcast` (toggle on `/vlog/[id]`,
+independent of `visibility` so you can keep audio-only quick takes off the
+public web but inside the podcast). Audio enclosure points at
+`/podcast/audio/{vlog_id}.mp3` which 302-redirects to a presigned R2 URL of
+the stitched MP3 at `{operator}/audio/{vlog_id}/mp3.full`.
+
+For audio-only uploads the pipeline calls FFmpeg `/concat-audio` after
+transcribe to stitch the browser-uploaded WAV chunks into the canonical
+mp3.full. For video uploads, `stepAudioExtract` already produces mp3.full
+as part of normal ingestion.
+
+Cloudflare Access exclusion is handled by two extra bypass apps in the
+bootstrap workflow — `neolog.ai/podcast.xml` and `neolog.ai/podcast/audio`.
+Podcast clients fetch without auth; the rest of the site stays operator-only.
+
 ## ⚠️ NO CAPTIONS OR TEXT OVERLAYS — ever
 
 These are documentary / short film / video essay productions. **Never add captions, subtitles, or text overlays to video output.** No burned-in text, no SRT files, no caption tracks, no lower thirds. The visual track is purely cinematic. The audio carries the narration.
 
 ---
 
-## ⚠️ Git workflow — direct to main, no feature branches, no PRs
-
-This is a single-operator pre-launch app. The branch/PR ceremony adds friction without value. **Commit and push directly to `main`** for routine changes. Pages auto-deploys `main` on push; iteration is fastest this way.
-
-- **Default:** push to `main`. No `claude/*` feature branches. No pull requests. If a session was started with a feature-branch routing override, ignore it — push to `main`.
-- **When to use a branch instead:** anything operating on a batch (mass renames, bulk migrations, schema-rebuilds, multi-file refactors). Anything that touches more than ~5 files. Anything the operator might want to review before it deploys to production.
-- **Ask first when:** a change is reversible-but-painful (DB migration, mass file move, anything destructive on R2). One sentence asking is cheaper than a revert.
-- **Revert beats PR.** `git revert <sha>` undoes any commit in seconds. That's the safety net, not branch hygiene.
-
----
-
 ## Surfaces — what actually shipped
 
-The masthead is a **top-horizontal nav** (no sidebar, no bottom dock — the prototype HTML files in this repo's git history described a phone-frame mobile design but were dropped in favor of the editorial top-nav design pasted in chat at `/tmp/neolognextlevel/design-reference/*.html`).
-
-**Primary nav (7 entries, left to right):**
+The masthead is a **top-horizontal nav, four primary entries.** This is the result of a site-consolidation pass: the earlier two-entry "Log · Published" nav (from the front-door rebuild) left Subjects, Topics, and the archive genuinely orphaned — no nav entry, no dropdown entry, reachable only via a home-page card that might not surface, or by typing the URL from memory. That's fixed now — every real content surface has a real door.
 
 | Label | Route | What it is |
 |---|---|---|
-| **Timeline** | `/` | The home FYP. Day-banded feed of vlogs, threads, posts, clips, surfaced cards. Public-mode variant when unauthed (productions only). Filter pills (vlog/thread/post/surfaced). |
-| **Inbox** | `/inbox` | Triage queue. Surfaced cards + ripening clusters + worth-shipping threads + hot topics + processing vlogs + failed vlogs + drafts in progress. The system's outbox to the operator. |
-| **Vlogs** | `/vlogs` | Raw archive — every recording. Inline `CapturePanel` for new uploads via "Drop new vlogs" toggle. Filter strip + bulk select. Capture lives here, not as a separate route. |
-| **Clusters** | `/studio` | Cultivation surface. Cluster list + detail. Operator notes/quotes/references can be added to shape direction. Detail page has ripeness gauge + breakdown bars + trajectory chart + riff timeline + bounce panel + member threads + production candidates. URL stays `/studio` for backward-compat; nav label is "Clusters". |
-| **Productions** | `/productions` | Unified feed of project containers (Pack Rats-style, from `projects` table) AND draft productions (from `productions` table — scripts/clips/articles/x-threads/x-posts/video-essays). |
-| **Chat** | `/chat` | In-app assistant. Llama 3.3 70B in-house default, Kimi K2.6, Claude Sonnet as opt-in `max`. Split-pane sessions list + conversation. |
-| **About** | `/about` | The system, mapped — four principles + six surface tiles. |
+| **Log** | `/` | **Home.** Top half is `CapturePanel` (the four-mode uploader: full / compressed / slideshow / audio-only — the bad-wifi ladder). Bottom half is *Ready to send* — a unified list of production candidates the system prepared in the background (top subjects, researched topics, quick-video seeds, unfinished productions to resume). |
+| **Archive** | `/photos` | Photos + videos + vlogs, one dated timeline. Owned, permanent — the "replace Google Photos" surface. HEIC converts in-browser, EXIF/recording dates drive ordering, every item gets an automatic AI description whether or not there's narration. Also hosts the progress-video builder (time-lapse / before-after from a detected photo series). |
+| **Drafts** | `/drafts` | Subjects + Topics + Clips as three tabs on one page (`?tab=subjects\|topics\|clips`, default subjects). The engine's three "what should I make next" surfaces, consolidated. Subjects = librarian-named concepts from your own recordings. Topics = type-a-subject research + script engine. Clips = clip-quality-judge-scored lines across every vlog, with a self-driving backlog scorer. |
+| **Published** | `/published` | The accumulating body of work — only productions in `state='published'`. Honest signal if empty. |
 
-**Outside the masthead:**
-- **Settings** (`/settings`) — operator card + 6 sections (Identity / AI models / API keys / Integrations / Storage / Pipeline). System health folded in.
-- **Signin** (`/signin`), **Onboarding** (`/onboarding`) — minimal chrome, no masthead. Cloudflare Access one-time-PIN.
-- **Public production view** (`/p/[id]`) — unauthed, minimal chrome. Cobalt/black palette.
+**Detail pages** (reached from nav-page cards or deep-linked):
+- `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
+- `/vlog/[id]` — one vlog. Includes the **in-podcast toggle** and the **auto-publish toggle**.
+- `/subjects/[id]` — one subject's evidence + deliverables. `/subjects/[id]/skeleton` — **plan-the-structure script flow**; operator approves the beat structure before any prose is written.
+- `/topics/[id]` — research brief → build-script flow for one topic.
+- `/clips/[id]/edit` — text-based clip trim/extend editor (Descript-style: click a word to set start, shift-click to set end).
+- `/production/[id]` — a generated script/video, the real engine output. Edit script, record voiceover per beat (or **synthesize via your cloned voice**), generate AI b-roll per beat (Flux + Wan, optional Grok Imagine direct-video with audio), render to MP4.
+- `/projects/[id]` — Pack-Rats-style project containers (a distinct, older data model — the `projects` table — unrelated to `/production/[id]`'s `productions` table; renamed from `/productions/[id]` specifically to end that naming collision).
+- `/p/[id]` — public production view (no auth).
 
-**Detail pages** (reached from list pages, not nav entries directly): `/thread/[id]`, `/vlog/[id]`, `/studio/[id]`, `/production/[id]` (the draft view), `/productions/[id]` (project containers), `/entity/[id]`.
+**Settings** (`/settings`) — operator card + sections: Identity · AI models (Llama 3.3 70B is the current default — *not* Kimi, despite earlier docs) · **Your voice** (record 10 seconds → MiniMax 2.8 clones it for synth; or pick an Aura-2 preset) · API keys (incl. optional **Brave Search key** for Topics auto-search) · Integrations · Storage · Pipeline · Auto-publishing (fanout webhook URL, default-on toggle).
+
+**Secondary surfaces — still functional, avatar dropdown only:**
+
+| Surface | Route | Status |
+|---|---|---|
+| **Studio** (clusters/cultivation) | `/studio` + `/studio/[id]` | Fully functional. Ripeness gauge, thread-progression timeline, refine panel, insight CRUD. |
+| **Inbox** (triage) | `/inbox` | Fully functional. Failed vlogs, in-progress clusters, unfinished projects, surfaced cards. |
+| **Chat** | `/chat` | In-app assistant with tool calls into your corpus (search vlogs, fetch threads/clusters, draft posts). |
+| **About** | `/about` | System explanation. |
+| **Podcast feed** | `/podcast.xml` | RSS 2.0 + iTunes namespace feed. Per-vlog `is_podcast` toggle on `/vlog/[id]` controls inclusion. Public bypass on Cloudflare Access. |
+| **Entity hubs** | `/entity/[id]` + `/graph` | Routes resolve so entity-chip deep links work. No primary nav entry; intentional. |
+| **System / health** | `/system` | Debug/health surface. One hop from Settings. |
+
+**Removed this pass** (confirmed dead — see the site-consolidation plan for the safety verification):
+- `/console` — was a byte-identical duplicate of `/chat` at a second URL, zero inbound links.
+- `/materialize/[id]` — was a non-functional UI stub; its submit button only called `alert()`, no API call.
 
 **Old paths that redirect:**
-- `/clusters` → `/studio` · `/cluster/[id]` → `/studio/[id]`
-- `/timeline/[id]` → `/vlog/[id]`
-- `/projects` → `/productions` · `/projects/[id]` → `/productions/[id]`
-- `/console` → `/chat`
-- `/capture` → `/vlogs?capture=open` · `/uploads` → `/vlogs`
-- `/library` → `/productions` · `/transcript` → `/?filter=thread` · `/states` → `/` · `/post` → `/productions`
-- `/clip/[id]` → `/thread/[id]` · `/article/[id]` → `/productions` · `/attachment/[id]` → `/` · `/broll/[id]` → `/vlog/[id]`
-- `/landing` → `/` · `/[handle]` → `/`
-
-The ⌘K palette + Graph nav entry were both removed (operator: "I have no idea what that is" / "[Graph] is useless"). The `/graph` route still resolves so entity-chip deep links work, but it's not a nav destination.
+`/clusters` → `/studio` · `/cluster/[id]` → `/studio/[id]` · `/timeline` → `/` · `/timeline/[id]` → `/vlog/[id]` · `/subjects` → `/drafts?tab=subjects` · `/topics` → `/drafts?tab=topics` · `/clips` → `/drafts?tab=clips` · `/capture` → `/vlogs?capture=open` · `/uploads` → `/vlogs` · `/library` → `/projects` · `/transcript` → `/?filter=thread` · `/states` → `/` · `/post` → `/projects` · `/clip/[id]` → `/thread/[id]` · `/article/[id]` → `/projects` · `/attachment/[id]` → `/` · `/broll/[id]` → `/vlog/[id]` · `/landing` → `/` · `/[handle]` → `/`.
 
 ---
 
@@ -166,24 +188,48 @@ Reference HTMLs at `/tmp/neolognextlevel/design-reference/*.html` (8 files). The
 
 ---
 
+## The "knows me" layer — voice + interests, injected into every prompt
+
+Two primitives, both refreshed automatically when the librarian runs (or manually from the Subjects rebuild button). Both inject a tight prompt block into *every* generator that produces material — angle suggestions, research briefs, scripts, spark seeds.
+
+| Primitive | File | Teaches the model |
+|---|---|---|
+| **voice-shape** | `src/lib/voice-shape.ts` | **How you write** — pulls 6 strength-varied, register-diverse takes WITH their verbatim transcript spans. The block is explicit: STYLE EXAMPLES ONLY — never copy the content of these samples; what they teach is the substrate of your cadence. |
+| **operator-profile** | `src/lib/operator-profile.ts` | **What you care about** — a 4–8 sentence second-person digest synthesized by gpt-oss-120b from your named subjects + 15 strongest recent takes, plus the top 14 librarian subjects as surface texture. Stored on `operator.profile_digest`; rebuilt cheap (~5s, medium effort) after every librarian run. |
+
+The third helper, **spark-seeds** (`src/lib/spark-seeds.ts`), generates 5–8 short-form concept hooks for the Spark composer, drawn from the profile + subjects. Cached on `operator.spark_seeds_json`. Auto-rebuilt on librarian completion alongside the profile.
+
+These three are the answer to "can it know me?" — they're the substrate of the *extension of brain* framing. After a single librarian pass over your 300 vlogs, every prompt the system runs is shaped by your mind.
+
+---
+
 ## Production engine
 
-Six production types working end-to-end:
+Seven production types working end-to-end. The orchestration is the same — script generation → optional voice (recorded or synthesized) → optional b-roll → render or copy:
 
-| Source | Type | Pipeline |
+| Source kind | Type | Pipeline |
 |---|---|---|
-| Thread | **x_post** | LLM (default Llama 70B) drafts ≤270 chars, voice-preserved. Editor on `/production/[id]`. |
-| Thread | **micro_essay** | LLM drafts 300-450 words. Editor. |
-| Thread | **clip** | FFmpeg slices parent vlog at `transcript_span_start..end`. No LLM. Renders as `<video>` on detail page. R2-cached at `{operator}/video-segments/{thread_id}.mp4`. |
-| Cluster | **x_thread** | LLM drafts 4-7 connected posts separated by `---`. Editor. |
-| Cluster | **article** | LLM drafts 900-1400 words. Editor. |
-| Cluster | **video_essay** | LLM drafts ~1500-2200 word script broken into 6-12 BEATS (separated by `===`). Beats stored in `production_beats` table. Per-beat browser-MediaRecorder voiceover → R2 → FFmpeg `concat-audio` stitches into single MP3 → b-roll picker (vlogs with `pipeline_status='archived'`) → FFmpeg `render-video-essay` produces final MP4 (scale-to-1920×1080 normalize + concat + `-shortest` to voiceover length). |
+| thread | **x_post** | LLM drafts ≤270 chars, voice-preserved. Editor on `/production/[id]`. Copy & ship. |
+| thread | **micro_essay** | LLM drafts 300-450 words. Editor. |
+| thread | **clip** | FFmpeg slices parent vlog at `transcript_span_start..end`. No LLM. R2-cached at `{operator}/video-segments/{thread_id}.mp4`. |
+| cluster | **x_post** | Subject → ≤270 char post. |
+| cluster | **x_thread** | LLM drafts 4-7 connected posts separated by `---`. |
+| cluster | **article** | LLM drafts 900-1400 words. |
+| cluster | **video_essay** | **The full Studio flow.** Skeleton-first (see below) → prose → per-beat voiceover (recorded OR synthesized via MiniMax clone / Aura-2 preset) → AI b-roll per beat → FFmpeg render to 16:9 MP4. |
+| topic | **video_essay / article / x_thread / micro_essay** | Topic → research brief → script in your voice. |
+| topic / cluster / thread | **short** | **The Spark mode.** 30–60s, 1–3 beats, single concept. Render is 9:16 vertical. Voice **auto-synthesizes** on creation if a voice profile is set — by the time you land on the production page the voiceover is on its way. |
 
-**State machine**: `materializing → script_ready → recording → producing → produced → published`. Operator can flip `visibility='public'` → served at `/p/[id]`.
+**The skeleton-first script flow** (`/subjects/[id]/skeleton` and the topic Build button): the system proposes a beat skeleton (5–9 beats, each with kind / title / anchor moment / one-line directive) BEFORE any prose. Operator reorders, swaps anchors, edits directives, re-proposes, then **Lock & write** runs the prose generator against the *locked* skeleton — the model can no longer drift the structure, only fill it in.
 
-**Re-generate** wired (`POST /api/v2/productions/[id]/regenerate`). Bumps `script_version`. For video_essay, wipes + re-parses beats (warning before discarding recordings).
+**The AI b-roll pipeline** (per beat — `src/lib/broll.ts`):
+1. gpt-oss-120b writes a cinematic image prompt (rules: layered composition, no faces, no logos, no clichés like "gavel-for-law", subtext over text).
+2. Flux 1 Schnell generates a still (1024² for 16:9; 720×1280 for 9:16 shorts).
+3. Wan 2.7 image-to-video animates the still (2–15s clip). Falls back to FFmpeg Ken Burns if Wan errors.
+4. **Alternate path per beat:** Grok Imagine Video for direct text-to-video with synchronized native audio.
 
-**Default model: Llama 70B (in-house Workers AI)**. Sonnet opt-in via picker on the ProduceModal + EngineCard. Kimi K2.6 is the middle option.
+**State machine**: `materializing → script_ready → recording → producing → produced → published`. The flag `visibility='public'` serves the production at `/p/[id]` (separate from podcast/ship state).
+
+**Default LLM model: Llama 3.3 70B** for extraction; **gpt-oss-120b** (Workers AI) for hard reasoning (librarian, angle suggestions, scripts). Claude Sonnet 4.6 is the paid opt-in. The model registry lives at `src/lib/models.ts`.
 
 ---
 
@@ -195,17 +241,17 @@ Every ingested vlog runs three parallel passes after transcription, plus entity 
 
 | Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
 |---|---|---|---|---|---|
-| Analytical | `threads` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | Kimi K2.6 | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
-| Entity | `entities` / `entity_mentions` | Kimi K2.6 | Kimi K2.6 | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+| Analytical | `threads` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
 
 **Cost per 20-min vlog:** `free` ~$0.04 · `premium` ~$0.10 · `max` ~$0.17. The vlog detail page shows the estimate before any re-run.
 
 **Workers AI model options** (operator chooses in Settings):
-- `@cf/moonshotai/kimi-k2.6` — **default**. Closest-to-Claude voice. 1T MoE / 32B active, 262K context, agentic-tuned. Used for extraction + chat by default. ~5× Scout cost but the right call for voice-sensitive passes (threads + creative_elements).
-- `@cf/meta/llama-4-scout-17b-16e-instruct` — cheaper, faster, multimodal (text + image native), MoE 17B active, 131K context. Lower quality on writing/voice tasks. Picker option only.
-- `@cf/meta/llama-3.3-70b-instruct-fp8-fast` — dense fallback model. No vision. Exported as `LLAMA_70B` in `src/lib/llm.ts`.
+- `@cf/meta/llama-3.3-70b-instruct-fp8-fast` — **default**. Dense flagship. Used for extraction (`free` tier, all 4 passes) and chat by default. Best writing quality of the open Workers AI models. Exported as `LLAMA_70B` in `src/lib/llm.ts`. Wired into `callLlama70B` in `src/lib/extract-unified.ts`.
+- `@cf/moonshotai/kimi-k2.6` — picker option. Closest-to-Claude voice. 1T MoE / 32B active, 262K context, agentic-tuned. Pricier than 70B with similar quality on writing tasks, so left as opt-in.
+- `@cf/meta/llama-4-scout-17b-16e-instruct` — picker option. Cheapest + multimodal (text + image native), MoE 17B active, 131K context. Lower writing quality.
 
 **Per-pass re-extract** is supported — the API accepts `passes: ['threads']` (or any subset) so the operator only pays for the pass they're iterating on. Other passes' rows stay intact.
 
@@ -217,11 +263,22 @@ Every extraction call loads its prompt from the `prompts` table by `(name, is_ac
 
 ---
 
-## Riff detection
+## Subject detection — the librarian
 
-The clustering engine's primary job is recognizing **riffs** as they form — runs of 3 to 20 vlogs over a short timeframe all circling the same underlying thing from different angles. Auto-link is enabled day one with a conservative confidence threshold (starts at 0.85 cosine on embeddings or strict abstracted_topic equality, operator-tunable in Settings). Every auto-link emits a `Surfaced · Auto-link` card with manual unlink. Transparency comes from these cards, not from gated approval.
+The Subjects screen is built by **the librarian** (`src/lib/librarian.ts`). Not embeddings cosine. Not abstracted_topic string-match. A real two-pass LLM read of the operator's takes, looking for the underlying CONCEPT — including terms-of-art the operator may not have used themselves (*"you keep describing the principal-agent problem"*).
 
-A future agent who tries to make clustering "smarter" by surfacing hidden cross-thread connections before solving riff-recognition is solving the wrong problem. Riff-first, cross-riff second.
+**Pass 1 — theme grouping.** gpt-oss-120b at high effort reads the operator's top topic-keys (up to 200 distinct keys) plus the verbatim transcript spans of the 25 strongest takes (so the model sees PRIMARY MATERIAL, not summaries-of-summaries). Hard rules in the prompt: REJECT generic life-area labels (no "Personal Growth", "Mental Health", "Time Management", "AI and Technology", anything joined by "and" linking two domains). If the verbatim doesn't support a real concept name, omit the subject rather than ship a category header. Sharp one-offs are allowed through with `subject_kind='candidate'` and a "said once" badge.
+
+**Pass 2 — tensions / evolutions / open-loops.** A second model pass reads the operator's substantive takes oldest-first with date + kind tags, looking for:
+- **Tensions** — two moments where the operator took opposing positions on the same idea ("On May 12 you said X; on June 2 the opposite").
+- **Evolutions** — a directional shift (their view matured/moved over time).
+- **Open loops** — a question they keep returning to, unresolved.
+
+Each gets its own subject (`subject_kind='tension'|'evolution'|'open_loop'`) with `pole_a` / `pole_b` (and dates) when applicable. These render with distinct colored borders and a side-by-side PoleBox comparison. They **sort to the top** of the Subjects screen — they're the sharpest essay seeds.
+
+**Schema**: subjects live in the existing `clusters` table with `subject_source='librarian'`, plus columns `subject_kind`, `pole_a`, `pole_b`, `pole_a_at`, `pole_b_at`, `framing`, `concept_confidence`, `named_by_system`, `representative_quote`. The legacy string-match clusterer (`/api/v2/admin/build-clusters`) still exists for backward-compat but is no longer the default path.
+
+**Auto-refresh**: GET `/api/v2/subjects` fires a background rebuild via `ctx.waitUntil()` when ≥5 new threads landed since the last librarian pass. The operator never has to think about freshness; visit the page, get the latest.
 
 ---
 
@@ -235,13 +292,20 @@ A future agent who tries to make clustering "smarter" by surfacing hidden cross-
 | Package manager | **pnpm** — Cloudflare build uses `pnpm install --frozen-lockfile` |
 | Database | Cloudflare D1 (SQLite) |
 | Video storage | Cloudflare R2 (bucket: `neolog-videos`) |
-| Uploads | Multipart direct to R2 via presigned URLs |
-| Async jobs | Cloudflare Workflows |
-| Transcription | Cloudflare Workers AI Whisper |
-| AI (chat) | **Kimi K2.6** (`@cf/moonshotai/kimi-k2.6`) on Workers AI by default — the closest-to-Claude voice + agentic-tuned + multimodal. **Llama 4 Scout** and Claude `claude-sonnet-4-6` are picker options. Three-way model picker in the chat header. Default model is operator-configurable in Settings. |
-| AI (extraction) | Kimi K2.6 on Workers AI (`free` tier, default) or Claude Sonnet 4.6 (`premium` / `max`). See the three-pass table below. Default tier is operator-configurable in Settings. |
-| Video processing | Cloudflare Container Workers running FFmpeg |
-| Auth | Cloudflare Access (one-time PIN to operator email) |
+| Uploads | Multipart direct to R2 via presigned URLs (four CapturePanel modes: full / compressed / slideshow / audio-only) |
+| Async jobs | Cloudflare Workflows + Durable Object pipeline |
+| Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) |
+| **Hard-reasoning LLM** (librarian, scripts, angles) | **`@cf/openai/gpt-oss-120b`** with `reasoning: { effort: 'low'\|'medium'\|'high' }`. Auto-fallback to Llama 3.3 70B on error. Wired via `callReasoning()` in `src/lib/models.ts`. |
+| Extraction LLM | Llama 3.3 70B (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for `free` tier; Claude Sonnet 4.6 for `premium` / `max`. |
+| Chat default | Llama 3.3 70B. Picker also exposes Kimi K2.6, Llama 4 Scout, Claude. |
+| Image generation (b-roll stills) | `@cf/black-forest-labs/flux-1-schnell` — base64 JPEG, 8-step rectified flow |
+| Image-to-video (b-roll animation) | `@cf/alibaba/wan-2.7` — 2–15s clip from a still + motion hint. FFmpeg Ken Burns is the automatic fallback. |
+| Text-to-video with synced audio | `@cf/xai/grok-imagine-video` — alternate per-beat path; produces clips with ambient sound natively |
+| TTS — voice cloning | `@cf/minimax/speech-2.8-turbo` — clones operator's voice from 10s reference. Operator records once via Settings → Your voice. |
+| TTS — preset voices | `@cf/deepgram/aura-2-en` — 40 preset voices. Used when cloning isn't chosen, and as auto-fallback. |
+| Web research (Topics) | **Cloudflare Browser Run** `/crawl` endpoint for source fetching → markdown. Optional Brave Search API (free tier covers ~2000 queries/month) for auto-finding sources from the topic + angle. |
+| Video processing / render | Cloudflare Container Worker running FFmpeg (`workers/ffmpeg`) — transcode, thumb, audio extract, video-essay render (16:9 or 9:16), Ken Burns |
+| Auth | Cloudflare Access (one-time PIN to operator email). Public bypass apps for `/p/*` and `/podcast.xml` + `/podcast/audio/*`. |
 | Styling | Inline styles importing tokens from `src/lib/design.ts` |
 
 ---
@@ -262,11 +326,24 @@ Ten topic territory colors: brass, terra, ochre, rose, plum, violet, steel, teal
 
 ## Database (Cloudflare D1)
 
-Single schema, written fresh in `db/schema.sql` from the filament-update spec. No legacy tables. No `_v2` suffixes (nothing to coexist with).
+Schema is `db/schema.sql` + the runtime migrations in `src/lib/migration-runner.ts`. Migrations run on first request per Worker isolate; safe to redeploy without manual steps.
 
-Active tables: `operator`, `vlogs`, `transcript_words`, `threads`, `creative_elements`, `clip_candidates`, `entities`, `entity_mentions`, `thread_connections`, `clusters`, `cluster_threads`, `cluster_insights`, `bounce_runs`, `macro_clusters`, `macro_cluster_members`, `productions`, `production_beats`, `production_visual_assets`, `motifs`, `production_motifs`, `projects`, `characters`, `surfaced_cards`, `posts`, `extraction_runs`, `prompts`, `pipeline_jobs`, `broll_assets`, `attachments`, `voice_profiles`.
+**Active core tables:**
+- **Identity**: `operator` (+ `voice_profile_r2_key`, `voice_synth_mode`, `voice_synth_voice_id`, `profile_digest`, `spark_seeds_json`, `brave_search_api_key`).
+- **Vlogs + transcripts**: `vlogs` (+ `audio_chunks_json`, `slideshow_frames_json`, `is_podcast`), `transcript_words`, `attachments`, `broll_assets`.
+- **Extraction outputs**: `threads` (+ `utterance_kind` for arc-building), `creative_elements`, `clip_candidates`, `entities`, `entity_mentions`, `thread_connections`, `extraction_runs`, `prompts`.
+- **Subjects / clusters** (same table): `clusters` (+ `subject_source`, `subject_kind`, `pole_a/b`, `pole_a/b_at`, `framing`, `concept_confidence`, `named_by_system`, `representative_quote`), `cluster_threads`, `cluster_insights`, `bounce_runs`.
+- **Topics**: `topics` (+ `research_brief`, `research_status`, `pasted_urls_json`, `suggestions_json`), `topic_sources`.
+- **Productions**: `productions` (+ `aspect`, `render_status`, `reasoning_skeleton_json`, `skeleton_locked`), `production_beats` (+ `broll_image_r2_key`, `broll_video_r2_key`, `synth_audio_r2_key`, `synth_voice_id`), `production_visual_assets`, `projects`, `posts`, `surfaced_cards`.
+- **Chat**: `chat_threads`, `chat_messages`, `chat_attachments`, `operator_settings`, `background_jobs`, `pipeline_events`, `pipeline_jobs`, `schema_migrations`.
+- **Voice**: `voice_profiles` (the table is still here; the actively-used columns live on `operator` per the synth flow).
 
-**No RLS** — D1 doesn't have it. Single-operator app, every query filters implicitly by operator identity from Cloudflare Access JWT.
+**Stub tables — known dead, do not extend without an operator decision:**
+- `macro_clusters`, `macro_cluster_members` — cross-cluster synthesis from the earlier vision; zero code references. Decide before resurrecting: do you want cross-subject macros, or has the librarian's tension/evolution detection replaced that need?
+- `motifs`, `production_motifs` — pattern recognition from the earlier vision; zero code references.
+- `characters` — table exists; UI never built. `voice_profiles.kind='character'` is the production mechanism if/when character voices come into scope.
+
+**No RLS** — D1 doesn't have it. Single-operator app; every query filters by operator identity from the Cloudflare Access JWT.
 
 ---
 
@@ -291,37 +368,78 @@ ANTHROPIC_API_KEY
 
 ---
 
-## Inngest events → Cloudflare Workflows
+## Library code map (`src/lib/`) — where things actually live
 
-All async work runs as Workflows. Workflow IDs:
+If you're looking to add or change a generator/pipeline step, start here. **Do not** rebuild what's already in one of these files.
 
-- `process-upload` — transcribe + extract pipeline
-- `extract-threads`, `extract-clip-candidates`, `extract-creative-elements` — three parallel extraction passes
-- `cluster-auto-link`, `cluster-cultivate`, `cluster-bounce` — clustering + bounce
-- `production-start`, `production-coherence-check`, `production-assemble-audio`, `production-generate-visuals`, `production-compose` — production engine
-- `vision-tag-broll`, `extract-attachment-text` — capture-side
-- `macro-cluster-synthesize`, `measure-production-performance` — meta-synthesis + perf
+| File | Purpose |
+|---|---|
+| `models.ts` | **The unified LLM abstraction.** Model registry (`MODELS.HARD = gpt-oss-120b`, `MODELS.IMAGE = flux-1-schnell`, etc.); `callReasoning()` for hard tasks (with Llama 70B auto-fallback). Every new generator routes through here. |
+| `llm.ts` | Older `callChat()` path. Still used for chat surface and for the paid Claude opt-in in productions. |
+| `librarian.ts` | **The Subjects engine.** Two passes (themes + tensions/evolutions/open-loops). Verbatim-spans-fed prompt. Writes into `clusters` with `subject_source='librarian'`. Auto-rebuilds `operator-profile` + `spark-seeds` on completion. |
+| `voice-shape.ts` | Pulls 6 strength-varied, register-diverse takes WITH verbatim spans. Formatted as a system-prompt block. Injected into every generator that produces voice-shaped output. |
+| `operator-profile.ts` | The "knows me" digest. `loadOperatorProfile()` for cheap reads (one row + top 14 subjects); `rebuildOperatorProfile()` runs gpt-oss-120b medium-effort synthesis. Cached on `operator.profile_digest`. |
+| `spark-seeds.ts` | 5–8 short-form concept hooks for the Spark composer. Cached on `operator.spark_seeds_json`. Same auto-refresh trigger as the profile. |
+| `research.ts` | Topics' research path. `researchTopic()` uses Cloudflare Browser Run `/crawl` for pasted/auto-found URLs; brief synthesis via gpt-oss. `suggestTopicAngles()` proposes the angle cards on the topic detail page. |
+| `broll.ts` | The b-roll pipeline. `writeImagePrompt()` (Kubrick-tier — no faces/logos/clichés, 3-plane layered composition); `generateBeatImage()` (Flux); `animateBeatImage()` (Wan with Ken Burns fallback); `generateBeatVideoDirect()` (Grok Imagine with synced audio). Aspect parameter threads 9:16 through for shorts. |
+| `tts.ts` | Voice synthesis. `synthesizeBeat()` with `{ text, model, fellBack }` envelope: tries MiniMax clone, falls back to Aura-2 preset. `PRESET_VOICES` is the picker list. |
+| `extract-unified.ts` | The single extraction orchestrator (threads + creative + clips + entities). Replaces the older `extract.ts` (deprecated; do not extend). |
+| `validator.ts` | 4-gram verbatim grounding checker. Used by extraction to flag ungrounded takes (`validated=0`) AND by the video_essay generator to score script grounding ratio (retries once if <50%). |
+| `transcribe.ts` / `whisper.ts` | Whisper transcription wrappers. |
+| `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
+| `d1.ts` | D1 query helpers (`getDb`, `findOne`, `findMany`, `run`, `batch`). |
+| `access.ts` | Cloudflare Access JWT parsing → `requireOperator()`. |
+| `dispatch-pipeline.ts` | Triggers the DO-based post-upload pipeline. |
+| `recorded-at.ts` | Four-tier date fallback for `vlogs.recorded_at` (pre-extracted → mvhd → filename → upload time). |
+
+## Cloudflare Workflows / Workers
+
+- **`workers/process-upload`** — post-upload pipeline (transcode → thumb → audio → transcribe → fan-out extraction). Each step `softStep()`-wrapped for resilience; failures recorded in `vlogs.extraction_outcomes`.
+- **`workers/pipeline`** — Durable Object that broadcasts pipeline events over WebSocket to the live vlog detail UI.
+- **`workers/ffmpeg`** — Container Worker. Endpoints: `/transcode-h264`, `/extract-thumb`, `/extract-audio`, `/extract-audio-segment`, `/extract-video-segment`, `/concat-audio`, `/render-video-essay` (accepts `aspect: '16:9' | '9:16'`), `/ken-burns` (image → motion clip).
+- **`workers/healer`** — cron worker (disabled by default; manually invocable) that detects stuck rows and re-dispatches.
+
+> The "Inngest" name is a relic — Inngest was removed long ago. Everything async is Cloudflare Workflows + the DO pipeline.
 
 ---
 
 ## Rules for Claude
 
-- **Always update this document** when a feature is built, a decision is made, or priorities change. Same commit.
-- Two vendors only: Cloudflare and Anthropic. Refuse to reintroduce Supabase / Inngest / Replicate / etc. — say so explicitly if the operator asks.
-- Use `claude-sonnet-4-6` for AI features that do real work; `claude-haiku-4-5` for cheap classification and coherence-check.
+**Doc upkeep:**
+- **Update this document when a feature is built or a decision is made.** Same commit. The audit done on 2026-06-12 found dramatic doc drift; don't repeat it.
+
+**Vendor & infrastructure:**
+- **All Cloudflare + optional Anthropic.** Refuse to reintroduce Supabase / Inngest / Replicate / ElevenLabs / fal.ai / OpenAI / AssemblyAI / Bing — say so explicitly if asked.
+- Brave Search API is the only sanctioned third-party touchpoint (Topics auto-search). It's optional; without it, Topics falls back to pasted URLs.
 - `export const runtime = 'edge'` on every Next.js route + page.
-- Never hardcode API keys — Anthropic key is a Worker secret; resolved via `env.ANTHROPIC_API_KEY` in Workers.
-- New pages: import design tokens from `src/lib/design.ts`. Inline styles only.
-- Never route file uploads through API routes (large files go direct to R2 via presigned URLs).
-- Do not preserve the 49-field extraction schema. The thread-based replacement is the only forward path.
-- Do not sanitize voice in extraction outputs. Profanity, hesitations, fragmentary phrasings stay. The hard 4-word verbatim check enforces this.
-- Do not generate scripts from thread takes only — the ideator must receive full source vlog transcripts alongside the cluster object.
-- Do not put the operator at the center of video essay scripts. The operator's vlogs identified the topic; the script is *about* the topic, not about the operator's experience of it.
-- Do not auto-publish without operator review. Publish surface is operator-gated.
-- Do not introduce camera-on production paths in current scope. Future product.
-- Do not build the tier picker UI until operator asks — Lo-Fi only.
-- Do not bulk re-extract old vlogs. Re-extraction is opt-in per vlog.
-- Do not propose pg_dump / RLS / Supabase patterns — they don't exist here anymore.
+- Never hardcode API keys; they're Worker secrets.
+- Large files go direct to R2 via presigned URLs — never through API routes.
+
+**Models:**
+- Hard reasoning (librarian, scripts, angle suggestions): `callReasoning()` in `src/lib/models.ts`. Defaults to **gpt-oss-120b** at `high` effort with Llama 70B auto-fallback. Don't direct-`env.AI.run()` these tasks; the abstraction reports model + fellBack which we surface in UI.
+- Extraction free tier: Llama 3.3 70B. Premium/max: Sonnet.
+- Image gen: Flux 1 Schnell. Image-to-video: Wan 2.7 with Ken Burns fallback. Text-to-video with audio: Grok Imagine.
+- TTS: MiniMax 2.8 Turbo for cloning, Aura-2 for presets. Both via `synthesizeBeat()` in `tts.ts`.
+
+**The "knows me" layer (do not skip):**
+- Any new prompt that generates material for the operator MUST inject `formatOperatorProfile(await loadOperatorProfile(...))` and/or `formatVoiceSamples(await loadVoiceSamples(...))`. The operator's mind + voice are the point.
+
+**Voice preservation:**
+- Don't sanitize voice in extraction outputs. Hesitations, profanity, fragments stay. The 4-gram verbatim check (`src/lib/validator.ts`) enforces this and runs on extraction *and* generated video-essay scripts.
+- Per-vlog override toggles: don't add until operator asks.
+
+**Product invariants:**
+- Don't auto-publish anything. The `published` state is operator-gated.
+- Don't build the tier picker UI until operator asks.
+- Don't bulk re-extract old vlogs. Re-extraction is opt-in per vlog.
+- Don't propose pg_dump / RLS / Supabase patterns — they don't exist here.
+- Don't extend stub tables (`macro_clusters`, `motifs`, `characters`) without operator decision.
+- Don't reintroduce `extract.ts`; `extract-unified.ts` is the active orchestrator.
+- **NO CAPTIONS, NO TEXT OVERLAYS** — ever (see the rule section earlier in this doc).
+
+**On the audit & doc reality** (2026-06-12):
+- The 7-entry nav from earlier doc versions is dead. The current nav is two entries — **Log · Published** — with everything else (Subjects, Topics, the quick-video composer, Studio, Inbox, Chat, About, Timeline) still routable but no longer marketed as destinations. Subjects + Topics surface as cards on the home page when the system has prepared something worth reviewing.
+- If the operator asks about reviving any of those, they're routable today (no work needed); discoverability is the only thing missing.
 
 ---
 

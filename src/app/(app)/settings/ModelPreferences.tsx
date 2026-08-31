@@ -8,22 +8,23 @@
 import { useEffect, useState } from 'react'
 
 const CHAT_OPTIONS = [
-  { key: 'kimi',   label: 'Kimi K2.6',      sub: 'Workers AI · closest-to-Claude voice · ~$0.01/turn (Recommended)' },
-  { key: 'scout',  label: 'Llama 4 Scout',  sub: 'Workers AI · cheap + fast, lower quality · ~$0.002/turn' },
-  { key: 'claude', label: 'Claude Sonnet 4.6', sub: 'Anthropic · premium · ~$0.05/turn' },
+  { key: 'llama70b', label: 'Llama 3.3 70B',     sub: 'Workers AI · dense flagship · best writing quality (Recommended)' },
+  { key: 'kimi',     label: 'Kimi K2.6',         sub: 'Workers AI · agentic/MoE · pricier than 70B, similar voice' },
+  { key: 'scout',    label: 'Llama 4 Scout',     sub: 'Workers AI · cheapest, multimodal, lower writing quality' },
+  { key: 'claude',   label: 'Claude Sonnet 4.6', sub: 'Anthropic · premium · ~$0.05/turn (requires funded API key)' },
 ] as const
 
 const TIER_OPTIONS = [
-  { key: 'free',    label: 'Free',    sub: 'Kimi K2.6 for all 4 passes · ~$0.04/vlog' },
-  { key: 'premium', label: 'Premium', sub: 'Sonnet for threads + creative, Kimi for the rest · ~$0.10/vlog' },
-  { key: 'max',     label: 'Max',     sub: 'Sonnet for all 4 passes · ~$0.17/vlog' },
+  { key: 'free',    label: 'Free',    sub: 'Llama 3.3 70B for all 4 passes · ~$0.04/vlog' },
+  { key: 'premium', label: 'Premium', sub: 'Sonnet for threads + creative, Llama 70B for the rest · ~$0.10/vlog' },
+  { key: 'max',     label: 'Max',     sub: 'Sonnet for all 4 passes · ~$0.17/vlog · (requires funded Anthropic key)' },
 ] as const
 
 type ChatModel = typeof CHAT_OPTIONS[number]['key']
 type Tier = typeof TIER_OPTIONS[number]['key']
 
 export function ModelPreferences() {
-  const [chatModel, setChatModel] = useState<ChatModel>('kimi')
+  const [chatModel, setChatModel] = useState<ChatModel>('llama70b')
   const [tier, setTier] = useState<Tier>('free')
   const [loading, setLoading] = useState(true)
   const [savingKey, setSavingKey] = useState<string | null>(null)

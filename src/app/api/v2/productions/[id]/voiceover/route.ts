@@ -53,21 +53,36 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Voiceover stitch only applies to video_essay productions' }, { status: 400 })
   }
 
-  const beats = await findMany<{ id: string; beat_index: number; audio_r2_key: string | null; beat_text: string }>(
+  const beats = await findMany<{
+    id: string; beat_index: number; audio_r2_key: string | null
+    synth_audio_r2_key: string | null; beat_text: string
+  }>(
     db,
-    `SELECT id, beat_index, audio_r2_key, beat_text
+    `SELECT id, beat_index, audio_r2_key, synth_audio_r2_key, beat_text
        FROM production_beats
       WHERE production_id = ?
       ORDER BY beat_index ASC`,
     params.id,
   )
-  const recorded = beats.filter(b => b.audio_r2_key)
-  if (recorded.length === 0) {
-    return NextResponse.json({ error: 'No beats have recordings yet — record at least one before stitching' }, { status: 400 })
-  }
-  if (recorded.length < beats.length) {
+  // For each beat, prefer the operator's recorded take; fall back to the
+  // synthesized take. Mixed productions (some recorded, some synthesized)
+  // stitch identically. Beats with neither source get skipped from the
+  // missing-count below.
+  const usable = beats.map(b => ({
+    ...b,
+    chosen_r2_key: b.audio_r2_key || b.synth_audio_r2_key,
+    source: b.audio_r2_key ? 'recorded' : b.synth_audio_r2_key ? 'synth' : null,
+  }))
+  const ready = usable.filter(b => !!b.chosen_r2_key)
+  if (ready.length === 0) {
     return NextResponse.json({
-      error: `Only ${recorded.length}/${beats.length} beats are recorded. Record the rest first, or stitch what you have by re-calling with ?partial=1 (not implemented).`,
+      error: 'No beats have audio yet — record or synthesize at least one before stitching',
+    }, { status: 400 })
+  }
+  if (ready.length < beats.length) {
+    const missing = beats.length - ready.length
+    return NextResponse.json({
+      error: `${missing} beat${missing === 1 ? '' : 's'} ${missing === 1 ? 'has' : 'have'} no audio yet. Record or synthesize them first.`,
     }, { status: 400 })
   }
 
@@ -77,9 +92,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Presign each beat's R2 audio for the FFmpeg container to fetch.
   const inputUrls: string[] = []
-  for (const b of recorded) {
+  for (const b of ready) {
     try {
-      const url = await presignGetUrl(env, b.audio_r2_key!, 1800)
+      const url = await presignGetUrl(env, b.chosen_r2_key!, 1800)
       inputUrls.push(url)
     } catch (err: any) {
       return NextResponse.json({ error: `Presign failed for beat ${b.beat_index}: ${err?.message || err}` }, { status: 500 })
@@ -113,7 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // the production page knows this is a voiceover (vs final render).
   const meta = JSON.stringify({
     kind: 'voiceover',
-    beat_count: recorded.length,
+    beat_count: ready.length,
     mime: 'audio/mpeg',
     stitched_at: new Date().toISOString(),
   })
@@ -127,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const url = await presignGetUrl(env, r2Key, 4 * 3600)
   return NextResponse.json({
     url, r2_key: r2Key,
-    beat_count: recorded.length,
+    beat_count: ready.length,
     bytes: stitchedBytes.length,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

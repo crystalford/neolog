@@ -322,7 +322,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
                   fontSize: 10, color, letterSpacing: 1.5, textTransform: 'uppercase',
                   fontFamily: 'var(--font-mono)', fontWeight: 600, marginBottom: 6,
                 }}>
-                  Bounce · {bounceTurns.length} turn{bounceTurns.length === 1 ? '' : 's'}
+                  Refine · {bounceTurns.length} turn{bounceTurns.length === 1 ? '' : 's'}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
                   Ask the model anything about this cluster. Threads + prior insights are in context.
@@ -394,7 +394,7 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
                 { name: 'Thread density',    value: composite.thread_density,    hot: composite.thread_density >= 80 },
                 { name: 'Take strength',     value: composite.take_strength,     hot: composite.take_strength >= 80 },
                 { name: 'Voice richness',    value: composite.voice_richness,    hot: composite.voice_richness >= 80 },
-                { name: 'Bounce readiness',  value: composite.bounce_readiness,  hot: composite.bounce_readiness >= 80 },
+                { name: 'Refine readiness',  value: composite.bounce_readiness,  hot: composite.bounce_readiness >= 80 },
                 { name: 'Macro-eligibility', value: composite.macro_eligibility, hot: composite.macro_eligibility >= 80 },
               ]}
             />
@@ -407,8 +407,8 @@ export default function StudioDetailPage({ params }: { params: { id: string } })
         {/* Riff progression */}
         <section className="canon-section canon-reveal d4" style={{ marginBottom: 32 }}>
           <div className="canon-section-head">
-            <h2>Riff progression <span className="meta">· {cluster.threads.length} thread{cluster.threads.length === 1 ? '' : 's'} · {weeks.length - 1} weeks</span></h2>
-            <div className="meta">how this cluster ripened</div>
+            <h2>Thread progression <span className="meta">· {cluster.threads.length} thread{cluster.threads.length === 1 ? '' : 's'} · {weeks.length - 1} weeks</span></h2>
+            <div className="meta">how this cluster developed</div>
           </div>
           <RiffTimeline nodes={riffNodes} windows={riff_windows} color={color} weeks={weeks}/>
         </section>

@@ -44,10 +44,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     throw e
   }
 
-  const body = await req.json().catch(() => ({})) as { broll_vlog_ids?: string[] }
+  const body = await req.json().catch(() => ({})) as {
+    broll_vlog_ids?: string[]
+    use_ai_broll?: boolean
+  }
+  const useAiBroll = body.use_ai_broll === true
   const brollIds = (body.broll_vlog_ids || []).filter(Boolean)
-  if (brollIds.length === 0) {
-    return NextResponse.json({ error: 'broll_vlog_ids (non-empty array) required' }, { status: 400 })
+  if (!useAiBroll && brollIds.length === 0) {
+    return NextResponse.json({ error: 'either use_ai_broll=true or broll_vlog_ids (non-empty) required' }, { status: 400 })
   }
   if (brollIds.length > 30) {
     return NextResponse.json({ error: 'Cap is 30 broll clips per render' }, { status: 400 })
@@ -56,16 +60,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const db = getDb(env)
   const prod = await findOne<{
     id: string; production_type: string; output_r2_key: string | null; output_metadata: string | null
+    aspect: string | null
   }>(
     db,
-    `SELECT id, production_type, output_r2_key, output_metadata
+    `SELECT id, production_type, output_r2_key, output_metadata, aspect
        FROM productions
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,
   )
   if (!prod) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (prod.production_type !== 'video_essay') {
-    return NextResponse.json({ error: 'Render only applies to video_essay productions' }, { status: 400 })
+  if (prod.production_type !== 'video_essay' && prod.production_type !== 'short') {
+    return NextResponse.json({ error: 'Render only applies to video_essay or short productions' }, { status: 400 })
   }
   if (!prod.output_r2_key) {
     return NextResponse.json({ error: 'No voiceover yet. Stitch one first via /voiceover.' }, { status: 400 })
@@ -81,69 +86,124 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const voiceoverKey = prod.output_r2_key
 
-  // Validate operator owns each b-roll vlog + collect playback keys.
-  const placeholders = brollIds.map(() => '?').join(',')
-  const brollRows = await findMany<{ id: string; r2_key: string; transcoded_r2_key: string | null }>(
-    db,
-    `SELECT id, r2_key, transcoded_r2_key
-       FROM vlogs
-      WHERE id IN (${placeholders}) AND operator_id = ? AND deleted_at IS NULL`,
-    ...brollIds, operator.id,
-  )
-  if (brollRows.length !== brollIds.length) {
-    return NextResponse.json({
-      error: `Found ${brollRows.length}/${brollIds.length} of the requested b-roll vlogs. Some may be deleted or not yours.`,
-    }, { status: 400 })
+  // Source the b-roll keys either from the operator's vlog archive (legacy
+  // path) or from the per-beat AI clips written by /broll (new path).
+  type BrollSource = { key: string; label: string }
+  let ordered: BrollSource[] = []
+  if (useAiBroll) {
+    const beatRows = await findMany<{ beat_index: number; broll_video_r2_key: string | null }>(
+      db,
+      `SELECT beat_index, broll_video_r2_key
+         FROM production_beats
+        WHERE production_id = ?
+        ORDER BY beat_index ASC`,
+      params.id,
+    )
+    const haveVideo = beatRows.filter(b => !!b.broll_video_r2_key)
+    if (haveVideo.length === 0) {
+      return NextResponse.json({
+        error: 'No AI b-roll clips yet. POST /api/v2/productions/[id]/broll first.',
+      }, { status: 400 })
+    }
+    ordered = haveVideo.map(b => ({ key: b.broll_video_r2_key!, label: `beat ${b.beat_index}` }))
+  } else {
+    const placeholders = brollIds.map(() => '?').join(',')
+    const brollRows = await findMany<{ id: string; r2_key: string; transcoded_r2_key: string | null }>(
+      db,
+      `SELECT id, r2_key, transcoded_r2_key
+         FROM vlogs
+        WHERE id IN (${placeholders}) AND operator_id = ? AND deleted_at IS NULL`,
+      ...brollIds, operator.id,
+    )
+    if (brollRows.length !== brollIds.length) {
+      return NextResponse.json({
+        error: `Found ${brollRows.length}/${brollIds.length} of the requested b-roll vlogs. Some may be deleted or not yours.`,
+      }, { status: 400 })
+    }
+    const byId = new Map(brollRows.map(r => [r.id, r]))
+    ordered = brollIds.map(id => {
+      const r = byId.get(id)!
+      return { key: r.transcoded_r2_key || r.r2_key, label: id }
+    }).filter(Boolean)
   }
-  // Preserve operator's specified order.
-  const byId = new Map(brollRows.map(r => [r.id, r]))
-  const ordered = brollIds.map(id => byId.get(id)!).filter(Boolean)
 
   if (!env.FFMPEG) {
     return NextResponse.json({ error: 'FFmpeg binding not available' }, { status: 503 })
   }
 
-  // Presign everything for the FFmpeg worker.
+  // Render heartbeat: write substep status to productions.render_status so
+  // the page poll can show "Presigning → FFmpeg → Uploading" instead of a
+  // five-minute silent spinner. Best-effort writes; never fail the render
+  // for a heartbeat write.
+  const setStatus = async (status: string) => {
+    try {
+      await db.prepare(
+        `UPDATE productions SET render_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND operator_id = ?`,
+      ).bind(status, params.id, operator.id).run()
+    } catch {}
+  }
+  try {
+    await db.prepare(
+      `UPDATE productions SET render_started_at = CURRENT_TIMESTAMP WHERE id = ? AND operator_id = ?`,
+    ).bind(params.id, operator.id).run()
+  } catch {}
+
+  await setStatus(`presigning · ${ordered.length} clips`)
   let voiceoverUrl: string
   try { voiceoverUrl = await presignGetUrl(env, voiceoverKey, 1800) }
-  catch (err: any) { return NextResponse.json({ error: `Voiceover presign failed: ${err?.message}` }, { status: 500 }) }
+  catch (err: any) {
+    await setStatus(`failed: voiceover presign — ${err?.message || err}`)
+    return NextResponse.json({ error: `Voiceover presign failed: ${err?.message}` }, { status: 500 })
+  }
 
   const brollUrls: string[] = []
   for (const b of ordered) {
-    const key = b.transcoded_r2_key || b.r2_key
-    try { brollUrls.push(await presignGetUrl(env, key, 1800)) }
+    try { brollUrls.push(await presignGetUrl(env, b.key, 1800)) }
     catch (err: any) {
-      return NextResponse.json({ error: `Broll presign failed for ${b.id}: ${err?.message}` }, { status: 500 })
+      await setStatus(`failed: broll presign — ${err?.message || err}`)
+      return NextResponse.json({ error: `Broll presign failed for ${b.label}: ${err?.message}` }, { status: 500 })
     }
   }
 
+  await setStatus(`ffmpeg rendering · ${ordered.length} clips + voiceover`)
   let renderedBytes: Uint8Array
   try {
     const ffResp = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/render-video-essay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ voiceover_url: voiceoverUrl, broll_urls: brollUrls }),
+      body: JSON.stringify({
+        voiceover_url: voiceoverUrl,
+        broll_urls: brollUrls,
+        aspect: prod.aspect === '9:16' ? '9:16' : '16:9',
+      }),
     })
     if (!ffResp.ok) {
       const txt = (await ffResp.text()).slice(0, 500)
+      await setStatus(`failed: ffmpeg ${ffResp.status}`)
       return NextResponse.json({ error: `FFmpeg render failed: ${txt}` }, { status: 502 })
     }
     renderedBytes = new Uint8Array(await ffResp.arrayBuffer())
   } catch (err: any) {
+    await setStatus(`failed: ffmpeg — ${err?.message || err}`)
     return NextResponse.json({ error: `FFmpeg call failed: ${err?.message || String(err)}` }, { status: 502 })
   }
 
+  await setStatus(`uploading · ${(renderedBytes.byteLength / 1_000_000).toFixed(1)} MB`)
   const r2Key = `${operator.id}/renders/${params.id}.mp4`
   try {
     await putObject(env, r2Key, renderedBytes, { httpMetadata: { contentType: 'video/mp4' } })
   } catch (err: any) {
+    await setStatus(`failed: r2 upload — ${err?.message || err}`)
     return NextResponse.json({ error: `R2 upload failed: ${err?.message || String(err)}` }, { status: 500 })
   }
+  await setStatus(`done · ${(renderedBytes.byteLength / 1_000_000).toFixed(1)} MB`)
 
   const meta = JSON.stringify({
     kind: 'final_render',
     voiceover_r2_key: voiceoverKey,
-    broll_vlog_ids: brollIds,
+    broll_source: useAiBroll ? 'ai_broll' : 'vlog_archive',
+    broll_vlog_ids: useAiBroll ? [] : brollIds,
+    broll_count: ordered.length,
     mime: 'video/mp4',
     rendered_at: new Date().toISOString(),
   })
