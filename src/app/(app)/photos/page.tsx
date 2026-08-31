@@ -49,9 +49,6 @@ export default function PhotosVideosPage() {
   const [dropOpen, setDropOpen] = useState(false)
   const [building, setBuilding] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
-  const [updateText, setUpdateText] = useState('')
-  const [updateDate, setUpdateDate] = useState('')
-  const [posting, setPosting] = useState(false)
 
   const loadMedia = useCallback(async (f: Filter) => {
     try {
@@ -92,27 +89,6 @@ export default function PhotosVideosPage() {
     } finally { setBuilding(null) }
   }
 
-  const postUpdate = async () => {
-    const text = updateText.trim()
-    if (!text || posting) return
-    setPosting(true)
-    try {
-      const r = await fetch('/api/v2/log-entries', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          ...(updateDate ? { occurred_at: new Date(updateDate + 'T12:00:00').toISOString() } : {}),
-        }),
-      })
-      if (!r.ok) { const d: any = await r.json().catch(() => ({})); throw new Error(d?.error || `HTTP ${r.status}`) }
-      setUpdateText(''); setUpdateDate('')
-      loadMedia(filter)
-    } catch (e: any) {
-      setNote(`Couldn't post: ${e?.message || e}`)
-    } finally { setPosting(false) }
-  }
-
   const byDay = useMemo(() => {
     if (!media) return null
     const map = new Map<string, MediaItem[]>()
@@ -149,41 +125,9 @@ export default function PhotosVideosPage() {
             Dump your camera roll — HEIC converts in your browser, capture dates come
             from the photo, and each is auto-described so it&rsquo;s searchable.
           </p>
-          {/* The cheapest possible capture: type a sentence, hit Log, it's
-              on the timeline. Backdate it for anything that already
-              happened — "got a job last Thursday" just needs the date
-              picked to actually be last Thursday. */}
-          <div style={{
-            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
-            padding: '10px 12px', marginBottom: 16,
-            background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 10,
-          }}>
-            <input
-              type="text"
-              value={updateText}
-              onChange={e => setUpdateText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postUpdate() } }}
-              placeholder="What happened? (e.g. got a job at the mushroom farm)"
-              style={{
-                flex: '1 1 260px', minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-                color: 'var(--fg)', fontSize: 14.5, fontFamily: 'var(--font-body)', padding: '6px 4px',
-              }}
-            />
-            <input
-              type="date"
-              value={updateDate}
-              onChange={e => setUpdateDate(e.target.value)}
-              title="Backdate this — leave blank for today"
-              style={{
-                background: 'var(--bg-2)', border: '1px solid var(--line-1)', borderRadius: 6,
-                color: 'var(--fg-2)', fontSize: 12.5, fontFamily: 'var(--font-mono)', padding: '5px 8px',
-              }}
-            />
-            <button onClick={postUpdate} disabled={!updateText.trim() || posting} className="canon-btn primary" style={{ fontSize: 12.5, padding: '6px 14px' }}>
-              {posting ? 'Logging…' : 'Log it'}
-            </button>
-          </div>
-
+          {/* Status updates are composed from Home ("Log something") —
+              this page shows them read-only, day-grouped alongside
+              everything else in the archive. */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => setDropOpen(o => !o)} className="canon-btn primary" style={{ fontSize: 13 }}>
               {dropOpen ? 'Close' : 'Add photos'}

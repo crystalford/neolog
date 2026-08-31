@@ -84,11 +84,48 @@ interface AutoShippedRecent {
   vlog_id: string | null
 }
 
+interface LogEntry { id: string; text: string; occurred_at: string; created_at: string }
+
 export default function HomePage() {
   const [authState, setAuthState] = useState<'checking' | 'authed' | 'public'>('checking')
   const [publicProductions, setPublicProductions] = useState<any[]>([])
   const [items, setItems] = useState<ReadyItem[] | null>(null)
   const [autoShipped, setAutoShipped] = useState<AutoShippedRecent[]>([])
+  const [feed, setFeed] = useState<LogEntry[] | null>(null)
+  const [composeText, setComposeText] = useState('')
+  const [composeDate, setComposeDate] = useState('')
+  const [posting, setPosting] = useState(false)
+
+  const loadFeed = useCallback(async () => {
+    try {
+      const r = await fetch('/api/v2/log-entries?limit=50', { credentials: 'include' })
+      if (!r.ok) { setFeed([]); return }
+      const d: any = await r.json()
+      setFeed(Array.isArray(d?.entries) ? d.entries : [])
+    } catch { setFeed([]) }
+  }, [])
+
+  const postEntry = async () => {
+    const text = composeText.trim()
+    if (!text || posting) return
+    setPosting(true)
+    try {
+      const r = await fetch('/api/v2/log-entries', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          ...(composeDate ? { occurred_at: new Date(composeDate + 'T12:00:00').toISOString() } : {}),
+        }),
+      })
+      if (!r.ok) { const d: any = await r.json().catch(() => ({})); throw new Error(d?.error || `HTTP ${r.status}`) }
+      setComposeText(''); setComposeDate('')
+      loadFeed()
+    } catch {
+      // Inline error would need its own slot; keep this cheap and just leave
+      // the text in the box so nothing typed is lost on failure.
+    } finally { setPosting(false) }
+  }
 
   const loadReady = useCallback(async () => {
     try {
@@ -120,8 +157,9 @@ export default function HomePage() {
       setItems(Array.isArray(d?.items) ? d.items : [])
       setAutoShipped(Array.isArray(d?.auto_shipped_recent) ? d.auto_shipped_recent : [])
       setAuthState('authed')
+      loadFeed()
     })().catch(() => setAuthState('public'))
-  }, [])
+  }, [loadFeed])
 
   if (authState === 'checking') {
     return (
@@ -162,10 +200,86 @@ export default function HomePage() {
             fontSize: 16, lineHeight: 1.55, color: 'var(--fg-2)',
             maxWidth: 660, letterSpacing: '-0.15px', margin: '0 0 24px',
           }}>
-            Talk into the recorder. Upload a video, audio, or slideshow. The system
-            extracts what you said, finds the patterns, and prepares drafts below.
+            Type it, talk into the recorder, or upload a video, audio, or slideshow.
+            The system extracts what you said, finds the patterns, and prepares drafts below.
           </p>
+
+          {/* The cheapest door: a sentence and a date, nothing else
+              required. Backdate it for anything that already happened. */}
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+            padding: '10px 12px', marginBottom: 14,
+            background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderRadius: 10,
+          }}>
+            <input
+              type="text"
+              value={composeText}
+              onChange={e => setComposeText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postEntry() } }}
+              placeholder="What happened? (e.g. got a job at the mushroom farm)"
+              style={{
+                flex: '1 1 260px', minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+                color: 'var(--fg)', fontSize: 14.5, fontFamily: 'var(--font-body)', padding: '6px 4px',
+              }}
+            />
+            <input
+              type="date"
+              value={composeDate}
+              onChange={e => setComposeDate(e.target.value)}
+              title="Backdate this — leave blank for today"
+              style={{
+                background: 'var(--bg-2)', border: '1px solid var(--line-1)', borderRadius: 6,
+                color: 'var(--fg-2)', fontSize: 12.5, fontFamily: 'var(--font-mono)', padding: '5px 8px',
+              }}
+            />
+            <button onClick={postEntry} disabled={!composeText.trim() || posting} className="canon-btn primary" style={{ fontSize: 12.5, padding: '6px 14px' }}>
+              {posting ? 'Logging…' : 'Log it'}
+            </button>
+          </div>
+
           <CapturePanel onUploaded={loadReady}/>
+        </section>
+
+        {/* MIDDLE — the feed itself: your own posts, newest first */}
+        <section style={{ padding: '0 0 40px' }}>
+          <div className="canon-section-head" style={{ marginBottom: 16 }}>
+            <h2>Your log</h2>
+            <div className="meta">
+              {feed === null ? '' : feed.length === 0 ? 'nothing logged yet' : `${feed.length} ${feed.length === 1 ? 'entry' : 'entries'}`}
+            </div>
+          </div>
+          {feed === null && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[0, 1].map(i => <div key={i} className="neolog-skeleton" style={{ height: 56, opacity: 1 - i * 0.3 }}/>)}
+            </div>
+          )}
+          {feed !== null && feed.length === 0 && (
+            <div style={{
+              padding: '24px 24px', border: '1px dashed var(--line-2)', borderRadius: 12,
+              color: 'var(--fg-3)', fontSize: 14, lineHeight: 1.55,
+            }}>
+              Nothing typed in yet. Use the box above — even one line, like "got a job today," is enough to start.
+            </div>
+          )}
+          {feed !== null && feed.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {feed.map(e => (
+                <div key={e.id} style={{
+                  display: 'flex', gap: 14, alignItems: 'baseline',
+                  padding: '12px 16px', borderRadius: 10,
+                  background: 'var(--bg-1)', border: '1px solid var(--line-1)', borderLeft: '2px solid var(--sig)',
+                }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: 0.8,
+                    color: 'var(--fg-4)', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                    {fmtLogDate(e.occurred_at)}
+                  </span>
+                  <span style={{ fontSize: 14.5, lineHeight: 1.5, color: 'var(--fg-1)' }}>{e.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* BOTTOM — Ready to send */}
@@ -251,6 +365,20 @@ function AutoShippedRibbon({ items }: { items: AutoShippedRecent[] }) {
       </Link>
     </div>
   )
+}
+
+/** Recent → relative ("2h ago"); older or backdated → an absolute date, so a
+ * backlogged "got a job last Thursday" entry doesn't read as "412d ago". */
+function fmtLogDate(iso: string): string {
+  const t = new Date(iso).getTime()
+  if (isNaN(t)) return ''
+  const deltaMs = Date.now() - t
+  const days = deltaMs / 86400000
+  if (days >= 0 && days < 14) {
+    const rel = relativeDate(iso)
+    if (rel) return rel
+  }
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function relativeDate(iso?: string | null): string {
