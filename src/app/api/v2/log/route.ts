@@ -292,7 +292,14 @@ export async function GET(req: NextRequest) {
       // recording mid-transcription and one whose pipeline died looked
       // identical to a finished one, which is the worst of the three.
       detail: pipelineLine(v.pipeline_status, v.pipeline_error)
-        || titled || v.summary || v.vision_description || null,
+        || titled || v.summary
+        // A recording with no words in it is not a broken recording. If the
+        // log has only a description of the frames, it says so — "nobody
+        // spoke" is a fact about the recording, and leaving it unsaid makes
+        // the log's own sentence look like a transcript (silent.html).
+        || (v.vision_description
+              ? `Nobody spoke. ${v.vision_description}`
+              : null),
       happened_at: v.recorded_at || v.created_at,
       logged_at: v.created_at,
       date_precision: precision,

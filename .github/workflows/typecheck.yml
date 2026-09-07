@@ -50,6 +50,12 @@ jobs:
       - name: Fetched API paths have routes
         run: node scripts/check-routes.mjs
 
+      # The logic where a bug corrupts the log silently: whether a line is
+      # attributed to the operator, what a date means, and which model
+      # sentences he is shown.
+      - name: Log logic
+        run: node scripts/test/log-logic.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
