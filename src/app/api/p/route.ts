@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest) {
     db,
     `SELECT p.id, p.production_type, p.source_kind, p.source_id, p.form,
             p.produced_at, p.created_at,
-            o.name AS operator_handle
+            o.handle AS operator_handle
        FROM productions p
        JOIN operator o ON o.id = p.operator_id
       WHERE p.visibility = 'public' AND p.deleted_at IS NULL

@@ -38,6 +38,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # A wrong column name is a runtime error, so tsc and next build are
+      # both blind to it. On 7 Sep the feed selected `vlogs.transcript`
+      # (the column is `transcript_text`); everything was green and
+      # /api/v2/log returned 500 for every request.
+      - name: SQL columns exist
+        run: node scripts/check-sql-columns.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 

@@ -115,7 +115,13 @@ export default function LogHome() {
   const [items, setItems] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [buried, setBuried] = useState(0)
-  const [filter, setFilter] = useState<FeedFilter>('all')
+  const [filter, setFilter] = useState<FeedFilter>(() => {
+    // ?filter=buried is how the buried view is reached — it is not a ninth
+    // button on a toolbar the design gives eight.
+    if (typeof window === 'undefined') return 'all'
+    const f = new URLSearchParams(window.location.search).get('filter')
+    return f === 'buried' ? 'buried' : 'all'
+  })
   const [order, setOrder] = useState<'happened' | 'logged'>('happened')
   const [q, setQ] = useState('')
   const [shotAt, setShotAt] = useState<number | null>(null)
@@ -321,7 +327,12 @@ export default function LogHome() {
                    never disagree with the day dividers. ────────────────── */}
             <div className="bar">
               <div className="f">
-                {FILTERS.map(f => (
+                {filter === 'buried' && (
+                  <button className="on" onClick={() => setFilter('all')}>
+                    buried — back to the log
+                  </button>
+                )}
+                {filter !== 'buried' && FILTERS.map(f => (
                   <button
                     key={f.k}
                     className={filter === f.k ? 'on' : ''}
@@ -360,14 +371,16 @@ export default function LogHome() {
 
             <div className="asview">
               <span>Everything above is public unless marked otherwise.</span>
-              {buried > 0 && <span>{buried} buried</span>}
-              <Link href="/published">See it as a stranger does →</Link>
+              {buried > 0 && (
+                <Link href="/?filter=buried">{buried} buried</Link>
+              )}
+              <Link href="/export">Pull a stretch of it out →</Link>
             </div>
           </main>
 
           {/* ── The rail ───────────────────────────────────────────────── */}
           <aside className="rail">
-            <WrittenDown items={items} />
+            <WrittenDown items={items} onYear={y => setQ(String(y))} />
             <div className="rc">
               <div className="h">
                 Arrived on its own <span>{items.filter(i => i.author === 'log').length}</span>
@@ -490,7 +503,7 @@ function Relog({ onDone }: { onDone: () => void }) {
 
 // ── The written-down bar: the door to thin years ──────────────────────────
 
-function WrittenDown({ items }: { items: LogEntry[] }) {
+function WrittenDown({ items, onYear }: { items: LogEntry[]; onYear: (y: number) => void }) {
   const stats = useMemo(() => {
     const counts = new Map<number, number>()
     for (const e of items) {
@@ -529,7 +542,8 @@ function WrittenDown({ items }: { items: LogEntry[] }) {
                 ? 'var(--line-2)'
                 : v.n / stats.max < 0.09 ? 'var(--t-ochre)' : 'var(--sig)',
             }}
-            title={`${v.y} — ${v.n} ${v.n === 1 ? 'entry' : 'entries'}`}
+            title={`${v.y} — ${v.n} ${v.n === 1 ? 'entry' : 'entries'} · click to see what's there`}
+            onClick={() => onYear(v.y)}
           />
         ))}
       </div>

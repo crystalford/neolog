@@ -226,7 +226,12 @@ export function dayHeadingFor(key: string, now = new Date()): { title: string; s
 // The toolbar's eight buttons, mapped onto the entry model. These are reading
 // filters over one feed — never separate queries producing separate lists.
 
-export type FeedFilter = 'all' | 'said' | 'did' | 'auto' | 'mem' | 'pub' | 'priv' | 'held'
+export type FeedFilter =
+  | 'all' | 'said' | 'did' | 'auto' | 'mem' | 'pub' | 'priv' | 'held'
+  // Buried rows are out of the feed, search and counts. This is the one
+  // view that shows them, because burial is a state and not a delete —
+  // without a way back there is no digging up, only losing.
+  | 'buried'
 
 export function matchesFilter(e: LogEntry, f: FeedFilter): boolean {
   switch (f) {
@@ -238,6 +243,9 @@ export function matchesFilter(e: LogEntry, f: FeedFilter): boolean {
     case 'pub':  return e.visibility === 'public'
     case 'priv': return e.visibility === 'private'
     case 'held': return e.visibility === 'held'
+    // The query already restricted these rows to the buried ones; there is
+    // nothing further to match on here.
+    case 'buried': return true
     default:     return true
   }
 }

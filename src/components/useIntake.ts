@@ -80,10 +80,11 @@ export function useIntake(onDone?: () => void) {
             && (item.file.type.startsWith('audio/') || item.file.type.startsWith('video/'))) {
           duration_seconds = await readMediaDuration(item.file)
         }
-        if (!happened_at && item.file.lastModified) {
-          happened_at = new Date(item.file.lastModified).toISOString()
-          date_source = 'client'
-        }
+        // Deliberately NOT falling back to file.lastModified. That is when
+        // the file was last written to a disk — on a download, a copy or an
+        // export it is today, and it looks exactly like a real capture date.
+        // With no EXIF and no media clock the server places the file by
+        // inference and marks it approximate, which is the honest answer.
 
         const presign = await fetch('/api/v2/log/presign', {
           method: 'POST',

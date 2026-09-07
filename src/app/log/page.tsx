@@ -65,7 +65,8 @@ export default async function PublicLogPage() {
 
   const rows = await findMany<Row>(
     db,
-    `SELECT v.id, v.title, v.recorded_at, v.duration_seconds, v.is_audio_only,
+    `SELECT v.id, v.title, v.recorded_at, v.duration_seconds,
+            CASE WHEN v.mime_type LIKE 'audio/%' THEN 1 ELSE 0 END AS is_audio_only,
             (SELECT COUNT(*) FROM threads t
               WHERE t.vlog_id = v.id AND t.deleted_at IS NULL) AS thread_count
        FROM vlogs v

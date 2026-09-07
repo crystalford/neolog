@@ -165,16 +165,22 @@ export function LogDays({ items, order, q, onImage }: {
 }) {
   const ord = order || 'happened'
   const groups: { key: string; title: string; sub: string; rows: LogEntry[] }[] = []
+  const byKey = new Map<string, { key: string; title: string; sub: string; rows: LogEntry[] }>()
   const now = new Date()
   for (const e of items) {
     const date = ord === 'logged' ? e.logged_at : e.happened_at
     const key = dayKeyFor(date, ord === 'logged' ? 'exact' : e.date_precision)
-    const last = groups[groups.length - 1]
-    if (last && last.key === key) last.rows.push(e)
-    else {
+    // Keyed, not adjacent-only. A year-precision entry sorts into the middle
+    // of a run of exact days it shares no key with, and an adjacency check
+    // would print that day's heading a second time underneath it.
+    let g = byKey.get(key)
+    if (!g) {
       const h = dayHeadingFor(key, now)
-      groups.push({ key, title: h.title, sub: h.sub, rows: [e] })
+      g = { key, title: h.title, sub: h.sub, rows: [] }
+      byKey.set(key, g)
+      groups.push(g)
     }
+    g.rows.push(e)
   }
 
   return (

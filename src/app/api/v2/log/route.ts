@@ -3,7 +3,7 @@
  *
  * Params:
  *   order  = happened | logged   (default happened — SPEC §1)
- *   filter = all | said | did | auto | mem | pub | priv | held
+ *   filter = all | said | did | auto | mem | pub | priv | held | buried
  *   q      = free text; matches the sentence, the detail AND the transcript
  *            of a recording, because searching text the reader cannot see is
  *            worse than no search (log.html)
@@ -59,6 +59,10 @@ export async function GET(req: NextRequest) {
   const filter = (url.searchParams.get('filter') || 'all') as FeedFilter
   const q = (url.searchParams.get('q') || '').trim().toLowerCase()
   const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit') || '200', 10)))
+  // Burial removes an entry from the feed, search and the counts. Asking for
+  // it by name is the only way to see it — and the only way back to digging
+  // one up, since the dig-up control lives on the entry's own page.
+  const wantBuried = filter === 'buried'
 
   // Pull a generous slice from each table, merge, then cap. Each table is
   // capped at `limit` because after the merge only `limit` rows survive
@@ -81,30 +85,31 @@ export async function GET(req: NextRequest) {
               batch_id, r2_key, mime, duration_seconds, transcript, link_url,
               original_filename, vlog_id, source_ref
          FROM log_entries
-        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        WHERE operator_id = ? AND deleted_at IS NULL
+          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}
         ORDER BY COALESCE(${order === 'logged' ? 'logged_at, created_at' : 'happened_at, occurred_at'}) DESC
         LIMIT ?`,
       operator.id, limit,
     ),
-    findMany<{
+    wantBuried ? Promise.resolve([]) : findMany<{
       id: string; title: string | null; original_filename: string | null
       thumbnail_r2_key: string | null; thumbnail_url: string | null
       duration_seconds: number | null; recorded_at: string | null
       recorded_at_source: string | null; created_at: string
       summary: string | null; vision_description: string | null
-      transcript: string | null
+      transcript_text: string | null
     }>(
       db,
       `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
               duration_seconds, recorded_at, recorded_at_source, created_at,
-              summary, vision_description, transcript
+              summary, vision_description, transcript_text
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
         LIMIT ?`,
       operator.id, limit,
     ),
-    findMany<{
+    wantBuried ? Promise.resolve([]) : findMany<{
       id: string; thumbnail_r2_key: string | null; r2_key: string
       caption: string | null; vision_description: string | null
       taken_at: string | null; created_at: string
@@ -206,7 +211,7 @@ export async function GET(req: NextRequest) {
       vlog_id: v.id,
       source_ref: null,
       // The transcript is searchable even though the row never shows it.
-      searchable: [v.title, v.summary, v.vision_description, v.original_filename, v.transcript]
+      searchable: [v.title, v.summary, v.vision_description, v.original_filename, v.transcript_text]
         .filter(Boolean).join(' ').toLowerCase(),
     })
   })
