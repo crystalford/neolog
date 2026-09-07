@@ -122,6 +122,7 @@ export default function LogHome() {
   const [coverage, setCoverage] = useState<Record<string, number>>({})
   // Everything older than the open window, as one line per period.
   const [fold, setFold] = useState<FoldBucket[]>([])
+  const [buriedByDay, setBuriedByDay] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<FeedFilter>(() => {
     // ?filter=buried is how the buried view is reached — it is not a ninth
     // button on a toolbar the design gives eight.
@@ -148,6 +149,7 @@ export default function LogHome() {
       const data = await res.json() as {
         items: LogEntry[]; buried: number
         coverage?: Record<string, number>; fold?: FoldBucket[]
+        buried_by_day?: Record<string, number>
       }
       setItems(data.items || [])
       setBuried(data.buried || 0)
@@ -155,6 +157,7 @@ export default function LogHome() {
       // Empty on a filtered or searched feed — that is already a narrowed
       // list, and folding it again would hide the thing being looked for.
       setFold(data.fold || [])
+      setBuriedByDay(data.buried_by_day || {})
     } catch { setItems([]) }
     finally { setLoading(false) }
   }, [order, filter, q])
@@ -196,6 +199,19 @@ export default function LogHome() {
   const undo = useCallback(async () => {
     await intake.undo()
   }, [intake])
+
+  // The search box's filter offer. Matched on the button's own label so the
+  // two can never drift apart.
+  const filterOffer = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    if (!t) return null
+    const hit = FILTERS.find(f =>
+      f.label.toLowerCase() === t
+      || (t === 'private' && f.k === 'priv')
+      || (t === 'public' && f.k === 'pub')
+      || (t === 'held' && f.k === 'held'))
+    return hit && hit.k !== filter ? hit : null
+  }, [q, filter])
 
   // Every picture on the page, in order, so the lightbox steps through them
   // rather than showing one in isolation.
@@ -354,6 +370,20 @@ export default function LogHome() {
               {q && <button className="clr" onClick={() => setQ('')}>clear</button>}
             </div>
 
+            {/* Typing "private" or "public" searches for the word, which
+                returns the handful of entries that happen to contain it and
+                looks exactly like an answer. The filter of the same name
+                finds every one, including the entries that never say it. */}
+            {filterOffer && (
+              <div className="qhint">
+                &ldquo;{q.trim()}&rdquo; is also a filter —{' '}
+                <button onClick={() => { setQ(''); setFilter(filterOffer.k) }}>
+                  {filterOffer.label}
+                </button>{' '}
+                finds every one, including entries that don&rsquo;t contain the word.
+              </div>
+            )}
+
             {/* ── Toolbar. Both controls read the same list, so they can
                    never disagree with the day dividers. ────────────────── */}
             <div className="bar">
@@ -385,7 +415,8 @@ export default function LogHome() {
 
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
-              <LogDays items={items} order={order} q={q} onImage={openShot} />
+              <LogDays items={items} order={order} q={q} onImage={openShot}
+                        buriedByDay={filter === 'buried' ? undefined : buriedByDay} />
               <FoldedPeriods fold={fold} order={order} onImage={openShot} />
 
               {/* Day one is the same page as day one thousand. Nothing is

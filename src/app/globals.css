@@ -3382,3 +3382,34 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
    (day-one.html). The log with nothing in it is the same page as the log
    with four thousand entries. */
 .logpage .quiet { font-size: 12px; color: var(--fg-4); line-height: 1.55; padding: 0 2px; }
+
+/* A day keeps one dim row for what was buried on it (buried.html). Without
+   it, a day whose only entry is buried disappears from the feed entirely,
+   which makes burial a delete with extra steps. */
+.logpage .en.buriedrow .s { font-size: 13px; color: var(--fg-4); font-weight: 300; }
+.logpage .en.buriedrow:hover .s { color: var(--fg-3); }
+
+/* "that word is also a filter" (log.html:795-810). Typing "private" searches
+   for the word and returns the few entries that happen to contain it, which
+   looks exactly like an answer. */
+.logpage .qhint { margin: 8px 0 0; font-size: 12.5px; color: var(--fg-4); line-height: 1.5; }
+.logpage .qhint button {
+  font-size: 12.5px; color: var(--fg); background: none; border: 0;
+  border-bottom: 1px solid var(--line-2); cursor: pointer; padding: 0;
+}
+.logpage .qhint button:hover { border-color: var(--fg-3); }
+
+/* A burst of photos is one act, not fifty lines (batch.html). Tiles are
+   smaller than a single-photo still, because a run is scanned rather than
+   looked at, and the overflow is one "+N" tile rather than a hidden number. */
+.logpage .en .pics .tile {
+  width: 96px; height: 72px; flex-shrink: 0; display: block;
+  border: 1px solid var(--line-1); border-radius: 6px; object-fit: cover;
+  cursor: zoom-in; background: var(--bg-2); padding: 0;
+}
+.logpage .en .pics .tile:hover { opacity: .9; transition: opacity .15s; }
+.logpage .en .pics .tile.more2 {
+  display: grid; place-items: center; cursor: default;
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-3);
+  border-style: dashed; background: none;
+}

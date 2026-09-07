@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
   // Pull a generous slice from each table, merge, then cap. Each table is
   // capped at `limit` because after the merge only `limit` rows survive
   // anyway — no table can starve another out of the window.
-  const [entryRows, vlogRows, photoRows, buriedRow, coverageRows] = await Promise.all([
+  const [entryRows, vlogRows, photoRows, buriedRow, buriedDayRows, coverageRows] = await Promise.all([
     findMany<{
       id: string; text: string; detail: string | null
       occurred_at: string; created_at: string
@@ -170,6 +170,18 @@ export async function GET(req: NextRequest) {
       db,
       `SELECT COUNT(*) AS n FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NOT NULL`,
+      operator.id,
+    ),
+    // Per day, so a day whose only entry is buried still shows up with one
+    // dim line rather than disappearing. "The day keeps one dim row" —
+    // buried.html. A day that silently vanishes is a delete with extra steps.
+    findMany<{ d: string; n: number }>(
+      db,
+      `SELECT substr(COALESCE(happened_at, occurred_at, created_at), 1, 10) AS d,
+              COUNT(*) AS n
+         FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NOT NULL
+        GROUP BY d`,
       operator.id,
     ),
     // Coverage by year, over the WHOLE log rather than the page being shown.
@@ -349,6 +361,7 @@ export async function GET(req: NextRequest) {
     {
       items: trimmed, total, order, filter,
       buried: buriedRow[0]?.n || 0,
+      buried_by_day: Object.fromEntries(buriedDayRows.filter(r => r.d).map(r => [r.d, r.n])),
       coverage, fold, open_days: OPEN_DAYS,
     },
     { headers: { 'Cache-Control': 'no-store' } },
