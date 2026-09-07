@@ -207,11 +207,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const existing = await findOne<{
     id: string; text: string; happened_at: string | null; occurred_at: string
     date_precision: string; visibility: string; buried_at: string | null
-    transcript: string | null; source_kind: string
+    transcript: string | null; source_kind: string; author: string
   }>(
     db,
     `SELECT id, text, happened_at, occurred_at, date_precision, visibility,
-            buried_at, transcript, source_kind
+            buried_at, transcript, source_kind, author
        FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
@@ -235,6 +235,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     date_precision?: string
     visibility?: string
     buried?: boolean
+    /** 'operator' when he says a line the log wrote is actually his. */
+    author?: string
   }
 
   const sets: string[] = []
@@ -289,6 +291,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     sets.push('visibility = ?')
     binds.push(v)
     if (v !== 'held') sets.push('held_reason = NULL')
+  }
+
+  // Who wrote it. A pasted document and a pasted conversation land as the
+  // log's line, because the log cannot know who wrote them and must not ask
+  // at input. This is where he says. It only ever moves toward him — the log
+  // never takes authorship back off him.
+  if (body.author === 'operator' && existing.author !== 'operator') {
+    note('author', existing.author, 'operator')
+    sets.push("author = 'operator'")
   }
 
   // Bury / dig up. Burying a public entry also unpublishes it (SPEC §1).

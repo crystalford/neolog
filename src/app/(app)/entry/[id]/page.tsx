@@ -394,6 +394,25 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 )}
               </div>
 
+              {/* A pasted document or conversation lands as the log's line,
+                  because the log cannot know who wrote it. This is where he
+                  says. It only moves one way — the log never takes
+                  authorship back off him. */}
+              {e.author === 'log' && (e.source_kind === 'document' || e.source_kind === 'chat') && (
+                <div className="i">
+                  <b>Did you write this?</b>
+                  <em>
+                    The log kept it without claiming it either way, because it
+                    cannot know. If the words are yours, say so.
+                  </em>
+                  <div className="fixrow">
+                    <button onClick={() => void patch({ author: 'operator' })}>
+                      These are my words
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="i">
                 <b>Wrong words?</b>
                 <em>Your line, rewritten by you. Nothing else changes.</em>
@@ -623,6 +642,7 @@ function trim(s: string): string {
 }
 
 const REV_LABEL: Record<string, string> = {
+  author:     'You said these were your words.',
   text:       'You rewrote this line.',
   date:       'You changed the date.',
   visibility: 'You changed who can see it.',
