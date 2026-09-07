@@ -26,6 +26,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 import { LogDays } from '@/components/LogRow'
+import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import { PAGE_KINDS } from '@/lib/pages'
 import type { LogEntry } from '@/lib/log-entry'
 
@@ -46,7 +47,7 @@ export default function PageView({ params }: { params: { id: string } }) {
   const [page, setPage] = useState<PageDetail | null>(null)
   const [items, setItems] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [shotAt, setShotAt] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState('')
   const [editingPara, setEditingPara] = useState(false)
@@ -72,6 +73,13 @@ export default function PageView({ params }: { params: { id: string } }) {
     })
     await load()
   }, [params.id, load])
+
+  const shots = useShots(items)
+  const openShot = useCallback((url: string) => {
+    const i = shots.findIndex(sh => sh.url === url)
+    setShotAt(i >= 0 ? i : null)
+  }, [shots])
+  useRestorePlace(!loading && items.length > 0)
 
   if (loading) return <Shell><div className="logpage" /></Shell>
   if (!page) {
@@ -170,7 +178,7 @@ export default function PageView({ params }: { params: { id: string } }) {
                 everything — a page is a way of looking at the log, not a
                 second kind of screen. */}
             <div id="feed" style={{ marginTop: 26 }}>
-              <LogDays items={items} onImage={setLightbox} />
+              <LogDays items={items} onImage={openShot} />
               {items.length === 0 && (
                 <div className="none">
                   Nothing is attached to this page yet.
@@ -241,12 +249,7 @@ export default function PageView({ params }: { params: { id: string } }) {
           </aside>
         </div>
 
-        {lightbox && (
-          <div className="lb" onClick={() => setLightbox(null)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightbox} alt="" />
-          </div>
-        )}
+        <LogLightbox shots={shots} index={shotAt} onClose={() => setShotAt(null)} onIndex={setShotAt} />
       </div>
     </Shell>
   )

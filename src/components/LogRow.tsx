@@ -20,6 +20,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { rememberPlace } from '@/components/LogLightbox'
 import {
   type LogEntry, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -137,8 +138,17 @@ export function LogRow({ e, order, q, onImage }: {
     </>
   )
 
+  // `data-open` is how the return finds this row again, and marking the
+  // place on the way out is what makes leaving the feed safe.
   return e.href
-    ? <Link className={`en${held ? ' isheld' : ''}`} href={e.href}>{body}</Link>
+    ? (
+      <Link
+        className={`en${held ? ' isheld' : ''}`}
+        href={e.href}
+        data-open={e.href}
+        onClick={() => rememberPlace(e.href)}
+      >{body}</Link>
+    )
     : <div className={`en${held ? ' isheld' : ''}`}>{body}</div>
 }
 

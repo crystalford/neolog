@@ -38,6 +38,7 @@ import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { useIntake } from '@/components/useIntake'
 import { LogDays } from '@/components/LogRow'
+import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import {
   type LogEntry, type FeedFilter, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -117,7 +118,7 @@ export default function LogHome() {
   const [filter, setFilter] = useState<FeedFilter>('all')
   const [order, setOrder] = useState<'happened' | 'logged'>('happened')
   const [q, setQ] = useState('')
-  const [lightbox, setLightbox] = useState<string | null>(null)
+  const [shotAt, setShotAt] = useState<number | null>(null)
 
   const loadFeed = useCallback(async () => {
     try {
@@ -168,6 +169,19 @@ export default function LogHome() {
   const undo = useCallback(async () => {
     await intake.undo()
   }, [intake])
+
+  // Every picture on the page, in order, so the lightbox steps through them
+  // rather than showing one in isolation.
+  const shots = useShots(items)
+  const openShot = useCallback((url: string) => {
+    const i = shots.findIndex(sh => sh.url === url)
+    setShotAt(i >= 0 ? i : null)
+  }, [shots])
+
+  // Put the reader back on the row they left from. Every look at detail is a
+  // navigation now, so without this the two-gesture rule costs more than it
+  // saves.
+  useRestorePlace(!loading && items.length > 0)
 
   return (
     <Shell active="log">
@@ -329,7 +343,7 @@ export default function LogHome() {
 
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
-              <LogDays items={items} order={order} q={q} onImage={setLightbox} />
+              <LogDays items={items} order={order} q={q} onImage={openShot} />
 
               {/* Day one is the same page as day one thousand. Nothing is
                   offered here that isn't offered when the log is full. */}
@@ -376,12 +390,7 @@ export default function LogHome() {
         </div>
 
         {/* Click the image → a lightbox over the feed; you never leave. */}
-        {lightbox && (
-          <div className="lb" onClick={() => setLightbox(null)}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={lightbox} alt="" />
-          </div>
-        )}
+        <LogLightbox shots={shots} index={shotAt} onClose={() => setShotAt(null)} onIndex={setShotAt} />
       </div>
     </Shell>
   )

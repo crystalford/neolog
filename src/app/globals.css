@@ -2721,12 +2721,57 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .asview a { margin-left: auto; color: var(--fg-2); border-bottom: 1px solid var(--line-2); white-space: nowrap; }
 .logpage .asview a:hover { color: var(--fg); }
 
-/* A lightbox over the feed — you never leave the log (SPEC §11). */
+/* A lightbox over the feed — you never leave the log (SPEC §11).
+   Values read from view.js:27-35: it steps through every picture on the
+   page, captions each with the sentence of its row, and answers Escape and
+   the arrow keys. A picture in a log is evidence, and evidence you can only
+   look at one at a time is worse evidence. */
 .logpage .lb {
-  position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.92);
-  display: grid; place-items: center; padding: 40px; cursor: zoom-out;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.92);
+  display: none; align-items: center; justify-content: center;
+  padding: 48px 64px;
 }
-.logpage .lb img { max-width: 100%; max-height: 100%; border-radius: 8px; display: block; }
+.logpage .lb.on { display: flex; }
+.logpage .lb img {
+  max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain;
+  border-radius: 4px; display: block; cursor: zoom-out;
+}
+.logpage .lb .cap {
+  position: absolute; left: 0; right: 0; bottom: 22px; text-align: center;
+  font-size: 13px; color: var(--fg-2); line-height: 1.5; padding: 0 64px;
+}
+.logpage .lb .cap b { color: var(--fg); font-weight: 450; display: block; margin-bottom: 3px; }
+.logpage .lb .x {
+  position: absolute; top: 20px; right: 24px;
+  font-size: 24px; color: var(--fg-4); line-height: 1; padding: 6px 10px;
+  background: none; border: 0; cursor: pointer;
+}
+.logpage .lb .x:hover { color: var(--fg); }
+.logpage .lb .nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 30px; color: var(--fg-4); padding: 14px 18px; line-height: 1;
+  background: none; border: 0; cursor: pointer;
+}
+.logpage .lb .nav:hover { color: var(--fg); }
+.logpage .lb .prev { left: 12px; }
+.logpage .lb .next { right: 12px; }
+.logpage .lb .nav.off { opacity: .15; pointer-events: none; }
+
+/* Coming back to where you were. Every look at detail is a navigation now
+   — that is the price of dropping expand-in-place — so the row you left
+   from flashes once when the log puts you back on it (view.js:23-24). */
+.logpage .en.landed { animation: landed 1.6s ease-out; border-radius: 9px; }
+@keyframes landed {
+  0%   { background: rgba(78,161,213,.14); }
+  100% { background: transparent; }
+}
+
+/* An inline player for a voice note, so a recording in the feed is
+   something you play rather than a row that mentions one. */
+.logpage .en .pics .aud { display: flex; align-items: center; gap: 11px; width: 100%; max-width: 420px; }
+.logpage .en .pics .aud audio { flex: 1; min-width: 0; height: 32px; }
+.logpage .en .pics .aud .tm { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3); flex-shrink: 0; }
 
 /* Under ~900px the rail stops competing with the reading column. */
 @media (max-width: 920px) {
