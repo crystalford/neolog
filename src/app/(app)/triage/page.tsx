@@ -97,7 +97,10 @@ export default function TriagePage() {
   return (
     <Shell>
       <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="crumb">
+          <Link href="/">the log</Link>
+          <Link href="/screenshots">screenshots</Link>
+        </div>
 
         <div className="pghead">
           <h1>Going through what arrived.</h1>

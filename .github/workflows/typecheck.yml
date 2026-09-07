@@ -78,6 +78,12 @@ jobs:
       - name: Correspondence
         run: node scripts/test/correspondence.mjs
 
+      # One of the three piles is offered for burying in bulk. Another
+      # person's words, and anything the log does not recognise, must never
+      # land in it.
+      - name: Screenshot sort
+        run: node scripts/test/screenshots.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 

@@ -3856,3 +3856,42 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   color: var(--fg-4); line-height: 1.55;
 }
 .logpage .consent .err { margin-top: 12px; font-size: 13px; color: var(--t-terra); line-height: 1.5; }
+
+/* ── Screenshots (`screenshots.html`) ───────────────────────────────────
+   The picture beside what the log read out of it, so the reason a row is
+   in a pile can be checked against the image without opening anything. */
+
+.logpage .shots { margin-top: 18px; display: flex; flex-direction: column; gap: 1px; }
+.logpage .shot {
+  display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 20px;
+  padding: 16px 0; border-bottom: 1px solid var(--line); align-items: start;
+}
+.logpage .shot img {
+  width: 108px; height: 108px; object-fit: cover; border-radius: 8px;
+  background: var(--bg-2); display: block;
+}
+.logpage .shot .x {
+  font-size: 15.5px; font-weight: 300; line-height: 1.5; color: var(--fg);
+  display: block; max-width: 620px; text-wrap: pretty;
+  white-space: pre-wrap; word-break: break-word;
+}
+.logpage .shot .x:hover { color: var(--fg); border-bottom: 1px solid var(--line-3); }
+.logpage .shot .m {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline;
+  margin-top: 8px; font-size: 12.5px; color: var(--fg-4);
+}
+.logpage .shot .m time { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
+.logpage .shot .why {
+  margin-top: 8px; font-size: 13px; color: var(--fg-3); line-height: 1.55;
+  max-width: 580px; text-wrap: pretty;
+}
+.logpage .shot .why a { color: var(--fg-2); border-bottom: 1px solid var(--line-2); }
+.logpage .shot .why a:hover { color: var(--fg); }
+.logpage .shot .keep {
+  margin-top: 10px; font-size: 12.5px; color: var(--fg-3);
+  border: 1px solid var(--line-1); border-radius: 6px; padding: 4px 11px;
+}
+.logpage .shot .keep:hover { color: var(--fg); border-color: var(--line-3); }
+/* one kept back out of the bury pile — visibly out of it, not just flagged */
+.logpage .shot.kept { opacity: .55; }
+.logpage .shot.kept .keep { color: var(--fg-1); border-color: var(--line-3); }

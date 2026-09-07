@@ -57,6 +57,7 @@ import {
   looksLikeConversation, splitTurns, operatorTurns, conversationSentence,
   looksLikeDocument, documentSentence,
 } from '@/lib/conversation'
+import { sortScreenshot } from '@/lib/screenshots'
 import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -548,14 +549,27 @@ async function runFollowUps(
         // a note whose words are not read is a photo of nothing. The
         // transcription is kept verbatim and stays the log's, not his:
         // author is already 'log' on an uploaded file.
+        //
+        // The kind comes from what the text SAYS, not from the fact that it
+        // has text in it. This used to file every readable picture as
+        // `paperwork`, which made a screenshot of a map into a receipt.
+        // `screenshots.html`: a receipt is paperwork, someone else's message
+        // arrived from outside, and everything the log does not recognise is
+        // a picture it looked at — never a claim about what it is.
+        const sorted = sortScreenshot(verdict.reads)
+        const detail = sorted.kind === 'receipt'
+          ? [sorted.facts.who, sorted.facts.amount].filter(Boolean).join(' · ') || verdict.description
+          : verdict.description
         await run(
           db,
           `UPDATE log_entries
               SET visibility = 'public', held_reason = NULL,
-                  text = ?, transcript = ?, kind = 'paperwork',
+                  text = ?, transcript = ?, kind = ?,
                   detail = COALESCE(detail, ?), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
-          firstLine(verdict.reads), verdict.reads, verdict.description, item.id,
+          firstLine(verdict.reads), verdict.reads,
+          sorted.entry_kind || 'seen',
+          detail, item.id,
         )
       } else {
         await run(

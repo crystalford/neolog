@@ -170,6 +170,32 @@ for the same reason. `/messages/[id]` renders that preview from the same
 function, so he sees what publishing would do to someone else before he does
 it. `scripts/test/correspondence.mjs` — 31 assertions, in CI.
 
+### Screenshots — three piles, and only one is offered
+
+`screenshots.html`. `src/lib/screenshots.ts`, `/screenshots`. The vision pass
+already reads the words out of a picture; the sort is a question about that
+TEXT, not about him — does it carry a currency amount beside a receipt word,
+a named speaker with a real sentence behind the colon, a route and an
+arrival time. Those are facts anyone can check, so the sort is **regexes, not
+a model**: a model asked "is this worth keeping?" answers with an opinion
+about his life, which §0 rules 2 and 3 both forbid.
+
+**Junk is offered, never decided.** Nothing in the library buries anything;
+it returns a pile and the reason, in words checkable against the picture.
+Every row in the bury pile has a *keep this one*, and burying is reversible.
+The fallback pile is always `keep` — unrecognised text is never offered for
+burying.
+
+Someone else's words are checked **first**, before receipts and before
+convenience, so a screenshot of a message can never be offered for bulk
+burial on a heuristic; it gets the message rule instead.
+
+Intake now takes the entry's kind from what the text says. It used to file
+every readable picture as `paperwork`, which made a screenshot of a map into
+a receipt: now a receipt is `paperwork`, someone's message is `read`, and
+anything unrecognised is `seen`. `scripts/test/screenshots.mjs` — 21
+assertions, in CI.
+
 ### Corrections leave a record
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites
@@ -269,8 +295,10 @@ fetched paths.
 fence · 5 meta**.
 
 Partial: `fix` (per-word transcript editing), `branch` (splitting one note
-into several), `screenshots` (reads the text; no three-pile sort), `audio` (no
-two-voice split), `flow` (a walkthrough page). `walk` is built — `/walk/[id]`.
+into several), `audio` (no two-voice split — `transcript_words.speaker` exists
+but nothing populates it; Whisper is not asked for diarization, so the split
+cannot be built honestly yet), `flow` (a walkthrough page). `walk` and
+`screenshots` are built.
 
 Not built: `elsewhere` · `photo` · `recording` (public); `repo` · `writing` ·
 `footage` · `image` · `image-filter` (per-kind bodies). `messages` shipped —
