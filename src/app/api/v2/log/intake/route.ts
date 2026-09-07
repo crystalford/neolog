@@ -49,6 +49,7 @@ import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
 import { transcribeAudio } from '@/lib/transcribe'
 import { checkHoldBack, placeFile, kindForUpload } from '@/lib/log-intake'
+import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -181,13 +182,56 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  // A video is a recording, not a file sitting on a row. Registering it as
+  // a vlog is what gets it transcoded, thumbnailed, transcribed and
+  // extracted — and the feed already reads vlogs, so it appears either way.
+  // Before this, dropping a 22-minute video into the composer produced an
+  // entry you could not play, search or read.
+  const videoIds: string[] = []
+
   // ── One entry per file, each placed by its own clock ────────────────────
   for (const f of files) {
-    const id = ulid()
-    entryIds.push(id)
     const mime = (f.mime || '').toLowerCase()
     const isImage = mime.startsWith('image/')
     const isAudio = mime.startsWith('audio/')
+    const isVideo = mime.startsWith('video/')
+
+    if (isVideo) {
+      const vlogId = ulid()
+      videoIds.push(vlogId)
+      const placed = statedAt
+        ? { happened_at: statedAt, placed_by: 'client' as const }
+        : placeFile({
+            clientDate: f.happened_at,
+            clientSource: f.date_source,
+            filename: f.original_filename,
+            arrivedAt: now,
+          })
+      statements.push({
+        sql: `INSERT INTO vlogs
+                (id, operator_id, r2_key, original_filename, file_size_bytes,
+                 mime_type, recorded_at, recorded_at_source, duration_seconds,
+                 pipeline_status)
+              VALUES (?,?,?,?,?,?,?,?,?,'uploaded')`,
+        binds: [
+          vlogId, operator.id, f.r2_key, f.original_filename || null,
+          f.bytes ?? null, f.mime || null,
+          placed.happened_at,
+          // The same four-tier vocabulary `recorded-at.ts` uses, so the
+          // vlog's own date pipeline and this one agree about what a date
+          // is worth.
+          placed.placed_by === 'exif' || placed.placed_by === 'media' ? 'pre_extracted'
+            : placed.placed_by === 'filename' ? 'filename'
+            : placed.placed_by === 'client' ? 'pre_extracted'
+            : 'upload_time_default',
+          f.duration_seconds ?? null,
+        ],
+      })
+      continue
+    }
+
+    const id = ulid()
+    entryIds.push(id)
 
     // An explicit backdate on the whole intake wins over the file's clock —
     // the operator saying "this was 2008" is better evidence than a camera
@@ -234,11 +278,35 @@ export async function POST(req: NextRequest) {
 
   await d1Batch(db, statements)
 
+  // Kick the post-upload pipeline for anything that is a recording. It runs
+  // on its own worker, so this returns immediately.
+  for (const vlogId of videoIds) {
+    try {
+      const dispatched = await dispatchPipeline(env as any, {
+        vlog_id: vlogId,
+        operator_id: operator.id,
+        mode: 'cheap',
+      })
+      if (!dispatched.ok) {
+        await run(
+          db,
+          `UPDATE vlogs SET pipeline_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          dispatched.error || 'dispatch failed', vlogId,
+        )
+      }
+    } catch (err: any) {
+      console.warn('[intake] pipeline dispatch failed:', err?.message || err)
+    }
+  }
+
   // ── The receipt: one line, one undo ─────────────────────────────────────
   const parts: string[] = []
   const words = text ? text.trim().split(/\s+/).filter(Boolean).length : 0
   if (words) parts.push(`${words} ${words === 1 ? 'word' : 'words'}`)
   if (files.length) parts.push(`${files.length} ${files.length === 1 ? 'file' : 'files'}`)
+  if (videoIds.length) {
+    parts.push(`${videoIds.length === 1 ? 'a recording' : `${videoIds.length} recordings`} being read`)
+  }
   if (linkUrl && !text) parts.push('a link')
   const when = statedAt
     ? `dated ${new Date(statedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}`
@@ -253,7 +321,15 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { batch_id: batchId, entry_ids: entryIds, receipt: { line, undo: batchId } },
+    {
+      batch_id: batchId,
+      entry_ids: entryIds,
+      // A video becomes a `vlogs` row, which carries no batch id — so undo
+      // is told about them explicitly rather than silently leaving a
+      // recording behind after the operator said to take it back.
+      vlog_ids: videoIds,
+      receipt: { line, undo: batchId },
+    },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -346,7 +422,11 @@ export async function DELETE(req: NextRequest) {
   const url = new URL(req.url)
   const batchId = url.searchParams.get('batch')
   const entryId = url.searchParams.get('entry')
-  if (!batchId && !entryId) return NextResponse.json({ error: 'batch or entry required' }, { status: 400 })
+  const vlogIds = (url.searchParams.get('vlogs') || '')
+    .split(',').map(v => v.trim()).filter(Boolean).slice(0, 50)
+  if (!batchId && !entryId && !vlogIds.length) {
+    return NextResponse.json({ error: 'batch, entry or vlogs required' }, { status: 400 })
+  }
 
   if (batchId) {
     await run(
@@ -364,5 +444,16 @@ export async function DELETE(req: NextRequest) {
       operator.id, entryId,
     )
   }
+  // A recording registered by this act. Soft-deleted the same way, so the
+  // file stays in R2 and only the row leaves the log.
+  for (const v of vlogIds) {
+    await run(
+      db,
+      `UPDATE vlogs SET deleted_at = CURRENT_TIMESTAMP
+        WHERE operator_id = ? AND id = ? AND deleted_at IS NULL`,
+      operator.id, v,
+    )
+  }
+
   return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -33,6 +33,8 @@ export interface Pending {
 export interface IntakeReceipt {
   line: string
   batch: string
+  /** Recordings this act registered — undo has to take these too. */
+  vlogIds: string[]
 }
 
 export function useIntake(onDone?: () => void) {
@@ -174,8 +176,14 @@ export function useIntake(onDone?: () => void) {
         }),
       })
       if (!res.ok) return null
-      const data = await res.json() as { batch_id: string; receipt: { line: string } }
-      const r: IntakeReceipt = { line: data.receipt.line, batch: data.batch_id }
+      const data = await res.json() as {
+        batch_id: string; vlog_ids?: string[]; receipt: { line: string }
+      }
+      const r: IntakeReceipt = {
+        line: data.receipt.line,
+        batch: data.batch_id,
+        vlogIds: data.vlog_ids || [],
+      }
       setText('')
       setPending([])
       setReceipt(r)
@@ -190,7 +198,10 @@ export function useIntake(onDone?: () => void) {
   const undo = useCallback(async (batch?: string) => {
     const id = batch ?? receipt?.batch
     if (!id) return
-    await fetch(`/api/v2/log/intake?batch=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const params = new URLSearchParams({ batch: id })
+    const vlogs = receipt?.vlogIds || []
+    if (vlogs.length) params.set('vlogs', vlogs.join(','))
+    await fetch(`/api/v2/log/intake?${params}`, { method: 'DELETE' })
     setReceipt(null)
     onDone?.()
   }, [receipt, onDone])

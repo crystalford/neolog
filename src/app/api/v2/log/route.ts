@@ -97,12 +97,12 @@ export async function GET(req: NextRequest) {
       duration_seconds: number | null; recorded_at: string | null
       recorded_at_source: string | null; created_at: string
       summary: string | null; vision_description: string | null
-      transcript_text: string | null
+      transcript_text: string | null; visibility: string | null
     }>(
       db,
       `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
               duration_seconds, recorded_at, recorded_at_source, created_at,
-              summary, vision_description, transcript_text
+              summary, vision_description, transcript_text, visibility
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
@@ -112,11 +112,11 @@ export async function GET(req: NextRequest) {
     wantBuried ? Promise.resolve([]) : findMany<{
       id: string; thumbnail_r2_key: string | null; r2_key: string
       caption: string | null; vision_description: string | null
-      taken_at: string | null; created_at: string
+      taken_at: string | null; created_at: string; visibility: string | null
     }>(
       db,
       `SELECT id, thumbnail_r2_key, r2_key, caption, vision_description,
-              taken_at, created_at
+              taken_at, created_at, visibility
          FROM photos
         WHERE operator_id = ? AND deleted_at IS NULL
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'taken_at, created_at'}) DESC
@@ -218,7 +218,10 @@ export async function GET(req: NextRequest) {
       happened_at: v.recorded_at || v.created_at,
       logged_at: v.created_at,
       date_precision: precision,
-      visibility: 'public',
+      // Read, never asserted. `vlogs.visibility` defaults to 'private', so
+      // claiming every recording is public marked three hundred of them for
+      // a public log that had not been asked about a single one.
+      visibility: (v.visibility === 'public' ? 'public' : 'private') as Visibility,
       held_reason: null,
       author: 'log',
       href: `/vlog/${v.id}`,
@@ -253,10 +256,15 @@ export async function GET(req: NextRequest) {
       happened_at: p.taken_at || p.created_at,
       logged_at: p.created_at,
       date_precision: p.taken_at ? 'exact' : 'approx',
-      visibility: 'public',
+      visibility: (p.visibility === 'public' ? 'public' : 'private') as Visibility,
       held_reason: null,
       author: p.caption ? 'operator' : 'log',
-      href: `/photos#${p.id}`,
+      // A row links to its content, never to the container it belongs to
+      // (SPEC §11). A photo has no page of its own in this build, so its row
+      // is not clickable — and it does not need to be: the picture IS the
+      // content, and clicking the picture opens it. Never invent a
+      // destination to satisfy an affordance.
+      href: '',
       media: [{ kind: 'image', url: photoThumbs[i], label: p.caption }],
       duration_seconds: null,
       batch_id: null,
