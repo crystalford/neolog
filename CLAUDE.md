@@ -125,7 +125,35 @@ to him — are structurally impossible to generate here.
 without the old value being kept first — "both versions kept, dated, marked
 revised by you." The PATCH handler reads the row before it writes.
 
-### ⚠️ `scripts/check-sql-columns.mjs` — run it, keep it green
+### The mechanics built on top of the entry
+
+**Threads** — one column, `led_from`. No thread table, no thread id, no
+membership: a thread is that column followed either way. `relation`
+distinguishes a **turn** (a new event) from a **reflection** (SPEC §1: "a
+later thought about an earlier event attaches to that entry… **it never
+becomes a second event**"), and a reflection renders as a layer under its
+target rather than taking a row.
+
+Deliberately NOT at `/thread/[id]` — that route serves the extraction
+`threads` table, a different thing with the same word, linked from five
+places. This repo already paid once for a naming collision.
+
+**Corrections** — `entry_revisions` keeps what every change replaced. Nothing
+overwrites without the old value being kept first.
+
+**Verification** (`src/lib/keep.ts`) — the client hashes a file before it
+leaves the browser; the log hashes what it stored and compares. Byte-for-byte
+to 50 MB, length above it, and the UI **names which check ran**. Claiming the
+stronger check would put a lie inside the one feature that exists to be
+trusted. Exact duplicates attach to the first arrival rather than becoming a
+second entry.
+
+**Record of origin** — `/api/v2/export?entry_id=…` exports the road to one
+position: the turns either side, the reflections, and every correction with
+both wordings. That last part is what a finished piece structurally cannot
+show.
+
+### ⚠️ `scripts/check-sql-columns.mjs` and `check-routes.mjs` — keep both green
 
 A wrong column name is a runtime error, so `tsc` and `next build` are both
 blind to it. On 7 Sep the feed selected `vlogs.transcript` (the column is
@@ -134,6 +162,18 @@ every request — **the log did not load at all**. The checker reads
 `db/schema.sql` + every migration and validates alias-qualified references in
 `src/`. It runs in CI before `tsc`. It immediately found three more live bugs
 (`operator.name` in both public production routes, `vlogs.is_audio_only`).
+
+`check-routes.mjs` covers the same blind spot from the other side: a fetch to
+a renamed or never-built path is a runtime 404 that renders as an empty list —
+which reads as "nothing here yet" rather than as a bug. 131 routes, 150
+fetched paths.
+
+**Everything in the design package is now built except:** the public About
+(`dossier.html`), the ways-in integrations (`connections.html`), the unlisted
+machine layer (`everything` / `source` / `asks` / `numbers`), the per-kind
+entry bodies (a silent video's frames, a two-voice recording, a document's
+provenance), and everything below the drafting fence — letters, cuts, the
+offer, `sayit`, `thinkit`. That last group **stays below the fence**.
 
 **The build order is void.** The operator lifted it on 7 Sep: *"not
 necessarily follow the steps because they may not be relevant since we
@@ -266,6 +306,13 @@ The masthead is a **top-horizontal nav, four primary entries.** This is the resu
 | **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), then the log filtered — **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
 | **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log. |
 | **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
+| **Search** | `/search` | Ask the log a question. The answer is written only from passages it can point at — **every sentence's citations are checked in code against the passages actually sent**, and uncitable sentences are dropped (and counted, out loud). The abstain line — "Not answered: …" — is the only line allowed no citation. Retrieval is keyword over entries + transcripts, and the page says so. |
+| **A month** | `/month/[ym]` | Reduction as a place. The month in one paragraph, written from that month's entries only, every sentence citing one. Coverage per day. Once he edits the paragraph it is his and the log stops rewriting it — refused at the SQL level, not just hidden. |
+| **On this day** | `/onthisday` | The one permitted resurfacing. Shows; never says. No "one year ago", no count, no nudge. Approximate dates are excluded — a guessed day has no business on the surface whose discipline is not saying. |
+| **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
+| **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
+
+**The fold** (`log-2028.html`) is on `/` itself: the last 14 days open as rows, then one line per week, per month, per year. A folded line carries **a real sentence from that period**, never a synthesis — writing period summaries needs the citation machinery, not a prompt.
 
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
