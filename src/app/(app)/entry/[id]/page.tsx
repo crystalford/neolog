@@ -46,6 +46,8 @@ interface Entry {
   link_url: string | null
   original_filename: string | null
   media_url: string | null
+  vlog_id: string | null
+  source_ref: string | null
 }
 
 const AUTHOR_LINE: Record<string, string> = {
@@ -307,7 +309,27 @@ export default function EntryPage({ params }: { params: { id: string } }) {
               <div className="i">
                 {sourceLine(e)}
                 <em>{AUTHOR_LINE[e.author]}</em>
+                {e.vlog_id && (
+                  <div className="fixrow">
+                    <Link href={`/vlog/${e.vlog_id}`}>
+                      <button>Open the recording</button>
+                    </Link>
+                  </div>
+                )}
               </div>
+              {/* A relogged line came out of a recording that already
+                  existed. Saying so is the difference between a quote and
+                  an assertion. */}
+              {e.source_ref?.startsWith('thread:') && (
+                <div className="i">
+                  <b>This was said out loud.</b>
+                  <em>
+                    Taken from a recording already on the log, placed at the
+                    moment it was said. The video is the ground truth; this
+                    line is the part of it that stands on its own.
+                  </em>
+                </div>
+              )}
             </div>
           </aside>
         </div>
@@ -338,6 +360,7 @@ function sourceLine(e: Entry): string {
     case 'file':  return e.original_filename ? `A file: ${e.original_filename}` : 'A file dropped in.'
     case 'link':  return 'A link, pasted.'
     case 'batch': return 'One act of putting things in.'
+    case 'vlog':  return 'Said out loud, in a recording.'
     default:      return 'Typed into the box.'
   }
 }

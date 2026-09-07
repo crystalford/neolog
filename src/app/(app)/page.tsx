@@ -386,6 +386,7 @@ export default function LogHome() {
                 <em>every line it wrote is correctable in one tap</em>
               </div>
             </div>
+            <Relog onDone={() => { void loadFeed() }} />
             <div className="rc">
               <div className="h"><Link href="/ready">Ready to send</Link></div>
               <div className="i">
@@ -497,6 +498,100 @@ function Row({ e, order, q, onImage }: {
   return e.href
     ? <Link className={`en${held ? ' isheld' : ''}`} href={e.href}>{body}</Link>
     : <div className={`en${held ? ' isheld' : ''}`}>{body}</div>
+}
+
+// ── Relog ─────────────────────────────────────────────────────────────────
+// The recordings are already here, already transcribed, already extracted.
+// What was SAID in them is not on the log until this runs. It pages through
+// the corpus, so a long run is a series of short requests rather than one
+// that times out, and it is idempotent — stopping halfway and starting again
+// loses nothing.
+
+function Relog({ onDone }: { onDone: () => void }) {
+  const [status, setStatus] = useState<{ vlogs: number; threads: number; relogged: number; remaining: number } | null>(null)
+  const [running, setRunning] = useState(false)
+  const [done, setDone] = useState(0)
+  const stop = useRef(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v2/log/relog', { cache: 'no-store' })
+      if (res.ok) setStatus(await res.json())
+    } catch { /* the card just doesn't show */ }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  const run = useCallback(async () => {
+    setRunning(true)
+    stop.current = false
+    let cursor: string | null = null
+    let written = 0
+    try {
+      // Keep going until the server says there is no next page.
+      for (;;) {
+        if (stop.current) break
+        const res: Response = await fetch('/api/v2/log/relog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor, limit: 20 }),
+        })
+        if (!res.ok) break
+        const r = await res.json() as { entries_written: number; next_cursor: string | null }
+        written += r.entries_written
+        setDone(written)
+        cursor = r.next_cursor
+        if (!cursor) break
+      }
+    } finally {
+      setRunning(false)
+      await load()
+      onDone()
+    }
+  }, [load, onDone])
+
+  if (!status) return null
+  // Nothing to say when the whole corpus is already on the log.
+  if (status.remaining <= 0 && !running && done === 0) return null
+
+  return (
+    <div className="rc">
+      <div className="h">
+        Recordings not on the log <span>{status.relogged} of {status.threads}</span>
+      </div>
+      <div className="i">
+        {running ? (
+          <>
+            <b>Putting them on the log.</b>
+            <em>{done} {done === 1 ? 'entry' : 'entries'} so far — you can leave this page.</em>
+          </>
+        ) : done > 0 ? (
+          <>
+            <b>Done. {done} {done === 1 ? 'entry' : 'entries'} added.</b>
+            <em>Each one sits at the second it was said.</em>
+          </>
+        ) : (
+          <>
+            <b>{status.remaining} things you said are not on the log.</b>
+            <em>
+              They are in {status.vlogs} recordings that were already
+              transcribed. This puts each one on the day and the minute it was
+              said. Nothing is written or rephrased — your words, where a
+              recording has them.
+            </em>
+          </>
+        )}
+        <div className="fixrow">
+          {running ? (
+            <button onClick={() => { stop.current = true }}>Stop</button>
+          ) : (
+            <button className="p" onClick={() => void run()}>
+              {done > 0 ? 'Check for more' : 'Put them on the log'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── The written-down bar: the door to thin years ──────────────────────────

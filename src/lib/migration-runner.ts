@@ -1173,6 +1173,33 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-09-07_idx_log_entries_batch',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_batch ON log_entries(batch_id)`,
   },
+
+  // ── Relog (7 Sep 2026) ──────────────────────────────────────────────────
+  // Three hundred-odd vlogs are already transcribed and already extracted.
+  // What the operator actually SAID in them lives in `threads` — each row a
+  // take, with its verbatim key_quotes and a transcript span. In the feed a
+  // vlog is one line ("Recorded 22 minutes of video"); the twelve things he
+  // said inside it are not on the log at all.
+  //
+  // Relog turns each of those into a dated entry, placed at
+  // `recorded_at + transcript_span_start` so a day's entries sit in the
+  // order they were spoken.
+  //
+  // `source_ref` makes it idempotent: 'thread:<id>' is unique, so a re-run
+  // inserts nothing it has already inserted. The index is partial because
+  // almost every row is a typed entry with no source_ref, and NULLs are
+  // distinct under a plain UNIQUE index anyway.
+  { name: '2026-09-07_log_entries_source_ref', sql: `ALTER TABLE log_entries ADD COLUMN source_ref TEXT` },
+  { name: '2026-09-07_log_entries_vlog_id', sql: `ALTER TABLE log_entries ADD COLUMN vlog_id TEXT` },
+  {
+    name: '2026-09-07_uidx_log_entries_source_ref',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_log_entries_source_ref
+            ON log_entries(operator_id, source_ref) WHERE source_ref IS NOT NULL`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_vlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_vlog ON log_entries(vlog_id)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

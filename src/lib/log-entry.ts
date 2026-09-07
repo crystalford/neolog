@@ -103,6 +103,10 @@ export interface LogEntry {
   media: MediaRef[]
   duration_seconds: number | null
   batch_id: string | null
+  /** The recording this came out of, when relog placed it there. */
+  vlog_id: string | null
+  /** 'thread:<id>' when relog wrote this row; null when the operator did. */
+  source_ref: string | null
   /** Free-text the search filter reads — includes transcripts the row doesn't show. */
   searchable: string
 }

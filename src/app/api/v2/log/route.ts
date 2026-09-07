@@ -73,12 +73,13 @@ export async function GET(req: NextRequest) {
       batch_id: string | null; r2_key: string | null; mime: string | null
       duration_seconds: number | null; transcript: string | null
       link_url: string | null; original_filename: string | null
+      vlog_id: string | null; source_ref: string | null
     }>(
       db,
       `SELECT id, text, detail, occurred_at, created_at, happened_at, logged_at,
               date_precision, kind, visibility, held_reason, author, source_kind,
               batch_id, r2_key, mime, duration_seconds, transcript, link_url,
-              original_filename
+              original_filename, vlog_id, source_ref
          FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         ORDER BY COALESCE(${order === 'logged' ? 'logged_at, created_at' : 'happened_at, occurred_at'}) DESC
@@ -159,6 +160,8 @@ export async function GET(req: NextRequest) {
       media,
       duration_seconds: r.duration_seconds,
       batch_id: r.batch_id,
+      vlog_id: r.vlog_id,
+      source_ref: r.source_ref,
       searchable: [r.text, r.detail, r.transcript, r.link_url, r.original_filename]
         .filter(Boolean).join(' ').toLowerCase(),
     })
@@ -200,6 +203,8 @@ export async function GET(req: NextRequest) {
       }],
       duration_seconds: v.duration_seconds,
       batch_id: null,
+      vlog_id: v.id,
+      source_ref: null,
       // The transcript is searchable even though the row never shows it.
       searchable: [v.title, v.summary, v.vision_description, v.original_filename, v.transcript]
         .filter(Boolean).join(' ').toLowerCase(),
@@ -227,6 +232,8 @@ export async function GET(req: NextRequest) {
       media: [{ kind: 'image', url: photoThumbs[i], label: p.caption }],
       duration_seconds: null,
       batch_id: null,
+      vlog_id: null,
+      source_ref: null,
       searchable: [p.caption, p.vision_description].filter(Boolean).join(' ').toLowerCase(),
     })
   })
