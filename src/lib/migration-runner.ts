@@ -1624,6 +1624,16 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_documents_operator
             ON documents(operator_id, created_at)`,
   },
+
+  // ── Footage (`footage.html`) ──────────────────────────────────────────
+  // The record as material. `usable` is HIS mark, not a score the log
+  // computed — null means he has not said, which is different from "no".
+  { name: '2026-09-07_vlogs_usable', sql: `ALTER TABLE vlogs ADD COLUMN usable INTEGER` },
+  { name: '2026-09-07_vlogs_usable_note', sql: `ALTER TABLE vlogs ADD COLUMN usable_note TEXT` },
+  // When he corrects what the log said was in the frame, the correction is
+  // his and the log's original stays in vision_description — the same
+  // both-versions-kept rule as everywhere else.
+  { name: '2026-09-07_vlogs_frame_note', sql: `ALTER TABLE vlogs ADD COLUMN frame_note TEXT` },
 ]
 
 const BENIGN_PATTERNS = [

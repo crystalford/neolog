@@ -227,6 +227,37 @@ show a made thing as public while the thing is not. Taking it down is one
 button and reverses both. A letter the log drafts in his voice is a different
 thing and stays below the fence (`letters.html`).
 
+### Footage — the record as material
+
+`footage.html` / SPEC §2. `/footage`, `/api/v2/footage`, `+ /sheet`. The same
+recordings the log quotes from, seen as a bin. It closes the "organization
+app" gap.
+
+**The second index.** A recording is already findable by what he SAID. This
+is the other half — what was in front of the camera, from the `vision_*`
+descriptions `src/lib/vision.ts` already writes off the thumbnail. Nothing
+new is generated. The row says **which index matched**: "found in the frame"
+and "found in what you said" are different facts, and someone looking for a
+shot needs to know which one they got.
+
+**His marks, not a score.** `vlogs.usable` is null / 1 / 0 — and null means
+*he has not said*, which is not "no". Pressing the same mark again clears it
+back to null.
+
+**Corrections keep both.** His `frame_note` goes in its own column and the
+log's `vision_description` stays; the page shows both, marked, rather than
+one replacing the other.
+
+**The hand-off.** `/api/v2/footage/sheet` is CSV — one row per clip with what
+it is, how long, when, both frame descriptions, his mark and a seven-day
+link. The header says the links expire rather than handing over URLs that
+quietly stop working. The originals are not copied.
+
+**The fence, drawn on the page.** Results are in date order, always. No
+relevance ranking, no suggested shot list, no "clips that would work for
+this" — a relevance score is the log having an opinion about which of his
+footage is good, and that is exactly what the fence exists to prevent.
+
 ### Corrections leave a record
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites
@@ -340,10 +371,12 @@ but nothing populates it; Whisper is not asked for diarization, so the split
 cannot be built honestly yet), `flow` (a walkthrough page). `walk` and
 `screenshots` are built.
 
-Not built: `elsewhere` · `photo` · `recording` (public); `footage` · `image` ·
-`image-filter` (per-kind bodies). `messages` and `writing` shipped — see
-**Correspondence** and **Documents** above. `repo` is a `code` document whose
-body is the README; the commits-folded-by-week view is not built. **The
+Not built: `elsewhere` · `photo` · `recording` (public); `image` ·
+`image-filter` (per-kind bodies — `/entry/[id]` already renders an image
+entry whole; these are the per-kind refinements). `messages` and `writing` shipped — see
+**Correspondence**, **Documents** and **Footage** above. `repo` is a `code`
+document whose body is the README; the commits-folded-by-week view is not
+built. **The
 machine layer shipped** — `dossier` → `/facts`, `everything`, `source` →
 `/glossary`, `asks`, `numbers`, plus the four feeds.
 
