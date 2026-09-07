@@ -465,6 +465,21 @@ async function runFollowUps(
           verdict.saw ? `It looks like ${verdict.saw}.` : (verdict.why || 'It has not been looked at yet.'),
           item.id,
         )
+      } else if (verdict.reads) {
+        // A picture that is really text — a note, a whiteboard, a receipt, a
+        // screenshot. The words become the entry's line, because a photo of
+        // a note whose words are not read is a photo of nothing. The
+        // transcription is kept verbatim and stays the log's, not his:
+        // author is already 'log' on an uploaded file.
+        await run(
+          db,
+          `UPDATE log_entries
+              SET visibility = 'public', held_reason = NULL,
+                  text = ?, transcript = ?, kind = 'paperwork',
+                  detail = COALESCE(detail, ?), updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+          firstLine(verdict.reads), verdict.reads, verdict.description, item.id,
+        )
       } else {
         await run(
           db,
@@ -481,6 +496,17 @@ async function runFollowUps(
       // placeholder sentence. Both are correctable in one tap.
     }
   }))
+}
+
+/**
+ * The first line of what a picture reads, as the entry's own sentence. The
+ * whole transcription is kept in `transcript`; this is only what the row
+ * shows.
+ */
+function firstLine(reads: string): string {
+  const first = reads.split('\n').map(l => l.trim()).find(Boolean) || reads.trim()
+  const one = first.replace(/\s+/g, ' ')
+  return one.length > 160 ? `${one.slice(0, 158)}…` : one
 }
 
 /**

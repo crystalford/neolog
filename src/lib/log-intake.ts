@@ -48,6 +48,17 @@ export interface HoldBackVerdict {
   why: string | null
   /** A plain description of the picture, so an image entry has a line. */
   description: string | null
+  /**
+   * The words visible in the picture, when it is really text — a note, a
+   * whiteboard, a receipt, a screenshot. `screenshots.html`: "A screenshot
+   * isn't a photo. It's text you wanted to keep for a second... So the log
+   * READS the text."
+   *
+   * The operator asked for this in his own words: *"if I write notes, I
+   * could take a picture of the note and save it to neolog."* A photo of a
+   * note whose words are not read is a photo of nothing.
+   */
+  reads: string | null
   /** False when the check could not run — the entry is held anyway. */
   checked: boolean
 }
@@ -68,7 +79,7 @@ const HOLD_BACK_KINDS = [
 const HOLD_BACK_SYSTEM = `You look at one image and report what is visibly on it. You do not interpret, advise, or say what it might mean to anyone.
 
 Return ONE JSON object and nothing else:
-{"description":"<one plain sentence: what is in the picture>","held":true|false,"saw":"<what is visibly on it, one short phrase, or null>"}
+{"description":"<one plain sentence: what is in the picture>","held":true|false,"saw":"<what is visibly on it, one short phrase, or null>","reads":"<the words visible in the picture, transcribed exactly, or null>"}
 
 Set "held" to true only if the image shows one of these:
 - ${HOLD_BACK_KINDS}
@@ -78,7 +89,8 @@ Rules:
 - "description" is always filled in: one factual sentence. No guessing who a specific person is — say "a person", "two people".
 - An ordinary photo, a screenshot of software, a landscape, food, or a document that is none of the five kinds above: held is false.
 - A conference badge, a library card, a loyalty card or a form is NOT an identity document unless it carries a date of birth or a government number.
-- If you cannot see the image clearly enough to tell, set held to true and saw to "could not read this clearly".`
+- If you cannot see the image clearly enough to tell, set held to true and saw to "could not read this clearly".
+- "reads": when the picture is mostly TEXT — a handwritten note, a whiteboard, a page, a receipt, a screenshot of a message or an app — transcribe the words exactly as they appear, keeping line breaks. Do not summarise them, do not correct spelling, do not fill in anything cut off. Use null when the picture is not text.`
 
 /** Pull the first JSON object out of a model response. */
 function firstJsonObject(text: string): any | null {
@@ -123,16 +135,16 @@ export async function checkHoldBack(
   try {
     const obj = await getObject(env, r2Key)
     if (!obj) {
-      return { held: true, saw: null, why: 'The file could not be read.', description: null, checked: false }
+      return { held: true, saw: null, why: 'The file could not be read.', description: null, reads: null, checked: false }
     }
     const buf = await obj.arrayBuffer()
     if (buf.byteLength > MAX_IMAGE_BYTES) {
-      return { held: true, saw: null, why: 'It is too large to look at.', description: null, checked: false }
+      return { held: true, saw: null, why: 'It is too large to look at.', description: null, reads: null, checked: false }
     }
     dataUri = `data:${mimeType};base64,${bytesToBase64(new Uint8Array(buf))}`
   } catch (err: any) {
     console.warn('[intake] hold-back read failed:', err?.message || err)
-    return { held: true, saw: null, why: 'The file could not be read.', description: null, checked: false }
+    return { held: true, saw: null, why: 'The file could not be read.', description: null, reads: null, checked: false }
   }
 
   try {
@@ -152,7 +164,7 @@ export async function checkHoldBack(
     const parsed = firstJsonObject(res.text)
     if (!parsed || typeof parsed.held !== 'boolean') {
       // A model that did not answer the question is not a "no".
-      return { held: true, saw: null, why: 'It could not be read clearly enough to tell.', description: null, checked: false }
+      return { held: true, saw: null, why: 'It could not be read clearly enough to tell.', description: null, reads: null, checked: false }
     }
     const description = typeof parsed.description === 'string' && parsed.description.trim()
       ? parsed.description.trim()
@@ -164,11 +176,16 @@ export async function checkHoldBack(
         : null,
       why: null,
       description,
+      // Kept verbatim. A transcription that has been tidied is not a
+      // transcription, and the words in his own note are his.
+      reads: typeof parsed.reads === 'string' && parsed.reads.trim()
+        ? parsed.reads.trim()
+        : null,
       checked: true,
     }
   } catch (err: any) {
     console.warn('[intake] hold-back check failed:', err?.message || err)
-    return { held: true, saw: null, why: 'The check could not run.', description: null, checked: false }
+    return { held: true, saw: null, why: 'The check could not run.', description: null, reads: null, checked: false }
   }
 }
 
