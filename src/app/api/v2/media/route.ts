@@ -86,9 +86,15 @@ export async function GET(req: NextRequest) {
     ) : Promise.resolve([]),
     wantUpdates ? findMany<{ id: string; text: string; occurred_at: string; created_at: string }>(
       db,
-      `SELECT id, text, occurred_at, created_at FROM log_entries
+      // Buried rows are out of every feed, search and count (SPEC §1), and
+      // a held-back row must not appear on a surface that does not blur it.
+      // This feed predates both states, so it has to exclude them explicitly.
+      `SELECT id, text, COALESCE(happened_at, occurred_at) AS occurred_at, created_at
+         FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL
-        ORDER BY occurred_at DESC
+          AND buried_at IS NULL
+          AND visibility <> 'held'
+        ORDER BY COALESCE(happened_at, occurred_at) DESC
         LIMIT ?`,
       operator.id, limit,
     ) : Promise.resolve([]),

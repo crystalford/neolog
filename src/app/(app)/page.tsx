@@ -115,6 +115,9 @@ export default function LogHome() {
   const [items, setItems] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [buried, setBuried] = useState(0)
+  // Coverage describes the whole log, so it comes from the server and does
+  // not move when the feed is filtered.
+  const [coverage, setCoverage] = useState<Record<string, number>>({})
   const [filter, setFilter] = useState<FeedFilter>(() => {
     // ?filter=buried is how the buried view is reached — it is not a ninth
     // button on a toolbar the design gives eight.
@@ -132,9 +135,12 @@ export default function LogHome() {
       if (q.trim()) params.set('q', q.trim())
       const res = await fetch(`/api/v2/log?${params}`, { cache: 'no-store' })
       if (!res.ok) { setItems([]); return }
-      const data = await res.json() as { items: LogEntry[]; buried: number }
+      const data = await res.json() as {
+        items: LogEntry[]; buried: number; coverage?: Record<string, number>
+      }
       setItems(data.items || [])
       setBuried(data.buried || 0)
+      if (data.coverage) setCoverage(data.coverage)
     } catch { setItems([]) }
     finally { setLoading(false) }
   }, [order, filter, q])
@@ -380,7 +386,7 @@ export default function LogHome() {
 
           {/* ── The rail ───────────────────────────────────────────────── */}
           <aside className="rail">
-            <WrittenDown items={items} onYear={y => setQ(String(y))} />
+            <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <div className="rc">
               <div className="h">
                 Arrived on its own <span>{items.filter(i => i.author === 'log').length}</span>
@@ -503,37 +509,36 @@ function Relog({ onDone }: { onDone: () => void }) {
 
 // ── The written-down bar: the door to thin years ──────────────────────────
 
-function WrittenDown({ items, onYear }: { items: LogEntry[]; onYear: (y: number) => void }) {
+function WrittenDown({ coverage, onYear }: {
+  coverage: Record<string, number>
+  onYear: (y: number) => void
+}) {
   const stats = useMemo(() => {
-    const counts = new Map<number, number>()
-    for (const e of items) {
-      const y = new Date(e.happened_at).getUTCFullYear()
-      if (!isNaN(y)) counts.set(y, (counts.get(y) || 0) + 1)
-    }
-    if (!counts.size) return null
-    const to = new Date().getUTCFullYear()
-    const from = Math.min(...Array.from(counts.keys()))
-    const max = Math.max(...Array.from(counts.values()))
-    const years: { y: number; n: number; h: number }[] = []
+    const years = Object.keys(coverage).map(Number).filter(y => !isNaN(y) && y > 1900)
+    if (!years.length) return null
+    const to = Math.max(new Date().getUTCFullYear(), ...years)
+    const from = Math.min(...years)
+    const max = Math.max(...Object.values(coverage))
+    const bars: { y: number; n: number; h: number }[] = []
     for (let y = from; y <= to; y++) {
-      const n = counts.get(y) || 0
-      years.push({ y, n, h: max ? Math.max(2, Math.round((n / max) * 100)) : 2 })
+      const n = coverage[String(y)] || 0
+      bars.push({ y, n, h: max ? Math.max(2, Math.round((n / max) * 100)) : 2 })
     }
     return {
-      years, from, to, max,
-      covered: years.filter(v => v.n > 0).length,
-      thin: years.filter(v => v.n > 0 && v.n / max < 0.09).length,
+      bars, from, to, max,
+      covered: bars.filter(v => v.n > 0).length,
+      thin: bars.filter(v => v.n > 0 && v.n / max < 0.09).length,
     }
-  }, [items])
+  }, [coverage])
 
   if (!stats) return null
-  const pct = Math.round((stats.covered / stats.years.length) * 100)
+  const pct = Math.round((stats.covered / stats.bars.length) * 100)
 
   return (
     <div className="rc">
-      <div className="h">Written down <span>{stats.from} – {stats.to}</span></div>
+      <div className="h">Written down <span>{stats.from} – {stats.to} · click a year</span></div>
       <div className="yrs">
-        {stats.years.map(v => (
+        {stats.bars.map(v => (
           <i
             key={v.y}
             style={{

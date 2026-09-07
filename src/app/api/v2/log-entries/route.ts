@@ -66,10 +66,19 @@ export async function POST(req: NextRequest) {
   }
 
   const id = ulid()
+  const now = new Date().toISOString()
+  // Both dates, always (SPEC §1). This route predates them and the one-time
+  // backfill has already run, so a row written here without them would stay
+  // NULL forever — the feed coalesces, so it would look fine and quietly
+  // drift out of step with everything written through /api/v2/log/intake.
   await run(
     db,
-    `INSERT INTO log_entries (id, operator_id, text, occurred_at) VALUES (?, ?, ?, ?)`,
-    id, operator.id, text, occurredAt,
+    `INSERT INTO log_entries (id, operator_id, text, occurred_at, happened_at, logged_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    id, operator.id, text, occurredAt, occurredAt, now,
   )
-  return NextResponse.json({ id, text, occurred_at: occurredAt }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json(
+    { id, text, occurred_at: occurredAt, happened_at: occurredAt, logged_at: now },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

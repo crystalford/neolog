@@ -18,11 +18,16 @@
  * (SPEC §0.2), so every failure path here holds back rather than publishes.
  */
 
-import { MODELS } from '@/lib/models'
+import { callChat } from '@/lib/llm'
+import { getObject, type R2Env } from '@/lib/r2'
 import type { EntryKind, DatePrecision } from '@/lib/log-entry'
 
-export interface IntakeEnv {
-  AI: { run: (model: any, args: unknown) => Promise<any> }
+export interface IntakeEnv extends R2Env {
+  // Structural, not the `Ai` global: callers whose `Ai` resolves against a
+  // different lib context (DOM `Response` vs the Workers one) are otherwise
+  // unassignable here, over a `gateway()` method nothing in this file calls.
+  AI: { run: (model: any, args: any) => Promise<any> }
+  ANTHROPIC_API_KEY?: string
 }
 
 // ── The hold-back check (SPEC §0.2) ────────────────────────────────────────
@@ -31,6 +36,8 @@ export interface HoldBackVerdict {
   held: boolean
   /** What the log saw, in its own words. Never an unnamed reason. */
   saw: string | null
+  /** A plain description of the picture, so an image entry has a line. */
+  description: string | null
   /** False when the check could not run — the entry is held anyway. */
   checked: boolean
 }
@@ -48,75 +55,118 @@ const HOLD_BACK_KINDS = [
   'a home address written out in full',
 ].join('\n- ')
 
-const HOLD_BACK_SYSTEM = `You look at one image and report what is visibly on it. You do not interpret, advise, or describe what it might mean to anyone.
+const HOLD_BACK_SYSTEM = `You look at one image and report what is visibly on it. You do not interpret, advise, or say what it might mean to anyone.
 
-Report whether the image shows any of these:
+Return ONE JSON object and nothing else:
+{"description":"<one plain sentence: what is in the picture>","held":true|false,"saw":"<what is visibly on it, one short phrase, or null>"}
+
+Set "held" to true only if the image shows one of these:
 - ${HOLD_BACK_KINDS}
 
-Answer with a single JSON object and nothing else:
-{"held": true|false, "saw": "<what is visibly on the image, one short phrase, or null>"}
-
 Rules:
-- "saw" describes only what is visible — "a name, a date of birth and a number laid out like a card". Never a reason, never a judgement, never a category name alone.
-- If the image is an ordinary photo, a screenshot of software, a landscape, a person, food, a document that is none of the five kinds above: {"held": false, "saw": null}.
+- "saw" describes only what is visible — "a name, a date of birth and a number laid out like a card". Never a reason, never a judgement, never a category name on its own. Use null when held is false.
+- "description" is always filled in: one factual sentence. No guessing who a specific person is — say "a person", "two people".
+- An ordinary photo, a screenshot of software, a landscape, food, or a document that is none of the five kinds above: held is false.
 - A conference badge, a library card, a loyalty card or a form is NOT an identity document unless it carries a date of birth or a government number.
-- If you cannot see the image clearly enough to tell, answer {"held": true, "saw": "could not read this clearly"}.`
+- If you cannot see the image clearly enough to tell, set held to true and saw to "could not read this clearly".`
 
 /** Pull the first JSON object out of a model response. */
 function firstJsonObject(text: string): any | null {
-  const start = text.indexOf('{')
+  const cleaned = (text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  const start = cleaned.indexOf('{')
   if (start < 0) return null
   let depth = 0
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '{') depth++
-    else if (text[i] === '}') {
+  for (let i = start; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') depth++
+    else if (cleaned[i] === '}') {
       depth--
       if (depth === 0) {
-        try { return JSON.parse(text.slice(start, i + 1)) } catch { return null }
+        try { return JSON.parse(cleaned.slice(start, i + 1)) } catch { return null }
       }
     }
   }
   return null
 }
 
+/** Display JPEGs are small; an enormous original is not worth the memory. */
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024
+
 /**
  * Look at an uploaded image and decide whether it must be held back.
  *
- * Held-back entries are stored whole and kept out of every feed; the operator
- * can publish one in a tap and the log takes his word for it. Because the
- * failure direction matters, EVERY error path here returns held=true — a
- * check that could not run is not a clean bill of health.
+ * The call shape is the one `src/lib/vision.ts` already uses in production:
+ * a base64 data URI in an `image_url` content part, through `callChat` with
+ * the `scout` model key. An earlier version of this function passed
+ * `{ image: Array.from(bytes) }`, which Llama 4 Scout does not accept — the
+ * model never saw the picture, so every uploaded image stayed held forever
+ * while appearing to have been checked.
+ *
+ * Because the failure direction matters, EVERY error path returns held=true.
+ * A check that could not run is not a clean bill of health.
  */
 export async function checkHoldBack(
   env: IntakeEnv,
-  imageBytes: Uint8Array,
+  r2Key: string,
+  mimeType = 'image/jpeg',
 ): Promise<HoldBackVerdict> {
+  let dataUri: string
   try {
-    const res: any = await env.AI.run(MODELS.VISION as any, {
-      messages: [
-        { role: 'system', content: HOLD_BACK_SYSTEM },
-        { role: 'user', content: 'What is visibly on this image?' },
-      ],
-      image: Array.from(imageBytes),
-      temperature: 0,
-      max_tokens: 200,
-    } as any)
-
-    const text: string = (res?.response ?? res?.result?.response ?? '').toString()
-    const parsed = firstJsonObject(text)
-    if (!parsed || typeof parsed.held !== 'boolean') {
-      // A model that didn't answer the question is not a "no".
-      return { held: true, saw: 'could not read this clearly', checked: false }
+    const obj = await getObject(env, r2Key)
+    if (!obj) return { held: true, saw: 'the file could not be read', description: null, checked: false }
+    const buf = await obj.arrayBuffer()
+    if (buf.byteLength > MAX_IMAGE_BYTES) {
+      return { held: true, saw: 'too large to look at', description: null, checked: false }
     }
+    dataUri = `data:${mimeType};base64,${bytesToBase64(new Uint8Array(buf))}`
+  } catch (err: any) {
+    console.warn('[intake] hold-back read failed:', err?.message || err)
+    return { held: true, saw: 'the file could not be read', description: null, checked: false }
+  }
+
+  try {
+    const res = await callChat(env as any, {
+      model: 'scout',
+      system: HOLD_BACK_SYSTEM,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is visibly on this image?' },
+          { type: 'image_url', image_url: { url: dataUri } },
+        ],
+      }] as any,
+      maxTokens: 300,
+      temperature: 0,
+    })
+    const parsed = firstJsonObject(res.text)
+    if (!parsed || typeof parsed.held !== 'boolean') {
+      // A model that did not answer the question is not a "no".
+      return { held: true, saw: 'could not read this clearly', description: null, checked: false }
+    }
+    const description = typeof parsed.description === 'string' && parsed.description.trim()
+      ? parsed.description.trim()
+      : null
     return {
       held: parsed.held,
-      saw: parsed.held ? (typeof parsed.saw === 'string' && parsed.saw.trim() ? parsed.saw.trim() : 'something that looks like a document') : null,
+      saw: parsed.held
+        ? (typeof parsed.saw === 'string' && parsed.saw.trim() ? parsed.saw.trim() : 'something that looks like a document')
+        : null,
+      description,
       checked: true,
     }
   } catch (err: any) {
     console.warn('[intake] hold-back check failed:', err?.message || err)
-    return { held: true, saw: 'the check could not run', checked: false }
+    return { held: true, saw: 'the check could not run', description: null, checked: false }
   }
+}
+
+/** Base64 without blowing the stack on a large buffer. */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(binary)
 }
 
 // ── Placing a file by its own clock ────────────────────────────────────────

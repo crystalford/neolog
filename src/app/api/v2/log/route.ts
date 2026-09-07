@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
   // Pull a generous slice from each table, merge, then cap. Each table is
   // capped at `limit` because after the merge only `limit` rows survive
   // anyway — no table can starve another out of the window.
-  const [entryRows, vlogRows, photoRows, buriedRow] = await Promise.all([
+  const [entryRows, vlogRows, photoRows, buriedRow, coverageRows] = await Promise.all([
     findMany<{
       id: string; text: string; detail: string | null
       occurred_at: string; created_at: string
@@ -128,6 +128,29 @@ export async function GET(req: NextRequest) {
       `SELECT COUNT(*) AS n FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NOT NULL`,
       operator.id,
+    ),
+    // Coverage by year, over the WHOLE log rather than the page being shown.
+    // Computing it from the returned rows made the bar describe a 200-row
+    // window, and clicking a year re-filtered the feed and collapsed the bar
+    // to the single year just clicked.
+    findMany<{ y: string; n: number }>(
+      db,
+      `SELECT strftime('%Y', COALESCE(happened_at, occurred_at, created_at)) AS y,
+              COUNT(*) AS n
+         FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        GROUP BY y
+       UNION ALL
+       SELECT strftime('%Y', COALESCE(recorded_at, created_at)) AS y, COUNT(*) AS n
+         FROM vlogs
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY y
+       UNION ALL
+       SELECT strftime('%Y', COALESCE(taken_at, created_at)) AS y, COUNT(*) AS n
+         FROM photos
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY y`,
+      operator.id, operator.id, operator.id,
     ),
   ])
 
@@ -252,8 +275,15 @@ export async function GET(req: NextRequest) {
   const total = list.length
   const trimmed = list.slice(0, limit)
 
+  // The three sources are counted separately, so fold them into one year map.
+  const coverage: Record<string, number> = {}
+  for (const r of coverageRows) {
+    if (!r.y) continue
+    coverage[r.y] = (coverage[r.y] || 0) + (r.n || 0)
+  }
+
   return NextResponse.json(
-    { items: trimmed, total, order, filter, buried: buriedRow[0]?.n || 0 },
+    { items: trimmed, total, order, filter, buried: buriedRow[0]?.n || 0, coverage },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }

@@ -270,11 +270,12 @@ async function runFollowUps(
 ) {
   await Promise.all(items.map(async item => {
     try {
-      const obj = await getObject(env, item.r2_key)
-      if (!obj) return
-      const bytes = new Uint8Array(await obj.arrayBuffer())
-
       if (item.kind === 'audio') {
+        // Only the transcription path needs the bytes in the Function. The
+        // hold-back check reads its own object, and caps the size.
+        const obj = await getObject(env, item.r2_key)
+        if (!obj) return
+        const bytes = new Uint8Array(await obj.arrayBuffer())
         // Whisper on Workers AI. The words are the operator's, so the entry
         // becomes his sentence and the author flips to `operator` — the log
         // transcribed it, it did not write it.
@@ -293,19 +294,27 @@ async function runFollowUps(
         return
       }
 
-      // An image: look at it once and decide whether it stays held.
-      const verdict = await checkHoldBack(env, bytes)
+      // An image: look at it once, decide whether it stays held, and keep
+      // the description so the row says what the picture is rather than
+      // just "Took a photo." The description is the log's, and `author`
+      // already records that.
+      const verdict = await checkHoldBack(env, item.r2_key, item.mime || 'image/jpeg')
       if (verdict.held) {
         await run(
           db,
-          `UPDATE log_entries SET visibility = 'held', held_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          `UPDATE log_entries
+              SET visibility = 'held', held_reason = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
           verdict.saw, item.id,
         )
       } else {
         await run(
           db,
-          `UPDATE log_entries SET visibility = 'public', held_reason = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-          item.id,
+          `UPDATE log_entries
+              SET visibility = 'public', held_reason = NULL,
+                  detail = COALESCE(detail, ?), updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+          verdict.description, item.id,
         )
       }
     } catch (err: any) {
