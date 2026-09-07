@@ -3614,3 +3614,94 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   font-style: normal; display: block; margin-top: 6px;
   font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
 }
+
+/* ── The machine layer ──────────────────────────────────────────────────
+   `everything.html` · `source.html` · `asks.html` · `numbers.html` ·
+   `dossier.html`. Lists collected out of the log, at stable addresses one
+   click below the nav.
+
+   Same frame as everything else — .logpage supplies it — so nothing
+   reframes when you click. What is added here is the list row, the number
+   row, and the stamp every page in this layer carries. No accent stripe on
+   any edge; no uppercase label; nothing under 10.5px. */
+
+.logpage .stamp {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline;
+  margin-top: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--fg-4);
+}
+.logpage .stamp time { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-3); }
+.logpage .stamp .unlisted { color: var(--fg-4); }
+
+/* the door: one row per address, the count on the right */
+.logpage .doors { margin-top: 26px; border-top: 1px solid var(--line); }
+.logpage .doors a.d {
+  display: grid; grid-template-columns: 168px minmax(0, 1fr) auto; gap: 24px;
+  padding: 15px 0; border-bottom: 1px solid var(--line); align-items: baseline;
+}
+.logpage .doors a.d:hover { background: rgba(255,255,255,.017); }
+.logpage .doors .n { font-size: 15.5px; color: var(--fg); font-weight: 400; }
+.logpage .doors .w { font-size: 13.5px; color: var(--fg-2); line-height: 1.55; text-wrap: pretty; }
+.logpage .doors .c {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--fg-3);
+  white-space: nowrap; text-align: right;
+}
+.logpage .doors .c.none { color: var(--fg-4); }
+
+/* a term, a question, a fact: the line, then what it came from underneath */
+.logpage .item { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.logpage .item .x {
+  font-size: 20px; font-weight: 300; line-height: 1.4; letter-spacing: -0.45px;
+  color: var(--fg); max-width: 660px; text-wrap: pretty;
+}
+.logpage .item .x a { color: inherit; }
+.logpage .item .x a:hover { border-bottom: 1px solid var(--line-3); }
+.logpage .item .m {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline;
+  margin-top: 9px; font-size: 12.5px; color: var(--fg-4);
+}
+.logpage .item .m time { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
+.logpage .item .p {
+  margin-top: 12px; font-size: 14.5px; line-height: 1.65; color: var(--fg-2);
+  max-width: 640px; text-wrap: pretty;
+}
+.logpage .item .said {
+  margin-top: 14px; padding: 12px 16px; border-left: 1px solid var(--line-2);
+  font-size: 14.5px; line-height: 1.6; color: var(--fg-1);
+  max-width: 640px; text-wrap: pretty;
+}
+.logpage .item .said em {
+  display: block; font-style: normal; margin-top: 7px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--fg-4);
+}
+
+/* a number: the figure, what it counts, and the rule it was counted by */
+.logpage .num {
+  display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 28px;
+  padding: 24px 0; border-bottom: 1px solid var(--line); align-items: start;
+}
+.logpage .num .big {
+  font-family: var(--font-mono); font-size: 40px; font-weight: 300;
+  letter-spacing: -2px; line-height: 1; color: var(--fg); padding-top: 3px;
+}
+.logpage .num .big.zero { color: var(--fg-4); }
+.logpage .num .big small {
+  display: block; font-family: var(--font-body); font-size: 12px;
+  letter-spacing: 0; color: var(--fg-4); margin-top: 8px;
+}
+.logpage .num .x { font-size: 17px; font-weight: 300; color: var(--fg); line-height: 1.45; }
+.logpage .num .how { margin-top: 9px; font-size: 13.5px; color: var(--fg-3); line-height: 1.6; }
+
+/* section heads inside a list — a word, not a code */
+.logpage .lsec {
+  margin-top: 40px; padding-bottom: 11px; border-bottom: 1px solid var(--line);
+  display: flex; justify-content: space-between; gap: 16px; align-items: baseline;
+  font-size: 13px; color: var(--fg-3);
+}
+.logpage .lsec b { font-family: var(--font-mono); font-weight: 400; font-size: 11px; color: var(--fg-4); }
+.logpage .lsec + .item, .logpage .lsec + .num { border-top: 0; }
+
+.logpage .none {
+  padding: 26px 0; font-size: 14.5px; color: var(--fg-3); line-height: 1.6;
+  max-width: 600px; text-wrap: pretty;
+}

@@ -203,10 +203,20 @@ Partial: `fix` (per-word transcript editing), `walk`/`branch` (no route view;
 splitting one note into several), `screenshots` (reads the text; no three-pile
 sort), `audio` (no two-voice split), `flow` (a walkthrough page).
 
-Not built, and all but two are the public or machine-facing layer the operator
-has not opened: `dossier` · `elsewhere` · `everything` · `source` · `asks` ·
-`numbers` · `photo` · `recording` (public); `messages` · `repo` · `writing` ·
-`footage` · `image` · `image-filter` (per-kind bodies).
+Not built: `elsewhere` · `photo` · `recording` (public); `messages` · `repo` ·
+`writing` · `footage` · `image` · `image-filter` (per-kind bodies). **The
+machine layer shipped** — `dossier` → `/facts`, `everything`, `source` →
+`/glossary`, `asks`, `numbers`, plus the four feeds.
+
+Two halves of that layer were deliberately left out, and both are the same
+refusal. `asks.html` writes prose answers with sub-questions fanned beneath
+them; `numbers.html` writes a reading under each figure. A model writing an
+answer in his voice on a surface that presents itself as a record is what §0
+rule 3 forbids, and a sentence about what a count MEANS is the log commenting
+(§0 rule 2). So the question and the answer are both his, joined by
+`led_from` and nothing else; and the slot under a number holds the rule it
+was counted by instead. `/search` remains the one place a written answer
+lives, and it checks its citations first.
 
 Below the fence and **staying there**: `letters`, `thinkit`, `sayit`, `cut`.
 
@@ -349,11 +359,27 @@ The masthead is a **top-horizontal nav, four primary entries.** This is the resu
 | **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), then the log filtered — **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
 | **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log. |
 | **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
+| **The facts** | `/facts` | `dossier.html`. What the log can state about him — work, projects, people, places — each with the dates it already derived, newest first, **no ranking**. His one sentence or none: the log will not draft a sentence about a person. Person schema. |
+| **Everything** | `/everything` | The one door to the machine layer, **linked from the log's footer and never from the nav** (§3: "a stranger chooses between two things"). Every address with its real count beside it. |
+| **The glossary** | `/glossary` | `source.html`. Every term and subject with a page, and the sentence it was first said in. DefinedTermSet. |
+| **Questions** | `/asks` | `asks.html`, minus the drafting. A question is an entry ending in `?`; an answer is an entry that `led_from` it. Both his. Open ones kept visible in their own section. FAQPage. |
+| **Numbers** | `/numbers` | `numbers.html`. Counts over dated rows, each carrying **the rule it was counted by**. No reading of what a number means — that would be the log commenting. Dataset. |
 | **Search** | `/search` | Ask the log a question. The answer is written only from passages it can point at — **every sentence's citations are checked in code against the passages actually sent**, and uncitable sentences are dropped (and counted, out loud). The abstain line — "Not answered: …" — is the only line allowed no citation. Retrieval is keyword over entries + transcripts, and the page says so. |
 | **A month** | `/month/[ym]` | Reduction as a place. The month in one paragraph, written from that month's entries only, every sentence citing one. Coverage per day. Once he edits the paragraph it is his and the log stops rewriting it — refused at the SQL level, not just hidden. |
 | **On this day** | `/onthisday` | The one permitted resurfacing. Shows; never says. No "one year ago", no count, no nudge. Approximate dates are excluded — a guessed day has no business on the surface whose discipline is not saying. |
 | **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
 | **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
+
+**The feeds** — `/feed.xml` (RSS 2.0), `/feed.json` (JSON Feed 1.1, where
+`date_published` is *happened* and `date_modified` is *logged* — the two
+times map without loss, and a `_neolog` extension carries the precision and
+who wrote the line), `/llms.txt` (what the site is, with live counts; it says
+where the primary material is and never describes the operator), and
+`/sitemap.xml` (public addresses only). All four resolve the sole operator
+row without auth, the way `/podcast.xml` does, and select **only**
+`visibility='public'` — the gate is in `loadPublicFeed`, once, so a new feed
+cannot forget it. They still sit behind Access until the operator adds a
+bypass app.
 
 **The fold** (`log-2028.html`) is on `/` itself: the last 14 days open as rows, then one line per week, per month, per year. A folded line carries **a real sentence from that period**, never a synthesis — writing period summaries needs the citation machinery, not a prompt.
 
