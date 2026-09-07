@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { LogDays } from '@/components/LogRow'
 import type { LogEntry } from '@/lib/log-entry'
 
@@ -101,6 +102,18 @@ export function FoldedPeriods({ fold, order, onImage }: {
                     {b.count} {b.count === 1 ? 'entry' : 'entries'}
                   </span>
                 </button>
+                {/* A month is also a place, with its own paragraph. The fold
+                    opens it here; the month page is the whole of it. */}
+                {b.grain === 'month' && state && (
+                  <div className="foldopen" style={{ paddingBottom: 8 }}>
+                    <Link
+                      href={`/month/${b.from.slice(0, 7)}`}
+                      style={{ fontSize: 12.5, color: 'var(--fg-3)', borderBottom: '1px solid var(--line-2)' }}
+                    >
+                      {b.label} as a place →
+                    </Link>
+                  </div>
+                )}
                 {state === 'loading' && (
                   <div className="foldopen"><div className="none">opening…</div></div>
                 )}

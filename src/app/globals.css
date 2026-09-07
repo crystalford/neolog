@@ -3446,3 +3446,13 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   color: var(--t-violet); margin-right: 8px;
 }
 .logpage .en .x .tags i.lay { color: var(--t-violet); }
+
+/* How much of a month is written down (month.html). One bar per day; a day
+   with nothing is a stub rather than a gap, because an absence is a fact
+   about the month too. */
+.logpage .monthdays {
+  display: flex; align-items: flex-end; gap: 3px; height: 44px;
+  padding: 12px 0 4px;
+}
+.logpage .monthdays i { flex: 1; min-height: 2px; display: block; border-radius: 1px 1px 0 0; }
+.logpage .monthdays i:hover { filter: brightness(1.6); }

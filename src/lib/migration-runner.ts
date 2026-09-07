@@ -1449,6 +1449,40 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_keep_state
             ON log_entries(operator_id, keep_state)`,
   },
+
+  // ── A month, as a place (7 Sep 2026) ────────────────────────────────────
+  // month.html: "The month in one paragraph · written by the log from the 47
+  // entries · rewritten as things arrive" and, underneath it, the rule that
+  // makes it safe: "Every sentence above points at entries below. Nothing in
+  // it is from outside the month."
+  //
+  // This is the reduction mechanic as a place. The paragraph is stored rather
+  // than regenerated per view, because it costs a model call and because the
+  // operator can edit it — and once he has, it is his and must not be
+  // silently rewritten.
+  {
+    name: '2026-09-07_month_summaries',
+    sql: `CREATE TABLE IF NOT EXISTS month_summaries (
+      id           TEXT PRIMARY KEY,          -- operator_id + ':' + YYYY-MM
+      operator_id  TEXT NOT NULL,
+      ym           TEXT NOT NULL,             -- YYYY-MM
+      -- The paragraph, with [n] citations pointing at cited_json.
+      summary      TEXT,
+      -- The entries each [n] refers to, in order.
+      cited_json   TEXT,
+      -- 'log' until he edits it; 'operator' after, and then it is left alone.
+      author       TEXT NOT NULL DEFAULT 'log',
+      -- How many entries it was written from, so a stale one is detectable.
+      built_from   INTEGER NOT NULL DEFAULT 0,
+      built_at     TEXT,
+      updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_month_summaries',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_month_summaries
+            ON month_summaries(operator_id, ym)`,
+  },
   {
     name: '2026-09-07_idx_log_entries_led_from',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,
