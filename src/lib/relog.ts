@@ -24,8 +24,19 @@
  * in" — and `LLM-PIPELINE.md` §1 — "verbatim spans are the only ground
  * truth; every summary is an index into them" — decide the shape:
  *
- *   - Where a thread has a verbatim `key_quote`, THAT is the entry's line,
- *     and `author` is `operator`. It is his sentence, from his mouth.
+ *   - Where a thread has a key_quote that is VERIFIED VERBATIM against the
+ *     recording's own transcript, THAT is the entry's line, and `author` is
+ *     `operator`. It is his sentence, from his mouth.
+ *
+ *     The check is not optional and it is not inherited. An extraction model
+ *     wrote these "quotes", and an earlier version of this file trusted them
+ *     — so a paraphrase, or an outright invention, would have been stored as
+ *     the operator's own words under `author='operator'`. That is the worst
+ *     thing this product can do. Every candidate quote is now matched against
+ *     `vlogs.transcript_text` with the same 4-gram check the extraction
+ *     pipeline uses (`src/lib/validator.ts`), at relog time, against the
+ *     actual transcript. A quote that does not appear in what he said is not
+ *     a quote.
  *   - The `take` — which an extraction model wrote — goes in `detail` and
  *     the entry is marked as carrying the log's summary.
  *   - Where a thread has no usable quote, the take becomes the line and
@@ -45,6 +56,7 @@
  */
 
 import { findMany, run, batch as d1Batch } from '@/lib/d1'
+import { buildTranscriptFourGrams, isGrounded } from '@/lib/validator'
 import { ulid } from '@/lib/ulid'
 import type { EntryKind, DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -99,7 +111,8 @@ function precisionForVlog(recordedAt: string | null, source: string | null): Dat
 function chooseLine(
   keyQuotesJson: string | null,
   take: string | null,
-): { text: string; author: 'operator' | 'log'; detail: string | null } | null {
+  fourGrams: Set<string> | null,
+): { text: string; author: 'operator' | 'log'; detail: string | null; grounded: number | null } | null {
   let quotes: string[] = []
   try {
     const parsed = JSON.parse(keyQuotesJson || '[]')
@@ -112,8 +125,12 @@ function chooseLine(
   } catch { /* a malformed key_quotes column falls through to the take */ }
 
   // A line has to survive on its own on the feed. Six words is the floor.
+  // Then the real gate: it has to actually appear in the recording. Without
+  // a transcript to check against there is no evidence, so nothing is
+  // attributed to him.
   const usable = quotes
     .filter(q => q.split(/\s+/).length >= 6 && q.length <= 600)
+    .filter(q => (fourGrams ? isGrounded(q, fourGrams) : false))
     .sort((a, b) => b.length - a.length)
 
   if (usable.length) {
@@ -124,12 +141,15 @@ function chooseLine(
       author: 'operator',
       // Don't repeat the quote back as its own summary.
       detail: summary && summary !== quote ? summary : null,
+      grounded: 1,
     }
   }
 
+  // No verified quote. The take is the extraction model's prose, so it goes
+  // in as the log's line and the feed marks it "arrived" — never as his.
   const t = (take || '').trim()
   if (!t) return null
-  return { text: t, author: 'log', detail: null }
+  return { text: t, author: 'log', detail: null, grounded: fourGrams ? 0 : null }
 }
 
 interface VlogRow {
@@ -138,6 +158,7 @@ interface VlogRow {
   recorded_at_source: string | null
   created_at: string
   duration_seconds: number | null
+  transcript_text: string | null
 }
 
 interface ThreadRow {
@@ -150,6 +171,7 @@ interface ThreadRow {
   utterance_kind: string | null
   strength: number | null
   transcript_span_start: number | null
+  transcript_span_end: number | null
 }
 
 /**
@@ -169,7 +191,8 @@ export async function relogBatch(
   // rather than with a hole in the middle.
   const vlogs = await findMany<VlogRow>(
     db,
-    `SELECT id, recorded_at, recorded_at_source, created_at, duration_seconds
+    `SELECT id, recorded_at, recorded_at_source, created_at, duration_seconds,
+            transcript_text
        FROM vlogs
       WHERE operator_id = ? AND deleted_at IS NULL
         ${cursor ? 'AND id > ?' : ''}
@@ -190,7 +213,7 @@ export async function relogBatch(
   const threads = await findMany<ThreadRow>(
     db,
     `SELECT id, vlog_id, topic, take, key_quotes, register, utterance_kind,
-            strength, transcript_span_start
+            strength, transcript_span_start, transcript_span_end
        FROM threads
       WHERE operator_id = ? AND deleted_at IS NULL AND vlog_id IN (${placeholders})
       ORDER BY vlog_id ASC, transcript_span_start ASC`,
@@ -198,13 +221,22 @@ export async function relogBatch(
   )
 
   const byVlog = new Map<string, VlogRow>(vlogs.map(v => [v.id, v]))
+  // One 4-gram set per recording, built once and reused for all its threads.
+  const gramsByVlog = new Map<string, Set<string> | null>(
+    vlogs.map(v => [
+      v.id,
+      v.transcript_text && v.transcript_text.trim()
+        ? buildTranscriptFourGrams(v.transcript_text)
+        : null,
+    ]),
+  )
   const withThreads = new Set(threads.map(t => t.vlog_id))
 
   const INSERT = `INSERT OR IGNORE INTO log_entries
     (id, operator_id, text, detail, occurred_at, happened_at, logged_at,
      date_precision, kind, visibility, held_reason, author, source_kind,
-     source_ref, vlog_id, duration_seconds)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     source_ref, vlog_id, duration_seconds, span_start, span_end, grounded)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
   const statements: { sql: string; binds: unknown[] }[] = []
   let considered = 0
@@ -212,7 +244,7 @@ export async function relogBatch(
   for (const t of threads) {
     const v = byVlog.get(t.vlog_id)
     if (!v) continue
-    const line = chooseLine(t.key_quotes, t.take)
+    const line = chooseLine(t.key_quotes, t.take, gramsByVlog.get(t.vlog_id) ?? null)
     if (!line) continue
     considered++
 
@@ -240,6 +272,9 @@ export async function relogBatch(
         `thread:${t.id}`,
         t.vlog_id,
         null,
+        t.transcript_span_start ?? null,
+        t.transcript_span_end ?? null,
+        line.grounded,
       ],
     })
   }

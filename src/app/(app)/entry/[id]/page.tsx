@@ -48,6 +48,9 @@ interface Entry {
   media_url: string | null
   vlog_id: string | null
   source_ref: string | null
+  span_start: number | null
+  span_end: number | null
+  grounded: number | null
   revisions?: Revision[]
 }
 
@@ -368,8 +371,18 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 <em>{AUTHOR_LINE[e.author]}</em>
                 {e.vlog_id && (
                   <div className="fixrow">
-                    <Link href={`/vlog/${e.vlog_id}`}>
-                      <button>Open the recording</button>
+                    {/* Open the recording at the second this was said, not
+                        at the top of a 22-minute file. */}
+                    <Link
+                      href={e.span_start != null
+                        ? `/vlog/${e.vlog_id}?t=${Math.floor(e.span_start)}`
+                        : `/vlog/${e.vlog_id}`}
+                    >
+                      <button>
+                        {e.span_start != null
+                          ? `Open the recording at ${clockDuration(e.span_start)}`
+                          : 'Open the recording'}
+                      </button>
                     </Link>
                   </div>
                 )}
@@ -385,6 +398,22 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                     moment it was said. The video is the ground truth; this
                     line is the part of it that stands on its own.
                   </em>
+                  {/* Whether the line is his words or the log's is not a
+                      matter of opinion here — it was checked against the
+                      transcript, and this says which. */}
+                  {e.grounded === 1 && (
+                    <em>
+                      Checked word for word against the recording&rsquo;s own
+                      transcript. These are his words.
+                    </em>
+                  )}
+                  {e.grounded === 0 && (
+                    <em>
+                      No part of this appeared word for word in the
+                      transcript, so it is kept as the log&rsquo;s summary
+                      rather than as a quote.
+                    </em>
+                  )}
                 </div>
               )}
             </div>

@@ -65,13 +65,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     duration_seconds: number | null; transcript: string | null
     link_url: string | null; original_filename: string | null
     vlog_id: string | null; source_ref: string | null
+    span_start: number | null; span_end: number | null; grounded: number | null
   }>(
     db,
     `SELECT id, text, detail, occurred_at, created_at, updated_at, happened_at,
             logged_at, date_precision, kind, visibility, held_reason, author,
             source_kind, batch_id, buried_at, r2_key, mime, bytes,
             duration_seconds, transcript, link_url, original_filename,
-            vlog_id, source_ref
+            vlog_id, source_ref, span_start, span_end, grounded
        FROM log_entries
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,

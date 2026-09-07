@@ -1312,6 +1312,16 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_field
             ON entry_revisions(operator_id, field, created_at DESC)`,
   },
+
+  // A relogged line came from a span of a recording. Keeping the span means
+  // the entry can point at the second it was said rather than at the whole
+  // video — "verbatim spans are the only ground truth; every summary is an
+  // index into them" (LLM-PIPELINE §1).
+  { name: '2026-09-07_log_entries_span_start', sql: `ALTER TABLE log_entries ADD COLUMN span_start REAL` },
+  { name: '2026-09-07_log_entries_span_end', sql: `ALTER TABLE log_entries ADD COLUMN span_end REAL` },
+  // Whether this line was checked verbatim against the recording's
+  // transcript. NULL = not applicable (the operator typed it himself).
+  { name: '2026-09-07_log_entries_grounded', sql: `ALTER TABLE log_entries ADD COLUMN grounded INTEGER` },
 ]
 
 const BENIGN_PATTERNS = [
