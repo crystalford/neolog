@@ -258,6 +258,34 @@ relevance ranking, no suggested shot list, no "clips that would work for
 this" — a relevance score is the log having an opinion about which of his
 footage is good, and that is exactly what the fence exists to prevent.
 
+### An entry, readable as data
+
+`src/lib/entry-schema.ts`, rendered on `/entry/[id]`. `footage.html`: "Also
+readable as data: SocialMediaPosting — both dates, the author, and who wrote
+the line. **in this page's source, not a separate feed**."
+
+That parenthesis is the rule. A schema block generated from a different query
+than the one the page rendered IS a second feed, and it can disagree with
+what is on screen — so the block is built from the entry object the page
+already holds, and a field the entry does not carry is absent rather than
+filled in. A **private or held entry produces no block at all**.
+
+Both dates survive: `dateCreated` is when it happened, `datePublished` is
+when it entered the log. `author` is the operator only when he wrote the
+line; a line the log composed is attributed to the log by name, in the data,
+the same as on screen. A date the log had to guess travels as
+`_neolog.date_precision` — there is no standard field for "approximately",
+and emitting a confident ISO timestamp for a year-only guess would be a lie
+in a format built to be trusted.
+
+**The owner strip** (`src/components/OwnerStrip.tsx`, SPEC §3) sits on the
+public-facing surfaces: *signed in · this is what a stranger sees · your log
+→*. It carries no controls — a public page that grows an edit button has
+stopped being what a stranger sees. `signedIn` is passed by the page, which
+knows because it called an operator-only endpoint; when one of these is
+served on a public path, that flag becomes false for a stranger with no
+change here.
+
 ### Corrections leave a record
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites

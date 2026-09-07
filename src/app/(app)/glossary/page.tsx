@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import Stamp from '@/components/Stamp'
+import OwnerStrip from '@/components/OwnerStrip'
 
 interface Item {
   id: string; name: string; kind: string
@@ -75,6 +76,7 @@ export default function Glossary() {
         </div>
 
         <div className="pghead"><h1>The glossary</h1></div>
+        <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
         <p className="none" style={{ paddingBottom: 0 }}>

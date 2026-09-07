@@ -28,6 +28,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import Stamp from '@/components/Stamp'
+import OwnerStrip from '@/components/OwnerStrip'
 
 interface Row {
   id: string; name: string; kind: string
@@ -88,6 +89,7 @@ export default function Facts() {
         <div className="pghead">
           <h1>{r?.person.name || 'The facts'}</h1>
         </div>
+        <OwnerStrip signedIn={!!r} />
         <Stamp at={r?.last_changed ?? null} />
 
         {loading && <div className="none">Reading the log.</div>}

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import Stamp from '@/components/Stamp'
+import OwnerStrip from '@/components/OwnerStrip'
 
 interface LogNumber {
   key: string; value: number; label: string; counted: string; unit?: string
@@ -75,6 +76,7 @@ export default function Numbers() {
         </div>
 
         <div className="pghead"><h1>Numbers</h1></div>
+        <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
         <p className="none" style={{ paddingBottom: 0 }}>

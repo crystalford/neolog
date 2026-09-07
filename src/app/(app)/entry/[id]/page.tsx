@@ -20,11 +20,12 @@
 
 export const runtime = 'edge'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 import { type DatePrecision, stampFor, isFuzzy, clockDuration } from '@/lib/log-entry'
+import { entrySchema } from '@/lib/entry-schema'
 
 interface Entry {
   id: string
@@ -113,6 +114,15 @@ export default function EntryPage({ params }: { params: { id: string } }) {
     })
     await load()
   }, [params.id, load])
+
+  // Described from the entry on screen, never re-fetched. `origin` is read
+  // in the browser so a deployed page and a preview each describe themselves.
+  const schema = useMemo(
+    () => (e
+      ? entrySchema(e, { origin: typeof window === 'undefined' ? '' : window.location.origin })
+      : null),
+    [e],
+  )
 
   if (loading) return <Shell><div className="logpage" /></Shell>
   if (!e) {
@@ -648,6 +658,14 @@ export default function EntryPage({ params }: { params: { id: string } }) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Readable as data, in this page's own source rather than as a
+            second feed (`footage.html`). Built from the entry already on
+            screen, so it cannot claim something the page does not show. A
+            private or held entry produces nothing at all. */}
+        {schema && (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
         )}
       </div>
     </Shell>

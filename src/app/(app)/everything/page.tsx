@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import Stamp from '@/components/Stamp'
+import OwnerStrip from '@/components/OwnerStrip'
 
 interface Door { href: string; name: string; what: string; count: number | null; stranger: boolean }
 interface Feed { href: string; name: string; what: string }
@@ -51,6 +52,7 @@ export default function Everything() {
         <div className="pghead">
           <h1>Everything</h1>
         </div>
+        <OwnerStrip signedIn={!!r} />
         <Stamp at={r?.last_changed ?? null} unlisted />
 
         <p className="none" style={{ paddingBottom: 0 }}>
