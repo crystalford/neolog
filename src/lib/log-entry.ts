@@ -72,6 +72,27 @@ export type DatePrecision = 'exact' | 'day' | 'month' | 'year' | 'approx'
 /** Public unmarked · private by the operator · held back by the log. */
 export type Visibility = 'public' | 'private' | 'held'
 
+/**
+ * The two values `log_entries.relation` takes, and the only two.
+ *
+ * SPEC §1: "a later thought about an earlier event attaches to that entry…
+ * **it never becomes a second event**." So `led_from` is a turn — a new
+ * event that came out of an earlier one — and `reflects` is a later thought
+ * about one, which the feed folds into a layer under its target instead of
+ * giving it a row of its own.
+ *
+ * They live here because a wrong value is invisible to every check this repo
+ * has: the column exists, the type is TEXT, `tsc` and the SQL column checker
+ * are both happy, and the only symptom is a reflection quietly rendering as
+ * an event. That has already happened once.
+ */
+export const RELATIONS = ['led_from', 'reflects'] as const
+export type Relation = typeof RELATIONS[number]
+/** The column's default, and what an unset value means: a turn. */
+export const RELATION_DEFAULT: Relation = 'led_from'
+/** A later thought about an earlier entry. Never a second event. */
+export const REFLECTS: Relation = 'reflects'
+
 /** you said it · the log wrote it · the log drafted it, you edited it. */
 export type Author = 'operator' | 'log' | 'drafted'
 

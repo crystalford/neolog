@@ -34,6 +34,7 @@
  */
 
 import { findMany } from './d1'
+import { RELATION_DEFAULT, type Relation } from './log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
 export interface Turn {
@@ -47,8 +48,14 @@ export interface Turn {
   visibility: string
   /** The turn this came out of. Null on the start. */
   led_from: string | null
-  /** `turn` — a new event. `reflection` — a later thought about that turn. */
-  relation: string
+  /**
+   * The column's own two values, not new words for them: `led_from` is a
+   * turn (a new event), `reflects` is a later thought about that turn.
+   * `src/app/api/v2/log/route.ts` folds a `reflects` row into a layer under
+   * its target rather than giving it a row, and the column defaults to
+   * `led_from`.
+   */
+  relation: Relation
   /** Seconds after the start of the walk. */
   offset_seconds: number
   /**
@@ -124,7 +131,7 @@ export async function loadWalk(
             COALESCE(le.author, 'operator') AS author,
             COALESCE(le.visibility, 'public') AS visibility,
             le.led_from,
-            COALESCE(le.relation, 'turn') AS relation
+            COALESCE(le.relation, 'led_from') AS relation
        FROM log_entries le JOIN tree ON tree.id = le.id
       WHERE le.buried_at IS NULL
       ORDER BY COALESCE(le.happened_at, le.occurred_at, le.created_at) ASC
@@ -178,7 +185,7 @@ export async function loadWalk(
       author: r.author,
       visibility: r.visibility,
       led_from: r.led_from,
-      relation: r.relation || 'turn',
+      relation: (r.relation as Relation) || RELATION_DEFAULT,
       offset_seconds: isNaN(ms) || isNaN(startMs) ? 0 : Math.round((ms - startMs) / 1000),
       // A loop is a real edge that skips back past the previous turn. The
       // order alone never decides this.

@@ -58,7 +58,10 @@ import {
   looksLikeDocument, documentSentence,
 } from '@/lib/conversation'
 import { sortScreenshot } from '@/lib/screenshots'
-import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
+import {
+  batchSentence, spokenDuration, RELATION_DEFAULT, REFLECTS,
+  type DatePrecision, type Relation,
+} from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends R2Env {
@@ -159,7 +162,7 @@ export async function POST(req: NextRequest) {
   // column followed in either direction.
   const ledFrom = (body.led_from || '').trim() || null
   // A reflection is not a second event. Only meaningful with a target.
-  const relation = ledFrom && body.relation === 'reflects' ? 'reflects' : 'led_from'
+  const relation: Relation = ledFrom && body.relation === REFLECTS ? REFLECTS : RELATION_DEFAULT
 
   const INSERT = `INSERT INTO log_entries
     (id, operator_id, text, detail, occurred_at, happened_at, logged_at,
@@ -504,7 +507,9 @@ async function runFollowUps(
                 // of. A finer time would be invented, not known.
                 happenedAt, happenedAt, now2,
                 precision, 'said', 'public', 'operator', 'voice',
-                item.id, 'led_from', null,
+                // A part of one take is a turn out of it, not a later
+                // thought about it — he said them in the same breath.
+                item.id, RELATION_DEFAULT, null,
               ],
             }))
             for (let i = 0; i < stmts.length; i += 40) {

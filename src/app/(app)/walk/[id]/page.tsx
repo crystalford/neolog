@@ -31,6 +31,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { REFLECTS } from '@/lib/log-entry'
 
 interface Turn {
   id: string; text: string; detail: string | null
@@ -129,7 +130,7 @@ export default function WalkPage() {
                   ? (new Date(t.happened_at).getTime() - new Date(prev.happened_at).getTime()) / 1000
                   : 0
                 return (
-                  <div className={`leg${t.loop ? ' loop' : ''}${t.relation === 'reflection' ? ' refl' : ''}`} key={t.id}>
+                  <div className={`leg${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`} key={t.id}>
                     <div className="when">
                       <time dateTime={t.happened_at}>
                         {t.returned ? gapLabel(gap) : offsetLabel(t.offset_seconds)}
@@ -148,7 +149,7 @@ export default function WalkPage() {
                         ) : (
                           <span>where it started</span>
                         )}
-                        {t.relation === 'reflection' && <span>a later thought, not a new event</span>}
+                        {t.relation === REFLECTS && <span>a later thought, not a new event</span>}
                         {t.author !== 'operator' && <span>written by the log</span>}
                         {t.revised_at && <span>revised {day(t.revised_at)}</span>}
                       </div>

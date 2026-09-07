@@ -211,6 +211,15 @@ later thought about an earlier event attaches to that entry… **it never
 becomes a second event**"), and a reflection renders as a layer under its
 target rather than taking a row.
 
+⚠️ **The column's two values are `led_from` and `reflects`**, exported from
+`src/lib/log-entry.ts` as `RELATION_DEFAULT` and `REFLECTS`. Import them;
+never type the string. A wrong value here is invisible to every check the
+repo has — the column exists, the type is TEXT, `tsc` and
+`check-sql-columns.mjs` are both green — and the only symptom is a reflection
+quietly rendering as an event. The walk shipped with an invented
+`'turn'`/`'reflection'` pair and was caught by reading the intake, not by a
+failure.
+
 Deliberately NOT at `/thread/[id]` — that route serves the extraction
 `threads` table, a different thing with the same word, linked from five
 places. This repo already paid once for a naming collision.

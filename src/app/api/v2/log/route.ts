@@ -30,6 +30,7 @@ import { buildFold, OPEN_DAYS } from '@/lib/fold'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import {
+  REFLECTS,
   type LogEntry, type FeedFilter, type DatePrecision, type Visibility,
   type Author, type EntryKind, type MediaRef,
   vlogSentence, photoSentence, matchesFilter,
@@ -232,7 +233,7 @@ export async function GET(req: NextRequest) {
   const present = new Set(entryRows.map(r => r.id))
   const reflections = new Set<string>()
   for (const r of entryRows) {
-    if (r.relation !== 'reflects' || !r.led_from || !present.has(r.led_from)) continue
+    if (r.relation !== REFLECTS || !r.led_from || !present.has(r.led_from)) continue
     reflections.add(r.id)
     const list = layersFor.get(r.led_from) || []
     list.push({ id: r.id, text: r.text, at: r.happened_at || r.occurred_at || r.created_at })
