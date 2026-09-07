@@ -414,15 +414,7 @@ export default function LogHome() {
           <aside className="rail">
             <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
-            <div className="rc">
-              <div className="h">
-                Arrived on its own <span>{items.filter(i => i.author === 'log').length}</span>
-              </div>
-              <div className="i">
-                Recordings, photos and files the log placed and described itself.
-                <em>every line it wrote is correctable in one tap</em>
-              </div>
-            </div>
+            <ArrivedOnItsOwn items={items} />
             <Relog onDone={() => { void loadFeed() }} />
             <div className="rc">
               <div className="h"><Link href="/ready">Ready to send</Link></div>
@@ -450,6 +442,38 @@ export default function LogHome() {
         <LogLightbox shots={shots} index={shotAt} onClose={() => setShotAt(null)} onIndex={setShotAt} />
       </div>
     </Shell>
+  )
+}
+
+// ── What arrived on its own ───────────────────────────────────────────────
+// Derived from the rows, not written by hand. The design's card breaks the
+// count down by where things came from, and a hand-written sentence would go
+// stale the first time the mix changed.
+
+function ArrivedOnItsOwn({ items }: { items: LogEntry[] }) {
+  const arrived = items.filter(i => i.author === 'log')
+  if (!arrived.length) return null
+
+  const bySource: Record<string, number> = {}
+  for (const i of arrived) {
+    const k = i.source === 'vlog' ? 'recordings'
+      : i.source === 'photo' ? 'photos'
+      : i.media.length ? 'files'
+      : 'lines the log wrote'
+    bySource[k] = (bySource[k] || 0) + 1
+  }
+  const parts = Object.entries(bySource)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${n} ${k}`)
+
+  return (
+    <div className="rc">
+      <div className="h">Arrived on its own <span>{arrived.length}</span></div>
+      <div className="i">
+        {parts.join(' · ')}
+        <em>every line the log wrote is correctable in one tap</em>
+      </div>
+    </div>
   )
 }
 

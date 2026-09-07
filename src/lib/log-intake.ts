@@ -34,8 +34,18 @@ export interface IntakeEnv extends R2Env {
 
 export interface HoldBackVerdict {
   held: boolean
-  /** What the log saw, in its own words. Never an unnamed reason. */
+  /**
+   * What the log saw, as a NOUN PHRASE — the row renders "It looks like
+   * {saw}." A verb phrase there produced "It looks like the check could not
+   * run.", which is broken English and, worse, describes the log's own
+   * failure as something it saw on the picture.
+   *
+   * Null when it is held for a reason that is not a sighting; `why` carries
+   * that instead.
+   */
   saw: string | null
+  /** Why it is held when nothing was seen — the log's own state, said plainly. */
+  why: string | null
   /** A plain description of the picture, so an image entry has a line. */
   description: string | null
   /** False when the check could not run — the entry is held anyway. */
@@ -112,15 +122,17 @@ export async function checkHoldBack(
   let dataUri: string
   try {
     const obj = await getObject(env, r2Key)
-    if (!obj) return { held: true, saw: 'the file could not be read', description: null, checked: false }
+    if (!obj) {
+      return { held: true, saw: null, why: 'The file could not be read.', description: null, checked: false }
+    }
     const buf = await obj.arrayBuffer()
     if (buf.byteLength > MAX_IMAGE_BYTES) {
-      return { held: true, saw: 'too large to look at', description: null, checked: false }
+      return { held: true, saw: null, why: 'It is too large to look at.', description: null, checked: false }
     }
     dataUri = `data:${mimeType};base64,${bytesToBase64(new Uint8Array(buf))}`
   } catch (err: any) {
     console.warn('[intake] hold-back read failed:', err?.message || err)
-    return { held: true, saw: 'the file could not be read', description: null, checked: false }
+    return { held: true, saw: null, why: 'The file could not be read.', description: null, checked: false }
   }
 
   try {
@@ -140,7 +152,7 @@ export async function checkHoldBack(
     const parsed = firstJsonObject(res.text)
     if (!parsed || typeof parsed.held !== 'boolean') {
       // A model that did not answer the question is not a "no".
-      return { held: true, saw: 'could not read this clearly', description: null, checked: false }
+      return { held: true, saw: null, why: 'It could not be read clearly enough to tell.', description: null, checked: false }
     }
     const description = typeof parsed.description === 'string' && parsed.description.trim()
       ? parsed.description.trim()
@@ -148,14 +160,15 @@ export async function checkHoldBack(
     return {
       held: parsed.held,
       saw: parsed.held
-        ? (typeof parsed.saw === 'string' && parsed.saw.trim() ? parsed.saw.trim() : 'something that looks like a document')
+        ? (typeof parsed.saw === 'string' && parsed.saw.trim() ? parsed.saw.trim() : 'something laid out like a document')
         : null,
+      why: null,
       description,
       checked: true,
     }
   } catch (err: any) {
     console.warn('[intake] hold-back check failed:', err?.message || err)
-    return { held: true, saw: 'the check could not run', description: null, checked: false }
+    return { held: true, saw: null, why: 'The check could not run.', description: null, checked: false }
   }
 }
 

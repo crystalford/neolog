@@ -117,6 +117,29 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     ),
   ])
 
+  // The entries either side of this one, so the way out of an entry is not
+  // only back up to the crumb. `.ends` in the design: earlier · the log ·
+  // later.
+  const at = row.happened_at || row.occurred_at || row.created_at
+  const [earlier, later] = await Promise.all([
+    findMany<{ id: string; text: string }>(
+      db,
+      `SELECT id, text FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND COALESCE(happened_at, occurred_at) < ?
+        ORDER BY COALESCE(happened_at, occurred_at) DESC LIMIT 1`,
+      operator.id, at,
+    ),
+    findMany<{ id: string; text: string }>(
+      db,
+      `SELECT id, text FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND COALESCE(happened_at, occurred_at) > ?
+        ORDER BY COALESCE(happened_at, occurred_at) ASC LIMIT 1`,
+      operator.id, at,
+    ),
+  ])
+
   let media_url: string | null = null
   if (row.r2_key) {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
@@ -131,6 +154,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       revisions,
       came_from: cameFrom[0] || null,
       led_to: ledTo,
+      earlier: earlier[0] || null,
+      later: later[0] || null,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )
@@ -153,9 +178,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const existing = await findOne<{
     id: string; text: string; happened_at: string | null; occurred_at: string
     date_precision: string; visibility: string; buried_at: string | null
+    transcript: string | null; source_kind: string
   }>(
     db,
-    `SELECT id, text, happened_at, occurred_at, date_precision, visibility, buried_at
+    `SELECT id, text, happened_at, occurred_at, date_precision, visibility,
+            buried_at, transcript, source_kind
        FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
@@ -195,6 +222,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     note('text', existing.text, t)
     sets.push('text = ?', "author = 'operator'")
     binds.push(t)
+    // A voice entry's text IS its transcript — Whisper wrote both. Fixing a
+    // misheard word in one and leaving the other is how the entry ends up
+    // showing the correction above and the error below it, forever.
+    if (existing.transcript && existing.transcript.trim() === existing.text.trim()) {
+      sets.push('transcript = ?')
+      binds.push(t)
+    }
   }
 
   // Wrong date. A year on its own is a complete answer, not a partial one.

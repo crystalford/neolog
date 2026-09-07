@@ -387,7 +387,8 @@ async function runFollowUps(
           `UPDATE log_entries
               SET visibility = 'held', held_reason = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
-          verdict.saw, item.id,
+          verdict.saw ? `It looks like ${verdict.saw}.` : (verdict.why || 'It has not been looked at yet.'),
+          item.id,
         )
       } else {
         await run(

@@ -75,7 +75,7 @@ export function LogRow({ e, order, q, onImage }: {
         {held && (
           <div className="more">
             <b>The log kept this back on its own.</b>{' '}
-            {e.held_reason ? `It looks like ${e.held_reason}.` : 'It has not been looked at yet.'}{' '}
+            {e.held_reason || 'It has not been looked at yet.'}{' '}
             Nothing about it is on the public log. You can publish it anyway,
             but you have to say so.
           </div>
@@ -131,7 +131,13 @@ export function LogRow({ e, order, q, onImage }: {
                   : null}
               </span>
             )}
-            {held && <span className="cap">blurred here too, until you say otherwise</span>}
+            {held
+              ? <span className="cap">blurred here too, until you say otherwise</span>
+              // What the file is called, beside it. The API has been sending
+              // this since the feed was built and nothing read it.
+              : (image?.label || video?.label || audio?.label)
+                ? <span className="cap">{image?.label || video?.label || audio?.label}</span>
+                : null}
           </div>
         )}
       </div>

@@ -54,6 +54,8 @@ interface Entry {
   led_from: string | null
   came_from?: Turn | null
   led_to?: Turn[]
+  earlier?: { id: string; text: string } | null
+  later?: { id: string; text: string } | null
   revisions?: Revision[]
 }
 
@@ -174,6 +176,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   <span>{gap} {gap === 1 ? 'day' : 'days'} between</span>
                 )}
                 <span>{AUTHOR_LINE[e.author] || ''}</span>
+                <span>{KIND_WORD[e.kind] || e.kind}</span>
+                {e.duration_seconds ? <span>{clockDuration(e.duration_seconds)}</span> : null}
               </div>
             </div>
 
@@ -182,7 +186,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             {held && (
               <div className="entry-body">
                 <b>The log kept this back on its own.</b>{' '}
-                {e.held_reason ? `It looks like ${e.held_reason}.` : 'It has not been looked at yet.'}{' '}
+                {e.held_reason || 'It has not been looked at yet.'}{' '}
                 It is stored whole and kept out of every feed. You can publish
                 it anyway — the log takes your word for it.
               </div>
@@ -480,6 +484,22 @@ export default function EntryPage({ params }: { params: { id: string } }) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+/** The seven kinds, as the word that goes on a page rather than a slug. */
+const KIND_WORD: Record<string, string> = {
+  happened:  'something that happened',
+  said:      'something you said',
+  seen:      'something you saw',
+  made:      'something you made',
+  read:      'something that arrived',
+  paperwork: 'paperwork',
+  ideas:     'an idea',
+}
+
+function trim(s: string): string {
+  const t = s.trim().replace(/\s+/g, ' ')
+  return t.length > 64 ? `${t.slice(0, 62)}…` : t
+}
 
 const REV_LABEL: Record<string, string> = {
   text:       'You rewrote this line.',
