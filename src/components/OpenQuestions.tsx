@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 interface Question {
   id: string
-  kind: 'entry_date' | 'thin_year' | 'page_name'
+  kind: 'entry_date' | 'thin_year' | 'page_name' | 'photo_date'
   question: string
   because: string | null
   target_kind: string | null
@@ -75,7 +75,7 @@ export function OpenQuestions({ onAnswered }: { onAnswered?: () => void }) {
         {first.because && <em>{first.because}</em>}
 
         <div className="ans">
-          {first.kind === 'entry_date' || first.kind === 'thin_year' ? (
+          {first.kind === 'entry_date' || first.kind === 'thin_year' || first.kind === 'photo_date' ? (
             <YearChoice
               busy={busy}
               onPick={y => void answer(first.id, { year: y })}
@@ -111,7 +111,9 @@ export function OpenQuestions({ onAnswered }: { onAnswered?: () => void }) {
           {/* What the answer becomes, said before it is given. */}
           <em>
             answered here, not somewhere else ·{' '}
-            {first.kind === 'entry_date'
+            {first.kind === 'photo_date'
+              ? 'the picture moves to the year you pick, marked from memory'
+              : first.kind === 'entry_date'
               ? 'the entry gets the year you pick, marked from memory'
               : first.kind === 'thin_year'
                 ? 'the answer becomes an entry dated to that year, marked from memory'

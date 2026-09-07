@@ -43,7 +43,7 @@ import { ulid } from '@/lib/ulid'
 import type { DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
-export type RecallKind = 'entry_date' | 'thin_year' | 'page_name'
+export type RecallKind = 'entry_date' | 'thin_year' | 'page_name' | 'photo_date'
 
 export interface RecallQuestion {
   id: string
@@ -114,6 +114,41 @@ export async function generateQuestions(
       target_kind: 'entry',
       target_id: e.id,
       dedupe_key: `entry_date:${e.id}`,
+    })
+  }
+
+  // ── 1b. A picture with no date in the file ─────────────────────────────
+  // `anchors.html`: "A scan has the scanner's date, not the picture's. So it
+  // can't be placed. Instead of leaving it undated in a pile, the log shows
+  // it to you and asks the two things only you can answer. One photo at a
+  // time, when you feel like it — never a queue you owe."
+  //
+  // It asks WHEN and nothing else. Who is in it is one of the four things
+  // SPEC §1 forbids the log to guess at, and a question about it here would
+  // be the log fishing for an answer it intends to use.
+  const undatedPictures = await findMany<{ id: string; text: string; happened_at: string }>(
+    db,
+    `SELECT id, text, COALESCE(happened_at, occurred_at) AS happened_at
+       FROM log_entries
+      WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        AND r2_key IS NOT NULL AND mime LIKE 'image/%'
+        AND date_precision = 'approx'
+        AND id NOT IN (
+          SELECT target_id FROM recall_questions
+           WHERE operator_id = ? AND target_kind = 'entry' AND target_id IS NOT NULL
+        )
+      ORDER BY COALESCE(happened_at, occurred_at) DESC
+      LIMIT 3`,
+    operatorId, operatorId,
+  )
+  for (const p of undatedPictures) {
+    candidates.push({
+      kind: 'photo_date',
+      question: 'When was this picture taken?',
+      because: 'The file had no date in it, so the log put it at the time it arrived. A scan carries the scanner\'s date, not the picture\'s.',
+      target_kind: 'entry',
+      target_id: p.id,
+      dedupe_key: `photo_date:${p.id}`,
     })
   }
 
@@ -242,7 +277,7 @@ export async function answerQuestion(
 
   // A date answer corrects the thing it was about rather than adding a
   // second entry saying the same thing in different words.
-  if (q.kind === 'entry_date' && q.target_id && answer.year) {
+  if ((q.kind === 'entry_date' || q.kind === 'photo_date') && q.target_id && answer.year) {
     const iso = new Date(Date.UTC(answer.year, 6, 1, 12)).toISOString()
     await run(
       db,
