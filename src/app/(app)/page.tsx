@@ -455,6 +455,7 @@ export default function LogHome() {
             <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <ArrivedOnItsOwn items={items} />
+            <OnThisDay />
             <SafeToClear />
             <Relog onDone={() => { void loadFeed() }} />
             {/* day-one.html: "The rail has nothing to show, so it says so in
@@ -522,6 +523,36 @@ function ArrivedOnItsOwn({ items }: { items: LogEntry[] }) {
         {parts.join(' · ')}
         <em>every line the log wrote is correctable in one tap</em>
       </div>
+    </div>
+  )
+}
+
+// ── On this day ───────────────────────────────────────────────────────────
+// The only resurfacing in the product, and the restraint is the feature.
+// One line in the rail: what was written on this date in another year, as it
+// was written. No "one year ago today", no count, no nudge.
+
+function OnThisDay() {
+  const [row, setRow] = useState<{ year: number; text: string; id: string } | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/v2/onthisday', { cache: 'no-store' })
+        if (!res.ok) return
+        const r = await res.json() as { years: { year: number; entries: { id: string; text: string }[] }[] }
+        // The most recent other year that had something. One, not a list.
+        const y = (r.years || []).find(v => v.year < new Date().getUTCFullYear() && v.entries.length)
+        if (y) setRow({ year: y.year, text: y.entries[0].text, id: y.entries[0].id })
+      } catch { /* the card just doesn't show */ }
+    })()
+  }, [])
+  if (!row) return null
+  return (
+    <div className="rc">
+      <div className="h">On this day <span>{row.year}</span></div>
+      <Link className="i" href="/onthisday" style={{ display: 'block' }}>
+        {row.text.length > 150 ? `${row.text.slice(0, 148)}…` : row.text}
+      </Link>
     </div>
   )
 }
