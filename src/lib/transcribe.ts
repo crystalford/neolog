@@ -32,7 +32,11 @@ export interface TranscribeResult {
 }
 
 export interface TranscribeEnv {
-  AI: Ai
+  // Only `.run()` is ever used here. Asking for the whole `Ai` surface made
+  // this unassignable from callers whose `Ai` global resolves against a
+  // different lib context (the DOM `Response` vs the Workers one) — a type
+  // error about `gateway()`, on a function that never calls it.
+  AI: { run: (model: any, args: any) => Promise<any> }
 }
 
 /**

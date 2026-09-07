@@ -11,7 +11,7 @@
  *   DELETE /api/v2/chat?thread_id=…   Soft-delete a thread.
  *
  * Model selection: body.model = 'kimi' (default, Workers AI Kimi K2.6) |
- * 'claude' (Anthropic Sonnet 4.6, requires ANTHROPIC_API_KEY).
+ * 'claude' (Anthropic Sonnet 5, requires ANTHROPIC_API_KEY).
  *
  * Tool calls are looped server-side up to TOOL_LIMIT iterations. The full
  * assistant turn — including intermediate tool_use + tool_result messages —

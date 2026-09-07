@@ -26,6 +26,74 @@ The operator uses the **Claude Code desktop app on Windows**, not VS Code, not a
 
 ---
 
+## ⚠️ The log — what this product is now (7 Sep 2026)
+
+**neolog is a permanent personal record.** You put things in — typed, spoken,
+photos, files — and the log keeps them, in order, dated twice, with the way
+back to every word. The video-essay engine is one thing built on top of that
+record; it is not the record.
+
+This was built from a 130-file design package (`SPEC.md`, `HANDOFF.md`, 57
+pages) produced between 15 Aug and 7 Sep 2026. **The pages are the spec.**
+Where a page and `SPEC.md` §0 disagree, §0 wins; where a page and prose
+disagree, the page wins.
+
+**The seven first principles** (`SPEC.md` §0 — these outrank everything in
+this file):
+
+1. The log is a place to put things and get them back.
+2. The log is quiet. It never comments on an entry. Roughly one question a
+   month, asked straight — never *"you've mentioned this eleven times."*
+3. Only what was said. Nothing is inferred or filled in. Guesses are marked
+   as guesses; a caption the operator didn't write is marked as the log's.
+4. Every line stands alone, and is a sentence. Subject, verb, object. No
+   *"isn't X — it's Y"* pivots, no fake-humble diminutives, no hedged verbs.
+5. Necessity before schema. Seven kinds, and nothing else until a real entry
+   needs one.
+6. **Never ask a question at the moment of input.** One line saying what
+   happened, one undo, then silence.
+7. You never write something down because it would look good in public.
+
+**Two times on every entry.** `happened_at` (when it occurred) and
+`logged_at` (when it entered the log), both always stored, default sort
+`happened_at`. Every file is placed by its own clock — EXIF, media metadata,
+filename — and one with no usable clock is placed by inference and **marked
+`approximate`**. The operator is never asked to date a file.
+
+**Public by default; the log holds back the exceptions** (`SPEC.md` §0.2).
+What the operator writes is public and unmarked. What he *uploads* is
+different: an image lands `held` and is released only after the vision check
+has looked at it. The log **says what it saw** — "a name, a date of birth and
+a number laid out like a card" — never an unnamed reason. Being wrong towards
+private is the only safe direction, so every failure path holds back.
+
+**Burial, not deletion.** There is no delete action. Bury removes an entry
+from the feed, search and counts and keeps the file, the attachments and the
+relationships. The one exception is the receipt's **undo**, which is for
+something that should never have gone in at all.
+
+**Two gestures on a row, and only two** (`SPEC.md` §11). Click the image → a
+lightbox over the feed. Click anywhere else → the entry's own page. There is
+no third expand-in-place gesture. A row links to its content, never to the
+container it belongs to, and **a row whose entry has no page of its own is
+not clickable** — never invent a destination to satisfy an affordance.
+
+**Settled here, and recorded because `HANDOFF.md` left it to Claude Code:**
+*does the log read the old `vlogs` table directly, or do those rows become
+`log_entries`?* — **It reads them where they live. There is no import.** The
+argument is in `src/lib/log-entry.ts`: `vlogs` carries twenty columns no entry
+row could hold, and `recorded_at`/`created_at` already *are* the two times.
+This does not violate §0.1 ("never author a second feed") — §0.1 forbids two
+*authored* feeds that can disagree, and requires one feed, one entry shape,
+one shell. `/api/v2/log` is that one feed over three tables.
+
+**What is deliberately NOT built** (`HANDOFF.md` build order, steps 2–5):
+pages/the index, threads, search-as-a-page, export, the public side, letters,
+cuts, the offer, and anything that drafts in the operator's voice. The fence
+opens after thirty days of daily use.
+
+---
+
 ## ⚠️ Locked architectural decisions — do not relitigate
 
 These are settled. Read this section before proposing alternatives.
@@ -134,10 +202,13 @@ The masthead is a **top-horizontal nav, four primary entries.** This is the resu
 
 | Label | Route | What it is |
 |---|---|---|
-| **Log** | `/` | **Home.** Top half is `CapturePanel` (the four-mode uploader: full / compressed / slideshow / audio-only — the bad-wifi ladder). Bottom half is *Ready to send* — a unified list of production candidates the system prepared in the background (top subjects, researched topics, quick-video seeds, unfinished productions to resume). |
+| **Log** | `/` | **Home — the log.** The composer on top (type, talk, drop files in; auto-grows from one line to a chapter; a `when` control for backdating with a precision — *that day / that month / that year* — so "2008 was a huge year" doesn't have to pretend to a day). Then the receipt: one line, one undo. Then search, the eight-way filter toolbar, the order toggle (*when it happened* / *when I logged it*), and the day-grouped feed. The rail carries the written-down bar (coverage by year — the door to thin years) and what arrived on its own. |
 | **Archive** | `/photos` | Photos + videos + vlogs, one dated timeline. Owned, permanent — the "replace Google Photos" surface. HEIC converts in-browser, EXIF/recording dates drive ordering, every item gets an automatic AI description whether or not there's narration. Also hosts the progress-video builder (time-lapse / before-after from a detected photo series). |
 | **Drafts** | `/drafts` | Subjects + Topics + Clips as three tabs on one page (`?tab=subjects\|topics\|clips`, default subjects). The engine's three "what should I make next" surfaces, consolidated. Subjects = librarian-named concepts from your own recordings. Topics = type-a-subject research + script engine. Clips = clip-quality-judge-scored lines across every vlog, with a self-driving backlog scorer. |
 | **Published** | `/published` | The accumulating body of work — only productions in `state='published'`. Honest signal if empty. |
+| **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
+| **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
+| **Ready to send** | `/ready` | What used to be home — the CapturePanel and the system-drafted production candidates, moved whole. The machine's suggestions drawn from the record; the record is what home is for. |
 
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
@@ -174,7 +245,7 @@ The masthead is a **top-horizontal nav, four primary entries.** This is the resu
 
 ## Design vocabulary — applied uniformly
 
-Pure black bg (`#000`), cool-gray fgs, cobalt signal `#5b8df6` (NOT the old warm orange). Ten topic territories (brass / terra / ochre / rose / plum / violet / steel / teal / sage / moss). Geist (300-700) + JetBrains Mono (300-600).
+Pure black bg (`#000`), cool-gray fgs, **steel signal `#4ea1d5`** — one signal colour (`SPEC.md` §1). Replaced cobalt `#5b8df6` on 7 Sep 2026: cobalt competed with the blue territory hue, steel doesn't. `--fg-3`/`--fg-4` were lightened to `#9a9aa4`/`#8a8a94` at the same time — the old zinc ramp failed contrast at the 10.5px floor. Ten topic territories (brass / terra / ochre / rose / plum / violet / steel / teal / sage / moss). Geist (200-700) + JetBrains Mono (300-500). **Mono is for dates and IDs only — never on a button.**
 
 **Type scale**: hero h1 ~ 56-92px weight 300-400 with `letter-spacing -2 to -4px`. Eyebrows: 10.5px JetBrains Mono `letter-spacing 3.2px` uppercase. Sub: 18px. Body: 14-16px.
 
@@ -229,7 +300,7 @@ Seven production types working end-to-end. The orchestration is the same — scr
 
 **State machine**: `materializing → script_ready → recording → producing → produced → published`. The flag `visibility='public'` serves the production at `/p/[id]` (separate from podcast/ship state).
 
-**Default LLM model: Llama 3.3 70B** for extraction; **gpt-oss-120b** (Workers AI) for hard reasoning (librarian, angle suggestions, scripts). Claude Sonnet 4.6 is the paid opt-in. The model registry lives at `src/lib/models.ts`.
+**Default LLM model: Llama 3.3 70B** for extraction; **gpt-oss-120b** (Workers AI) for hard reasoning (librarian, angle suggestions, scripts). Claude Sonnet 5 is the paid opt-in. The model registry lives at `src/lib/models.ts`.
 
 ---
 
@@ -241,10 +312,10 @@ Every ingested vlog runs three parallel passes after transcription, plus entity 
 
 | Pass | Output table | `free` (default) | `premium` | `max` | Purpose |
 |---|---|---|---|---|---|
-| Analytical | `threads` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | topic / take / key_quotes / register / strength / abstracted_topic |
-| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 4.6** | Sonnet 4.6 | Fictional / creative material for projects |
-| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | Delivery moments where the operator nailed a segment |
-| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 4.6** | People, places, projects, tools, concepts, themes |
+| Analytical | `threads` | Llama 3.3 70B | **Sonnet 5** | Sonnet 5 | topic / take / key_quotes / register / strength / abstracted_topic |
+| Creative-mode | `creative_elements` | Llama 3.3 70B | **Sonnet 5** | Sonnet 5 | Fictional / creative material for projects |
+| Clip-candidate | `clip_candidates` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 5** | Delivery moments where the operator nailed a segment |
+| Entity | `entities` / `entity_mentions` | Llama 3.3 70B | Llama 3.3 70B | **Sonnet 5** | People, places, projects, tools, concepts, themes |
 
 **Cost per 20-min vlog:** `free` ~$0.04 · `premium` ~$0.10 · `max` ~$0.17. The vlog detail page shows the estimate before any re-run.
 
@@ -296,7 +367,7 @@ Each gets its own subject (`subject_kind='tension'|'evolution'|'open_loop'`) wit
 | Async jobs | Cloudflare Workflows + Durable Object pipeline |
 | Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) |
 | **Hard-reasoning LLM** (librarian, scripts, angles) | **`@cf/openai/gpt-oss-120b`** with `reasoning: { effort: 'low'\|'medium'\|'high' }`. Auto-fallback to Llama 3.3 70B on error. Wired via `callReasoning()` in `src/lib/models.ts`. |
-| Extraction LLM | Llama 3.3 70B (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for `free` tier; Claude Sonnet 4.6 for `premium` / `max`. |
+| Extraction LLM | Llama 3.3 70B (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for `free` tier; Claude Sonnet 5 for `premium` / `max`. |
 | Chat default | Llama 3.3 70B. Picker also exposes Kimi K2.6, Llama 4 Scout, Claude. |
 | Image generation (b-roll stills) | `@cf/black-forest-labs/flux-1-schnell` — base64 JPEG, 8-step rectified flow |
 | Image-to-video (b-roll animation) | `@cf/alibaba/wan-2.7` — 2–15s clip from a still + motion hint. FFmpeg Ken Burns is the automatic fallback. |
@@ -312,9 +383,11 @@ Each gets its own subject (`subject_kind='tension'|'evolution'|'open_loop'`) wit
 
 ## Design system — bone/ink/Geist + topic territories
 
-Cinematic warm dark. Bone-on-ink. Geist body, JetBrains Mono for metadata only.
+Cinematic warm dark. Bone-on-ink. Geist body, JetBrains Mono for dates and IDs only — never on a control.
 
 **Tokens live in `src/lib/design.ts`.** Import from there; do not redefine inline.
+
+**Three rules from the design package's `plain.css`, now binding:** nothing on screen below **10.5px**; **no uppercase-letterspaced labels** — a label is a word, not a code; **no accent stripe on any card edge**. One frame everywhere: `max-width 1140px`, `padding 0 44px` → 1052 inner, spent as 708 + 48 gap + 296 rail. Nothing reframes when you click.
 
 ```typescript
 import { INK, BONE, TOPIC, STATE, FONT_BODY, FONT_MONO } from '@/lib/design'

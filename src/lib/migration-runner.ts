@@ -1099,6 +1099,80 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-08-31_idx_log_entries_operator',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_operator ON log_entries(operator_id, occurred_at DESC)`,
   },
+
+  // ── The entry model (7 Sep 2026) ────────────────────────────────────────
+  // The 31 Aug table was `{ text, occurred_at }` and its comment said the
+  // taxonomy was "unproven structure". Thirty-seven design pages later it is
+  // proven, so the columns land now. Every one of these exists because a
+  // rule in SPEC §0–§1 needs somewhere to live:
+  //
+  //   two dates          — happened_at (when it occurred) + logged_at (when it
+  //                        entered the log). Both ALWAYS stored. Default sort
+  //                        is happened_at. The distance between them is itself
+  //                        a queryable signal.
+  //   date_precision     — a file with no usable clock is placed by inference
+  //                        and marked. Answers "just 2008" without inventing a
+  //                        separate precision schema: one enum column.
+  //   kind               — the seven on the log. Necessity before schema.
+  //   visibility         — public by default; 'private' is the operator's
+  //                        call, 'held' is the log's (§0.2). Only the two
+  //                        exceptions are ever marked.
+  //   held_reason        — the log SAYS WHAT IT SAW, never an unnamed reason.
+  //   author             — who wrote each line: said | log | drafted (§1).
+  //                        Set when the line is made, never reconstructed.
+  //   buried_at          — burial, not deletion. No delete action exists.
+  //   batch_id           — one act of putting-in is itself an entry with a
+  //                        manifest; its children carry its id and are each
+  //                        placed by their own clock.
+  //
+  // Columns are added one per migration so a partial failure leaves the rest
+  // applied — the runner's BENIGN_PATTERNS swallow "duplicate column name",
+  // so re-running is always safe.
+  { name: '2026-09-07_log_entries_happened_at', sql: `ALTER TABLE log_entries ADD COLUMN happened_at TEXT` },
+  { name: '2026-09-07_log_entries_logged_at', sql: `ALTER TABLE log_entries ADD COLUMN logged_at TEXT` },
+  { name: '2026-09-07_log_entries_date_precision', sql: `ALTER TABLE log_entries ADD COLUMN date_precision TEXT NOT NULL DEFAULT 'exact'` },
+  { name: '2026-09-07_log_entries_kind', sql: `ALTER TABLE log_entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'said'` },
+  { name: '2026-09-07_log_entries_visibility', sql: `ALTER TABLE log_entries ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'` },
+  { name: '2026-09-07_log_entries_held_reason', sql: `ALTER TABLE log_entries ADD COLUMN held_reason TEXT` },
+  { name: '2026-09-07_log_entries_author', sql: `ALTER TABLE log_entries ADD COLUMN author TEXT NOT NULL DEFAULT 'operator'` },
+  { name: '2026-09-07_log_entries_buried_at', sql: `ALTER TABLE log_entries ADD COLUMN buried_at TEXT` },
+  { name: '2026-09-07_log_entries_batch_id', sql: `ALTER TABLE log_entries ADD COLUMN batch_id TEXT` },
+  { name: '2026-09-07_log_entries_source_kind', sql: `ALTER TABLE log_entries ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'text'` },
+  { name: '2026-09-07_log_entries_detail', sql: `ALTER TABLE log_entries ADD COLUMN detail TEXT` },
+  { name: '2026-09-07_log_entries_r2_key', sql: `ALTER TABLE log_entries ADD COLUMN r2_key TEXT` },
+  { name: '2026-09-07_log_entries_mime', sql: `ALTER TABLE log_entries ADD COLUMN mime TEXT` },
+  { name: '2026-09-07_log_entries_bytes', sql: `ALTER TABLE log_entries ADD COLUMN bytes INTEGER` },
+  { name: '2026-09-07_log_entries_duration', sql: `ALTER TABLE log_entries ADD COLUMN duration_seconds REAL` },
+  { name: '2026-09-07_log_entries_transcript', sql: `ALTER TABLE log_entries ADD COLUMN transcript TEXT` },
+  { name: '2026-09-07_log_entries_link_url', sql: `ALTER TABLE log_entries ADD COLUMN link_url TEXT` },
+  { name: '2026-09-07_log_entries_original_filename', sql: `ALTER TABLE log_entries ADD COLUMN original_filename TEXT` },
+
+  // Backfill the two dates for every row written before they existed. An
+  // entry typed on 31 Aug happened when it said it happened and was logged
+  // when the row was created — both facts are already on the row, they just
+  // had no column of their own.
+  {
+    name: '2026-09-07_log_entries_backfill_dates',
+    sql: `UPDATE log_entries
+             SET happened_at = COALESCE(happened_at, occurred_at, created_at),
+                 logged_at   = COALESCE(logged_at, created_at, occurred_at)
+           WHERE happened_at IS NULL OR logged_at IS NULL`,
+  },
+
+  // Default sort is happened_at, so that's the index. The second index
+  // serves the "when I logged it" toggle on the toolbar.
+  {
+    name: '2026-09-07_idx_log_entries_happened',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_happened ON log_entries(operator_id, happened_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_logged',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_logged ON log_entries(operator_id, logged_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_batch',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_batch ON log_entries(batch_id)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

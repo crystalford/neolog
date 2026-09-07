@@ -53,7 +53,7 @@ type ModelKey = 'llama70b' | 'kimi' | 'sonnet'
 const MODEL_IDS: Record<ModelKey, { provider: 'workers_ai' | 'claude'; id: string }> = {
   llama70b: { provider: 'workers_ai', id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
   kimi:     { provider: 'workers_ai', id: '@cf/moonshotai/kimi-k2.6' },
-  sonnet:   { provider: 'claude',     id: 'claude-sonnet-4-6' },
+  sonnet:   { provider: 'claude',     id: 'claude-sonnet-5' },
 }
 
 const CULTIVATE_PROMPT_VERSION = 'cultivate-v1'

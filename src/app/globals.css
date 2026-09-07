@@ -1,7 +1,7 @@
 /* ============================================================
  * NEOLOG — Console direction · design tokens + base components
  *
- * Pure neutral palette. Geist Sans for everything, Geist Mono
+ * Pure black. Geist for everything on screen, JetBrains Mono
  * for technical labels only. Dense but never crowded — Vercel /
  * Linear pacing, not control-room.
  *
@@ -9,7 +9,7 @@
  * in workers/.../HANDOFF.md → §10.
  * ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
   /* Surface — pure black + cool grays (canon: 00-Sitemap.html) */
@@ -19,23 +19,29 @@
   --bg-3:      #161616;
   --bg-4:      #1c1c1c;
   --bg-5:      #232323;
-  --line:      #1d1d1d;
-  --line-1:    #262626;
-  --line-2:    #2e2e2e;
-  --line-3:    #3f3f3f;
+  --line:      #1c1c1c;
+  --line-1:    #252525;
+  --line-2:    #2f2f2f;
+  --line-3:    #454545;
 
-  /* Text */
+  /* Text — the design package's ramp, 7 Sep 2026.
+   * fg-3 and fg-4 moved a long way up (#71717a → #9a9aa4, #52525b → #8a8a94).
+   * The old zinc ramp put secondary text and every timestamp at a contrast
+   * that failed at the 10.5px floor the design sets; these are the values the
+   * 57 design pages are drawn at. */
   --fg:        #fafafa;
   --fg-1:      #e4e4e7;
-  --fg-2:      #a1a1aa;
-  --fg-3:      #71717a;
-  --fg-4:      #52525b;
-  --fg-5:      #3f3f46;
+  --fg-2:      #a3a3ab;
+  --fg-3:      #9a9aa4;
+  --fg-4:      #8a8a94;
+  --fg-5:      #6a6a74;
 
-  /* Signal — cobalt blue, the system's accent */
-  --sig:       #5b8df6;
-  --sig-soft:  rgba(91,141,246,0.12);
-  --sig-glow:  rgba(91,141,246,0.40);
+  /* Signal — steel. One signal colour, named in SPEC §1 and HANDOFF § Design.
+   * Replaces cobalt #5b8df6: steel sits beside the ten territory hues without
+   * competing with the blue one, which cobalt did. */
+  --sig:       #4ea1d5;
+  --sig-soft:  rgba(78,161,213,0.12);
+  --sig-glow:  rgba(78,161,213,0.40);
   --accent:    var(--sig);          /* alias for older code */
   --accent-bg: var(--sig-soft);
   --accent-bd: var(--sig-glow);
@@ -89,7 +95,9 @@
   --state-err:   var(--err);
 
   --font-body: 'Geist', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  /* JetBrains Mono, and only for dates and IDs — never on a button
+   * (SPEC §1 design constants). */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -579,19 +587,36 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
+/* One frame, every page (design package, `plain.css`). Pages had drifted to
+ * six column widths and four rail widths; 1140/44 is the single answer.
+ * Inner width is 1052 — a page with a rail spends it as 708 + 48 + 296, and a
+ * page without one caps its content at the same 708. Nothing reframes when
+ * you click. */
 .canon-wrap {
-  max-width: 1280px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 0 56px;
+  padding: 0 44px;
   position: relative;
 }
+/* The masthead is a row, not a three-column grid: lockup, then the state
+ * pill, then the nav pushed to the right edge. Text links, no pill
+ * backgrounds — a nav entry is a word, not a button. */
 .canon-masthead {
-  padding: 22px 0 20px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  padding: 18px 0 16px;
+  display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 22px;
   border-bottom: 1px solid var(--line);
+}
+/* "private · only you see this" — the log says whose it is, always. */
+.canon-masthead .pv {
+  font-size: 11.5px;
+  color: var(--fg-4);
+  padding: 3px 9px;
+  border: 1px solid var(--line-1);
+  border-radius: 100px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .canon-lockup {
   display: inline-flex;
@@ -2417,4 +2442,505 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .neolog-fade-in {
   animation: neolog-fade-in 240ms ease both;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * THE LOG — src/app/(app)/page.tsx
+ *
+ * Translated from the design package's `log.html` + `plain.css` (7 Sep
+ * 2026). Scoped under `.logpage` so the design's own class names survive
+ * intact without fighting the console-era rules above — the package's own
+ * note is that a bare generic class with !important "ambushed four new
+ * pages in one day", and scoping is how that is avoided here.
+ *
+ * Values are read from the design files, not recalled: the 64px timestamp
+ * column, the 600px sentence measure, the 296px rail, 15.5px/300 rows.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.logpage { font-size: 15px; line-height: 1.6; color: var(--fg-1); }
+
+/* Two columns: the reading column takes what's left, the rail is fixed.
+ * 1052 inner = 708 + 48 + 296. */
+.logpage .grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 296px;
+  gap: 48px;
+  align-items: start;
+  padding-top: 8px;
+}
+
+/* ── The composer — the front door ──────────────────────────────────── */
+.logpage .comp {
+  position: relative;
+  border-radius: 16px;
+  padding: 1px;
+  margin: 14px 0 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04) 40%, rgba(78,161,213,.08));
+  box-shadow: 0 24px 60px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6);
+  transition: box-shadow .3s, transform .4s;
+}
+.logpage .comp:focus-within {
+  background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,.05) 40%, rgba(78,161,213,.22));
+  box-shadow: 0 24px 60px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6), 0 0 70px -30px rgba(78,161,213,.32);
+}
+.logpage .comp .in { background: #0a0a0b; border-radius: 15px; overflow: hidden; }
+/* One box at any length. "got a job" and a 900-word memory of 2008 are the
+ * same action, so they are the same control — it grows, it never switches
+ * mode. */
+.logpage .comp textarea {
+  width: 100%; background: none; border: 0; outline: none; resize: none;
+  color: var(--fg); font-family: var(--font-body);
+  padding: 18px 22px 6px;
+  font-size: 19px; font-weight: 300; line-height: 1.5; letter-spacing: -0.35px;
+  min-height: 72px; max-height: 40vh; overflow: auto;
+  caret-color: var(--sig);
+  display: block;
+}
+.logpage .comp textarea::placeholder { color: var(--fg-4); }
+.logpage .comp .cnt {
+  position: absolute; right: 16px; top: 12px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
+  pointer-events: none;
+}
+.logpage .comp .att { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 20px 0; }
+.logpage .comp .att:empty { display: none; }
+.logpage .chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px; border: 1px solid var(--line-2); border-radius: 9px;
+  font-size: 12.5px; color: var(--fg-1); background: rgba(255,255,255,.025);
+}
+.logpage .chip em { font-style: normal; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); }
+.logpage .chip button { color: var(--fg-4); line-height: 1; opacity: .5; padding: 0 2px; }
+.logpage .chip:hover button { opacity: 1; }
+.logpage .comp .bar2 {
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 10px 10px 12px; border-top: 1px solid rgba(255,255,255,.05);
+}
+.logpage .way {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: grid; place-items: center; color: var(--fg-3);
+  transition: all .16s; position: relative; cursor: pointer;
+  background: none; border: 0;
+}
+.logpage .way:hover, .logpage .way.on { color: var(--fg); background: rgba(255,255,255,.05); }
+.logpage .way .ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* Talk is the front door: filled, ringed, primary. */
+.logpage .way.mic {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--fg); color: #000; margin-right: 6px;
+  box-shadow: 0 0 0 5px rgba(255,255,255,.035), 0 0 0 10px rgba(255,255,255,.016);
+}
+.logpage .way.mic .ico { width: 17px; height: 17px; stroke: #000; stroke-width: 1.7; }
+.logpage .way.mic:hover { background: #fff; transform: translateY(-1px); }
+.logpage .way.mic.on { background: var(--t-teal); box-shadow: 0 0 0 5px rgba(52,193,168,.14), 0 0 0 10px rgba(52,193,168,.06); }
+.logpage .way.mic.on .ico { stroke: #04211c; }
+.logpage .sep { width: 1px; height: 20px; background: rgba(255,255,255,.08); margin: 0 8px 0 4px; flex-shrink: 0; }
+.logpage input[type=file] { display: none; }
+.logpage .comp .focus { margin-left: auto; font-size: 11.5px; color: var(--fg-4); padding: 0 10px; white-space: nowrap; }
+.logpage .comp .focus:hover { color: var(--fg-2); }
+.logpage .send {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--fg); color: #000; display: grid; place-items: center;
+  transition: all .18s; border: 0; cursor: pointer;
+}
+.logpage .send:hover { background: #fff; transform: translateY(-1px); }
+.logpage .send:disabled { background: var(--line-3); color: var(--fg-4); cursor: default; transform: none; }
+.logpage .send .ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The receipt: one line, one undo, then gone. Never a question. */
+.logpage .rcpt {
+  height: 0; overflow: hidden; transition: height .3s;
+  font-size: 13px; color: var(--fg-2); padding: 0 4px;
+}
+.logpage .rcpt.show { height: 34px; padding-top: 10px; }
+.logpage .rcpt b { color: var(--fg); font-weight: 450; }
+.logpage .rcpt button { color: var(--fg-4); margin-left: 12px; font-size: 13px; border-bottom: 1px solid var(--line-2); }
+.logpage .rcpt button:hover { color: var(--fg); }
+
+/* The backdate control. Not a required field — it sits inside the bar and
+ * says nothing until it is used. */
+.logpage .when {
+  font-size: 11.5px; color: var(--fg-4); background: none; border: 0;
+  padding: 0 8px; cursor: pointer; white-space: nowrap; font-family: var(--font-body);
+}
+.logpage .when:hover, .logpage .when.set { color: var(--fg-2); }
+.logpage .whenrow {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 20px 0; font-size: 12px; color: var(--fg-4);
+}
+.logpage .whenrow input[type=date] {
+  background: var(--bg-2); border: 1px solid var(--line-1); border-radius: 7px;
+  color: var(--fg-1); font: inherit; font-size: 12.5px; padding: 5px 9px;
+  color-scheme: dark;
+}
+.logpage .whenrow .prec { display: flex; gap: 4px; }
+.logpage .whenrow .prec button {
+  font-size: 11.5px; padding: 4px 9px; border: 1px solid var(--line-1);
+  border-radius: 6px; color: var(--fg-3); background: none;
+}
+.logpage .whenrow .prec button.on { color: #000; background: var(--fg); border-color: var(--fg); font-weight: 500; }
+
+/* ── Search: the way in, above the toolbar ──────────────────────────── */
+.logpage .find {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 14px; margin: 18px 0 0;
+  border: 1px solid var(--line-1); border-radius: 9px; background: var(--bg-1);
+}
+.logpage .find svg { width: 13px; height: 13px; stroke: var(--fg-4); fill: none; stroke-width: 1.7; flex-shrink: 0; }
+.logpage .find input { flex: 1; background: none; border: 0; outline: none; color: var(--fg); font: inherit; font-size: 14px; min-width: 0; }
+.logpage .find input::placeholder { color: var(--fg-4); }
+.logpage .find .clr { font-size: 11.5px; color: var(--fg-4); cursor: pointer; white-space: nowrap; background: none; border: 0; }
+.logpage .find .clr:hover { color: var(--fg-2); }
+
+/* ── The toolbar ────────────────────────────────────────────────────── */
+.logpage .bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 22px;
+  padding: 18px 0 12px;
+  background: linear-gradient(180deg, var(--bg) 78%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.logpage .bar .f { display: flex; gap: 20px; flex-wrap: wrap; }
+.logpage .bar .f button {
+  font-size: 13.5px; color: var(--fg-3); padding: 0 0 6px;
+  border: 0; border-bottom: 1.5px solid transparent; background: none;
+  white-space: nowrap; cursor: pointer;
+}
+.logpage .bar .f button.on { color: var(--fg); border-bottom-color: var(--fg); }
+.logpage .bar .r { margin-left: auto; display: flex; gap: 12px; font-size: 12px; color: var(--fg-4); flex-wrap: wrap; min-width: 0; align-items: baseline; }
+.logpage .bar .r > * { white-space: nowrap; }
+.logpage .bar .r button { color: var(--fg-3); background: none; border: 0; font-size: 12px; cursor: pointer; }
+.logpage .bar .r button.on { color: var(--fg); }
+
+/* ── Day groups and rows ────────────────────────────────────────────── */
+.logpage .day {
+  font-size: 11.5px; color: var(--fg-4);
+  padding: 32px 0 6px; display: flex; gap: 12px; align-items: baseline;
+}
+.logpage .day b { font-weight: 450; color: var(--fg-2); font-size: 12.5px; }
+.logpage .day::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+/* One rhythm: the timestamp holds a 64px column, the sentence a 600px
+ * measure, the metadata its own right edge. Nothing centred, nothing
+ * floating. */
+.logpage .en {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 20px;
+  padding: 11px 12px; margin: 0 -12px; border-radius: 9px;
+  transition: background .14s;
+}
+.logpage .en:hover { background: var(--bg-1); }
+.logpage .en .t {
+  text-align: right; padding-top: 4px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3);
+  white-space: nowrap;
+}
+/* A date the log had to guess reads in ochre, so a fuzzy date is visible
+ * without a word being spent on it. */
+.logpage .en .t.fz { color: var(--t-ochre); }
+.logpage .en .x { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: baseline; }
+.logpage .en .x .s {
+  font-size: 15.5px; font-weight: 300; line-height: 1.5; color: var(--fg);
+  letter-spacing: -0.25px; text-wrap: pretty; max-width: 600px;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.logpage .en .x .tags { display: flex; gap: 12px; align-items: baseline; white-space: nowrap; padding-top: 2px; }
+.logpage .en .x .tags i { font-style: normal; font-size: 11px; color: var(--fg-4); }
+.logpage .en .x .tags i.pub  { color: var(--t-teal); }
+.logpage .en .x .tags i.priv { color: var(--t-ochre); }
+.logpage .en .x .tags i.held { color: var(--t-terra); }
+.logpage .en .more {
+  margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: var(--fg-3);
+  max-width: 640px; text-wrap: pretty;
+}
+.logpage .en .pics { display: flex; gap: 10px; margin-top: 12px; align-items: flex-end; flex-wrap: wrap; }
+.logpage .en .pics .cap { font-size: 11.5px; color: var(--fg-4); line-height: 1.45; max-width: 200px; }
+.logpage .en .pics img, .logpage .en .pics .still, .logpage .en .pics .vid {
+  width: 130px; height: 73px; flex-shrink: 0; display: block; position: relative;
+  border: 1px solid var(--line-1); border-radius: 6px; overflow: hidden;
+  object-fit: cover; background: none; padding: 0; cursor: zoom-in;
+}
+.logpage .en .pics .still { background: repeating-linear-gradient(135deg, #141414 0 8px, #191919 8px 16px); }
+.logpage .en .pics .vid { background: radial-gradient(ellipse at 42% 38%, rgba(78,161,213,.22), transparent 62%), linear-gradient(150deg, #161616, #070707); }
+.logpage .en .pics .vid .play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 26px; height: 26px; border-radius: 50%; background: rgba(250,250,250,.92);
+  display: grid; place-items: center;
+}
+.logpage .en .pics .vid .play::after {
+  content: ''; border-left: 8px solid #000; border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent; margin-left: 2px;
+}
+.logpage .en .pics .dur {
+  position: absolute; right: 5px; bottom: 5px;
+  font-family: var(--font-mono); font-size: 10.5px; line-height: 1.3;
+  background: rgba(0,0,0,.72); color: var(--fg-1); padding: 1px 5px; border-radius: 3px;
+}
+/* A held-back image is blurred in the operator's own log, so it isn't
+ * sitting on screen in front of someone else (SPEC §0.2). */
+.logpage .en.isheld .pics img { filter: blur(14px); }
+.logpage .en.isheld .pics .still .lbl2 {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 10.5px; color: var(--fg-4);
+}
+/* A row links to its content. One with no page of its own is not clickable
+ * — never invent a destination to satisfy an affordance (SPEC §11). */
+.logpage a.en { color: inherit; text-decoration: none; }
+.logpage .en mark { background: none; color: var(--fg); border-bottom: 1.5px solid var(--t-ochre); padding-bottom: 1px; }
+
+.logpage .none { padding: 40px 0; font-size: 14px; color: var(--fg-3); }
+.logpage .none button { font-size: 13px; color: var(--fg); border-bottom: 1px solid var(--line-2); margin-left: 6px; background: none; border-top: 0; border-left: 0; border-right: 0; cursor: pointer; }
+
+/* ── The rail ───────────────────────────────────────────────────────── */
+.logpage .rail { display: flex; flex-direction: column; gap: 22px; padding-top: 18px; align-self: start; }
+.logpage .rc { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.logpage .rc .h {
+  padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--bg-1);
+  font-size: 12.5px; font-weight: 450; color: var(--fg);
+  display: flex; justify-content: space-between; gap: 10px; white-space: nowrap;
+}
+.logpage .rc .h span { font-weight: 400; color: var(--fg-4); font-size: 11.5px; }
+.logpage .rc .i { padding: 11px 14px; font-size: 13px; line-height: 1.5; color: var(--fg-2); }
+.logpage .rc .i + .i { border-top: 1px solid var(--line); }
+.logpage .rc .i b { color: var(--fg); font-weight: 450; }
+.logpage .rc .i em { font-style: normal; display: block; font-size: 11.5px; color: var(--fg-4); margin-top: 4px; }
+.logpage .rc .empty { padding: 14px; font-size: 12.5px; color: var(--fg-4); text-align: center; }
+/* The written-down bar: the door to thin years. */
+.logpage .rc .yrs { display: flex; align-items: flex-end; gap: 2px; height: 36px; padding: 12px 14px 4px; }
+.logpage .rc .yrs i { flex: 1; min-height: 2px; display: block; border-radius: 1px 1px 0 0; cursor: pointer; }
+.logpage .rc .yrs i:hover { filter: brightness(1.6); }
+.logpage .rc .yl { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); padding: 0 14px 6px; }
+
+.logpage .asview {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline;
+  margin-top: 34px; padding: 14px 0 0; border-top: 1px solid var(--line);
+  font-size: 12.5px; color: var(--fg-4);
+}
+.logpage .asview a { margin-left: auto; color: var(--fg-2); border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.logpage .asview a:hover { color: var(--fg); }
+
+/* A lightbox over the feed — you never leave the log (SPEC §11). */
+.logpage .lb {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.92);
+  display: grid; place-items: center; padding: 40px; cursor: zoom-out;
+}
+.logpage .lb img { max-width: 100%; max-height: 100%; border-radius: 8px; display: block; }
+
+/* Under ~900px the rail stops competing with the reading column. */
+@media (max-width: 920px) {
+  .logpage .grid { grid-template-columns: minmax(0, 1fr) !important; gap: 32px !important; }
+  .logpage .en { grid-template-columns: 52px minmax(0, 1fr); gap: 14px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * AN ENTRY — src/app/(app)/entry/[id]/page.tsx
+ *
+ * "A page is the log filtered, not a report about a subject" (SPEC §11):
+ * same masthead, same frame, same type. A compact header on top, the entry
+ * whole beneath, and everything that is not the entry in the rail. Never
+ * section headings or a stats row — that reads as a different site the
+ * moment you click into it.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.logpage .crumb { padding-top: 20px; font-size: 12.5px; color: var(--fg-4); display: flex; gap: 10px; align-items: baseline; }
+.logpage .crumb a { color: var(--fg-3); }
+.logpage .crumb a:hover { color: var(--fg); }
+
+.logpage .entry-h { padding: 14px 0 0; }
+.logpage .entry-h .s {
+  font-size: 24px; font-weight: 300; line-height: 1.3; letter-spacing: -0.7px;
+  color: var(--fg); max-width: 640px; text-wrap: pretty; white-space: pre-wrap;
+}
+/* Both dates, always — and the distance between them when there is one,
+ * because that gap is the signal (35 days from first saying "the job" to
+ * getting it). */
+.logpage .twodates {
+  display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px;
+  font-size: 12px; color: var(--fg-4);
+}
+.logpage .twodates b { font-family: var(--font-mono); font-weight: 400; color: var(--fg-2); font-size: 11.5px; }
+.logpage .entry-body { margin-top: 22px; font-size: 15px; line-height: 1.65; color: var(--fg-1); max-width: 640px; }
+.logpage .entry-media { margin-top: 22px; }
+.logpage .entry-media img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line-1); display: block; }
+.logpage .entry-media img.blur { filter: blur(26px); }
+.logpage .entry-media audio, .logpage .entry-media video { width: 100%; max-width: 560px; border-radius: 10px; display: block; }
+.logpage .transcript {
+  margin-top: 22px; padding: 16px 18px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg-1);
+  font-size: 14.5px; line-height: 1.7; color: var(--fg-1);
+  max-width: 640px; white-space: pre-wrap;
+}
+.logpage .transcript .who { font-size: 11.5px; color: var(--fg-4); margin-bottom: 10px; }
+
+/* The corrections. Five kinds, one tap each, and they live where the
+ * mistake is — no settings screen, no review queue, no dialog. */
+.logpage .rc .fixrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.logpage .rc .fixrow button {
+  font-size: 11.5px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid var(--line-2); color: var(--fg-1); background: none; cursor: pointer;
+}
+.logpage .rc .fixrow button.p { background: var(--fg); color: #000; border-color: var(--fg); font-weight: 500; }
+.logpage .rc .fixrow button:hover { border-color: var(--line-3); }
+.logpage .rc input[type=date], .logpage .rc textarea {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line-1);
+  border-radius: 7px; color: var(--fg-1); font: inherit; font-size: 12.5px;
+  padding: 6px 9px; margin-top: 8px; color-scheme: dark; font-family: var(--font-body);
+}
+.logpage .rc textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * NOW — src/app/(app)/now/page.tsx
+ *
+ * The intake with nothing else on the screen. Translated from `now.html` +
+ * `intake.css`: the signal field behind, the slab, one line of hint after a
+ * few seconds in an empty field, and the acknowledgement.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.nowpage {
+  position: fixed; inset: 0; z-index: 60; overflow: hidden;
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+}
+.nowpage .atm {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 1100px 620px at 50% 44%, rgba(78,161,213,.075), transparent 65%),
+    radial-gradient(ellipse 800px 380px at 50% 104%, rgba(52,193,168,.05), transparent 70%),
+    var(--bg);
+}
+.nowpage .waves { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: .82; transition: opacity .6s; animation: nowdrift 60s ease-in-out infinite alternate; }
+.nowpage.hot .waves { opacity: .95; }
+@keyframes nowdrift {
+  from { transform: translate3d(-0.6%, 0.3%, 0) scale(1.01); }
+  to   { transform: translate3d(0.6%, -0.3%, 0) scale(1.03); }
+}
+.nowpage .grain {
+  position: fixed; inset: 0; z-index: 3; pointer-events: none;
+  opacity: .035; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.nowpage .vig { position: fixed; inset: 0; z-index: 3; pointer-events: none; box-shadow: inset 0 0 260px 70px rgba(0,0,0,.78); }
+.nowpage .top {
+  position: fixed; top: 0; left: 0; right: 0; padding: 24px 32px; z-index: 6;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nowpage .top .lock { display: flex; align-items: center; gap: 10px; }
+.nowpage .top .mk { width: 22px; height: 22px; color: var(--fg); }
+.nowpage .top .mk svg { width: 100%; height: 100%; display: block; }
+.nowpage .top .wm { font-size: 16px; font-weight: 500; letter-spacing: -0.5px; color: var(--fg); }
+.nowpage .top .tolog { font-size: 13px; color: var(--fg-3); transition: color .15s; }
+.nowpage .top .tolog:hover { color: var(--fg); }
+.nowpage .stage { position: relative; z-index: 4; min-height: 100vh; display: grid; place-items: center; padding: 80px 40px; }
+
+.nowpage .slab {
+  width: min(760px, 100%); position: relative; border-radius: 22px; padding: 1px;
+  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04) 40%, rgba(78,161,213,.10));
+  box-shadow: 0 40px 100px -40px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6);
+  transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .5s, box-shadow .4s, background .4s;
+  animation: nowrise .8s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes nowrise { from { opacity: 0; transform: translateY(16px) scale(.985); } }
+.nowpage .slab:focus-within {
+  background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,.05) 40%, rgba(78,161,213,.22));
+  box-shadow: 0 40px 100px -40px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6), 0 0 80px -30px rgba(78,161,213,.35);
+}
+.nowpage.hot .slab { transform: translateY(-2px); }
+.nowpage .slab .in {
+  border-radius: 21px; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, rgba(18,18,20,.92), rgba(11,11,12,.96));
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.nowpage .slab .in::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px 260px at var(--mx,50%) var(--my,0%), rgba(78,161,213,.10), transparent 70%);
+  transition: background .2s;
+}
+.nowpage.rec .slab .in::before {
+  background: radial-gradient(420px 260px at var(--mx,50%) var(--my,0%), rgba(52,193,168,.14), transparent 70%);
+}
+.nowpage textarea {
+  width: 100%; background: none; border: 0; outline: none; resize: none; display: block;
+  color: var(--fg); font-family: var(--font-body);
+  padding: 24px 26px 8px;
+  font-size: 22px; font-weight: 300; line-height: 1.5; letter-spacing: -0.45px;
+  min-height: 120px; max-height: 56vh; overflow: auto; caret-color: var(--sig);
+}
+.nowpage.rec textarea { caret-color: var(--t-teal); }
+.nowpage .cnt {
+  position: absolute; right: 22px; top: 14px; z-index: 2; pointer-events: none;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 1.4px;
+  color: var(--fg-4); opacity: 0; transition: opacity .3s;
+}
+.nowpage.hot .cnt { opacity: 1; }
+.nowpage .att { display: flex; gap: 8px; flex-wrap: wrap; padding: 18px 22px 0; }
+.nowpage .att:empty { display: none; }
+.nowpage .bar {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  padding: 10px 12px 12px 14px; border-top: 1px solid rgba(255,255,255,.05);
+}
+.nowpage .bar::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+}
+.nowpage .way {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  color: var(--fg-3); transition: all .16s; position: relative; background: none;
+  border: 0; cursor: pointer;
+}
+.nowpage .way:hover { color: var(--fg); background: rgba(255,255,255,.05); }
+.nowpage .way:active { transform: scale(.94); }
+.nowpage .way .ico { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.nowpage .way.mic {
+  width: 44px; height: 44px; border-radius: 50%; background: var(--fg); color: #000;
+  margin-right: 6px; box-shadow: 0 0 0 6px rgba(255,255,255,.035), 0 0 0 12px rgba(255,255,255,.016);
+}
+.nowpage .way.mic .ico { width: 19px; height: 19px; stroke: #000; stroke-width: 1.7; }
+.nowpage .way.mic:hover { background: #fff; transform: translateY(-1px); }
+.nowpage .way.mic.on { background: var(--t-teal); box-shadow: 0 0 0 6px rgba(52,193,168,.14), 0 0 0 12px rgba(52,193,168,.06); }
+.nowpage .way.mic.on .ico { stroke: #04211c; }
+.nowpage .way::after {
+  content: attr(data-n); position: absolute; top: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); font-size: 11.5px; color: var(--fg-4);
+  white-space: nowrap; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.nowpage .way:hover::after { opacity: 1; }
+.nowpage .sep { width: 1px; height: 22px; background: rgba(255,255,255,.08); margin: 0 8px 0 4px; flex-shrink: 0; }
+.nowpage input[type=file] { display: none; }
+.nowpage .send {
+  margin-left: auto; width: 40px; height: 40px; border-radius: 12px;
+  background: var(--fg); color: #000; display: grid; place-items: center;
+  transition: all .18s cubic-bezier(.2,.7,.3,1); border: 0; cursor: pointer;
+  box-shadow: 0 8px 24px -12px rgba(255,255,255,.35);
+}
+.nowpage .send:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 12px 28px -12px rgba(255,255,255,.5); }
+.nowpage .send:active { transform: translateY(0) scale(.96); }
+.nowpage .send:disabled { background: var(--line-3); color: var(--fg-4); box-shadow: none; cursor: default; transform: none; }
+.nowpage .send .ico { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nowpage .chip {
+  display: flex; align-items: center; gap: 8px; padding: 7px 11px;
+  border: 1px solid var(--line-2); border-radius: 9px; font-size: 12.5px;
+  color: var(--fg-1); background: rgba(255,255,255,.025);
+  animation: nowpop .35s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes nowpop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+.nowpage .chip em { font-style: normal; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); }
+.nowpage .chip button { color: var(--fg-4); line-height: 1; opacity: .5; background: none; border: 0; cursor: pointer; }
+.nowpage .chip:hover button { opacity: 1; }
+/* The slab settles, and one line says what went in. */
+.nowpage .slab.sent { transform: translateY(-10px) scale(.99); opacity: .35; }
+.nowpage .slab.sent textarea { opacity: 0; transform: translateY(-6px); transition: opacity .25s, transform .25s; }
+.nowpage .ack {
+  position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 2.4px;
+  color: var(--t-teal); opacity: 0; transition: opacity .35s; white-space: nowrap;
+}
+.nowpage .ack.show { opacity: 1; }
+/* One hint, once, only after sitting in an empty field for a few seconds. */
+.nowpage .hint {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  font-size: 12.5px; color: var(--fg-4); opacity: 0; transition: opacity .6s;
+  pointer-events: none; z-index: 6;
+}
+.nowpage .hint.show { opacity: 1; }
+.nowpage .hint kbd { border: 1px solid var(--line-2); border-radius: 3px; padding: 1px 5px; margin: 0 2px; color: var(--fg-3); font-family: var(--font-mono); }
+@media (prefers-reduced-motion: reduce) {
+  .nowpage .slab, .nowpage .waves { animation: none; }
 }

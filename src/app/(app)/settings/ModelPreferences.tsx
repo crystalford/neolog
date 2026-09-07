@@ -11,7 +11,7 @@ const CHAT_OPTIONS = [
   { key: 'llama70b', label: 'Llama 3.3 70B',     sub: 'Workers AI · dense flagship · best writing quality (Recommended)' },
   { key: 'kimi',     label: 'Kimi K2.6',         sub: 'Workers AI · agentic/MoE · pricier than 70B, similar voice' },
   { key: 'scout',    label: 'Llama 4 Scout',     sub: 'Workers AI · cheapest, multimodal, lower writing quality' },
-  { key: 'claude',   label: 'Claude Sonnet 4.6', sub: 'Anthropic · premium · ~$0.05/turn (requires funded API key)' },
+  { key: 'claude',   label: 'Claude Sonnet 5', sub: 'Anthropic · premium · ~$0.05/turn (requires funded API key)' },
 ] as const
 
 const TIER_OPTIONS = [

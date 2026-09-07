@@ -7,9 +7,9 @@
  *             closest-to-Claude voice. Worth the ~4× cost over Scout for
  *             threads + creative_elements where voice/register nuance
  *             matters most.)
- *   premium → Claude Sonnet 4.6 for threads + creative, Kimi for clips +
+ *   premium → Claude Sonnet 5 for threads + creative, Kimi for clips +
  *             entities. Best balance of quality and cost. ~$0.10/vlog.
- *   max     → Claude Sonnet 4.6 for all 4 passes. ~$0.17/vlog.
+ *   max     → Claude Sonnet 5 for all 4 passes. ~$0.17/vlog.
  *
  * Cost numbers are estimates for a ~20-min vlog at current pricing. Adjust
  * COST_TABLE when models or pricing change.
@@ -32,7 +32,7 @@ const LLAMA_4_SCOUT = '@cf/meta/llama-4-scout-17b-16e-instruct'
 const KIMI_K2_6 = '@cf/moonshotai/kimi-k2.6'
 const LLAMA_70B = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'  // kept as a fallback
 const WORKERS_AI_MODEL = KIMI_K2_6  // default Workers AI model for extraction
-const CLAUDE_SONNET = 'claude-sonnet-4-6'
+const CLAUDE_SONNET = 'claude-sonnet-5'
 
 export const CHAT_MODELS = {
   SCOUT: LLAMA_4_SCOUT,
@@ -43,7 +43,7 @@ export const CHAT_MODELS = {
 // 'scout'    = Llama 4 Scout on Workers AI (cheapest, multimodal)
 // 'kimi'     = Kimi K2.6 on Workers AI (closest-to-Claude voice)
 // 'llama70b' = Llama 3.3 70B dense on Workers AI (operator default for chat)
-// 'claude'   = Anthropic Sonnet 4.6 (premium, third-party billing)
+// 'claude'   = Anthropic Sonnet 5 (premium, third-party billing)
 export type ChatModelKey = 'scout' | 'kimi' | 'llama70b' | 'claude'
 
 /**
@@ -369,7 +369,7 @@ function parseToolArgs(raw: any): Record<string, unknown> {
   catch { return {} }
 }
 
-// ─── Claude chat (Sonnet 4.6) with tool use ─────────────────────────────────
+// ─── Claude chat (Sonnet 5) with tool use ─────────────────────────────────
 
 async function callClaudeChat(
   env: { ANTHROPIC_API_KEY: string },

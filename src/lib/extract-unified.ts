@@ -5,10 +5,10 @@
  *
  * Provider routing (operator-configurable; default 'auto'):
  *   'auto'     Workers AI Llama 3.3 70B fp8-fast (cheap). If validator
- *              reports failRate > 0.15, retry on Anthropic Sonnet 4.6
+ *              reports failRate > 0.15, retry on Anthropic Sonnet 5
  *              via the same prompt. Sonnet result wins.
  *   'cheap'    Llama 3.3 70B fp8-fast only. No escalation.
- *   'premium'  Sonnet 4.6 only.
+ *   'premium'  Sonnet 5 only.
  *
  * Caller responsibilities:
  *  - Provide the full transcript_text.
@@ -120,7 +120,7 @@ export interface ExtractionPayload {
 }
 
 export interface ExtractionRun {
-  model: 'llama-3.3-70b-fp8-fast' | 'sonnet-4.6'
+  model: 'llama-3.3-70b-fp8-fast' | 'sonnet-5'
   escalated_from?: 'llama-3.3-70b-fp8-fast'
   payload: ExtractionPayload
   total_items: number
@@ -283,7 +283,7 @@ export async function runExtraction(
       length: transcript.length, words: wordCount, min_words: 5,
     })
     return {
-      model: mode === 'premium' ? 'sonnet-4.6' : 'llama-3.3-70b-fp8-fast',
+      model: mode === 'premium' ? 'sonnet-5' : 'llama-3.3-70b-fp8-fast',
       payload: { summary: '', threads: [], clips: [], creative_elements: [], entities: [] },
       total_items: 0,
       invalid_items: 0,
@@ -293,10 +293,10 @@ export async function runExtraction(
   const fourGrams = buildTranscriptFourGrams(transcript)
 
   const runOne = async (
-    model: 'llama-3.3-70b-fp8-fast' | 'sonnet-4.6',
+    model: 'llama-3.3-70b-fp8-fast' | 'sonnet-5',
   ): Promise<{ payload: ExtractionPayload; failRate: number; invalid: number; total: number }> => {
     await progress('llm_call', { state: 'running', model, attempt: 1 })
-    const raw = model === 'sonnet-4.6'
+    const raw = model === 'sonnet-5'
       ? await callSonnet(env, transcript)
       : await callLlama70B(env, transcript)
 
@@ -306,7 +306,7 @@ export async function runExtraction(
     } catch (err: any) {
       // One retry with a "return only JSON" reminder.
       await progress('llm_call', { state: 'retrying', model, attempt: 2, reason: err?.message || String(err) })
-      const retried = model === 'sonnet-4.6'
+      const retried = model === 'sonnet-5'
         ? await callSonnet(env, transcript, true)
         : await callLlama70B(env, transcript, true)
       parsed = parseExtractionJson(retried)
@@ -341,7 +341,7 @@ export async function runExtraction(
     return { payload: parsed, failRate, invalid, total }
   }
 
-  const initialModel = mode === 'premium' ? 'sonnet-4.6' : 'llama-3.3-70b-fp8-fast'
+  const initialModel = mode === 'premium' ? 'sonnet-5' : 'llama-3.3-70b-fp8-fast'
   const first = await runOne(initialModel)
 
   // Empty-extraction guard removed. The earlier "throw if zero items
@@ -508,12 +508,12 @@ async function callLlama70B(env: ExtractEnv, transcript: string, jsonReminder = 
 
 async function callSonnet(env: ExtractEnv, transcript: string, jsonReminder = false): Promise<string> {
   if (!env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY missing — required for sonnet-4.6 extraction')
+    throw new Error('ANTHROPIC_API_KEY missing — required for sonnet-5 extraction')
   }
   const res = await callClaude(
     { ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY },
     {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       maxTokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [

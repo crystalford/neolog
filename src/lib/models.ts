@@ -27,6 +27,13 @@ export const MODELS = {
   BULK: '@cf/openai/gpt-oss-20b',
   // Fallback when the strong model errors or the catalog moved.
   FALLBACK: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  // Vision. Llama 4 Scout is natively multimodal (text + image) and is the
+  // only vision model in the two-vendor constraint. Used for exactly one
+  // job: looking at an uploaded image and saying whether it is the kind of
+  // document that must never be published (SPEC §0.2 — the log holds back
+  // identity documents, statements, medical letters, addresses). It is
+  // asked what it SEES, never what something means.
+  VISION: '@cf/meta/llama-4-scout-17b-16e-instruct',
   // Image generation for AI b-roll. Flux Schnell is the verified shape on
   // Workers AI: { prompt, seed, steps:1..8 } → response.image is base64 JPEG.
   IMAGE: '@cf/black-forest-labs/flux-1-schnell',

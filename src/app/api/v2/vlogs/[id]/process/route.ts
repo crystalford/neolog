@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // mode picks the LLM stack: `cheap` = Workers AI (Llama/Kimi),
-    // `premium` = Anthropic Sonnet 4.6. Two modes only — operator collapsed
+    // `premium` = Anthropic Sonnet 5. Two modes only — operator collapsed
     // the prior free/auto/max picker into this. `tier` is accepted as a
     // legacy alias so cached client bundles don't break.
     const body = await req.json().catch(() => null) as {
