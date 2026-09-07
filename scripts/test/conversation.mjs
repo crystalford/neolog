@@ -7,7 +7,7 @@
  * sentence to him. So detection is tested for what it must REFUSE as much as
  * for what it must catch.
  */
-import { looksLikeConversation, splitTurns, operatorTurns } from '../../src/lib/conversation.ts'
+import { looksLikeConversation, splitTurns, operatorTurns, looksLikeDocument, documentSentence } from '../../src/lib/conversation.ts'
 
 let pass = 0, fail = 0
 const ok = (n, c) => { c ? pass++ : (fail++, console.error('  FAIL ' + n)) }
@@ -52,6 +52,21 @@ ok('both paragraphs are kept', mt[0].text.includes('second paragraph'))
 // Short acknowledgements do not become entries.
 const acks = splitTurns('You: yes do that\nClaude: done\nYou: ok\nClaude: ok')
 eq('short acknowledgements are not entries', operatorTurns(acks).length, 0)
+
+// ── Documents ────────────────────────────────────────────────────────────
+// The failure that matters: attributing a model-written report to him.
+// ~1,000 words with headings and bullets — the shape of a pasted report.
+const report = '# Findings\n\n' + 'A paragraph of the report. '.repeat(200) +
+  '\n\n## Method\n\n' + '- a bullet here\n'.repeat(8)
+ok('a long structured report is a document', looksLikeDocument(report))
+// The one that matters: his own long writing must never be filed as a
+// document he merely kept.
+ok('a long unstructured memory is NOT a document',
+   !looksLikeDocument('I remember 2008 very clearly. '.repeat(200)))
+ok('a short note is not a document', !looksLikeDocument('- milk\n- bread\n- eggs'))
+ok('the document sentence carries its title', documentSentence(report).includes('Findings'))
+ok('the document sentence never summarises',
+   !/about|discusses|covers/i.test(documentSentence(report)))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

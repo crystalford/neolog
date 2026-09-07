@@ -51,7 +51,10 @@ import { transcribeAudio } from '@/lib/transcribe'
 import { checkHoldBack, placeFile, kindForUpload } from '@/lib/log-intake'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import { verifyStored, findExistingCopy } from '@/lib/keep'
-import { looksLikeConversation, splitTurns, operatorTurns, conversationSentence } from '@/lib/conversation'
+import {
+  looksLikeConversation, splitTurns, operatorTurns, conversationSentence,
+  looksLikeDocument, documentSentence,
+} from '@/lib/conversation'
 import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -171,6 +174,14 @@ export async function POST(req: NextRequest) {
   const turns = isConversation ? splitTurns(text) : []
   const mine = isConversation ? operatorTurns(turns) : []
 
+  // A long structured paste is very often something he KEPT rather than
+  // something he WROTE. The log cannot know which, and must not ask at
+  // input — so it does not claim: the line is the log's, the body is kept
+  // whole, and he can say it is his in one tap. Under-claiming is the only
+  // safe direction, because the alternative puts a model's prose behind his
+  // name.
+  const isDocument = !isConversation && !!text && !linkUrl && looksLikeDocument(text)
+
   if (text || linkUrl) {
     const id = ulid()
     entryIds.push(id)
@@ -182,21 +193,23 @@ export async function POST(req: NextRequest) {
       : (isConversation ? 'approx' : 'exact')
     const sentence = isConversation
       ? conversationSentence(text, turns)
-      : (text || `Kept a link: ${linkUrl}`)
+      : isDocument
+        ? documentSentence(text)
+        : (text || `Kept a link: ${linkUrl}`)
     statements.push({
       sql: INSERT,
       binds: [
         id, operator.id, sentence,
         // The whole conversation is kept, so nothing is lost and the other
         // half is still there to read.
-        isConversation ? text : null,
+        isConversation || isDocument ? text : null,
         happenedAt, happenedAt, now,
         precision,
-        isConversation ? 'read' : (linkUrl && !text ? 'read' : 'said'),
+        isConversation ? 'read' : isDocument ? 'made' : (linkUrl && !text ? 'read' : 'said'),
         'public', null,
         // The log wrote the conversation's own line; his turns below are his.
-        isConversation ? 'log' : 'operator',
-        isConversation ? 'chat' : (linkUrl && !text ? 'link' : 'text'),
+        isConversation || isDocument ? 'log' : 'operator',
+        isConversation ? 'chat' : isDocument ? 'document' : (linkUrl && !text ? 'link' : 'text'),
         batchId, null, null, null, null, linkUrl, null, ledFrom, relation,
         null, null,
       ],
@@ -370,6 +383,8 @@ export async function POST(req: NextRequest) {
   if (isConversation) {
     parts.push(`a conversation · ${words.toLocaleString('en-GB')} words`)
     if (mine.length) parts.push(`${mine.length} of your turns`)
+  } else if (isDocument) {
+    parts.push(`a document · ${words.toLocaleString('en-GB')} words`)
   } else if (words) {
     parts.push(`${words} ${words === 1 ? 'word' : 'words'}`)
   }

@@ -117,3 +117,48 @@ export function conversationSentence(text: string, turns: Turn[]): string {
   const n = turns.length
   return `Pasted a conversation — ${words.toLocaleString('en-GB')} words, ${n} ${n === 1 ? 'turn' : 'turns'}.`
 }
+
+/**
+ * Is this a document rather than something he typed?
+ *
+ * SPEC §1 on documents: "**A document is a made thing with a body**: a
+ * report, a spec, a deck, a repository, a dataset, an export... **Artifacts
+ * from AI sessions arrive as documents.** A report Claude drafted from the
+ * operator's questions is kept as exactly that — model's words, operator's
+ * questions and keeping."
+ *
+ * This matters because of who the words belong to. A short paste is plainly
+ * him typing. A two-thousand-word report pasted in is very often something
+ * he KEPT rather than something he WROTE — and storing it under
+ * `author='operator'` would put a model's prose behind his name, which is
+ * the same failure relog had with unverified quotes.
+ *
+ * The log cannot know who wrote a pasted document, and it must not ask at
+ * the moment of input. So it does not claim: the entry's line becomes the
+ * log's ("Kept a document"), the body is kept whole, and he can say it is
+ * his in one tap afterwards. Being wrong towards "the log wrote this line"
+ * is the only direction that is safe, because it under-claims rather than
+ * over-claims.
+ */
+export function looksLikeDocument(text: string): boolean {
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+  // Long enough that it is unlikely to be typed into a compose box in one
+  // go. Length alone is never enough — his own memory of 2008 is long too —
+  // so structure is required as well, and that is what actually separates a
+  // document from his writing.
+  if (words < 400) return false
+  // Structure a person does not usually type into a compose box in one go.
+  const hasHeadings = /^#{1,6}\s+\S/m.test(text)
+  const hasNumberedSections = (text.match(/^\s*\d+[.)]\s+\S/gm) || []).length >= 4
+  const hasBullets = (text.match(/^\s*[-*•]\s+\S/gm) || []).length >= 6
+  return hasHeadings || hasNumberedSections || hasBullets
+}
+
+/** "Kept a document — 2,400 words." Facts, never a summary of it. */
+export function documentSentence(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+  // A markdown title, when the document carries one. His own words if so.
+  const heading = text.match(/^#{1,3}\s+(.{3,90})$/m)?.[1]?.trim()
+  const size = `${words.toLocaleString('en-GB')} words`
+  return heading ? `Kept a document: ${heading} — ${size}.` : `Kept a document — ${size}.`
+}
