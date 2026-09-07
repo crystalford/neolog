@@ -138,6 +138,24 @@ Deliberately NOT at `/thread/[id]` — that route serves the extraction
 `threads` table, a different thing with the same word, linked from five
 places. This repo already paid once for a naming collision.
 
+**The route view is `/walk/[id]`** (`walk.html`), reached from the turns block
+on any entry. The id in the path is an ENTRY's — there is no thread row, so
+every turn on a route opens the same walk. One query does both directions: a
+recursive CTE up to the start, then `UNION` (not `UNION ALL`) down over
+everything that led from it, so a `led_from` cycle terminates instead of
+running to the depth cap. It keeps the three things a list cannot: **loops**
+(a turn whose `led_from` is not the turn before it in time — followed as a
+real edge, never inferred from order), **returns** (a turn that came from
+reading the log hours later is still on the route; no session window), and
+**wrong turns** (nothing is pruned). The design's "offer" at the bottom of
+that page — *here's the turn you haven't taken* — is below the fence and
+stays there.
+
+The CSS row class is `.leg`, not `.turn`: `.logpage .turn` is already the
+entry page's came-out-of/led-to card and sets a border, padding and
+first/last radii that would box every step. A different thing gets a
+different class rather than a specificity fight.
+
 **Corrections** — `entry_revisions` keeps what every change replaced. Nothing
 overwrites without the old value being kept first.
 
@@ -199,9 +217,9 @@ fetched paths.
 `e-*` entry examples): **43 built · 6 partial · 16 not built · 4 below the
 fence · 5 meta**.
 
-Partial: `fix` (per-word transcript editing), `walk`/`branch` (no route view;
-splitting one note into several), `screenshots` (reads the text; no three-pile
-sort), `audio` (no two-voice split), `flow` (a walkthrough page).
+Partial: `fix` (per-word transcript editing), `branch` (splitting one note
+into several), `screenshots` (reads the text; no three-pile sort), `audio` (no
+two-voice split), `flow` (a walkthrough page). `walk` is built — `/walk/[id]`.
 
 Not built: `elsewhere` · `photo` · `recording` (public); `messages` · `repo` ·
 `writing` · `footage` · `image` · `image-filter` (per-kind bodies). **The
@@ -231,10 +249,8 @@ carries **first said** and how it has changed.
 **The build order is void.** The operator lifted it on 7 Sep: *"not
 necessarily follow the steps because they may not be relevant since we
 already built a version of the system... go through the whole thing and build
-the full system."* Steps 2–5 are in scope. What remains unbuilt: **threads**
-(`led_from` on entries, `walk.html`), **search as a page** (answer-first with
-numbered claims, `search.html`), **the fold rules past twenty**
-(`log-2028.html`), and everything below the drafting fence — letters, cuts,
+the full system."* Steps 2–5 are in scope. What remains unbuilt: **the fold rules past twenty**
+(`log-2028.html`), the per-kind bodies, and everything below the drafting fence — letters, cuts,
 the offer, anything that drafts in his voice. That last group stays below the
 fence regardless.
 

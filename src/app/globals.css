@@ -3705,3 +3705,75 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   padding: 26px 0; font-size: 14.5px; color: var(--fg-3); line-height: 1.6;
   max-width: 600px; text-wrap: pretty;
 }
+
+/* ── The walk (`walk.html`) ─────────────────────────────────────────────
+   A thought as a route. The left column is when, the right is what — the
+   same two-column shape the log's day dividers use, so the page reads as
+   the log seen sideways rather than as a different product.
+
+   The vertical line is the route itself and it is drawn once, on the
+   container, not as a stripe on each card — no accent stripe on any card
+   edge. A loop dots it, because a loop is the one place the route does not
+   run straight down.
+
+   The row is `.leg`, not `.turn`: `.logpage .turn` is already the entry
+   page's came-out-of/led-to card, and it sets a border, a padding and
+   first/last radii that would draw a box around every step here. A
+   different thing gets a different class rather than a specificity fight. */
+
+.logpage .walk { margin-top: 30px; position: relative; }
+.logpage .walk::before {
+  content: ''; position: absolute; left: 111px; top: 8px; bottom: 34px;
+  width: 1px; background: var(--line-1);
+}
+.logpage .walk .leg {
+  display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 32px;
+  padding: 0 0 30px; position: relative;
+}
+.logpage .walk .leg .when { text-align: right; padding-top: 2px; }
+.logpage .walk .leg .when time {
+  display: block; font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--fg-2); white-space: nowrap;
+}
+.logpage .walk .leg .when em {
+  display: block; font-style: normal; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
+}
+/* the node on the line */
+.logpage .walk .leg::before {
+  content: ''; position: absolute; left: 108px; top: 7px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--fg-3); box-shadow: 0 0 0 4px var(--bg);
+}
+.logpage .walk .leg.loop::before { background: var(--t-steel); }
+.logpage .walk .leg.refl::before { background: transparent; border: 1px solid var(--line-3); }
+.logpage .walk .leg.open::before { background: transparent; border: 1px dashed var(--line-2); }
+
+.logpage .walk .leg .what .x {
+  font-size: 17px; font-weight: 300; line-height: 1.5; letter-spacing: -0.35px;
+  color: var(--fg); max-width: 620px; text-wrap: pretty;
+}
+.logpage .walk .leg .what .x a { color: inherit; }
+.logpage .walk .leg .what .x a:hover { border-bottom: 1px solid var(--line-3); }
+.logpage .walk .leg .what .p {
+  margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--fg-2);
+  max-width: 600px; text-wrap: pretty;
+}
+.logpage .walk .leg .what .m {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline;
+  margin-top: 9px; font-size: 12.5px; color: var(--fg-4);
+}
+.logpage .walk .leg .what .m a { color: var(--fg-3); }
+.logpage .walk .leg .what .m a:hover { color: var(--fg-1); }
+.logpage .walk .leg .made { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.logpage .walk .leg .made a {
+  font-size: 12.5px; color: var(--fg-2); padding: 4px 10px;
+  border: 1px solid var(--line-1); border-radius: 6px;
+}
+.logpage .walk .leg .made a:hover { color: var(--fg); border-color: var(--line-3); }
+.logpage .walk .leg.open .what .p { color: var(--fg-3); }
+
+/* the route link, at the end of an entry's turns */
+.logpage .turn.all .tl { color: var(--fg-3); }
+.logpage .turn.all .tx { color: var(--fg-3); }
+.logpage .turn.all:hover .tx { color: var(--fg-1); }

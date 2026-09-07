@@ -255,6 +255,15 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                     </span>
                   </Link>
                 ))}
+                {/* Both neighbours are here; the whole route is one click on.
+                    `walk.html`: "A page is a pile... A thread is a path." */}
+                <Link className="turn all" href={`/walk/${e.id}`}>
+                  <span className="tl">the route</span>
+                  <span className="tx">
+                    Follow it back to where it started, and forward to
+                    everything that came out of it.
+                  </span>
+                </Link>
               </div>
             )}
 
