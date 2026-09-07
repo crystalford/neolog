@@ -39,6 +39,25 @@ interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string
 
 const SIGNED_TTL = 24 * 3600
 
+/**
+ * What the log can honestly say about a recording it has not finished
+ * reading. Never a spinner: `processing.html` is explicit that when a step
+ * breaks the log says which one and why, in words.
+ */
+function pipelineLine(status: string | null, error: string | null): string | null {
+  if (error) return `The log could not finish reading this: ${error}`
+  switch ((status || '').toLowerCase()) {
+    case 'uploaded':
+    case 'queued':       return 'Just arrived. Nothing read yet.'
+    case 'transcoding':  return 'Being converted so it will play here.'
+    case 'transcribing': return 'Being transcribed. The words are not searchable yet.'
+    case 'extracting':   return 'Transcribed. Being read for what was said in it.'
+    case 'failed':       return 'The log could not finish reading this.'
+    case 'archived':     return 'Kept, not read — you asked for it that way.'
+    default:             return null
+  }
+}
+
 /** Presign a batch of keys at once. Serialised awaits made /media slow. */
 async function presignAll(env: Env, keys: (string | null)[]): Promise<(string | null)[]> {
   return Promise.all(keys.map(async k => {
@@ -116,11 +135,13 @@ export async function GET(req: NextRequest) {
       recorded_at_source: string | null; created_at: string
       summary: string | null; vision_description: string | null
       transcript_text: string | null; visibility: string | null
+      pipeline_status: string | null; pipeline_error: string | null
     }>(
       db,
       `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
               duration_seconds, recorded_at, recorded_at_source, created_at,
-              summary, vision_description, transcript_text, visibility
+              summary, vision_description, transcript_text, visibility,
+              pipeline_status, pipeline_error
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL${
           rangeSql.replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(recorded_at, created_at)')
@@ -236,7 +257,12 @@ export async function GET(req: NextRequest) {
       source: 'vlog',
       kind: 'made',
       sentence: vlogSentence(v.duration_seconds),
-      detail: titled || v.summary || v.vision_description || null,
+      // The entry appears immediately, before anything has been read — and
+      // then says where it has got to, in words rather than a spinner. A
+      // recording mid-transcription and one whose pipeline died looked
+      // identical to a finished one, which is the worst of the three.
+      detail: pipelineLine(v.pipeline_status, v.pipeline_error)
+        || titled || v.summary || v.vision_description || null,
       happened_at: v.recorded_at || v.created_at,
       logged_at: v.created_at,
       date_precision: precision,

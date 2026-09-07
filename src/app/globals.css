@@ -3377,3 +3377,8 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .logpage .ends .nx.last { text-align: left; justify-self: start; }
   .logpage .ends .mid { padding-top: 0; }
 }
+
+/* An empty rail says so in one line rather than showing empty boxes
+   (day-one.html). The log with nothing in it is the same page as the log
+   with four thousand entries. */
+.logpage .quiet { font-size: 12px; color: var(--fg-4); line-height: 1.55; padding: 0 2px; }

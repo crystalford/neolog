@@ -416,14 +416,22 @@ export default function LogHome() {
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <ArrivedOnItsOwn items={items} />
             <Relog onDone={() => { void loadFeed() }} />
-            <div className="rc">
-              <div className="h"><Link href="/ready">Ready to send</Link></div>
-              <div className="i">
-                What the machine has drawn out of the record — drafts, clips,
-                candidates.
-                <em>suggestions, not the record</em>
+            {/* day-one.html: "The rail has nothing to show, so it says so in
+                one line rather than showing empty boxes." Every card above
+                hides itself when it is empty; this one would not, so on an
+                empty log the whole rail becomes the one line. */}
+            {items.length > 0 ? (
+              <div className="rc">
+                <div className="h"><Link href="/ready">Ready to send</Link></div>
+                <div className="i">
+                  What the machine has drawn out of the record — drafts,
+                  clips, candidates.
+                  <em>suggestions, not the record</em>
+                </div>
               </div>
-            </div>
+            ) : !loading && (
+              <div className="quiet">Nothing to show until there is something in the log.</div>
+            )}
           </aside>
         </div>
 
