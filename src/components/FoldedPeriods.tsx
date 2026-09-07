@@ -1,0 +1,122 @@
+'use client'
+
+/**
+ * The folded periods, under the open days.
+ *
+ * "Nothing is a flat list past about twenty — fold by time, fold by heading,
+ * search first" (SPEC §1). `log-2028.html` is the same page at 4,212
+ * entries: this week open, earlier weeks one line, months one line, years
+ * one line.
+ *
+ * A folded line carries a real sentence out of that period — the longest
+ * thing he said in it — rather than a summary of the period. That is the
+ * honest version, it needs no model, and it is better for finding your way
+ * back: the line you remember is the line you click.
+ *
+ * Opening one fetches exactly that range and renders it with the same rows
+ * as the feed, so an opened period is the log, not a different screen.
+ */
+
+import { useCallback, useState } from 'react'
+import { LogDays } from '@/components/LogRow'
+import type { LogEntry } from '@/lib/log-entry'
+
+export interface FoldBucket {
+  grain: 'week' | 'month' | 'year'
+  from: string
+  to: string
+  label: string
+  count: number
+  line: string | null
+  line_entry_id: string | null
+}
+
+const BAND: Record<FoldBucket['grain'], string> = {
+  week: 'earlier — weeks',
+  month: 'months',
+  year: 'years',
+}
+
+export function FoldedPeriods({ fold, order, onImage }: {
+  fold: FoldBucket[]
+  order: 'happened' | 'logged'
+  onImage?: (url: string) => void
+}) {
+  const [open, setOpen] = useState<Record<string, LogEntry[] | 'loading'>>({})
+
+  const toggle = useCallback(async (b: FoldBucket) => {
+    const key = `${b.from}:${b.to}`
+    if (open[key]) {
+      setOpen(o => { const n = { ...o }; delete n[key]; return n })
+      return
+    }
+    setOpen(o => ({ ...o, [key]: 'loading' }))
+    try {
+      const params = new URLSearchParams({
+        order, filter: 'all', limit: '500', from: b.from, to: b.to,
+      })
+      const res = await fetch(`/api/v2/log?${params}`, { cache: 'no-store' })
+      if (!res.ok) { setOpen(o => ({ ...o, [key]: [] })); return }
+      const data = await res.json() as { items: LogEntry[] }
+      setOpen(o => ({ ...o, [key]: data.items || [] }))
+    } catch {
+      setOpen(o => ({ ...o, [key]: [] }))
+    }
+  }, [open, order])
+
+  if (!fold.length) return null
+
+  // Band the periods by grain, so weeks, months and years are visibly
+  // different distances rather than one undifferentiated list.
+  const bands: { grain: FoldBucket['grain']; rows: FoldBucket[] }[] = []
+  for (const b of fold) {
+    const last = bands[bands.length - 1]
+    if (last && last.grain === b.grain) last.rows.push(b)
+    else bands.push({ grain: b.grain, rows: [b] })
+  }
+
+  return (
+    <>
+      {bands.map((band, i) => (
+        <div key={`${band.grain}-${i}`}>
+          <div className="foldband">
+            <b>{BAND[band.grain]}</b>
+            {band.rows.reduce((n, r) => n + r.count, 0)} entries
+          </div>
+          {band.rows.map(b => {
+            const key = `${b.from}:${b.to}`
+            const state = open[key]
+            return (
+              <div key={key}>
+                <button
+                  className={`fold${state ? ' open' : ''}`}
+                  onClick={() => void toggle(b)}
+                  aria-expanded={!!state}
+                >
+                  <span className="fl">{b.label}</span>
+                  <span className="fs">
+                    {b.line || <em>Nothing written in words — files and photos only.</em>}
+                  </span>
+                  <span className="fc">
+                    {b.count} {b.count === 1 ? 'entry' : 'entries'}
+                  </span>
+                </button>
+                {state === 'loading' && (
+                  <div className="foldopen"><div className="none">opening…</div></div>
+                )}
+                {Array.isArray(state) && (
+                  <div className="foldopen">
+                    <LogDays items={state} order={order} onImage={onImage} />
+                    {state.length === 0 && (
+                      <div className="none">Nothing in this period after all.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </>
+  )
+}

@@ -3199,3 +3199,36 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .logpage .ft .r, .publog .ft .r { display: flex; gap: 18px; flex-wrap: wrap; }
 .logpage .ft a:hover, .publog .ft a:hover { color: var(--fg); }
+
+/* The fold. "Nothing is a flat list past about twenty — fold by time, fold
+   by heading, search first." Recent days stay open as ordinary rows;
+   everything older is one line per week, then per month, then per year.
+   A folded line carries a real sentence from that period, never a summary
+   of it — the line you remember is the one you can click. */
+.logpage .foldband {
+  padding: 34px 0 4px; display: flex; gap: 12px; align-items: baseline;
+  font-size: 11.5px; color: var(--fg-4);
+}
+.logpage .foldband b { font-weight: 450; color: var(--fg-2); font-size: 12.5px; }
+.logpage .foldband::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.logpage .fold {
+  display: grid; grid-template-columns: 108px minmax(0, 1fr) auto; gap: 20px;
+  align-items: baseline; padding: 11px 12px; margin: 0 -12px;
+  border-radius: 9px; transition: background .14s;
+  width: 100%; text-align: left; background: none; border: 0;
+  cursor: pointer; color: inherit; font: inherit;
+}
+.logpage .fold:hover { background: var(--bg-1); }
+.logpage .fold .fl {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3);
+  white-space: nowrap; padding-top: 3px;
+}
+.logpage .fold .fs {
+  font-size: 14px; font-weight: 300; line-height: 1.5; color: var(--fg-2);
+  letter-spacing: -0.2px; text-wrap: pretty; max-width: 560px;
+}
+.logpage .fold .fs em { font-style: normal; color: var(--fg-4); }
+.logpage .fold .fc { font-size: 11.5px; color: var(--fg-4); white-space: nowrap; }
+.logpage .fold.open { background: var(--bg-1); }
+.logpage .foldopen { padding-left: 12px; border-left: 1px solid var(--line-1); margin-left: -12px; }

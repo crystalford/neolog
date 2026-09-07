@@ -40,6 +40,7 @@ import { useIntake } from '@/components/useIntake'
 import { LogDays } from '@/components/LogRow'
 import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import { OpenQuestions } from '@/components/OpenQuestions'
+import { FoldedPeriods, type FoldBucket } from '@/components/FoldedPeriods'
 import {
   type LogEntry, type FeedFilter, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -119,6 +120,8 @@ export default function LogHome() {
   // Coverage describes the whole log, so it comes from the server and does
   // not move when the feed is filtered.
   const [coverage, setCoverage] = useState<Record<string, number>>({})
+  // Everything older than the open window, as one line per period.
+  const [fold, setFold] = useState<FoldBucket[]>([])
   const [filter, setFilter] = useState<FeedFilter>(() => {
     // ?filter=buried is how the buried view is reached — it is not a ninth
     // button on a toolbar the design gives eight.
@@ -137,11 +140,15 @@ export default function LogHome() {
       const res = await fetch(`/api/v2/log?${params}`, { cache: 'no-store' })
       if (!res.ok) { setItems([]); return }
       const data = await res.json() as {
-        items: LogEntry[]; buried: number; coverage?: Record<string, number>
+        items: LogEntry[]; buried: number
+        coverage?: Record<string, number>; fold?: FoldBucket[]
       }
       setItems(data.items || [])
       setBuried(data.buried || 0)
       if (data.coverage) setCoverage(data.coverage)
+      // Empty on a filtered or searched feed — that is already a narrowed
+      // list, and folding it again would hide the thing being looked for.
+      setFold(data.fold || [])
     } catch { setItems([]) }
     finally { setLoading(false) }
   }, [order, filter, q])
@@ -362,10 +369,11 @@ export default function LogHome() {
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
               <LogDays items={items} order={order} q={q} onImage={openShot} />
+              <FoldedPeriods fold={fold} order={order} onImage={openShot} />
 
               {/* Day one is the same page as day one thousand. Nothing is
                   offered here that isn't offered when the log is full. */}
-              {!loading && items.length === 0 && (
+              {!loading && items.length === 0 && fold.length === 0 && (
                 <div className="none">
                   {q ? (
                     <>Nothing in the log matches that.<button onClick={() => setQ('')}>clear the search</button></>

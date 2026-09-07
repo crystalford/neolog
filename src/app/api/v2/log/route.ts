@@ -8,7 +8,8 @@
  *            of a recording, because searching text the reader cannot see is
  *            worse than no search (log.html)
  *   limit  = 1..500 (default 200)
- *   before = ISO cursor on the ordering date, for paging
+ *   from   = ISO date, inclusive — open one folded period
+ *   to     = ISO date, inclusive
  *
  * Reads `log_entries`, `vlogs` and `photos` and returns one normalised list.
  * The reasoning for reading rather than importing is in `src/lib/log-entry.ts`
@@ -24,6 +25,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
+import { buildFold, OPEN_DAYS } from '@/lib/fold'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import {
@@ -59,6 +61,22 @@ export async function GET(req: NextRequest) {
   const filter = (url.searchParams.get('filter') || 'all') as FeedFilter
   const q = (url.searchParams.get('q') || '').trim().toLowerCase()
   const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit') || '200', 10)))
+  // Opening one folded period. "Nothing is a flat list past about twenty —
+  // fold by time, fold by heading, search first" (SPEC §1 design constants).
+  const from = url.searchParams.get('from')
+  const to = url.searchParams.get('to')
+  const dateCol = order === 'logged'
+    ? 'COALESCE(logged_at, created_at)'
+    : 'COALESCE(happened_at, occurred_at)'
+  const rangeSql = from || to
+    ? ` AND ${dateCol} >= ? AND ${dateCol} <= ?`
+    : ''
+  const rangeBinds: string[] = from || to
+    ? [
+        from ? new Date(from).toISOString() : '0000',
+        to ? new Date(`${to}T23:59:59.999Z`).toISOString() : '9999',
+      ]
+    : []
   // Burial removes an entry from the feed, search and the counts. Asking for
   // it by name is the only way to see it — and the only way back to digging
   // one up, since the dig-up control lives on the entry's own page.
@@ -86,10 +104,10 @@ export async function GET(req: NextRequest) {
               original_filename, vlog_id, source_ref
          FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL
-          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}
+          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}${rangeSql}
         ORDER BY COALESCE(${order === 'logged' ? 'logged_at, created_at' : 'happened_at, occurred_at'}) DESC
         LIMIT ?`,
-      operator.id, limit,
+      operator.id, ...rangeBinds, limit,
     ),
     wantBuried ? Promise.resolve([]) : findMany<{
       id: string; title: string | null; original_filename: string | null
@@ -104,10 +122,12 @@ export async function GET(req: NextRequest) {
               duration_seconds, recorded_at, recorded_at_source, created_at,
               summary, vision_description, transcript_text, visibility
          FROM vlogs
-        WHERE operator_id = ? AND deleted_at IS NULL
+        WHERE operator_id = ? AND deleted_at IS NULL${
+          rangeSql.replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(recorded_at, created_at)')
+                  .replace(/COALESCE\(logged_at, created_at\)/g, 'created_at')}
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
         LIMIT ?`,
-      operator.id, limit,
+      operator.id, ...rangeBinds, limit,
     ),
     wantBuried ? Promise.resolve([]) : findMany<{
       id: string; thumbnail_r2_key: string | null; r2_key: string
@@ -118,10 +138,12 @@ export async function GET(req: NextRequest) {
       `SELECT id, thumbnail_r2_key, r2_key, caption, vision_description,
               taken_at, created_at, visibility
          FROM photos
-        WHERE operator_id = ? AND deleted_at IS NULL
+        WHERE operator_id = ? AND deleted_at IS NULL${
+          rangeSql.replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(taken_at, created_at)')
+                  .replace(/COALESCE\(logged_at, created_at\)/g, 'created_at')}
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'taken_at, created_at'}) DESC
         LIMIT ?`,
-      operator.id, limit,
+      operator.id, ...rangeBinds, limit,
     ),
     findMany<{ n: number }>(
       db,
@@ -290,8 +312,19 @@ export async function GET(req: NextRequest) {
     coverage[r.y] = (coverage[r.y] || 0) + (r.n || 0)
   }
 
+  // The folded periods, for the unfiltered default view only. A filtered or
+  // searched feed is already a narrowed list, and folding it again would
+  // hide the thing being looked for.
+  const fold = (!q && filter === 'all' && !from && !to)
+    ? await buildFold(db, operator.id, { order })
+    : []
+
   return NextResponse.json(
-    { items: trimmed, total, order, filter, buried: buriedRow[0]?.n || 0, coverage },
+    {
+      items: trimmed, total, order, filter,
+      buried: buriedRow[0]?.n || 0,
+      coverage, fold, open_days: OPEN_DAYS,
+    },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
