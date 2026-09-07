@@ -153,6 +153,33 @@ position: the turns either side, the reflections, and every correction with
 both wordings. That last part is what a finished piece structurally cannot
 show.
 
+### ⚠️ `readyDb()` — any route reading a freshly-added column must await it
+
+`getDb()` starts migrations **fire-and-forget and does not await them**
+(`src/lib/d1.ts` explains the trade). That is fine for a route touching
+columns that have existed for months, and broken for one whose columns landed
+in the same deploy: the first request queries a column that does not exist
+yet. Same failure as `vlogs.transcript`, but transient — it looks like the log
+is broken, then mysteriously isn't.
+
+**Every route reading this session's columns wraps its db in
+`readyDb(getDb(env), 'label')`** (`src/lib/ready-db.ts`). Sixteen of them do.
+Add the wrapper to any new route that reads a column added in the same
+deploy.
+
+### Watch the hot path at scale
+
+Three things were fine at four entries and wrong at four hundred, found by
+looking rather than by failing:
+
+- the **fold** ran one D1 query per bucket — ~50 per home-page load. One
+  query now, assigned in memory.
+- **seeding pages** had no `LIMIT` on a join over `entity_mentions`. Capped at
+  4,000 per press; it is idempotent, and the index says "press again".
+- the **feed** presigned every row from all three tables *before* merging and
+  trimming — up to 600 HMAC signings to show 200 rows. Only survivors are
+  signed.
+
 ### ⚠️ `scripts/check-sql-columns.mjs` and `check-routes.mjs` — keep both green
 
 A wrong column name is a runtime error, so `tsc` and `next build` are both
