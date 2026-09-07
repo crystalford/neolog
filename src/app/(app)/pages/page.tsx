@@ -67,11 +67,15 @@ export default function PagesIndex() {
         body: JSON.stringify({ limit: 500 }),
       })
       if (!res.ok) return
-      const r = await res.json() as { pages_written: number; attachments_written: number }
+      const r = await res.json() as {
+        pages_written: number; attachments_written: number; more_to_attach?: boolean
+      }
       setSeedNote(
-        r.pages_written > 0
-          ? `${r.pages_written} pages made, ${r.attachments_written} entries attached.`
-          : 'Nothing new to make — every name already has a page.',
+        r.more_to_attach
+          ? `${r.pages_written} pages made, ${r.attachments_written} entries attached — there are more. Press again to carry on.`
+          : r.pages_written > 0 || r.attachments_written > 0
+            ? `${r.pages_written} pages made, ${r.attachments_written} entries attached.`
+            : 'Nothing new to make — every name already has a page.',
       )
       await load()
     } finally { setSeeding(false) }

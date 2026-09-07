@@ -159,6 +159,8 @@ export interface SeedResult {
   pages_written: number
   attachments_written: number
   skipped_existing: number
+  /** True when the attach hit its cap — press again to continue. */
+  more_to_attach: boolean
 }
 
 /**
@@ -253,7 +255,8 @@ export async function seedPages(
   // Attach what each entity was mentioned in. `entity_mentions.source_id`
   // points at a thread or a vlog; a relogged entry carries its thread in
   // `source_ref`, so the two join up without a new column.
-  const attachments = await attachFromMentions(db, operatorId)
+  const ATTACH_CAP = 4000
+  const attachments = await attachFromMentions(db, operatorId, ATTACH_CAP)
 
   return {
     entities_seen: entities.length,
@@ -261,6 +264,9 @@ export async function seedPages(
     pages_written: written,
     attachments_written: attachments,
     skipped_existing: Math.max(0, statements.length - written),
+    // INSERT OR IGNORE means a re-run only does what is left, so "press
+    // again" is a complete answer rather than a workaround.
+    more_to_attach: attachments >= ATTACH_CAP,
   }
 }
 
@@ -270,7 +276,16 @@ export async function seedPages(
  * the log as an entry carrying `source_ref = 'thread:<id>'`, so a mention
  * resolves to a real row on the feed.
  */
-async function attachFromMentions(db: D1Database, operatorId: string): Promise<number> {
+async function attachFromMentions(
+  db: D1Database,
+  operatorId: string,
+  limit = 4000,
+): Promise<number> {
+  // Bounded. `entity_mentions` across 320 vlogs is tens of thousands of rows,
+  // and this join can multiply them — an unbounded version built one INSERT
+  // per row and then tried to run them all inside one Worker invocation.
+  // Seeding is idempotent and re-runnable, so a cap costs a second press and
+  // nothing else; running out of time or memory costs the whole seed.
   const rows = await findMany<{
     page_id: string; entry_kind: string; entry_id: string
   }>(
@@ -296,8 +311,10 @@ async function attachFromMentions(db: D1Database, operatorId: string): Promise<n
        JOIN vlogs v
          ON v.operator_id = em.operator_id AND v.id = em.source_id
       WHERE em.operator_id = ? AND em.source_kind = 'vlog'
-        AND p.deleted_at IS NULL AND v.deleted_at IS NULL`,
-    operatorId, operatorId,
+        AND p.deleted_at IS NULL AND v.deleted_at IS NULL
+
+      LIMIT ?`,
+    operatorId, operatorId, limit,
   )
 
   if (!rows.length) return 0

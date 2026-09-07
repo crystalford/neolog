@@ -162,21 +162,37 @@ export async function buildFold(
   // ── One real line per period ───────────────────────────────────────────
   // The longest thing HE said in it. Not a summary of the period — a
   // sentence out of it, so the line you remember is the one you can click.
-  await Promise.all(buckets.map(async b => {
-    const rows = await findMany<{ id: string; text: string }>(
+  //
+  // ONE query, not one per bucket. This runs on every load of the home page,
+  // and with entries going back to 2001 there are around fifty buckets — so
+  // the obvious per-bucket query was fifty round trips to D1 on the hot
+  // path. The longest few hundred lines are fetched once and assigned in
+  // memory instead.
+  if (buckets.length) {
+    const oldestNeeded = buckets[buckets.length - 1].from
+    const candidates = await findMany<{ id: string; text: string; at: string }>(
       db,
-      `SELECT id, text FROM log_entries
+      `SELECT id, text, ${dateCol} AS at
+         FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
           AND author = 'operator'
-          AND ${dateCol} >= ? AND ${dateCol} <= ?
-        ORDER BY LENGTH(text) DESC LIMIT 1`,
-      operatorId, `${b.from}T00:00:00.000Z`, `${b.to}T23:59:59.999Z`,
+          AND ${dateCol} >= ? AND ${dateCol} < ?
+        ORDER BY LENGTH(text) DESC
+        LIMIT 600`,
+      operatorId, `${oldestNeeded}T00:00:00.000Z`, openFrom.toISOString(),
     )
-    if (rows[0]) {
-      b.line_entry_id = rows[0].id
-      b.line = rows[0].text.length > 180 ? `${rows[0].text.slice(0, 178)}…` : rows[0].text
+
+    // Longest first, so the first candidate falling inside a bucket is the
+    // one that bucket wants.
+    for (const b of buckets) {
+      const from = `${b.from}T00:00:00.000Z`
+      const to = `${b.to}T23:59:59.999Z`
+      const hit = candidates.find(c => c.at >= from && c.at <= to)
+      if (!hit) continue
+      b.line_entry_id = hit.id
+      b.line = hit.text.length > 180 ? `${hit.text.slice(0, 178)}…` : hit.text
     }
-  }))
+  }
 
   return buckets
 }
