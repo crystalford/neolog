@@ -364,14 +364,22 @@ async function runFollowUps(
         const result = await transcribeAudio(env, bytes)
         const said = (result.text || '').trim()
         if (!said) return
+        // Keep the timed segments. Whisper returns them and throwing them
+        // away left the transcript as one blob with nothing to point at.
+        const segments = (result.segments || [])
+          .filter(sg => sg && typeof sg.start === 'number' && (sg.text || '').trim())
+          .map(sg => ({ s: Math.round(sg.start * 10) / 10, t: sg.text.trim() }))
         await run(
           db,
           `UPDATE log_entries
-              SET text = ?, transcript = ?, author = 'operator', kind = 'said',
+              SET text = ?, transcript = ?, transcript_segments = ?,
+                  author = 'operator', kind = 'said',
                   duration_seconds = COALESCE(duration_seconds, ?),
                   detail = NULL, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
-          said, said, result.duration_seconds ?? null, item.id,
+          said, said,
+          segments.length ? JSON.stringify(segments) : null,
+          result.duration_seconds ?? null, item.id,
         )
         return
       }

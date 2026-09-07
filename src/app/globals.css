@@ -3413,3 +3413,20 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   font-family: var(--font-mono); font-size: 11px; color: var(--fg-3);
   border-style: dashed; background: none;
 }
+
+/* A transcript you can point at. Whisper returns timed segments, so the
+   transcript is rows rather than one blob — click one and the audio plays
+   from there. "Verbatim spans are the only ground truth" (LLM-PIPELINE §1),
+   and a span you cannot address is not much of a span. */
+.logpage .transcript .tline {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px;
+  width: 100%; text-align: left; padding: 6px 0;
+  background: none; border: 0; cursor: pointer; color: inherit; font: inherit;
+  border-radius: 6px;
+}
+.logpage .transcript .tline:hover { background: var(--bg-2); }
+.logpage .transcript .tt {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
+  padding-top: 4px; white-space: nowrap;
+}
+.logpage .transcript .tw { font-size: 14.5px; line-height: 1.6; color: var(--fg-1); }

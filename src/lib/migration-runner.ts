@@ -1390,6 +1390,11 @@ export const MIGRATIONS: Migration[] = [
   // word, and this repo has already paid once for a naming collision
   // (productions vs projects). The mechanic lives on the entry page, where
   // both directions are visible at the same time.
+  // Whisper returns timed segments and the intake threw them away, so a
+  // voice note's transcript was one undifferentiated blob you could not
+  // point at. LLM-PIPELINE §1: "verbatim spans are the only ground truth" —
+  // a span you cannot address is not much of a span.
+  { name: '2026-09-07_log_entries_segments', sql: `ALTER TABLE log_entries ADD COLUMN transcript_segments TEXT` },
   { name: '2026-09-07_log_entries_led_from', sql: `ALTER TABLE log_entries ADD COLUMN led_from TEXT` },
   {
     name: '2026-09-07_idx_log_entries_led_from',

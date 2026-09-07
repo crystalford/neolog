@@ -51,6 +51,7 @@ interface Entry {
   span_start: number | null
   span_end: number | null
   grounded: number | null
+  transcript_segments: string | null
   led_from: string | null
   came_from?: Turn | null
   led_to?: Turn[]
@@ -121,6 +122,13 @@ export default function EntryPage({ params }: { params: { id: string } }) {
       </Shell>
     )
   }
+
+  // Whisper's timed segments, when the intake kept them.
+  let segments: { s: number; t: string }[] = []
+  try {
+    const parsed = JSON.parse(e.transcript_segments || '[]')
+    if (Array.isArray(parsed)) segments = parsed.filter(x => x && typeof x.s === 'number' && x.t)
+  } catch { /* an older entry has none; the blob below still renders */ }
 
   const held = e.visibility === 'held'
   const isImage = (e.mime || '').startsWith('image/')
@@ -266,7 +274,31 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             )}
 
             {/* The words are the ground truth; everything else indexes them. */}
-            {e.transcript && (
+            {e.transcript && segments.length > 0 ? (
+              <div className="transcript">
+                <div className="who">
+                  Transcribed on arrival
+                  {e.duration_seconds ? ` · ${clockDuration(e.duration_seconds)}` : ''}
+                  {' '}· click a line to play from there
+                </div>
+                {/* Timed lines rather than one blob. "Verbatim spans are the
+                    only ground truth" — and a span you cannot point at is
+                    not much of a span. */}
+                {segments.map((sg, i) => (
+                  <button
+                    className="tline"
+                    key={i}
+                    onClick={() => {
+                      const el = document.querySelector<HTMLAudioElement>('.entry-media audio, .entry-media video')
+                      if (el) { el.currentTime = sg.s; void el.play() }
+                    }}
+                  >
+                    <span className="tt">{clockDuration(sg.s) || '0:00'}</span>
+                    <span className="tw">{sg.t}</span>
+                  </button>
+                ))}
+              </div>
+            ) : e.transcript ? (
               <div className="transcript">
                 <div className="who">
                   Transcribed on arrival
@@ -275,7 +307,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 </div>
                 {e.transcript}
               </div>
-            )}
+            ) : null}
           </main>
 
           {/* ── The corrections ─────────────────────────────────────────── */}
