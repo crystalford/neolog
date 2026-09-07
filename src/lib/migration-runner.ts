@@ -1564,6 +1564,66 @@ export const MIGRATIONS: Migration[] = [
   // checkbox." A state with no record of how it was given is a checkbox.
   { name: '2026-09-07_pages_consent_at', sql: `ALTER TABLE pages ADD COLUMN consent_at TEXT` },
   { name: '2026-09-07_pages_consent_note', sql: `ALTER TABLE pages ADD COLUMN consent_note TEXT` },
+
+  // ── Documents (`writing.html`) ────────────────────────────────────────
+  // A made thing. "a document is a document · kind and who-made-it are
+  // fields" — one table for an essay, a report, a repository, a cut, a
+  // voice-over, a deck, a design and an export, because they differ only in
+  // those two fields and in what the body points at.
+  {
+    name: '2026-09-07_documents',
+    sql: `CREATE TABLE IF NOT EXISTS documents (
+      id            TEXT PRIMARY KEY,
+      operator_id   TEXT NOT NULL,
+      kind          TEXT NOT NULL DEFAULT 'essay',
+      title         TEXT NOT NULL,
+      -- The text itself, whole. A document is never split into entries.
+      body          TEXT,
+      -- What the body points at when it is not text: a video, audio, slides.
+      body_r2_key   TEXT,
+      body_url      TEXT,
+      -- Disclosed, always, and in the file when it is published.
+      made_by       TEXT NOT NULL DEFAULT 'operator',
+      status        TEXT NOT NULL DEFAULT 'draft',
+      word_count    INTEGER NOT NULL DEFAULT 0,
+      draft_count   INTEGER NOT NULL DEFAULT 1,
+      -- The page it sits under, and the entry it shows as on the feed.
+      page_id       TEXT,
+      entry_id      TEXT,
+      visibility    TEXT NOT NULL DEFAULT 'private',
+      published_at  TEXT,
+      finished_at   TEXT,
+      created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at    TEXT
+    )`,
+  },
+  // Every draft kept and dated. A new draft never overwrites the one before
+  // it — the same rule `entry_revisions` enforces for a line.
+  {
+    name: '2026-09-07_document_drafts',
+    sql: `CREATE TABLE IF NOT EXISTS document_drafts (
+      id           TEXT PRIMARY KEY,
+      document_id  TEXT NOT NULL,
+      operator_id  TEXT NOT NULL,
+      n            INTEGER NOT NULL,
+      body         TEXT,
+      word_count   INTEGER NOT NULL DEFAULT 0,
+      -- In his words, why this draft happened. Never the log's.
+      note         TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_document_drafts',
+    sql: `CREATE INDEX IF NOT EXISTS idx_document_drafts_doc
+            ON document_drafts(document_id, n)`,
+  },
+  {
+    name: '2026-09-07_idx_documents_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_documents_operator
+            ON documents(operator_id, created_at)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

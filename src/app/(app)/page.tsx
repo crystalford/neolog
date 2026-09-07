@@ -491,6 +491,7 @@ export default function LogHome() {
             <Link href="/ways-in">ways in</Link>
             <Link href="/messages">messages</Link>
             <Link href="/screenshots">screenshots</Link>
+            <Link href="/writing">writing</Link>
             {/* SPEC §3: the machine layer is "linked from about and the
                 log's footer, never the nav." */}
             <Link href="/everything">everything</Link>

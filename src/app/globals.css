@@ -3895,3 +3895,21 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* one kept back out of the bury pile — visibly out of it, not just flagged */
 .logpage .shot.kept { opacity: .55; }
 .logpage .shot.kept .keep { color: var(--fg-1); border-color: var(--line-3); }
+
+/* the title field in the paste box — a document has a name before it has a body */
+.logpage .paste .ti {
+  width: 100%; background: #0a0a0b; color: var(--fg);
+  border: 1px solid var(--line-1); border-radius: 12px 12px 0 0;
+  border-bottom: 0; padding: 14px 18px; font: inherit;
+  font-size: 17px; font-weight: 300; letter-spacing: -0.4px; outline: none;
+}
+.logpage .paste .ti:focus { border-color: var(--line-3); }
+.logpage .paste .ti::placeholder { color: var(--fg-4); }
+.logpage .paste .ti + textarea { border-radius: 0 0 12px 12px; }
+
+/* a document's body: the text as written, at a width you can read */
+.logpage .docbody {
+  margin-top: 26px; max-width: 640px;
+  font-size: 16.5px; line-height: 1.75; color: var(--fg-1);
+  white-space: pre-wrap; text-wrap: pretty; word-break: break-word;
+}

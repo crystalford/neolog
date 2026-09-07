@@ -196,6 +196,37 @@ a receipt: now a receipt is `paperwork`, someone's message is `read`, and
 anything unrecognised is `seen`. `scripts/test/screenshots.mjs` — 21
 assertions, in CI.
 
+### Documents — every made thing, one shape
+
+`writing.html`. `src/lib/documents.ts`, `/writing`, `/writing/[id]`, tables
+`documents` + `document_drafts`. Eight kinds (essay · report · code ·
+produced video · voice-over · deck · design · export) that differ only in two
+fields and in what the body points at, so they are one table, not eight.
+
+**Whole. Never split.** This is what separates a document from a paste.
+`split-note.ts` splits a recollection INTO entries because that is what a
+recollection is for. A finished piece was made to be read whole, and cutting
+it into lines destroys it — so nothing here calls the splitter, and a
+document shows on the feed as ONE entry saying it was made.
+
+**Who made it is a field, always filled in.** `operator` · `operator_with_log`
+· `log_drafted_kept` · `log`. `asMadeBy()` resolves an unknown value to
+**`log`**, not to him — claiming he wrote something is the wrong direction to
+be wrong in. The entry's `author` comes from `made_by`, not from who pressed
+the button, so the log never signs his essay and he never signs the log's
+report.
+
+**Every draft kept.** A new draft writes a `document_drafts` row before
+`documents.body` changes — the same rule `entry_revisions` enforces for a
+line. Any draft can be shown again; none is replaced.
+
+**Above the fence.** Publishing runs the text through nothing: no reading, no
+reduction, no redraft. It sets a flag and a date, `made_by` travels into the
+file, and the entry's visibility follows the document's so the log can never
+show a made thing as public while the thing is not. Taking it down is one
+button and reverses both. A letter the log drafts in his voice is a different
+thing and stays below the fence (`letters.html`).
+
 ### Corrections leave a record
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites
@@ -309,9 +340,10 @@ but nothing populates it; Whisper is not asked for diarization, so the split
 cannot be built honestly yet), `flow` (a walkthrough page). `walk` and
 `screenshots` are built.
 
-Not built: `elsewhere` · `photo` · `recording` (public); `repo` · `writing` ·
-`footage` · `image` · `image-filter` (per-kind bodies). `messages` shipped —
-see **Correspondence** above. **The
+Not built: `elsewhere` · `photo` · `recording` (public); `footage` · `image` ·
+`image-filter` (per-kind bodies). `messages` and `writing` shipped — see
+**Correspondence** and **Documents** above. `repo` is a `code` document whose
+body is the README; the commits-folded-by-week view is not built. **The
 machine layer shipped** — `dossier` → `/facts`, `everything`, `source` →
 `/glossary`, `asks`, `numbers`, plus the four feeds.
 
