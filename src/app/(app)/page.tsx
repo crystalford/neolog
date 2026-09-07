@@ -422,6 +422,7 @@ export default function LogHome() {
           <span>neolog · the log · private</span>
           <span className="r">
             <Link href="/now">now</Link>
+            <Link href="/search">search</Link>
             <Link href="/pages">the index</Link>
             <Link href="/public">what&rsquo;s public</Link>
             <Link href="/export">export</Link>

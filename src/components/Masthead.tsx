@@ -29,6 +29,9 @@ const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Log',       href: '/',          matchPaths: [
     /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
   ] },
+  { label: 'Search',    href: '/search',    matchPaths: [
+    /^\/search/,
+  ] },
   { label: 'Index',     href: '/pages',     matchPaths: [
     /^\/pages/, /^\/page\//,
   ] },

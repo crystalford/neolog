@@ -3232,3 +3232,81 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .fold .fc { font-size: 11.5px; color: var(--fg-4); white-space: nowrap; }
 .logpage .fold.open { background: var(--bg-1); }
 .logpage .foldopen { padding-left: 12px; border-left: 1px solid var(--line-1); margin-left: -12px; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * SEARCH — src/app/(app)/search
+ *
+ * From `search.html`. "The answer is written only from passages it can
+ * point at — a number on every sentence."
+ *
+ * The answer reads at the size of a thing you read, not the size of a
+ * feed row; the citations are the only marked things in it, because they
+ * are what makes it trustworthy.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.logpage .askbox {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; margin: 22px 0 0;
+  border: 1px solid var(--line-1); border-radius: 11px; background: var(--bg-1);
+}
+.logpage .askbox input {
+  flex: 1; background: none; border: 0; outline: none; min-width: 0;
+  color: var(--fg); font-family: var(--font-body);
+  font-size: 18px; font-weight: 300; letter-spacing: -0.3px;
+}
+.logpage .askbox input::placeholder { color: var(--fg-4); }
+.logpage .askbox button {
+  font-size: 12.5px; color: var(--fg-3); background: none; border: 0;
+  cursor: pointer; white-space: nowrap;
+}
+.logpage .askbox button:hover { color: var(--fg); }
+.logpage .egs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.logpage .egs button {
+  font-size: 12.5px; color: var(--fg-3); background: none;
+  border: 1px solid var(--line-1); border-radius: 100px;
+  padding: 5px 11px; cursor: pointer; white-space: nowrap;
+}
+.logpage .egs button:hover { color: var(--fg); border-color: var(--line-3); }
+
+.logpage .ansblock { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); }
+.logpage .ansblock .k {
+  font-size: 11.5px; color: var(--fg-4); display: flex;
+  justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.logpage .ansblock p {
+  margin-top: 14px; max-width: 660px;
+  font-size: 17px; font-weight: 300; line-height: 1.6;
+  letter-spacing: -0.25px; color: var(--fg-1); text-wrap: pretty;
+}
+.logpage .ansblock .cite {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--sig);
+  vertical-align: super; cursor: pointer; padding: 0 1px;
+  background: none; border: 0;
+}
+.logpage .ansblock .cite:hover { color: var(--fg); }
+/* What the log could not answer. The only line without a citation, because
+   it is about what is missing. */
+.logpage .nota {
+  margin-top: 20px; padding: 13px 16px;
+  border: 1px dashed var(--line-2); border-radius: 9px;
+  font-size: 14px; line-height: 1.6; color: var(--fg-2); max-width: 660px;
+}
+.logpage .nota b { color: var(--fg); font-weight: 450; }
+
+.logpage .psg {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 16px;
+  padding: 18px 0; border-bottom: 1px solid var(--line);
+}
+.logpage .psg.lit { background: var(--bg-1); border-radius: 9px; padding: 18px 12px; margin: 0 -12px; }
+.logpage .psg .n { font-family: var(--font-mono); font-size: 11px; color: var(--sig); padding-top: 4px; }
+.logpage .psg .meta {
+  display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--fg-4);
+}
+.logpage .psg q {
+  display: block; margin-top: 8px; quotes: '"' '"';
+  font-size: 15.5px; font-weight: 300; line-height: 1.55;
+  color: var(--fg); letter-spacing: -0.2px; max-width: 640px;
+}
+.logpage .psg .go { margin-top: 8px; font-size: 12px; }
+.logpage .psg .go a { color: var(--fg-3); border-bottom: 1px solid var(--line-2); }
+.logpage .psg .go a:hover { color: var(--fg); }
