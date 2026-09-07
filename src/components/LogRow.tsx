@@ -65,6 +65,11 @@ export function LogRow({ e, order, q, onImage }: {
             {tags.map((t, i) => (
               <i key={i} className={t.tone === 'plain' ? undefined : t.tone}>{t.text}</i>
             ))}
+            {(e.layers?.length || 0) > 0 && (
+              <i className="lay">
+                thought about {e.layers!.length === 1 ? 'again' : `${e.layers!.length} times since`}
+              </i>
+            )}
           </span>
         </div>
 
@@ -80,6 +85,16 @@ export function LogRow({ e, order, q, onImage }: {
             but you have to say so.
           </div>
         )}
+
+        {/* Later thoughts about this entry. They sit under it because a
+            reflection is not a second event — it is the same event, thought
+            about again. */}
+        {(e.layers || []).map(l => (
+          <div className="lay-row" key={l.id}>
+            <span>{stampFor(l.at, 'exact')}</span>
+            {l.text}
+          </div>
+        ))}
 
         {/* A compressed run of photos: every tile at once, with the rest
             behind one "+N" tile. */}

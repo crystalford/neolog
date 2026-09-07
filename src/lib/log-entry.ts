@@ -107,6 +107,13 @@ export interface LogEntry {
   vlog_id: string | null
   /** 'thread:<id>' when relog wrote this row; null when the operator did. */
   source_ref: string | null
+  /**
+   * Later thoughts about THIS entry. SPEC §1: "A later thought about an
+   * earlier event attaches to that entry as a `reflected` layer. It never
+   * becomes a second event." So a reflection has no row of its own on the
+   * feed — it sits under the thing it is about.
+   */
+  layers?: { id: string; text: string; at: string }[]
   /** Free-text the search filter reads — includes transcripts the row doesn't show. */
   searchable: string
 }

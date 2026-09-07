@@ -139,6 +139,10 @@ export default function LogHome() {
     if (typeof window === 'undefined') return null
     return new URLSearchParams(window.location.search).get('led_from')
   })
+  const [relation] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('relation')
+  })
 
   const loadFeed = useCallback(async () => {
     try {
@@ -185,6 +189,7 @@ export default function LogHome() {
       happened_at: when ? new Date(`${when}T12:00:00Z`).toISOString() : undefined,
       date_precision: when ? precision : undefined,
       led_from: ledFrom || undefined,
+      relation: relation || undefined,
     })
     if (!r) return
     // Receipt, then silence. Nothing is asked.
@@ -194,7 +199,7 @@ export default function LogHome() {
     if (receiptTimer.current) clearTimeout(receiptTimer.current)
     receiptTimer.current = setTimeout(() => intake.setReceipt(null), 8000)
     taRef.current?.focus()
-  }, [intake, when, precision, ledFrom])
+  }, [intake, when, precision, ledFrom, relation])
 
   const undo = useCallback(async () => {
     await intake.undo()
@@ -271,7 +276,11 @@ export default function LogHome() {
                     something you have forgotten you clicked. */}
                 {ledFrom && (
                   <div className="whenrow">
-                    <span>This carries on from an earlier entry.</span>
+                    <span>
+                      {relation === 'reflects'
+                        ? 'This is a later thought about an earlier entry. It attaches to it rather than becoming its own.'
+                        : 'This carries on from an earlier entry.'}
+                    </span>
                     <Link className="clr" href="/">on its own instead</Link>
                     <Link className="clr" href={`/entry/${ledFrom}`}>see it</Link>
                   </div>

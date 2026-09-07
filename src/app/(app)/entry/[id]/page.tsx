@@ -453,6 +453,18 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   </Link>
                 </div>
               </div>
+              <div className="i">
+                <b>Thought about it again?</b>
+                <em>
+                  A later thought about this attaches to it. It never becomes
+                  a second event — the thing happened once.
+                </em>
+                <div className="fixrow">
+                  <Link href={`/?led_from=${e.id}&relation=reflects`}>
+                    <button>Add a later thought</button>
+                  </Link>
+                </div>
+              </div>
             </div>
 
             <div className="rc">

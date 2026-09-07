@@ -153,6 +153,8 @@ export function useIntake(onDone?: () => void) {
     date_precision?: DatePrecision
     /** The turn this came out of, when continuing a thread. */
     led_from?: string
+    /** 'reflects' when this is a later thought rather than a new event. */
+    relation?: string
   }): Promise<IntakeReceipt | null> => {
     const ready = pending.filter(p => p.r2_key && !p.error)
     if (!text.trim() && !ready.length) return null
@@ -167,6 +169,7 @@ export function useIntake(onDone?: () => void) {
           happened_at: opts?.happened_at,
           date_precision: opts?.date_precision,
           led_from: opts?.led_from,
+          relation: opts?.relation,
           files: ready.map(p => ({
             r2_key: p.r2_key,
             original_filename: p.file.name,

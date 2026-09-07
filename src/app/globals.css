@@ -3430,3 +3430,19 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   padding-top: 4px; white-space: nowrap;
 }
 .logpage .transcript .tw { font-size: 14.5px; line-height: 1.6; color: var(--fg-1); }
+
+/* The reflected layer. "A later thought about an earlier event attaches to
+   that entry as a reflected layer. It never becomes a second event."
+   (SPEC §1.) So it renders under the thing it is about rather than taking a
+   row and a date of its own. */
+.logpage .en .lay-row {
+  margin-top: 8px; padding-left: 12px;
+  border-left: 1px solid var(--line-1);
+  font-size: 13px; line-height: 1.55; color: var(--fg-3); max-width: 620px;
+}
+.logpage .en .lay-row + .lay-row { margin-top: 6px; }
+.logpage .en .lay-row span {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--t-violet); margin-right: 8px;
+}
+.logpage .en .x .tags i.lay { color: var(--t-violet); }

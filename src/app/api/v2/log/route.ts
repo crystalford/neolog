@@ -115,12 +115,13 @@ export async function GET(req: NextRequest) {
       duration_seconds: number | null; transcript: string | null
       link_url: string | null; original_filename: string | null
       vlog_id: string | null; source_ref: string | null
+      led_from: string | null; relation: string
     }>(
       db,
       `SELECT id, text, detail, occurred_at, created_at, happened_at, logged_at,
               date_precision, kind, visibility, held_reason, author, source_kind,
               batch_id, r2_key, mime, duration_seconds, transcript, link_url,
-              original_filename, vlog_id, source_ref
+              original_filename, vlog_id, source_ref, led_from, relation
          FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL
           AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}${rangeSql}
@@ -211,9 +212,25 @@ export async function GET(req: NextRequest) {
 
   const items: LogEntry[] = []
 
+  // A reflection never becomes a second event, so it is lifted out of the
+  // list and attached to what it is about. One whose target is not in this
+  // window falls back to being its own row — better a row out of place than
+  // a thought that vanishes.
+  const layersFor = new Map<string, { id: string; text: string; at: string }[]>()
+  const present = new Set(entryRows.map(r => r.id))
+  const reflections = new Set<string>()
+  for (const r of entryRows) {
+    if (r.relation !== 'reflects' || !r.led_from || !present.has(r.led_from)) continue
+    reflections.add(r.id)
+    const list = layersFor.get(r.led_from) || []
+    list.push({ id: r.id, text: r.text, at: r.happened_at || r.occurred_at || r.created_at })
+    layersFor.set(r.led_from, list)
+  }
+
   // ── Typed, spoken, dropped-in entries ────────────────────────────────────
   const entryMedia = await presignAll(env, entryRows.map(r => r.r2_key))
   entryRows.forEach((r, i) => {
+    if (reflections.has(r.id)) return
     const signed = entryMedia[i]
     const media: MediaRef[] = []
     if (r.r2_key) {
@@ -245,6 +262,7 @@ export async function GET(req: NextRequest) {
       batch_id: r.batch_id,
       vlog_id: r.vlog_id,
       source_ref: r.source_ref,
+      layers: layersFor.get(r.id),
       searchable: [r.text, r.detail, r.transcript, r.link_url, r.original_filename]
         .filter(Boolean).join(' ').toLowerCase(),
     })

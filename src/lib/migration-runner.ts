@@ -1396,6 +1396,19 @@ export const MIGRATIONS: Migration[] = [
   // a span you cannot address is not much of a span.
   { name: '2026-09-07_log_entries_segments', sql: `ALTER TABLE log_entries ADD COLUMN transcript_segments TEXT` },
   { name: '2026-09-07_log_entries_led_from', sql: `ALTER TABLE log_entries ADD COLUMN led_from TEXT` },
+  // What `led_from` MEANS. SPEC §1 distinguishes two things that both point
+  // at an earlier entry:
+  //
+  //   a turn      — a new event that came out of an earlier one. Its own row,
+  //                 its own date, its own place on the log.
+  //   a reflection — "A later thought about an earlier event attaches to that
+  //                 entry as a `reflected` layer. **It never becomes a second
+  //                 event.**"
+  //
+  // One column rather than two relationships, because the difference is what
+  // the pointer means, not what it points at. Default 'led_from' so every
+  // row written before this reads as a turn, which is what they were.
+  { name: '2026-09-07_log_entries_relation', sql: `ALTER TABLE log_entries ADD COLUMN relation TEXT NOT NULL DEFAULT 'led_from'` },
   {
     name: '2026-09-07_idx_log_entries_led_from',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,
