@@ -89,3 +89,26 @@ export function validateGrounded<T>(
     invalidIndices,
   }
 }
+
+/**
+ * The strict form of the check above: EVERY 4-gram of the field must appear
+ * in the transcript, not merely one.
+ *
+ * `isGrounded` answers "did this text touch the recording at all" — the right
+ * question for a model's paraphrase, where one verbatim anchor is the evidence
+ * that it did not invent the whole thing. It is the wrong question for a
+ * passage the log is about to attribute to the operator word-for-word: a
+ * sentence with one real 4-gram and nine invented ones passes it.
+ *
+ * So relog uses this instead. A contiguous run of the recording's own words
+ * satisfies it by construction; anything assembled, reordered or padded does
+ * not. Same O(M) cost.
+ */
+export function isFullyGrounded(field: string, transcriptFourGrams: Set<string>): boolean {
+  const words = norm(field).split(' ').filter(Boolean)
+  if (words.length < 4) return false
+  for (let i = 0; i <= words.length - 4; i++) {
+    if (!transcriptFourGrams.has(words.slice(i, i + 4).join(' '))) return false
+  }
+  return true
+}

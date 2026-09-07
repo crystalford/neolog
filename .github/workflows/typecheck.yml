@@ -66,6 +66,12 @@ jobs:
       - name: Note splitting
         run: node --experimental-strip-types scripts/test/split-note.mjs
 
+      # Relog reads three hundred recordings back onto the log. The strict
+      # grounding check is the only thing between a span slice and words in
+      # his mouth, and the loose check would pass a half-invented sentence.
+      - name: Relog attribution
+        run: node scripts/test/relog-line.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 

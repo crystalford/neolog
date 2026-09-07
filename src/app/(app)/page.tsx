@@ -681,6 +681,9 @@ function Relog({ onDone }: { onDone: () => void }) {
   const [status, setStatus] = useState<{ vlogs: number; threads: number; relogged: number; remaining: number } | null>(null)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(0)
+  // Whose words landed. `take` is the only tier that is not his, so it is the
+  // only number the card has to own up to.
+  const [tiers, setTiers] = useState({ mine: 0, take: 0 })
   const stop = useRef(false)
 
   const load = useCallback(async () => {
@@ -696,6 +699,7 @@ function Relog({ onDone }: { onDone: () => void }) {
     stop.current = false
     let cursor: string | null = null
     let written = 0
+    const seen = { mine: 0, take: 0 }
     try {
       for (;;) {
         if (stop.current) break
@@ -705,9 +709,16 @@ function Relog({ onDone }: { onDone: () => void }) {
           body: JSON.stringify({ cursor, limit: 20 }),
         })
         if (!res.ok) break
-        const r = await res.json() as { entries_written: number; next_cursor: string | null }
+        const r = await res.json() as {
+          entries_written: number
+          lines?: { from_quote: number; from_span: number; from_take: number }
+          next_cursor: string | null
+        }
         written += r.entries_written
+        seen.mine += (r.lines?.from_quote ?? 0) + (r.lines?.from_span ?? 0)
+        seen.take += r.lines?.from_take ?? 0
         setDone(written)
+        setTiers({ ...seen })
         cursor = r.next_cursor
         if (!cursor) break
       }
@@ -735,7 +746,12 @@ function Relog({ onDone }: { onDone: () => void }) {
         ) : done > 0 ? (
           <>
             <b>Done. {done} {done === 1 ? 'entry' : 'entries'} added.</b>
-            <em>Each one sits at the second it was said.</em>
+            <em>
+              Each one sits at the second it was said.
+              {tiers.mine > 0 && ` ${tiers.mine} in your own words`}
+              {tiers.take > 0 && `, ${tiers.take} written by the log because the recording had no word timings`}
+              {tiers.mine > 0 && '.'}
+            </em>
           </>
         ) : (
           <>
