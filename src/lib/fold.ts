@@ -33,14 +33,21 @@ import { findMany } from '@/lib/d1'
 import type { D1Database } from '@cloudflare/workers-types'
 
 export interface FoldBucket {
-  /** 'week' | 'month' | 'year' */
-  grain: 'week' | 'month' | 'year'
+  /**
+   * 'week' · 'month' · 'year' — one period.
+   * 'months' · 'years' — several of them on one line, because the rule is
+   * about the LIST, not about the period: twenty-eight year rows is still a
+   * flat list past twenty.
+   */
+  grain: 'week' | 'month' | 'year' | 'months' | 'years'
   /** Inclusive ISO dates, for opening the period. */
   from: string
   to: string
   /** "28 Aug – 1 Sep" · "Jul 2028" · "2011" */
   label: string
   count: number
+  /** How many periods are on this line. 1 for everything but a band. */
+  spans: number
   /** The longest thing said in that period, verbatim. Never a synthesis. */
   line: string | null
   line_entry_id: string | null
@@ -61,6 +68,94 @@ function labelRange(from: Date, to: Date): string {
   const a = `${from.getUTCDate()} ${MONTHS[from.getUTCMonth()]}`
   const b = sameMonth ? `${to.getUTCDate()}` : `${to.getUTCDate()} ${MONTHS[to.getUTCMonth()]}`
   return sameMonth ? `${from.getUTCDate()} – ${b} ${MONTHS[from.getUTCMonth()]}` : `${a} – ${b}`
+}
+
+/**
+ * A year is thin when it holds less than this share of the fullest year.
+ *
+ * `log-2028.html` stands 1,847 and 1,388-entry years on their own and puts
+ * everything from 2001 to 2025 — ten to thirty entries a year — into bands.
+ * A fifth of the fullest year is where that line falls.
+ */
+const THIN_SHARE = 0.2
+/**
+ * A band stops at ten years even when the thin run is longer.
+ *
+ * "2001 – 2025" is one row and satisfies the letter of the rule, and it is
+ * also useless: a quarter-century behind a single line is not a way back
+ * into anything. Ten is a stretch you can hold in your head.
+ */
+const MAX_BAND_YEARS = 10
+
+/**
+ * Fold the year rows.
+ *
+ * SPEC §1: "Nothing is a flat list past about twenty." Twenty-eight year
+ * rows is a flat list past twenty, so consecutive THIN years go on one line
+ * together and full years keep their own.
+ *
+ * The rule is about density and nothing else. It is tempting to band by
+ * meaning — the years at one company, the years with nothing written down —
+ * and that is exactly what the log must not do: those are readings of his
+ * life, and §0 rule 3 says the log does not infer. A band here says only
+ * "these years are next to each other and each has little in it", which is
+ * arithmetic he can check against the counts on the row.
+ *
+ * Exported for the test: this is pure arithmetic with no database in it, and
+ * a wrong boundary silently hides years.
+ */
+export function bandYears(byYear: Map<number, number>): FoldBucket[] {
+  const years = Array.from(byYear.keys()).sort((a, b) => b - a)
+  if (!years.length) return []
+
+  const fullest = Math.max(...Array.from(byYear.values()))
+  const thinAt = Math.max(2, fullest * THIN_SHARE)
+  const isThin = (y: number) => (byYear.get(y) || 0) < thinAt
+
+  const out: FoldBucket[] = []
+  let i = 0
+  while (i < years.length) {
+    const y = years[i]
+    if (!isThin(y)) {
+      out.push({
+        grain: 'year', from: `${y}-01-01`, to: `${y}-12-31`,
+        label: String(y), count: byYear.get(y) || 0, spans: 1,
+        line: null, line_entry_id: null,
+      })
+      i++
+      continue
+    }
+    // A run of thin years. It ends at a full year, at a gap in the sequence
+    // (a year with nothing in it is not a row and must not be swallowed into
+    // a band that claims to cover it), or at the cap.
+    let j = i
+    let count = 0
+    while (
+      j < years.length
+      && isThin(years[j])
+      && years[i] - years[j] < MAX_BAND_YEARS
+      && (j === i || years[j - 1] - years[j] === 1)
+    ) {
+      count += byYear.get(years[j]) || 0
+      j++
+    }
+    const newest = years[i]
+    const oldest = years[j - 1]
+    out.push(
+      newest === oldest
+        ? {
+            grain: 'year', from: `${oldest}-01-01`, to: `${newest}-12-31`,
+            label: String(newest), count, spans: 1, line: null, line_entry_id: null,
+          }
+        : {
+            grain: 'years', from: `${oldest}-01-01`, to: `${newest}-12-31`,
+            label: `${oldest} – ${newest}`, count, spans: newest - oldest + 1,
+            line: null, line_entry_id: null,
+          },
+    )
+    i = j
+  }
+  return out
 }
 
 /**
@@ -116,7 +211,7 @@ export async function buildFold(
     if (n > 0) {
       buckets.push({
         grain: 'week', from: iso(from), to: iso(to),
-        label: labelRange(from, to), count: n, line: null, line_entry_id: null,
+        label: labelRange(from, to), count: n, spans: 1, line: null, line_entry_id: null,
       })
     }
     cursor = new Date(from.getTime() - 86400000)
@@ -136,13 +231,13 @@ export async function buildFold(
       buckets.push({
         grain: 'month', from: iso(from), to: iso(capped),
         label: `${MONTHS[from.getUTCMonth()]} ${from.getUTCFullYear()}`,
-        count: n, line: null, line_entry_id: null,
+        count: n, spans: 1, line: null, line_entry_id: null,
       })
     }
     m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1))
   }
 
-  // ── Years, everything before that ──────────────────────────────────────
+  // ── Years, everything before that, banded where they are thin ──────────
   const byYear = new Map<number, number>()
   for (const [d, n] of counts) {
     const y = parseInt(d.slice(0, 4), 10)
@@ -150,14 +245,7 @@ export async function buildFold(
     if (y >= monthsBack.getUTCFullYear()) continue
     byYear.set(y, (byYear.get(y) || 0) + n)
   }
-  for (const y of Array.from(byYear.keys()).sort((a, b) => b - a)) {
-    buckets.push({
-      grain: 'year',
-      from: `${y}-01-01`, to: `${y}-12-31`,
-      label: String(y), count: byYear.get(y) || 0,
-      line: null, line_entry_id: null,
-    })
-  }
+  for (const b of bandYears(byYear)) buckets.push(b)
 
   // ── One real line per period ───────────────────────────────────────────
   // The longest thing HE said in it. Not a summary of the period — a

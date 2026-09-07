@@ -581,6 +581,20 @@ bypass app.
 
 **The fold** (`log-2028.html`) is on `/` itself: the last 14 days open as rows, then one line per week, per month, per year. A folded line carries **a real sentence from that period**, never a synthesis — writing period summaries needs the citation machinery, not a prompt.
 
+**Past twenty, the years band too.** Twenty-eight year rows is still a flat
+list past twenty, so consecutive *thin* years share one line — `bandYears()`
+in `src/lib/fold.ts`, tested in `scripts/test/fold.mjs`. Thin means under a
+fifth of the fullest year, which is where `log-2028.html`'s own numbers fall
+(1,847 and 1,388 stand alone; 2001–2025 at ten to thirty a year band). Three
+rules keep a band honest: **density only** — banding by meaning ("the years
+at one company") would be the log reading his life, which §0 rule 3 forbids;
+**a gap breaks a band**, because a year with nothing in it is not a row and a
+band spanning it would imply coverage the log does not have; and **ten years
+is the cap**, because "2001 – 2025" satisfies the rule and is useless. A band
+says how many years it stands for as well as how many entries — 203 entries
+over a decade and over one year are different facts. Opening one says out
+loud when it is showing 500 of more.
+
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
 - `/vlog/[id]` — one vlog. Includes the **in-podcast toggle** and the **auto-publish toggle**.

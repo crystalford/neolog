@@ -84,6 +84,11 @@ jobs:
       - name: Screenshot sort
         run: node scripts/test/screenshots.mjs
 
+      # A wrong band boundary silently hides years of the log behind a line
+      # that claims to cover them.
+      - name: The fold
+        run: node scripts/test/fold.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
