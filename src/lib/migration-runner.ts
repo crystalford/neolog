@@ -1200,6 +1200,79 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-09-07_idx_log_entries_vlog',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_vlog ON log_entries(vlog_id)`,
   },
+
+  // ── Pages — the index (7 Sep 2026) ──────────────────────────────────────
+  // "There is one kind of page that gathers entries: a page." An idea, a job,
+  // a company, a person, a place, a project — anything the operator would say
+  // "the ___ page" about. The kind is a LABEL, not a different page.
+  //
+  // One mention makes a page. No threshold — "the log doesn't make you repeat
+  // yourself to be taken seriously." The count on a page describes; it never
+  // decides, and it never triggers a prompt.
+  //
+  // Why a table rather than reading `entities` the way the feed reads `vlogs`:
+  // a page is editable in ways an extraction output is not. It can be
+  // renamed, merged with another when the log made one thing into two, and
+  // its paragraph is the operator's to correct. `entities` is a pass's
+  // output; a page is a thing he owns. `source_ref` keeps the link, so
+  // seeding from entities stays idempotent.
+  {
+    name: '2026-09-07_pages',
+    sql: `CREATE TABLE IF NOT EXISTS pages (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      name            TEXT NOT NULL,
+      kind            TEXT NOT NULL DEFAULT 'subject',
+      -- The log's one-paragraph version, rewritten as things attach and
+      -- always the operator's to edit. Never shown as his words.
+      summary         TEXT,
+      summary_author  TEXT NOT NULL DEFAULT 'log',
+      -- first said -> last said. A job or a place may have a fixed range.
+      span_start      TEXT,
+      span_end        TEXT,
+      entry_count     INTEGER NOT NULL DEFAULT 0,
+      visibility      TEXT NOT NULL DEFAULT 'public',
+      named_by_system INTEGER NOT NULL DEFAULT 1,
+      -- 'entity:<id>' or 'cluster:<id>' when seeded; null when made by hand.
+      source_ref      TEXT,
+      -- Set when this page turned out to be the same thing as another.
+      merged_into     TEXT,
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_pages_source_ref',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_pages_source_ref
+            ON pages(operator_id, source_ref) WHERE source_ref IS NOT NULL`,
+  },
+  {
+    name: '2026-09-07_idx_pages_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_pages_operator ON pages(operator_id, kind, name)`,
+  },
+
+  // What a page gathers. Polymorphic because the log's three row sources —
+  // a typed entry, a recording, a photo — are all attachable, and the feed
+  // already treats them as one shape.
+  {
+    name: '2026-09-07_page_entries',
+    sql: `CREATE TABLE IF NOT EXISTS page_entries (
+      page_id     TEXT NOT NULL,
+      entry_kind  TEXT NOT NULL,          -- 'entry' | 'vlog' | 'photo'
+      entry_id    TEXT NOT NULL,
+      -- how it got here: 'word' (the name appeared), 'date', 'place',
+      -- 'operator' (attached by hand). Shown so a wrong attach is one tap
+      -- to detach, and detaching leaves the entry alone.
+      attached_by TEXT NOT NULL DEFAULT 'word',
+      attached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (page_id, entry_kind, entry_id)
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_page_entries_entry',
+    sql: `CREATE INDEX IF NOT EXISTS idx_page_entries_entry ON page_entries(entry_kind, entry_id)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

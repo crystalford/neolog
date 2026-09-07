@@ -37,6 +37,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { useIntake } from '@/components/useIntake'
+import { LogDays } from '@/components/LogRow'
 import {
   type LogEntry, type FeedFilter, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -167,23 +168,6 @@ export default function LogHome() {
   const undo = useCallback(async () => {
     await intake.undo()
   }, [intake])
-
-  // ── Day groups ──────────────────────────────────────────────────────────
-  const groups = useMemo(() => {
-    const out: { key: string; title: string; sub: string; rows: LogEntry[] }[] = []
-    const now = new Date()
-    for (const e of items) {
-      const date = order === 'logged' ? e.logged_at : e.happened_at
-      const key = dayKeyFor(date, order === 'logged' ? 'exact' : e.date_precision)
-      const last = out[out.length - 1]
-      if (last && last.key === key) last.rows.push(e)
-      else {
-        const h = dayHeadingFor(key, now)
-        out.push({ key, title: h.title, sub: h.sub, rows: [e] })
-      }
-    }
-    return out
-  }, [items, order])
 
   return (
     <Shell active="log">
@@ -345,14 +329,7 @@ export default function LogHome() {
 
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
-              {groups.map(g => (
-                <div key={g.key}>
-                  <div className="day"><b>{g.title}</b>{g.sub}</div>
-                  {g.rows.map(e => (
-                    <Row key={`${e.source}-${e.id}`} e={e} order={order} q={q} onImage={setLightbox} />
-                  ))}
-                </div>
-              ))}
+              <LogDays items={items} order={order} q={q} onImage={setLightbox} />
 
               {/* Day one is the same page as day one thousand. Nothing is
                   offered here that isn't offered when the log is full. */}
@@ -410,96 +387,6 @@ export default function LogHome() {
   )
 }
 
-// ── A row ─────────────────────────────────────────────────────────────────
-
-function Row({ e, order, q, onImage }: {
-  e: LogEntry
-  order: 'happened' | 'logged'
-  q: string
-  onImage: (url: string) => void
-}) {
-  const date = order === 'logged' ? e.logged_at : e.happened_at
-  const precision: DatePrecision = order === 'logged' ? 'exact' : e.date_precision
-  const fuzzy = order === 'happened' && isFuzzy(e.date_precision)
-  const tags = tagsFor(e)
-  const image = e.media.find(m => m.kind === 'image')
-  const video = e.media.find(m => m.kind === 'video')
-  const held = e.visibility === 'held'
-
-  const body = (
-    <>
-      <div className={`t${fuzzy ? ' fz' : ''}`}>{stampFor(date, precision)}</div>
-      <div>
-        <div className="x">
-          <span className="s">{highlight(e.sentence, q)}</span>
-          <span className="tags">
-            {tags.map((t, i) => (
-              <i key={i} className={t.tone === 'plain' ? undefined : t.tone}>{t.text}</i>
-            ))}
-          </span>
-        </div>
-
-        {/* The row carries its context — the second line stays visible. */}
-        {e.detail && !held && <div className="more">{highlight(e.detail, q)}</div>}
-
-        {/* The log says what it saw, never an unnamed reason. */}
-        {held && (
-          <div className="more">
-            <b>The log kept this back on its own.</b>{' '}
-            {e.held_reason
-              ? `It looks like ${e.held_reason}.`
-              : 'It has not been looked at yet.'}{' '}
-            Nothing about it is on the public log. You can publish it anyway,
-            but you have to say so.
-          </div>
-        )}
-
-        {(image || video) && (
-          <div className="pics">
-            {image && (
-              held
-                ? <span className="still"><span className="lbl2">not shown</span></span>
-                : image.url
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img
-                      src={image.url}
-                      alt=""
-                      loading="lazy"
-                      onClick={ev => { ev.preventDefault(); ev.stopPropagation(); onImage(image.url!) }}
-                    />
-                  : <span className="still"><span className="lbl2">no picture</span></span>
-            )}
-            {video && (
-              <span className="vid">
-                {video.poster_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={video.poster_url}
-                    alt=""
-                    loading="lazy"
-                    style={{ width: '100%', height: '100%', border: 0, borderRadius: 0, cursor: 'inherit' }}
-                  />
-                )}
-                <span className="play" />
-                {video.duration_seconds
-                  ? <span className="dur">{clockDuration(video.duration_seconds)}</span>
-                  : null}
-              </span>
-            )}
-            {held && <span className="cap">blurred here too, until you say otherwise</span>}
-          </div>
-        )}
-      </div>
-    </>
-  )
-
-  // A row links to its content. An entry with no page of its own is not
-  // clickable — a destination is never invented to satisfy an affordance.
-  return e.href
-    ? <Link className={`en${held ? ' isheld' : ''}`} href={e.href}>{body}</Link>
-    : <div className={`en${held ? ' isheld' : ''}`}>{body}</div>
-}
-
 // ── Relog ─────────────────────────────────────────────────────────────────
 // The recordings are already here, already transcribed, already extracted.
 // What was SAID in them is not on the log until this runs. It pages through
@@ -527,7 +414,6 @@ function Relog({ onDone }: { onDone: () => void }) {
     let cursor: string | null = null
     let written = 0
     try {
-      // Keep going until the server says there is no next page.
       for (;;) {
         if (stop.current) break
         const res: Response = await fetch('/api/v2/log/relog', {
@@ -550,7 +436,6 @@ function Relog({ onDone }: { onDone: () => void }) {
   }, [load, onDone])
 
   if (!status) return null
-  // Nothing to say when the whole corpus is already on the log.
   if (status.remaining <= 0 && !running && done === 0) return null
 
   return (
@@ -666,14 +551,3 @@ function whenLabel(iso: string, p: DatePrecision): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
-/**
- * A search result shows its reason: the matched term is marked. Searching
- * text the reader cannot see is worse than no search.
- */
-function highlight(s: string, q: string): ReactNode {
-  const term = q.trim()
-  if (!term) return s
-  const i = s.toLowerCase().indexOf(term.toLowerCase())
-  if (i < 0) return s
-  return <>{s.slice(0, i)}<mark>{s.slice(i, i + term.length)}</mark>{s.slice(i + term.length)}</>
-}

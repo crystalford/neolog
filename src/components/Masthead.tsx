@@ -29,6 +29,9 @@ const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
   { label: 'Log',       href: '/',          matchPaths: [
     /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
   ] },
+  { label: 'Index',     href: '/pages',     matchPaths: [
+    /^\/pages/, /^\/page\//,
+  ] },
   { label: 'Archive',   href: '/photos',    matchPaths: [
     /^\/photos/, /^\/photo\//,
   ] },
@@ -54,6 +57,8 @@ export function Masthead() {
         </span>
         <span className="wordmark">neolog</span>
       </Link>
+
+      <span className="pv">private · only you see this</span>
 
       <nav className="canon-nav">
         {NAV.map(item => {

@@ -637,18 +637,21 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   color: var(--fg);
   line-height: 1;
 }
+/* Pushed to the right edge, and the entries are words rather than buttons —
+ * `plain.css` rule 2: a control is a word. `justify-self` was a leftover
+ * from the grid masthead and does nothing in a flex row. */
 .canon-nav {
-  justify-self: center;
+  margin-left: auto;
   display: flex;
-  gap: 1px;
-  font-size: 12.5px;
-  color: var(--fg-2);
+  gap: 20px;
+  font-size: 13px;
+  color: var(--fg-3);
   flex-wrap: nowrap;
 }
 .canon-nav a {
-  padding: 7px 11px;
-  border-radius: 7px;
-  transition: color .15s, background .15s;
+  padding: 0;
+  border-radius: 0;
+  transition: color .15s;
   white-space: nowrap;
 }
 @media (max-width: 1240px) {
@@ -658,11 +661,11 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .canon-search span:first-of-type { display: none; }
   .canon-search { min-width: 0 !important; padding: 7px 12px !important; }
 }
-.canon-nav a:hover { color: var(--fg); background: var(--bg-3); }
-.canon-nav a.current { color: var(--fg); background: var(--bg-3); }
+.canon-nav a:hover { color: var(--fg); }
+.canon-nav a.current { color: var(--fg); }
 .canon-meta {
-  justify-self: end;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 10px;
 }
@@ -2943,4 +2946,90 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .nowpage .hint kbd { border: 1px solid var(--line-2); border-radius: 3px; padding: 1px 5px; margin: 0 2px; color: var(--fg-3); font-family: var(--font-mono); }
 @media (prefers-reduced-motion: reduce) {
   .nowpage .slab, .nowpage .waves { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * THE INDEX and A PAGE — src/app/(app)/pages, src/app/(app)/page/[id]
+ *
+ * From `headings.html` (the table: page · kind · span · entries · status,
+ * banded into going-on-now / from-before / people / places) and
+ * `subject.html` (a page's own header, the log's one paragraph, then the
+ * entries as ordinary feed rows).
+ *
+ * A page is the log filtered. It uses the same frame, the same day
+ * dividers and the same rows — everything below is the compact header on
+ * top of them, and nothing else.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+.logpage .idxband { padding: 34px 0 4px; display: flex; gap: 12px; align-items: baseline; font-size: 11.5px; color: var(--fg-4); }
+.logpage .idxband b { font-weight: 450; color: var(--fg-2); font-size: 12.5px; }
+.logpage .idxband::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.logpage .idxhead,
+.logpage .idxrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 132px 60px minmax(0, 108px);
+  gap: 18px; align-items: baseline;
+}
+.logpage .idxhead {
+  padding: 10px 12px 8px; margin: 0 -12px;
+  font-size: 11.5px; color: var(--fg-4); border-bottom: 1px solid var(--line);
+}
+.logpage .idxrow {
+  padding: 11px 12px; margin: 0 -12px; border-radius: 9px;
+  transition: background .14s; color: inherit; text-decoration: none;
+}
+.logpage a.idxrow:hover { background: var(--bg-1); }
+.logpage .idxrow .nm { font-size: 15px; font-weight: 300; color: var(--fg); letter-spacing: -0.2px; }
+.logpage .idxrow .nm em { font-style: normal; display: block; font-size: 12.5px; color: var(--fg-4); margin-top: 2px; line-height: 1.45; }
+.logpage .idxrow .kd { font-size: 12px; color: var(--fg-3); white-space: nowrap; }
+.logpage .idxrow .sp,
+.logpage .idxrow .ct { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3); white-space: nowrap; }
+.logpage .idxrow .ct { text-align: right; }
+.logpage .idxrow .st { font-size: 11.5px; color: var(--fg-4); white-space: nowrap; }
+/* Only the states that mean "there is a hole here" take a colour. */
+.logpage .idxrow .st.blank { color: var(--t-ochre); }
+.logpage .idxrow .st.once { color: var(--fg-4); }
+
+/* A page's own header. Compact — the entries are the page. */
+.logpage .pghead { padding: 16px 0 0; }
+.logpage .pghead h1 {
+  font-size: 28px; font-weight: 300; letter-spacing: -0.9px; line-height: 1.25;
+  color: var(--fg); margin: 0; max-width: 700px;
+}
+.logpage .pgmeta {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px;
+  font-size: 12px; color: var(--fg-4);
+}
+.logpage .pgmeta b { font-family: var(--font-mono); font-weight: 400; font-size: 11.5px; color: var(--fg-2); }
+/* The log's one-paragraph version. Marked as the log's, always — it is
+   never shown as the operator's words. */
+.logpage .pgpara {
+  margin-top: 20px; padding: 15px 17px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1);
+  font-size: 14.5px; line-height: 1.65; color: var(--fg-1); max-width: 660px;
+}
+.logpage .pgpara .who { display: block; margin-top: 10px; font-size: 11.5px; color: var(--fg-4); }
+.logpage .pgpara textarea {
+  width: 100%; min-height: 120px; background: var(--bg-2);
+  border: 1px solid var(--line-1); border-radius: 8px; color: var(--fg-1);
+  font: inherit; font-size: 14.5px; line-height: 1.6; padding: 10px 12px;
+  resize: vertical; font-family: var(--font-body);
+}
+.logpage .rc input[type=text] {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line-1);
+  border-radius: 7px; color: var(--fg-1); font: inherit; font-size: 12.5px;
+  padding: 6px 9px; margin-top: 8px; font-family: var(--font-body);
+}
+.logpage .rc select {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line-1);
+  border-radius: 7px; color: var(--fg-1); font: inherit; font-size: 12.5px;
+  padding: 6px 9px; margin-top: 8px; font-family: var(--font-body);
+}
+
+@media (max-width: 920px) {
+  .logpage .idxhead,
+  .logpage .idxrow { grid-template-columns: minmax(0, 1fr) 78px 52px; }
+  .logpage .idxhead .sp, .logpage .idxrow .sp,
+  .logpage .idxhead .st, .logpage .idxrow .st { display: none; }
 }
