@@ -61,6 +61,11 @@ jobs:
       - name: Conversation splitting
         run: node --experimental-strip-types scripts/test/conversation.mjs
 
+      # A seam the model invented must not become a part — the anchors it
+      # returns are located in the transcript, never trusted as text.
+      - name: Note splitting
+        run: node --experimental-strip-types scripts/test/split-note.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
