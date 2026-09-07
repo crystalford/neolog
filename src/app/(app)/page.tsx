@@ -422,6 +422,8 @@ export default function LogHome() {
               </div>
             </div>
 
+            <WhileYouWereGone />
+
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
               <LogDays items={items} order={order} q={q} onImage={openShot}
@@ -523,6 +525,47 @@ function ArrivedOnItsOwn({ items }: { items: LogEntry[] }) {
         {parts.join(' · ')}
         <em>every line the log wrote is correctable in one tap</em>
       </div>
+    </div>
+  )
+}
+
+// ── While you were gone ───────────────────────────────────────────────────
+// away.html is mostly a list of things the log refuses to do. No welcome
+// back, no broken streak, no badge, no unread count, no queue to clear. Its
+// own summary line is "all filed · nothing waiting", and the point of the
+// band is to say that the days are not empty rather than to ask him to do
+// anything about them.
+
+function WhileYouWereGone() {
+  const [a, setA] = useState<{
+    away: boolean; days: number; total: number
+    parts: { label: string; n: number }[]
+  } | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/v2/away', { cache: 'no-store' })
+        if (res.ok) setA(await res.json())
+      } catch { /* the band just doesn't show */ }
+    })()
+  }, [])
+
+  if (!a?.away) return null
+
+  const list = a.parts.map(p => `${p.n} ${p.label}`).join(', ')
+
+  return (
+    <div className="gone">
+      <b>{a.days} days without writing anything.</b>{' '}
+      {a.total > 0 ? (
+        <>
+          {list} arrived on their own, so the days aren&rsquo;t empty — they
+          just have no words on them. All filed; nothing waiting.
+        </>
+      ) : (
+        <>Nothing arrived either. The days are simply blank.</>
+      )}
     </div>
   )
 }

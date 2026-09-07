@@ -21,12 +21,23 @@ import Shell from '@/components/Shell'
 
 interface IndexPage { id: string; name: string; kind: string; entry_count: number }
 
+interface Bill {
+  estimate: boolean
+  note: string
+  stored: { gb: number; recordings: number; photos: number; entries: number; hours_of_recording: number }
+  monthly: { what: string; rate: string; how: string; usd: number }[]
+  monthly_total: number
+  one_off: { what: string; rate: string; how: string; usd: number }[]
+  one_off_total: number
+}
+
 export default function ExportPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [pageId, setPageId] = useState('')
   const [pages, setPages] = useState<IndexPage[]>([])
   const [count, setCount] = useState<number | null>(null)
+  const [bill, setBill] = useState<Bill | null>(null)
   const [counting, setCounting] = useState(false)
 
   useEffect(() => {
@@ -35,6 +46,18 @@ export default function ExportPage() {
         const res = await fetch('/api/v2/pages?limit=500', { cache: 'no-store' })
         if (res.ok) setPages(((await res.json()) as { items: IndexPage[] }).items || [])
       } catch { /* the picker just stays empty */ }
+    })()
+  }, [])
+
+  // takeout.html calls export and the bill "two promises that only mean
+  // something if you can check them". The second one belongs here, beside
+  // the first.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/v2/bill', { cache: 'no-store' })
+        if (res.ok) setBill(await res.json() as Bill)
+      } catch { /* the section just doesn't show */ }
     })()
   }, [])
 
@@ -147,6 +170,53 @@ export default function ExportPage() {
             </div>
           </div>
         </div>
+        {/* The second promise: what it costs to keep. */}
+        {bill && (
+          <>
+            <div className="idxband"><b>What it costs to keep</b>an estimate, not an invoice</div>
+            <div className="pgpara" style={{ marginTop: 14 }}>
+              {bill.stored.gb} GB — {bill.stored.entries} entries,{' '}
+              {bill.stored.recordings} recordings
+              {bill.stored.hours_of_recording > 0 && ` (${bill.stored.hours_of_recording} hours)`},{' '}
+              {bill.stored.photos} photos.
+              <span className="who">{bill.note}</span>
+            </div>
+
+            <div className="idxhead" style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
+              <span>what</span><span>rate</span><span>how much</span>
+              <span style={{ textAlign: 'right' }}>a month</span>
+            </div>
+            {bill.monthly.map((l, i) => (
+              <div className="idxrow" key={i} style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
+                <span className="nm">{l.what}</span>
+                <span className="kd">{l.rate}</span>
+                <span className="sp">{l.how}</span>
+                <span className="ct">${l.usd.toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="idxrow" style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
+              <span className="nm"><b>Every month, to keep all of it</b></span>
+              <span className="kd" /><span className="sp" />
+              <span className="ct"><b>${bill.monthly_total.toFixed(2)}</b></span>
+            </div>
+
+            <div className="idxband"><b>Already paid, once</b>reading it, not keeping it</div>
+            {bill.one_off.map((l, i) => (
+              <div className="idxrow" key={i} style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
+                <span className="nm">{l.what}</span>
+                <span className="kd">{l.rate}</span>
+                <span className="sp">{l.how}</span>
+                <span className="ct">${l.usd.toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="quiet" style={{ marginTop: 12 }}>
+              Every line says which rate it used, so the arithmetic can be
+              checked by hand. There is no billing API wired into this app, and
+              a number that looked like an invoice but wasn&rsquo;t would be
+              worse than one that says what it is.
+            </div>
+          </>
+        )}
       </div>
     </Shell>
   )

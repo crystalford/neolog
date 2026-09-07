@@ -3499,3 +3499,13 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 @media (max-width: 720px) {
   .logpage .sheet .sh-cols { grid-template-columns: 1fr; }
 }
+
+/* "While you were gone — nothing needed you" (away.html). A statement about
+   the log, not a reproach: no streak, no badge, no unread count, nothing to
+   clear. It says the days are not empty and then gets out of the way. */
+.logpage .gone {
+  margin: 18px 0 0; padding: 12px 15px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--bg-1);
+  font-size: 13.5px; line-height: 1.6; color: var(--fg-3); max-width: 660px;
+}
+.logpage .gone b { color: var(--fg-1); font-weight: 450; }
