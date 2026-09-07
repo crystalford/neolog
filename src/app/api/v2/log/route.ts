@@ -66,6 +66,17 @@ async function presignAll(env: Env, keys: (string | null)[]): Promise<(string | 
   }))
 }
 
+/**
+ * Which R2 key an item still needs a URL for, and where it goes.
+ *
+ * Presigning is HMAC work, and each of the three sources returns up to
+ * `limit` rows — so signing them all before the merge meant up to three
+ * times `limit` signatures to show `limit` rows, two thirds of them for rows
+ * that never survive the trim. The keys ride along instead and only the
+ * survivors are signed.
+ */
+const NEEDS_URL = new WeakMap<LogEntry, { key: string; slot: 'url' | 'poster_url' }>()
+
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   let operator
@@ -228,10 +239,8 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Typed, spoken, dropped-in entries ────────────────────────────────────
-  const entryMedia = await presignAll(env, entryRows.map(r => r.r2_key))
-  entryRows.forEach((r, i) => {
+  entryRows.forEach(r => {
     if (reflections.has(r.id)) return
-    const signed = entryMedia[i]
     const media: MediaRef[] = []
     if (r.r2_key) {
       const m = r.mime || ''
@@ -239,7 +248,7 @@ export async function GET(req: NextRequest) {
         kind: m.startsWith('image/') ? 'image'
             : m.startsWith('video/') ? 'video'
             : m.startsWith('audio/') ? 'audio' : 'file',
-        url: signed,
+        url: null,
         duration_seconds: r.duration_seconds,
         label: r.original_filename,
       })
@@ -266,14 +275,15 @@ export async function GET(req: NextRequest) {
       searchable: [r.text, r.detail, r.transcript, r.link_url, r.original_filename]
         .filter(Boolean).join(' ').toLowerCase(),
     })
+    if (r.r2_key) NEEDS_URL.set(items[items.length - 1], { key: r.r2_key, slot: 'url' })
   })
 
   // ── Recordings ──────────────────────────────────────────────────────────
   // The sentence is the log's, composed from the file's own facts. The
   // operator's title, if there is one, sits underneath — never invented.
-  const vlogThumbs = await presignAll(env, vlogRows.map(r => r.thumbnail_r2_key))
-  vlogRows.forEach((v, i) => {
-    const thumb = vlogThumbs[i] || v.thumbnail_url || null
+  vlogRows.forEach(v => {
+    // A legacy data-URI thumbnail needs no signing; a key does.
+    const thumb = v.thumbnail_url || null
     // A date the pipeline had to guess is a fuzzy date, and says so.
     const src = v.recorded_at_source || ''
     const precision: DatePrecision =
@@ -325,11 +335,13 @@ export async function GET(req: NextRequest) {
       searchable: [v.title, v.summary, v.vision_description, v.original_filename, v.transcript_text]
         .filter(Boolean).join(' ').toLowerCase(),
     })
+    if (v.thumbnail_r2_key) {
+      NEEDS_URL.set(items[items.length - 1], { key: v.thumbnail_r2_key, slot: 'poster_url' })
+    }
   })
 
   // ── Photos ──────────────────────────────────────────────────────────────
-  const photoThumbs = await presignAll(env, photoRows.map(p => p.thumbnail_r2_key || p.r2_key))
-  photoRows.forEach((p, i) => {
+  photoRows.forEach(p => {
     items.push({
       id: p.id,
       source: 'photo',
@@ -350,12 +362,15 @@ export async function GET(req: NextRequest) {
       // content, and clicking the picture opens it. Never invent a
       // destination to satisfy an affordance.
       href: '',
-      media: [{ kind: 'image', url: photoThumbs[i], label: p.caption }],
+      media: [{ kind: 'image', url: null, label: p.caption }],
       duration_seconds: null,
       batch_id: null,
       vlog_id: null,
       source_ref: null,
       searchable: [p.caption, p.vision_description].filter(Boolean).join(' ').toLowerCase(),
+    })
+    NEEDS_URL.set(items[items.length - 1], {
+      key: p.thumbnail_r2_key || p.r2_key, slot: 'url',
     })
   })
 
@@ -367,6 +382,16 @@ export async function GET(req: NextRequest) {
 
   const total = list.length
   const trimmed = list.slice(0, limit)
+
+  // Only the rows that are actually being returned get a signature.
+  const pending = trimmed.map(e => NEEDS_URL.get(e) || null)
+  const signed = await presignAll(env, pending.map(p => p?.key || null))
+  trimmed.forEach((e, i) => {
+    const want = pending[i]
+    if (!want || !signed[i] || !e.media.length) return
+    if (want.slot === 'url') e.media[0].url = signed[i]
+    else e.media[0].poster_url = signed[i]
+  })
 
   // The three sources are counted separately, so fold them into one year map.
   const coverage: Record<string, number> = {}
