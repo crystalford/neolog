@@ -90,6 +90,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
   const [newDate, setNewDate] = useState('')
   const [newPrecision, setNewPrecision] = useState<DatePrecision>('exact')
   const [newYear, setNewYear] = useState('')
+  const [sheet, setSheet] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -408,8 +409,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 </em>
                 <div className="fixrow">
                   {e.visibility !== 'public' && (
-                    <button className="p" onClick={() => void patch({ visibility: 'public' })}>
-                      Publish it anyway
+                    <button className="p" onClick={() => setSheet(true)}>
+                      {e.visibility === 'held' ? 'Publish it anyway' : 'Make it public'}
                     </button>
                   )}
                   {e.visibility !== 'private' && (
@@ -522,6 +523,63 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             </div>
           </aside>
         </div>
+        {/* publish.html: "Left: what you have. Right: what a stranger would
+            see. Nothing on the right that isn't on the left." No queue, no
+            drafts folder, no schedule — one entry, one decision. */}
+        {sheet && (
+          <div className="sheetwrap" onClick={ev => { if (ev.target === ev.currentTarget) setSheet(false) }}>
+            <div className="sheet">
+              <div className="sh-head">
+                <b>Make this entry public?</b>
+                <span>
+                  {stampFor(e.happened_at, e.date_precision)} · one entry · nothing else changes
+                </span>
+              </div>
+              <div className="sh-cols">
+                <div className="sh-col">
+                  <div className="sh-k">What you have — stays private</div>
+                  <div className="sh-body">{e.text}</div>
+                  {e.detail && <div className="sh-sub">{e.detail}</div>}
+                  {/* The private context behind it, named rather than
+                      silently carried across. */}
+                  {(e.came_from || (e.led_to && e.led_to.length > 0) || e.transcript || e.media_url) && (
+                    <div className="sh-sub">
+                      Behind it:{' '}
+                      {[
+                        e.transcript ? 'the recording and its transcript' : null,
+                        e.media_url && !e.transcript ? 'the file' : null,
+                        e.came_from ? 'the entry this came out of' : null,
+                        (e.led_to?.length || 0) > 0
+                          ? `${e.led_to!.length} later ${e.led_to!.length === 1 ? 'turn' : 'turns'}`
+                          : null,
+                      ].filter(Boolean).join(', ')}. None of it goes with this.
+                    </div>
+                  )}
+                </div>
+                <div className="sh-col">
+                  <div className="sh-k">What a stranger would see</div>
+                  <div className="sh-body">{e.text}</div>
+                  <div className="sh-sub">
+                    {stampFor(e.happened_at, e.date_precision)}
+                    {isFuzzy(e.date_precision) ? ' · from memory' : ' · written down at the time'}
+                    {e.author === 'log' ? ' · written by the log' : ''}
+                  </div>
+                </div>
+              </div>
+              <div className="sh-note">
+                Nothing on the right that isn&rsquo;t on the left. It appears on
+                the public log, which still needs signing in until you open it.
+              </div>
+              <div className="sh-act">
+                <button
+                  className="p"
+                  onClick={async () => { await patch({ visibility: 'public' }); setSheet(false) }}
+                >Make it public</button>
+                <button onClick={() => setSheet(false)}>Not now</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Shell>
   )
