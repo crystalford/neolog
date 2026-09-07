@@ -28,7 +28,7 @@ import Shell from '@/components/Shell'
 import { LogDays } from '@/components/LogRow'
 import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import { PAGE_KINDS } from '@/lib/pages'
-import type { LogEntry } from '@/lib/log-entry'
+import { stampFor, type LogEntry } from '@/lib/log-entry'
 
 interface PageDetail {
   id: string
@@ -42,10 +42,15 @@ interface PageDetail {
   named_by_system: number
 }
 
+interface FirstSaid { id: string; text: string; at: string; href: string }
+interface Change { entry_id: string; old_value: string | null; new_value: string | null; created_at: string }
+
 export default function PageView({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [page, setPage] = useState<PageDetail | null>(null)
   const [items, setItems] = useState<LogEntry[]>([])
+  const [firstSaid, setFirstSaid] = useState<FirstSaid | null>(null)
+  const [changes, setChanges] = useState<Change[]>([])
   const [loading, setLoading] = useState(true)
   const [shotAt, setShotAt] = useState<number | null>(null)
   const [renaming, setRenaming] = useState(false)
@@ -57,9 +62,14 @@ export default function PageView({ params }: { params: { id: string } }) {
     try {
       const res = await fetch(`/api/v2/pages/${params.id}`, { cache: 'no-store' })
       if (!res.ok) { setPage(null); return }
-      const data = await res.json() as { page: PageDetail; items: LogEntry[] }
+      const data = await res.json() as {
+        page: PageDetail; items: LogEntry[]
+        first_said?: FirstSaid | null; changes?: Change[]
+      }
       setPage(data.page)
       setItems(data.items || [])
+      setFirstSaid(data.first_said || null)
+      setChanges(data.changes || [])
     } catch { setPage(null) }
     finally { setLoading(false) }
   }, [params.id])
@@ -171,6 +181,42 @@ export default function PageView({ params }: { params: { id: string } }) {
                     </span>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* `idea.html` and `term.html`: a page of a THOUGHT needs two
+                things a page of a person does not — when it was first said,
+                and every time he has changed it since. Both are read from
+                rows that already exist, so neither can be wrong in a way the
+                entries are not. */}
+            {firstSaid && (
+              <div className="firstsaid">
+                <div className="fk">first said</div>
+                <Link className="fv" href={firstSaid.href}>
+                  {firstSaid.text.length > 200 ? `${firstSaid.text.slice(0, 198)}…` : firstSaid.text}
+                  <em>{stampFor(firstSaid.at, 'exact')}</em>
+                </Link>
+              </div>
+            )}
+
+            {changes.length > 0 && (
+              <div className="revs" style={{ marginTop: 16 }}>
+                <div className="who">
+                  Changed {changes.length === 1 ? 'once' : `${changes.length} times`} since
+                </div>
+                {changes.map((c, i) => (
+                  <div className="rev" key={i}>
+                    <span className="rt">
+                      {new Date(c.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                      })}
+                    </span>
+                    <span className="rb">
+                      {c.old_value && <span className="was">{c.old_value}</span>}
+                      <em>both wordings kept</em>
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 

@@ -41,9 +41,13 @@ import type { D1Database } from '@cloudflare/workers-types'
 /** One shape, these labels. `mention` is a name that was never made into more. */
 export type PageKind =
   | 'job' | 'project' | 'subject' | 'person' | 'place' | 'thing' | 'mention'
+  // `term.html` — a word he coined or took over, with the sentence it was
+  // coined in and every use since. It is a page like any other; the kind is
+  // a label, and what makes it a term is that the FIRST use is the point.
+  | 'term'
 
 export const PAGE_KINDS: PageKind[] = [
-  'job', 'project', 'subject', 'person', 'place', 'thing', 'mention',
+  'job', 'project', 'subject', 'person', 'place', 'thing', 'term', 'mention',
 ]
 
 export interface PageRow {

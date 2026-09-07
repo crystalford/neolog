@@ -148,6 +148,26 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   items.sort((a, b) => (b.happened_at || '').localeCompare(a.happened_at || ''))
 
+  // `idea.html` and `term.html`: what a page of a THOUGHT needs that a page
+  // of a person does not — when it was first said, and every time he changed
+  // his mind since. Both come from rows that already exist: the earliest
+  // entry, and the revisions on anything under it.
+  const changes = items.length
+    ? await findMany<{
+        entry_id: string; old_value: string | null; new_value: string | null; created_at: string
+      }>(
+        db,
+        `SELECT entry_id, old_value, new_value, created_at
+           FROM entry_revisions
+          WHERE operator_id = ? AND field = 'text'
+            AND entry_id IN (${items.filter(i => i.source === 'entry').map(() => '?').join(',') || "''"})
+          ORDER BY created_at ASC LIMIT 20`,
+        operator.id, ...items.filter(i => i.source === 'entry').map(i => i.id),
+      )
+    : []
+
+  const oldest = items.length ? items[items.length - 1] : null
+
   const now = new Date()
   return NextResponse.json(
     {
@@ -157,6 +177,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         span: spanFor(page, now),
       },
       items,
+      // The first time he said it, and every time he has changed it since.
+      first_said: oldest
+        ? { id: oldest.id, text: oldest.sentence, at: oldest.happened_at, href: oldest.href }
+        : null,
+      changes,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )

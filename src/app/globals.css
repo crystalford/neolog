@@ -3593,3 +3593,24 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 @media (max-width: 720px) {
   .logpage .way-row { grid-template-columns: 1fr; gap: 6px; }
 }
+
+/* What a page of a thought carries that a page of a person does not
+   (idea.html, term.html): the first time it was said, and how it has changed.
+   The first saying gets weight because on an idea's page it is the point —
+   anyone can hold a position today; holding it three years ago is the part
+   that cannot be produced on demand. */
+.logpage .firstsaid {
+  margin-top: 20px; padding: 14px 16px; max-width: 660px;
+  border: 1px solid var(--line-1); border-radius: 10px;
+  border-left: 1px solid var(--sig);
+}
+.logpage .firstsaid .fk { font-size: 11.5px; color: var(--fg-4); margin-bottom: 8px; }
+.logpage .firstsaid .fv {
+  display: block; font-size: 15.5px; font-weight: 300; line-height: 1.5;
+  color: var(--fg); letter-spacing: -0.2px; text-wrap: pretty;
+}
+.logpage .firstsaid .fv:hover { color: var(--fg); }
+.logpage .firstsaid .fv em {
+  font-style: normal; display: block; margin-top: 6px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
+}
