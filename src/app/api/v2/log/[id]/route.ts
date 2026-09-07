@@ -66,13 +66,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     link_url: string | null; original_filename: string | null
     vlog_id: string | null; source_ref: string | null
     span_start: number | null; span_end: number | null; grounded: number | null
+    led_from: string | null
   }>(
     db,
     `SELECT id, text, detail, occurred_at, created_at, updated_at, happened_at,
             logged_at, date_precision, kind, visibility, held_reason, author,
             source_kind, batch_id, buried_at, r2_key, mime, bytes,
             duration_seconds, transcript, link_url, original_filename,
-            vlog_id, source_ref, span_start, span_end, grounded
+            vlog_id, source_ref, span_start, span_end, grounded, led_from
        FROM log_entries
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,
@@ -91,6 +92,31 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     params.id, operator.id,
   )
 
+  // Both directions of the thread. A thread is `led_from` followed either
+  // way — there is no thread object to fetch.
+  const [cameFrom, ledTo] = await Promise.all([
+    row.led_from
+      ? findMany<{ id: string; text: string; happened_at: string; occurred_at: string; date_precision: string }>(
+          db,
+          `SELECT id, text, COALESCE(happened_at, occurred_at) AS happened_at,
+                  occurred_at, date_precision
+             FROM log_entries
+            WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+          row.led_from, operator.id,
+        )
+      : Promise.resolve([]),
+    findMany<{ id: string; text: string; happened_at: string; occurred_at: string; date_precision: string }>(
+      db,
+      `SELECT id, text, COALESCE(happened_at, occurred_at) AS happened_at,
+              occurred_at, date_precision
+         FROM log_entries
+        WHERE led_from = ? AND operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        ORDER BY COALESCE(happened_at, occurred_at) ASC
+        LIMIT 20`,
+      params.id, operator.id,
+    ),
+  ])
+
   let media_url: string | null = null
   if (row.r2_key) {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
@@ -103,6 +129,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       logged_at: row.logged_at || row.created_at,
       media_url,
       revisions,
+      came_from: cameFrom[0] || null,
+      led_to: ledTo,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )

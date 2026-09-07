@@ -1374,6 +1374,27 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_recall_status
             ON recall_questions(operator_id, status, created_at DESC)`,
   },
+
+  // ── Threads (7 Sep 2026) ────────────────────────────────────────────────
+  // "A thread adds ONE thing: each turn carries a `led_from` pointing at the
+  //  turn it came out of. Loops allowed. Turns from outside the note
+  //  (reading the log and reacting) are turns. Stays open." (SPEC §1)
+  //
+  // One column, because that is genuinely all a thread is. There is no
+  // thread table, no thread id, no membership: a thread is what you get by
+  // following `led_from` from any turn, in either direction. Nothing has to
+  // be created, named, closed, or joined.
+  //
+  // Deliberately NOT at /thread/[id]: that route already serves a row of the
+  // extraction `threads` table, which is a different thing with the same
+  // word, and this repo has already paid once for a naming collision
+  // (productions vs projects). The mechanic lives on the entry page, where
+  // both directions are visible at the same time.
+  { name: '2026-09-07_log_entries_led_from', sql: `ALTER TABLE log_entries ADD COLUMN led_from TEXT` },
+  {
+    name: '2026-09-07_idx_log_entries_led_from',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

@@ -151,6 +151,8 @@ export function useIntake(onDone?: () => void) {
   const submit = useCallback(async (opts?: {
     happened_at?: string
     date_precision?: DatePrecision
+    /** The turn this came out of, when continuing a thread. */
+    led_from?: string
   }): Promise<IntakeReceipt | null> => {
     const ready = pending.filter(p => p.r2_key && !p.error)
     if (!text.trim() && !ready.length) return null
@@ -164,6 +166,7 @@ export function useIntake(onDone?: () => void) {
           text: text.trim() || undefined,
           happened_at: opts?.happened_at,
           date_precision: opts?.date_precision,
+          led_from: opts?.led_from,
           files: ready.map(p => ({
             r2_key: p.r2_key,
             original_filename: p.file.name,

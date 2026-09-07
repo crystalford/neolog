@@ -51,7 +51,17 @@ interface Entry {
   span_start: number | null
   span_end: number | null
   grounded: number | null
+  led_from: string | null
+  came_from?: Turn | null
+  led_to?: Turn[]
   revisions?: Revision[]
+}
+
+interface Turn {
+  id: string
+  text: string
+  happened_at: string
+  date_precision: DatePrecision
 }
 
 interface Revision {
@@ -201,6 +211,35 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                     {e.original_filename || 'the file'}
                   </a>
                 )}
+              </div>
+            )}
+
+            {/* A thread is `led_from` followed either way. Both directions
+                sit here rather than on a page of their own, so the turn you
+                are reading always shows what it came out of and what came
+                out of it — which is the whole of the mechanic. */}
+            {(e.came_from || (e.led_to && e.led_to.length > 0)) && (
+              <div className="turns">
+                {e.came_from && (
+                  <Link className="turn back" href={`/entry/${e.came_from.id}`}>
+                    <span className="tl">came out of</span>
+                    <span className="tx">
+                      {e.came_from.text.length > 150
+                        ? `${e.came_from.text.slice(0, 148)}…`
+                        : e.came_from.text}
+                      <em>{stampFor(e.came_from.happened_at, e.came_from.date_precision)}</em>
+                    </span>
+                  </Link>
+                )}
+                {(e.led_to || []).map(t => (
+                  <Link className="turn fwd" href={`/entry/${t.id}`} key={t.id}>
+                    <span className="tl">led to</span>
+                    <span className="tx">
+                      {t.text.length > 150 ? `${t.text.slice(0, 148)}…` : t.text}
+                      <em>{stampFor(t.happened_at, t.date_precision)}</em>
+                    </span>
+                  </Link>
+                ))}
               </div>
             )}
 
@@ -360,6 +399,22 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                       Bury it
                     </button>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rc">
+              <div className="h">The thread</div>
+              <div className="i">
+                <b>Where did this go?</b>
+                <em>
+                  A thread is one thing: each turn points at the turn it came
+                  out of. Nothing is created, named or closed.
+                </em>
+                <div className="fixrow">
+                  <Link href={`/?led_from=${e.id}`}>
+                    <button className="p">Write what this led to</button>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -132,6 +132,12 @@ export default function LogHome() {
   const [order, setOrder] = useState<'happened' | 'logged'>('happened')
   const [q, setQ] = useState('')
   const [shotAt, setShotAt] = useState<number | null>(null)
+  // Arriving from an entry with "write what this led to". The composer
+  // carries the turn so the next thing typed joins the thread.
+  const [ledFrom] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.search).get('led_from')
+  })
 
   const loadFeed = useCallback(async () => {
     try {
@@ -175,6 +181,7 @@ export default function LogHome() {
     const r = await intake.submit({
       happened_at: when ? new Date(`${when}T12:00:00Z`).toISOString() : undefined,
       date_precision: when ? precision : undefined,
+      led_from: ledFrom || undefined,
     })
     if (!r) return
     // Receipt, then silence. Nothing is asked.
@@ -184,7 +191,7 @@ export default function LogHome() {
     if (receiptTimer.current) clearTimeout(receiptTimer.current)
     receiptTimer.current = setTimeout(() => intake.setReceipt(null), 8000)
     taRef.current?.focus()
-  }, [intake, when, precision])
+  }, [intake, when, precision, ledFrom])
 
   const undo = useCallback(async () => {
     await intake.undo()
@@ -243,6 +250,16 @@ export default function LogHome() {
                   }}
                 />
 
+                {/* Continuing a thread. Said plainly, with a way out — the
+                    composer must never silently attach what you type to
+                    something you have forgotten you clicked. */}
+                {ledFrom && (
+                  <div className="whenrow">
+                    <span>This carries on from an earlier entry.</span>
+                    <Link className="clr" href="/">on its own instead</Link>
+                    <Link className="clr" href={`/entry/${ledFrom}`}>see it</Link>
+                  </div>
+                )}
                 {whenOpen && (
                   <div className="whenrow">
                     <span>It happened</span>

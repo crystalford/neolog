@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
     happened_at?: string
     date_precision?: string
     link_url?: string
+    led_from?: string
     files?: IncomingFile[]
   }
 
@@ -139,11 +140,16 @@ export async function POST(req: NextRequest) {
   // Files needing work after the reply: transcription, or the hold-back look.
   const followUps: { id: string; r2_key: string; mime: string; kind: 'audio' | 'image' }[] = []
 
+  // The turn this came out of, when it is one. A thread is just this
+  // column followed in either direction.
+  const ledFrom = (body.led_from || '').trim() || null
+
   const INSERT = `INSERT INTO log_entries
     (id, operator_id, text, detail, occurred_at, happened_at, logged_at,
      date_precision, kind, visibility, held_reason, author, source_kind,
-     batch_id, r2_key, mime, bytes, duration_seconds, link_url, original_filename)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     batch_id, r2_key, mime, bytes, duration_seconds, link_url,
+     original_filename, led_from)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
   // ── The typed / spoken sentence ─────────────────────────────────────────
   // The operator's own words. Author is always `operator`, and the text is
@@ -161,7 +167,7 @@ export async function POST(req: NextRequest) {
         id, operator.id, sentence, null, happenedAt, happenedAt, now,
         precision, linkUrl && !text ? 'read' : 'said', 'public', null, 'operator',
         linkUrl && !text ? 'link' : 'text',
-        batchId, null, null, null, null, linkUrl, null,
+        batchId, null, null, null, null, linkUrl, null, ledFrom,
       ],
     })
   }
@@ -177,7 +183,7 @@ export async function POST(req: NextRequest) {
         id, operator.id, batchSentence(files.length),
         names.slice(0, 12).join(', ') + (names.length > 12 ? `, and ${names.length - 12} more` : ''),
         now, now, now, 'exact', 'happened', 'public', null, 'log', 'batch',
-        batchId, null, null, null, null, null, null,
+        batchId, null, null, null, null, null, null, null,
       ],
     })
   }
@@ -268,7 +274,7 @@ export async function POST(req: NextRequest) {
         isAudio ? 'voice' : 'file',
         batchId,
         f.r2_key, f.mime || null, f.bytes ?? null, f.duration_seconds ?? null,
-        null, f.original_filename || null,
+        null, f.original_filename || null, ledFrom,
       ],
     })
 
