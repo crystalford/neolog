@@ -51,6 +51,7 @@ import { transcribeAudio } from '@/lib/transcribe'
 import { checkHoldBack, placeFile, kindForUpload } from '@/lib/log-intake'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import { verifyStored, findExistingCopy } from '@/lib/keep'
+import { looksLikeConversation, splitTurns, operatorTurns, conversationSentence } from '@/lib/conversation'
 import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -162,22 +163,65 @@ export async function POST(req: NextRequest) {
   // The operator's own words. Author is always `operator`, and the text is
   // stored exactly as typed — hesitations, fragments, no punctuation, all of
   // it (CLAUDE.md's voice-preservation rule applies to his own entries too).
+  // A pasted conversation is kept whole and split. Only HIS turns become
+  // entries — the same consent rule audio.html states for a two-voice
+  // recording, and doubly right here because an entry carries
+  // author='operator' and a model's sentence must never sit behind that.
+  const isConversation = !!text && !linkUrl && looksLikeConversation(text)
+  const turns = isConversation ? splitTurns(text) : []
+  const mine = isConversation ? operatorTurns(turns) : []
+
   if (text || linkUrl) {
     const id = ulid()
     entryIds.push(id)
+    // SPEC §11: a source with no clock gets a date and no time, marked
+    // approximate — never the paste time dressed up as when it happened.
     const happenedAt = statedAt || now
-    const precision = statedAt ? statedPrecision : 'exact'
-    const sentence = text || `Kept a link: ${linkUrl}`
+    const precision: DatePrecision = statedAt
+      ? statedPrecision
+      : (isConversation ? 'approx' : 'exact')
+    const sentence = isConversation
+      ? conversationSentence(text, turns)
+      : (text || `Kept a link: ${linkUrl}`)
     statements.push({
       sql: INSERT,
       binds: [
-        id, operator.id, sentence, null, happenedAt, happenedAt, now,
-        precision, linkUrl && !text ? 'read' : 'said', 'public', null, 'operator',
-        linkUrl && !text ? 'link' : 'text',
+        id, operator.id, sentence,
+        // The whole conversation is kept, so nothing is lost and the other
+        // half is still there to read.
+        isConversation ? text : null,
+        happenedAt, happenedAt, now,
+        precision,
+        isConversation ? 'read' : (linkUrl && !text ? 'read' : 'said'),
+        'public', null,
+        // The log wrote the conversation's own line; his turns below are his.
+        isConversation ? 'log' : 'operator',
+        isConversation ? 'chat' : (linkUrl && !text ? 'link' : 'text'),
         batchId, null, null, null, null, linkUrl, null, ledFrom, relation,
         null, null,
       ],
     })
+  }
+
+  // Each of his substantive turns, verbatim, pointing back at the
+  // conversation it came out of. Nothing the model said becomes an entry.
+  if (isConversation && mine.length) {
+    const conversationId = entryIds[0]
+    for (const turn of mine.slice(0, 60)) {
+      const id = ulid()
+      entryIds.push(id)
+      statements.push({
+        sql: INSERT,
+        binds: [
+          id, operator.id, turn, null,
+          statedAt || now, statedAt || now, now,
+          statedAt ? statedPrecision : 'approx',
+          'said', 'public', null, 'operator', 'chat',
+          batchId, null, null, null, null, null, null,
+          conversationId, 'led_from', null, null,
+        ],
+      })
+    }
   }
 
   // ── The act of putting files in — itself an entry, with the manifest ────
@@ -323,7 +367,12 @@ export async function POST(req: NextRequest) {
   // ── The receipt: one line, one undo ─────────────────────────────────────
   const parts: string[] = []
   const words = text ? text.trim().split(/\s+/).filter(Boolean).length : 0
-  if (words) parts.push(`${words} ${words === 1 ? 'word' : 'words'}`)
+  if (isConversation) {
+    parts.push(`a conversation · ${words.toLocaleString('en-GB')} words`)
+    if (mine.length) parts.push(`${mine.length} of your turns`)
+  } else if (words) {
+    parts.push(`${words} ${words === 1 ? 'word' : 'words'}`)
+  }
   if (files.length) parts.push(`${files.length} ${files.length === 1 ? 'file' : 'files'}`)
   if (videoIds.length) {
     parts.push(`${videoIds.length === 1 ? 'a recording' : `${videoIds.length} recordings`} being read`)

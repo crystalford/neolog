@@ -56,6 +56,11 @@ jobs:
       - name: Log logic
         run: node scripts/test/log-logic.mjs
 
+      # A false positive here splits his own writing into turns that were
+      # never turns, and can put a model's sentence behind author='operator'.
+      - name: Conversation splitting
+        run: node --experimental-strip-types scripts/test/conversation.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
