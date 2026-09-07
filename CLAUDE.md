@@ -87,10 +87,63 @@ This does not violate §0.1 ("never author a second feed") — §0.1 forbids two
 *authored* feeds that can disagree, and requires one feed, one entry shape,
 one shell. `/api/v2/log` is that one feed over three tables.
 
-**What is deliberately NOT built** (`HANDOFF.md` build order, steps 2–5):
-pages/the index, threads, search-as-a-page, export, the public side, letters,
-cuts, the offer, and anything that drafts in the operator's voice. The fence
-opens after thirty days of daily use.
+### Relog — the corpus is already the log
+
+A vlog showed on the feed as one line: "Recorded 22 minutes of video." What
+he actually said is in `threads` — one row per take with verbatim
+`key_quotes` and a `transcript_span_start`. **Relog** (`src/lib/relog.ts`,
+`POST /api/v2/log/relog`, paged + idempotent via `source_ref='thread:<id>'`)
+turns each into a dated entry placed at `recorded_at + span_start`.
+
+**Every quote is verified verbatim against the recording's own
+`transcript_text`** with the 4-gram check in `src/lib/validator.ts`, at relog
+time. A verified quote is his line with `author='operator'` and
+`grounded=1`; anything else falls back to the model's `take` as the log's
+line with `author='log'`. Nothing here calls a model. **Never relax this
+check** — it is the only thing standing between the log and putting words in
+his mouth.
+
+### Pages seed from what the passes already named
+
+`entities` + librarian `clusters` → `pages`, idempotent via `source_ref`;
+`entity_mentions` → `page_entries` (a mention names a thread, relog put that
+thread on the log carrying the same ref, so they join without a new column).
+
+### Recall — the one place the log asks
+
+`src/lib/recall.ts`. Three kinds only, all facts with one right answer:
+an entry the log had to date by inference, a year with nothing between two
+years that have something, and a page the log named itself. **No model
+writes a question.** Max three open at once. "Don't remember" is a complete
+answer and closes the question for good. The four things it must never ask —
+what a recording MEANS, WHY he did it, whether it was GOOD, who someone IS
+to him — are structurally impossible to generate here.
+
+### Corrections leave a record
+
+`entry_revisions` keeps what every correction replaced. Nothing overwrites
+without the old value being kept first — "both versions kept, dated, marked
+revised by you." The PATCH handler reads the row before it writes.
+
+### ⚠️ `scripts/check-sql-columns.mjs` — run it, keep it green
+
+A wrong column name is a runtime error, so `tsc` and `next build` are both
+blind to it. On 7 Sep the feed selected `vlogs.transcript` (the column is
+`transcript_text`); everything was green and `/api/v2/log` returned 500 for
+every request — **the log did not load at all**. The checker reads
+`db/schema.sql` + every migration and validates alias-qualified references in
+`src/`. It runs in CI before `tsc`. It immediately found three more live bugs
+(`operator.name` in both public production routes, `vlogs.is_audio_only`).
+
+**The build order is void.** The operator lifted it on 7 Sep: *"not
+necessarily follow the steps because they may not be relevant since we
+already built a version of the system... go through the whole thing and build
+the full system."* Steps 2–5 are in scope. What remains unbuilt: **threads**
+(`led_from` on entries, `walk.html`), **search as a page** (answer-first with
+numbered claims, `search.html`), **the fold rules past twenty**
+(`log-2028.html`), and everything below the drafting fence — letters, cuts,
+the offer, anything that drafts in his voice. That last group stays below the
+fence regardless.
 
 ---
 
@@ -209,6 +262,10 @@ The masthead is a **top-horizontal nav, four primary entries.** This is the resu
 | **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
 | **Ready to send** | `/ready` | What used to be home — the CapturePanel and the system-drafted production candidates, moved whole. The machine's suggestions drawn from the record; the record is what home is for. |
+| **Index** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. Seeded from `entities` + librarian `clusters`. |
+| **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), then the log filtered — **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
+| **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log. |
+| **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
 
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — raw archive of recordings, reachable from the avatar dropdown ("Upload a vlog").
