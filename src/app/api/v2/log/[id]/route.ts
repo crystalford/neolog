@@ -209,10 +209,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     id: string; text: string; happened_at: string | null; occurred_at: string
     date_precision: string; visibility: string; buried_at: string | null
     transcript: string | null; source_kind: string; author: string
+    detail: string | null
   }>(
     db,
     `SELECT id, text, happened_at, occurred_at, date_precision, visibility,
-            buried_at, transcript, source_kind, author
+            buried_at, transcript, source_kind, author, detail
        FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
@@ -232,6 +233,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json().catch(() => ({})) as {
     text?: string
+    /**
+     * What the picture shows, in his words instead of the log's
+     * (`image.html`: "what it shows marked as the operator's or the log's").
+     * It has no author column of its own and does not need one: once a
+     * `detail` revision exists, the line was his, and that is derivable
+     * rather than stored twice.
+     */
+    detail?: string
     happened_at?: string
     date_precision?: string
     visibility?: string
@@ -270,6 +279,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   // Wrong date. A year on its own is a complete answer, not a partial one.
+  // Replacing the log's description of a picture with his own. The log's
+  // wording goes into the revision record first, so the entry can always
+  // show what it used to say it saw.
+  if (typeof body.detail === 'string') {
+    const d = body.detail.trim()
+    if (d.length > 20_000) return NextResponse.json({ error: 'that is too long' }, { status: 400 })
+    note('detail', existing.detail ?? null, d || null)
+    sets.push('detail = ?')
+    binds.push(d || null)
+  }
+
   if (body.happened_at !== undefined) {
     const d = new Date(body.happened_at)
     if (isNaN(d.getTime())) return NextResponse.json({ error: 'happened_at is not a valid date' }, { status: 400 })

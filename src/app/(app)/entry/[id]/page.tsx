@@ -115,6 +115,12 @@ export default function EntryPage({ params }: { params: { id: string } }) {
     await load()
   }, [params.id, load])
 
+  const [detailEditing, setDetailEditing] = useState(false)
+  const [detailDraft, setDetailDraft] = useState('')
+  // A description he has corrected is his. The revision record already says
+  // so, so nothing new is stored to know it.
+  const detailIsHis = !!e?.revisions?.some(r => r.field === 'detail')
+
   // Described from the entry on screen, never re-fetched. `origin` is read
   // in the browser so a deployed page and a preview each describe themselves.
   const schema = useMemo(
@@ -202,7 +208,45 @@ export default function EntryPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
-            {e.detail && !held && <div className="entry-body">{e.detail}</div>}
+            {/* `image.html`: "what it shows marked as the operator's or the
+                log's." There is no author column on the description and it
+                does not need one — once a `detail` revision exists the words
+                are his, which is derived rather than stored twice. */}
+            {e.detail && !held && (
+              detailEditing ? (
+                <div className="paste" style={{ margin: '14px 0 0' }}>
+                  <textarea
+                    value={detailDraft}
+                    onChange={ev => setDetailDraft(ev.target.value)}
+                    rows={4}
+                  />
+                  <div className="bar">
+                    <button
+                      className="p"
+                      onClick={async () => { await patch({ detail: detailDraft }); setDetailEditing(false) }}
+                    >Keep my words</button>
+                    <button onClick={() => setDetailEditing(false)}>Not now</button>
+                    <span className="say">The log&rsquo;s wording is kept, dated.</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="entry-body">
+                  {e.detail}
+                  {e.author !== 'operator' && !detailIsHis && (
+                    <em style={{
+                      display: 'block', fontStyle: 'normal', marginTop: 8,
+                      fontSize: 12.5, color: 'var(--fg-4)',
+                    }}>
+                      the log wrote this ·{' '}
+                      <button
+                        onClick={() => { setDetailDraft(e.detail || ''); setDetailEditing(true) }}
+                        style={{ color: 'var(--fg-2)', borderBottom: '1px solid var(--line-2)' }}
+                      >say what it actually shows</button>
+                    </em>
+                  )}
+                </div>
+              )
+            )}
 
             {held && (
               <div className="entry-body">

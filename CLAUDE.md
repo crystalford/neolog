@@ -410,9 +410,35 @@ but nothing populates it; Whisper is not asked for diarization, so the split
 cannot be built honestly yet), `flow` (a walkthrough page). `walk` and
 `screenshots` are built.
 
-Not built: `elsewhere` · `photo` · `recording` (public); `image` ·
-`image-filter` (per-kind bodies — `/entry/[id]` already renders an image
-entry whole; these are the per-kind refinements). `messages` and `writing` shipped — see
+**Not built, and each for a stated reason:**
+
+- `elsewhere` — **declined.** Its three "moves" all draft a reply in his voice
+  for posting on someone else's site, which is below the drafting fence with
+  `letters`. What is left once those are removed is a static essay about
+  which sites AI engines cite, which belongs in the design package rather
+  than in the product — and a page whose subject is getting cited sits badly
+  against §0 rule 7, *you never write something down because it would look
+  good in public*.
+- `repo`'s commits-folded-by-week — **declined.** It needs a GitHub
+  connector, and the vendor list is locked to Cloudflare + Anthropic. A
+  repository is already a `code` document whose body is the README.
+- `audio`'s two-voice split — **blocked, not declined.**
+  `transcript_words.speaker` exists and nothing populates it; Whisper is not
+  asked for diarization. Building the split without it would mean guessing
+  who said what, and the consent rule then attributes another person's
+  sentence to him. The mechanism it needs already exists in
+  `src/lib/correspondence.ts`.
+- `photo` · `recording` · `question` — **served.** SPEC §3's "one design, two
+  views: nothing is designed twice" makes these `/entry/[id]` plus the
+  schema block, not new pages.
+- `branch` — **served by `/walk/[id]`.** A split take's parts each `led_from`
+  it, so the take's walk is branch.html's fan. The trace levels that page
+  also shows (*a fact · a term · a position · a piece*) are the offer, which
+  is below the fence.
+- `image` · `image-filter` — the entry page renders an image entry whole, and
+  the description is now correctable: **the log's wording is marked as the
+  log's until he replaces it**, at which point the revision record makes it
+  his. No second author column — that is derived from `entry_revisions`. `messages` and `writing` shipped — see
 **Correspondence**, **Documents** and **Footage** above. `repo` is a `code`
 document whose body is the README; the commits-folded-by-week view is not
 built. **The
