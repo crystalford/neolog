@@ -20,6 +20,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'onthisday')
   const url = new URL(req.url)
 
   // Default to today, in UTC, to match how dates are stored.

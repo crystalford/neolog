@@ -16,6 +16,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { seedPages, recountPages } from '@/lib/pages'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'seed')
   const body = await req.json().catch(() => ({})) as { limit?: number; min_mentions?: number }
   const result = await seedPages(db, operator.id, {
     limit: body.limit,

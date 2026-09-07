@@ -44,6 +44,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, run, batch as d1Batch } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { getObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'intake')
 
   const body = await req.json().catch(() => ({})) as {
     text?: string
@@ -652,7 +653,7 @@ export async function DELETE(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'intake')
   const url = new URL(req.url)
   const batchId = url.searchParams.get('batch')
   const entryId = url.searchParams.get('entry')

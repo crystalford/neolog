@@ -13,6 +13,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { loadMonth, buildMonthSummary, setMonthSummary, isValidYm } from '@/lib/month'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: { ym: string }
   if (error) return error
   if (!isValidYm(params.ym)) return NextResponse.json({ error: 'ym must be YYYY-MM' }, { status: 400 })
   return NextResponse.json(
-    await loadMonth(getDb(env), operator!.id, params.ym),
+    await loadMonth(await readyDb(getDb(env), 'month'), operator!.id, params.ym),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { ym: string 
   if (error) return error
   if (!isValidYm(params.ym)) return NextResponse.json({ error: 'ym must be YYYY-MM' }, { status: 400 })
   return NextResponse.json(
-    await buildMonthSummary(env, getDb(env), operator!.id, params.ym),
+    await buildMonthSummary(env, await readyDb(getDb(env), 'month'), operator!.id, params.ym),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -64,6 +65,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { ym: string
   if (typeof body.summary !== 'string') {
     return NextResponse.json({ error: 'summary required' }, { status: 400 })
   }
-  await setMonthSummary(getDb(env), operator!.id, params.ym, body.summary)
+  await setMonthSummary(await readyDb(getDb(env), 'month'), operator!.id, params.ym, body.summary)
   return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
 }

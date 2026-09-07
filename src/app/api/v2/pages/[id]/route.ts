@@ -21,6 +21,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany, run } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import {
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'page')
 
   const page = await findOne<PageRow>(
     db,
@@ -195,7 +196,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'page')
 
   const existing = await findOne<{ id: string }>(
     db, `SELECT id FROM pages WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,

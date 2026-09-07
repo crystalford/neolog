@@ -12,6 +12,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, run } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { clearSummary, verifyStored } from '@/lib/keep'
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     throw e
   }
   return NextResponse.json(
-    await clearSummary(getDb(env), operator.id),
+    await clearSummary(await readyDb(getDb(env), 'clear'), operator.id),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'clear')
 
   // Anything the log has not been able to say yes or no about yet. A file it
   // already called `checked` is not re-checked; a `mismatch` is, because a

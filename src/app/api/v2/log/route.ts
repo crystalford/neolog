@@ -25,6 +25,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { buildFold, OPEN_DAYS } from '@/lib/fold'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'log')
   const url = new URL(req.url)
   const order = url.searchParams.get('order') === 'logged' ? 'logged' : 'happened'
   const filter = (url.searchParams.get('filter') || 'all') as FeedFilter

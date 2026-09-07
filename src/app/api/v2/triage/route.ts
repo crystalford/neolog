@@ -19,6 +19,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, run } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'triage')
 
   const rows = await findMany<{
     id: string; text: string; detail: string | null
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'triage')
   const body = await req.json().catch(() => ({})) as {
     id?: string
     // keep | bury | public | words

@@ -15,6 +15,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { openQuestions, generateQuestions, answerQuestion, dismissQuestion } from '@/lib/recall'
 import type { DatePrecision } from '@/lib/log-entry'
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'recall')
   const questions = await openQuestions(db, operator.id)
 
   // Top up after the reply, never before it. Looking for gaps is the log's
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'recall')
   const body = await req.json().catch(() => ({})) as {
     id?: string
     text?: string

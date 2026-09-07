@@ -21,6 +21,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { buildExport, renderMarkdown } from '@/lib/export'
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'export')
   const url = new URL(req.url)
   const from = url.searchParams.get('from')
   const to = url.searchParams.get('to')

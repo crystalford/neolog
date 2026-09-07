@@ -20,6 +20,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { relogBatch, relogStatus, unrelogAll } from '@/lib/relog'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
-  const status = await relogStatus(getDb(env), operator!.id)
+  const status = await relogStatus(await readyDb(getDb(env), 'relog'), operator!.id)
   return NextResponse.json(status, { headers: { 'Cache-Control': 'no-store' } })
 }
 
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
   const body = await req.json().catch(() => ({})) as { cursor?: string; limit?: number }
-  const result = await relogBatch(getDb(env), operator!.id, {
+  const result = await relogBatch(await readyDb(getDb(env), 'relog'), operator!.id, {
     cursor: body.cursor || null,
     limit: body.limit,
   })
@@ -60,6 +61,6 @@ export async function DELETE(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
-  const removed = await unrelogAll(getDb(env), operator!.id)
+  const removed = await unrelogAll(await readyDb(getDb(env), 'relog'), operator!.id)
   return NextResponse.json({ removed }, { headers: { 'Cache-Control': 'no-store' } })
 }

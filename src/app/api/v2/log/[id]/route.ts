@@ -26,6 +26,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany, run, batch as d1Batch } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { ulid } from '@/lib/ulid'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'entry')
 
   const row = await findOne<{
     id: string; text: string; detail: string | null
@@ -198,7 +199,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'entry')
   const id = params.id
 
   // Read what is there first: nothing may be overwritten without the old

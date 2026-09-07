@@ -12,6 +12,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { search, findPassages } from '@/lib/search'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const db = getDb(env)
+  const db = await readyDb(getDb(env), 'search')
   const url = new URL(req.url)
   const q = (url.searchParams.get('q') || '').trim()
   if (!q) return NextResponse.json({ error: 'q required' }, { status: 400 })
