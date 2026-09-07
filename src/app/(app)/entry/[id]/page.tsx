@@ -57,6 +57,8 @@ interface Entry {
   led_to?: Turn[]
   earlier?: { id: string; text: string } | null
   later?: { id: string; text: string } | null
+  on_pages?: { id: string; name: string; kind: string }[]
+  copies?: { id: string; logged_at: string }[]
   revisions?: Revision[]
 }
 

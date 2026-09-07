@@ -141,6 +141,32 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     ),
   ])
 
+  // The three cells at the foot of every entry, whatever kind it is
+  // (`expanded.html` — "one shape"): where it came from, what it is
+  // connected to, and what came out of it. The third had no data path at
+  // all, and the second none on this page.
+  const [onPages, copies] = await Promise.all([
+    findMany<{ id: string; name: string; kind: string }>(
+      db,
+      `SELECT p.id, p.name, p.kind
+         FROM page_entries pe
+         JOIN pages p ON p.id = pe.page_id
+        WHERE pe.entry_id = ? AND pe.entry_kind = 'entry'
+          AND p.operator_id = ? AND p.deleted_at IS NULL AND p.merged_into IS NULL
+        ORDER BY p.name ASC LIMIT 12`,
+      params.id, operator.id,
+    ),
+    // Exact re-arrivals of the same file, which are sources rather than
+    // entries of their own.
+    findMany<{ id: string; logged_at: string }>(
+      db,
+      `SELECT id, COALESCE(logged_at, created_at) AS logged_at
+         FROM log_entries
+        WHERE copy_of = ? AND operator_id = ? AND deleted_at IS NULL`,
+      params.id, operator.id,
+    ),
+  ])
+
   let media_url: string | null = null
   if (row.r2_key) {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
@@ -157,6 +183,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       led_to: ledTo,
       earlier: earlier[0] || null,
       later: later[0] || null,
+      on_pages: onPages,
+      copies,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )
