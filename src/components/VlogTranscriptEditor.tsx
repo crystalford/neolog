@@ -88,7 +88,48 @@ export default function VlogTranscriptEditor({
     load()
   }, [hasWordTimestamps, load])
 
+  // `fix.html`: "Whisper heard 'leaf.' You said 'Leif.' Fixing it is one
+  // click." It is a MODE rather than another meaning for the same click —
+  // cutting and correcting are different intents, and overloading the click
+  // would make every word a guess about what would happen.
+  const [fixing, setFixing] = useState(false)
+  const [fixAt, setFixAt] = useState<number | null>(null)
+  const [fixText, setFixText] = useState('')
+  const [fixNote, setFixNote] = useState<string | null>(null)
+
+  const saveWord = async (idx: number, word: string) => {
+    const next = word.trim()
+    if (!next || !data) { setFixAt(null); return }
+    const was = data.words[idx]?.word
+    if (was === next) { setFixAt(null); return }
+    // Optimistic: the correction is his, and the request either confirms it
+    // or the note says it did not land.
+    setData(d => d && ({
+      ...d,
+      words: d.words.map((w, i) => (i === idx ? { ...w, word: next } : w)),
+    }))
+    setFixAt(null)
+    try {
+      const res = await fetch(`/api/v2/vlogs/${vlogId}/transcript-words`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_index: idx, word: next }),
+      })
+      setFixNote(res.ok
+        ? `“${was}” → “${next}”. What Whisper heard is kept.`
+        : 'That correction did not save.')
+    } catch {
+      setFixNote('That correction did not save.')
+    }
+    setTimeout(() => setFixNote(null), 4000)
+  }
+
   const onWordClick = (idx: number, shiftKey: boolean) => {
+    if (fixing) {
+      setFixText(data?.words[idx]?.word || '')
+      setFixAt(idx)
+      return
+    }
     const hitRange = cutRanges.find(r => idx >= r.start_word_index && idx <= r.end_word_index)
     if (hitRange) {
       // Click a struck-through word to bring it back.
@@ -265,6 +306,18 @@ export default function VlogTranscriptEditor({
             {cutRanges.length} cut{cutRanges.length === 1 ? '' : 's'} · {totalCutSec.toFixed(0)}s removed
           </span>
         )}
+        <button
+          onClick={() => { setFixing(f => !f); setFixAt(null); setSelStart(null); setSelEnd(null) }}
+          style={{
+            fontSize: 12, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+            border: `1px solid ${fixing ? 'var(--sig)' : 'var(--line-2)'}`,
+            background: 'none', color: fixing ? 'var(--fg)' : 'var(--fg-2)',
+          }}
+          title="Whisper is good, not perfect — names and jargon are where it slips"
+        >
+          {fixing ? 'fixing words — click one' : 'fix a word'}
+        </button>
+        {fixNote && <span style={{ fontSize: 12, color: 'var(--fg-2)' }}>{fixNote}</span>}
         {note && <span style={{ fontSize: 12, color: 'var(--fg-2)' }}>{note}</span>}
       </div>
 
@@ -278,12 +331,34 @@ export default function VlogTranscriptEditor({
           const isCut = cutRanges.some(r => i >= r.start_word_index && i <= r.end_word_index)
           const inSel = selStart != null && selEnd != null && i >= selStart && i <= selEnd
           const isAnchor = selStart != null && selEnd == null && i === selStart
+          if (fixAt === i) {
+            return (
+              <input
+                key={i}
+                value={fixText}
+                autoFocus
+                onChange={e => setFixText(e.target.value)}
+                onBlur={() => void saveWord(i, fixText)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); void saveWord(i, fixText) }
+                  if (e.key === 'Escape') setFixAt(null)
+                }}
+                style={{
+                  font: 'inherit', fontSize: 15.5,
+                  width: `${Math.max(4, fixText.length + 1)}ch`,
+                  background: 'var(--bg-2)', color: 'var(--fg)',
+                  border: '1px solid var(--sig)', borderRadius: 3,
+                  padding: '1px 3px', outline: 'none', margin: '0 1px',
+                }}
+              />
+            )
+          }
           return (
             <span
               key={i}
               onClick={e => onWordClick(i, e.shiftKey)}
               style={{
-                cursor: 'pointer',
+                cursor: fixing ? 'text' : 'pointer',
                 padding: '2px 1px',
                 borderRadius: 3,
                 textDecoration: isCut ? 'line-through' : 'none',

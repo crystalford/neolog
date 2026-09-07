@@ -1,5 +1,6 @@
 /**
- * GET /api/v2/vlogs/[id]/transcript-words
+ * GET   /api/v2/vlogs/[id]/transcript-words
+ * PATCH /api/v2/vlogs/[id]/transcript-words — fix one word Whisper misheard
  *
  * Feeds the whole-vlog click-to-cut editor on /vlog/[id] (see
  * VlogTranscriptEditor). Full-vlog counterpart to
@@ -21,7 +22,8 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb, findOne, findMany } from '@/lib/d1'
+import { getDb, findOne, findMany, run } from '@/lib/d1'
+import { ulid } from '@/lib/ulid'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -77,4 +79,101 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     cut_ranges: cutRanges,
     cut_ranges_updated_at: vlog.cut_ranges_updated_at,
   }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
+/**
+ * PATCH — fix one word.
+ *
+ * `fix.html`: "Whisper heard 'leaf.' You said 'Leif.' Fixing it is one
+ * click... **The audio doesn't change; the reading of it does.**"
+ *
+ * Whisper is good, not perfect, and names and jargon are exactly where it
+ * slips — which matters here more than in most products, because the whole
+ * log is built on 320 recordings of one person saying names.
+ *
+ * What this does and does not touch:
+ *   - the word in `transcript_words` changes, and the timings do NOT. The
+ *     word was said at that second whatever it was heard as.
+ *   - `vlogs.transcript_text` is rebuilt so search finds the right word.
+ *   - the audio is untouched. It always was the ground truth.
+ *   - what Whisper heard is KEPT, in `entry_revisions`, so he can see the
+ *     machine's version if he ever doubts his own.
+ *
+ * Body: { word_index: number, word: string }
+ */
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const env = getRequestContext().env as unknown as Env
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
+  const db = getDb(env)
+
+  const body = await req.json().catch(() => ({})) as { word_index?: number; word?: string }
+  const idx = typeof body.word_index === 'number' ? body.word_index : null
+  const next = (body.word || '').trim()
+  if (idx === null || idx < 0) return NextResponse.json({ error: 'word_index required' }, { status: 400 })
+  if (!next) return NextResponse.json({ error: 'word required' }, { status: 400 })
+  // One word, not a rewrite of the line. A whole sentence pasted in here
+  // would be an edit pretending to be a correction.
+  if (/\s/.test(next) || next.length > 60) {
+    return NextResponse.json({ error: 'one word at a time' }, { status: 400 })
+  }
+
+  const owned = await findOne<{ id: string }>(
+    db,
+    `SELECT id FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+    params.id, operator.id,
+  )
+  if (!owned) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  const existing = await findOne<{ word: string }>(
+    db,
+    `SELECT word FROM transcript_words
+      WHERE vlog_id = ? AND operator_id = ? AND word_index = ?`,
+    params.id, operator.id, idx,
+  )
+  if (!existing) return NextResponse.json({ error: 'no word at that position' }, { status: 404 })
+  if (existing.word === next) return NextResponse.json({ ok: true, unchanged: true })
+
+  await run(
+    db,
+    `UPDATE transcript_words SET word = ?
+      WHERE vlog_id = ? AND operator_id = ? AND word_index = ?`,
+    next, params.id, operator.id, idx,
+  )
+
+  // Rebuild the flat transcript so search and every reader agree with the
+  // words. Leaving it stale is how the corrected line and the uncorrected
+  // one end up on the same screen.
+  const all = await findMany<{ word: string }>(
+    db,
+    `SELECT word FROM transcript_words
+      WHERE vlog_id = ? AND operator_id = ? ORDER BY word_index ASC LIMIT ?`,
+    params.id, operator.id, WORDS_LIMIT,
+  )
+  const rebuilt = all.map(w => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+  await run(
+    db,
+    `UPDATE vlogs SET transcript_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    rebuilt, params.id,
+  )
+
+  // What the machine heard is kept, dated, so he can check his own memory
+  // against it later.
+  await run(
+    db,
+    `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
+     VALUES (?,?,?,'transcript_word',?,?)`,
+    ulid(), operator.id, params.id,
+    `Whisper heard "${existing.word}" at word ${idx}`,
+    `you corrected it to "${next}"`,
+  )
+
+  return NextResponse.json(
+    { ok: true, was: existing.word, now: next },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }
