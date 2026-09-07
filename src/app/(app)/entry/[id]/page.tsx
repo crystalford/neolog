@@ -475,6 +475,28 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   </Link>
                 </div>
               </div>
+              {/* The log split a take into parts it thought were separate.
+                  This is where he says two of them were one thing —
+                  "wrong split → merge, thread intact" (wrong.html). Only
+                  offered on a part, because only a part can be a bad seam. */}
+              {e.came_from && (
+                <div className="i">
+                  <b>One thing, not two?</b>
+                  <em>
+                    The log split the take it came from. If this belongs with
+                    what came before it, join them — nothing is lost either way.
+                  </em>
+                  <div className="fixrow">
+                    <button
+                      onClick={async () => {
+                        await patch({ merge_into: e.came_from!.id })
+                        router.push(`/entry/${e.came_from!.id}`)
+                      }}
+                    >Join it to that one</button>
+                  </div>
+                </div>
+              )}
+
               <div className="i">
                 <b>Thought about it again?</b>
                 <em>
@@ -642,6 +664,7 @@ function trim(s: string): string {
 }
 
 const REV_LABEL: Record<string, string> = {
+  merge:      'You said this and another entry were one thing.',
   author:     'You said these were your words.',
   text:       'You rewrote this line.',
   date:       'You changed the date.',

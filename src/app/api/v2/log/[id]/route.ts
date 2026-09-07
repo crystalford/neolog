@@ -237,6 +237,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     buried?: boolean
     /** 'operator' when he says a line the log wrote is actually his. */
     author?: string
+    /**
+     * "Wrong split → merge, thread intact" (`wrong.html`). This entry's
+     * words join the target's and this one is buried, so nothing is lost and
+     * the take it came from is untouched.
+     */
+    merge_into?: string
   }
 
   const sets: string[] = []
@@ -300,6 +306,44 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.author === 'operator' && existing.author !== 'operator') {
     note('author', existing.author, 'operator')
     sets.push("author = 'operator'")
+  }
+
+  // "Wrong split → merge, thread intact." The log split one take into parts
+  // it thought were separate; this is where he says two of them were one
+  // thing. Both wordings survive: the target gains the words, this row is
+  // buried rather than deleted, and the revision record on both says what
+  // happened.
+  if (typeof body.merge_into === 'string' && body.merge_into && body.merge_into !== id) {
+    const target = await findOne<{ id: string; text: string }>(
+      db,
+      `SELECT id, text FROM log_entries
+        WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+      body.merge_into, operator.id,
+    )
+    if (!target) return NextResponse.json({ error: 'no such entry to merge into' }, { status: 400 })
+
+    const joined = `${target.text.trim()} ${existing.text.trim()}`.replace(/\s+/g, ' ').trim()
+    await run(
+      db,
+      `UPDATE log_entries SET text = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND operator_id = ?`,
+      joined, target.id, operator.id,
+    )
+    await d1Batch(db, [
+      {
+        sql: `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
+              VALUES (?,?,?,'merge',?,?)`,
+        binds: [ulid(), operator.id, target.id, target.text, joined],
+      },
+      {
+        sql: `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
+              VALUES (?,?,?,'merge',?,?)`,
+        binds: [ulid(), operator.id, id, existing.text, `merged into ${target.id}`],
+      },
+    ])
+    // Buried, not deleted — the words are now in two places and neither is
+    // gone.
+    sets.push('buried_at = CURRENT_TIMESTAMP', "visibility = 'private'")
   }
 
   // Bury / dig up. Burying a public entry also unpublishes it (SPEC §1).
