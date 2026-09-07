@@ -95,13 +95,30 @@ he actually said is in `threads` — one row per take with verbatim
 `POST /api/v2/log/relog`, paged + idempotent via `source_ref='thread:<id>'`)
 turns each into a dated entry placed at `recorded_at + span_start`.
 
-**Every quote is verified verbatim against the recording's own
-`transcript_text`** with the 4-gram check in `src/lib/validator.ts`, at relog
-time. A verified quote is his line with `author='operator'` and
-`grounded=1`; anything else falls back to the model's `take` as the log's
-line with `author='log'`. Nothing here calls a model. **Never relax this
-check** — it is the only thing standing between the log and putting words in
-his mouth.
+**Three tiers, and the first one that yields a line wins.** Nothing here
+calls a model.
+
+1. **A `key_quote` verified verbatim** against the recording's own
+   `transcript_text`, with the 4-gram check in `src/lib/validator.ts`, at
+   relog time. His line: `author='operator'`, `grounded=1`.
+2. **The span itself.** When no quote survives, the log does not reach for
+   the model's prose — it reads the stretch back out of `transcript_words`
+   between `transcript_span_start` and `_end` (seconds). Also his. A failed
+   quote check means the model paraphrased; it does not mean he said nothing.
+   The slice is checked with **`isFullyGrounded`** — EVERY 4-gram must appear
+   in `transcript_text`, not merely one. `isGrounded` asks "did this touch
+   the recording at all", the right question for a paraphrase and the wrong
+   one for a passage about to be attributed word-for-word. One query per
+   recording, not per thread; spans clamped to 90s, words to 200; the line is
+   as many whole sentences as fit under sixty words and what trails it is the
+   detail.
+3. **The `take`**, only when there is no span or no word-level transcript —
+   and then it is the log's line, `author='log'`, which the feed labels
+   "arrived".
+
+**Never relax any of this** — it is the only thing standing between the log
+and putting words in his mouth. `scripts/test/relog-line.mjs`, 19 assertions
+in CI, is written around the refusals.
 
 ### Pages seed from what the passes already named
 
@@ -118,6 +135,40 @@ writes a question.** Max three open at once. "Don't remember" is a complete
 answer and closes the question for good. The four things it must never ask —
 what a recording MEANS, WHY he did it, whether it was GOOD, who someone IS
 to him — are structurally impossible to generate here.
+
+### Correspondence — the one kind with someone else in it
+
+`messages.html`. `src/lib/correspondence.ts`, `/messages`, `/messages/[id]`.
+A conversation is the only thing on the log that is half somebody else's, so
+it works differently from every other kind.
+
+**Forwarded, never pulled.** There is no ingest connector and there will not
+be one — the absence IS the enforcement. `POST /api/v2/log/correspondence`
+requires a paste.
+
+**Two owners.** His messages become `log_entries` under the normal rules.
+Theirs are written to `correspondence_messages` and stop there. An entry
+carries `author='operator'`; putting another person's sentence behind that
+flag is the same lie relog was already fixed for.
+
+**Which side is his is never guessed.** A thread labelled by name on both
+sides comes back `409 { needs: 'mine', speakers }` with **nothing written**.
+Guessing wrong files their sentences as his.
+
+**Their yes is a fact, not a checkbox.** Four states on `pages.consent`
+(`kept_private` — the default, applied without asking · `named_not_quoted` ·
+`quotable` · `not_on_the_log`), with `consent_at` and `consent_note`. It
+lives on the PERSON'S page, so one answer governs every thread they are in.
+`asConsent()` resolves every unknown, null or near-miss value to
+`kept_private` — never to the last state seen.
+
+`publicView()` is the only place the states turn into what a stranger sees,
+and every surface calls it. At the default it returns his words and **their
+absences as rows** — removing their turns would produce a monologue that
+reads as though he said all of it. `not_on_the_log` publishes nothing at all,
+for the same reason. `/messages/[id]` renders that preview from the same
+function, so he sees what publishing would do to someone else before he does
+it. `scripts/test/correspondence.mjs` — 31 assertions, in CI.
 
 ### Corrections leave a record
 
@@ -221,8 +272,9 @@ Partial: `fix` (per-word transcript editing), `branch` (splitting one note
 into several), `screenshots` (reads the text; no three-pile sort), `audio` (no
 two-voice split), `flow` (a walkthrough page). `walk` is built — `/walk/[id]`.
 
-Not built: `elsewhere` · `photo` · `recording` (public); `messages` · `repo` ·
-`writing` · `footage` · `image` · `image-filter` (per-kind bodies). **The
+Not built: `elsewhere` · `photo` · `recording` (public); `repo` · `writing` ·
+`footage` · `image` · `image-filter` (per-kind bodies). `messages` shipped —
+see **Correspondence** above. **The
 machine layer shipped** — `dossier` → `/facts`, `everything`, `source` →
 `/glossary`, `asks`, `numbers`, plus the four feeds.
 
