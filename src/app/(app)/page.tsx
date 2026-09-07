@@ -488,6 +488,7 @@ export default function LogHome() {
             <Link href="/pages">the index</Link>
             <Link href="/public">what&rsquo;s public</Link>
             <Link href="/export">export</Link>
+            <Link href="/ways-in">ways in</Link>
           </span>
         </footer>
 

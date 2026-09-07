@@ -3573,3 +3573,23 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 @media (max-width: 720px) {
   .logpage .cells { grid-template-columns: 1fr; gap: 14px; }
 }
+
+/* Every way in (connections.html). The built ones and the unbuilt ones on
+   the same page, because a door that isn't there is worse than one that was
+   never listed. */
+.logpage .way-row {
+  display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px;
+  padding: 13px 0; border-bottom: 1px solid var(--line); max-width: 700px;
+}
+.logpage .way-row .wk { font-size: 13.5px; color: var(--fg); font-weight: 300; }
+.logpage .way-row .wv { font-size: 13.5px; line-height: 1.6; color: var(--fg-2); }
+.logpage .way-row .wv a { color: var(--fg-1); border-bottom: 1px solid var(--line-2); }
+.logpage .way-row .wv a:hover { color: var(--fg); }
+.logpage .way-row .wv em {
+  font-style: normal; display: block; margin-top: 5px;
+  font-size: 12px; color: var(--fg-4);
+}
+.logpage .way-row.off .wk, .logpage .way-row.off .wv { color: var(--fg-4); }
+@media (max-width: 720px) {
+  .logpage .way-row { grid-template-columns: 1fr; gap: 6px; }
+}
