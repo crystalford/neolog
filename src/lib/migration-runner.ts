@@ -1483,6 +1483,20 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_month_summaries
             ON month_summaries(operator_id, ym)`,
   },
+
+  // Going through what arrived (triage.html). "Everything that arrives is
+  // placed by date before you see it. This is optional... Skipping the whole
+  // pile costs nothing — it's still on the log, still searchable."
+  //
+  // So this column records only that he has LOOKED at something. It is not a
+  // queue, nothing is blocked on it, and an untriaged entry is in no way
+  // lesser — it is filed exactly the same.
+  { name: '2026-09-07_log_entries_triaged_at', sql: `ALTER TABLE log_entries ADD COLUMN triaged_at TEXT` },
+  {
+    name: '2026-09-07_idx_log_entries_triaged',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_triaged
+            ON log_entries(operator_id, triaged_at)`,
+  },
   {
     name: '2026-09-07_idx_log_entries_led_from',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,

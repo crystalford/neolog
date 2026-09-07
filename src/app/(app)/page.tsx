@@ -457,6 +457,7 @@ export default function LogHome() {
             <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <ArrivedOnItsOwn items={items} />
+            <WhatArrived />
             <OnThisDay />
             <SafeToClear />
             <Relog onDone={() => { void loadFeed() }} />
@@ -566,6 +567,39 @@ function WhileYouWereGone() {
       ) : (
         <>Nothing arrived either. The days are simply blank.</>
       )}
+    </div>
+  )
+}
+
+// ── What arrived ──────────────────────────────────────────────────────────
+// triage.html's rule is that skipping the pile costs nothing, so this card
+// is an offer and never a queue: no unread badge, nothing blocked on it, and
+// the copy says outright that ignoring it is fine.
+
+function WhatArrived() {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/v2/triage', { cache: 'no-store' })
+        if (res.ok) setN(((await res.json()) as { total: number }).total || 0)
+      } catch { /* the card just doesn't show */ }
+    })()
+  }, [])
+  if (n <= 0) return null
+  return (
+    <div className="rc">
+      <div className="h">Arrived, not looked at <span>{n}</span></div>
+      <div className="i">
+        <b>All of it is already filed.</b>
+        <em>
+          Going through it adds your words. Skipping it costs nothing — it
+          stays on the log either way, and stays searchable.
+        </em>
+        <div className="fixrow">
+          <Link href="/triage"><button>Go through it</button></Link>
+        </div>
+      </div>
     </div>
   )
 }
