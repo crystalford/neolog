@@ -1273,6 +1273,45 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-09-07_idx_page_entries_entry',
     sql: `CREATE INDEX IF NOT EXISTS idx_page_entries_entry ON page_entries(entry_kind, entry_id)`,
   },
+
+  // ── Corrections (7 Sep 2026) ────────────────────────────────────────────
+  // Two rules from SPEC §1 that had nowhere to live:
+  //
+  //   "Revisions — the operator correcting his own words — are entries. Both
+  //    versions kept, dated, marked revised by you."
+  //   "Every correction is itself a dated entry, so the log keeps a record of
+  //    its own mistakes and the error rate is readable by kind over time.
+  //    This is the only honest answer to 'will it be smart enough': the
+  //    operator doesn't have to trust it, he can read it."
+  //
+  // Editing a line was destroying the previous wording, which is the one
+  // thing a record must never do. Every correction now writes a row here,
+  // and nothing overwrites without leaving the old value behind.
+  {
+    name: '2026-09-07_entry_revisions',
+    sql: `CREATE TABLE IF NOT EXISTS entry_revisions (
+      id           TEXT PRIMARY KEY,
+      operator_id  TEXT NOT NULL,
+      entry_id     TEXT NOT NULL,
+      -- what was corrected: text | date | visibility | kind | attach | bury
+      field        TEXT NOT NULL,
+      old_value    TEXT,
+      new_value    TEXT,
+      -- 'operator' always, for now: the log does not correct itself.
+      by_whom      TEXT NOT NULL DEFAULT 'operator',
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_entry_revisions_entry',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_entry
+            ON entry_revisions(entry_id, created_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_entry_revisions_field',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_field
+            ON entry_revisions(operator_id, field, created_at DESC)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [

@@ -48,6 +48,14 @@ interface Entry {
   media_url: string | null
   vlog_id: string | null
   source_ref: string | null
+  revisions?: Revision[]
+}
+
+interface Revision {
+  field: string
+  old_value: string | null
+  new_value: string | null
+  created_at: string
 }
 
 const AUTHOR_LINE: Record<string, string> = {
@@ -64,7 +72,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
   const [draft, setDraft] = useState('')
   const [fixingDate, setFixingDate] = useState(false)
   const [newDate, setNewDate] = useState('')
-  const [newPrecision, setNewPrecision] = useState<DatePrecision>('day')
+  const [newPrecision, setNewPrecision] = useState<DatePrecision>('exact')
+  const [newYear, setNewYear] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -192,6 +201,24 @@ export default function EntryPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
+            {/* Both versions kept, dated, marked revised by you. A record
+                that quietly replaces what it used to say is not a record. */}
+            {e.revisions && e.revisions.length > 0 && (
+              <div className="revs">
+                <div className="who">What this used to say</div>
+                {e.revisions.map((r, i) => (
+                  <div className="rev" key={i}>
+                    <span className="rt">{shortDate(r.created_at)}</span>
+                    <span className="rb">
+                      <b>{REV_LABEL[r.field] || r.field}</b>
+                      {r.old_value && <span className="was">{r.old_value}</span>}
+                      <em>revised by you</em>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* The words are the ground truth; everything else indexes them. */}
             {e.transcript && (
               <div className="transcript">
@@ -215,12 +242,6 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 <em>A year on its own is a complete answer.</em>
                 {fixingDate ? (
                   <>
-                    <input
-                      type="date"
-                      value={newDate}
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={ev => setNewDate(ev.target.value)}
-                    />
                     <div className="fixrow">
                       {(['exact', 'month', 'year'] as DatePrecision[]).map(p => (
                         <button
@@ -230,15 +251,46 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                         >{p === 'exact' ? 'that day' : p === 'month' ? 'that month' : 'that year'}</button>
                       ))}
                     </div>
+                    {/* A year on its own is a complete answer, so the control
+                        has to be able to take one. `input type=date` cannot —
+                        it demands a day, and demanding a day is how the log
+                        ends up storing one it was never told. */}
+                    {newPrecision === 'year' ? (
+                      <input
+                        type="number"
+                        placeholder="2008"
+                        min={1900}
+                        max={new Date().getUTCFullYear()}
+                        value={newYear}
+                        onChange={ev => setNewYear(ev.target.value)}
+                      />
+                    ) : newPrecision === 'month' ? (
+                      <input
+                        type="month"
+                        value={newDate.slice(0, 7)}
+                        max={new Date().toISOString().slice(0, 7)}
+                        onChange={ev => setNewDate(`${ev.target.value}-15`)}
+                      />
+                    ) : (
+                      <input
+                        type="date"
+                        value={newDate}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={ev => setNewDate(ev.target.value)}
+                      />
+                    )}
                     <div className="fixrow">
                       <button
                         className="p"
-                        disabled={!newDate}
+                        disabled={newPrecision === 'year' ? !newYear : !newDate}
                         onClick={async () => {
-                          await patch({
-                            happened_at: new Date(`${newDate}T12:00:00Z`).toISOString(),
-                            date_precision: newPrecision,
-                          })
+                          // A year-only answer is stored mid-year so that
+                          // ordering works, and the precision is what says
+                          // not to believe the month or the day.
+                          const iso = newPrecision === 'year'
+                            ? new Date(`${newYear}-07-01T12:00:00Z`).toISOString()
+                            : new Date(`${newDate}T12:00:00Z`).toISOString()
+                          await patch({ happened_at: iso, date_precision: newPrecision })
                           setFixingDate(false)
                         }}
                       >Set it</button>
@@ -249,7 +301,12 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   <div className="fixrow">
                     <button onClick={() => {
                       setNewDate(e.happened_at.slice(0, 10))
-                      setNewPrecision(e.date_precision === 'approx' ? 'day' : e.date_precision)
+                      setNewYear(e.happened_at.slice(0, 4))
+                      setNewPrecision(
+                        e.date_precision === 'approx' || e.date_precision === 'day'
+                          ? 'exact'
+                          : e.date_precision,
+                      )
                       setFixingDate(true)
                     }}>Change the date</button>
                   </div>
@@ -339,6 +396,19 @@ export default function EntryPage({ params }: { params: { id: string } }) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+const REV_LABEL: Record<string, string> = {
+  text:       'You rewrote this line.',
+  date:       'You changed the date.',
+  visibility: 'You changed who can see it.',
+  bury:       'Buried, then dug up.',
+}
+
+function shortDate(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 function fullDate(iso: string): string {
   const d = new Date(iso)

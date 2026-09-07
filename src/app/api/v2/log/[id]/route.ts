@@ -25,7 +25,8 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb, findOne, run } from '@/lib/d1'
+import { getDb, findOne, findMany, run, batch as d1Batch } from '@/lib/d1'
+import { ulid } from '@/lib/ulid'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { DatePrecision, Visibility } from '@/lib/log-entry'
@@ -77,6 +78,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   )
   if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
+  // Both versions kept, dated, marked revised by you (SPEC §1). An entry
+  // that has been corrected carries its own history.
+  const revisions = await findMany<{
+    field: string; old_value: string | null; new_value: string | null; created_at: string
+  }>(
+    db,
+    `SELECT field, old_value, new_value, created_at FROM entry_revisions
+      WHERE entry_id = ? AND operator_id = ?
+      ORDER BY created_at DESC LIMIT 50`,
+    params.id, operator.id,
+  )
+
   let media_url: string | null = null
   if (row.r2_key) {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
@@ -88,6 +101,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       happened_at: row.happened_at || row.occurred_at || row.created_at,
       logged_at: row.logged_at || row.created_at,
       media_url,
+      revisions,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )
@@ -104,12 +118,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const db = getDb(env)
   const id = params.id
 
-  const existing = await findOne<{ id: string }>(
+  // Read what is there first: nothing may be overwritten without the old
+  // value being kept. "A correction changes what things mean, never what was
+  // said" (SPEC §1).
+  const existing = await findOne<{
+    id: string; text: string; happened_at: string | null; occurred_at: string
+    date_precision: string; visibility: string; buried_at: string | null
+  }>(
     db,
-    `SELECT id FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+    `SELECT id, text, happened_at, occurred_at, date_precision, visibility, buried_at
+       FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
   if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  // Every correction is itself a dated record, so the log keeps an account of
+  // its own mistakes and the error rate is readable by kind over time.
+  const revisions: { sql: string; binds: unknown[] }[] = []
+  const note = (field: string, oldValue: string | null, newValue: string | null) => {
+    if (oldValue === newValue) return
+    revisions.push({
+      sql: `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
+            VALUES (?,?,?,?,?,?)`,
+      binds: [ulid(), operator.id, id, field, oldValue, newValue],
+    })
+  }
 
   const body = await req.json().catch(() => ({})) as {
     text?: string
@@ -128,6 +161,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const t = body.text.trim()
     if (!t) return NextResponse.json({ error: 'text cannot be emptied — bury it instead' }, { status: 400 })
     if (t.length > 100_000) return NextResponse.json({ error: 'text too long' }, { status: 400 })
+    // Both wordings kept. The previous one goes into the revision record
+    // before the column is touched.
+    note('text', existing.text, t)
     sets.push('text = ?', "author = 'operator'")
     binds.push(t)
   }
@@ -137,11 +173,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const d = new Date(body.happened_at)
     if (isNaN(d.getTime())) return NextResponse.json({ error: 'happened_at is not a valid date' }, { status: 400 })
     const p = body.date_precision as DatePrecision
+    const prec = PRECISIONS.has(p) ? p : 'day'
+    note('date',
+      `${existing.happened_at || existing.occurred_at} (${existing.date_precision})`,
+      `${d.toISOString()} (${prec})`)
     sets.push('happened_at = ?', 'occurred_at = ?', 'date_precision = ?')
-    binds.push(d.toISOString(), d.toISOString(), PRECISIONS.has(p) ? p : 'day')
+    binds.push(d.toISOString(), d.toISOString(), prec)
   } else if (body.date_precision !== undefined) {
     const p = body.date_precision as DatePrecision
     if (!PRECISIONS.has(p)) return NextResponse.json({ error: 'unknown date_precision' }, { status: 400 })
+    note('date', existing.date_precision, p)
     sets.push('date_precision = ?')
     binds.push(p)
   }
@@ -152,6 +193,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.visibility !== undefined) {
     const v = body.visibility as Visibility
     if (!VISIBILITIES.has(v)) return NextResponse.json({ error: 'unknown visibility' }, { status: 400 })
+    note('visibility', existing.visibility, v)
     sets.push('visibility = ?')
     binds.push(v)
     if (v !== 'held') sets.push('held_reason = NULL')
@@ -159,9 +201,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Bury / dig up. Burying a public entry also unpublishes it (SPEC §1).
   if (body.buried !== undefined) {
+    // Digging up is an event, so it is recorded as one rather than erasing
+    // the fact that the entry was ever buried.
     if (body.buried) {
+      note('bury', existing.buried_at ? 'buried' : 'on the log', 'buried')
       sets.push('buried_at = CURRENT_TIMESTAMP', "visibility = 'private'")
     } else {
+      note('bury', existing.buried_at ? `buried ${existing.buried_at}` : 'on the log', 'dug up')
       sets.push('buried_at = NULL')
     }
   }
@@ -171,6 +217,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   sets.push('updated_at = CURRENT_TIMESTAMP')
   binds.push(id, operator.id)
   await run(db, `UPDATE log_entries SET ${sets.join(', ')} WHERE id = ? AND operator_id = ?`, ...binds)
+  if (revisions.length) await d1Batch(db, revisions)
 
-  return NextResponse.json({ ok: true, id }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ ok: true, id, recorded: revisions.length }, { headers: { 'Cache-Control': 'no-store' } })
 }

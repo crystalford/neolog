@@ -3078,3 +3078,30 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .logpage .idxhead .sp, .logpage .idxrow .sp,
   .logpage .idxhead .st, .logpage .idxrow .st { display: none; }
 }
+
+/* What an entry used to say.
+   "Both versions kept, dated, marked revised by you" (SPEC §1). A record
+   that quietly replaces what it used to say is not a record, so a corrected
+   entry carries its own history under it — dimmer than the current wording,
+   because the current wording is the one that stands. */
+.logpage .revs {
+  margin-top: 22px; padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: 10px;
+  max-width: 640px;
+}
+.logpage .revs .who { font-size: 11.5px; color: var(--fg-4); margin-bottom: 10px; }
+.logpage .revs .rev { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 14px; padding: 7px 0; }
+.logpage .revs .rev + .rev { border-top: 1px solid var(--line); }
+.logpage .revs .rt { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); padding-top: 2px; }
+.logpage .revs .rb { font-size: 13px; line-height: 1.55; color: var(--fg-3); }
+.logpage .revs .rb b { display: block; color: var(--fg-2); font-weight: 450; }
+.logpage .revs .was {
+  display: block; margin-top: 4px; color: var(--fg-4);
+  border-left: 1px solid var(--line-2); padding-left: 10px;
+}
+.logpage .revs .rb em { font-style: normal; display: block; margin-top: 4px; font-size: 11.5px; color: var(--fg-4); }
+.logpage .rc input[type=number], .logpage .rc input[type=month] {
+  width: 100%; background: var(--bg-2); border: 1px solid var(--line-1);
+  border-radius: 7px; color: var(--fg-1); font: inherit; font-size: 12.5px;
+  padding: 6px 9px; margin-top: 8px; color-scheme: dark; font-family: var(--font-body);
+}
