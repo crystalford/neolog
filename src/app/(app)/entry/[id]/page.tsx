@@ -469,6 +469,23 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             </div>
 
             <div className="rc">
+              <div className="h">The record of origin</div>
+              <div className="i">
+                <b>Prove you thought it.</b>
+                <em>
+                  A finished piece no longer proves anyone thought it — anyone
+                  can produce one. The road to it does: this entry, the turns
+                  either side, every wording it has had, each dated.
+                </em>
+                <div className="fixrow">
+                  <a href={`/api/v2/export?entry_id=${e.id}&format=md`} download>
+                    <button>Take the road out</button>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="rc">
               <div className="h">Where it came from</div>
               <div className="i">
                 {sourceLine(e)}

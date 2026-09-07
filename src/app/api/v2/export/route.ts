@@ -3,6 +3,7 @@
  *
  *   ?from=YYYY-MM-DD  &to=YYYY-MM-DD   the range (both optional)
  *   ?page_id=<id>                      restrict to one page
+ *   ?entry_id=<id>                     a record of origin for one position
  *   ?format=md | json                  the document, or the manifest
  *
  * "Export is the promise" (SPEC §1). Markdown opens in anything; the JSON
@@ -48,12 +49,13 @@ export async function GET(req: NextRequest) {
   const from = url.searchParams.get('from')
   const to = url.searchParams.get('to')
   const pageId = url.searchParams.get('page_id')
+  const entryId = url.searchParams.get('entry_id')
   const format = url.searchParams.get('format') === 'json' ? 'json' : 'md'
 
   const bundle = await buildExport(
     env, db, operator.id,
     (operator as any).name || (operator as any).email || 'the operator',
-    { from, to, pageId },
+    { from, to, pageId, entryId },
   )
 
   if (format === 'json') {

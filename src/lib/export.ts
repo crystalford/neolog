@@ -36,6 +36,13 @@ import {
 import type { D1Database } from '@cloudflare/workers-types'
 
 export interface ExportScope {
+  /**
+   * One entry and everything that makes it evidence — its thread, its
+   * revisions, its dates. SPEC §1: "**Export of one position is a record of
+   * origin:** dates, the words, both wordings, who wrote each line, what the
+   * software did."
+   */
+  entryId?: string | null
   /** ISO date, inclusive. */
   from?: string | null
   /** ISO date, inclusive. */
@@ -71,6 +78,8 @@ export interface ExportBundle {
   scope: ExportScope
   page: { id: string; name: string; kind: string; summary: string | null; summary_author: string } | null
   entries: ExportEntry[]
+  /** Every correction, with both wordings. Only on a record of origin. */
+  revisions?: { entry_id: string; field: string; old_value: string | null; new_value: string | null; created_at: string }[]
   counts: { entries: number; approximate_dates: number; log_written: number }
 }
 
@@ -105,6 +114,12 @@ export async function buildExport(
     end.setUTCHours(23, 59, 59, 999)
     where.push('COALESCE(le.happened_at, le.occurred_at) <= ?')
     binds.push(end.toISOString())
+  }
+
+  // A record of origin: one entry, the turns either side of it, and the
+  // reflections attached to it. Not a range — a road.
+  if (scope.entryId) {
+    return buildRecordOfOrigin(env, db, operatorId, operatorName, scope.entryId)
   }
 
   const join = scope.pageId
@@ -165,6 +180,98 @@ export async function buildExport(
       log_written: entries.filter(e => e.author === 'log').length,
     },
   }
+}
+
+/**
+ * A record of origin — one position, as it actually happened.
+ *
+ * `proof.html`: "A finished essay no longer proves anyone thought it. The
+ * road to it does — and the log already keeps the road... You can fake an
+ * essay. You can't fake three months of a thought coming back to you — that
+ * takes living three months."
+ *
+ * So this exports the road: the entry, the turn it came out of, the turns it
+ * led to, the later thoughts attached to it, and every correction with both
+ * wordings — each dated, each saying who wrote it.
+ */
+async function buildRecordOfOrigin(
+  env: Env,
+  db: D1Database,
+  operatorId: string,
+  operatorName: string,
+  entryId: string,
+): Promise<ExportBundle> {
+  const SELECT = `SELECT le.id, le.text, le.detail,
+            COALESCE(le.happened_at, le.occurred_at, le.created_at) AS happened_at,
+            COALESCE(le.logged_at, le.created_at) AS logged_at,
+            le.date_precision, le.kind, le.visibility, le.author, le.source_kind,
+            le.source_ref, le.vlog_id, le.transcript, le.link_url,
+            le.original_filename, le.duration_seconds, le.r2_key,
+            le.occurred_at, le.created_at, le.led_from, le.relation
+       FROM log_entries le`
+
+  const rows = await findMany<ExportEntry & {
+    r2_key: string | null; occurred_at: string; created_at: string
+    led_from: string | null; relation: string
+  }>(
+    db,
+    `${SELECT}
+      WHERE le.operator_id = ? AND le.deleted_at IS NULL
+        AND (
+          le.id = ?
+          OR le.led_from = ?
+          OR le.id = (SELECT led_from FROM log_entries WHERE id = ? AND operator_id = ?)
+        )
+      ORDER BY COALESCE(le.happened_at, le.occurred_at) ASC`,
+    operatorId, entryId, entryId, entryId, operatorId,
+  )
+
+  const entries: ExportEntry[] = await Promise.all(rows.map(async r => {
+    let media_url: string | null = null
+    if (r.r2_key) {
+      try { media_url = await presignGetUrl(env, r.r2_key, 24 * 3600) } catch {}
+    }
+    const { r2_key, occurred_at, created_at, led_from, relation, ...rest } = r as any
+    return { ...rest, media_url } as ExportEntry
+  }))
+
+  // Both wordings of anything corrected — that is the part a finished piece
+  // cannot show.
+  const revisions = await findMany<{
+    entry_id: string; field: string; old_value: string | null
+    new_value: string | null; created_at: string
+  }>(
+    db,
+    `SELECT entry_id, field, old_value, new_value, created_at
+       FROM entry_revisions
+      WHERE operator_id = ? AND entry_id IN (${rows.map(() => '?').join(',') || "''"})
+      ORDER BY created_at ASC`,
+    operatorId, ...rows.map(r => r.id),
+  )
+
+  const subject = rows.find(r => r.id === entryId)
+
+  return {
+    title: subject ? firstSentence(subject.text) : 'A record of origin',
+    operator: operatorName,
+    exported_at: new Date().toISOString(),
+    scope: { entryId },
+    page: null,
+    entries,
+    revisions,
+    counts: {
+      entries: entries.length,
+      approximate_dates: entries.filter(e => isFuzzy(e.date_precision)).length,
+      log_written: entries.filter(e => e.author === 'log').length,
+    },
+  }
+}
+
+function firstSentence(s: string): string {
+  const t = s.trim().replace(/\s+/g, ' ')
+  const stop = t.search(/[.!?](\s|$)/)
+  const cut = stop > 0 ? t.slice(0, stop) : t
+  return cut.length > 80 ? `${cut.slice(0, 78)}…` : cut
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────
@@ -242,6 +349,11 @@ export function renderMarkdown(b: ExportBundle): string {
   out.push(`${b.counts.entries} ${b.counts.entries === 1 ? 'entry' : 'entries'}. ${b.counts.approximate_dates} carry an approximate date. ${b.counts.log_written} of the lines were written by the log rather than by ${b.operator}.`)
   out.push('')
 
+  if (b.scope.entryId) {
+    out.push('This is a record of origin: one position as it actually happened, with the entries either side of it and every wording it has had. A finished piece proves nobody thought it; the road to it does.')
+    out.push('')
+  }
+
   if (b.page?.summary) {
     out.push('---')
     out.push('')
@@ -283,6 +395,21 @@ export function renderMarkdown(b: ExportBundle): string {
     }
     out.push(`*${provenance(e)} · entry ${e.id}*`)
     out.push('')
+  }
+
+  if (b.revisions && b.revisions.length) {
+    out.push('---')
+    out.push('')
+    out.push('## What changed, and when')
+    out.push('')
+    out.push('Both wordings are kept. This is the part a finished piece cannot show.')
+    out.push('')
+    for (const r of b.revisions) {
+      out.push(`**${new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}** — ${r.field}`)
+      out.push('')
+      if (r.old_value) { out.push(`> was: ${r.old_value}`); out.push('') }
+      if (r.new_value) { out.push(`> became: ${r.new_value}`); out.push('') }
+    }
   }
 
   out.push('---')
