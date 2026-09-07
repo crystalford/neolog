@@ -3777,3 +3777,82 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .turn.all .tl { color: var(--fg-3); }
 .logpage .turn.all .tx { color: var(--fg-3); }
 .logpage .turn.all:hover .tx { color: var(--fg-1); }
+
+/* ── Correspondence (`messages.html`) ───────────────────────────────────
+   The one kind with someone else in it. His side and theirs are visually
+   distinct because they belong to different people — that is the whole
+   design, not decoration. */
+
+.logpage .paste { margin: 8px 0 34px; }
+.logpage .paste textarea {
+  width: 100%; background: #0a0a0b; color: var(--fg-1);
+  border: 1px solid var(--line-1); border-radius: 12px;
+  padding: 16px 18px; font: inherit; font-size: 14.5px; line-height: 1.6;
+  resize: vertical; outline: none;
+}
+.logpage .paste textarea:focus { border-color: var(--line-3); }
+.logpage .paste textarea::placeholder { color: var(--fg-4); }
+.logpage .paste .who { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.logpage .paste .who button {
+  font-size: 13.5px; color: var(--fg-2); padding: 6px 14px;
+  border: 1px solid var(--line-1); border-radius: 100px;
+}
+.logpage .paste .who button:hover { color: var(--fg); border-color: var(--line-3); }
+.logpage .paste .who button.on { color: #04211c; background: var(--fg); border-color: var(--fg); }
+.logpage .paste .who em {
+  font-style: normal; font-size: 12.5px; color: var(--fg-4); flex-basis: 100%;
+}
+.logpage .paste .bar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
+.logpage .paste .bar .say { font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+
+.logpage .msgs { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; max-width: 660px; }
+.logpage .msg { padding: 12px 16px; border-radius: 12px; max-width: 82%; }
+.logpage .msg.operator { align-self: flex-end; background: var(--bg-2); }
+.logpage .msg.other { align-self: flex-start; background: var(--bg-1); border: 1px solid var(--line); }
+.logpage .msg .who {
+  display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; color: var(--fg-4);
+  margin-bottom: 6px;
+}
+.logpage .msg .who time { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); }
+.logpage .msg .body {
+  font-size: 14.5px; line-height: 1.55; color: var(--fg-1);
+  white-space: pre-wrap; text-wrap: pretty;
+}
+.logpage .msg .note { margin-top: 7px; font-size: 12px; color: var(--fg-4); }
+.logpage .msg .note a { color: var(--fg-3); }
+.logpage .msg .note a:hover { color: var(--fg); }
+/* an absence: a row, not a gap. It has to be visible to be honest. */
+.logpage .msg.gone { border-style: dashed; background: transparent; }
+.logpage .msg.gone .body { color: var(--fg-4); font-size: 13.5px; }
+
+.logpage .consent { margin-top: 18px; display: flex; flex-direction: column; gap: 1px; max-width: 660px; }
+.logpage .consent button {
+  display: block; text-align: left; padding: 14px 18px;
+  border: 1px solid var(--line); background: transparent;
+}
+.logpage .consent button:first-child { border-radius: 12px 12px 0 0; }
+.logpage .consent button:nth-last-child(3) { border-radius: 0 0 12px 12px; }
+.logpage .consent button + button { border-top: 0; }
+.logpage .consent button:hover { background: var(--bg-1); }
+.logpage .consent button.on { border-color: var(--line-3); background: var(--bg-2); }
+.logpage .consent button b { display: block; font-size: 15px; font-weight: 450; color: var(--fg); }
+.logpage .consent button.on b { color: var(--fg); }
+.logpage .consent button span {
+  display: block; margin-top: 6px; font-size: 13.5px; line-height: 1.55;
+  color: var(--fg-3); text-wrap: pretty;
+}
+.logpage .consent button em {
+  display: block; margin-top: 7px; font-style: normal; font-size: 12px; color: var(--fg-4);
+}
+.logpage .consent .how { margin-top: 16px; }
+.logpage .consent .how input {
+  width: 100%; background: #0a0a0b; color: var(--fg-1);
+  border: 1px solid var(--line-1); border-radius: 9px;
+  padding: 10px 14px; font: inherit; font-size: 14px; outline: none;
+}
+.logpage .consent .how input:focus { border-color: var(--line-3); }
+.logpage .consent .how em {
+  display: block; margin-top: 8px; font-style: normal; font-size: 12.5px;
+  color: var(--fg-4); line-height: 1.55;
+}
+.logpage .consent .err { margin-top: 12px; font-size: 13px; color: var(--t-terra); line-height: 1.5; }

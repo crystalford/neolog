@@ -1501,6 +1501,69 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-09-07_idx_log_entries_led_from',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,
   },
+
+  // ── Correspondence (`messages.html`) ──────────────────────────────────
+  // The one kind with someone else in it. A thread has two owners: his side
+  // is entries under the normal rules, their side is kept here and never
+  // becomes an entry, because an entry carries author='operator'.
+  {
+    name: '2026-09-07_correspondence',
+    sql: `CREATE TABLE IF NOT EXISTS correspondence (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL,
+      -- The person's page. Their consent lives there, not here, so one
+      -- answer governs every thread they appear in.
+      person_page_id  TEXT,
+      person_name     TEXT NOT NULL,
+      -- 'text' | 'email' | 'chat' — what he forwarded, as he said it was.
+      medium          TEXT NOT NULL DEFAULT 'text',
+      started_at      TEXT,
+      ended_at        TEXT,
+      message_count   INTEGER NOT NULL DEFAULT 0,
+      -- The whole paste, kept. Nothing is reconstructed from the parts.
+      raw             TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at      TEXT
+    )`,
+  },
+  {
+    name: '2026-09-07_correspondence_messages',
+    sql: `CREATE TABLE IF NOT EXISTS correspondence_messages (
+      id           TEXT PRIMARY KEY,
+      thread_id    TEXT NOT NULL,
+      operator_id  TEXT NOT NULL,
+      -- 'operator' | 'other'. There is no third side.
+      side         TEXT NOT NULL,
+      speaker      TEXT,
+      text         TEXT NOT NULL,
+      sent_at      TEXT,
+      -- Whether the timestamp came from the paste or from the order alone.
+      sent_at_source TEXT NOT NULL DEFAULT 'order',
+      position     INTEGER NOT NULL DEFAULT 0,
+      -- Set only on his side: the entry this message became.
+      entry_id     TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_correspondence_messages',
+    sql: `CREATE INDEX IF NOT EXISTS idx_corr_msgs_thread
+            ON correspondence_messages(thread_id, position)`,
+  },
+  {
+    name: '2026-09-07_idx_correspondence_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_corr_operator
+            ON correspondence(operator_id, started_at)`,
+  },
+  // Their answer, on their page. Four states, and the default is the most
+  // private one — everyone starts at 'kept_private' without being asked,
+  // because the log cannot ask on their behalf.
+  { name: '2026-09-07_pages_consent', sql: `ALTER TABLE pages ADD COLUMN consent TEXT NOT NULL DEFAULT 'kept_private'` },
+  // When they said it and how. "Their yes is a fact on the log. Not a
+  // checkbox." A state with no record of how it was given is a checkbox.
+  { name: '2026-09-07_pages_consent_at', sql: `ALTER TABLE pages ADD COLUMN consent_at TEXT` },
+  { name: '2026-09-07_pages_consent_note', sql: `ALTER TABLE pages ADD COLUMN consent_note TEXT` },
 ]
 
 const BENIGN_PATTERNS = [

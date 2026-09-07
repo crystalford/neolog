@@ -48,7 +48,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const page = await findOne<PageRow>(
     db,
     `SELECT id, name, kind, summary, summary_author, span_start, span_end,
-            entry_count, visibility, named_by_system, source_ref, merged_into
+            entry_count, visibility, named_by_system, source_ref, merged_into,
+            consent, consent_at, consent_note
        FROM pages
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,

@@ -72,6 +72,12 @@ jobs:
       - name: Relog attribution
         run: node scripts/test/relog-line.mjs
 
+      # The one kind with someone else in it. A wrong split files another
+      # person's sentence as something HE said; a wrong public view
+      # publishes words nobody agreed to publish.
+      - name: Correspondence
+        run: node scripts/test/correspondence.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 

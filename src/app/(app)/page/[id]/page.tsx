@@ -25,6 +25,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { CONSENT_WORDS, asConsent } from '@/lib/correspondence'
 import { LogDays } from '@/components/LogRow'
 import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import { PAGE_KINDS } from '@/lib/pages'
@@ -40,6 +41,10 @@ interface PageDetail {
   status: string
   entry_count: number
   named_by_system: number
+  /** Only meaningful on a person: their answer about their own words. */
+  consent: string | null
+  consent_at: string | null
+  consent_note: string | null
 }
 
 interface FirstSaid { id: string; text: string; at: string; href: string }
@@ -153,7 +158,22 @@ export default function PageView({ params }: { params: { id: string } }) {
                 </span>
                 <span>{page.status}</span>
                 {page.named_by_system === 1 && <span>named by the log</span>}
+                {/* `messages.html`: the state is "shown on their page, and
+                    enforced everywhere their words appear." Read-only here
+                    — it is set on the conversation it came out of, where
+                    the words it governs are in front of him. */}
+                {page.kind === 'person' && (
+                  <span>{CONSENT_WORDS[asConsent(page.consent)].name.toLowerCase()}</span>
+                )}
               </div>
+              {page.kind === 'person' && (
+                <p className="none" style={{ padding: '10px 0 0', fontSize: 13 }}>
+                  {CONSENT_WORDS[asConsent(page.consent)].what}
+                  {page.consent_at
+                    ? ` Set ${new Date(page.consent_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}${page.consent_note ? ` — ${page.consent_note}` : ''}.`
+                    : ' Never asked; this is the default.'}
+                </p>
+              )}
             </div>
 
             {/* The log's one-paragraph version — rewritten as things attach,
