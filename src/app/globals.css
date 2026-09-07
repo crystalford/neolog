@@ -3105,3 +3105,32 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   border-radius: 7px; color: var(--fg-1); font: inherit; font-size: 12.5px;
   padding: 6px 9px; margin-top: 8px; color-scheme: dark; font-family: var(--font-body);
 }
+
+/* Open questions — the rail card, and the only place the log asks anything.
+   From log.html's rail: the question in the operator's reading weight, what
+   the log already has underneath it, then the ways to answer. "don't
+   remember" is offered as plainly as the rest, because it is a complete
+   answer. */
+.logpage .rc .i.ask { background: var(--bg-2); }
+.logpage .rc .ans { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.logpage .rc .ans .opts { display: flex; gap: 5px; flex-wrap: wrap; }
+.logpage .rc .ans .opts span {
+  font-size: 11.5px; padding: 5px 9px;
+  border: 1px solid var(--line-2); border-radius: 6px;
+  color: var(--fg-1); white-space: nowrap; cursor: pointer;
+}
+.logpage .rc .ans .opts span:hover { border-color: var(--line-3); }
+.logpage .rc .ans .opts span.p { background: var(--fg); color: #000; border-color: var(--fg); font-weight: 500; }
+.logpage .rc .ans .opts span.d { color: var(--fg-4); border-style: dashed; }
+.logpage .rc .ans .or {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--line-1); border-radius: 8px; background: var(--bg-1);
+}
+.logpage .rc .ans .or input {
+  flex: 1; background: none; border: 0; outline: none;
+  color: var(--fg); font: inherit; font-size: 12px; min-width: 0;
+  font-family: var(--font-body); margin: 0; padding: 0;
+}
+.logpage .rc .ans .or input::placeholder { color: var(--fg-4); }
+.logpage .rc .ans em { font-size: 11px; color: var(--fg-4); font-style: normal; line-height: 1.45; }

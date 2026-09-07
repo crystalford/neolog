@@ -39,6 +39,7 @@ import Shell from '@/components/Shell'
 import { useIntake } from '@/components/useIntake'
 import { LogDays } from '@/components/LogRow'
 import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
+import { OpenQuestions } from '@/components/OpenQuestions'
 import {
   type LogEntry, type FeedFilter, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -386,6 +387,7 @@ export default function LogHome() {
 
           {/* ── The rail ───────────────────────────────────────────────── */}
           <aside className="rail">
+            <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <div className="rc">
               <div className="h">

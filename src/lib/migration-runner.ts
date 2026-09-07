@@ -1322,6 +1322,58 @@ export const MIGRATIONS: Migration[] = [
   // Whether this line was checked verbatim against the recording's
   // transcript. NULL = not applicable (the operator typed it himself).
   { name: '2026-09-07_log_entries_grounded', sql: `ALTER TABLE log_entries ADD COLUMN grounded INTEGER` },
+
+  // ── Recall (7 Sep 2026) ─────────────────────────────────────────────────
+  // "recall — filling in what was never written down — a VERB, not a place:
+  //  a question appears where it belongs (the log's rail, a page, a thin
+  //  year) and is answered there, by voice, typing, a choice, or 'don't
+  //  remember'." (SPEC §1, and the reason `recall.html` was deleted.)
+  //
+  // The rules this table exists to keep:
+  //   - The log asks roughly one question a month, straight. It never says
+  //     "you've mentioned this eleven times."
+  //   - It never asks at the moment of input.
+  //   - It asks only about parts that could sharpen. Once he says he does
+  //     not remember, it stops asking that question — for good.
+  //   - Four things it must never ask about, because a wrong guess there is
+  //     the tool putting words in his mouth: what a recording MEANS, WHY he
+  //     did something, whether something was GOOD, and who someone IS to
+  //     him. Question generation only ever produces date and name gaps.
+  {
+    name: '2026-09-07_recall_questions',
+    sql: `CREATE TABLE IF NOT EXISTS recall_questions (
+      id            TEXT PRIMARY KEY,
+      operator_id   TEXT NOT NULL,
+      -- 'entry_date' | 'thin_year' | 'page_name'
+      kind          TEXT NOT NULL,
+      -- The question, and the one line saying what the log already has. Both
+      -- are composed from real rows, never written by a model.
+      question      TEXT NOT NULL,
+      because       TEXT,
+      -- What it is about, so the answer can attach to the right thing.
+      target_kind   TEXT,
+      target_id     TEXT,
+      -- open | answered | dont_remember | dismissed
+      status        TEXT NOT NULL DEFAULT 'open',
+      -- The entry the answer became. An answer is an entry like any other.
+      answer_entry_id TEXT,
+      -- Stable across regeneration, so the same gap is one question forever
+      -- and a dismissed one never comes back.
+      dedupe_key    TEXT NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      answered_at   TEXT
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_recall_dedupe',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_recall_dedupe
+            ON recall_questions(operator_id, dedupe_key)`,
+  },
+  {
+    name: '2026-09-07_idx_recall_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_recall_status
+            ON recall_questions(operator_id, status, created_at DESC)`,
+  },
 ]
 
 const BENIGN_PATTERNS = [
