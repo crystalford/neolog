@@ -168,12 +168,28 @@ a renamed or never-built path is a runtime 404 that renders as an empty list —
 which reads as "nothing here yet" rather than as a bug. 131 routes, 150
 fetched paths.
 
-**Everything in the design package is now built except:** the public About
-(`dossier.html`), the ways-in integrations (`connections.html`), the unlisted
-machine layer (`everything` / `source` / `asks` / `numbers`), the per-kind
-entry bodies (a silent video's frames, a two-voice recording, a document's
-provenance), and everything below the drafting fence — letters, cuts, the
-offer, `sayit`, `thinkit`. That last group **stays below the fence**.
+**Package inventory, 7 Sep 2026** — 74 distinct pages (excluding the 37
+`e-*` entry examples): **43 built · 6 partial · 16 not built · 4 below the
+fence · 5 meta**.
+
+Partial: `fix` (per-word transcript editing), `walk`/`branch` (no route view;
+splitting one note into several), `screenshots` (reads the text; no three-pile
+sort), `audio` (no two-voice split), `flow` (a walkthrough page).
+
+Not built, and all but two are the public or machine-facing layer the operator
+has not opened: `dossier` · `elsewhere` · `everything` · `source` · `asks` ·
+`numbers` · `photo` · `recording` (public); `messages` · `repo` · `writing` ·
+`footage` · `image` · `image-filter` (per-kind bodies).
+
+Below the fence and **staying there**: `letters`, `thinkit`, `sayit`, `cut`.
+
+**Later additions this session:** a pasted **conversation** is kept whole and
+split, and only HIS turns become entries (`src/lib/conversation.ts`) — the
+consent rule from `audio.html`. A pasted **document** is "kept", not written:
+the log cannot know who wrote it and must not ask at input, so the line is the
+log's and he claims it in one tap. The vision pass **reads the words out of a
+picture of a note**. An undated picture asks when it was taken. An idea's page
+carries **first said** and how it has changed.
 
 **The build order is void.** The operator lifted it on 7 Sep: *"not
 necessarily follow the steps because they may not be relevant since we
