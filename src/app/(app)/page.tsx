@@ -381,7 +381,7 @@ export default function LogHome() {
               {buried > 0 && (
                 <Link href="/?filter=buried">{buried} buried</Link>
               )}
-              <Link href="/export">Pull a stretch of it out →</Link>
+              <Link href="/public">See it as a stranger does →</Link>
             </div>
           </main>
 
@@ -409,6 +409,16 @@ export default function LogHome() {
             </div>
           </aside>
         </div>
+
+        <footer className="ft">
+          <span>neolog · the log · private</span>
+          <span className="r">
+            <Link href="/now">now</Link>
+            <Link href="/pages">the index</Link>
+            <Link href="/public">what&rsquo;s public</Link>
+            <Link href="/export">export</Link>
+          </span>
+        </footer>
 
         {/* Click the image → a lightbox over the feed; you never leave. */}
         <LogLightbox shots={shots} index={shotAt} onClose={() => setShotAt(null)} onIndex={setShotAt} />
