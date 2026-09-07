@@ -45,6 +45,11 @@ jobs:
       - name: SQL columns exist
         run: node scripts/check-sql-columns.mjs
 
+      # Same class of blind spot: a fetch to a renamed or never-built path is
+      # a runtime 404 that renders as "no data yet" rather than as an error.
+      - name: Fetched API paths have routes
+        run: node scripts/check-routes.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
