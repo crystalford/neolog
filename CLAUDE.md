@@ -389,6 +389,17 @@ a renamed or never-built path is a runtime 404 that renders as an empty list —
 which reads as "nothing here yet" rather than as a bug. 131 routes, 150
 fetched paths.
 
+`check-enum-values.mjs` covers the third: **a right column with a wrong
+value.** The column checker catches `vlogs.transcript`; it cannot catch
+`relation = 'reflection'` when the two values are `led_from` and `reflects` —
+SQLite accepts the write, `tsc` accepts the comparison, `next build` is
+green, and the only symptom is a reflection rendering as an event. It
+validates both sides (`col = 'x'`, `col IN (…)`, `x.col === 'y'`) against the
+value sets for eleven columns and prints the allowed set beside a failure.
+Adding a value means adding it to the list on purpose, which is the point.
+Also update `src/lib/log-entry.ts` — `RELATIONS`, `RELATION_DEFAULT`,
+`REFLECTS` — rather than typing a string.
+
 **Package inventory, 7 Sep 2026** — 74 distinct pages (excluding the 37
 `e-*` entry examples): **43 built · 6 partial · 16 not built · 4 below the
 fence · 5 meta**.

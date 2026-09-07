@@ -50,6 +50,14 @@ jobs:
       - name: Fetched API paths have routes
         run: node scripts/check-routes.mjs
 
+      # And the third: a RIGHT column with a WRONG value. The column exists,
+      # the type is TEXT, tsc and the column checker are both green, and the
+      # only symptom is behaviour — the walk shipped comparing `relation` to
+      # 'reflection' when the value is 'reflects', so a reflection rendered
+      # on a route as an event.
+      - name: Column values are ones the column can hold
+        run: node scripts/check-enum-values.mjs
+
       # The logic where a bug corrupts the log silently: whether a line is
       # attributed to the operator, what a date means, and which model
       # sentences he is shown.
