@@ -1409,6 +1409,46 @@ export const MIGRATIONS: Migration[] = [
   // the pointer means, not what it points at. Default 'led_from' so every
   // row written before this reads as a turn, which is what they were.
   { name: '2026-09-07_log_entries_relation', sql: `ALTER TABLE log_entries ADD COLUMN relation TEXT NOT NULL DEFAULT 'led_from'` },
+
+  // ── Safe to clear your phone (7 Sep 2026) ───────────────────────────────
+  // clear.html calls this "the loop the log exists to close", and it is the
+  // original problem in the operator's own words: the phone fills up, he
+  // deletes, the record is gone.
+  //
+  // The log only fixes that if it can say, per file, "kept, checked, you can
+  // clear this" — and MEAN it. So:
+  //
+  //   "'Clear it' means verified, not uploaded. Uploaded isn't kept. The log
+  //    checks the stored bytes against the phone's before it says so."
+  //
+  // Four states, and only one of them means delete it locally:
+  //   pending   still uploading or queued — don't touch it on the phone
+  //   checking  stored; the log is confirming the copy
+  //   checked   stored and verified — the only state that means clear it
+  //   mismatch  the copy differs; the log re-sends and says so. Never clear.
+  //
+  // `checksum` is the client's SHA-256 of the original. `verified_by` records
+  // WHICH check was done, because claiming a byte check that was really a
+  // size check is exactly the lie this feature exists not to tell.
+  { name: '2026-09-07_log_entries_checksum', sql: `ALTER TABLE log_entries ADD COLUMN checksum TEXT` },
+  { name: '2026-09-07_log_entries_keep_state', sql: `ALTER TABLE log_entries ADD COLUMN keep_state TEXT` },
+  { name: '2026-09-07_log_entries_verified_by', sql: `ALTER TABLE log_entries ADD COLUMN verified_by TEXT` },
+  { name: '2026-09-07_log_entries_verified_at', sql: `ALTER TABLE log_entries ADD COLUMN verified_at TEXT` },
+  // The entry this one turned out to be a copy of. "The log never deletes a
+  // copy" (dupes.html) — the second arrival attaches to the first and notes
+  // where it came from, so there is one thing with two sources rather than
+  // two things.
+  { name: '2026-09-07_log_entries_copy_of', sql: `ALTER TABLE log_entries ADD COLUMN copy_of TEXT` },
+  {
+    name: '2026-09-07_idx_log_entries_checksum',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_checksum
+            ON log_entries(operator_id, checksum)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_keep_state',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_keep_state
+            ON log_entries(operator_id, keep_state)`,
+  },
   {
     name: '2026-09-07_idx_log_entries_led_from',
     sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,

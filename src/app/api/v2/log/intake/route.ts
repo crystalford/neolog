@@ -50,6 +50,7 @@ import { ulid } from '@/lib/ulid'
 import { transcribeAudio } from '@/lib/transcribe'
 import { checkHoldBack, placeFile, kindForUpload } from '@/lib/log-intake'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
+import { verifyStored, findExistingCopy } from '@/lib/keep'
 import { batchSentence, spokenDuration, type DatePrecision } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -69,6 +70,8 @@ interface IncomingFile {
   happened_at?: string
   date_source?: string
   duration_seconds?: number
+  /** SHA-256 of the original, computed before it left the browser. */
+  checksum?: string
 }
 
 const PRECISIONS = new Set<DatePrecision>(['exact', 'day', 'month', 'year', 'approx'])
@@ -140,6 +143,7 @@ export async function POST(req: NextRequest) {
   const entryIds: string[] = []
   // Files needing work after the reply: transcription, or the hold-back look.
   const followUps: { id: string; r2_key: string; mime: string; kind: 'audio' | 'image' }[] = []
+  const verifies: { id: string; r2_key: string; checksum: string | null; bytes: number | null }[] = []
 
   // The turn this came out of, when it is one. A thread is just this
   // column followed in either direction.
@@ -151,8 +155,8 @@ export async function POST(req: NextRequest) {
     (id, operator_id, text, detail, occurred_at, happened_at, logged_at,
      date_precision, kind, visibility, held_reason, author, source_kind,
      batch_id, r2_key, mime, bytes, duration_seconds, link_url,
-     original_filename, led_from, relation)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+     original_filename, led_from, relation, checksum, keep_state)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
   // ── The typed / spoken sentence ─────────────────────────────────────────
   // The operator's own words. Author is always `operator`, and the text is
@@ -171,6 +175,7 @@ export async function POST(req: NextRequest) {
         precision, linkUrl && !text ? 'read' : 'said', 'public', null, 'operator',
         linkUrl && !text ? 'link' : 'text',
         batchId, null, null, null, null, linkUrl, null, ledFrom, relation,
+        null, null,
       ],
     })
   }
@@ -187,6 +192,7 @@ export async function POST(req: NextRequest) {
         names.slice(0, 12).join(', ') + (names.length > 12 ? `, and ${names.length - 12} more` : ''),
         now, now, now, 'exact', 'happened', 'public', null, 'log', 'batch',
         batchId, null, null, null, null, null, null, null, 'led_from',
+        null, null,
       ],
     })
   }
@@ -278,11 +284,17 @@ export async function POST(req: NextRequest) {
         batchId,
         f.r2_key, f.mime || null, f.bytes ?? null, f.duration_seconds ?? null,
         null, f.original_filename || null, ledFrom, relation,
+        // Stored so the log can check what it holds against what was
+        // sent. Until it has, the file is 'checking' — never 'kept'.
+        f.checksum || null, 'checking',
       ],
     })
 
     if (isAudio) followUps.push({ id, r2_key: f.r2_key, mime, kind: 'audio' })
     else if (isImage) followUps.push({ id, r2_key: f.r2_key, mime, kind: 'image' })
+    // Everything with a file behind it gets verified, whatever kind it is —
+    // that is what makes "clear it" mean something.
+    verifies.push({ id, r2_key: f.r2_key, checksum: f.checksum || null, bytes: f.bytes ?? null })
   }
 
   await d1Batch(db, statements)
@@ -327,6 +339,9 @@ export async function POST(req: NextRequest) {
   // knows about the files, and it happens with him already gone.
   if (followUps.length) {
     ctx.waitUntil(runFollowUps(env, db, followUps))
+  }
+  if (verifies.length) {
+    ctx.waitUntil(runVerifications(env, db, operator.id, verifies))
   }
 
   return NextResponse.json(
@@ -417,6 +432,56 @@ async function runFollowUps(
       // placeholder sentence. Both are correctable in one tap.
     }
   }))
+}
+
+/**
+ * Check what was stored against what was sent, and notice exact copies.
+ *
+ * This is what lets the log say "kept, checked, you can clear this" and mean
+ * it. Until it has run, a file's state is `checking`; a check that cannot run
+ * leaves it there rather than claiming either answer.
+ */
+async function runVerifications(
+  env: Env,
+  db: ReturnType<typeof getDb>,
+  operatorId: string,
+  items: { id: string; r2_key: string; checksum: string | null; bytes: number | null }[],
+) {
+  for (const item of items) {
+    try {
+      const verdict = await verifyStored(env, item.r2_key, {
+        checksum: item.checksum, bytes: item.bytes,
+      })
+      await run(
+        db,
+        `UPDATE log_entries
+            SET keep_state = ?, verified_by = ?, verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+        verdict.state, verdict.verified_by, item.id,
+      )
+
+      // "The log never deletes a copy." An exact re-arrival attaches to the
+      // first one and notes where it came from, so there is one thing with
+      // two sources rather than two things.
+      if (verdict.state === 'checked' && item.checksum) {
+        const original = await findExistingCopy(db, operatorId, item.checksum, item.id)
+        if (original) {
+          await run(
+            db,
+            `UPDATE log_entries
+                SET copy_of = ?, visibility = 'private',
+                    detail = COALESCE(detail, 'Already here — this exact file arrived earlier. Kept as a second source rather than a second entry.'),
+                    updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+            original.id, item.id,
+          )
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[intake] verification failed for ${item.id}:`, err?.message || err)
+    }
+  }
 }
 
 /**

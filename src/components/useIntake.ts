@@ -22,6 +22,8 @@ import type { DatePrecision } from '@/lib/log-entry'
 export interface Pending {
   key: string
   file: File
+  /** SHA-256 of the original, so the log can verify what it stored. */
+  checksum?: string
   r2_key?: string
   uploading: boolean
   error?: string
@@ -67,6 +69,20 @@ export function useIntake(onDone?: () => void) {
         let date_source: string | undefined
         let duration_seconds = item.duration_seconds
 
+        // Hash the original before it leaves. This is what lets the log say
+        // "kept, checked, clear it" and mean it rather than meaning "the
+        // upload returned 200". Skipped above the ceiling the server can
+        // re-read, where the check is length instead and says so.
+        let checksum: string | undefined
+        if (item.file.size <= 50 * 1024 * 1024) {
+          try {
+            const buf = await item.file.arrayBuffer()
+            const digest = await crypto.subtle.digest('SHA-256', buf)
+            checksum = Array.from(new Uint8Array(digest))
+              .map(b => b.toString(16).padStart(2, '0')).join('')
+          } catch { /* no hash — the server falls back to a size check */ }
+        }
+
         if (item.file.type.startsWith('image/')) {
           try {
             const { readExif } = await import('@/lib/photo-client')
@@ -104,7 +120,7 @@ export function useIntake(onDone?: () => void) {
         if (!put.ok) throw new Error('upload failed')
 
         setPending(p => p.map(x => x.key === item.key
-          ? { ...x, uploading: false, r2_key: key, happened_at, date_source, duration_seconds }
+          ? { ...x, uploading: false, r2_key: key, happened_at, date_source, duration_seconds, checksum }
           : x))
       } catch (err: any) {
         setPending(p => p.map(x => x.key === item.key
@@ -178,6 +194,7 @@ export function useIntake(onDone?: () => void) {
             happened_at: p.happened_at,
             date_source: p.date_source,
             duration_seconds: p.duration_seconds,
+            checksum: p.checksum,
           })),
         }),
       })

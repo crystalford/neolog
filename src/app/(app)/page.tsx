@@ -455,6 +455,7 @@ export default function LogHome() {
             <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <ArrivedOnItsOwn items={items} />
+            <SafeToClear />
             <Relog onDone={() => { void loadFeed() }} />
             {/* day-one.html: "The rail has nothing to show, so it says so in
                 one line rather than showing empty boxes." Every card above
@@ -520,6 +521,41 @@ function ArrivedOnItsOwn({ items }: { items: LogEntry[] }) {
       <div className="i">
         {parts.join(' · ')}
         <em>every line the log wrote is correctable in one tap</em>
+      </div>
+    </div>
+  )
+}
+
+// ── Safe to clear your phone ──────────────────────────────────────────────
+// The loop the log exists to close. Only appears when the log can honestly
+// say something is safe to delete — it never nags, and it never guesses.
+
+function SafeToClear() {
+  const [s, setS] = useState<{ clearable: number; clearable_bytes: number } | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/v2/clear', { cache: 'no-store' })
+        if (res.ok) setS(await res.json())
+      } catch { /* the card just doesn't show */ }
+    })()
+  }, [])
+  if (!s || s.clearable <= 0) return null
+  const gb = s.clearable_bytes >= 1e9
+    ? `${(s.clearable_bytes / 1e9).toFixed(1)} GB`
+    : `${Math.round(s.clearable_bytes / 1e6)} MB`
+  return (
+    <div className="rc">
+      <div className="h">Safe to clear <span>{s.clearable} files</span></div>
+      <div className="i">
+        <b>{gb} is kept and checked.</b>
+        <em>
+          Verified against what your phone sent, not just uploaded. Safe to
+          delete locally.
+        </em>
+        <div className="fixrow">
+          <Link href="/clear"><button>See what</button></Link>
+        </div>
       </div>
     </div>
   )
