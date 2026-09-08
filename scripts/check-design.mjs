@@ -57,7 +57,10 @@ const PAGES = [
   ['public-log', 'src/app/(app)/public/page.tsx',       10],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    23],
   ['writing',    'src/app/(app)/writing/page.tsx',      6],
-  ['screenshots','src/app/(app)/screenshots/page.tsx',  14],
+  // writing.html's title is "an essay you wrote" — it covers the mechanic
+  // AND one document, so the detail page is measured against it too.
+  ['writing',    'src/app/(app)/writing/[id]/page.tsx', 15],
+  ['screenshots','src/app/(app)/screenshots/page.tsx',  9],
   ['messages',   'src/app/(app)/messages/page.tsx',     21],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live

@@ -91,17 +91,22 @@ export default function Screenshots() {
         <div className="grid">
           <main>
 
-        <div className="pghead"><h1>Screenshots</h1></div>
-        <div className="stamp">
-          <span>pictures that are really text</span>
-          {total > 0 && <span>{total} the log has read</span>}
-        </div>
+        <section className="top">
+          <h1>
+            {total > 0 ? `${total} screenshots.` : 'Screenshots.'}{' '}
+            <b>The log reads them — and knows most are junk.</b>
+          </h1>
+          <p>
+            A screenshot isn&rsquo;t a photo. It&rsquo;s text you wanted to
+            keep for a second — a message, a receipt, a map, a thing to buy.
+            So the log <b>reads the text</b>, dates it, and sorts it into
+            three piles. It never buries anything on its own; the last pile
+            is an offer.
+          </p>
+        </section>
 
-        <p className="none" style={{ paddingBottom: 0 }}>
-          A screenshot is text you wanted for a second. The log reads the
-          words and sorts by what they say. It never buries anything on its
-          own — the last pile is an offer.
-        </p>
+        <div className="grid">
+          <main>
 
         {loading && <div className="none">Reading them.</div>}
         {!loading && total === 0 && (
@@ -135,9 +140,9 @@ export default function Screenshots() {
               </div>
             )}
 
-            <div className="shots">
+            <div className="paper">
               {piles[p].map(s => (
-                <div className={`shot${keeping.has(s.id) ? ' kept' : ''}`} key={s.id}>
+                <div className={`im${keeping.has(s.id) ? ' kept' : ''}`} key={s.id}>
                   {s.url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.url} alt="" loading="lazy" />
@@ -150,16 +155,16 @@ export default function Screenshots() {
                       {s.facts.who && <span>{s.facts.who}</span>}
                       <span>on the log as {s.entry_kind_now}</span>
                     </div>
-                    <div className="why">{s.why}</div>
+                    <div className="txt">{s.why}</div>
                     {s.kind === 'message' && (
-                      <div className="why">
+                      <div className="txt">
                         Someone else&rsquo;s words, so they get{' '}
                         <Link href="/messages">the message rule</Link> — kept,
                         attached to them, private by default.
                       </div>
                     )}
                     {p === 'convenience' && (
-                      <button className="keep" onClick={() => toggleKeep(s.id)}>
+                      <button className="go" onClick={() => toggleKeep(s.id)}>
                         {keeping.has(s.id) ? 'in the pile again' : 'keep this one'}
                       </button>
                     )}
@@ -172,6 +177,28 @@ export default function Screenshots() {
                 </main>
 
           <Rail goesTo={[{ href: '/triage', label: 'what arrived' }, { href: '/messages', label: 'the message rule' }, { href: '/clear', label: 'safe to clear' }]} />
+        </div>
+        {/* `screenshots.html` closes on these two, and both are the design
+            rather than reassurance about it. */}
+        <div className="rules">
+          <div>
+            <b>Read the text; keep the picture.</b> A screenshot&rsquo;s
+            meaning is its words. The log reads them and files by what they
+            say — the image is the original and stays.
+          </div>
+          <div>
+            <b>Junk is offered, not decided.</b> Directions, a one-time code,
+            a thing you wanted for a second — grouped and offered in one go.
+            Buried is reversible; nothing is ever deleted.
+          </div>
+        </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/triage', label: 'what arrived' },
+            { href: '/messages', label: 'the message rule' },
+            { href: '/clear', label: 'safe to clear' },
+          ]} />
         </div>
       </div>
     </Shell>

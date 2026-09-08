@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import {
   DOC_WORDS, MADE_BY_WORDS, asKind, asMadeBy, type DocumentRow, type Draft,
 } from '@/lib/documents'
@@ -81,6 +82,9 @@ export default function DocumentPage() {
           <Link href="/writing">writing</Link>
         </div>
 
+        <div className="grid">
+          <main>
+
         {loading && <div className="none">Getting it.</div>}
         {!loading && !d && <div className="none">No such document.</div>}
 
@@ -126,7 +130,7 @@ export default function DocumentPage() {
             ) : (
               <>
                 {shown ? (
-                  <div className="docbody">{shown}</div>
+                  <div className="doc">{shown}</div>
                 ) : d.body_url ? (
                   <p className="none">
                     <a href={d.body_url} target="_blank" rel="noreferrer">{DOC_WORDS[kind].body}</a>
@@ -208,6 +212,13 @@ export default function DocumentPage() {
             </div>
           </>
         )}
+          </main>
+
+          <Rail goesTo={[
+            { href: '/writing', label: 'everything made' },
+            { href: '/', label: 'the log' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )
