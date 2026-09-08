@@ -81,6 +81,7 @@ const PAGES = [
   ['messages',   'src/app/(app)/messages/[id]/page.tsx', 12],
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',    14],
   ['now',        'src/app/(app)/now/page.tsx',           1],
+  ['connections','src/app/(app)/ways-in/page.tsx',      16],
 ]
 
 /**
@@ -94,11 +95,16 @@ const PAGES = [
  * that is of something else.
  */
 const NO_DESIGN_PAGE = {
-  '(export.html)': 'a rendered export document, not a surface — /export is takeout.html',
-  '/everything': 'everything.html is an entry example; SPEC §3 describes the door in prose only',
-  '/footage':    'footage.html is an entry example; SPEC §2 describes footage in prose only',
+  // Files in the package that are NOT product surfaces, recorded so nobody
+  // points a route at one. Three of them cost real time this session.
+  '(export.html)':     'a rendered export document — /export is takeout.html',
+  '(everything.html)': 'an entry example, despite SPEC §3 naming it the machine-layer door',
+  '(footage.html)':    'an entry example, despite SPEC §2 describing footage',
+  '(portal.html)':     'a flat map of the package\'s own HTML files, not a product page',
+  '(index.html)':      'the package\'s designed hub, same',
+  '/everything': 'built from SPEC §3 prose — everything.html is an entry example and portal.html is a map of the package',
+  '/footage':    'built from SPEC §2 prose — footage.html is an entry example',
   '/ready': 'no page in the package', '/share': 'no page in the package',
-  '/ways-in': 'connections.html covers the doors, not this screen',
   '/settings': 'no page in the package', '/vlogs': 'vlog.html is one recording, not the list',
 }
 

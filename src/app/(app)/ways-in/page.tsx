@@ -24,6 +24,7 @@ export const runtime = 'edge'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 
 export default function WaysIn() {
   const [installed, setInstalled] = useState(false)
@@ -33,22 +34,23 @@ export default function WaysIn() {
 
   return (
     <Shell>
-      <div className="logpage">
+      <div className="logpage pg-connections">
         <div className="back"><Link href="/">the log</Link></div>
 
-        <div className="pghead">
-          <h1>Every way in.</h1>
-          <div className="pgmeta">
-            <span>
-              What&rsquo;s built, and what isn&rsquo;t. A door that
-              isn&rsquo;t there is worse than one that was never listed.
-            </span>
-          </div>
-        </div>
+        <section className="top">
+          <h1>Every way something gets into the log.</h1>
+          <p className="sub">
+            What&rsquo;s built, and what isn&rsquo;t. A door that
+            isn&rsquo;t there is worse than one that was never listed.
+          </p>
+        </section>
 
-        <div className="idxband"><b>Built</b></div>
+        <div className="grid">
+          <main>
 
-        <div className="way-row">
+        <div className="sh"><b>Built</b></div>
+
+        <div className="ways">
           <div className="wk">The box</div>
           <div className="wv">
             Type or paste into the composer on <Link href="/">the log</Link>.
@@ -56,7 +58,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="way-row">
+        <div className="ways">
           <div className="wk">Full screen</div>
           <div className="wv">
             <Link href="/now">/now</Link> — nothing on the screen but the box.
@@ -64,7 +66,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="way-row">
+        <div className="ways">
           <div className="wk">Talk</div>
           <div className="wv">
             The microphone in either composer. It records, uploads, and
@@ -73,7 +75,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="way-row">
+        <div className="ways">
           <div className="wk">Files, photos, video</div>
           <div className="wv">
             Drag in, paste, or pick. Each is placed by its own clock and
@@ -82,7 +84,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="way-row">
+        <div className="ways">
           <div className="wk">On your phone</div>
           <div className="wv">
             Open neolog in the phone&rsquo;s browser and add it to the home
@@ -91,7 +93,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="way-row">
+        <div className="ways">
           <div className="wk">The share sheet</div>
           <div className="wv">
             Once it is on the home screen, neolog appears in any app&rsquo;s
@@ -100,7 +102,7 @@ export default function WaysIn() {
           </div>
         </div>
 
-        <div className="idxband"><b>Not built</b>and the page says so rather than implying otherwise</div>
+        <div className="sh"><b>Not built</b>and the page says so rather than implying otherwise</div>
 
         <div className="way-row off">
           <div className="wk">Hands-free from earbuds</div>
@@ -125,6 +127,22 @@ export default function WaysIn() {
           Everything already recorded is a way in too — the{' '}
           <Link href="/">relog</Link> puts what you said in three hundred
           existing recordings onto the log, at the second you said it.
+        </div>
+            {/* `connections.html`'s closing rule, which is the reason
+                there are eight doors rather than one. */}
+            <div className="rules">
+              <b>Eight doors, one receipt.</b> However something gets in —
+              typed, spoken, shared, forwarded — what comes back is the same
+              single line saying what happened, and one undo. Nothing asks a
+              question at the moment of input.
+            </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/now', label: 'the box, full screen' },
+            { href: '/triage', label: 'what arrived' },
+          ]} />
         </div>
       </div>
     </Shell>

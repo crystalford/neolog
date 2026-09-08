@@ -4155,3 +4155,93 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .logpage.pg-takeout .ends .nx { text-align:left!important; }
 }
 
+
+/* ── every way in (`connections.html`) ─────────────────────────────── */
+
+.logpage.pg-connections .top { max-width:800px; }
+.logpage.pg-connections h1 { font-size:30px; font-weight:300; letter-spacing:-1px; color:var(--fg); line-height:1.2; text-wrap:pretty; }
+.logpage.pg-connections h1 b { font-weight:450; }
+.logpage.pg-connections .top p { font-size:15.5px; color:var(--fg-2); margin-top:14px; line-height:1.6; text-wrap:pretty; }
+.logpage.pg-connections .top p b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .sh { font-size:15px; font-weight:450; color:var(--fg); padding:40px 0 10px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:16px; align-items:baseline; }
+.logpage.pg-connections .sh b { font-size:12px; font-weight:400; color:var(--fg-4); white-space:nowrap; }
+.logpage.pg-connections .src { display:grid; grid-template-columns:200px 1fr 190px; gap:24px; padding:20px 0; border-bottom:1px solid var(--line); align-items:start; }
+.logpage.pg-connections .src .nm b { display:block; font-size:15px; font-weight:450; color:var(--fg); line-height:1.35; }
+.logpage.pg-connections .src .nm i { display:block; font-style:normal; font-size:12px; color:var(--fg-4); margin-top:4px; line-height:1.45; }
+.logpage.pg-connections .src .nm .sw { display:inline-flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color:var(--fg-3); }
+.logpage.pg-connections .src .nm .sw i { display:block; width:28px; height:16px; border-radius:100px; background:var(--bg-3); border:1px solid var(--line-2); position:relative; margin:0; flex-shrink:0; }
+.logpage.pg-connections .src .nm .sw i::after { content:''; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:var(--fg-4); }
+.logpage.pg-connections .src .nm .sw.on i { background:rgba(78,161,213,.18); border-color:rgba(78,161,213,.5); }
+.logpage.pg-connections .src .nm .sw.on i::after { left:14px; background:var(--steel); }
+.logpage.pg-connections .src .nm .sw.on { color:var(--fg-1); }
+.logpage.pg-connections .src .x { font-size:14.5px; color:var(--fg-1); line-height:1.55; text-wrap:pretty; }
+.logpage.pg-connections .src .x b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .src .x .ln { margin-top:9px; font-size:13px; color:var(--fg-3); line-height:1.55; }
+.logpage.pg-connections .src .x .ln a { color:var(--fg-2); border-bottom:1px solid var(--line-2); }
+.logpage.pg-connections .src .x .ln a:hover { color:var(--fg); }
+.logpage.pg-connections .src .st { text-align:right; font-size:12px; color:var(--fg-4); line-height:1.6; }
+.logpage.pg-connections .src .st b { display:block; font-family:var(--mono); font-size:18px; font-weight:300; color:var(--fg); letter-spacing:-0.4px; }
+.logpage.pg-connections .src .st .lst { display:block; font-family:var(--mono); font-size:10.5px; color:var(--fg-3); margin-top:4px; white-space:nowrap; }
+.logpage.pg-connections .src .st .lst.q { color:var(--ochre); }
+.logpage.pg-connections .src.off .nm b { color:var(--fg-2); }
+.logpage.pg-connections .src.off .x { color:var(--fg-3); }
+.logpage.pg-connections .src.off .st b { color:var(--fg-3); }
+.logpage.pg-connections .how { border:1px solid var(--line-1); border-radius:12px; background:var(--bg-1); padding:18px 22px; display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+.logpage.pg-connections .how h3 { font-size:14px; font-weight:450; color:var(--fg); margin-bottom:8px; }
+.logpage.pg-connections .how p { font-size:13.5px; color:var(--fg-2); line-height:1.6; text-wrap:pretty; }
+.logpage.pg-connections .how p b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .how .ex { margin-top:10px; padding:10px 13px; border:1px solid var(--line); border-radius:8px; background:var(--bg); font-size:13px; color:var(--fg-2); line-height:1.55; }
+.logpage.pg-connections .how .ex b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .how .ex i { display:block; font-style:normal; font-size:11.5px; color:var(--fg-4); margin-top:5px; }
+.logpage.pg-connections .how .ex .a { display:flex; gap:8px; margin-top:9px; }
+.logpage.pg-connections .how .ex .a span { font-size:11.5px; padding:5px 10px; border-radius:6px; border:1px solid var(--line-2); color:var(--fg-1); }
+.logpage.pg-connections .how .ex .a span.p { background:var(--fg); color:#000; border-color:var(--fg); font-weight:500; }
+.logpage.pg-connections .off2 { border:1px dashed var(--line-2); border-radius:12px; padding:18px 22px; }
+.logpage.pg-connections .off2 h3 { font-size:16px; font-weight:300; color:var(--fg); line-height:1.4; letter-spacing:-0.3px; }
+.logpage.pg-connections .off2 h3 b { font-weight:450; }
+.logpage.pg-connections .off2 p { font-size:13.5px; color:var(--fg-3); margin-top:8px; line-height:1.6; text-wrap:pretty; }
+.logpage.pg-connections .off2 p b { color:var(--fg-1); font-weight:450; }
+.logpage.pg-connections .rules { margin-top:44px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.logpage.pg-connections .rules>div { background:var(--bg); padding:18px 20px; }
+.logpage.pg-connections .rules b { font-size:14px; font-weight:450; color:var(--fg); display:block; line-height:1.4; }
+.logpage.pg-connections .rules p { font-size:13px; color:var(--fg-2); margin-top:7px; line-height:1.55; text-wrap:pretty; }
+.logpage.pg-connections .ways { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:14px; }
+.logpage.pg-connections .ways .w { background:var(--bg-1); padding:15px 16px; }
+.logpage.pg-connections .ways .w b { display:block; font-size:14px; font-weight:450; color:var(--fg); }
+.logpage.pg-connections .ways .w i { display:block; font-style:normal; font-size:11.5px; color:var(--fg-4); margin-top:3px; line-height:1.4; }
+.logpage.pg-connections .ways .w i a { color:var(--fg-3); border-bottom:1px solid var(--line-2); }
+.logpage.pg-connections .ways .w p { font-size:13px; color:var(--fg-2); margin-top:8px; line-height:1.5; text-wrap:pretty; }
+.logpage.pg-connections .ways .w p a { color:var(--fg-1); border-bottom:1px solid var(--line-2); }
+.logpage.pg-connections .ways .w p em { font-style:normal; color:var(--fg-1); }
+.logpage.pg-connections .note2 { margin-top:12px; font-size:13.5px; color:var(--fg-2); line-height:1.6; max-width:760px; text-wrap:pretty; }
+.logpage.pg-connections .note2 b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .grid { grid-template-columns:minmax(0,1fr) 296px!important; gap:48px!important; }
+.logpage.pg-connections .grid { display:grid; grid-template-columns:minmax(0,1fr) 296px; gap:48px; align-items:start; padding-top:20px; }
+.logpage.pg-connections .rail { position:sticky; top:20px; display:flex; flex-direction:column; gap:16px; }
+.logpage.pg-connections .rc { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.logpage.pg-connections .rc .h { padding:10px 14px; border-bottom:1px solid var(--line); background:var(--bg-1); font-size:12.5px; font-weight:450; color:var(--fg); display:flex; justify-content:space-between; gap:10px; }
+.logpage.pg-connections .rc .h span { font-weight:400; color:var(--fg-4); font-size:11.5px; white-space:nowrap; }
+.logpage.pg-connections .rc .i { padding:11px 14px; font-size:13px; color:var(--fg-2); line-height:1.5; }
+.logpage.pg-connections .rc .i+.i { border-top:1px solid var(--line); }
+.logpage.pg-connections .rc .i b { color:var(--fg); font-weight:450; }
+.logpage.pg-connections .rc .i em { display:block; font-style:normal; font-size:11.5px; color:var(--fg-4); margin-top:3px; }
+.logpage.pg-connections .rc .i a { color:var(--fg-1); border-bottom:1px solid var(--line-2); }
+.logpage.pg-connections .rc .acts { display:flex; gap:6px; flex-wrap:wrap; padding:10px 14px; }
+.logpage.pg-connections .rc .acts a { font-size:11.5px; padding:6px 10px; border-radius:6px; border:1px solid var(--line-1); color:var(--fg-2); white-space:nowrap; }
+.logpage.pg-connections .rc .acts a:hover { color:var(--fg); border-color:var(--line-3); }
+.logpage.pg-connections .meta i { font-style:normal; white-space:nowrap; color:var(--fg-4); }
+.logpage.pg-connections .meta i.pub { color:var(--teal); }
+.logpage.pg-connections .meta i.priv { color:var(--ochre); }
+.logpage.pg-connections .meta i.held { color:var(--terra); }
+.logpage.pg-connections .meta i.ch { color:var(--steel); }
+@media (max-width:920px){
+  .logpage.pg-connections .grid { grid-template-columns:minmax(0,1fr)!important; gap:32px!important; }
+  .logpage.pg-connections .rail { position:static!important; top:auto!important; }
+  .logpage.pg-connections .rail .rc { max-width:none; }
+  .logpage.pg-connections .media .still, .logpage.pg-connections .player { width:100%!important; }
+  .logpage.pg-connections .row, .logpage.pg-connections .ex .detail .row { grid-template-columns:100px minmax(0,1fr)!important; gap:16px!important; }
+  .logpage.pg-connections .chain a, .logpage.pg-connections .chain .self { grid-template-columns:62px 66px minmax(0,1fr)!important; gap:10px!important; }
+  .logpage.pg-connections .ends { grid-template-columns:1fr!important; gap:12px!important; text-align:left; }
+  .logpage.pg-connections .ends .nx { text-align:left!important; }
+}
+
