@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import {
   CONSENT_STATES, CONSENT_WORDS, asConsent, type Consent,
 } from '@/lib/correspondence'
@@ -100,6 +101,25 @@ export default function Thread() {
           <Link href="/messages">messages</Link>
         </div>
 
+        <div className="grid">
+          <main>
+
+            {/* `messages.html`: "Your side is yours; their side is kept,
+                attached to them, and never crosses to public on your say-so
+                alone." The page says which is which before it shows either. */}
+            <div className="sides">
+              <div>
+                <b>Your side — yours.</b> Each of your messages is an entry
+                you said, dated to the minute, the same as anything you type
+                into the log. Normal rules.
+              </div>
+              <div>
+                <b>Their side — theirs.</b> Kept in full, attached to them,
+                and never public without their yes. A fact they state is
+                filed as <i>they said</i>, not as fact.
+              </div>
+            </div>
+
         {loading && <div className="none">Reading it.</div>}
         {!loading && !t && <div className="none">No such conversation.</div>}
 
@@ -122,10 +142,10 @@ export default function Thread() {
                 read and is not affected by the consent state — the state
                 governs what a STRANGER sees, not what he keeps. */}
             <div className="sh"><span>the thread</span><b>only you see this</b></div>
-            <div className="msgs">
+            <div className="body">
               {r.messages.map(m => (
-                <div className={`msg ${m.side}`} key={m.id}>
-                  <div className="who">
+                <div className={`msg ${m.side === 'operator' ? 'you' : 'them'}`} key={m.id}>
+                  <div className="w">
                     {m.speaker || (m.side === 'operator' ? 'you' : t.person_name)}
                     {m.sent_at && (
                       <time dateTime={m.sent_at}>
@@ -152,11 +172,11 @@ export default function Thread() {
               <span>their answer</span>
               <b>{r.consent_at ? `set ${clock(r.consent_at)}` : 'never asked'}</b>
             </div>
-            <div className="consent">
+            <div className="cons">
               {CONSENT_STATES.map(s => (
                 <button
                   key={s}
-                  className={consent === s ? 'on' : ''}
+                  className={`cs${consent === s ? ' on' : ''}`}
                   onClick={() => void setConsent(s)}
                 >
                   <b>{CONSENT_WORDS[s].name}</b>
@@ -189,14 +209,14 @@ export default function Thread() {
                 read as though you said all of it.
               </div>
             ) : (
-              <div className="msgs pub">
+              <div className="pubv">
                 {r.public_view.map(m => (
-                  <div className={`msg ${m.side}${m.text === null ? ' gone' : ''}`} key={m.id}>
+                  <div className={`msg ${m.side === 'operator' ? 'you' : 'them'}${m.text === null ? ' veil' : ''}`} key={m.id}>
                     {m.text === null ? (
                       <div className="body">{m.withheld}</div>
                     ) : (
                       <>
-                        <div className="who">{m.speaker || 'you'}</div>
+                        <div className="w">{m.speaker || 'you'}</div>
                         <div className="body">{m.text}</div>
                       </>
                     )}
@@ -213,6 +233,13 @@ export default function Thread() {
             )}
           </>
         )}
+                </main>
+
+          <Rail goesTo={[
+            { href: '/messages', label: 'every conversation' },
+            { href: '/pages', label: 'the index' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )

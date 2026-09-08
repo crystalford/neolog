@@ -147,23 +147,44 @@ export default function Messages() {
         {threads.map(t => {
           const c = asConsent(t.consent)
           return (
-            <div className="item" key={t.id}>
-              <div className="x">
+            <div className="th" key={t.id}>
+              <b>
                 <Link href={`/messages/${t.id}`}>
                   {t.medium === 'email' ? 'Emails' : t.medium === 'chat' ? 'Messages' : 'Texts'} with {t.person_name}
                 </Link>
-              </div>
-              <div className="m">
+              </b>
+              <span>
                 {t.started_at && <time dateTime={t.started_at}>{day(t.started_at)}</time>}
                 <span>{t.message_count} {t.message_count === 1 ? 'message' : 'messages'}</span>
                 <span>{CONSENT_WORDS[c].name.toLowerCase()}</span>
                 {t.person_page_id
                   ? <Link href={`/page/${t.person_page_id}`}>their page</Link>
                   : <span>not attached to a page</span>}
-              </div>
+              </span>
             </div>
           )
         })}
+
+        {/* `messages.html` closes on these three, and they are the design
+            rather than a footnote to it. */}
+        <div className="rules">
+          <div>
+            <b>Two owners, one entry.</b> Your side is yours — entries,
+            quotes, public, normal rules. Their side is theirs: kept,
+            attached to them, filed as &ldquo;they said&rdquo;, never public
+            on your word alone.
+          </div>
+          <div>
+            <b>Their yes is a fact on the log.</b> Not a checkbox. When they
+            said it, how, for which words. Revocable, and revoking pulls the
+            quotes. The default, for everyone, is the most private state.
+          </div>
+          <div>
+            <b>Forwarded, never pulled.</b> The log doesn&rsquo;t read your
+            inbox. Every conversation on it is one you chose to bring in,
+            because every one has another person in it.
+          </div>
+        </div>
                 </main>
 
           <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/ways-in', label: 'the ways in' }]} />
