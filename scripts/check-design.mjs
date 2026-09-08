@@ -46,7 +46,10 @@ const PAGES = [
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     6],
   ['clear',      'src/app/(app)/clear/page.tsx',        7],
   ['triage',     'src/app/(app)/triage/page.tsx',       3],
-  ['export',     'src/app/(app)/export/page.tsx',       15],
+  // takeout.html — "everything out, and the bill" — is this page.
+  // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
+  // from the log"): what the Markdown looks like, not a route.
+  ['takeout',    'src/app/(app)/export/page.tsx',       10],
   ['dossier',    'src/app/(app)/facts/page.tsx',         5],
   ['source',     'src/app/(app)/glossary/page.tsx',     12],
   ['asks',       'src/app/(app)/asks/page.tsx',         12],
@@ -75,6 +78,7 @@ const PAGES = [
  * that is of something else.
  */
 const NO_DESIGN_PAGE = {
+  '(export.html)': 'a rendered export document, not a surface — /export is takeout.html',
   '/everything': 'everything.html is an entry example; SPEC §3 describes the door in prose only',
   '/footage':    'footage.html is an entry example; SPEC §2 describes footage in prose only',
   '/ready': 'no page in the package', '/share': 'no page in the package',

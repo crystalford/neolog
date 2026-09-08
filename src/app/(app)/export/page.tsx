@@ -18,6 +18,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 
 interface IndexPage { id: string; name: string; kind: string; entry_count: number }
 
@@ -90,20 +91,39 @@ export default function ExportPage() {
 
   return (
     <Shell>
-      <div className="logpage pg-export">
+      <div className="logpage pg-takeout">
         <div className="back"><Link href="/">the log</Link></div>
 
-        <div className="pghead">
+        <section className="top">
           <h1>Pulling a stretch of it out</h1>
-          <div className="pgmeta">
-            <span>
-              Pick a date range, or a page, or both. Everything the log has
-              for it comes out in order.
-            </span>
+          <p>
+            Everything you have ever put in, as plain files, in one download.
+            And the bill for keeping it, to the cent. <b>Two promises that
+            only mean something if you can check them.</b>
+          </p>
+        </section>
+
+        <div className="grid">
+          <main>
+
+        {/* `takeout.html`: export at three levels. The whole log is the
+            last of them, not the only one. */}
+        <div className="levels">
+          <div className="row">
+            <b>One entry</b>
+            <span>From any entry: a Markdown file and its original.</span>
+          </div>
+          <div className="row">
+            <b>One page</b>
+            <span>Every entry under it, as a document you could hand to someone.</span>
+          </div>
+          <div className="row">
+            <b>Everything</b>
+            <span>The whole log as plain files — words, originals, versions, the manifest.</span>
           </div>
         </div>
 
-        <div className="pgpara" style={{ marginTop: 22 }}>
+        <div className="note">
           Nothing is added that isn&rsquo;t in the log. Every line traces back
           to an entry, and dates marked approximate come out marked
           approximate. The Markdown opens in anything; the JSON manifest
@@ -115,8 +135,8 @@ export default function ExportPage() {
           </span>
         </div>
 
-        <div className="rc" style={{ marginTop: 26, maxWidth: 660 }}>
-          <div className="h">What to pull out</div>
+        <div className="sh"><span>What to pull out</span></div>
+        <div className="out">
 
           <div className="i">
             <b>A range</b>
@@ -173,8 +193,9 @@ export default function ExportPage() {
         {/* The second promise: what it costs to keep. */}
         {bill && (
           <>
-            <div className="idxband"><b>What it costs to keep</b>an estimate, not an invoice</div>
-            <div className="pgpara" style={{ marginTop: 14 }}>
+            <div className="sh"><span>What it costs to keep</span><b>an estimate, not an invoice</b></div>
+            <div className="bill">
+            <div className="note">
               {bill.stored.gb} GB — {bill.stored.entries} entries,{' '}
               {bill.stored.recordings} recordings
               {bill.stored.hours_of_recording > 0 && ` (${bill.stored.hours_of_recording} hours)`},{' '}
@@ -182,16 +203,14 @@ export default function ExportPage() {
               <span className="who">{bill.note}</span>
             </div>
 
-            <div className="idxhead" style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
-              <span>what</span><span>rate</span><span>how much</span>
-              <span style={{ textAlign: 'right' }}>a month</span>
-            </div>
+
             {bill.monthly.map((l, i) => (
-              <div className="idxrow" key={i} style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
-                <span className="nm">{l.what}</span>
-                <span className="kd">{l.rate}</span>
-                <span className="sp">{l.how}</span>
-                <span className="ct">${l.usd.toFixed(2)}</span>
+              <div className="row" key={i}>
+                <div>
+                  <b>{l.what}</b>
+                  <span>{l.how} · {l.rate}</span>
+                </div>
+                <span className="c">${l.usd.toFixed(2)}</span>
               </div>
             ))}
             <div className="idxrow" style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
@@ -202,14 +221,16 @@ export default function ExportPage() {
 
             <div className="idxband"><b>Already paid, once</b>reading it, not keeping it</div>
             {bill.one_off.map((l, i) => (
-              <div className="idxrow" key={i} style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
-                <span className="nm">{l.what}</span>
-                <span className="kd">{l.rate}</span>
-                <span className="sp">{l.how}</span>
-                <span className="ct">${l.usd.toFixed(2)}</span>
+              <div className="row" key={i}>
+                <div>
+                  <b>{l.what}</b>
+                  <span>{l.how} · {l.rate}</span>
+                </div>
+                <span className="c">${l.usd.toFixed(2)}</span>
               </div>
             ))}
-            <div className="quiet" style={{ marginTop: 12 }}>
+            </div>
+            <div className="note">
               Every line says which rate it used, so the arithmetic can be
               checked by hand. There is no billing API wired into this app, and
               a number that looked like an invoice but wasn&rsquo;t would be
@@ -217,6 +238,14 @@ export default function ExportPage() {
             </div>
           </>
         )}
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/clear', label: 'safe to clear' },
+            { href: '/pages', label: 'the index' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )
