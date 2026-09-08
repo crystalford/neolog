@@ -72,6 +72,11 @@ export default function Recording() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [at, setAt] = useState(0)
+  // `fix.html`: click the word, type the right one. One word is open at a
+  // time — `editing` is its index, `draft` is what he has typed so far.
+  const [editing, setEditing] = useState<number | null>(null)
+  const [draft, setDraft] = useState('')
+  const [fixMsg, setFixMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +102,42 @@ export default function Recording() {
     } catch { setMsg('that did not run') }
     finally { setBusy(false) }
   }, [params.id, load])
+
+  /**
+   * Correct one word Whisper misheard.
+   *
+   * The log says what happened and nothing more (§0 rule 6 — one line, then
+   * silence). It names what re-read itself, because `fix.html` is explicit
+   * that a downstream change is never silent; when nothing was built on that
+   * word yet, it says that too rather than implying something moved.
+   */
+  const fixWord = useCallback(async (wordIndex: number, word: string) => {
+    const next = word.trim()
+    setEditing(null)
+    if (!next) return
+    const was = r?.words.find(w => w.word_index === wordIndex)?.word
+    if (!was || was === next) return
+    setFixMsg(null)
+    try {
+      const res = await fetch(`/api/v2/vlogs/${params.id}/transcript-words`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_index: wordIndex, word: next }),
+      })
+      const j = await res.json() as { ok?: boolean; error?: string; rechecked?: number }
+      if (!res.ok || !j.ok) { setFixMsg(j.error || 'that did not save'); return }
+      const n = j.rechecked ?? 0
+      setFixMsg(
+        `Whisper heard “${was}”. You corrected it to “${next}”. What it heard is kept. `
+        + (n === 0
+          ? 'Nothing on the log was built on that word yet.'
+          : n === 1
+            ? 'One entry read out of that line re-read itself, and both wordings are kept.'
+            : `${n} entries read out of that line re-read themselves, and both wordings are kept.`),
+      )
+      await load()
+    } catch { setFixMsg('that did not save') }
+  }, [params.id, r, load])
 
   const v = r?.vlog
   // The word under the playhead, so the transcript follows the video.
@@ -222,16 +263,46 @@ export default function Recording() {
               <>
                 <div className="sh">
                   <span>the transcript</span>
-                  <b>as it was heard</b>
+                  <b>as it was heard · click a word to fix it</b>
                 </div>
                 <p className="tw">
                   {r.words.map((w, i) => (
-                    <span
-                      key={w.word_index}
-                      className={i === activeIndex ? 'on' : undefined}
-                      title={clock(w.start_time)}
-                    >{w.word} </span>
+                    editing === w.word_index ? (
+                      <input
+                        key={w.word_index}
+                        className="ed"
+                        autoFocus
+                        value={draft}
+                        size={Math.max(draft.length, 3)}
+                        onChange={e => setDraft(e.target.value)}
+                        onBlur={() => void fixWord(w.word_index, draft)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { e.preventDefault(); void fixWord(w.word_index, draft) }
+                          if (e.key === 'Escape') setEditing(null)
+                        }}
+                      />
+                    ) : (
+                      <span
+                        key={w.word_index}
+                        className={i === activeIndex ? 'on' : undefined}
+                        title={`${clock(w.start_time)} · click to fix`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { setEditing(w.word_index); setDraft(w.word) }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault(); setEditing(w.word_index); setDraft(w.word)
+                          }
+                        }}
+                      >{w.word} </span>
+                    )
                   ))}
+                </p>
+                {/* What changed, what was kept, what re-read itself — said
+                    once, then nothing. The audio and the timings are
+                    untouched either way, so the line says so. */}
+                <p className="say" style={{ marginTop: 8 }}>
+                  {fixMsg ?? 'The audio is never changed and the timings are kept. What Whisper heard is kept too.'}
                 </p>
               </>
             )}

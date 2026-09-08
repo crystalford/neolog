@@ -2,20 +2,33 @@
  * GET   /api/v2/vlogs/[id]/transcript-words
  * PATCH /api/v2/vlogs/[id]/transcript-words — fix one word Whisper misheard
  *
- * Feeds the whole-vlog click-to-cut editor on /vlog/[id] (see
- * VlogTranscriptEditor). Full-vlog counterpart to
- * /api/v2/clip-candidates/[id]/transcript-window — that route windows
- * ±90s around one clip; this one has no clip to window around, so it
- * returns every word in the vlog plus whatever cut-range draft the
- * operator has saved so far.
+ * `fix.html`: *"Whisper heard 'leaf.' You said 'Leif.' Fixing it is one
+ * click."* The audio does not change and the timings are kept; only the
+ * reading of it changes.
  *
- * Response:
- *   {
- *     vlog_id, vlog_title, duration_seconds,
- *     words: [{ word, start_time, end_time }],
- *     cut_ranges: [{ start_word_index, end_word_index }],
- *     cut_ranges_updated_at: string | null
- *   }
+ * Three things happen on a correction, and the page names all three:
+ *
+ *   what changed          the word, and `vlogs.transcript_text` rebuilt from
+ *                         the words so no reader sees the corrected line and
+ *                         the uncorrected one on the same screen
+ *   what was kept         an `entry_revisions` row carrying what Whisper
+ *                         heard, dated — *"so you can see the machine's
+ *                         version if you ever doubt yours"*
+ *   what re-checked       every entry read out of the span containing that
+ *                         word is rebuilt from the words and gets its own
+ *                         revision row. *"Anything built on the words you
+ *                         changed re-reads them and says so. Never
+ *                         silently."* The response returns the count so the
+ *                         page can say it out loud.
+ *
+ * ⚠️ **An entry's text must stay a substring of the transcript.** That is the
+ * invariant the whole read path exists to hold, so the rebuild joins the
+ * words in the span rather than doing a find-and-replace on the entry text —
+ * a replace would also hit an identical word the correction was not about.
+ *
+ * One word at a time, enforced. A whole sentence pasted in here would be an
+ * edit pretending to be a correction, and the operator's own words have
+ * their own surface for that (`entry_revisions` via `PATCH /api/v2/log/[id]`).
  */
 
 export const runtime = 'edge'
@@ -172,8 +185,64 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     `you corrected it to "${next}"`,
   )
 
+  // ── What re-checked itself ────────────────────────────────────────────
+  //
+  // An entry read out of this recording is a run of these words, and it
+  // carries the seconds that run covers (`span_start` / `span_end`). So the
+  // entries affected by one corrected word are exactly those whose span
+  // contains the second that word was said — found by the timings, not by
+  // searching the text for the old spelling, which would also hit an
+  // identical word the correction was not about.
+  const at = await findOne<{ start_time: number }>(
+    db,
+    `SELECT start_time FROM transcript_words
+      WHERE vlog_id = ? AND operator_id = ? AND word_index = ?`,
+    params.id, operator.id, idx,
+  )
+
+  let rechecked = 0
+  if (at) {
+    const affected = await findMany<{ id: string; text: string; span_start: number; span_end: number }>(
+      db,
+      `SELECT id, text, span_start, span_end FROM log_entries
+        WHERE operator_id = ? AND vlog_id = ? AND deleted_at IS NULL
+          AND span_start IS NOT NULL AND span_end IS NOT NULL
+          AND span_start <= ? AND span_end >= ?`,
+      operator.id, params.id, at.start_time, at.start_time,
+    )
+
+    for (const e of affected) {
+      const span = await findMany<{ word: string }>(
+        db,
+        `SELECT word FROM transcript_words
+          WHERE vlog_id = ? AND operator_id = ?
+            AND start_time >= ? AND start_time <= ?
+          ORDER BY word_index ASC LIMIT ?`,
+        params.id, operator.id, e.span_start, e.span_end, WORDS_LIMIT,
+      )
+      const rebuilt = span.map(w => w.word).join(' ').replace(/\s+([,.!?;:])/g, '$1').trim()
+      if (!rebuilt || rebuilt === e.text) continue
+
+      // The old wording is kept first, always — the same rule a correction
+      // to his own line follows. Nothing overwrites without the replaced
+      // value being written down.
+      await run(
+        db,
+        `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
+         VALUES (?,?,?,'text',?,?)`,
+        ulid(), operator.id, e.id, e.text, rebuilt,
+      )
+      await run(
+        db,
+        `UPDATE log_entries SET text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        rebuilt, e.id,
+      )
+      rechecked++
+    }
+  }
+
   return NextResponse.json(
-    { ok: true, was: existing.word, now: next },
+    { ok: true, was: existing.word, now: next, rechecked },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }

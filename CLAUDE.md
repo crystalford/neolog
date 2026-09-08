@@ -333,6 +333,41 @@ knows because it called an operator-only endpoint; when one of these is
 served on a public path, that flag becomes false for a stranger with no
 change here.
 
+### Fixing what the machine misheard
+
+`fix.html`. `PATCH /api/v2/vlogs/[id]/transcript-words`, the transcript on
+`/vlog/[id]`. *"Whisper heard 'leaf.' You said 'Leif.' Fixing it is one
+click."* Click a word, type the right one. **The audio never changes and the
+timings are kept** — only the reading of it changes.
+
+The page names three things and so does the log:
+
+- **what changed** — the word, and `vlogs.transcript_text` rebuilt from the
+  words. Leaving that stale is how the corrected line and the uncorrected one
+  end up on the same screen.
+- **what was kept** — an `entry_revisions` row carrying what Whisper heard,
+  dated, *"so you can see the machine's version if you ever doubt yours."*
+- **what re-checked itself** — every entry read out of the span containing
+  that word is rebuilt and gets its own revision row, and **the response says
+  how many** so the line can say it out loud. When nothing was built on that
+  word yet it says that instead, rather than implying something moved.
+  *"Never silently."*
+
+⚠️ **The affected entries are found by the timings, not by searching for the
+old spelling.** An entry carries `span_start`/`span_end`, so the entries built
+on one corrected word are exactly those whose span contains the second it was
+said. A find-and-replace over the entry text would also hit an identical word
+the correction was not about — and an entry's text must stay a substring of
+the transcript, which is the invariant the whole read path exists to hold. For
+the same reason the rebuild joins the words in the span rather than patching
+the string.
+
+**One word at a time, enforced in the handler.** A whole sentence pasted in
+would be an edit pretending to be a correction, and his own words have their
+own surface for that. The machine's mistakes are quiet — a fixed word is
+marked but does not shout; his own changed words stay struck through in view,
+because he did say them.
+
 ### Corrections leave a record
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites
@@ -564,11 +599,10 @@ Also update `src/lib/log-entry.ts` — `RELATIONS`, `RELATION_DEFAULT`,
 `e-*` entry examples): **43 built · 6 partial · 16 not built · 4 below the
 fence · 5 meta**.
 
-Partial: `fix` (per-word transcript editing), `branch` (splitting one note
-into several), `audio` (no two-voice split — `transcript_words.speaker` exists
-but nothing populates it; Whisper is not asked for diarization, so the split
-cannot be built honestly yet), `flow` (a walkthrough page). `walk` and
-`screenshots` are built.
+Partial: `branch` (splitting one note into several), `audio` (no two-voice
+split — `transcript_words.speaker` exists but nothing populates it; Whisper is
+not asked for diarization, so the split cannot be built honestly yet), `flow`
+(a walkthrough page). `walk`, `screenshots` and `fix` are built.
 
 **Not built, and each for a stated reason:**
 
