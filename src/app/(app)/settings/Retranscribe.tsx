@@ -14,7 +14,7 @@
  * far the log has got.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 
 interface Status { recordings: number; transcribed: number; read: number; entries: number }
 
@@ -23,6 +23,21 @@ export function Retranscribe() {
   const [busy, setBusy] = useState<'transcribe' | 'read' | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [stop, setStop] = useState(false)
+  /**
+   * ⚠️ A REF as well as state, and the loop reads the ref.
+   *
+   * `read` walks four hundred recordings a page at a time, and it checked
+   * `stop` from the closure it STARTED with — which is `false` for the whole
+   * run, because `useCallback` making a new function does not reach into the
+   * one already looping. Pressing Stop set the state, re-rendered the button,
+   * and changed nothing. On the one job long enough to want stopping, the
+   * stop did nothing.
+   *
+   * The state is what the button renders from — it says "stopping after this
+   * page…" so the press is visibly heard — and the ref is what the loop
+   * reads. They are set together.
+   */
+  const stopRef = useRef(false)
 
   const load = useCallback(async () => {
     try {
@@ -66,13 +81,13 @@ export function Retranscribe() {
   }, [load])
 
   const read = useCallback(async () => {
-    setBusy('read'); setNote(null); setStop(false)
+    setBusy('read'); setNote(null); setStop(false); stopRef.current = false
     let cursor: string | null = null
     let written = 0
     let skipped = 0
     try {
       for (;;) {
-        if (stop) break
+        if (stopRef.current) break
         const res: Response = await fetch('/api/v2/log/read', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -95,7 +110,7 @@ export function Retranscribe() {
       await load()
     } catch { setNote('that stopped early — press again, it picks up where it left off') }
     finally { setBusy(null) }
-  }, [stop, load])
+  }, [load])
 
   return (
     <div className="paste">
@@ -112,7 +127,12 @@ export function Retranscribe() {
         <button className="p" onClick={() => void read()} disabled={busy !== null}>
           {busy === 'read' ? 'Reading' : 'Read them onto the log'}
         </button>
-        {busy === 'read' && <button onClick={() => setStop(true)}>Stop</button>}
+        {busy === 'read' && (
+          <button
+            onClick={() => { stopRef.current = true; setStop(true) }}
+            disabled={stop}
+          >{stop ? 'stopping after this page…' : 'Stop'}</button>
+        )}
         {note && <span className="say">{note}</span>}
       </div>
       <p className="none" style={{ padding: '10px 0 0', fontSize: 13 }}>

@@ -1007,6 +1007,20 @@ loud when it is showing 500 of more.
   read out of it, and one action — **read it onto the log**. Deleting buries;
   the file always stays.
 
+⚠️ **A long loop must read a REF, not state.** `read` walks four hundred
+recordings a page at a time and checked `stop` from the closure it STARTED
+with — which stays `false` for the whole run, because `useCallback` making a
+new function does not reach into the one already looping. Pressing Stop set
+the state, re-rendered the button and changed nothing: **on the one job long
+enough to want stopping, the stop did nothing.** The state renders the button
+("stopping after this page…", so the press is visibly heard); the ref is what
+the loop reads. Both are set together.
+
+The two long jobs beside it were already right, and are the pattern to copy:
+**transcribe** resolves the list with a dry run then dispatches in tens, and
+**read** is cursor-paged five at a time and idempotent, so "press again, it
+picks up where it left off" is true rather than hopeful.
+
 **Settings** (`/settings`) — his one sentence (which `/facts` shows and will
 not draft), where the files are kept, the recordings panel (**transcribe the
 untranscribed · read them onto the log**, with the running counts), the two
