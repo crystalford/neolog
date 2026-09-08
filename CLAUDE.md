@@ -85,6 +85,15 @@ has looked at it. The log **says what it saw** — "a name, a date of birth and
 a number laid out like a card" — never an unnamed reason. Being wrong towards
 private is the only safe direction, so every failure path holds back.
 
+⚠️ **"Held" means every sense, not just the picture.** In the feed a held row
+blurred its image and then showed the video's poster frame and played its
+audio on a tap — while the caption beside it said *"blurred here too, until
+you say otherwise."* A poster is a still out of the file the log has not
+looked at, and holding back a picture while the same entry's audio plays is
+the same leak with a different sense. Both hold back now. **When a new kind
+of media reaches `LogRow`, the question is not "should it blur" — it is
+"does `held` reach it at all".**
+
 **Burial, not deletion.** There is no delete action. Bury removes an entry
 from the feed, search and counts and keeps the file, the attachments and the
 relationships. The one exception is the receipt's **undo**, which is for

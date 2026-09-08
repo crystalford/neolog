@@ -887,10 +887,16 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* A held-back image is blurred in the operator's own log, so it isn't
  * sitting on screen in front of someone else (SPEC §0.2). */
 .logpage .en.isheld .pics img { filter: blur(14px); }
-.logpage .en .pics .still .lbl2, .logpage .en.isheld .pics .still .lbl2 {
+.logpage .en .pics .still .lbl2, .logpage .en.isheld .pics .still .lbl2,
+/* A held RECORDING shows no frame either. Its poster is a still out of the
+   file, and the log has not looked at it — the image branch has always held
+   back and the video did not, while the caption beside it claimed "blurred
+   here too". */
+.logpage .en.isheld .pics .vid .lbl2 {
   position: absolute; inset: 0; display: grid; place-items: center;
   font-size: 10.5px; color: var(--fg-4);
 }
+.logpage .en.isheld .pics .vid { background: var(--bg-3); }
 /* A row links to its content. One with no page of its own is not clickable
  * — never invent a destination to satisfy an affordance (SPEC §11). */
 .logpage a.en { color: inherit; text-decoration: none; }

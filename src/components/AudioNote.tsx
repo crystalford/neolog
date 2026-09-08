@@ -40,16 +40,26 @@ export function AudioNote({ src, duration }: { src: string; duration?: number | 
   const toggle = useCallback(() => {
     const a = el.current
     if (!a) return
-    if (a.paused) { void a.play(); setPlaying(true) } else { a.pause(); setPlaying(false) }
+    if (!a.paused) { a.pause(); return }
+    // `play()` returns a promise that REJECTS when the browser refuses —
+    // a presigned URL that has expired, a file that will not decode. The
+    // button must not sit showing "pause" on a recording that never
+    // started, so the state follows the audio element's own events and
+    // `onPlay` is what turns it on.
+    a.play().catch(() => setPlaying(false))
   }, [])
 
   const seek = useCallback((ev: React.MouseEvent<HTMLSpanElement>) => {
     const a = el.current
     if (!a || !len) return
     const box = ev.currentTarget.getBoundingClientRect()
-    const to = ((ev.clientX - box.left) / box.width) * len
-    a.currentTime = Math.max(0, Math.min(len, to))
-    setAt(a.currentTime)
+    const to = Math.max(0, Math.min(len, ((ev.clientX - box.left) / box.width) * len))
+    // ⚠️ Nothing is loaded until he presses play (`preload="none"`), so
+    // `currentTime` before that has no buffer to seek into and throws in
+    // some browsers. Move the bar to where he clicked either way — the
+    // position is real — and let the element catch up when it loads.
+    setAt(to)
+    try { a.currentTime = to } catch { /* seeks once it has the file */ }
   }, [len])
 
   const pct = len > 0 ? Math.min(100, (at / len) * 100) : 0

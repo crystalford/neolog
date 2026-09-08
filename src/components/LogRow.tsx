@@ -136,7 +136,14 @@ export function LogRow({ e, order, q, onImage }: {
                   : <span className="still"><span className="lbl2">no picture</span></span>
             )}
             {video && (
-              <span className="vid">
+              // ⚠️ A HELD entry shows no frame. The poster is a still out of
+              // the recording, and the log has not looked at it yet — SPEC
+              // §0.2, "being wrong towards private is the only safe
+              // direction, so every failure path holds back". The image
+              // branch above has always done this; the video did not.
+              held
+              ? <span className="vid"><span className="lbl2">not shown</span></span>
+              : <span className="vid">
                 {video.poster_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -157,7 +164,10 @@ export function LogRow({ e, order, q, onImage }: {
                 No waveform bars: nothing measures amplitude, and drawing
                 them would put a picture the log never took beside a
                 duration it did. */}
-            {audio && audio.url && (
+            {/* And a held entry does not play. Holding back a picture while
+                the same entry's audio plays on a tap is the same leak with a
+                different sense. */}
+            {audio && audio.url && !held && (
               <AudioNote src={audio.url} duration={audio.duration_seconds} />
             )}
             {held
