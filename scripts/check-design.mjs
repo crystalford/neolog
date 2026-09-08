@@ -51,7 +51,7 @@ const PAGES = [
   ['source',     'src/app/(app)/glossary/page.tsx',     12],
   ['asks',       'src/app/(app)/asks/page.tsx',         12],
   ['numbers',    'src/app/(app)/numbers/page.tsx',       8],
-  ['public-log', 'src/app/(app)/public/page.tsx',       23],
+  ['public-log', 'src/app/(app)/public/page.tsx',       10],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    23],
   ['writing',    'src/app/(app)/writing/page.tsx',      16],
   ['screenshots','src/app/(app)/screenshots/page.tsx',  14],

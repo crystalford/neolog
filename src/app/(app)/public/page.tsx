@@ -37,9 +37,11 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { LogDays } from '@/components/LogRow'
+import { Rail } from '@/components/Rail'
+import OwnerStrip from '@/components/OwnerStrip'
 import {
   type LogEntry, type FeedFilter,
-  stampFor, isFuzzy, tagsFor, dayKeyFor, dayHeadingFor,
 } from '@/lib/log-entry'
 
 const FILTERS: { k: FeedFilter; label: string }[] = [
@@ -72,43 +74,29 @@ export default function PublicLog() {
 
   // Same grouping as the private feed, so the two cannot disagree about
   // which day something happened on.
-  const groups: { key: string; title: string; rows: LogEntry[] }[] = []
-  const byKey = new Map<string, { key: string; title: string; rows: LogEntry[] }>()
-  const now = new Date()
-  for (const e of items) {
-    const date = order === 'logged' ? e.logged_at : e.happened_at
-    const key = dayKeyFor(date, order === 'logged' ? 'exact' : e.date_precision)
-    let g = byKey.get(key)
-    if (!g) {
-      g = { key, title: dayHeadingFor(key, now).title, rows: [] }
-      byKey.set(key, g)
-      groups.push(g)
-    }
-    g.rows.push(e)
-  }
+  // Grouping into days was done here and is LogDays' job now — the whole
+  // point of using the feed's component is that this page holds no row
+  // rendering of its own to drift from it.
 
   return (
     <Shell>
       <div className="logpage publog pg-public-log">
-        <div className="who">
-          <div className="k">what a stranger sees</div>
-          <h1>The public log — everything except what I&rsquo;ve kept private.</h1>
-          <div className="upd">
-            {loading ? '' : `${items.length} ${items.length === 1 ? 'entry' : 'entries'}`}
-            {' · '}
-            <Link href="/">your log →</Link>
-          </div>
+        {/* `public-log.html`: the owner strip, and nothing else above the
+            bar. The private log's header does not belong on the page that
+            is meant to be what a stranger sees. */}
+        <OwnerStrip signedIn={!loading} />
 
-          <div className="notlive">
-            <b>Nobody can see this yet.</b> This page needs signing in, like
-            every other page. Everything you write is public by default and
-            the log marks only the exceptions, so this is what would go out —
-            but it is not out. Putting it on the open web is one deliberate
-            change to the Cloudflare Access rules, and it is yours to make
-            once you have read what is on this page.
-          </div>
+        <div className="notlive">
+          <b>Nobody can see this yet.</b> This page needs signing in, like
+          every other page. Everything you write is public by default and the
+          log marks only the exceptions, so this is what would go out — but
+          it is not out. Putting it on the open web is one deliberate change
+          to the Cloudflare Access rules, and it is yours to make once you
+          have read what is on this page.
         </div>
 
+        <div className="grid">
+          <main>
         <div className="bar">
           <div className="f">
             {FILTERS.map(f => (
@@ -130,39 +118,22 @@ export default function PublicLog() {
           </div>
         </div>
 
-        {groups.map(g => (
-          <div key={g.key}>
-            <div className="pubday">{g.title}</div>
-            {g.rows.map(e => {
-              const date = order === 'logged' ? e.logged_at : e.happened_at
-              const image = e.media.find(m => m.kind === 'image')
-              return (
-                <article className="e" key={`${e.source}-${e.id}`}>
-                  <div className="x">
-                    <span className="s">{e.sentence}</span>
-                    <span className="tags">
-                      {/* A stranger needs one thing the operator does not:
-                          whether this was written down at the time or
-                          recalled later. */}
-                      <i>{stampFor(date, e.date_precision)}</i>
-                      {isFuzzy(e.date_precision) && <i>from memory</i>}
-                      {e.author === 'log' && <i>written by the log</i>}
-                    </span>
-                  </div>
-                  {e.detail && <p>{e.detail}</p>}
-                  {image?.url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={image.url} alt="" loading="lazy" />
-                  )}
-                </article>
-              )
-            })}
-          </div>
-        ))}
+            {/* The same rows and day dividers as the feed. SPEC §3:
+                "one design, two views — nothing is designed twice." The
+                public view is the private view minus what isn't public. */}
+            <LogDays items={items} order={order} />
 
-        {!loading && items.length === 0 && (
-          <div className="none">Nothing is public yet.</div>
-        )}
+            {!loading && items.length === 0 && (
+              <div className="none">Nothing is public yet.</div>
+            )}
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'your log' },
+            { href: '/facts', label: 'the facts' },
+            { href: '/everything', label: 'everything' },
+          ]} />
+        </div>
 
         <footer className="ft">
           <span>neolog · the public log</span>
