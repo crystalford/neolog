@@ -83,6 +83,12 @@ const AUTHOR_LINE: Record<string, string> = {
   drafted:  'The log drafted it; you edited it.',
 }
 
+/** A neighbour's line, cut to a glance — the design shows about this much. */
+function shorten(t: string, n = 62): string {
+  const one = t.replace(/\s+/g, ' ').trim()
+  return one.length <= n ? one : one.slice(0, n - 1).replace(/\s\S*$/, '') + '…'
+}
+
 export default function EntryPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [e, setE] = useState<Entry | null>(null)
@@ -374,6 +380,63 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 {e.transcript}
               </div>
             ) : null}
+
+            {/* ── Who wrote what ──────────────────────────────────────────
+                `entry.html`'s `.facts`. Only rows that are FACTS: who wrote
+                the line, and how the log came to have it. The design's other
+                row — "What came of it", a sentence about what the entry led
+                to — is the log reading his life, and it is not built. */}
+            <div className="facts">
+              <div className="row">
+                <div className="k">Who wrote what</div>
+                <div className="v">
+                  {e.author === 'operator'
+                    ? 'Yours. Nothing here was drafted.'
+                    : 'The log wrote this line, from what the file carried.'}
+                  {e.transcript ? ' Transcribed on arrival; nothing added.' : ''}
+                </div>
+              </div>
+              <div className="row">
+                <div className="k">How it is dated</div>
+                <div className="v">
+                  {e.date_precision === 'exact'
+                    ? 'By its own clock, to the minute.'
+                    : `Approximate — placed to the ${e.date_precision}, and marked as a guess.`}
+                </div>
+              </div>
+              {e.revisions && e.revisions.length > 0 && (
+                <div className="row">
+                  <div className="k">Corrections</div>
+                  <div className="v">
+                    {e.revisions.length} kept, dated, with what each replaced.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── The entry either side ──────────────────────────────────
+                `entry.html`'s `.ends`. The log in order, one step at a time.
+                Both come from the API and always have; nothing rendered
+                them. An end with nothing past it is a blank, not a dead
+                link — a row with no destination is not clickable (SPEC
+                §11). */}
+            <div className="ends">
+              {e.earlier
+                ? (
+                  <Link href={`/entry/${e.earlier.id}`}>
+                    <span>earlier</span>← {shorten(e.earlier.text)}
+                  </Link>
+                )
+                : <span />}
+              <Link className="home" href="/">back to the log</Link>
+              {e.later
+                ? (
+                  <Link className="nx" href={`/entry/${e.later.id}`}>
+                    <span>later</span>{shorten(e.later.text)} →
+                  </Link>
+                )
+                : <span />}
+            </div>
           </main>
 
           {/* ── The corrections ─────────────────────────────────────────── */}
@@ -486,12 +549,25 @@ export default function EntryPage({ params }: { params: { id: string } }) {
 
               <div className="i">
                 <b>Who can see it</b>
+                {/* `entry.html` says the state in one coloured word and then
+                    what it means in plain words — teal for public, because
+                    steel is the log's one signal colour and a state is not a
+                    signal. */}
                 <em>
-                  {e.visibility === 'public' ? 'Public — unmarked, like everything else.'
-                    : e.visibility === 'private' ? 'Private — your call.'
-                    : 'Held back by the log.'}
+                  <span
+                    className="state"
+                    style={{
+                      color: e.visibility === 'public' ? 'var(--t-teal)'
+                        : e.visibility === 'held' ? 'var(--t-ochre)'
+                        : 'var(--fg-3)',
+                    }}
+                  >{e.visibility}</span>
+                  {' — '}
+                  {e.visibility === 'public' ? 'a stranger can load this page.'
+                    : e.visibility === 'private' ? 'only you, and that is your call.'
+                    : 'the log is holding it back until you say otherwise.'}
                 </em>
-                <div className="fixrow">
+                <div className="acts fixrow">
                   {e.visibility !== 'public' && (
                     <button className="p" onClick={() => setSheet(true)}>
                       {e.visibility === 'held' ? 'Publish it anyway' : 'Make it public'}

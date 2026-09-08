@@ -38,7 +38,7 @@ import { readFileSync, existsSync } from 'node:fs'
 /** page in design/ → the route file that must match it → today's ceiling. */
 const PAGES = [
   ['log',        'src/app/(app)/page.tsx',              3],
-  ['entry',      'src/app/(app)/entry/[id]/page.tsx',   9],
+  ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         5],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
   ['search',     'src/app/(app)/search/page.tsx',       10],
