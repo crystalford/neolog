@@ -88,11 +88,11 @@ export default function SearchPage() {
         <div className="grid">
           <main>
 
-        <div className="pghead">
+        <section className="q">
           <h1>Ask the log a question.</h1>
-        </div>
+        </section>
 
-        <div className="askbox">
+        <div className="box">
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
@@ -105,7 +105,7 @@ export default function SearchPage() {
         </div>
 
         {!result && !asking && (
-          <div className="egs">
+          <div className="try">
             {EXAMPLES.map(e => (
               <button key={e} onClick={() => { setQ(e); void ask(e) }}>{e}</button>
             ))}
@@ -114,7 +114,7 @@ export default function SearchPage() {
 
         {result && (
           <>
-            <div className="ansblock">
+            <div className="ans">
               <div className="k">
                 <span>
                   From what&rsquo;s in the log · {result.passages.length}{' '}
@@ -142,7 +142,7 @@ export default function SearchPage() {
               </div>
 
               {result.answer.length > 0 ? (
-                <p>{result.answer.map((s, i) => <Sentence key={i} s={s} onJump={jump} />)}</p>
+                <p className="a">{result.answer.map((s, i) => <Sentence key={i} s={s} onJump={jump} />)}</p>
               ) : (
                 <p style={{ color: 'var(--fg-3)' }}>
                   {result.passages.length === 0
@@ -152,7 +152,7 @@ export default function SearchPage() {
               )}
 
               {result.not_answered && (
-                <div className="nota">
+                <div className="abst">
                   <b>Not answered:</b> {result.not_answered}
                 </div>
               )}
@@ -168,13 +168,15 @@ export default function SearchPage() {
               )}
             </div>
 
-            <div style={{ marginTop: 30 }}>
-              <div className="idxband"><b>The passages</b>{result.passages.length}</div>
+            {/* `search.html`: the passages the answer is written from,
+                numbered, so every citation above lands on one. */}
+            <div className="hits">
+              <div className="sh"><span>The passages</span><b>{result.passages.length}</b></div>
               {result.passages.map(p => (
-                <div className={`psg${lit === p.n ? ' lit' : ''}`} id={`p-${p.n}`} key={p.n}>
+                <div className={`pt${lit === p.n ? ' lit' : ''}`} id={`p-${p.n}`} key={p.n}>
                   <span className="n">{p.n}</span>
                   <div>
-                    <div className="meta">
+                    <div className="ps">
                       <span>{stampFor(p.happened_at, p.date_precision)}</span>
                       <span>{p.source}</span>
                       <span>{p.whose}</span>

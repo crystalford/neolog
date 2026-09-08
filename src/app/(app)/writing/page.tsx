@@ -148,31 +148,72 @@ export default function Writing() {
         )}
 
         {docs.length > 0 && (
-          <div className="doors" style={{ marginTop: 26 }}>
-            {docs.map(d => (
-              <Link className="d" key={d.id} href={`/writing/${d.id}`}>
-                <span className="n">{DOC_WORDS[asKind(d.kind)].name}</span>
-                <span className="w">
-                  {d.title}
-                  <em style={{
-                    display: 'block', fontStyle: 'normal', marginTop: 5,
-                    fontSize: 12.5, color: 'var(--fg-4)',
-                  }}>
+          <>
+            {/* `writing.html`: "a document is a document · kind and
+                who-made-it are fields." One table, four columns, whatever
+                the thing is. */}
+            <div className="sh"><span>Every made thing</span><b>one shape</b></div>
+            <div className="spread">
+              <div className="sp hd">
+                <span>kind</span><span>the thing</span><span>who made it</span><span>body</span>
+              </div>
+              {docs.map(d => (
+                <Link className="sp" key={d.id} href={`/writing/${d.id}`}>
+                  <span className="k">{DOC_WORDS[asKind(d.kind)].name}</span>
+                  <span className="n">
+                    {d.title}
+                    <i>
+                      {d.word_count > 0 && `${d.word_count.toLocaleString('en-GB')} words`}
+                      {d.draft_count > 1 && ` · ${d.draft_count} drafts, all kept`}
+                      {d.page_name && ` · under ${d.page_name}`}
+                    </i>
+                  </span>
+                  <span className={`w${asMadeBy(d.made_by) === 'operator' ? ' you' : ' ai'}`}>
                     {MADE_BY_WORDS[asMadeBy(d.made_by)]}
-                    {d.word_count > 0 && ` · ${d.word_count.toLocaleString('en-GB')} words`}
-                    {d.draft_count > 1 && ` · ${d.draft_count} drafts, all kept`}
-                    {d.page_name && ` · under ${d.page_name}`}
-                    {d.visibility === 'public' ? ' · public' : ' · private'}
-                  </em>
-                </span>
-                <span className="c">{day(d.finished_at || d.created_at)}</span>
-              </Link>
-            ))}
-          </div>
+                  </span>
+                  <span className="c">
+                    {DOC_WORDS[asKind(d.kind)].body}
+                    <i>{d.visibility === 'public' ? 'public' : 'private'}</i>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
-                </main>
 
-          <Rail goesTo={[{ href: '/', label: 'the log' }, { href: '/export', label: 'export' }]} />
+        {/* `writing.html`: "Three things that look alike and aren't." The
+            distinction is the page — without it a finished essay and a
+            letter the log drafted are the same row. */}
+        <div className="cmp">
+          <div>
+            <b>This — something you wrote.</b> Whole. Never split. Yours from
+            the first word, and publishable as-is the moment you say so. The
+            log keeps the drafts and the dates; it never touches the text.
+          </div>
+          <div>
+            <b>A recollection you dumped.</b> Also yours, also whole — but
+            written <i>to be split</i> into dated entries. The document stays;
+            the entries point back into it. Different intent, different page.
+          </div>
+          <div className="fence">
+            <b>A letter the log drafted.</b> Assembled from your entries, in
+            your voice. <i>Below the fence</i> — designed, not built, and
+            never confused with the first two.
+          </div>
+        </div>
+
+        <div className="rule">
+          <b>You wrote it; the log kept it.</b> A document you made yourself
+          is the one kind of made thing that crosses to public untouched — no
+          reading, no reduction, no draft. The log&rsquo;s only mark on it is
+          the date and the drafts.
+        </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/export', label: 'export' },
+          ]} />
         </div>
       </div>
     </Shell>
