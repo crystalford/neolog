@@ -118,7 +118,7 @@ export default function Facts() {
 
             {r.roles.length > 0 && (
               <>
-                <div className="lsec">
+                <div className="sh">
                   <span>work and projects</span>
                   <b>newest first</b>
                 </div>
@@ -147,7 +147,7 @@ export default function Facts() {
 
             {r.names.length > 0 && (
               <>
-                <div className="lsec">
+                <div className="sh">
                   <span>people and places</span>
                   <b>{r.names.length}</b>
                 </div>

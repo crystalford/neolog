@@ -117,9 +117,10 @@ export default function PageView({ params }: { params: { id: string } }) {
           <Link href="/pages">the index</Link>
         </div>
 
-        <div className="grid">
-          <main>
-            <div className="pghead">
+        {/* `person.html`: the name and its facts sit above the grid, not
+            inside the column — the page is about the thing, and the thing is
+            named before the layout begins. */}
+        <div className="phead">
               {renaming ? (
                 <>
                   <input
@@ -150,7 +151,7 @@ export default function PageView({ params }: { params: { id: string } }) {
                 <h1>{page.name}</h1>
               )}
 
-              <div className="pgmeta">
+        <div className="meta">
                 <span>a {page.kind}</span>
                 {page.span && <span><b>{page.span}</b></span>}
                 <span>
@@ -174,12 +175,14 @@ export default function PageView({ params }: { params: { id: string } }) {
                     : ' Never asked; this is the default.'}
                 </p>
               )}
-            </div>
+        </div>
 
+        <div className="grid">
+          <main>
             {/* The log's one-paragraph version — rewritten as things attach,
                 always his to edit, and never shown as his words. */}
             {(page.summary || editingPara) && (
-              <div className="pgpara">
+              <div className="para">
                 {editingPara ? (
                   <>
                     <textarea value={para} onChange={e => setPara(e.target.value)} autoFocus />

@@ -109,7 +109,7 @@ export default function Asks() {
 
         {answered.length > 0 && (
           <>
-            <div className="lsec">
+            <div className="sh">
               <span>answered</span>
               <b>{answered.length}</b>
             </div>
@@ -133,7 +133,7 @@ export default function Asks() {
 
         {open.length > 0 && (
           <>
-            <div className="lsec">
+            <div className="sh">
               <span>open</span>
               <b>{open.length}</b>
             </div>

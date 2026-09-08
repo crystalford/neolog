@@ -139,7 +139,7 @@ export default function DocumentPage() {
 
             {r.drafts.length > 1 && (
               <>
-                <div className="lsec"><span>drafts</span><b>{r.drafts.length}, all kept</b></div>
+                <div className="sh"><span>drafts</span><b>{r.drafts.length}, all kept</b></div>
                 <div className="doors">
                   {r.drafts.map(x => (
                     <button
@@ -167,7 +167,7 @@ export default function DocumentPage() {
 
             {r.came_from.length > 0 && (
               <>
-                <div className="lsec"><span>came out of</span></div>
+                <div className="sh"><span>came out of</span></div>
                 <div className="doors">
                   {r.came_from.map(e => (
                     <Link className="d" key={e.id} href={`/entry/${e.id}`}>
@@ -180,7 +180,7 @@ export default function DocumentPage() {
               </>
             )}
 
-            <div className="lsec"><span>do something</span></div>
+            <div className="sh"><span>do something</span></div>
             <div className="paste" style={{ marginTop: 14 }}>
               <div className="bar">
                 {!editing && (

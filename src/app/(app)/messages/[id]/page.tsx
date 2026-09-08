@@ -121,7 +121,7 @@ export default function Thread() {
             {/* Both sides, whole, as he forwarded them. This half is his to
                 read and is not affected by the consent state — the state
                 governs what a STRANGER sees, not what he keeps. */}
-            <div className="lsec"><span>the thread</span><b>only you see this</b></div>
+            <div className="sh"><span>the thread</span><b>only you see this</b></div>
             <div className="msgs">
               {r.messages.map(m => (
                 <div className={`msg ${m.side}`} key={m.id}>
@@ -148,7 +148,7 @@ export default function Thread() {
             {/* Their answer. Four states, and the default is the most
                 private one — set without asking, because the person whose
                 words these are is not here to ask. */}
-            <div className="lsec">
+            <div className="sh">
               <span>their answer</span>
               <b>{r.consent_at ? `set ${clock(r.consent_at)}` : 'never asked'}</b>
             </div>
@@ -180,7 +180,7 @@ export default function Thread() {
             </div>
 
             {/* The whole reason this page exists. */}
-            <div className="lsec">
+            <div className="sh">
               <span>what a stranger sees if you publish this today</span>
             </div>
             {r.public_view.length === 0 ? (

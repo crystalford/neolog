@@ -109,7 +109,7 @@ export default function Screenshots() {
 
         {piles && ORDER.map(p => piles[p].length > 0 && (
           <div key={p}>
-            <div className="lsec">
+            <div className="sh">
               <span>{PILE_WORDS[p].name}</span>
               <b>{piles[p].length}</b>
             </div>

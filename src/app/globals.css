@@ -1791,13 +1791,15 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .num .how { margin-top: 9px; font-size: 13.5px; color: var(--fg-3); line-height: 1.6; }
 
 /* section heads inside a list — a word, not a code */
-.logpage .lsec {
-  margin-top: 40px; padding-bottom: 11px; border-bottom: 1px solid var(--line);
+/* A section head. `person.html`'s `.sh` — the design's name and values for
+   exactly this, replacing a `.lsec` I had invented for the same job. */
+.logpage .sh {
+  font-size: 15px; font-weight: 450; color: var(--fg);
+  padding: 30px 0 10px; border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; gap: 16px; align-items: baseline;
-  font-size: 13px; color: var(--fg-3);
 }
-.logpage .lsec b { font-family: var(--font-mono); font-weight: 400; font-size: 11px; color: var(--fg-4); }
-.logpage .lsec + .item, .logpage .lsec + .num { border-top: 0; }
+.logpage .sh b { font-size: 12px; font-weight: 400; color: var(--fg-4); white-space: nowrap; }
+.logpage .sh + .item, .logpage .sh + .num { border-top: 0; }
 
 .logpage .none {
   padding: 26px 0; font-size: 14.5px; color: var(--fg-3); line-height: 1.6;

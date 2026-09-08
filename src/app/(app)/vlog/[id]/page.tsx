@@ -152,7 +152,7 @@ export default function Recording() {
 
             {/* Provenance, in words. Two facts, and the log says how it knows
                 each — a recording that cannot be checked is not evidence. */}
-            <div className="lsec"><span>where this came from</span></div>
+            <div className="sh"><span>where this came from</span></div>
             <div className="doors">
               <span className="d">
                 <span className="n">the date</span>
@@ -175,7 +175,7 @@ export default function Recording() {
               </span>
             </div>
 
-            <div className="lsec">
+            <div className="sh">
               <span>what the log read out of it</span>
               <b>{r.entries.length}</b>
             </div>
@@ -206,7 +206,7 @@ export default function Recording() {
 
             {r.words.length > 0 && (
               <>
-                <div className="lsec">
+                <div className="sh">
                   <span>the transcript</span>
                   <b>as it was heard</b>
                 </div>
@@ -222,7 +222,7 @@ export default function Recording() {
               </>
             )}
 
-            <div className="lsec"><span>do something</span></div>
+            <div className="sh"><span>do something</span></div>
             <div className="paste" style={{ marginTop: 14 }}>
               <div className="bar">
                 <button

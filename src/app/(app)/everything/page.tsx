@@ -65,14 +65,14 @@ export default function Everything() {
 
         {r && (
           <>
-            <div className="lsec">
+            <div className="sh">
               <span>what a person reads</span>
             </div>
             <div className="doors">
               {r.doors.filter(d => d.stranger).map(d => <DoorRow key={d.href} d={d} />)}
             </div>
 
-            <div className="lsec">
+            <div className="sh">
               <span>the lists</span>
               <b>unlisted</b>
             </div>
@@ -80,7 +80,7 @@ export default function Everything() {
               {r.doors.filter(d => !d.stranger).map(d => <DoorRow key={d.href} d={d} />)}
             </div>
 
-            <div className="lsec">
+            <div className="sh">
               <span>feeds</span>
             </div>
             <div className="doors">

@@ -62,10 +62,10 @@ export default async function SettingsPage() {
           <span>one operator · signed in by a code sent to that address</span>
         </div>
 
-        <div className="lsec"><span>you</span></div>
+        <div className="sh"><span>you</span></div>
         <OperatorSentence/>
 
-        <div className="lsec"><span>where it is kept</span></div>
+        <div className="sh"><span>where it is kept</span></div>
         <div className="doors">
           <span className="d"><span className="n">the recordings</span><span className="w">Cloudflare R2 · neolog-videos</span><span className="c">yours</span></span>
           <span className="d"><span className="n">the log</span><span className="w">Cloudflare D1 · neolog</span><span className="c">yours</span></span>
@@ -77,10 +77,10 @@ export default async function SettingsPage() {
           before you delete it locally is <Link href="/clear">safe to clear</Link>.
         </p>
 
-        <div className="lsec"><span>the recordings, and what the log has read</span></div>
+        <div className="sh"><span>the recordings, and what the log has read</span></div>
         <Retranscribe/>
 
-        <div className="lsec"><span>when a recording gets stuck</span></div>
+        <div className="sh"><span>when a recording gets stuck</span></div>
         <div className="doors">
           <span className="d">
             <span className="n">missing a still</span>
@@ -98,7 +98,7 @@ export default async function SettingsPage() {
             terminal — this session is his runtime — so the one irreversible
             act in the product has to be a button, and it has to say what it
             keeps before it says what it destroys. */}
-        <div className="lsec">
+        <div className="sh">
           <span>start again</span>
           <b>irreversible</b>
         </div>
