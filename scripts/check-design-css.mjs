@@ -79,7 +79,18 @@ const norm = v => {
   return out
 }
 
-const BUDGET={"log": 3, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 3, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 3, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
+// ⚠️ `vlog` was 3 and is 5 on purpose, 8 Sep. The operator saw the deployed
+// page and rejected the design's caption-beside-the-video layout: "the text
+// should be below... it needs to be tightened up." `vlog.css` lays `.media`
+// out as a flex row because ITS player is a 420px mock with room to its
+// right; the product plays the real recording at full column width, so the
+// same rule squeezed the caption into 230px and broke it across two ragged
+// lines. Three rules diverge for that (`.media`, `.media > .cap`, `.rail`'s
+// padding), and each carries its reasoning in globals.css.
+//
+// Raising a budget needs a reason in the commit — this is that reason, kept
+// next to the number so the next session does not "fix" the divergence back.
+const BUDGET={"log": 3, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 3, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
 
 // No argument: check every page against its budget and exit non-zero on drift.
 if(!process.argv[2]){

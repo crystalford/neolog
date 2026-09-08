@@ -1011,6 +1011,39 @@ stripes on cards. That was the old product's, it mandated exactly what rules
 1–3 forbid, and it is why surfaces built at different times do not match. If
 a page still has a giant hero or an uppercase eyebrow, it is a leftover.
 
+### ⚠️ `/vlog/[id]` — the caption goes under the video, not beside it
+
+A deliberate divergence from `vlog.css`, made after the operator looked at
+the deployed page: *"the only thing that shouldn't be copied from the
+prototype is the text to the right of the video. That is incorrect, the text
+should be below."*
+
+The design lays `.media` out as a flex row with `.cap` in a 230px column
+because ITS player is a 420px mock with room to its right. The product plays
+the real recording at the full column width, so the same rule squeezed the
+caption into 230px and broke *"the whole thing, kept — nothing on this page
+changes the file"* across two ragged lines beside a 400px-tall video. The
+video is the subject of this page; the caption is a footnote to it.
+
+Three rules diverge, each carrying its reasoning in `globals.css`, and
+`check-design-css.mjs`'s `vlog` budget went 3 → 5 with that reason written
+beside the number so the next session does not "fix" it back. **Raising a
+budget needs a reason; this is what one looks like.**
+
+Two real defects went with it. `.rail` was inheriting `padding-top:18px` from
+the generic `.logpage .rail` — that rule exists for pages whose rail starts
+below a toolbar, and here it pushed the first card out of line with the title
+block beside it. And `.rec` had no height cap, so a vertical phone recording
+became a two-screen slab; it is capped at `62vh`.
+
+⚠️ **Look at the page before changing its CSS.** These were found by
+rendering the real `globals.css` against the page's own markup in headless
+Chromium and measuring — not by reading the stylesheet, which had looked
+right for a week. Chromium is at `/opt/pw-browsers/chromium`; a throwaway
+harness plus `page.evaluate` returning `getBoundingClientRect()` is enough,
+and it is the only way to tell a rule that is wrong from one that is merely
+unfamiliar.
+
 **Every detail page answers four questions** — the work itself; where it came
 from; where it sits; what it became. On a recording that is: the video, the
 provenance in words, the pages it is on, and the entries read out of it.

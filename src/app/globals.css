@@ -3583,7 +3583,16 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-vlog .ends .nx { text-align:right; }
 .logpage.pg-vlog .ends .home { font-size:12.5px; color:var(--fg-3); padding:7px 14px; border:1px solid var(--line-1); border-radius:7px; white-space:nowrap; }
 .logpage.pg-vlog .ends .home:hover { color:var(--fg); border-color:var(--line-3); }
-.logpage.pg-vlog .rail { position:sticky; top:22px; display:flex; flex-direction:column; gap:16px; }
+/* `vlog.css` line 62 exactly — and `padding-top:0` because the generic
+   `.logpage .rail` carries 18px for the pages whose rail starts below a
+   toolbar. Inheriting it here pushed the first card 18px out of line with
+   the title block beside it, which is the kind of small mismatch that
+   reads as "the card is overlapped at the top". */
+.logpage.pg-vlog .rail { position:sticky; top:22px; padding-top:0; display:flex; flex-direction:column; gap:16px; }
+/* The video is the subject of the page, so it gets the column — but a
+   bare `video` element with no height cap turns a vertical phone recording
+   into a two-screen slab. */
+.logpage.pg-vlog .media .rec { width:100%; max-height:62vh; border:1px solid var(--line-1); border-radius:10px; background:#000; display:block; }
 .logpage.pg-vlog .rc { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
 .logpage.pg-vlog .rc .h { padding:10px 14px; border-bottom:1px solid var(--line); background:var(--bg-1); font-size:12.5px; font-weight:450; color:var(--fg); display:flex; justify-content:space-between; gap:10px; }
 .logpage.pg-vlog .rc .h span { font-weight:400; color:var(--fg-4); font-size:11.5px; white-space:nowrap; }
@@ -3623,12 +3632,21 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-vlog .script .ln2.now { color:var(--fg); }
 .logpage.pg-vlog .script .ln2.now .t2 { color:var(--steel); }
 .logpage.pg-vlog .script .ln2:hover { background:var(--bg-1); border-radius:6px; }
-.logpage.pg-vlog .media { margin:26px 0 0; display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+/* ⚠️ The caption goes UNDER the video, not beside it — a deliberate
+   divergence from `vlog.css` line 113, recorded rather than hidden.
+   The design lays `.media` out as a flex row because its player is a 420px
+   mock with room to its right. The product plays the real recording at the
+   full column width, so the same rule squeezed the caption into a 230px
+   column and broke "the whole thing, kept — nothing on this page changes
+   the file" across two ragged lines beside a 400px-tall video. The
+   operator's call, and the right one: the video is the subject of this
+   page and the caption is a footnote to it. */
+.logpage.pg-vlog .media { margin:22px 0 0; display:block; }
 .logpage.pg-vlog .media .still { width:420px; max-width:100%; aspect-ratio:3/2; flex-shrink:0; border:1px solid var(--line-1); border-radius:10px; position:relative; overflow:hidden; background:repeating-linear-gradient(135deg,#131313 0 10px,#181818 10px 20px); }
 .logpage.pg-vlog .media .still .lbl2 { position:absolute; inset:0; display:grid; place-items:center; font-size:12px; color:var(--fg-4); letter-spacing:.2px; }
 .logpage.pg-vlog .media .tile { width:150px; aspect-ratio:4/3; display:block; flex-shrink:0; border:1px solid var(--line-1); border-radius:8px; }
 .logpage.pg-vlog .media img { max-width:min(420px,100%); height:auto; border:1px solid var(--line-1); border-radius:10px; display:block; }
-.logpage.pg-vlog .media > .cap { font-size:12.5px; color:var(--fg-4); line-height:1.55; flex:1 1 160px; min-width:160px; max-width:230px; padding-top:4px; }
+.logpage.pg-vlog .media > .cap { display:block; margin-top:10px; font-size:12px; color:var(--fg-4); line-height:1.5; max-width:none; }
 .logpage.pg-vlog .media .cap b { display:block; color:var(--fg-2); font-weight:450; margin-bottom:3px; }
 .logpage.pg-vlog .media .cap a { color:var(--fg-2); border-bottom:1px solid var(--line-2); }
 .logpage.pg-vlog .media > .side { font-size:12.5px; color:var(--fg-4); line-height:1.55; flex:1 1 160px; min-width:160px; max-width:230px; padding-top:4px; }
