@@ -107,9 +107,19 @@ be held the way an image is, the operator answered the more useful question:
 > yes it should flag the driver's licence. Basically the extent of which we
 > discussed."*
 
-⚠️ **The bulk drop is the real case, not the edge case**, and the intake pass
-was built for the edge case. It ran `Promise.all` over every file in the
-drop — one R2 read and one model call each, unbounded, inside a single
+⚠️ **The bulk drop is the real case, not the edge case**, and BOTH ends of it
+were built for the edge case.
+
+**In the browser**, `attach()` ran `Promise.all` over every dropped file. The
+checksum reads each one WHOLE into memory (`file.arrayBuffer()`), so a few
+hundred photos is a gigabyte-plus allocated before a single upload finishes
+and the tab goes down. A browser opens about six connections per origin
+anyway, so the concurrency bought nothing; only the memory was real. Four at
+a time now — every file still shows as pending immediately, what is bounded
+is how many are being HELD.
+
+**On the server**, the intake pass ran `Promise.all` over every file in the drop —
+one R2 read and one model call each, unbounded, inside a single
 `waitUntil`. A Worker has a subrequest ceiling and `waitUntil` has a time
 budget, so a camera-roll import of a few hundred photos failed most of its
 checks; **every failure path returns held, correctly, and the result was a

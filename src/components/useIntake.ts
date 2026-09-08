@@ -39,6 +39,22 @@ export interface IntakeReceipt {
   vlogIds: string[]
 }
 
+/**
+ * Run `fn` over `items`, at most `n` in flight. Plain and local — a pool
+ * this small does not need a dependency, and the alternative (all of them at
+ * once) is what it exists to prevent.
+ */
+async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0
+  const runners = Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++
+      await fn(items[i])
+    }
+  })
+  await Promise.all(runners)
+}
+
 export function useIntake(onDone?: () => void) {
   const [text, setText] = useState('')
   const [pending, setPending] = useState<Pending[]>([])
@@ -63,7 +79,19 @@ export function useIntake(onDone?: () => void) {
     }))
     setPending(p => [...p, ...added])
 
-    await Promise.all(added.map(async item => {
+    // ⚠️ FOUR AT A TIME, and it used to be all of them at once.
+    //
+    // The bulk drop is the real case — "I'm just banking all my iPhone
+    // photos" — and `Promise.all` over the whole list starts every file
+    // together. The checksum reads each one WHOLE into memory
+    // (`file.arrayBuffer()`), so a few hundred photos is a gigabyte-plus
+    // allocated before a single upload finishes and the tab goes down. The
+    // browser only opens about six connections per origin anyway, so the
+    // concurrency was never bought anything; only the memory was real.
+    //
+    // Every file still shows as pending immediately. What is bounded is how
+    // many are being HELD at once.
+    await pool(added, 4, async item => {
       try {
         let happened_at: string | undefined
         let date_source: string | undefined
@@ -127,7 +155,7 @@ export function useIntake(onDone?: () => void) {
           ? { ...x, uploading: false, error: err?.message || 'failed' }
           : x))
       }
-    }))
+    })
   }, [])
 
   const removePending = useCallback((key: string) => {
