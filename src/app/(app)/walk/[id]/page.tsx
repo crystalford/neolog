@@ -157,12 +157,25 @@ export default function WalkPage() {
                   : 0
                 return (
                   <div
-                    className={`step${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`}
+                    /* `walk.html`'s `.turn` marks a step that came from
+                       reading the log rather than from the moment — the
+                       source line is one the log wrote. It tints the step
+                       and nothing else; it is not the entry page's card of
+                       the same name (see globals.css). */
+                    className={
+                      `step${t.loop ? ' loop' : ''}`
+                      + `${t.relation === REFLECTS ? ' refl' : ''}`
+                      + `${from && from.author !== 'operator' ? ' turn' : ''}`
+                    }
                     key={t.id}
                     /* `walk.html` colours each step's dot through a custom
                        property on the row. Steel for a loop — the one turn
                        that did not come from the turn before it in time. */
-                    style={{ ['--c' as string]: t.loop ? 'var(--t-steel)' : 'var(--fg-3)' }}
+                    style={{
+                      ['--c' as string]: t.loop
+                        ? 'var(--t-steel)'
+                        : from && from.author !== 'operator' ? 'var(--t-ochre)' : 'var(--fg-3)',
+                    }}
                   >
                     <div className="t">
                       <time dateTime={t.happened_at}>

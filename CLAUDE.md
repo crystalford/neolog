@@ -1160,11 +1160,17 @@ Everything the generic rule sets and the design does not mention survives.
 | `.sh` | `padding:30px 0 10px` | `/facts`'s mono section head | a 30px heading rendering at 78px |
 | `.msg` | the earlier chat bubble, `max-width:82%` | `/messages`'s two-column row | every message 100px narrow, 40px tall |
 | `.fold` | the home page's folded-period row | `/writing`'s footer strip | a 50px strip rendering at 154px |
+| `.turn` | the entry page's came-out-of card | `/walk`'s "came from the log" step | **the one this file already warned about** — one step boxed, 30px narrow, 26px tall |
 
-The repo already knew the shape — `.turn` vs `.leg` on the walk is recorded
-above — but knowing it did not prevent four more, because **nothing looks at
-a rendered page.** `tsc`, the build, and all three text-level design checks
-are green through every one of these.
+⚠️ **The last row is the point.** This file has warned since 8 Sep that
+`.logpage .turn` "would box every step" of the walk, and named `.leg` as the
+class to use for a row instead. It was right, and it did not help: `walk.css`
+uses `.turn` as a MODIFIER on a step — a turn that came from reading the log
+rather than from the moment, tinting its `.c` and nothing else — so the
+design's own markup carries `class="step turn"` and our card rule boxed it.
+**Knowing the hazard is not the same as catching it**, because nothing looked
+at a rendered page. `tsc`, the build, and all three text-level design checks
+are green through every row of this table.
 
 **The rule when a design page redefines a shared class: reset what the
 generic rule SETS, not only the properties the design names.** `display`,
@@ -1172,13 +1178,12 @@ generic rule SETS, not only the properties the design names.** `display`,
 comment beside each fix in `globals.css` says which generic rule it is
 undoing.
 
-`check-design-render.mjs` finds them in seconds. **Fifteen of the 22 product
-surfaces render pixel-identically to the design, and the other seven each
-carry a recorded reason.** The seven: `/` (the toolbar wrap), `/vlog/[id]`
-(the caption, and `vlog.css` having no frame rule), `/entry/[id]` (the same),
-`/facts`, `/asks` (the drafted answer it refuses to build), `/now` (its own
-`.nowpage` scope and atmosphere layers) and `/walk` (two blocks below the
-route, not converted). 
+`check-design-render.mjs` finds them in seconds. **Sixteen of the 22 product
+surfaces render pixel-identically to the design, and the other six each carry
+a recorded reason.** The six: `/` (the toolbar wrap), `/vlog/[id]` (the
+caption, and `vlog.css` having no frame rule), `/entry/[id]` (the same),
+`/facts`, `/asks` (the drafted answer it refuses to build) and `/now` (its own
+`.nowpage` scope and atmosphere layers). 
 
 ⚠️ **The checker measures the 22 surfaces, read from `check-design.mjs` so
 there is one list.** Pointing it at all 74 design pages buries the real

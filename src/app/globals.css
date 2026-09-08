@@ -4099,6 +4099,25 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
    227px tall, so the connector line stopped short of every step it was
    drawn to join. Reset what the generic rule sets, not just the one
    property the design happens to name. */
+/* ⚠️ `.turn` on a walk step is a MODIFIER — `walk.css` uses it for a turn
+   that came from reading the log itself, and tints only its `.c`. This repo
+   already documented the hazard: `.logpage .turn` is the entry page's
+   came-out-of / led-to CARD, a 96px grid with a border and 12/14 padding,
+   "which would box every step". It was boxing one. Step 6 of the design's
+   own walk carries `step turn` and rendered 30px narrower and 26px taller
+   than every step around it.
+   The fix is the same as everywhere else on this page: reset what the
+   generic rule sets, then apply what the design actually means by it. */
+.logpage.pg-walk .step.turn {
+  display:grid; grid-template-columns:82px 26px 1fr; gap:0 14px;
+  padding:0; border:0; border-radius:0;
+}
+.logpage.pg-walk .step.turn .c {
+  background:linear-gradient(90deg,rgba(200,150,64,.06),transparent 70%);
+  margin-left:-10px; padding-left:10px; border-radius:8px;
+}
+.logpage.pg-walk .step.turn .c .x b { color:var(--t-ochre); }
+
 .logpage.pg-walk .step .rail {
   position:relative; display:block; gap:0; padding-top:0; top:auto; align-self:stretch;
 }

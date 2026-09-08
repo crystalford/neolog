@@ -125,7 +125,7 @@ const BUDGET = {
   // atmosphere layers (`.atm`, `.grain`, `.vig`, `.stage`) are ours.
   now: 11,
   // The two blocks below the route on `/walk` are not converted yet.
-  walk: 7,
+  walk: 0,
 }
 
 /**
