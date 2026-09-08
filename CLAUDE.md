@@ -1208,7 +1208,15 @@ surfaces render pixel-identically to the design, and the other six each carry
 a recorded reason.** The six: `/` (the toolbar wrap), `/vlog/[id]` (the
 caption, and `vlog.css` having no frame rule), `/entry/[id]` (the same),
 `/facts`, `/asks` (the drafted answer it refuses to build) and `/now` (its own
-`.nowpage` scope and atmosphere layers). 
+`.nowpage` scope and atmosphere layers).
+
+**Markup coverage: 122 unused classes across the 22 surfaces, from 219 when
+this pass began.** `/entry/[id]` and `/pages` are at zero. ⚠️ **None of that
+came from adding markup to satisfy a checker** — four of the reductions were
+the checker being wrong about what it measured: the package's own
+self-describing furniture (`.specnote`, `.rules`, `.st`), one design page
+charged twice against both its routes, and class names picked from a lookup
+map rather than written as literals. 
 
 ⚠️ **The checker measures the 22 surfaces, read from `check-design.mjs` so
 there is one list.** Pointing it at all 74 design pages buries the real
