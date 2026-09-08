@@ -40,6 +40,8 @@ export default function ExportPage() {
   const [count, setCount] = useState<number | null>(null)
   const [bill, setBill] = useState<Bill | null>(null)
   const [counting, setCounting] = useState(false)
+  /** What the range HOLDS, when that is more than one file can carry. */
+  const [matched, setMatched] = useState<number | null>(null)
   /** Today, for the archive's folder name — the design names it by date. */
   const ymd = new Date().toISOString().slice(0, 10)
 
@@ -81,9 +83,14 @@ export default function ExportPage() {
       try {
         const res = await fetch(`/api/v2/export?${params('json')}`, { cache: 'no-store' })
         if (!res.ok || cancelled) return
-        const b = await res.json() as { counts: { entries: number } }
-        if (!cancelled) setCount(b.counts.entries)
-      } catch { if (!cancelled) setCount(null) }
+        const b = await res.json() as {
+          counts: { entries: number; matched?: number; truncated?: boolean }
+        }
+        if (!cancelled) {
+          setCount(b.counts.entries)
+          setMatched(b.counts.truncated ? (b.counts.matched ?? null) : null)
+        }
+      } catch { if (!cancelled) { setCount(null); setMatched(null) } }
       finally { if (!cancelled) setCounting(false) }
     }, 350)
     return () => { cancelled = true; clearTimeout(t) }
@@ -182,6 +189,17 @@ export default function ExportPage() {
               {chosen ? `Everything under ${chosen.name}` : 'The whole log'}
               {from || to ? `, ${from || 'the beginning'} to ${to || 'today'}` : ''}.
             </em>
+            {/* Said before he presses, not discovered afterwards. The file
+                says it too — this is the same fact in the place where the
+                decision is made. */}
+            {matched !== null && count !== null && (
+              <p className="none" style={{ padding: '8px 0 0', fontSize: 13 }}>
+                This range holds {matched.toLocaleString('en-GB')} entries and one
+                file carries {count.toLocaleString('en-GB')}, oldest first. Narrow
+                the range for the rest — nothing is left out of the log, only out
+                of the file.
+              </p>
+            )}
             <div className="fixrow">
               <a href={`/api/v2/export?${params('md')}`} download>
                 <button className="p" disabled={count === 0}>Download the document</button>

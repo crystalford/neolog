@@ -489,6 +489,27 @@ stronger check would put a lie inside the one feature that exists to be
 trusted. Exact duplicates attach to the first arrival rather than becoming a
 second entry.
 
+### ⚠️ The export was truncating at 5,000 and saying nothing
+
+An edge Worker builds the whole document in memory, so `MAX_EXPORT_ENTRIES`
+is a real ceiling rather than a preference. It has always been there and it
+was **silent** — past five thousand entries the file simply held less than it
+claimed, and the more of a life is in the log the more certain that becomes.
+Reading four hundred recordings alone can pass it.
+
+An export is the one artefact he keeps and trusts **on its own**, away from
+the page that made it and away from the log. This product's whole claim is
+that nothing is added and nothing is quietly changed; **dropping entries
+without saying so is the same lie by omission.**
+
+So the bundle now counts what the range HOLDS as well as what fits
+(`counts.matched`, `counts.truncated`), and both surfaces say it: the page,
+before he presses, and **the document itself**, because that is where it will
+be read a year later. The wording draws the line that matters — *"nothing has
+been left out of the log, only out of this file"* — and tells him what to do
+about it. A record of origin is never truncated: one entry's road is the
+whole of what it set out to gather.
+
 **Record of origin** — `/api/v2/export?entry_id=…` exports the road to one
 position: the turns either side, the reflections, and every correction with
 both wordings. That last part is what a finished piece structurally cannot
@@ -919,7 +940,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
 | **Index** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |
 | **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), **when it comes up** — a bar per year split *warm* (written from memory) and *cool* (said as it happened) — then the log filtered, **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
-| **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log. |
+| **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log — **and when the range holds more than one file can carry, both the page and the file say so.** |
 | **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
 | **The facts** | `/facts` | `dossier.html`. What the log can state about him — work, projects, people, places — each with the dates it already derived, newest first, **no ranking**. His one sentence or none: the log will not draft a sentence about a person. Person schema. |
 | **Everything** | `/everything` | The one door to the machine layer, **linked from the log's footer and never from the nav** (§3: "a stranger chooses between two things"). Every address with its real count beside it. |

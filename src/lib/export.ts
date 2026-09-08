@@ -80,8 +80,24 @@ export interface ExportBundle {
   entries: ExportEntry[]
   /** Every correction, with both wordings. Only on a record of origin. */
   revisions?: { entry_id: string; field: string; old_value: string | null; new_value: string | null; created_at: string }[]
-  counts: { entries: number; approximate_dates: number; log_written: number }
+  counts: {
+    entries: number; approximate_dates: number; log_written: number
+    /**
+     * How many entries the range actually HOLDS, which is not always how
+     * many are in this file.
+     */
+    matched: number
+    /** True when `matched` is more than this export could carry. */
+    truncated: boolean
+  }
 }
+
+/**
+ * The most entries one export carries. An edge Worker builds the whole
+ * document in memory, so this is a real ceiling rather than a preference —
+ * which is exactly why the file has to say when it hits it.
+ */
+export const MAX_EXPORT_ENTRIES = 5000
 
 interface Env extends R2Env { DB: D1Database }
 
@@ -140,9 +156,27 @@ export async function buildExport(
        ${join}
       WHERE ${where.join(' AND ')}
       ORDER BY COALESCE(le.happened_at, le.occurred_at) ASC
-      LIMIT 5000`,
+      LIMIT ${MAX_EXPORT_ENTRIES}`,
     ...binds,
   )
+
+  // ⚠️ How many the range HOLDS, so a truncated export can say so.
+  //
+  // The cap has always been here and it was silent. An export is the one
+  // artefact a person keeps and trusts on its own, away from the log — and
+  // this product's whole claim is that nothing is added and nothing is
+  // quietly changed. **Dropping entries without saying so is the same lie by
+  // omission**, and the more of a life is in the log the more certain it
+  // becomes. `check-design.mjs`'s own rule applies here too: no silent caps.
+  const total = await findMany<{ n: number }>(
+    db,
+    `SELECT COUNT(*) AS n
+       FROM log_entries le
+       ${join}
+      WHERE ${where.join(' AND ')}`,
+    ...binds,
+  )
+  const matched = Number(total[0]?.n ?? rows.length)
 
   // Media stays where it is; the manifest points at it.
   const entries: ExportEntry[] = await Promise.all(rows.map(async r => {
@@ -176,6 +210,8 @@ export async function buildExport(
     entries,
     counts: {
       entries: entries.length,
+      matched,
+      truncated: matched > entries.length,
       approximate_dates: entries.filter(e => isFuzzy(e.date_precision)).length,
       log_written: entries.filter(e => e.author === 'log').length,
     },
@@ -261,6 +297,10 @@ async function buildRecordOfOrigin(
     revisions,
     counts: {
       entries: entries.length,
+      // A record of origin is one entry's road. It is never truncated —
+      // what it gathers is the whole of what it set out to gather.
+      matched: entries.length,
+      truncated: false,
       approximate_dates: entries.filter(e => isFuzzy(e.date_precision)).length,
       log_written: entries.filter(e => e.author === 'log').length,
     },
@@ -347,6 +387,19 @@ export function renderMarkdown(b: ExportBundle): string {
   if (range.length) { out.push(`Range: ${range.join(' ')}`); out.push('') }
 
   out.push(`${b.counts.entries} ${b.counts.entries === 1 ? 'entry' : 'entries'}. ${b.counts.approximate_dates} carry an approximate date. ${b.counts.log_written} of the lines were written by the log rather than by ${b.operator}.`)
+  // ⚠️ Said in the FILE, not only on the screen that made it. An export is
+  // kept and read on its own, long after the page that produced it is gone;
+  // a document that quietly holds less than it claims is the one failure
+  // this product cannot afford.
+  if (b.counts.truncated) {
+    out.push('')
+    out.push(
+      `**This is not all of it.** The range holds ${b.counts.matched.toLocaleString('en-GB')} `
+      + `entries and this file carries the first ${b.counts.entries.toLocaleString('en-GB')}, `
+      + 'oldest first. Narrow the range and export again for the rest — nothing '
+      + 'has been left out of the log, only out of this file.',
+    )
+  }
   out.push('')
 
   if (b.scope.entryId) {
