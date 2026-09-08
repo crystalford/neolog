@@ -1004,7 +1004,13 @@ forty-seven classes it should never have owed:
   would be the log explaining itself under the feature, which is the opposite
   of §0 rule 2. They are in `PACKAGE_FURNITURE` with that reasoning beside
   them. ⚠️ **That set is not for a class that is merely unbuilt** — a class
-  belongs there when rendering it would be WRONG.
+  belongs there when rendering it would be WRONG. **`.st` joined them** —
+  the numbered walkthrough section on 19 pages ("1 a thread arrives", "2 who
+  wrote it"), each wrapping an `<h2>` and a paragraph that talk the reader
+  through the mechanic. Its own words give it away: *"This is the whole
+  design. Not a checkbox you tick once…"* ⚠️ **`.n`, the number badge inside
+  it, is NOT excluded** — it is the step number on those pages and a link or
+  a dash on others, and this check matches by class rather than by context.
 - **One design page measured twice.** SPEC §3: *"one design, two views:
   nothing is designed twice."* `messages.html` is the list and the thread;
   `writing.html` is the shelf and the piece. Measuring each route against the

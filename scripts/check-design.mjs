@@ -68,20 +68,20 @@ const PAGES = [
   // the gaps), questions, the composer." public-log.html draws them; §0
   // wins over a page.
   ['public-log', 'src/app/(app)/public/page.tsx',       8],
-  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    10],
+  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    9],
   ['writing',    'src/app/(app)/writing/page.tsx',      5],
   // writing.html's title is "an essay you wrote" — it covers the mechanic
   // AND one document, so the detail page is measured against it too.
   ['writing',    'src/app/(app)/writing/[id]/page.tsx', 5],
-  ['screenshots','src/app/(app)/screenshots/page.tsx',  8],
-  ['messages',   'src/app/(app)/messages/page.tsx',     10],
+  ['screenshots','src/app/(app)/screenshots/page.tsx',  7],
+  ['messages',   'src/app/(app)/messages/page.tsx',     9],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live
   // there.
-  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 10],
+  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 9],
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',    10],
   ['now',        'src/app/(app)/now/page.tsx',           1],
-  ['connections','src/app/(app)/ways-in/page.tsx',      12],
+  ['connections','src/app/(app)/ways-in/page.tsx',      11],
 ]
 
 /**
@@ -131,6 +131,18 @@ const PACKAGE_FURNITURE = new Set([
   // under the feature would be the log explaining itself, which is the
   // opposite of §0 rule 2.
   'rules',
+  // The numbered walkthrough section, on 19 of the 74 pages — "1 a thread
+  // arrives", "1 read, not looked at", "2 who wrote it" — each wrapping an
+  // <h2> and a paragraph that talk the reader through the mechanic step by
+  // step. Its own words give it away: "This is the whole design. Not a
+  // checkbox you tick once…" The product does not number its features and
+  // narrate them; that is the log explaining itself (§0 rule 2).
+  //
+  // ⚠️ `.n`, the number badge inside it, is NOT here. It is the step number
+  // on those pages and a link or a dash on others, and this check matches by
+  // class rather than by context — excluding it globally would hide real
+  // gaps on the pages that use it for something else.
+  'st',
 ])
 
 function classesInMarkup(html) {

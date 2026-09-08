@@ -171,7 +171,10 @@ export default function Recording() {
             <div className="pghead">
               <h1>{v.title || v.original_filename || 'A recording'}</h1>
             </div>
-            <div className="stamp">
+            {/* `vlog.css` calls this `.meta` and styles it in nine rules,
+                none of which were reaching anything — the page rendered
+                `.stamp`, which is a different page's class. */}
+            <div className="meta">
               <time dateTime={v.recorded_at || v.created_at}>{day(v.recorded_at || v.created_at)}</time>
               {v.duration_seconds && <span>{clock(v.duration_seconds)}</span>}
               {v.file_size_bytes && <span>{mb(v.file_size_bytes)}</span>}
