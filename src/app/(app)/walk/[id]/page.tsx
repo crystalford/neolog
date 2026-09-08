@@ -156,14 +156,26 @@ export default function WalkPage() {
                   ? (new Date(t.happened_at).getTime() - new Date(prev.happened_at).getTime()) / 1000
                   : 0
                 return (
-                  <div className={`step${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`} key={t.id}>
-                    <div className="when">
+                  <div
+                    className={`step${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`}
+                    key={t.id}
+                    /* `walk.html` colours each step's dot through a custom
+                       property on the row. Steel for a loop — the one turn
+                       that did not come from the turn before it in time. */
+                    style={{ ['--c' as string]: t.loop ? 'var(--t-steel)' : 'var(--fg-3)' }}
+                  >
+                    <div className="t">
                       <time dateTime={t.happened_at}>
                         {t.returned ? gapLabel(gap) : offsetLabel(t.offset_seconds)}
                       </time>
-                      <em>{clock(t.happened_at)}</em>
+                      <i>{clock(t.happened_at)}</i>
                     </div>
-                    <div className="what">
+                    {/* The gutter, and the dot on the line. A reflection is
+                        hollow because it is not a new event (SPEC §1). */}
+                    <div className="rail">
+                      <span className={t.relation === REFLECTS ? 'dot' : 'dot f'} />
+                    </div>
+                    <div className="c">
                       <div className="x"><Link href={t.href}>{t.text}</Link></div>
                       {t.detail && <div className="p">{t.detail}</div>}
                       <div className="m">
@@ -193,9 +205,10 @@ export default function WalkPage() {
 
               {/* The design's last row: the thread stays open. Not a prompt
                   to do anything — a statement that nothing is closed. */}
-              <div className="step open">
-                <div className="when"><time>not yet</time></div>
-                <div className="what">
+              <div className="step open" style={{ ['--c' as string]: 'var(--line-2)' }}>
+                <div className="t"><time>not yet</time></div>
+                <div className="rail"><span className="dot" /></div>
+                <div className="c">
                   <div className="p">
                     Anything that leads from any turn above attaches here,
                     dated, with the turn it came from. The route stays open.

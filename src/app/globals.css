@@ -1879,57 +1879,17 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
    first/last radii that would draw a box around every step here. A
    different thing gets a different class rather than a specificity fight. */
 
-.logpage .walk { margin-top: 30px; position: relative; }
-.logpage .walk::before {
-  content: ''; position: absolute; left: 111px; top: 8px; bottom: 34px;
-  width: 1px; background: var(--line-1);
-}
-.logpage .walk .step {
-  display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 32px;
-  padding: 0 0 30px; position: relative;
-}
-.logpage .walk .step .when { text-align: right; padding-top: 2px; }
-.logpage .walk .step .when time {
-  display: block; font-family: var(--font-mono); font-size: 11.5px;
-  color: var(--fg-2); white-space: nowrap;
-}
-.logpage .walk .step .when em {
-  display: block; font-style: normal; margin-top: 5px;
-  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
-}
-/* the node on the line */
-.logpage .walk .step::before {
-  content: ''; position: absolute; left: 108px; top: 7px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--fg-3); box-shadow: 0 0 0 4px var(--bg);
-}
-.logpage .walk .step.loop::before { background: var(--t-steel); }
-.logpage .walk .step.refl::before { background: transparent; border: 1px solid var(--line-3); }
-.logpage .walk .step.open::before { background: transparent; border: 1px dashed var(--line-2); }
+/* ⚠️ The hand-written walk that used to live here is gone (8 Sep).
+   `/walk/[id]` had TWO layouts applying at once: this one — `.when`/`.what`
+   on a 96px grid with its own `::before` connector at left:111px — and the
+   vendored `.logpage.pg-walk` rules from `walk.css` on a 82/26/1fr grid with
+   a per-step `.rail` gutter. Both drew a connector line, at different x
+   positions, and the page rendered a hybrid: the design's columns with this
+   one's 30px row padding.
 
-.logpage .walk .step .what .x {
-  font-size: 17px; font-weight: 300; line-height: 1.5; letter-spacing: -0.35px;
-  color: var(--fg); max-width: 620px; text-wrap: pretty;
-}
-.logpage .walk .step .what .x a { color: inherit; }
-.logpage .walk .step .what .x a:hover { border-bottom: 1px solid var(--line-3); }
-.logpage .walk .step .what .p {
-  margin-top: 8px; font-size: 14px; line-height: 1.6; color: var(--fg-2);
-  max-width: 600px; text-wrap: pretty;
-}
-.logpage .walk .step .what .m {
-  display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline;
-  margin-top: 9px; font-size: 12.5px; color: var(--fg-4);
-}
-.logpage .walk .step .what .m a { color: var(--fg-3); }
-.logpage .walk .step .what .m a:hover { color: var(--fg-1); }
-.logpage .walk .step .made { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.logpage .walk .step .made a {
-  font-size: 12.5px; color: var(--fg-2); padding: 4px 10px;
-  border: 1px solid var(--line-1); border-radius: 6px;
-}
-.logpage .walk .step .made a:hover { color: var(--fg); border-color: var(--line-3); }
-.logpage .walk .step.open .what .p { color: var(--fg-3); }
+   The page now renders the design's markup (`.t` · `.rail` · `.c`), so the
+   only walk CSS is `.logpage.pg-walk`, further down. Do not add a bare
+   `.walk` rule here — a second layout for one page is how this started. */
 
 /* the route link, at the end of an entry's turns */
 .logpage .turn.all .tl { color: var(--fg-3); }
@@ -4019,7 +3979,18 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-walk .step { display:grid; grid-template-columns:82px 26px 1fr; gap:0 14px; position:relative; }
 .logpage.pg-walk .step .t { font-family:var(--mono); font-size:10.5px; color:var(--fg-4); text-align:right; padding-top:14px; white-space:nowrap; line-height:1.4; }
 .logpage.pg-walk .step .t i { display:block; font-style:normal; font-size:10.5px; color:var(--fg-4); opacity:.7; }
-.logpage.pg-walk .step .rail { position:relative; }
+/* ⚠️ `.rail` inside a walk step is the timeline GUTTER — a different thing
+   with the same class name as the page rail, and `walk.css` line 35 is one
+   property because the design has no other `.rail` to collide with. We do:
+   `.logpage .rail` makes it a sticky flex column with a 22px gap, 18px of
+   padding and `align-self:start`, and this rule was overriding only
+   `position`. The gutter therefore collapsed to 18px where the step is
+   227px tall, so the connector line stopped short of every step it was
+   drawn to join. Reset what the generic rule sets, not just the one
+   property the design happens to name. */
+.logpage.pg-walk .step .rail {
+  position:relative; display:block; gap:0; padding-top:0; top:auto; align-self:stretch;
+}
 .logpage.pg-walk .step .rail::before { content:''; position:absolute; left:12px; top:0; bottom:0; width:1px; background:var(--line-2); }
 .logpage.pg-walk .step:first-child .rail::before { top:20px; }
 .logpage.pg-walk .step:last-child .rail::before { bottom:auto; height:20px; }

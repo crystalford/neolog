@@ -122,20 +122,29 @@ for (const page of PAGES) {
   const a = await measure(theirs, false)
   const b = await measure(ours, true)
   // Compare element-by-element in document order — same markup, same order.
-  let moved = 0, worst = null
+  let moved = 0
+  const off = []
   for (let i = 0; i < Math.min(a.length, b.length); i++) {
     const d = Math.abs(a[i].w - b[i].w) + Math.abs(a[i].h - b[i].h)
     if (d > 24) {
       moved++
-      if (!worst || d > worst.d) worst = { d, c: a[i].c, their: `${a[i].w}x${a[i].h}`, our: `${b[i].w}x${b[i].h}` }
+      off.push({ d, c: String(a[i].c).split(' ')[0], their: `${a[i].w}x${a[i].h}`, our: `${b[i].w}x${b[i].h}` })
     }
   }
-  rows.push({ page, n: a.length, moved, worst })
+  // One line per class, worst first — the same reasoning as check-design.mjs:
+  // a count says the page is wrong, the list says where to start.
+  const byClass = new Map()
+  for (const o of off) if (!byClass.has(o.c) || byClass.get(o.c).d < o.d) byClass.set(o.c, o)
+  rows.push({ page, n: a.length, moved, off: [...byClass.values()].sort((x, y) => y.d - x.d) })
 }
 await browser.close()
 
 rows.sort((x, y) => y.moved - x.moved)
 for (const r of rows) {
-  console.log(`  ${r.page.padEnd(13)} ${String(r.moved).padStart(3)} / ${r.n} boxes differ`
-    + (r.worst ? `   worst: .${String(r.worst.c).split(' ')[0]} ${r.worst.their} → ${r.worst.our}` : ''))
+  console.log(`  ${r.page.padEnd(13)} ${String(r.moved).padStart(3)} / ${r.n} boxes differ`)
+  if (PAGES.length <= 4) {
+    for (const o of r.off.slice(0, 12)) {
+      console.log(`      .${o.c.padEnd(14)} design ${o.their.padEnd(11)} ours ${o.our}`)
+    }
+  }
 }
