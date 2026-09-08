@@ -40,6 +40,8 @@ export default function ExportPage() {
   const [count, setCount] = useState<number | null>(null)
   const [bill, setBill] = useState<Bill | null>(null)
   const [counting, setCounting] = useState(false)
+  /** Today, for the archive's folder name — the design names it by date. */
+  const ymd = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
     void (async () => {
@@ -190,6 +192,46 @@ export default function ExportPage() {
             </div>
           </div>
         </div>
+
+        {/* ── What is in it ─────────────────────────────────────────────
+            `takeout.html`'s `.tree`. The shape of what he is about to
+            download, before he downloads it — the counts are the real ones
+            for the selection above, so the tree changes when the selection
+            does. Nothing here is a promise the export does not keep: the
+            two files below the buttons are the two the API actually
+            writes. */}
+        {count !== null && count > 0 && (
+          <div className="tree">
+            <div><b>neolog-{ymd}/</b></div>
+            <div className="d1">
+              <b>log.md</b>
+              <i>
+                {count.toLocaleString('en-GB')} {count === 1 ? 'entry' : 'entries'} ·
+                Markdown, in order · every line carries who wrote it
+              </i>
+            </div>
+            <div className="d2">
+              {chosen ? `${chosen.name} only` : 'the whole log'}
+              <i>
+                {from || to
+                  ? `${from || 'the beginning'} to ${to || 'today'}`
+                  : 'no range — everything the log holds'}
+              </i>
+            </div>
+            <div className="d1">
+              <b>manifest.json</b>
+              <i>
+                the same entries as data · both dates, the author, and the
+                precision of a date the log had to guess
+              </i>
+            </div>
+            <div className="d2">
+              an approximate date stays approximate
+              <i>marked as a guess, never rounded into a day it did not have</i>
+            </div>
+          </div>
+        )}
+
         {/* The second promise: what it costs to keep. */}
         {bill && (
           <>

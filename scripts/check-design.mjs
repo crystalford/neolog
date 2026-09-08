@@ -49,7 +49,7 @@ const PAGES = [
   // takeout.html — "everything out, and the bill" — is this page.
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
   // from the log"): what the Markdown looks like, not a route.
-  ['takeout',    'src/app/(app)/export/page.tsx',       9],
+  ['takeout',    'src/app/(app)/export/page.tsx',       6],
   ['dossier',    'src/app/(app)/facts/page.tsx',         5],
   // Its last five are .was (the struck previous wording of a changed
   // claim) and .eg (an example of a machine rephrasing a line) — both need
