@@ -1076,6 +1076,9 @@ Everything the generic rule sets and the design does not mention survives.
 | `.bar` | the feed's filter toolbar | `/triage`'s 3px progress **meter** | a 31px flex container |
 | `.card` | an old-system card, 18/20 padding | `/triage`'s card, no padding | the card's interior 40px narrower |
 | `.en` / `.en .x` | the shared `LogRow` | `/page/[id]`'s plainer row | rows 24px wider, three times the height |
+| `.en` | the same, on `/public` | `public-log.css`'s row | every public row 24px wider |
+| `.sh` | `padding:30px 0 10px` | `/facts`'s mono section head | a 30px heading rendering at 78px |
+| `.msg` | the earlier chat bubble, `max-width:82%` | `/messages`'s two-column row | every message 100px narrow, 40px tall |
 
 The repo already knew the shape — `.turn` vs `.leg` on the walk is recorded
 above — but knowing it did not prevent four more, because **nothing looks at
@@ -1088,8 +1091,27 @@ generic rule SETS, not only the properties the design names.** `display`,
 comment beside each fix in `globals.css` says which generic rule it is
 undoing.
 
-`check-design-render.mjs` finds them in seconds. `/triage` and `/page/[id]`
-now render **identically** to the design; `/walk` went 18 boxes to 7.
+`check-design-render.mjs` finds them in seconds. **Sixteen of the 22 product
+surfaces now render identically to the design** — `/`(feed rows), `/triage`,
+`/page/[id]`, `/public`, `/messages`, `/pages`, `/search`, `/month`,
+`/onthisday`, `/clear`, `/export`, `/glossary`, `/numbers`, `/screenshots`,
+`/ways-in` and `/facts` at 2. `/walk` went 18 boxes to 7.
+
+⚠️ **The checker measures the 22 surfaces, read from `check-design.mjs` so
+there is one list.** Pointing it at all 74 design pages buries the real
+findings: the other 52 are entry examples, maps of the package, pages
+declined with a reason, pages below the drafting fence and futures. Our
+stylesheet does not style them and should not, so they each reported 50 to
+240 boxes wrong.
+
+Two things it has to get right to be believed, both learned by getting them
+wrong first. **Where the scope class goes** — most pages take
+`.logpage.pg-<page>` on `.wrap`, but `now.html` has no `.wrap` and `/now`
+renders `.nowpage` as its root, so that page is wrapped whole; matching no
+rule reports every box at the full viewport, a page that looks
+catastrophically broken and is not. And **matching by class and ordinal
+rather than by index** — the injected wrapper is one element on our side
+only, and by-index comparison shifted everything after it.
 
 **Every detail page answers four questions** — the work itself; where it came
 from; where it sits; what it became. On a recording that is: the video, the

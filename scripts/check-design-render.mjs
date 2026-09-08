@@ -72,10 +72,47 @@ const REPO = '/home/user/neolog'
 const ours = readFileSync(`${REPO}/src/app/globals.css`, 'utf8')
 let PAGES = process.argv.slice(2)
 if (!PAGES.length) {
-  PAGES = readdirSync(`${REPO}/design/markup`)
-    .filter(f => f.endsWith('.html'))
-    .map(f => f.replace(/\.html$/, ''))
-    .filter(p => { try { readFileSync(`${REPO}/design/css/${p}.css`); return true } catch { return false } })
+  // ⚠️ The 22 pages that are PRODUCT SURFACES, read from `check-design.mjs`
+  // so there is one list and it cannot drift.
+  //
+  // Globbing `design/markup` instead measures all 74, and the other 52 are
+  // entry examples (`image`, `question`, `held`), maps of the package
+  // (`index`, `portal`), pages declined with a reason (`elsewhere`, `repo`),
+  // pages below the drafting fence (`thinkit`, `sayit`), and futures
+  // (`log-2028`, `public-log-2029`). Our stylesheet does not style them, and
+  // it should not — so they reported 50 to 240 boxes wrong each and buried
+  // the handful of real findings under noise. A checker nobody can read is a
+  // checker nobody runs.
+  const list = readFileSync(`${REPO}/scripts/check-design.mjs`, 'utf8')
+  const body = /const PAGES = \[([\s\S]*?)\n\]/.exec(list)?.[1] ?? ''
+  PAGES = [...new Set([...body.matchAll(/\[\s*'([a-z0-9-]+)'/g)].map(m => m[1]))]
+}
+
+/**
+ * The wrapper class a page's rules are scoped under, where it is not the
+ * usual `.logpage.pg-<page>`. `/now` is the intake with nothing else on the
+ * screen and carries its own `.nowpage` scope, so measuring it as a logpage
+ * matched no rule at all and reported every box at the full 1280 viewport —
+ * a page that looks catastrophically broken and is not.
+ */
+const SCOPE = { now: 'nowpage' }
+
+/**
+ * Put our scope class where the page's rules expect it.
+ *
+ * Most design pages hang their content off `.wrap`, and our equivalent adds
+ * `.logpage.pg-<page>` to that element — so the class goes on `.wrap`. A page
+ * with no `.wrap` at all (`now.html` opens straight into `.atm`) gets the
+ * whole body wrapped instead, because our `/now` renders `.nowpage` as its
+ * root element. Getting this wrong matches no rule and reports every box at
+ * the full viewport width: a page that looks catastrophically broken and is
+ * not.
+ */
+function scoped(body, page) {
+  const cls = SCOPE[page] ?? `logpage pg-${page}`
+  return body.includes('class="wrap"')
+    ? body.replace('class="wrap"', `class="wrap ${cls}"`)
+    : `<div class="${cls}">${body}</div>`
 }
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
@@ -100,7 +137,7 @@ for (const page of PAGES) {
     await p.route('**://**', r => (/^(file|data|about)/.test(r.request().url()) ? r.continue() : r.abort()))
     await p.setContent(
       `<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><style>${css}</style></head>`
-      + `<body>${scope ? body.replace('class="wrap"', `class="wrap logpage pg-${page}"`) : body}</body></html>`,
+      + `<body>${scope ? scoped(body, page) : body}</body></html>`,
       { waitUntil: 'load' },
     )
     const out = await p.evaluate(() => {
@@ -122,20 +159,37 @@ for (const page of PAGES) {
   const a = await measure(theirs, false)
   const b = await measure(ours, true)
   // Compare element-by-element in document order — same markup, same order.
+  // ⚠️ Match by (class, nth-of-that-class), NOT by index. The scope class has
+  // to go somewhere, and on a page with no `.wrap` that means an extra
+  // wrapper element on our side only — which shifts every index after it and
+  // reports the whole page as broken. Indexing by class also survives an
+  // element that renders in one pass and not the other.
+  const key = r => `${String(r.c).trim()}#`
+  const seq = list => {
+    const n = new Map(), out = new Map()
+    for (const r of list) {
+      const k = key(r); const i = (n.get(k) ?? 0); n.set(k, i + 1)
+      out.set(`${k}${i}`, r)
+    }
+    return out
+  }
+  const A = seq(a), B = seq(b)
   let moved = 0
   const off = []
-  for (let i = 0; i < Math.min(a.length, b.length); i++) {
-    const d = Math.abs(a[i].w - b[i].w) + Math.abs(a[i].h - b[i].h)
+  for (const [k, ra] of A) {
+    const rb = B.get(k)
+    if (!rb) continue
+    const d = Math.abs(ra.w - rb.w) + Math.abs(ra.h - rb.h)
     if (d > 24) {
       moved++
-      off.push({ d, c: String(a[i].c).split(' ')[0], their: `${a[i].w}x${a[i].h}`, our: `${b[i].w}x${b[i].h}` })
+      off.push({ d, c: String(ra.c).split(' ')[0], their: `${ra.w}x${ra.h}`, our: `${rb.w}x${rb.h}` })
     }
   }
   // One line per class, worst first — the same reasoning as check-design.mjs:
   // a count says the page is wrong, the list says where to start.
   const byClass = new Map()
   for (const o of off) if (!byClass.has(o.c) || byClass.get(o.c).d < o.d) byClass.set(o.c, o)
-  rows.push({ page, n: a.length, moved, off: [...byClass.values()].sort((x, y) => y.d - x.d) })
+  rows.push({ page, n: A.size, moved, off: [...byClass.values()].sort((x, y) => y.d - x.d) })
 }
 await browser.close()
 
