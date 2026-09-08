@@ -41,7 +41,7 @@ interface Env {
 }
 
 const STUCK_MIN_MINUTES = 5
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'uploaded']
+const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading', 'uploaded']
 
 // Rough per-vlog costs. Numbers mirror the costs documented in src/lib/llm.ts
 // and the FFmpeg container billing assumption (cold-start + ~60s compute).

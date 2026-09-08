@@ -61,7 +61,7 @@ const MAX_LIST_RESOLVE = 1000
 
 // In-flight grace: if pipeline_status is one of these AND updated_at is
 // within this window, treat the vlog as already running and skip.
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting']
+const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading']
 const IN_FLIGHT_WINDOW_MIN = 15
 
 function noStore(body: unknown, init: number | ResponseInit = 200): NextResponse {
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
           const all = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
             `SELECT id,
-                    CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
+                    CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting','reading')
                               AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                          THEN 1 ELSE 0 END AS in_flight,
                     CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
         // right DO entry point per vlog. ORDER BY id keeps the list
         // stable across the dry-run/dispatch handoff.
         const inFlightWhere = skipInFlight
-          ? `AND NOT (v.pipeline_status IN ('transcoding','transcribing','extracting')
+          ? `AND NOT (v.pipeline_status IN ('transcoding','transcribing','extracting','reading')
                 AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes'))`
           : ''
         rows = await findMany<{ id: string; has_transcript: number }>(
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
               db,
               `SELECT COUNT(*) AS n FROM vlogs
                 WHERE operator_id = ? AND deleted_at IS NULL
-                  AND pipeline_status IN ('transcoding','transcribing','extracting')
+                  AND pipeline_status IN ('transcoding','transcribing','extracting','reading')
                   AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')`,
               operator.id,
             )
@@ -264,7 +264,7 @@ export async function POST(req: NextRequest) {
     owned = await findMany<{ id: string; pipeline_status: string; in_flight: number; has_transcript: number }>(
       db,
       `SELECT id, pipeline_status,
-              CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
+              CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting','reading')
                         AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                    THEN 1 ELSE 0 END AS in_flight,
               CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20

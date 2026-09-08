@@ -1,21 +1,20 @@
 /**
- * Shared dispatch primitive for kicking the post-upload pipeline for a
- * single vlog. Both the per-vlog `/api/v2/vlogs/[id]/process` route and
- * the bulk `/api/v2/admin/reprocess-vlogs` route call this — keeps the
- * dispatch path identical so a re-extract works the same whether the
- * operator triggers one vlog from the detail page or 200 from the bulk
- * action.
+ * Kick the post-upload pipeline for one recording. Both
+ * `/api/v2/vlogs/[id]/process` and the bulk `/api/v2/admin/reprocess-vlogs`
+ * call this, so re-running one recording and re-running two hundred take the
+ * identical path.
  *
- * Two backends:
- *   - PIPELINE (DO) `/reextract/:id` — skips audio_extract + transcribe
- *     if their artifacts already exist on R2 / in D1; runs the unified
- *     extract step against the stored transcript.
- *   - PROCESS_UPLOAD (Workflow) `/dispatch` — legacy fallback, supports
- *     per-pass subset via `passes`. Used when caller asks for legacy
- *     mode explicitly (e.g. re-running just `threads`).
+ * Two backends: the PIPELINE Durable Object (which skips audio extraction and
+ * transcription when their artifacts already exist) and the PROCESS_UPLOAD
+ * Workflow (the full run from the file).
  *
- * The function is fire-and-forget per vlog: it returns once the dispatch
- * call returns OK; the actual run happens asynchronously in the DO/Workflow.
+ * Fire-and-forget: it returns once the dispatch call returns OK; the run
+ * happens asynchronously.
+ *
+ * `mode` and `passes` used to choose an extraction tier and a subset of the
+ * four passes. There are no passes now — the last step reads the transcript
+ * with no model in it — so they survive only as the shape the DO and the
+ * Workflow still accept, and neither changes what is produced.
  */
 
 import { run } from './d1'
@@ -31,8 +30,9 @@ export interface DispatchEnv {
 export interface DispatchInput {
   vlog_id: string
   operator_id: string
-  mode: 'cheap' | 'premium'
-  passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]
+  /** Vestigial: the pipeline has no tiers left. Kept for the DO's payload. */
+  mode?: 'cheap' | 'premium'
+  passes?: string[]
   reset?: boolean
   // When true, dispatch /start (full pipeline from audio_extract). When
   // false/undefined, dispatch /reextract (jumps straight to the LLM

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
             updated_at = CURRENT_TIMESTAMP
       WHERE operator_id = ?
         AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing','archived','uploaded')
+        AND pipeline_status IN ('transcoding','processing','extracting','reading','transcribing','archived','uploaded')
         AND LENGTH(COALESCE(transcript_text, '')) > 0
         AND EXISTS (SELECT 1 FROM extraction_runs r WHERE r.vlog_id = vlogs.id AND r.is_active = 1)`,
   ).bind(operator.id).run()
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     db,
     `SELECT COUNT(*) AS c FROM vlogs
       WHERE operator_id = ? AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing')
+        AND pipeline_status IN ('transcoding','processing','extracting','reading','transcribing')
         AND LENGTH(COALESCE(transcript_text, '')) > 0`,
     operator.id,
   )

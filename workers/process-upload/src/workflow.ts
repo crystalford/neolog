@@ -22,7 +22,8 @@
  *   6. transcribe           — Workers AI Whisper-large-v3-turbo, writes plain
  *                              text to vlogs.transcript_text and per-word rows
  *                              to transcript_words
- *   7. fan-out extraction   — analytical / creative_mode / clip_candidate
+ *   7. read onto the log    — cut the transcript at his own pauses and
+ *                              write the entries. No model in this step.
  *                              passes via Claude. Implemented in a separate
  *                              workflow that this one dispatches at the end.
  *                              (Placeholder for now.)
@@ -34,13 +35,6 @@
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import type { D1Database, R2Bucket, Ai, Fetcher } from '@cloudflare/workers-types'
-import {
-  extractThreads,
-  extractClipCandidates,
-  extractCreativeElements,
-  extractEntities,
-} from '../../../src/lib/extract'
-import { runExtraction, type ExtractionMode } from '../../../src/lib/extract-unified'
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
@@ -75,7 +69,6 @@ interface Env {
 interface Params {
   vlog_id: string
   operator_id: string
-  tier?: 'free' | 'premium' | 'max'  // extraction provider tier — defaults to 'free' (Workers AI Llama)
   passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]  // when set, re-run only these passes
   thumbnail_only?: boolean  // when true, runs transcode+thumbnail only, skips transcribe + all extractions
   extract_thumb_only?: boolean  // when true, JUST extracts a thumbnail. Skips transcode for H.264 sources (1-2 sec). Falls through to locked transcode-then-thumb for HEVC. No transcribe, no extractions.
@@ -86,7 +79,6 @@ const MP4_EPOCH_OFFSET_SEC = 2082844800 // seconds between 1904-01-01 and 1970-0
 export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const { vlog_id, operator_id } = event.payload
-    const tier: 'free' | 'premium' | 'max' = event.payload.tier ?? 'free'
     const thumbnailOnly = event.payload.thumbnail_only === true
     const passesToRun = new Set(event.payload.passes ?? ['threads', 'clip_candidates', 'creative_elements', 'entities'])
     // Re-extract dispatch (from /api/v2/vlogs/[id]/process) explicitly sets
@@ -677,292 +669,43 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     }
 
     // ── Step 7: mark extracting ──────────────────────────────────────────────
-    await step.do('mark-extracting', async () => reportStatus('extracting'))
+    // ── Read it onto the log ────────────────────────────────────────────────
+    //
+    // This step used to be the extraction fan-out: one LLM call producing
+    // threads, clips, creative_elements and entities, escalating to a bigger
+    // model when its own grounding check failed, writing an `extraction_runs`
+    // row and an AI-written title and summary onto the recording.
+    //
+    // All of it is gone. The operator, 8 Sep: "the problem with the old
+    // system was i didn't trust its output anyway."
+    //
+    // What replaces it calls no model. `readRecording` reads the word
+    // timestamps Whisper just wrote and cuts them at his own pauses — a
+    // 2.5-second gap between two words is a fact about the recording, not a
+    // judgement about his thoughts. Every entry is a contiguous run of the
+    // transcript at the second he said it.
+    //
+    // It is softStep-wrapped like everything else: a recording whose reader
+    // fails still keeps its file, its thumbnail, its date and its transcript,
+    // and can be read again from its own page.
+    await step.do('mark-reading', async () => reportStatus('reading'))
 
-    // Reload the transcript text — it was written in the transcribe step but
-    // we need a fresh read since the Workflow may resume here from a retry.
-    const transcriptRow = await step.do('reload-transcript', async () => {
-      const row = await this.env.DB.prepare(
-        'SELECT transcript_text FROM vlogs WHERE id = ?',
-      ).bind(vlog_id).first<{ transcript_text: string | null }>()
-      return row
-    })
-
-    if (transcriptRow?.transcript_text && transcriptRow.transcript_text.length > 20) {
-      // ── Unified extraction ────────────────────────────────────────────────
-      // Single LLM call returns threads + clips + creative_elements + entities
-      // as one JSON response. Validator runs against transcript with 4-gram
-      // grounding; if cheap-tier fails >15% of items, auto-escalates to
-      // Sonnet 4.6. Provenance recorded in extraction_runs.is_active=1 row.
-      //
-      // Note: legacy extract* functions stay in src/lib/extract.ts as a
-      // fallback path until this proves out. Toggle by setting
-      // `passes=[...]` to a non-empty subset to run the legacy 4-pass code.
-      const legacyPath = (passesToRun.size > 0 && passesToRun.size < 4)
-      const extractCtx = {
-        vlog_id,
-        operator_id,
-        transcript_text: transcriptRow.transcript_text,
-        tier,
-      }
-      if (legacyPath) {
-        if (passesToRun.has('threads')) {
-          await softStep('extract-threads', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
-            return await extractThreads(this.env, extractCtx)
-          })
+    await softStep(
+      'read-onto-log',
+      { retries: { limit: 2, delay: '10 seconds' }, timeout: '5 minutes' },
+      async () => {
+        const { readRecording } = await import('../../../src/lib/read-recording')
+        const r = await readRecording(this.env.DB as any, operator_id, vlog_id)
+        // Named in the outcome rather than swallowed: a recording with no
+        // word timings is skipped, never dated by guess.
+        return {
+          passages: r.passages,
+          entries_written: r.entries_written,
+          no_word_timings: r.no_words,
         }
-        if (passesToRun.has('clip_candidates')) {
-          await softStep('extract-clip-candidates', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
-            return await extractClipCandidates(this.env, extractCtx)
-          })
-        }
-        if (passesToRun.has('creative_elements')) {
-          await softStep('extract-creative-elements', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
-            return await extractCreativeElements(this.env, extractCtx)
-          })
-        }
-        if (passesToRun.has('entities')) {
-          await softStep('extract-entities', { retries: { limit: 2, delay: '30 seconds' }, timeout: '5 minutes' }, async () => {
-            return await extractEntities(this.env, extractCtx)
-          })
-        }
-      } else {
-        const mode: ExtractionMode = tier === 'max' || tier === 'premium' ? 'premium' : 'auto'
-        await softStep('extract', { retries: { limit: 1, delay: '30 seconds' }, timeout: '8 minutes' }, async () => {
-          const progress = async (sub: string, payload: Record<string, unknown>) => {
-            const state = (payload.state as string | undefined) === 'ok' ? 'ok'
-              : (payload.state as string | undefined) === 'error' ? 'failed'
-              : 'started'
-            await insertPipelineEvent('extract', state, 0, null, sub, payload)
-          }
-          const run = await runExtraction(this.env, transcriptRow.transcript_text!, mode, progress)
-          const run_id = ulid()
-          const r2_key = `${operator_id}/extractions/${vlog_id}/${run_id}.json`
-          // Best-effort: write the full payload to R2 as cold storage
-          try {
-            await putObject(this.env, r2_key, JSON.stringify(run.payload), {
-              httpMetadata: { contentType: 'application/json' },
-            })
-          } catch (err: any) {
-            console.warn(`[extract] R2 write failed: ${err?.message || err}`)
-          }
-          // Mark older active runs inactive
-          await this.env.DB.prepare(
-            `UPDATE extraction_runs SET is_active = 0 WHERE vlog_id = ? AND is_active = 1`,
-          ).bind(vlog_id).run()
-          // Insert the new run row
-          await this.env.DB.prepare(
-            `INSERT INTO extraction_runs
-               (id, vlog_id, operator_id, model, escalated_from, mode, r2_key,
-                total_items, invalid_items, fail_rate, is_active, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-          ).bind(
-            run_id, vlog_id, operator_id, run.model, run.escalated_from ?? null, mode, r2_key,
-            run.total_items, run.invalid_items, run.fail_rate, Date.now(),
-          ).run()
+      },
+    )
 
-          // Persist the AI-derived title + 2-3 sentence summary so the
-          // vlog hero and Timeline cards stop showing the meaningless
-          // DJI filename. Both fields are nullable; we COALESCE so a
-          // missing field doesn't overwrite an existing value.
-          const newTitle = ((run.payload as any).title || '').trim().slice(0, 120) || null
-          const newSummary = (run.payload.summary || '').trim()
-          if (newTitle || (newSummary && newSummary.length > 10)) {
-            try {
-              await this.env.DB.prepare(
-                `UPDATE vlogs SET
-                   title   = COALESCE(?, title),
-                   summary = COALESCE(?, summary),
-                   updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`,
-              ).bind(
-                newTitle,
-                newSummary.length > 10 ? newSummary : null,
-                vlog_id,
-              ).run()
-            } catch (err: any) {
-              console.warn('[extract] vlogs title/summary write failed:', err?.message || err)
-            }
-          }
-
-          // Flatten payload into existing tables. Old rows for this vlog
-          // remain (with run_id NULL or pointing to an older run); the UI
-          // reads run_id = active run to filter. Cheaper than re-deleting.
-          //
-          // Each kind runs as its own .batch so one bad shape per kind
-          // (e.g. an unmigrated NOT NULL column) reports loudly instead of
-          // tanking the whole run silently. persist_warnings is emitted
-          // when any kind under-persists, so LivePipeline shows the gap.
-          const promptVersion = 'unified-v1'
-          const persisted: Record<string, number> = { threads: 0, clips: 0, creative: 0, entities: 0 }
-          const expected: Record<string, number> = {
-            threads: run.payload.threads.length,
-            clips: run.payload.clips.length,
-            creative: run.payload.creative_elements.length,
-            entities: run.payload.entities.length,
-          }
-
-          const runBatch = async (kind: string, stmts: any[]) => {
-            if (stmts.length === 0) return
-            const CHUNK = 50
-            for (let i = 0; i < stmts.length; i += CHUNK) {
-              const slice = stmts.slice(i, i + CHUNK)
-              try {
-                await this.env.DB.batch(slice)
-                persisted[kind] += slice.length
-              } catch (err: any) {
-                console.warn(`[extract] ${kind} batch failed at i=${i}: ${err?.message || err}`)
-                for (const stmt of slice) {
-                  try { await stmt.run(); persisted[kind] += 1 } catch (innerErr: any) {
-                    console.warn(`[extract] ${kind} single insert failed: ${innerErr?.message || innerErr}`)
-                  }
-                }
-              }
-            }
-          }
-
-          await runBatch('threads', run.payload.threads.map(t => this.env.DB.prepare(
-            `INSERT INTO threads
-               (id, operator_id, vlog_id, run_id, topic, take, key_quotes, register, validated, extraction_prompt_version, extracted_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          ).bind(
-            ulid(), operator_id, vlog_id, run_id,
-            String(t.topic || '').slice(0, 200),
-            String(t.take || ''),
-            JSON.stringify(t.key_quotes ?? []),
-            String(t.register || 'observation'),
-            t.validated ?? 1,
-            promptVersion,
-          )))
-
-          await runBatch('clips', run.payload.clips.map(c => {
-            const startSec = typeof (c as any).start_time_sec === 'number'
-              ? (c as any).start_time_sec
-              : (c.start_time_ms != null ? c.start_time_ms / 1000 : 0)
-            const endSec = typeof (c as any).end_time_sec === 'number'
-              ? (c as any).end_time_sec
-              : (c.end_time_ms != null ? c.end_time_ms / 1000 : 0)
-            return this.env.DB.prepare(
-              `INSERT INTO clip_candidates
-                 (id, operator_id, vlog_id, run_id, start_time, end_time, headline, quote, why_clippable, validated, status, extraction_prompt_version, extracted_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP)`,
-            ).bind(
-              ulid(), operator_id, vlog_id, run_id,
-              startSec, endSec,
-              String(c.headline || '').slice(0, 200),
-              String(c.quote || ''),
-              typeof c.why_clippable === 'string' ? c.why_clippable : '',
-              c.validated ?? 1,
-              promptVersion,
-            )
-          }))
-
-          await runBatch('creative', run.payload.creative_elements.map(e => this.env.DB.prepare(
-            `INSERT INTO creative_elements
-               (id, operator_id, vlog_id, run_id, element_type, content, validated, extraction_prompt_version, extracted_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-          ).bind(
-            ulid(), operator_id, vlog_id, run_id,
-            String(e.element_type || 'theme'),
-            String(e.content || ''),
-            e.validated ?? 1,
-            promptVersion,
-          )))
-
-          const entityIds = run.payload.entities.map(() => ulid())
-          await runBatch('entities', run.payload.entities.map((ent, i) => this.env.DB.prepare(
-            `INSERT INTO entities
-               (id, operator_id, vlog_id, run_id, name, entity_type, mention_count, first_mentioned_at, last_mentioned_at)
-             VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-          ).bind(
-            entityIds[i], operator_id, vlog_id, run_id,
-            String(ent.name || '').slice(0, 200),
-            String(ent.entity_type || 'concept'),
-          )))
-
-          // entity_mentions with source_kind='vlog' — verbatim sentences
-          // from the transcript where the operator references this entity.
-          const mentionStmts: any[] = []
-          for (let i = 0; i < run.payload.entities.length; i++) {
-            const ent: any = run.payload.entities[i]
-            const quotes = Array.isArray(ent.mention_quotes) ? ent.mention_quotes : []
-            for (const raw of quotes) {
-              const q = typeof raw === 'string' ? raw.trim().slice(0, 800) : ''
-              if (!q) continue
-              mentionStmts.push(this.env.DB.prepare(
-                `INSERT INTO entity_mentions (id, entity_id, operator_id, source_kind, source_id, mention_text)
-                 VALUES (?, ?, ?, 'vlog', ?, ?)`,
-              ).bind(ulid(), entityIds[i], operator_id, vlog_id, q))
-            }
-          }
-          if (mentionStmts.length > 0) {
-            try { await this.env.DB.batch(mentionStmts) }
-            catch (err: any) {
-              console.warn('[extract] entity_mentions(vlog) write failed:', err?.message || err)
-            }
-          }
-
-          const warnings: Record<string, { expected: number; persisted: number }> = {}
-          for (const kind of Object.keys(expected)) {
-            if (persisted[kind] < expected[kind]) {
-              warnings[kind] = { expected: expected[kind], persisted: persisted[kind] }
-            }
-          }
-          if (Object.keys(warnings).length > 0) {
-            await progress('persist_warnings', { state: 'warn', run_id, warnings })
-          }
-
-          await progress('llm_persist', {
-            state: 'ok', run_id,
-            threads: run.payload.threads.length,
-            clips: run.payload.clips.length,
-            creative_elements: run.payload.creative_elements.length,
-            entities: run.payload.entities.length,
-            model: run.model,
-            escalated_from: run.escalated_from ?? null,
-            fail_rate: run.fail_rate,
-          })
-
-          try {
-            const surfaceResult = await surfaceFromRun(
-              { db: this.env.DB, vlog_id, operator_id, run_id },
-              run.payload.threads as any,
-            )
-            await progress('surface', {
-              state: 'ok',
-              inserted: surfaceResult.inserted,
-              errors: surfaceResult.errors.length,
-            })
-          } catch (err: any) {
-            console.warn(`[surface] failed for run ${run_id}: ${err?.message || err}`)
-          }
-
-          return { run_id, ...run }
-        })
-      }
-    } else {
-      console.log(`[process-upload] no transcript text for vlog ${vlog_id} — skipping extraction`)
-    }
-
-    // ── Auto-publish flag ────────────────────────────────────────────────────
-    // If the operator opted this vlog in to auto-publish (vlogs.auto_publish_clips=1),
-    // flag it pending so refresh-drafts (cron) or the next home-page visit
-    // (via ctx.waitUntil) picks it up and runs the auto-promote pipeline:
-    // slice top clips → caption → fire fanout webhook → social posts go out.
-    // We don't run the auto-promote logic here because it lives in the Pages
-    // app (src/lib/auto-promote.ts) and the worker can't import it.
-    await softStep('flag-auto-publish', { retries: { limit: 2, delay: '5 seconds' }, timeout: '15 seconds' }, async () => {
-      const row = await env.DB.prepare(
-        `SELECT auto_publish_clips FROM vlogs WHERE id = ? AND operator_id = ?`,
-      ).bind(vlog_id, operator_id).first<{ auto_publish_clips: number | null }>()
-      if (row?.auto_publish_clips === 1) {
-        await env.DB.prepare(
-          `UPDATE vlogs SET auto_publish_pending = 1, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ? AND operator_id = ?`,
-        ).bind(vlog_id, operator_id).run()
-      }
-      return { flagged: row?.auto_publish_clips === 1 }
-    })
 
     // ── Final: mark complete ─────────────────────────────────────────────────
     await step.do('mark-complete', async () => reportStatus('complete'))

@@ -85,7 +85,12 @@ const SQL_START = /\b(SELECT|INSERT\s+INTO|INSERT\s+OR\s+IGNORE\s+INTO|UPDATE|DE
 const problems = []
 let checked = 0
 
-for (const file of walk(join(ROOT, 'src'))) {
+// `workers/` too, and not as an afterthought: the workers write to D1 the
+// same way the app does, and on 8 Sep every remaining reference to a dropped
+// table was in `workers/` — the app was clean and the checker said so,
+// because it had only ever looked at `src/`.
+const ROOTS = [join(ROOT, 'src'), join(ROOT, 'workers')]
+for (const file of ROOTS.flatMap(r => { try { return walk(r) } catch { return [] } })) {
   const src = readFileSync(file, 'utf8')
   // Every backtick template that looks like SQL.
   for (const m of src.matchAll(/`([^`]*)`/g)) {
@@ -125,7 +130,7 @@ for (const file of walk(join(ROOT, 'src'))) {
 }
 
 console.log(`Schema: ${tables.size} tables.`)
-console.log(`Checked ${checked} qualified column references in src/.`)
+console.log(`Checked ${checked} qualified column references in src/ and workers/.`)
 
 if (problems.length) {
   console.error(`\n${problems.length} unknown column${problems.length === 1 ? '' : 's'}:\n`)

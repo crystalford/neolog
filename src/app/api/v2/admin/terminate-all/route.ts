@@ -48,7 +48,7 @@ interface Env {
 }
 
 const WORKFLOW_NAME = 'process-upload'
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'uploaded']
+const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading', 'uploaded']
 const PAGE_SIZE = 100  // Cloudflare API pagination
 const MAX_PAGES = 20   // hard cap so we never spin forever
 

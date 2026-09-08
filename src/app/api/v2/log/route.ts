@@ -53,6 +53,10 @@ function pipelineLine(status: string | null, error: string | null): string | nul
     case 'queued':       return 'Just arrived. Nothing read yet.'
     case 'transcoding':  return 'Being converted so it will play here.'
     case 'transcribing': return 'Being transcribed. The words are not searchable yet.'
+    // `reading` is the step; `extracting` is what it was called before the
+    // extraction engine was removed, kept so rows written by the old
+    // pipeline still say something true rather than falling through.
+    case 'reading':
     case 'extracting':   return 'Transcribed. Being read for what was said in it.'
     case 'failed':       return 'The log could not finish reading this.'
     case 'archived':     return 'Kept, not read — you asked for it that way.'
