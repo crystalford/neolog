@@ -767,6 +767,12 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   background: linear-gradient(180deg, var(--bg) 78%, transparent);
   border-bottom: 1px solid var(--line);
 }
+/* ⚠️ `flex-wrap:wrap` is ours; `log.css` has no wrap on `.f`. Recorded
+   rather than silent: the eight filters measure 754px and the column is 708,
+   so on one row they spill past the frame — and "one frame everywhere" is
+   rule 4. The design gets away with it because its own page is a mock-up
+   with fewer filters shown. Wrapping costs 37px of toolbar height and keeps
+   every control inside the column. */
 .logpage .bar .f { display: flex; gap: 20px; flex-wrap: wrap; }
 .logpage .bar .f button {
   font-size: 13.5px; color: var(--fg-3); padding: 0 0 6px;
@@ -903,6 +909,11 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .rc .i em { font-style: normal; display: block; font-size: 11.5px; color: var(--fg-4); margin-top: 4px; }
 .logpage .rc .empty { padding: 14px; font-size: 12.5px; color: var(--fg-4); text-align: center; }
 /* The written-down bar: the door to thin years. */
+/* The action row under an open question in the rail — `log.css`'s
+   `.rc .i .a`. We had no rule for it, so it laid out inline with no space
+   above and the card came up 40px short. */
+.logpage .rc .i .a { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+
 .logpage .rc .yrs { display: flex; align-items: flex-end; gap: 2px; height: 36px; padding: 12px 14px 4px; }
 .logpage .rc .yrs i { flex: 1; min-height: 2px; display: block; border-radius: 1px 1px 0 0; cursor: pointer; }
 .logpage .rc .yrs i:hover { filter: brightness(1.6); }
