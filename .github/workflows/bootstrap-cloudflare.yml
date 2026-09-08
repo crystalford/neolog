@@ -305,51 +305,14 @@ jobs:
             echo "✅ Access application for neolog.ai already exists ($existing)."
           fi
 
-      - name: Configure Cloudflare Access — public bypass for /podcast.xml + /podcast/*
-        run: |
-          set -e
-          # Podcast feed + audio redirect are PUBLIC. Apple Podcasts, Overcast,
-          # Spotify etc. don't carry session cookies — they need raw GET access.
-          # We create a path-specific Access app per public path with a bypass
-          # policy; the broader "Operator only" app keeps gating the rest of
-          # the site.
-          create_bypass_app() {
-            local name="$1"
-            local domain_path="$2"
-            local existing
-            existing=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps" \
-              | jq -r --arg d "$domain_path" '.result[] | select(.domain == $d) | .id')
-            if [ -n "$existing" ]; then
-              echo "✅ Bypass Access app for $domain_path already exists ($existing)."
-              return
-            fi
-            echo "Creating bypass Access app for $domain_path..."
-            local app_response
-            app_response=$(curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"name\": \"$name\",
-                \"domain\": \"$domain_path\",
-                \"type\": \"self_hosted\",
-                \"session_duration\": \"0s\"
-              }" \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps")
-            echo "$app_response" | jq .
-            local app_id
-            app_id=$(echo "$app_response" | jq -r '.result.id')
-            curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d '{
-                "name": "Public bypass",
-                "decision": "bypass",
-                "include": [{ "everyone": {} }]
-              }' \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/access/apps/$app_id/policies" \
-              | jq .
-          }
-          create_bypass_app "Podcast feed (public)" "neolog.ai/podcast.xml"
-          create_bypass_app "Podcast audio (public)" "neolog.ai/podcast/audio"
+      # The podcast bypass Access apps used to be created here — /podcast.xml
+      # and /podcast/audio served without auth so a podcast client could
+      # fetch them. Both routes went with the video-essay studio on 8 Sep.
+      #
+      # Nothing is public now, on purpose. Every surface, including /public
+      # and the feeds, still needs signing in, and making one genuinely
+      # public is one bypass app the OPERATOR adds — not something a
+      # bootstrap does on his behalf while he is not looking.
 
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile || pnpm install
@@ -418,33 +381,6 @@ jobs:
           fi
           echo "Deploying neolog-healer cron worker..."
           wrangler deploy
-
-      - name: Deploy auto-publish-cron worker (workers/auto-publish-cron)
-        if: hashFiles('workers/auto-publish-cron/wrangler.toml') != ''
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          OPERATOR_ID: ${{ secrets.OPERATOR_ID }}
-        run: |
-          set -e
-          cd workers/auto-publish-cron
-          if [ -f package.json ]; then
-            npm install --no-audit --no-fund
-          fi
-          echo "Deploying neolog-auto-publish-cron worker..."
-          wrangler deploy
-          # Set the shared secret + operator id every run (idempotent).
-          # CRON_SECRET is shared with the Pages project (set in the
-          # "Wire Pages project bindings" step below).
-          if [ -n "$CRON_SECRET" ]; then
-            echo "$CRON_SECRET" | wrangler secret put CRON_SECRET
-          else
-            echo "::warning::CRON_SECRET secret not set in the repo — cron will fail until you add it"
-          fi
-          if [ -n "$OPERATOR_ID" ]; then
-            echo "$OPERATOR_ID" | wrangler secret put OPERATOR_ID
-          else
-            echo "::warning::OPERATOR_ID secret not set in the repo — cron will fail until you add it"
-          fi
 
       - name: Wire Pages project bindings (D1, R2, AI, services)
         if: hashFiles('wrangler.toml') != ''
@@ -567,12 +503,6 @@ jobs:
           fi
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
             echo "$CLOUDFLARE_API_TOKEN" | wrangler pages secret put CLOUDFLARE_API_TOKEN --project-name "$PAGES_PROJECT"
-          fi
-          # CRON_SECRET — shared with the neolog-auto-publish-cron worker so
-          # its scheduled call to /api/v2/refresh-drafts bypasses Cloudflare
-          # Access (single-operator app; harmless for the cron path).
-          if [ -n "$CRON_SECRET" ]; then
-            echo "$CRON_SECRET" | wrangler pages secret put CRON_SECRET --project-name "$PAGES_PROJECT"
           fi
 
       - name: Build + deploy Pages project

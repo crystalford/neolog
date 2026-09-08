@@ -1,3 +1,11 @@
+> **Superseded, 8 Sep 2026.** This brief says the video-essay engine "is
+> still true and still works" and describes the record as something built
+> underneath it. That is no longer the shape: on 8 Sep the engine and every
+> table it wrote into were deleted, and the log is the whole product. The
+> brief is kept because it is the record of the pivot as it was understood
+> at the time — which is the thing this product exists to preserve — but do
+> not build from it. `CLAUDE.md` is current.
+
 # Design brief — the log vision refocus
 
 *For a Claude Design session with this repo attached. Read this first —

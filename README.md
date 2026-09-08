@@ -1,100 +1,47 @@
 # neolog
 
-**An AI video-essay studio you talk into.** Three doors into making something:
+**A permanent personal record.** You put things in — typed, spoken, photos,
+files — and the log keeps them, in order, dated twice, with the way back to
+every word.
 
-- **Subjects** — concepts the system finds you keep circling in your own recordings, *named for you* (often using terms-of-art you didn't have a word for).
-- **Topics** — anything you want to make a video about. The system researches it on the open web and drafts a script in your voice.
-- **Spark** — type one thought; get a 30–60 second vertical short ready to post.
+## What it does that nothing else does
 
-Every output is written in your voice. Two layers learn you — *how you write* (cadence, register, intellectual moves) and *what you care about* (recurring fascinations, the lens you bring) — both refreshed automatically from your past vlogs. **After your first batch of recordings you can stop uploading entirely** — your existing corpus is voice training forever, and the open web supplies any new substance.
+**It never puts words in your mouth.** Every line says who wrote it. A line
+the log composed from a file's metadata is marked as the log's, always,
+including the ones that read naturally.
 
-The whole pipeline runs on Cloudflare. One bill. No third-party SaaS.
+**It reads your recordings without a model.** Four hundred vlogs become
+entries by cutting the transcript at your own pauses — a 2.5-second gap
+between two words is a fact about the recording, not a judgement about your
+thoughts. Every entry is a contiguous run of what you said, at the second you
+said it. Nothing summarises, nothing paraphrases.
 
----
+**It closes the loop on your phone.** A file is hashed in the browser before
+it leaves, hashed again once stored, and compared. Only then does anything
+say it is safe to delete locally — and the row names which check ran.
 
-## How it works
+## The shape
 
-```
-                          YOU TALK (vlogs)           OR     YOU TYPE (topics)        OR     YOU SPARK (a thought)
-                                │                                  │                                │
-                                ▼                                  ▼                                ▼
-                          Whisper transcribes              Browser Run crawls                Profile-aware concept seed
-                                │                          sources you paste or               drawn from your mind
-                                ▼                          Brave Search finds                       │
-                          Threads + entities                       │                                ▼
-                          + clip candidates                        ▼                          Short script (~30-60s)
-                                │                          Research brief                          │
-                                ▼                                  │                                │
-                    ┌─►   Librarian names the subjects ◄────────────┴─── (operator profile)        │
-                    │     you keep circling                                                         │
-                    │           │                                                                  │
-                    │           ▼                                                                  │
-                    │     Skeleton (beat structure)                                                │
-                    │     ── operator approves ──                                                   │
-                    │           │                                                                  │
-                    │           ▼                                                                  │
-                    └─► Script in your voice  ◄─── voice-shape (cadence) + operator-profile (mind) ◄┘
-                                │
-                                ▼
-                  Voiceover ── recorded OR synthesized via your cloned voice (MiniMax 2.8)
-                                │
-                                ▼
-                  AI b-roll per beat (Flux still → Wan 2.7 motion, or Grok Imagine direct + audio)
-                                │
-                                ▼
-                  FFmpeg renders to MP4 (16:9 for essays, 9:16 for shorts)
-                                │
-                                ▼
-                                Published
-```
+Two times on every entry: when it *happened* and when it was *logged*. Seven
+kinds. Burial, never deletion. Public by default, with the log holding back
+what it recognises as an identity document, a statement, a medical letter —
+and saying what it saw rather than giving an unnamed reason.
 
-## What's in the masthead
+The nav is three entries: **home · search · index**. Everything else is
+reached from the page it belongs to.
 
-Two entries. Everything else runs in the background and surfaces on the home page when the system has prepared a draft.
+## Running on
 
-| Surface | What it is |
-|---|---|
-| **Log** | The home page. Top half is the recorder + uploader (four bad-wifi-friendly modes: full / compressed / slideshow / audio-only). Bottom half is *Ready to send* — production candidates the system surfaced from your subjects (named concepts the librarian found), topics (typed subjects it researched), and quick-video seeds drawn from your operator profile. |
-| **Published** | The accumulating body of work — anything in `state='published'`. |
+Cloudflare, entirely. Pages, R2 (the recordings), D1 (the log), Workers,
+Workers AI (Whisper), Access, and FFmpeg in a Container Worker. One bill.
 
-Plus **Settings** for voice cloning, model preferences, API keys (incl. optional Brave Search), and the in-house podcast feed. The Subjects, Topics, Studio, Inbox, Chat, and About pages all still route (deep links and old bookmarks don't break) — they're reachable from the avatar dropdown or via the cards the home page lifts onto the *Ready to send* list.
+## History
 
-## Stack — all Cloudflare
+Until 8 Sep 2026 this repo was an AI video-essay studio — Subjects, Topics,
+Spark, a librarian, a production engine, voice cloning, b-roll. All of it was
+deleted, along with every table it wrote into. The operator's reason: *"the
+problem with the old system was i didn't trust its output anyway."* The
+recordings in R2 are the only thing that survived, and the log now reads them
+with no model in the path.
 
-| Layer | Service |
-|---|---|
-| Framework | Next.js 15 App Router on `@cloudflare/next-on-pages` |
-| Hosting | Cloudflare Pages |
-| Database | Cloudflare D1 (SQLite at the edge) |
-| Storage | Cloudflare R2 (videos, audio, generated images & clips, render output) |
-| Auth | Cloudflare Access (one-time PIN to operator email) |
-| Async work | Cloudflare Workflows + a Durable Object pipeline that broadcasts progress over WebSocket |
-| Video processing | Cloudflare Container Worker running FFmpeg |
-| Web research | Cloudflare Browser Run `/crawl` (markdown extraction); Brave Search API optional for auto-finding sources |
-| Hard-reasoning LLM | Workers AI `gpt-oss-120b` (with `reasoning: { effort }` dial), Llama 3.3 70B auto-fallback |
-| Extraction LLM | Workers AI Llama 3.3 70B (`free` tier default); Claude Sonnet 4.6 (`premium`/`max`, paid opt-in) |
-| Image generation | Workers AI Flux 1 Schnell |
-| Image-to-video | Workers AI Wan 2.7 (Ken Burns FFmpeg fallback) |
-| Text-to-video with native audio | Workers AI Grok Imagine Video |
-| Voice cloning | Workers AI MiniMax Speech 2.8 Turbo |
-| Voice presets | Workers AI Deepgram Aura-2 |
-| Transcription | Workers AI Whisper-large-v3-turbo |
-
-## Deploying / running
-
-This is a single-operator app. The setup is documented in `docs/CLOUDFLARE-NATIVE-DEPLOY.md` and runs end-to-end via the GitHub Actions workflow at `.github/workflows/bootstrap-cloudflare.yml`. The workflow provisions D1, R2, Workers, Workflows, Container, Access, and Pages bindings — idempotent, safe to re-run.
-
-After a push to `main`:
-1. The Pages project rebuilds and deploys automatically.
-2. The bootstrap workflow re-runs to keep bindings in sync.
-3. Sign in via Cloudflare Access at the configured domain.
-
-That's it. No local terminal, no manual wrangler steps for routine work.
-
-## Project history (one line)
-
-`neolog 1.0`: an ActivityPub-federated blog (decommissioned). `neolog 2.0`: a personal-vlog-extraction-and-cluster-cultivation system on Supabase/Inngest (also dead). `neolog as it stands today`: an AI video-essay studio on Cloudflare, with three input modes (Subjects / Topics / Spark) and a "knows me" layer (voice-shape + operator-profile) that injects your mind and voice into every prompt.
-
-For internal architecture and code conventions, see [CLAUDE.md](./CLAUDE.md).
-
-For full system reference (infrastructure facts, credentials map, the post-upload pipeline in detail), see [SYSTEM_REFERENCE.md](./SYSTEM_REFERENCE.md).
+`CLAUDE.md` is the working document — read it before changing anything.
