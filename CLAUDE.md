@@ -419,6 +419,22 @@ a renamed or never-built path is a runtime 404 that renders as an empty list —
 which reads as "nothing here yet" rather than as a bug. 131 routes, 150
 fetched paths.
 
+⚠️ **`tsconfig.workers.json` — the workers are typechecked separately, and
+they must stay that way.** The root `tsconfig.json` excludes `workers/`, so
+until 8 Sep nothing typechecked them at all: an edit could delete a library
+both workers import and `tsc --noEmit` stayed green. `wrangler deploy`
+transpiles with esbuild and does not typecheck either, so the failure surface
+was a broken deploy. The first run of this config found exactly that — both
+workers still importing `src/lib/surface`, which had just been deleted.
+`workers/ffmpeg` is excluded because it depends on `@cloudflare/containers`
+installed in its own package and shares no code with `src/`.
+
+⚠️ **The worker deploy had been failing since 26 July** — six weeks, silently,
+so the pipeline and healer on Cloudflare were running June code. Cause:
+`wrangler@4.x` moved its peer to `@cloudflare/workers-types@^5` and the worker
+packages still pinned `^4`, so `npm install` refused. If it goes red again,
+read the resolution error before assuming it is your change.
+
 `check-enum-values.mjs` covers the third: **a right column with a wrong
 value.** The column checker catches `vlogs.transcript`; it cannot catch
 `relation = 'reflection'` when the two values are `led_from` and `reflects` —

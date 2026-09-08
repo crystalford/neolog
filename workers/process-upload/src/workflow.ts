@@ -38,7 +38,6 @@ import type { D1Database, R2Bucket, Ai, Fetcher } from '@cloudflare/workers-type
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
-import { surfaceFromRun } from '../../../src/lib/surface'
 
 interface Env {
   DB: D1Database

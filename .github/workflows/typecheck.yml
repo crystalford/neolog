@@ -100,6 +100,14 @@ jobs:
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 
+      # The root tsconfig excludes `workers/`, so until 8 Sep nothing
+      # typechecked them — and the first time this ran it found both workers
+      # still importing a library that had been deleted, which would have
+      # failed at deploy. `wrangler deploy` transpiles with esbuild and does
+      # not typecheck either, so this is the only thing that looks.
+      - name: TypeScript type check — workers
+        run: pnpm exec tsc --noEmit -p tsconfig.workers.json
+
       - name: Next.js build (catches Next-specific type errors)
         run: pnpm exec next build --no-lint
         env:

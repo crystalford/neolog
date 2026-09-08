@@ -43,7 +43,6 @@ import type {
 
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
-import { surfaceFromRun } from '../../../src/lib/surface'
 
 export interface Env {
   DB: D1Database

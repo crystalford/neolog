@@ -1,0 +1,16 @@
+{
+  "//": "The workers, typechecked. The root tsconfig excludes `workers/`, so until 8 Sep nothing typechecked them at all — an edit to workers/pipeline could break the build and `tsc --noEmit` stayed green, which is exactly how a wrong column or a missing import reaches production. `wrangler deploy` transpiles with esbuild and does not typecheck either.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "skipLibCheck": true
+  },
+  "include": ["workers/**/*.ts"],
+  "//exclude": "workers/ffmpeg is left out: it imports @cloudflare/containers, which is installed in its own package rather than at the root, and it shares no code with src/. The two that matter here are pipeline and process-upload — they import from src/lib/, and that coupling is what breaks silently when a library moves.",
+  "exclude": ["node_modules", "workers/**/node_modules", "workers/ffmpeg"]
+}
