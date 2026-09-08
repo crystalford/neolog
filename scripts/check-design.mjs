@@ -62,7 +62,12 @@ const PAGES = [
   // answer lives, and it citation-checks every sentence first.
   ['asks',       'src/app/(app)/asks/page.tsx',          4],
   ['numbers',    'src/app/(app)/numbers/page.tsx',       3],
-  ['public-log', 'src/app/(app)/public/page.tsx',       10],
+  // Five of its remaining eight must STAY missing: mic, opts and or are
+  // the composer, and yl/yrs are the coverage bar. SPEC §3 — "Not on the
+  // public side: the coverage bar (the operator's instrument; it advertises
+  // the gaps), questions, the composer." public-log.html draws them; §0
+  // wins over a page.
+  ['public-log', 'src/app/(app)/public/page.tsx',       8],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    10],
   ['writing',    'src/app/(app)/writing/page.tsx',      6],
   // writing.html's title is "an essay you wrote" — it covers the mechanic

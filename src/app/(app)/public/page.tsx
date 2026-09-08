@@ -34,7 +34,7 @@
 
 export const runtime = 'edge'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { LogDays } from '@/components/LogRow'
@@ -57,6 +57,17 @@ export default function PublicLog() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FeedFilter>('pub')
   const [order, setOrder] = useState<'happened' | 'logged'>('happened')
+  const [q, setQ] = useState('')
+
+  // Filters what is on the page; it never asks the log anything.
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return items
+    return items.filter(e =>
+      e.sentence.toLowerCase().includes(needle)
+      || (e.detail || '').toLowerCase().includes(needle)
+      || (e.searchable || '').toLowerCase().includes(needle))
+  }, [items, q])
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +108,19 @@ export default function PublicLog() {
 
         <div className="grid">
           <main>
+        {/* SPEC §3: "The public log gets a quiet search." Quiet meaning it
+            filters what is already on the page — it does not ask the log a
+            question, which is /search and has its own citation discipline. */}
+        <div className="ask">
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="find something on this page"
+            aria-label="Find something on this page"
+          />
+          {q && <span className="ans">{shown.length} of {items.length}</span>}
+        </div>
+
         <div className="bar">
           <div className="f">
             {FILTERS.map(f => (
@@ -121,10 +145,12 @@ export default function PublicLog() {
             {/* The same rows and day dividers as the feed. SPEC §3:
                 "one design, two views — nothing is designed twice." The
                 public view is the private view minus what isn't public. */}
-            <LogDays items={items} order={order} />
+            <LogDays items={shown} order={order} />
 
-            {!loading && items.length === 0 && (
-              <div className="none">Nothing is public yet.</div>
+            {!loading && shown.length === 0 && (
+              <div className="none">
+                {q ? 'Nothing on this page matches that.' : 'Nothing is public yet.'}
+              </div>
             )}
           </main>
 
