@@ -1,3 +1,26 @@
+#!/usr/bin/env node
+/**
+ * The stylesheet half of the design check.
+ *
+ * `check-design.mjs` asks whether a page's MARKUP uses the design's classes.
+ * This asks whether the RULES agree: for every selector the design defines,
+ * does the value I wrote for it match?
+ *
+ * Two values are the same if they differ only by whitespace, a leading zero,
+ * `!important`, or which name a variable is reached by — this repo aliases
+ * the design's `--steel` to `--t-steel` and `--body` to `--font-body`, and
+ * comparing the text would report equal values as differences forever while
+ * the real ones drowned. Normalising that took the home page from 21
+ * differences to 3, and the three that were left were all real: a bare
+ * `.rail` from the old sidebar layout putting a border and a filled
+ * background on every rail in the product, a send arrow stroked in the wrong
+ * colour, and 4px of padding.
+ *
+ * The budgets are today's numbers, not targets. Raising one needs a reason.
+ *
+ * Run: node scripts/check-design-css.mjs [page]
+ */
+
 import { readFileSync, readdirSync } from 'node:fs'
 const D='design/css'
 const mine = readFileSync('src/app/globals.css','utf8')
@@ -35,7 +58,50 @@ function rules(css){
   }
   return out
 }
-const norm=v=>v.replace(/\s+/g,'').replace(/0\./g,'.').replace(/;$/,'').toLowerCase()
+/**
+ * Two values are the same if they differ only by whitespace, a leading zero,
+ * `!important`, or which NAME a variable is reached by. This repo aliases the
+ * design's --steel to --t-steel and its --body to --font-body, so comparing
+ * the text would report equal values as differences forever and the real
+ * ones would drown.
+ */
+const ALIAS = {
+  '--font-body': '--body', '--font-mono': '--mono',
+  '--t-steel': '--steel', '--t-teal': '--teal', '--t-ochre': '--ochre',
+  '--t-terra': '--terra', '--t-violet': '--violet', '--t-sage': '--sage',
+  '--t-plum': '--plum', '--t-rose': '--rose', '--t-brass': '--brass',
+  '--t-moss': '--moss', '--sig': '--steel',
+}
+const norm = v => {
+  let out = v.replace(/!important/g, '').replace(/\s+/g, '')
+    .replace(/0\./g, '.').replace(/;$/, '').toLowerCase()
+  for (const [a, b] of Object.entries(ALIAS)) out = out.split(a).join(b)
+  return out
+}
+
+const BUDGET={"log": 3, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 3, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 3, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
+
+// No argument: check every page against its budget and exit non-zero on drift.
+if(!process.argv[2]){
+  let over=0
+  for(const [pg,budget] of Object.entries(BUDGET)){
+    const P=rules(readFileSync(`${D}/${pg}.css`,'utf8')), M=rules(mine)
+    let diff=0
+    for(const [sel,decls] of P){
+      if(sel.startsWith('@')||sel.startsWith(':')||/^(html|body|\*|a|button|input|textarea|svg)\b/.test(sel)) continue
+      const ms=[sel,`.logpage.pg-${pg} ${sel}`,`.logpage.pg-${pg}${sel}`,`.pg-${pg} ${sel}`,`.logpage ${sel}`,`.nowpage ${sel}`].find(c=>M.has(c))
+      if(!ms) continue
+      const md=M.get(ms)
+      for(const [k,v] of decls){ if(md.has(k)&&norm(md.get(k))!==norm(v)){ diff++; break } }
+    }
+    const flag = diff>budget ? '  DRIFTED' : diff<budget ? '  ↓ lower the budget' : ''
+    console.log(`  ${pg.padEnd(13)} ${String(diff).padStart(2)} / ${String(budget).padEnd(2)} rules differ${flag}`)
+    if(diff>budget) over++
+  }
+  if(over){ console.error(`\n${over} page(s) drifted. Every budget is a debt; the real number is zero.`); process.exit(1) }
+  console.log('\nNo stylesheet has drifted.')
+  process.exit(0)
+}
 
 const page=process.argv[2]
 const pcss=readFileSync(`${D}/${page}.css`,'utf8')
@@ -70,3 +136,4 @@ for(const [sel,decls] of P){
 }
 console.log(`${page}.html — ${ok} match · ${diff} differ · ${miss} missing\n`)
 for(const [kind,sel,note] of report.slice(0,28)) console.log(`  ${kind.padEnd(8)} ${sel}\n           ${note}`)
+

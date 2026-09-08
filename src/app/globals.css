@@ -314,12 +314,10 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .tile .label { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); letter-spacing: 0.3px; margin-bottom: 10px; text-transform: uppercase; }
 .tile .num { font-size: 24px; color: var(--fg); font-weight: 500; letter-spacing: -0.4px; line-height: 1; }
 
-/* ─── Right rail ────────────────────────────────────────── */
-.rail { border-left: 1px solid var(--line); background: var(--bg-1); overflow-y: auto; min-height: 0; }
-
-.rail .bar { height: 3px; background: var(--bg-3); border-radius: 2px; position: relative; overflow: hidden; margin: 8px 0; }
-.rail .bar > div { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(59,130,246,0.4); }
-.rail .bar.hot > div { background: var(--hot); box-shadow: 0 0 8px rgba(236,95,58,0.5); }
+/* The rail is `.logpage .rail` — sticky, no border, no background, per
+   log.html. A bare `.rail` with a left border and a filled background lived
+   here from the old sidebar layout and was applying to every rail on every
+   page, along with a progress bar in the old accent colour. Both gone. */
 
 /* ─── Pips ──────────────────────────────────────────────── */
 
@@ -672,7 +670,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   padding: 7px 11px; border: 1px solid var(--line-2); border-radius: 9px;
   font-size: 12.5px; color: var(--fg-1); background: rgba(255,255,255,.025);
 }
-.logpage .chip em { font-style: normal; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4); }
+.logpage .chip em { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--fg-4); }
 .logpage .chip button { color: var(--fg-4); line-height: 1; opacity: .5; padding: 0 2px; }
 .logpage .chip:hover button { opacity: 1; }
 .logpage .comp .bar2 {
@@ -708,7 +706,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .logpage .send:hover { background: #fff; transform: translateY(-1px); }
 .logpage .send:disabled { background: var(--line-3); color: var(--fg-4); cursor: default; transform: none; }
-.logpage .send .ico { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.logpage .send .ico { width: 15px; height: 15px; stroke: #000; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* The receipt: one line, one undo, then gone. Never a question. */
 .logpage .rcpt {
@@ -863,7 +861,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* ── The rail ───────────────────────────────────────────────────────── */
 /* `log.html`: the rail is sticky at 64px — it stays beside the feed as you
    scroll rather than scrolling away with it. */
-.logpage .rail { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 22px; padding-top: 18px; align-self: start; }
+.logpage .rail, .rail { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 22px; padding-top: 18px; align-self: start; }
 .logpage .rc { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .logpage .rc .h {
   padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--bg-1);

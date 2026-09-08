@@ -117,6 +117,14 @@ jobs:
       - name: Every CSS variable resolves
         run: node scripts/check-css-vars.mjs
 
+      # And the other half: for every selector the design defines, does the
+      # value match? Normalising variable aliases and !important took the
+      # home page from 21 differences to 3, and all three that remained were
+      # real — including a bare `.rail` from the old sidebar layout putting a
+      # border and a filled background on every rail in the product.
+      - name: Stylesheets have not drifted from the design
+        run: node scripts/check-design-css.mjs
+
       - name: Pages have not drifted from the design
         run: node scripts/check-design.mjs
 
