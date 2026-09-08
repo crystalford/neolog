@@ -861,6 +861,28 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* ── The rail ───────────────────────────────────────────────────────── */
 /* `log.html`: the rail is sticky at 64px — it stays beside the feed as you
    scroll rather than scrolling away with it. */
+/* ⚠️ One frame everywhere — the rule 51 of the 74 design pages carry and
+   this stylesheet did not have at all.
+
+   The package writes it as
+     .wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+   because in the design the page's children sit directly inside `.wrap`.
+   Ours nest one level deeper, under `.logpage`, so the same rule is written
+   against that — `.mh` is outside `.logpage` in `Shell`, which is why it is
+   not in the exception list here.
+
+   Without it, anything a page renders OUTSIDE its `.grid` — a provenance
+   block, a comparison, a footer band — stretched the full 1052 instead of
+   sitting in the 708 column, and the page read as two different widths
+   stacked on each other. `/walk` had 84 of its 109 boxes wrong from this one
+   rule. Found by rendering the design's own markup under this stylesheet and
+   measuring; no amount of reading the CSS would have shown a rule that is
+   simply absent.
+
+   The exceptions are the design's, unchanged: the two full-width layout
+   containers, the owner strip, the stamp and the footer. */
+.logpage > :not(.grid):not(.rail):not(.owner):not(.stamp):not(.ft):not(script) { max-width: 708px; }
+
 .logpage .rail, .rail { position: sticky; top: 64px; display: flex; flex-direction: column; gap: 22px; padding-top: 18px; align-self: start; }
 .logpage .rc { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .logpage .rc .h {

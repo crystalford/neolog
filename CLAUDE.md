@@ -931,6 +931,25 @@ in the commit.
 | `check-design.mjs` | Does the page's MARKUP use the design's classes? Follows the components it imports — LogRow and Rail carry design classes, and counting them as missing overstated every page by twenty. |
 | `check-design-css.mjs` | For every selector the design defines, does the VALUE match? Normalises variable aliases and `!important`, without which real differences drown. |
 | `check-css-vars.mjs` | Does every `var(--x)` resolve? |
+| `check-design-render.mjs` | Does the page LOOK like it? Renders the design's own markup under both stylesheets in headless Chromium and compares every box. **Not in CI** — it needs Playwright and about ten seconds a page. |
+
+⚠️ **The first three read text, and all three are blind to the same thing: a
+rule the design has and we never wrote at all.** There is no value to compare
+and no variable to resolve — there is nothing. That is how `.wrap>:not(…)
+{max-width:708px}` — the **one frame everywhere** rule, on 51 of the 74
+design pages — was missing from this stylesheet entirely. Anything a page
+rendered outside its `.grid` stretched the full 1052 instead of sitting in
+the 708 column, so pages read as two different widths stacked on each other.
+`/walk` had **84 of its 109 boxes wrong from that one absence**, with every
+text check green and the operator saying the design looked "all over the
+place".
+
+`check-design-render.mjs` is the answer to that class of bug. Same markup
+under both stylesheets, so any difference is ours. Adding the rule took
+`/walk` from 84 to 18, and `headings`, `takeout`, `numbers`, `onthisday` and
+`connections` render **identically** to the design. ⚠️ A difference is not
+automatically a bug — `/vlog`'s `.cap` is 230px in the design and 708 here
+because the operator asked for it.
 
 **Why they exist.** Nothing in the repo could tell a page that MATCHED the
 design from one that RESEMBLED it. `tsc` cannot. A build cannot. Reading the
