@@ -684,7 +684,7 @@ export class VlogPipelineDO {
       // Probe-detected silent input (DJI slow-mo, time-lapse, etc.) —
       // FFmpeg returns a JSON envelope { ok: true, no_audio: true }
       // instead of audio bytes. Skip the R2 write, mark transcript as
-      // empty, mark pipeline complete. The b-roll classifier picks
+      // empty, mark pipeline complete. A silent recording is
       // this up via transcript_len < 200 + 0 extracted items.
       const contentType = resp.headers.get('content-type') || ''
       if (contentType.includes('application/json')) {
@@ -697,12 +697,12 @@ export class VlogPipelineDO {
               video_codec: envelope.video_codec,
               video_fps: envelope.video_fps,
               duration_sec: envelope.duration_sec,
-              note: 'Input has no audio stream (DJI slow-mo, time-lapse, or other silent recording). Marking complete as b-roll — no transcribe / extract steps will run.',
+              note: 'Input has no audio stream (DJI slow-mo, time-lapse, or another silent recording). Marking complete — nothing to transcribe, so nothing to read onto the log.',
             },
           )
           // Mark transcript empty + jump straight to complete. Skip
           // transcribe + extract entirely. The diagnosis banner will
-          // classify this as b-roll on the next /events poll.
+          // show it as silent on the next /events poll.
           await this.env.DB.prepare(
             `UPDATE vlogs
                 SET pipeline_status = 'complete',

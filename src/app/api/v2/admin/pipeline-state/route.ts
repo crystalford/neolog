@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       n: number
     }>(
       db,
-      // B-roll classification: a vlog is b-roll when it completed
+      // Silent: a recording that completed with nothing said in it —
       // successfully but has either no transcript or very short
       // (< 200 chars) transcript content AND zero extracted items.
       // These are silent / dialogue-less recordings — still valid

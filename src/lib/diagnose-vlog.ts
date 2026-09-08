@@ -33,7 +33,7 @@ export type DiagnosisStatus =
   | 'code_reset'        // DO/workflow killed by deploy, will auto-retry
   | 'network_lost'      // transient connection failure between services
   | 'restart_limit'     // healer gave up (MAX_RESTARTS reached)
-  | 'short_transcript'  // transcript < 20 chars; treated as b-roll
+  | 'short_transcript'  // under 20 chars: nothing was said in it
   | 'unknown'           // couldn't classify
 
 export interface Diagnosis {
@@ -74,7 +74,7 @@ export function diagnoseFromEvents(
   if (pipelineStatus === 'complete' && (transcriptLen < 200) && totalExtractedItems === 0) {
     return {
       status: 'b_roll',
-      label: 'No extractable dialogue (b-roll)',
+      label: 'Nothing said in it',
       recommendation: 'Treat as cinematic footage. Nothing to extract.',
     }
   }

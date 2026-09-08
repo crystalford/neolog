@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
   // Restore already-extracted vlogs (real transcript content) to complete,
   // regardless of whatever stuck/in-flight/archived label the wedged DO
   // dispatch or a terminate-all left them in. The transcript-length guard
-  // preserves genuine silent b-roll (transcript_text='' from no-audio-skip)
-  // and never touches operator-archived imports (no active extraction_run).
+  // preserves a genuinely silent recording (transcript_text='' from the
+  // no-audio skip) and never touches an operator-archived import.
   const res = await db.prepare(
     `UPDATE vlogs
         SET pipeline_status = 'complete',

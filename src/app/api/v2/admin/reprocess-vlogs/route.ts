@@ -186,10 +186,10 @@ export async function POST(req: NextRequest) {
             //   2. No active extraction_runs row at all
             //   3. Active extraction_runs row exists but total_items=0
             //      AND the transcript is substantial (>= 200 chars).
-            //      Short-transcript zero-item runs are b-roll — those
+            //      A short transcript means nothing was said — those
             //      are terminal, NOT eligible for re-dispatch.
             //   4. extraction_runs.model = 'short-transcript-skip' is
-            //      explicitly the b-roll marker; never re-dispatch.
+            //      are silent recordings; never re-dispatch.
             : `SELECT v.id AS id,
                       CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
                            THEN 1 ELSE 0 END AS has_transcript

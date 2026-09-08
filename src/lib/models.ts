@@ -1,60 +1,45 @@
 /**
- * Model routing — the single inference abstraction.
+ * Model routing.
  *
- * Per CANOPTICON spec Part 16 (model strategy): Llama 3.3 70B is retired as
- * the default. On Cloudflare Workers AI's neuron billing, stronger open
- * models cost the same or less — so within the cheap tier we optimize for
- * QUALITY, not cost. gpt-oss-120b (with adjustable reasoning effort) is the
- * pick for hard-reasoning tasks: the librarian's concept-naming and the
- * video-essay/post script generation. Reasoning effort is a DIAL — high for
- * hard synthesis, low/none for bulk extraction.
+ * Two models, for two jobs, and that is the whole list.
  *
- * Everything routes through callReasoning() so a single stage can later be
- * pointed at a different model (or a paid frontier API) by changing one
- * constant — no rearchitecting.
+ * `callReasoning` is the ONE place in this product a model writes prose,
+ * and it has exactly two callers: the answer on `/search` and a month's
+ * paragraph on `/month/[ym]`. Both check every sentence's citations in code
+ * before showing it and drop the ones that fail — the model's output is
+ * never trusted, only its ability to point at passages that exist.
+ *
+ * `VISION` has one job: looking at an uploaded image and saying whether it
+ * is the kind of document that must never be published (SPEC §0.2), plus
+ * reading the words out of a picture that is really text. It is asked what
+ * it SEES, never what something means.
+ *
+ * ── What this file used to route ─────────────────────────────────────────
+ *
+ * Flux for b-roll stills, Wan 2.7 for animating them, Grok Imagine for
+ * text-to-video with synchronised audio, MiniMax for cloning the operator's
+ * voice, Aura-2 for preset narration, gpt-oss-20b reserved for bulk
+ * extraction. All of it went with the video-essay studio on 8 Sep, and none
+ * of it is coming back: a generator is what the operator stopped trusting.
+ *
+ * **Do not add a model to this file without a caller and a reason written
+ * next to it.** A model id sitting here unused is an invitation.
  *
  * SAFETY: the live Workers AI catalog churns and model IDs change on short
- * notice. callReasoning tries the strong model, and on ANY error or empty
- * response falls back to Llama 70B so the feature never hard-breaks. The
- * return value reports which model actually answered (`model`, `fellBack`)
- * so callers can surface it for debugging.
+ * notice, so `callReasoning` tries the strong model and on ANY error or
+ * empty response falls back, reporting which one answered.
  */
 
 export const MODELS = {
-  // Hard reasoning — librarian naming, script/voice synthesis.
+  // Writing an answer from passages, on /search and /month. The only place
+  // a model writes prose, and its output is citation-checked in code.
   HARD: '@cf/openai/gpt-oss-120b',
-  // Cheaper strong model — bulk extraction (not yet wired here; reserved).
-  BULK: '@cf/openai/gpt-oss-20b',
   // Fallback when the strong model errors or the catalog moved.
   FALLBACK: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-  // Vision. Llama 4 Scout is natively multimodal (text + image) and is the
-  // only vision model in the two-vendor constraint. Used for exactly one
-  // job: looking at an uploaded image and saying whether it is the kind of
-  // document that must never be published (SPEC §0.2 — the log holds back
-  // identity documents, statements, medical letters, addresses). It is
-  // asked what it SEES, never what something means.
+  // Vision. Llama 4 Scout is natively multimodal. Used for exactly two
+  // jobs, both of which are "what is visibly on this image": the hold-back
+  // check, and reading the words out of a screenshot.
   VISION: '@cf/meta/llama-4-scout-17b-16e-instruct',
-  // Image generation for AI b-roll. Flux Schnell is the verified shape on
-  // Workers AI: { prompt, seed, steps:1..8 } → response.image is base64 JPEG.
-  IMAGE: '@cf/black-forest-labs/flux-1-schnell',
-  // Image-to-video for animated b-roll. The Workers AI catalog hosts Wan 2.7
-  // (Alibaba) as the image-to-video model; exact id may churn so the caller
-  // also has a Ken-Burns FFmpeg fallback if the AI call fails.
-  IMAGE_TO_VIDEO: '@cf/alibaba/wan-2.7',
-  // Direct text-to-video with native synchronized audio (dialogue, SFX,
-  // ambient). 1-15s per generation, 720p, all aspect ratios. Audio is
-  // ALWAYS on — shape it by mentioning sound in the prompt
-  // ("with ambient city noise", "soft piano underneath").
-  TEXT_TO_VIDEO_AUDIO: '@cf/xai/grok-imagine-video',
-  // Text-to-speech with voice cloning. MiniMax 2.8 Turbo clones from a
-  // 5-10s reference clip — operator records themselves once, then every
-  // beat synthesizes in their voice. 40+ languages, inline interjection
-  // tags ((laughs), (sighs), (breath), etc.).
-  TTS_CLONE: '@cf/minimax/speech-2.8-turbo',
-  // Preset-voice TTS fallback. Deepgram Aura-2 — 40+ voices, natural
-  // context-aware pacing. Used when cloning fails or the operator picks
-  // a preset voice instead.
-  TTS_PRESET: '@cf/deepgram/aura-2-en',
 } as const
 
 export type ReasoningEffort = 'low' | 'medium' | 'high'
