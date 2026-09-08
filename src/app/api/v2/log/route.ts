@@ -29,6 +29,7 @@ import { readyDb } from '@/lib/ready-db'
 import { buildFold, OPEN_DAYS } from '@/lib/fold'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { lookAtHeldBacklog } from '@/lib/log-intake'
 import {
   REFLECTS,
   type LogEntry, type FeedFilter, type DatePrecision, type Visibility,
@@ -37,7 +38,12 @@ import {
 } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends R2Env {
+  DB: D1Database
+  // The hold-back backlog is drained from here, and it looks at pictures.
+  AI: { run: (m: unknown, a: unknown) => Promise<unknown> }
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
 
 const SIGNED_TTL = 24 * 3600
 
@@ -412,6 +418,22 @@ export async function GET(req: NextRequest) {
   const fold = (!q && filter === 'all' && !from && !to)
     ? await buildFold(db, operator.id, { order })
     : []
+
+  // ── Look at the pictures that are still waiting ────────────────────────
+  //
+  // A camera-roll import lands more images than one request can look at, so
+  // intake checks a few and leaves the rest exactly as they arrived. This is
+  // where the remainder gets seen: a small batch per feed load, after the
+  // response has gone. The feed is the right place because a held row is
+  // visible ON it — "not looked at yet" is a state he can watch clear.
+  //
+  // A picture the check already refused is not re-asked; its `held_reason`
+  // says what the log saw, and asking again would eventually release
+  // something it held on purpose.
+  getRequestContext().ctx.waitUntil(
+    lookAtHeldBacklog(env as never, db, operator.id, 6)
+      .catch(err => console.warn('[log] hold-back backlog:', err?.message || err)),
+  )
 
   return NextResponse.json(
     {

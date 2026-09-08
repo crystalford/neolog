@@ -20,6 +20,8 @@
 
 import { callChat } from '@/lib/llm'
 import { getObject, presignGetUrl, type R2Env } from '@/lib/r2'
+import { findMany, run } from '@/lib/d1'
+import type { D1Database } from '@cloudflare/workers-types'
 import type { EntryKind, DatePrecision } from '@/lib/log-entry'
 
 export interface IntakeEnv extends R2Env {
@@ -163,6 +165,75 @@ export async function frameOf(
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * Look at the images that arrived and were never reached.
+ *
+ * ⚠️ **The bulk drop is the real case, not the edge case.** The operator:
+ * *"I'm just banking all my iPhone photos and my driver's licence is in
+ * there."* That is hundreds of files in one go, and the intake's follow-up
+ * pass ran `Promise.all` over every one of them — one R2 read and one model
+ * call each, unbounded, inside a single `waitUntil`. A Worker has a
+ * subrequest ceiling and `waitUntil` has a time budget; past a couple of
+ * dozen photos most calls fail, every failure path returns held (correctly),
+ * and the result is a camera roll stuck behind "not looked at yet" with
+ * nothing to retry it.
+ *
+ * So intake now looks at a bounded few per request and leaves the rest in
+ * exactly the state they arrived in. This drains the remainder a batch at a
+ * time from a page visit — the same shape `visionTagVlogBacklog` uses, for
+ * the same reason.
+ *
+ * An image the check has already REFUSED is not picked up again: its
+ * `held_reason` says what the log saw, and re-asking would eventually
+ * release something it held on purpose.
+ */
+export const NOT_LOOKED_AT = 'not looked at yet'
+
+export async function lookAtHeldBacklog(
+  env: IntakeEnv & { DB?: unknown },
+  db: D1Database,
+  operatorId: string,
+  max = 6,
+): Promise<{ looked: number }> {
+  const rows = await findMany<{ id: string; r2_key: string; mime: string | null }>(
+    db,
+    `SELECT id, r2_key, mime FROM log_entries
+      WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        AND visibility = 'held' AND held_reason = ?
+        AND r2_key IS NOT NULL
+      ORDER BY logged_at ASC
+      LIMIT ?`,
+    operatorId, NOT_LOOKED_AT, Math.min(20, Math.max(1, max)),
+  )
+
+  let looked = 0
+  for (const r of rows) {
+    const verdict = await checkHoldBack(env, r.r2_key, r.mime || 'image/jpeg')
+    // A check that could not run leaves the row exactly as it is, so the
+    // next visit tries again. Only a real answer writes.
+    if (!verdict.checked) continue
+    if (verdict.held) {
+      await run(
+        db,
+        `UPDATE log_entries SET held_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        verdict.saw ? `It looks like ${verdict.saw}.` : (verdict.why || NOT_LOOKED_AT),
+        r.id,
+      )
+    } else {
+      await run(
+        db,
+        `UPDATE log_entries
+            SET visibility = 'public', held_reason = NULL,
+                detail = COALESCE(detail, ?), updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+        verdict.description, r.id,
+      )
+    }
+    looked++
+  }
+  return { looked }
 }
 
 /** Display JPEGs are small; an enormous original is not worth the memory. */

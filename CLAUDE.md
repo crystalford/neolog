@@ -94,22 +94,42 @@ the same leak with a different sense. Both hold back now. **When a new kind
 of media reaches `LogRow`, the question is not "should it blur" — it is
 "does `held` reach it at all".**
 
-⚠️ **OPEN — an uploaded VIDEO lands public, and nothing has looked at it.**
-`const held = isImage` in `/api/v2/log/intake`, which follows §0.2 to the
-letter: *"an image lands `held` and is released only after the vision check
-has looked at it."* The composer accepts `image/*,video/*`, so this is
-reachable, and a video's first frame is exactly as revealing as a photo — a
-screen recording, a document on a desk.
+**A video is not a file entry at all** — the composer registers it as a
+`vlogs` row and it goes through the upload pipeline, which extracts a
+thumbnail. So `const held = isImage` in `/api/v2/log/intake` is not the whole
+story: an uploaded clip never reaches that branch. Asked whether video should
+be held the way an image is, the operator answered the more useful question:
 
-It is **not** changed unilaterally, because the cost is real either way.
-Holding every uploaded video means the vision check has to run on a frame,
-which means extracting one first (the FFmpeg thumbnail path exists for
-`/api/v2/vlogs` but intake does not use it) — and until that is built,
-"held" would mean "held forever". The 400-recording corpus is unaffected
-either way: it arrives through `/api/v2/vlogs`, not here.
+> *"I'm just wondering what value the vision check even has for video other
+> than to describe it, which is good… the idea is everything is public… the
+> only thing with the images was, if I posted my driver's licence because I'm
+> just banking all my iPhone photos and my driver's licence is in there, then
+> yes it should flag the driver's licence. Basically the extent of which we
+> discussed."*
 
-**The operator's call.** The two readings are: follow the spec's word
-(image), or follow its reason (nothing unlooked-at is public).
+⚠️ **The bulk drop is the real case, not the edge case**, and the intake pass
+was built for the edge case. It ran `Promise.all` over every file in the
+drop — one R2 read and one model call each, unbounded, inside a single
+`waitUntil`. A Worker has a subrequest ceiling and `waitUntil` has a time
+budget, so a camera-roll import of a few hundred photos failed most of its
+checks; **every failure path returns held, correctly, and the result was a
+roll stuck behind "not looked at yet" with nothing to retry it.**
+
+Six per request now, the rest left in exactly the state they arrived in, and
+`lookAtHeldBacklog()` drains the remainder a batch at a time from a feed
+load — the same shape `visionTagVlogBacklog` uses, for the same reason. The
+feed is the right place because **a held row is visible on it**: "not looked
+at yet" is a state he can watch clear. An audio note is never deferred; it is
+the *talk* button and he is waiting for the words. And a picture the check
+already REFUSED is not re-asked — its `held_reason` says what the log saw,
+and asking again would eventually release something it held on purpose.
+
+**So the hold-back has one job, and it is that one.** Not a principle applied
+to every kind of file — the specific case of an identity document arriving in
+a bulk camera-roll dump. Everything else is public, which is the default the
+whole product is built on. The vision pass earns its keep the other way: it
+**describes** what is in the frame, and a clip gets described off its
+thumbnail the same way a photo is described off itself.
 
 **Burial, not deletion.** There is no delete action. Bury removes an entry
 from the feed, search and counts and keeps the file, the attachments and the

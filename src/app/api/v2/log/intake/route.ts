@@ -49,7 +49,7 @@ import { getObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
 import { transcribeAudio } from '@/lib/transcribe'
-import { checkHoldBack, placeFile, kindForUpload } from '@/lib/log-intake'
+import { checkHoldBack, NOT_LOOKED_AT, placeFile, kindForUpload } from '@/lib/log-intake'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import { verifyStored, findExistingCopy } from '@/lib/keep'
 import { splitNote } from '@/lib/split-note'
@@ -349,7 +349,7 @@ export async function POST(req: NextRequest) {
         placement.date_precision,
         kindForUpload(mime, false),
         held ? 'held' : 'public',
-        held ? 'not looked at yet' : null,
+        held ? NOT_LOOKED_AT : null,
         'log',
         isAudio ? 'voice' : 'file',
         batchId,
@@ -450,6 +450,13 @@ export async function POST(req: NextRequest) {
  * — one failure never takes the others down, and a failure always leaves the
  * entry in its safe state rather than reverting it to public.
  */
+/**
+ * How many uploaded images are looked at in the request that brought them.
+ * Six is two model calls short of the Workers AI concurrency the pipeline
+ * gate settled on, and leaves room for the audio path in the same batch.
+ */
+const MAX_LOOKS_PER_REQUEST = 6
+
 async function runFollowUps(
   env: Env,
   db: ReturnType<typeof getDb>,
@@ -459,7 +466,25 @@ async function runFollowUps(
     happenedAt: string; precision: string
   }[],
 ) {
-  await Promise.all(items.map(async item => {
+  // ⚠️ BOUNDED, and it did not used to be. This ran `Promise.all` over every
+  // file in the drop — one R2 read and one model call each, all at once,
+  // inside a single `waitUntil`. A Worker has a subrequest ceiling and
+  // `waitUntil` has a time budget, so a camera-roll import of a few hundred
+  // photos failed most of its checks; every failure path returns held, which
+  // is correct, and the result was a roll stuck behind "not looked at yet".
+  //
+  // A few per request, the rest left in the state they arrived in and
+  // drained later by `lookAtHeldBacklog` from a page visit. An audio note is
+  // never deferred — it is the composer's *talk* button and he is waiting
+  // for the words.
+  const audio = items.filter(i => i.kind === 'audio')
+  const images = items.filter(i => i.kind !== 'audio')
+  const now = [...audio, ...images.slice(0, MAX_LOOKS_PER_REQUEST)]
+  if (images.length > MAX_LOOKS_PER_REQUEST) {
+    console.log(`[intake] ${images.length - MAX_LOOKS_PER_REQUEST} image(s) left for the backlog`)
+  }
+
+  await Promise.all(now.map(async item => {
     const { happenedAt, precision } = item
     try {
       if (item.kind === 'audio') {
