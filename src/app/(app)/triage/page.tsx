@@ -22,6 +22,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { stampFor, type DatePrecision } from '@/lib/log-entry'
 
 interface Item {
@@ -102,25 +103,26 @@ export default function TriagePage() {
           <Link href="/screenshots">screenshots</Link>
         </div>
 
-        <div className="pghead">
+        <section className="top">
           <h1>Going through what arrived.</h1>
-          <div className="pgmeta">
-            <span>
+          <p>
               Everything here is already filed by date. This is optional —
               skipping the whole pile costs nothing. Going through it adds
               your words.
-            </span>
-          </div>
-        </div>
+          </p>
+        </section>
+
+        <div className="grid">
+          <main>
 
         {current ? (
           <>
-            <div className="tri-meta">
+            <div className="top2">
               {done + 1} of {total} · {stampFor(current.happened_at, current.date_precision)}
               {current.original_filename ? ` · ${current.original_filename}` : ''}
             </div>
 
-            <div className="tri-card">
+            <div className="card">
               {current.media_url && (current.mime || '').startsWith('image/') && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -133,9 +135,9 @@ export default function TriagePage() {
                 <audio src={current.media_url} controls preload="none" />
               )}
 
-              <div className="tri-line">{current.text}</div>
-              {current.detail && <div className="tri-sub">{current.detail}</div>}
-              <div className="tri-who">
+              <div className="what">{current.text}</div>
+              {current.detail && <div className="med">{current.detail}</div>}
+              <div className="cap">
                 the log&rsquo;s line, from the file · filed on{' '}
                 {stampFor(current.happened_at, current.date_precision)}
               </div>
@@ -146,7 +148,7 @@ export default function TriagePage() {
                 placeholder="or say what it actually was — your words replace the log's"
               />
 
-              <div className="tri-keys">
+              <div className="acts">
                 <button onClick={() => void decide('keep')}>
                   Keep as filed <kbd>→</kbd>
                 </button>
@@ -166,9 +168,15 @@ export default function TriagePage() {
               </div>
             </div>
 
-            <div className="quiet" style={{ marginTop: 16 }}>
-              {done} done · {Math.max(0, total - done)} left. Stop whenever —
-              the rest stay filed exactly as they are.
+            {/* `triage.html`'s progress bar. It says how much is left and,
+                in the same breath, that stopping costs nothing — a count
+                that only counted would make this an inbox. */}
+            <div className="bar">
+              <div className="prog">
+                <b>{done} done</b>
+                <span>{Math.max(0, total - done)} left</span>
+              </div>
+              <span>stop here — the rest stay filed</span>
             </div>
           </>
         ) : !loading && (
@@ -178,6 +186,24 @@ export default function TriagePage() {
               : 'Nothing arrived that you haven’t seen.'}
           </div>
         )}
+
+        {/* Not an inbox: nothing is blocked on this, there is no badge, and
+            skipping the pile costs nothing. The design says so on the page
+            rather than leaving it to be inferred from the absence of a
+            counter. */}
+        <div className="rules">
+          <b>Already filed before you start.</b> Triage adds your words and
+          your marks. It never decides whether something is on the log — it
+          already is, placed by its own date, whether you open this or not.
+        </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/screenshots', label: 'screenshots' },
+            { href: '/clear', label: 'safe to clear' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )
