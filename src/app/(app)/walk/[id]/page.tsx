@@ -33,6 +33,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { REFLECTS } from '@/lib/log-entry'
 
 interface Turn {
@@ -103,6 +104,18 @@ export default function WalkPage() {
           {start && <Link href={start.href}>the first turn</Link>}
         </div>
 
+        <section className="top">
+          <h1>The log kept the places your thought arrived.</h1>
+          <p>
+            It should also keep <b>the route it took to get there</b>. A
+            thought isn&rsquo;t a point — this is the path, with the turn each
+            one came out of, still growing.
+          </p>
+        </section>
+
+        <div className="grid">
+          <main>
+
         {loading && <div className="none">Following it back.</div>}
 
         {!loading && !start && (
@@ -114,7 +127,8 @@ export default function WalkPage() {
 
         {start && (
           <>
-            <div className="pghead">
+            <div className="hd">
+              <div className="route">a thread · started {day(start.happened_at)} · {clock(start.happened_at)}</div>
               <h1>{start.text}</h1>
             </div>
             <div className="stamp">
@@ -122,6 +136,16 @@ export default function WalkPage() {
               <time dateTime={start.happened_at}>{day(start.happened_at)} · {clock(start.happened_at)}</time>
               <span>{turns.length - 1} {turns.length - 1 === 1 ? 'turn' : 'turns'} since</span>
               {turns.some(t => t.loop) && <span>{turns.filter(t => t.loop).length} loop back</span>}
+            </div>
+
+            {/* `walk.html`: "A thread keeps two things an entry can't — the
+                order things came in, and what each one led from." Said at
+                the top, because a list of turns looks like a list until you
+                know what the extra column is for. */}
+            <div className="two">
+              <b>A thread keeps two things an entry can&rsquo;t:</b> the order
+              things came in, and what each one led from. A page is a pile —
+              everything about one thing, newest first. A thread is a path.
             </div>
 
             <div className="walk">
@@ -132,7 +156,7 @@ export default function WalkPage() {
                   ? (new Date(t.happened_at).getTime() - new Date(prev.happened_at).getTime()) / 1000
                   : 0
                 return (
-                  <div className={`leg${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`} key={t.id}>
+                  <div className={`step${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}`} key={t.id}>
                     <div className="when">
                       <time dateTime={t.happened_at}>
                         {t.returned ? gapLabel(gap) : offsetLabel(t.offset_seconds)}
@@ -144,12 +168,12 @@ export default function WalkPage() {
                       {t.detail && <div className="p">{t.detail}</div>}
                       <div className="m">
                         {from ? (
-                          <span>
+                          <span className="led">
                             {t.loop ? 'looped back to' : 'led from'}{' '}
                             <Link href={from.href}>{shorten(from.text)}</Link>
                           </span>
                         ) : (
-                          <span>where it started</span>
+                          <span className="led">where it started</span>
                         )}
                         {t.relation === REFLECTS && <span>a later thought, not a new event</span>}
                         {t.author !== 'operator' && <span>written by the log</span>}
@@ -169,7 +193,7 @@ export default function WalkPage() {
 
               {/* The design's last row: the thread stays open. Not a prompt
                   to do anything — a statement that nothing is closed. */}
-              <div className="leg open">
+              <div className="step open">
                 <div className="when"><time>not yet</time></div>
                 <div className="what">
                   <div className="p">
@@ -181,6 +205,32 @@ export default function WalkPage() {
             </div>
           </>
         )}
+            {/* walk.html's closing comparison, and the reason the route is
+                worth keeping at all. */}
+            <div className="prov">
+              <b>Where a finished piece came from isn&rsquo;t a list of
+              sources.</b> It&rsquo;s the whole route.
+              <div className="cmp">
+                <div className="old">
+                  <b>What every other publication offers</b>
+                  <span>Source · Source · Source · Source</span>
+                </div>
+                <div className="own">
+                  <b>What a piece from this log carries</b>
+                  <span>
+                    Every turn, dated to the second, with the turn it came out
+                    of — including the loops and the wrong ones.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/pages', label: 'the index' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )
