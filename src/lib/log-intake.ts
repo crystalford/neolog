@@ -19,7 +19,7 @@
  */
 
 import { callChat } from '@/lib/llm'
-import { getObject, type R2Env } from '@/lib/r2'
+import { getObject, presignGetUrl, type R2Env } from '@/lib/r2'
 import type { EntryKind, DatePrecision } from '@/lib/log-entry'
 
 export interface IntakeEnv extends R2Env {
@@ -110,6 +110,61 @@ function firstJsonObject(text: string): any | null {
   return null
 }
 
+/**
+ * One frame out of an uploaded video, so the same eye can look at it.
+ *
+ * ── Why a video is looked at at all ──────────────────────────────────────
+ *
+ * The operator, asked whether video should be held the way an image is:
+ * *"I'm just wondering what value the vision check even has for video other
+ * than to describe it, which is good… the idea is everything is public…
+ * the only thing with the images was, if I posted my driver's licence
+ * because I'm just banking all my iPhone photos and my driver's licence is
+ * in there, then yes it should flag the driver's licence."*
+ *
+ * So the check earns its place twice over and neither reason is "hold
+ * things back on principle": it **describes** the clip, which is worth
+ * having, and it catches the one case the hold-back exists for. A frame out
+ * of a screen recording carries a licence exactly as well as a photo does.
+ *
+ * ⚠️ **A video that cannot be framed lands PUBLIC, not held.** That is the
+ * opposite of the image rule, and it is deliberate: for an image, held is a
+ * momentary state on the way to being released, and the check always runs.
+ * Here the frame grab is a container call that can be cold, slow or absent
+ * in a preview deploy, and "held" would mean held until he noticed. Public
+ * by default is what he asked for, and nothing on this log is published to
+ * anyone without signing in.
+ */
+export async function frameOf(
+  env: IntakeEnv & { FFMPEG?: { fetch: (u: string, i?: unknown) => Promise<Response> } },
+  r2Key: string,
+  timeoutMs = 20_000,
+): Promise<Uint8Array | null> {
+  if (!env.FFMPEG) return null
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), timeoutMs)
+  try {
+    const url = await presignGetUrl(env, r2Key, 600)
+    // `-noautorotate` lives inside the worker's own handler; one second in
+    // avoids the black first frame most cameras open on.
+    const res = await env.FFMPEG.fetch('https://internal/extract-thumb', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input_url: url, t: 1.0 }),
+      signal: ctl.signal,
+    } as RequestInit)
+    if (!res.ok) return null
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    // A few hundred bytes is a failed grab, not a picture.
+    return bytes.byteLength > 2000 ? bytes : null
+  } catch (err: any) {
+    console.warn('[intake] frame grab failed:', err?.message || err)
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** Display JPEGs are small; an enormous original is not worth the memory. */
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024
 
@@ -131,7 +186,7 @@ export async function checkHoldBack(
   r2Key: string,
   mimeType = 'image/jpeg',
 ): Promise<HoldBackVerdict> {
-  let dataUri: string
+  let bytes: Uint8Array
   try {
     const obj = await getObject(env, r2Key)
     if (!obj) {
@@ -141,11 +196,29 @@ export async function checkHoldBack(
     if (buf.byteLength > MAX_IMAGE_BYTES) {
       return { held: true, saw: null, why: 'It is too large to look at.', description: null, reads: null, checked: false }
     }
-    dataUri = `data:${mimeType};base64,${bytesToBase64(new Uint8Array(buf))}`
+    bytes = new Uint8Array(buf)
   } catch (err: any) {
     console.warn('[intake] hold-back read failed:', err?.message || err)
     return { held: true, saw: null, why: 'The file could not be read.', description: null, reads: null, checked: false }
   }
+  return lookAt(env, bytes, mimeType)
+}
+
+/**
+ * The same eye, given bytes rather than a key.
+ *
+ * Split out so a video's FIRST FRAME can be looked at with exactly the check
+ * an uploaded photo gets — the operator: *"if I posted my driver's licence
+ * because I'm just banking all my iPhone photos and my driver's licence is in
+ * there then yes it should flag the driver's licence."* A frame out of a
+ * screen recording is the same risk and the same picture.
+ */
+export async function lookAt(
+  env: IntakeEnv,
+  bytes: Uint8Array,
+  mimeType = 'image/jpeg',
+): Promise<HoldBackVerdict> {
+  const dataUri = `data:${mimeType};base64,${bytesToBase64(bytes)}`
 
   try {
     const res = await callChat(env as any, {

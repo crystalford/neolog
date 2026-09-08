@@ -482,6 +482,40 @@ looking rather than by failing:
   trimming — up to 600 HMAC signings to show 200 rows. Only survivors are
   signed.
 
+### ⚠️ `/footage`'s second index had no data, because `vision.ts` had no importer
+
+`src/lib/vision.ts` was reached by **nothing**. Both functions were written,
+correct against the schema, and imported by no file — so `vision_status`
+stayed `'pending'` on every recording, `vision_description` stayed null, and
+**the whole "find a clip by what was in front of the camera" half of
+`/footage` had no data source at all.**
+
+Three files and this document described it as live. `footage/route.ts`: *"the
+`vision_*` descriptions exist (`src/lib/vision.ts` writes them from the
+thumbnail)."* `log-intake.ts`: *"the call shape `src/lib/vision.ts` already
+uses in production."* ⚠️ **None of them was a caller.** A mention in a comment
+is exactly what a dead library looks like from the inside.
+
+It is wired where its own comment says it belongs — *"called from … a
+page-visit `waitUntil`, so the backlog drains on its own without the operator
+doing anything."* `GET /api/v2/footage` runs a bounded batch of eight after
+the response has gone, on the one page that needs what it writes. It
+describes what is in the FRAME and nothing else; it does not rank or score,
+and the fence on that page is unchanged.
+
+**`scripts/check-unreached-lib.mjs` holds the line**, and it is the same
+shape as the route check one level down. Three libraries have now been found
+this way: `vision.ts`, `design.ts` (unimported and drifted — `--fg-3`
+`#71717a` where the screen renders `#9a9aa4`) and `llm.ts` (380 of 474 lines,
+including a live path to `api.anthropic.com` nothing selected).
+
+⚠️ **It matches dynamic imports too.** The first version reported
+`photo-client.ts` as dead — `useIntake.ts` reaches it with
+`await import('@/lib/photo-client')`, so reading a photo's EXIF was live all
+along. A check that cries wolf is worse than no check: it teaches the next
+reader to skim the output. `browser-audio.ts` was the same false alarm,
+reached three times from `CapturePanel.tsx`.
+
 ### ⚠️ `scripts/check-unreached-routes.mjs` — a route nothing calls
 
 `check-routes.mjs` catches a fetch to a path that was never built: a runtime

@@ -121,6 +121,14 @@ jobs:
       - name: Every day in exactly one week
         run: node scripts/test/month.mjs
 
+      # The same shape as check-unreached-routes.mjs, one level down.
+      # src/lib/vision.ts had NO importer: both functions written, tested
+      # against the schema, reached by nothing — so vision_status stayed
+      # 'pending' on every recording and /footage's second index had no data
+      # at all, while three files and CLAUDE.md described it as live.
+      - name: Every library has an importer
+        run: node scripts/check-unreached-lib.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:

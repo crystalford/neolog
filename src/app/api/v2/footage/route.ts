@@ -35,9 +35,15 @@ import { getDb, findMany, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { visionTagVlogBacklog, type VisionEnv } from '@/lib/vision'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends R2Env {
+  DB: D1Database
+  // The frame descriptions are written by a model, so the binding is here.
+  AI: { run: (m: unknown, a: unknown) => Promise<unknown> }
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
 
 async function operatorOr401(req: NextRequest, env: Env) {
   try { return { operator: await requireOperator(req, env), error: null as null } }
@@ -150,6 +156,29 @@ export async function GET(req: NextRequest) {
         : [],
     }
   }))
+
+  // ── Drain the frame-description backlog ────────────────────────────────
+  //
+  // ⚠️ `src/lib/vision.ts` had NO CALLER. Both its functions were written,
+  // tested against the schema, and imported by nothing — so `vision_status`
+  // stayed `'pending'` on every recording and `vision_description` stayed
+  // null, which means **this page's second index had no data at all**. The
+  // route's own header says the descriptions "exist"; three other files and
+  // CLAUDE.md said the same. None of them was a caller.
+  //
+  // This is where it belongs, and the library's own comment says so: "called
+  // from … a page-visit waitUntil, so the backlog drains on its own without
+  // the operator doing anything." A bounded batch per visit, after the
+  // response has gone, on the one page that needs what it writes.
+  //
+  // It describes what is in the FRAME and nothing else — the same reporting
+  // call the hold-back check uses. It does not rank, score, or say whether a
+  // clip is any good.
+  const ctx = getRequestContext()
+  ctx.ctx.waitUntil(
+    visionTagVlogBacklog(env as unknown as VisionEnv, operator.id, 8)
+      .catch(err => console.warn('[footage] frame descriptions:', err?.message || err)),
+  )
 
   return NextResponse.json({ clips, query: q }, { headers: { 'Cache-Control': 'no-store' } })
 }
