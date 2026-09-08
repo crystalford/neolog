@@ -34,7 +34,7 @@ export default function WaysIn() {
   return (
     <Shell>
       <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>Every way in.</h1>

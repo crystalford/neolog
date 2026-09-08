@@ -47,7 +47,7 @@ export default function SharePage() {
   return (
     <Shell>
       <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>{receipt ? 'In.' : 'Put this in the log.'}</h1>

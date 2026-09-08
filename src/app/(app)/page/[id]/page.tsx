@@ -96,12 +96,12 @@ export default function PageView({ params }: { params: { id: string } }) {
   }, [shots])
   useRestorePlace(!loading && items.length > 0)
 
-  if (loading) return <Shell><div className="logpage" /></Shell>
+  if (loading) return <Shell><div className="logpage pg-person" /></Shell>
   if (!page) {
     return (
       <Shell>
-        <div className="logpage">
-          <div className="crumb"><Link href="/pages">the index</Link></div>
+        <div className="logpage pg-person">
+          <div className="back"><Link href="/pages">the index</Link></div>
           <div className="none">There&rsquo;s no page here.</div>
         </div>
       </Shell>
@@ -110,8 +110,8 @@ export default function PageView({ params }: { params: { id: string } }) {
 
   return (
     <Shell active="index">
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-person">
+        <div className="back">
           <Link href="/">the log</Link>
           <span>·</span>
           <Link href="/pages">the index</Link>

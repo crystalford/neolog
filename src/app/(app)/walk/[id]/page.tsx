@@ -97,8 +97,8 @@ export default function WalkPage() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-walk">
+        <div className="back">
           <Link href="/">the log</Link>
           {start && <Link href={start.href}>the first turn</Link>}
         </div>

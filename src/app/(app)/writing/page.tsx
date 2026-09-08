@@ -78,8 +78,8 @@ export default function Writing() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-writing">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead"><h1>Writing</h1></div>
         <div className="stamp">

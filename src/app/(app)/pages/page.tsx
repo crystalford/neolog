@@ -92,8 +92,8 @@ export default function PagesIndex() {
 
   return (
     <Shell active="index">
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-headings">
+        <div className="back">
           <Link href="/">the log</Link>
           <span>·</span>
           <span>{items.length} {items.length === 1 ? 'page' : 'pages'}</span>

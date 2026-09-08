@@ -81,8 +81,8 @@ export default function SearchPage() {
 
   return (
     <Shell active="search">
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-search">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>Ask the log a question.</h1>

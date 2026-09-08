@@ -54,7 +54,7 @@ export default async function SettingsPage() {
   return (
     <Shell>
       <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead"><h1>Settings</h1></div>
         <div className="stamp">

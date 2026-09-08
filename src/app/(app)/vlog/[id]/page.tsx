@@ -111,8 +111,8 @@ export default function Recording() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-vlog">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/vlogs">recordings</Link>
           {r?.navigation.prev_id && <Link href={`/vlog/${r.navigation.prev_id}`}>earlier</Link>}

@@ -88,8 +88,8 @@ export default function Footage() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-footage">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/vlogs">recordings</Link>
         </div>

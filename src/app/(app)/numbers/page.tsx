@@ -69,8 +69,8 @@ export default function Numbers() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-numbers">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>

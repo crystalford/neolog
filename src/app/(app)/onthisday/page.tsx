@@ -65,8 +65,8 @@ export default function OnThisDay() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-onthisday">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>{title}</h1>

@@ -80,8 +80,8 @@ export default function Asks() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-asks">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>

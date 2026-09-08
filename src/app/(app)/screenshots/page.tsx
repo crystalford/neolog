@@ -81,8 +81,8 @@ export default function Screenshots() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-screenshots">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/triage">what arrived</Link>
         </div>

@@ -79,12 +79,12 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
     } finally { setWriting(false) }
   }, [params.ym, load])
 
-  if (loading) return <Shell><div className="logpage" /></Shell>
+  if (loading) return <Shell><div className="logpage pg-month" /></Shell>
   if (!v) {
     return (
       <Shell>
-        <div className="logpage">
-          <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="logpage pg-month">
+          <div className="back"><Link href="/">the log</Link></div>
           <div className="none">That month isn&rsquo;t a month.</div>
         </div>
       </Shell>
@@ -96,8 +96,8 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-month">
+        <div className="back">
           <Link href="/">the log</Link>
           <span>·</span>
           <Link href={`/month/${shift(v.ym, -1)}`}>← {shift(v.ym, -1)}</Link>

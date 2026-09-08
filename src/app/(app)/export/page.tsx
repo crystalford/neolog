@@ -90,8 +90,8 @@ export default function ExportPage() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-export">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>Pulling a stretch of it out</h1>

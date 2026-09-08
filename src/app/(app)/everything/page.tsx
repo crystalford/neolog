@@ -46,8 +46,8 @@ export default function Everything() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-everything">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead">
           <h1>Everything</h1>

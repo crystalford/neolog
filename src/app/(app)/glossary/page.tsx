@@ -69,8 +69,8 @@ export default function Glossary() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-source">
+        <div className="back">
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>

@@ -89,7 +89,7 @@ export default function PublicLog() {
 
   return (
     <Shell>
-      <div className="logpage publog">
+      <div className="logpage publog pg-public-log">
         <div className="who">
           <div className="k">what a stranger sees</div>
           <h1>The public log — everything except what I&rsquo;ve kept private.</h1>

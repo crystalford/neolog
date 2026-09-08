@@ -134,8 +134,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
   if (!e) {
     return (
       <Shell>
-        <div className="logpage">
-          <div className="crumb"><Link href="/">the log</Link></div>
+        <div className="logpage pg-entry">
+          <div className="back"><Link href="/">the log</Link></div>
           <div className="none">That entry isn&rsquo;t in the log.</div>
         </div>
       </Shell>
@@ -157,8 +157,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb">
+      <div className="logpage pg-entry">
+        <div className="back">
           <Link href="/">the log</Link>
           <span>·</span>
           <span>{stampFor(e.happened_at, e.date_precision)}</span>
@@ -167,7 +167,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
 
         <div className="grid">
           <main>
-            <div className="entry-h">
+            <div className="ehead">
               {editing ? (
                 <>
                   <textarea
@@ -189,11 +189,11 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   </div>
                 </>
               ) : (
-                <div className="s">{e.text}</div>
+                <h1>{e.text}</h1>
               )}
 
               {/* Two dates, always. The distance between them is the signal. */}
-              <div className="twodates">
+              <div className="meta">
                 <span>
                   Happened <b>{stampFor(e.happened_at, e.date_precision)}</b>
                   {isFuzzy(e.date_precision) && ' — the log had to guess this'}
@@ -230,7 +230,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
               ) : (
-                <div className="entry-body">
+                <div className="lede">
                   {e.detail}
                   {e.author !== 'operator' && !detailIsHis && (
                     <em style={{
@@ -249,7 +249,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             )}
 
             {held && (
-              <div className="entry-body">
+              <div className="lede">
                 <b>The log kept this back on its own.</b>{' '}
                 {e.held_reason || 'It has not been looked at yet.'}{' '}
                 It is stored whole and kept out of every feed. You can publish
@@ -258,7 +258,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             )}
 
             {e.link_url && (
-              <div className="entry-body">
+              <div className="lede">
                 <a href={e.link_url} target="_blank" rel="noopener noreferrer"
                    style={{ color: 'var(--sig)', borderBottom: '1px solid var(--line-2)' }}>
                   {e.link_url}

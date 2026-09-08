@@ -90,8 +90,8 @@ export default function Messages() {
 
   return (
     <Shell>
-      <div className="logpage">
-        <div className="crumb"><Link href="/">the log</Link></div>
+      <div className="logpage pg-messages">
+        <div className="back"><Link href="/">the log</Link></div>
 
         <div className="pghead"><h1>Messages</h1></div>
         <div className="stamp">
