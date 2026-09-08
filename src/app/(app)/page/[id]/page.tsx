@@ -101,7 +101,7 @@ export default function PageView({ params }: { params: { id: string } }) {
     return (
       <Shell>
         <div className="logpage pg-person">
-          <div className="back"><Link href="/pages">the index</Link></div>
+          <div className="crumb"><Link href="/pages">the index</Link></div>
           <div className="none">There&rsquo;s no page here.</div>
         </div>
       </Shell>
@@ -111,7 +111,7 @@ export default function PageView({ params }: { params: { id: string } }) {
   return (
     <Shell active="index">
       <div className="logpage pg-person">
-        <div className="back">
+        <div className="crumb">
           <Link href="/">the log</Link>
           <span>·</span>
           <Link href="/pages">the index</Link>

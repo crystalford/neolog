@@ -39,6 +39,10 @@ interface IndexPage {
 
 const BAND_ORDER: PageBand[] = ['now', 'before', 'people', 'places']
 
+const KIND_CLASS: Record<string, string> = {
+  job: 'job', project: 'proj', subject: 'subj', person: 'per', place: 'place',
+}
+
 export default function PagesIndex() {
   const [items, setItems] = useState<IndexPage[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +50,7 @@ export default function PagesIndex() {
   const [seeding, setSeeding] = useState(false)
   const [seedNote, setSeedNote] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [tab, setTab] = useState<'all' | PageBand>('all')
 
   const load = useCallback(async () => {
     try {
@@ -94,99 +99,127 @@ export default function PagesIndex() {
     <Shell active="index">
       <div className="logpage pg-headings">
         <div className="back">
-          <Link href="/">the log</Link>
-          <span>·</span>
+          <Link href="/">← the log</Link>
+          <span className="sep">·</span>
           <span>{items.length} {items.length === 1 ? 'page' : 'pages'}</span>
         </div>
 
-        <div className="pghead">
-          <h1>The index</h1>
-          <div className="pgmeta">
-            <span>
-              Every name, place, project and subject on the log — each one a
-              page, pointing at everything about it.
-            </span>
-          </div>
-        </div>
-
-        <div className="find">
-          <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.3" /><path d="M9.3 9.3 12.5 12.5" /></svg>
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Find a page — a name, a place, a project"
-            aria-label="Find a page"
-          />
-          {q && <button className="clr" onClick={() => setQ('')}>clear</button>}
-        </div>
-
-        {bands.map(({ band, rows }) => (
-          <div key={band}>
-            <div className="idxband">
-              <b>{BAND_LABELS[band].title}</b>
-              {rows.length}
-              {BAND_LABELS[band].sub && ` · ${BAND_LABELS[band].sub}`}
+        <div className="grid">
+          <main>
+            <div className="top">
+              <h1>The index</h1>
+              <span className="sub">
+                {items.length} · every name, place, project and subject on the
+                log — each one a page, pointing at everything about it
+              </span>
             </div>
-            <div className="idxhead">
-              <span>page</span><span>kind</span><span>span</span>
-              <span style={{ textAlign: 'right' }}>entries</span><span>status</span>
+
+            <div className="find">
+              <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.3" /><path d="M9.3 9.3 12.5 12.5" /></svg>
+              <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="Find a page — a name, a place, a project"
+                aria-label="Find a page"
+              />
+              {q && <button className="clr" onClick={() => setQ('')}>clear</button>}
             </div>
-            {rows.map(p => (
-              <Link className="idxrow" key={p.id} href={p.href}>
-                <span className="nm">
-                  {p.name}
-                  {p.summary && <em>{firstClause(p.summary)}</em>}
-                </span>
-                <span className="kd">a {p.kind}</span>
-                <span className="sp">{p.span}</span>
-                <span className="ct">{p.entry_count || ''}</span>
-                <span className={`st${p.status === 'mostly blank' ? ' blank' : p.status === 'said once' ? ' once' : ''}`}>
-                  {p.status}
-                </span>
-              </Link>
+
+            {/* `headings.html`: all · going on now · from before · people ·
+                places. A filter with nothing behind it is not shown — the
+                bar offers only the bands that exist. */}
+            <div className="tabs">
+              <button className={tab === 'all' ? 'on' : undefined} onClick={() => setTab('all')}>all</button>
+              {bands.filter(b => b.rows.length).map(({ band }) => (
+                <button
+                  key={band}
+                  className={tab === band ? 'on' : undefined}
+                  onClick={() => setTab(band)}
+                >{BAND_LABELS[band].title.toLowerCase()}</button>
+              ))}
+              <span className="r">newest activity first</span>
+            </div>
+
+            {bands.filter(b => tab === 'all' || b.band === tab).map(({ band, rows }) => (
+              <div key={band}>
+                <div className="grp">
+                  <b>{BAND_LABELS[band].title}</b>
+                  {rows.length}
+                  {BAND_LABELS[band].sub && ` · ${BAND_LABELS[band].sub}`}
+                </div>
+                <div className="row hd">
+                  <span>page</span><span>kind</span><span>span</span>
+                  <span>entries</span><span>status</span>
+                </div>
+                {rows.map(p => (
+                  <Link className="row" key={p.id} href={p.href}>
+                    <div className="n">
+                      {p.name}
+                      {p.summary && <i>{firstClause(p.summary)}</i>}
+                    </div>
+                    <span className={`k ${KIND_CLASS[p.kind] || ''}`}>a {p.kind}</span>
+                    <span className={`sp${/^from memory|^\d{4}$/.test(p.span) ? ' fz' : ''}`}>{p.span}</span>
+                    <span className="c">{p.entry_count || ''}</span>
+                    <span className={`st${p.status === 'going on now' ? ' on' : p.status === 'said once' ? ' q' : ''}`}>
+                      {p.status}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ))}
-          </div>
-        ))}
 
-        {/* Day one and day one thousand are the same page. The only thing
-            offered on an empty index is the one action that fills it, and
-            it is offered the same way when the index is full. */}
-        {!loading && items.length === 0 && (
-          <div className="none">
-            {q ? <>No page matches that.<button onClick={() => setQ('')}>clear</button></>
-              : 'No pages yet.'}
-          </div>
-        )}
+            {/* Day one and day one thousand are the same page. The only
+                thing offered on an empty index is the one action that fills
+                it, and it is offered the same way when the index is full. */}
+            {!loading && items.length === 0 && (
+              <div className="none">
+                {q ? <>No page matches that.<button onClick={() => setQ('')}>clear</button></>
+                  : 'No pages yet.'}
+              </div>
+            )}
 
-        {/* A page is made because he named something. Seeding from what a
-            model thought mattered is gone, and its absence is the feature. */}
-        <div className="asview">
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') void make() }}
-            placeholder="Name something — a person, a place, a project, an idea"
-            style={{
-              flex: 1, minWidth: 220, background: '#0a0a0b', color: 'var(--fg)',
-              border: '1px solid var(--line-1)', borderRadius: 8,
-              padding: '8px 12px', font: 'inherit', fontSize: 14, outline: 'none',
-            }}
-          />
-          <button
-            onClick={() => void make()}
-            disabled={seeding || !newName.trim()}
-            style={{
-              fontSize: 12.5, color: 'var(--fg-2)',
-              borderBottom: '1px solid var(--line-2)', background: 'none',
-              border: 0, cursor: seeding ? 'default' : 'pointer', whiteSpace: 'nowrap',
-            }}
-          >
-            {seeding ? 'making it…' : 'Make the page'}
-          </button>
-          <span style={{ flexBasis: '100%', fontSize: 12.5, color: 'var(--fg-4)' }}>
-            {seedNote || 'A page is made the first time you name something. Everything after attaches on its own.'}
-          </span>
+            <div className="rule">
+              <b>One shape, five kinds.</b> A job, a project, a subject, a
+              person, a place — each is a page: made once, the first time you
+              name it; the log&rsquo;s one paragraph; every entry under it.
+              The kind is a label, not a different page.
+            </div>
+          </main>
+
+          <aside className="rail">
+            {/* A page is made because he named something. Seeding from what
+                a model thought mattered is gone, and its absence is the
+                feature. */}
+            <div className="rc">
+              <div className="h">Name something</div>
+              <div className="i">
+                <input
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void make() }}
+                  placeholder="a person, a place, a project, an idea"
+                  aria-label="Name something"
+                />
+              </div>
+              <div className="acts">
+                <button onClick={() => void make()} disabled={seeding || !newName.trim()}>
+                  {seeding ? 'making it…' : 'Make the page'}
+                </button>
+              </div>
+              <div className="i">
+                {seedNote || 'A page is made the first time you name something. Everything after attaches on its own.'}
+              </div>
+            </div>
+          </aside>
         </div>
+
+        <footer className="ft">
+          <span>neolog · the index</span>
+          <span className="r">
+            <Link href="/">the log</Link>
+            <Link href="/everything">everything</Link>
+          </span>
+        </footer>
       </div>
     </Shell>
   )

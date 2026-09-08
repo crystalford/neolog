@@ -76,7 +76,7 @@ export default function DocumentPage() {
   return (
     <Shell>
       <div className="logpage">
-        <div className="back">
+        <div className="crumb">
           <Link href="/">the log</Link>
           <Link href="/writing">writing</Link>
         </div>
