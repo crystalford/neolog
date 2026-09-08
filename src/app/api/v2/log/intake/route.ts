@@ -69,6 +69,11 @@ interface Env extends R2Env {
   // The real Workers AI binding type — `transcribeAudio` needs the full
   // shape, and it satisfies the looser one `checkHoldBack` asks for.
   AI: Ai
+  // `transcribeAudio` falls back to the Workers AI REST endpoint when the
+  // binding's JSON encoding fails the model schema; the bootstrap pushes
+  // both of these to the Pages project as secrets.
+  CLOUDFLARE_API_TOKEN?: string
+  CF_AI_TOKEN?: string
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 

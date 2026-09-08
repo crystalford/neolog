@@ -50,15 +50,6 @@ export interface Env {
   AI: Ai
   FFMPEG: Fetcher
   PIPELINE_DO: DurableObjectNamespace
-  // Singleton DO that serializes Llama calls behind a concurrency cap.
-  // Every pipeline DO routes its extraction LLM call through this gate,
-  // so Workers AI sees at most LLAMA_GATE_CONCURRENCY concurrent requests
-  // regardless of how many vlogs are in flight. Eliminates the burst
-  // failure mode where 150 simultaneous DOs cause Workers AI to return
-  // silent empty extractions.
-  LLAMA_GATE: DurableObjectNamespace
-  // Tunable cap on in-flight Llama calls through the gate. Default 3.
-  LLAMA_GATE_CONCURRENCY?: string
   // Singleton DO that funnels FFmpeg container calls through a
   // concurrency cap. The FFmpeg container worker has max_instances=5
   // (workers/ffmpeg/wrangler.toml). 150 simultaneous /extract-audio
@@ -1217,204 +1208,11 @@ export class VlogPipelineDO {
   async webSocketError(_ws: WebSocket, _err: unknown): Promise<void> {}
 }
 
-// ─── LlamaGate ─────────────────────────────────────────────────────────────
-//
-// Singleton Durable Object that serializes Workers AI Llama calls behind an
-// in-memory concurrency cap. Every pipeline DO sends its extraction LLM
-// call through the gate so Workers AI sees at most LLAMA_GATE_CONCURRENCY
-// concurrent requests regardless of how many vlog DOs are in flight.
-//
-// Why this exists: bulk-reprocessing 150 vlogs at once had every vlog mark
-// complete with zero data persisted. Root cause: 150 DO alarms fired in
-// parallel, all calling env.AI.run independently. Under that burst,
-// Workers AI returned malformed/empty responses for some fraction of
-// calls — which slipped past the existing guards and persisted as silent
-// empty extractions. The fix is coordination: a single instance that
-// holds a counter, lets only N calls through at a time, and queues the
-// rest in memory.
-//
-// Single instance: callers must always use idFromName('llama-gate-singleton').
-// JS's single-threaded event loop means the counter manipulation is
-// race-free between awaits.
-//
-// Hibernation: the gate is keep-alive by definition during a bulk run —
-// requests arrive continuously. If hibernated between runs, the in-memory
-// counter is reset to 0 and waiters list is empty, which is the correct
-// fresh state for the next run.
-
-const LLAMA_70B_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
-const LLAMA_GATE_DEFAULT_CONCURRENCY = 8
-const LLAMA_GATE_SYSTEM_PROMPT_NOTE =
-  'NOTE: The gate passes the full system + user messages straight through to env.AI.run. ' +
-  'The src/lib/extract-unified.ts caller is responsible for building messages identical ' +
-  'to its direct-call path, so behavior is byte-equivalent except for queuing.'
-
-interface LlamaGateRequest {
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-  max_tokens?: number
-  // Optional vlog_id / operator_id for observability — emitted into
-  // pipeline_events so the operator sees per-call wait/run timings.
-  vlog_id?: string
-  operator_id?: string
-}
-
-interface LlamaGateResponse {
-  ok: boolean
-  result?: any   // The raw env.AI.run return value
-  error?: string
-  wait_ms: number
-  run_ms: number
-  in_flight_peak: number
-}
-
-export class LlamaGate {
-  private state: DurableObjectState
-  private env: Env
-  private inFlight = 0
-  private waiters: Array<() => void> = []
-  private maxConcurrency: number
-
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state
-    this.env = env
-    const raw = env.LLAMA_GATE_CONCURRENCY
-    const parsed = raw ? parseInt(raw, 10) : NaN
-    this.maxConcurrency = Number.isFinite(parsed) && parsed > 0 ? parsed : LLAMA_GATE_DEFAULT_CONCURRENCY
-  }
-
-  async fetch(req: Request): Promise<Response> {
-    if (req.method !== 'POST') {
-      return new Response('POST only', { status: 405 })
-    }
-    const url = new URL(req.url)
-    if (url.pathname === '/stats') {
-      return Response.json({
-        in_flight: this.inFlight,
-        waiting: this.waiters.length,
-        max_concurrency: this.maxConcurrency,
-        worker_version: WORKER_VERSION,
-        note: LLAMA_GATE_SYSTEM_PROMPT_NOTE,
-      })
-    }
-    if (url.pathname !== '/run') {
-      return new Response('not found', { status: 404 })
-    }
-
-    let body: LlamaGateRequest
-    try {
-      body = await req.json()
-    } catch {
-      return Response.json(
-        { ok: false, error: 'invalid JSON body', wait_ms: 0, run_ms: 0, in_flight_peak: this.inFlight } satisfies LlamaGateResponse,
-        { status: 400 },
-      )
-    }
-    if (!Array.isArray(body.messages) || body.messages.length === 0) {
-      return Response.json(
-        { ok: false, error: 'messages array required', wait_ms: 0, run_ms: 0, in_flight_peak: this.inFlight } satisfies LlamaGateResponse,
-        { status: 400 },
-      )
-    }
-
-    const acquireStart = Date.now()
-    await this.acquire()
-    const waitMs = Date.now() - acquireStart
-    const inFlightPeak = this.inFlight
-
-    const runStart = Date.now()
-    try {
-      const result: any = await this.env.AI.run(LLAMA_70B_MODEL, {
-        messages: body.messages,
-        max_tokens: body.max_tokens ?? 4096,
-      } as any)
-      const runMs = Date.now() - runStart
-
-      // Observability: best-effort write to pipeline_events. Wrapped so
-      // a D1 hiccup doesn't fail the actual extraction.
-      this.recordEvent(body, waitMs, runMs, inFlightPeak, null).catch(() => {})
-
-      return Response.json({
-        ok: true,
-        result,
-        wait_ms: waitMs,
-        run_ms: runMs,
-        in_flight_peak: inFlightPeak,
-      } satisfies LlamaGateResponse)
-    } catch (err: any) {
-      const runMs = Date.now() - runStart
-      const errorMsg = err?.message || String(err)
-      this.recordEvent(body, waitMs, runMs, inFlightPeak, errorMsg).catch(() => {})
-      return Response.json({
-        ok: false,
-        error: errorMsg,
-        wait_ms: waitMs,
-        run_ms: runMs,
-        in_flight_peak: inFlightPeak,
-      } satisfies LlamaGateResponse, { status: 502 })
-    } finally {
-      this.release()
-    }
-  }
-
-  private acquire(): Promise<void> {
-    if (this.inFlight < this.maxConcurrency) {
-      this.inFlight += 1
-      return Promise.resolve()
-    }
-    return new Promise<void>(resolve => {
-      this.waiters.push(() => {
-        this.inFlight += 1
-        resolve()
-      })
-    })
-  }
-
-  private release(): void {
-    this.inFlight -= 1
-    if (this.inFlight < 0) this.inFlight = 0  // defensive
-    const next = this.waiters.shift()
-    if (next) next()
-  }
-
-  private async recordEvent(
-    body: LlamaGateRequest,
-    waitMs: number,
-    runMs: number,
-    inFlightPeak: number,
-    errorMsg: string | null,
-  ): Promise<void> {
-    if (!body.vlog_id || !body.operator_id) return
-    try {
-      await insertEvent(this.env.DB, {
-        vlog_id: body.vlog_id,
-        operator_id: body.operator_id,
-        step: 'extract',
-        sub_step: 'llama_gate',
-        status: errorMsg ? 'failed' : 'ok',
-        duration_ms: waitMs + runMs,
-        error_full_text: errorMsg,
-        detail_json: JSON.stringify({
-          wait_ms: waitMs,
-          run_ms: runMs,
-          in_flight_peak: inFlightPeak,
-          max_concurrency: this.maxConcurrency,
-          worker_version: WORKER_VERSION,
-        }),
-        attempt: 1,
-        ts: Date.now(),
-      })
-    } catch {
-      // recordEvent is observability — never fail the LLM call because the
-      // event write failed.
-    }
-  }
-}
-
 // ─── FFmpegGate ────────────────────────────────────────────────────────────
 //
 // Singleton Durable Object that funnels FFmpeg container calls through an
-// in-memory concurrency cap. Solves the same problem LlamaGate solves for
-// Workers AI: too many simultaneous calls overwhelm the upstream service.
+// in-memory concurrency cap: too many simultaneous calls overwhelm the
+// upstream service.
 //
 // Why a token-passing model instead of full proxy: the FFmpeg /extract-audio
 // response is the raw audio bytes (often 50MB+ for long vlogs). Tunneling
@@ -1428,7 +1226,7 @@ export class LlamaGate {
 // 15 min is well past the longest legitimate FFmpeg call (10-min cap in
 // stepAudioExtract); legitimate callers always release first.
 //
-// Hibernation: same caveat as LlamaGate. During an active bulk run, the
+// Hibernation: during an active bulk run, the
 // DO stays warm because requests are continuous. After 10s idle the DO
 // can hibernate, which resets in-memory state — but that's the correct
 // fresh state for the next run, since no work is in flight.

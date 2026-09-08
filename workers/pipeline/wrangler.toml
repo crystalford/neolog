@@ -54,14 +54,6 @@ service = "neolog-ffmpeg"
 name = "PIPELINE_DO"
 class_name = "VlogPipelineDO"
 
-# Singleton DO that funnels Workers AI Llama calls behind a concurrency
-# cap. Every pipeline DO calls env.LLAMA_GATE so Workers AI never sees
-# more than LLAMA_GATE_CONCURRENCY in-flight requests across the whole
-# bulk run — eliminates the burst failure mode we hit at 150 vlogs.
-[[durable_objects.bindings]]
-name = "LLAMA_GATE"
-class_name = "LlamaGate"
-
 # Singleton DO that gates FFmpeg container calls. The FFmpeg worker has
 # max_instances=5; without this gate, simultaneous bulk dispatches burst
 # the container pool and 503 on instances 6+. The pipeline DO acquires
@@ -98,17 +90,21 @@ new_classes = ["KimiGate"]
 tag = "v5"
 deleted_classes = ["KimiGate"]
 
+# v6 drops LlamaGate. It gated the extraction engine's Llama calls, and
+# `src/lib/extract-unified.ts` — the only caller, named in the class's own
+# comment — went with the video-essay studio on 8 Sep. The class sat
+# deployed and bound with nothing reaching it. Deleted here the same way
+# v5 deleted KimiGate: the earlier tags stay so wrangler's history stays
+# continuous and it does not retry v1 against a VlogPipelineDO that
+# already holds data.
+[[migrations]]
+tag = "v6"
+deleted_classes = ["LlamaGate"]
+
 [vars]
 CLOUDFLARE_ACCOUNT_ID = "eda2e9bbd9acc42699027cfdcb50f998"
 R2_BUCKET_NAME = "neolog-videos"
 PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers.dev"
-# Concurrent Workers AI Llama 3.3-70B calls through the gate. Bumped
-# from 3 → 8 after the over-aggressive cap-of-3 turned out to be
-# throttling bulk runs to a crawl. Workers AI handles 8 simultaneous
-# Llama calls fine; the original cap was a guess made when we thought
-# burst was the cause of empty-extraction failures (the real cause was
-# an over-aggressive < 50 char validation check in extract-unified.ts).
-LLAMA_GATE_CONCURRENCY = "8"
 # Hard cap on concurrent FFmpeg container calls. The container worker
 # has max_instances=5, so we leave 2 instances of headroom for thumbnail
 # / transcode work from the legacy workflow. Default 3.

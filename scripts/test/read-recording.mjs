@@ -3,15 +3,18 @@
  * Tests for cutting a recording into passages (src/lib/read-recording.ts,
  * inlined, same as the other suites here).
  *
- * This is the whole of how a recording reaches the log now — no model, no
- * extraction, just his words cut at his own pauses. So the things that must
- * never happen are about the WORDS, not about the boundaries:
+ * This is the whole of how a recording reaches the log. A model is asked
+ * WHERE the seams go and may answer only by copying — the anchors are
+ * located in the transcript by exact match — so the things that must never
+ * happen are about the WORDS, not about the boundaries:
  *
  *   no word is dropped        every word of the transcript is in exactly one
  *                             passage, in order
  *   no word is invented       the joined passages are the transcript
  *   nothing is placed blind   a recording with no word timings writes
  *                             nothing at all
+ *   nothing is written        the only model call is the splitter, and every
+ *                             passage's text is words joined
  *
  * A boundary in the wrong place is a merge or a split away. A missing or
  * invented word is not recoverable, which is why the assertions are here.

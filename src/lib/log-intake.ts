@@ -149,7 +149,6 @@ export async function checkHoldBack(
 
   try {
     const res = await callChat(env as any, {
-      model: 'scout',
       system: HOLD_BACK_SYSTEM,
       messages: [{
         role: 'user',

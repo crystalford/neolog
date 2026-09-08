@@ -9,9 +9,11 @@ Three things it does that nothing else does:
 - **It never puts words in your mouth.** Every line says who wrote it. A line
   the log composed from a file's metadata is marked as the log's, always,
   including the ones that read naturally.
-- **It reads your recordings without a model.** Four hundred vlogs become
-  entries by cutting the transcript at your own pauses — your sentences, at
-  the second you said them. Nothing summarises, nothing paraphrases.
+- **It never writes a word of your recordings.** Four hundred vlogs become
+  entries at the seams between the things you said. A model is asked only
+  WHERE those seams are, and may answer only by quoting you — so every line
+  is a substring of your own transcript. Nothing summarises, nothing
+  paraphrases.
 - **It closes the loop on your phone.** A file is checked byte-for-byte
   against what arrived before anything tells you it is safe to delete
   locally.
@@ -108,31 +110,44 @@ one shell. `/api/v2/log` is that one feed over three tables.
 Four hundred recordings sit in R2. Until they are read, each shows on the
 feed as one line: "Recorded 22 minutes of video." True, and nearly useless.
 
-**`src/lib/read-recording.ts` reads them, and calls no model.** This is the
-single most important fact about this product, and it is what the whole
+**`src/lib/read-recording.ts` reads them, and nothing in it writes.** This is
+the single most important fact about this product, and it is what the whole
 8 Sep rebuild was for. The old path had an extraction model write `threads` —
 a topic, a take, some quotes — and relog turned those into entries, so the
 words on the log were a paraphrase of a paraphrase. The operator: *"the
 problem with the old system was i didn't trust its output anyway."*
 
-Now: `transcript_words` carries a start and an end for every word, so a gap
-between two of them is a **fact about the recording** — he stopped talking
-for two and a half seconds. That is the cut. A sentence end is a weaker
-second cut, used only once a passage would otherwise be a wall (90 words),
-and a hard ceiling at 140 catches a stretch with neither. Each passage
-becomes one entry at `recorded_at + start`, `author='operator'`,
-`grounded=1`, idempotent via `source_ref='said:<vlog>:<first word index>'`.
+Now the seams come from `splitNote` (`src/lib/split-note.ts`), which
+`LLM-PIPELINE.md` §8 stage 01 specifies and `branch.html` demonstrates. The
+model returns the **first six to ten words of each thread, character for
+character**, and those anchors are located in the transcript by exact match.
+The entries are the slices between them, so **every entry is a substring of
+what he actually said**. An anchor the model invented is not found and that
+seam is dropped — the failure mode is *fewer splits*, never *words he did
+not say*. Each passage becomes one entry at `recorded_at + start`,
+`author='operator'`, `grounded=1`, idempotent via
+`source_ref='said:<vlog>:<first word index>'`.
+
+**`cutIntoPassages` is the fallback**, cutting at his own pauses — a
+2.5-second gap between two words, a sentence end past 90, a ceiling at 140.
+It needs no model and was the default until 8 Sep, when running it against
+`branch.html`'s own example produced ONE entry where the design shows five:
+he said all five of those things without stopping. It still runs when no
+model is available or the split returns nothing, because a coarse entry of
+his words beats no entry at all.
 
 **A recording with no word timings writes nothing at all.** It could split
 `transcript_text` on punctuation, and then every entry would carry a second
 the log invented — the failure this product exists to avoid. It stays one
 line saying he recorded, until it has been transcribed.
 
-The honest limitation, stated because it is the trade: a pause is sometimes
-the wrong boundary. He pauses mid-thought; he runs two thoughts together
-without breathing. **The log is wrong about the boundary sometimes and never
-wrong about the words** — which is the right way round, and is why merge and
-split exist on an entry. A model would be wrong about the words too.
+The honest limitation, stated because it is the trade: the boundary is
+sometimes wrong. The splitter can miss a seam, and the pause fallback is
+coarser still — he pauses mid-thought and runs two thoughts together without
+breathing. **The log is wrong about the boundary sometimes and never wrong
+about the words** — which is the right way round, and is why merge and split
+exist on an entry. A model allowed to WRITE would be wrong about the words
+too, and that is the line this design does not cross.
 
 **The 4-gram grounding checker is gone too**, and its absence is the same
 point: it existed to catch an extraction model's paraphrase being attributed
@@ -141,10 +156,12 @@ transcript, not something checked against it. Do not reintroduce one — if a
 new path needs a grounding check, that path is a generator and should not
 exist.
 
-`scripts/test/read-recording.mjs` — 20 assertions, in CI. Every word in
-exactly one passage, the passages joined equal to the transcript, the same
-recording always cut the same way, and — checked against the source with
-comments stripped — no code path to `transcript_text` and no model call.
+`scripts/test/read-recording.mjs` — in CI. Every word in exactly one
+passage, the passages joined equal to the transcript, the same recording
+always cut the same way, and — checked against the source with comments
+stripped — no code path to `transcript_text`, the only model use is the
+splitter, and every passage's text is words joined rather than model
+output.
 
 
 ### A page is made when he names it
@@ -403,6 +420,74 @@ looking rather than by failing:
 - the **feed** presigned every row from all three tables *before* merging and
   trimming — up to 600 HMAC signings to show 200 rows. Only survivors are
   signed.
+
+### The backend pass — what the old engine left behind
+
+Four things survived the 8 Sep deletion because nothing imported them from a
+surface, so no check objected. Removed together on the same day.
+
+**`src/lib/llm.ts` was 474 lines and about 380 were the extraction engine.**
+Three tiers (`free`/`premium`/`max`) over four passes (`threads`,
+`clip_candidates`, `creative_elements`, `entities`), costed per vlog, routing
+the voice-sensitive passes to **Claude Sonnet over `api.anthropic.com`** and
+the rest to Kimi K2.6. The passes had been deleted; the routing outlived them.
+Both live callers — `vision.ts` and `log-intake.ts` — passed `'scout'`, so
+Kimi, Llama-70B and the whole Anthropic chat path were unreachable. The file
+is now the one call it makes, with no `model` argument: one model, one job. A
+picker is a choice nothing here is in a position to make.
+
+`src/lib/anthropic.ts` stays, uncalled and on purpose — Anthropic is a paid
+opt-in the operator has not taken, and wiring it is a deliberate act. **No
+branch reaches it**, which is what "nothing currently calls it" should have
+meant all along.
+
+**`LlamaGate` was a deployed Durable Object with no caller.** A singleton
+concurrency gate for Workers AI, whose own comment named its caller:
+*"The `src/lib/extract-unified.ts` caller is responsible for building
+messages…"* — a file deleted hours earlier. Removed with a `v6`
+`deleted_classes` migration, the same way `v5` removed `KimiGate`; the
+earlier tags stay so wrangler's history stays continuous. **`FFmpegGate`
+stays** — the container worker has `max_instances = 5` and the gate is what
+keeps a bulk run from 503ing on instance 6.
+
+**`workers/admin-bridge` was still on `wrangler@3` + `workers-types@^4`**
+while `pipeline` and `healer` were on 4/5. That family of mismatch is what
+broke the worker deploy silently for six weeks from 26 July. Aligned.
+
+### ⚠️ The composer's audio note was calling the Whisper shape that does not work
+
+`src/lib/transcribe.ts` posted `{ audio: Array.from(bytes) }` straight to
+`env.AI.run`. That is the exact shape `src/lib/whisper.ts` exists to document
+as **rejected**: the AI binding base64-encodes an array into a string, and
+the model schema accepts only `array` or `binary` —
+
+    5006: ... '/audio', 'string' not in 'array','binary'
+
+`runWhisper` was written for this. It tries eight JSON shapes, then POSTs the
+raw bytes to the Workers AI REST endpoint as `binary`, and it **remembers the
+shape that won** so every later call in the isolate goes straight there. Both
+Workers used it. Only `/api/v2/log/intake` — the composer's *talk* button —
+did not, and `Array.from()` on a multi-megabyte buffer built a JS array of
+several million numbers inside a Worker on the way to being rejected.
+
+`transcribeAudio` now normalizes what `runWhisper` returns and nothing else.
+**Two implementations of one call is the bug**; the fix is deleting the
+second one, not improving it. The REST fallback needs
+`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, and the bootstrap already
+pushes both to the Pages project.
+
+### ⚠️ Framework debt — Next 14.2.5 under a deprecated adapter
+
+`package.json` pins `next@14.2.5`. `@cloudflare/next-on-pages@1.13.16`
+declares `next: '>=14.3.0 && <=15.5.2'` — **we are below the adapter's own
+supported floor**, an unsupported pairing that happens to build. The adapter
+is itself deprecated in favour of the OpenNext Cloudflare adapter.
+
+This is real and it is not a cleanup. It is a framework major plus an adapter
+migration, and the Pages bindings are set by REST in the bootstrap workflow
+rather than read from `wrangler.toml` (see the lock above), so the binding
+wiring has to be re-proved on the far side. **Do it as its own pass with CI
+green at each step.** Do not bolt it onto unrelated work.
 
 ### ⚠️ `scripts/check-sql-columns.mjs` and `check-routes.mjs` — keep both green
 
@@ -704,7 +789,7 @@ preserves a bookmark to a product that no longer exists.
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 App Router |
+| Framework | Next.js 14.2.5, App Router |
 | Runtime | Cloudflare Workers / Pages Functions |
 | Hosting | Cloudflare Pages |
 | Package manager | **pnpm** — Cloudflare build uses `pnpm install --frozen-lockfile` |
@@ -713,7 +798,7 @@ preserves a bookmark to a product that no longer exists.
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows + Durable Object pipeline |
 | Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) — word-level timestamps, which the reader needs |
-| **Reading a recording** | **No model.** `src/lib/read-recording.ts` cuts `transcript_words` at his own pauses. |
+| **Reading a recording** | `src/lib/read-recording.ts` → `split-note.ts`. The model returns verbatim anchors and nothing else; the fallback cuts `transcript_words` at his own pauses. |
 | Looking at an uploaded image | Llama 4 Scout via `callChat` — the hold-back check and the words out of a screenshot. It reports what is visibly there and nothing else. |
 | Writing a search answer | `callReasoning()` in `src/lib/models.ts` — the one place a model writes prose, and every sentence's citations are checked in code before it is shown. |
 | Video processing | Cloudflare Container Worker running FFmpeg (`workers/ffmpeg`) — transcode, thumbnail, audio extract |
@@ -846,7 +931,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | File | Purpose |
 |---|---|
 | `models.ts` | **The unified LLM abstraction.** Model registry (`MODELS.HARD = gpt-oss-120b`, `MODELS.IMAGE = flux-1-schnell`, etc.); `callReasoning()` for hard tasks (with Llama 70B auto-fallback). Every new generator routes through here. |
-| `read-recording.ts` | **How a recording reaches the log, and there is no model in it.** Reads `transcript_words` and cuts at his own pauses. Never add a model call to this file. |
+| `read-recording.ts` | **How a recording reaches the log.** Reads `transcript_words`, gets the seams from `splitNote`, and falls back to cutting at his own pauses. The model says WHERE only, by quoting. Never let anything here write a word. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
 | `transcribe.ts` | Whisper, with word-level timestamps — which `read-recording.ts` needs and without which a recording is not read at all. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
@@ -878,13 +963,15 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 - Large files go direct to R2 via presigned URLs — never through API routes.
 
 **Models:**
-- **There are three places a model runs, and that is all of them.** The
+- **There are four places a model runs, and that is all of them.** The
   hold-back check on an uploaded image (what is visibly on it); the words out
-  of a screenshot; and the answer on `/search`, whose every sentence has its
-  citations checked in code before it is shown. A fourth would need a reason
+  of a screenshot; the answer on `/search` and `/month`, whose every sentence
+  has its citations checked in code before it is shown; and `splitNote`,
+  which returns verbatim anchors and never prose. A fifth would need a reason
   written down next to it.
-- **Never add a model to `read-recording.ts`.** That path is what the old
-  product got wrong.
+- **Never let a model WRITE in the read path.** `read-recording.ts` may ask
+  where a seam is; it may never ask for a sentence. The old product asked
+  for sentences, and that is what he stopped trusting.
 
 **Voice preservation:**
 - **Nothing the operator said is ever cleaned up.** Hesitations, profanity,

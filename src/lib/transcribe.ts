@@ -1,11 +1,28 @@
 /**
  * Transcription via Cloudflare Workers AI Whisper.
  *
- * Replaces Groq Whisper + Replicate Whisper fallback. Same vendor as the rest
- * of the stack.
- *
  * Model: @cf/openai/whisper-large-v3-turbo
- * Returns word-level timestamps suitable for the transcript_words table.
+ * Returns word-level timestamps suitable for the transcript_words table —
+ * which is the whole reason this path matters, because a recording with no
+ * word timings is never read onto the log at all.
+ *
+ * ⚠️ **The call itself belongs to `src/lib/whisper.ts`, not here.** Until
+ * 8 Sep this file posted `{ audio: Array.from(bytes) }` directly, which is
+ * the shape `whisper.ts` documents as rejected by the model schema: the AI
+ * binding base64-encodes an array into a string, and the schema accepts
+ * only `array` or `binary` —
+ *
+ *   5006: ... '/audio', 'string' not in 'array','binary'
+ *
+ * So the composer's audio note went to the one shape known not to work,
+ * while the two Workers went through `runWhisper`, which tries eight JSON
+ * shapes and then POSTs the raw bytes to the Workers AI REST endpoint as
+ * `binary`. It also remembers the shape that won, so every later call in
+ * the isolate goes straight there. `Array.from()` on a multi-megabyte
+ * buffer was the second cost — a JS array of several million numbers built
+ * inside a Worker to be thrown away.
+ *
+ * This file now normalizes what `runWhisper` returns and nothing else.
  *
  * Pricing: Workers AI is billed by neurons. Whisper-large-v3-turbo at
  * roughly 10k neurons / minute of audio. Workers Paid plan ($5/mo) includes
@@ -15,7 +32,7 @@
  *   const result = await transcribeAudio(env, audioBytes)
  */
 
-import type { Ai } from '@cloudflare/workers-types'
+import { runWhisper } from '@/lib/whisper'
 
 export interface TranscribeWord {
   word: string
@@ -37,6 +54,11 @@ export interface TranscribeEnv {
   // different lib context (the DOM `Response` vs the Workers one) — a type
   // error about `gateway()`, on a function that never calls it.
   AI: { run: (model: any, args: any) => Promise<any> }
+  // The REST fallback in `runWhisper` needs these. Absent, it still tries
+  // every JSON shape first — it just has nothing left when they all fail.
+  CLOUDFLARE_ACCOUNT_ID?: string
+  CF_AI_TOKEN?: string
+  CLOUDFLARE_API_TOKEN?: string
 }
 
 /**
@@ -52,17 +74,8 @@ export async function transcribeAudio(
 ): Promise<TranscribeResult> {
   const bytes = audioBytes instanceof Uint8Array ? audioBytes : new Uint8Array(audioBytes)
 
-  // Workers AI Whisper accepts a Uint8Array directly. The model returns a
-  // text field plus optional word/segment arrays.
-  const response: any = await env.AI.run(
-    '@cf/openai/whisper-large-v3-turbo' as any,
-    {
-      audio: Array.from(bytes),
-      task: 'transcribe',
-      // Returns timestamps when available
-      // (model behavior varies by version — present at time of writing)
-    } as any,
-  )
+  // One implementation of the call, and it is the one that works.
+  const response: any = await runWhisper(env, bytes)
 
   // Normalize the response into our shape. Workers AI returns different field
   // names across models / versions; we map the common ones.
