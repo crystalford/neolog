@@ -121,6 +121,16 @@ jobs:
       - name: Every day in exactly one week
         run: node scripts/test/month.mjs
 
+      # Five routes answer without signing in. A sixth is not an error
+      # anywhere — it builds, typechecks, deploys, and serves whatever it
+      # queries to anyone who asks. And being open is not itself the bug:
+      # /sitemap.xml was open on purpose and published the wrong SET, because
+      # `entry_count > 0` counts private entries too. So this checks both —
+      # that the list of open routes is the recorded one, and that an open
+      # route reading the log filters it.
+      - name: Nothing new answers without signing in
+        run: node scripts/check-auth-surface.mjs
+
       # check-routes.mjs covers a fetch to a path that was never built. This
       # is the other direction, and it hides differently: a route with no
       # caller is not an error anywhere — it builds, it typechecks, it

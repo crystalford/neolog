@@ -842,11 +842,18 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
 | **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
 
-### ⚠️ Five routes have no `requireOperator`, and that is the whole list
+### ⚠️ Five routes have no `requireOperator`, and `check-auth-surface.mjs` holds the line
 
 `/feed.xml` · `/feed.json` · `/llms.txt` · `/sitemap.xml` · `/api/debug/whoami`.
-Everything else in `src/app/api` authenticates. **Check this list before
-adding a sixth**, and check what a new one selects.
+Everything else in `src/app/api` authenticates, and **`check-auth-surface.mjs`
+fails CI on a sixth**. It checks two things, because being open is not itself
+the bug: that the list of open routes is the recorded one, and that an open
+route reading `log_entries` or `pages` filters what it returns.
+
+⚠️ It matches the CALL `loadPublicFeed(`, not the import — the first version
+passed a route that still imported the gate and had stopped calling it, which
+is exactly how one goes missing during an edit. Both failure modes were
+proved by breaking the code and watching it fail.
 
 The four feeds go through `loadPublicFeed`, which hard-codes
 `visibility = 'public' AND author = 'operator'` with no flag to turn it off —
