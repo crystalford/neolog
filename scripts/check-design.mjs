@@ -42,14 +42,14 @@ const PAGES = [
   ['headings',   'src/app/(app)/pages/page.tsx',         5],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    16],
   ['search',     'src/app/(app)/search/page.tsx',       10],
-  ['month',      'src/app/(app)/month/[ym]/page.tsx',   19],
+  ['month',      'src/app/(app)/month/[ym]/page.tsx',   18],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
-  ['clear',      'src/app/(app)/clear/page.tsx',        7],
-  ['triage',     'src/app/(app)/triage/page.tsx',       3],
+  ['clear',      'src/app/(app)/clear/page.tsx',        5],
+  ['triage',     'src/app/(app)/triage/page.tsx',       2],
   // takeout.html — "everything out, and the bill" — is this page.
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
   // from the log"): what the Markdown looks like, not a route.
-  ['takeout',    'src/app/(app)/export/page.tsx',       10],
+  ['takeout',    'src/app/(app)/export/page.tsx',       9],
   ['dossier',    'src/app/(app)/facts/page.tsx',         5],
   // Its last five are .was (the struck previous wording of a changed
   // claim) and .eg (an example of a machine rephrasing a line) — both need
@@ -69,19 +69,19 @@ const PAGES = [
   // wins over a page.
   ['public-log', 'src/app/(app)/public/page.tsx',       8],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    10],
-  ['writing',    'src/app/(app)/writing/page.tsx',      6],
+  ['writing',    'src/app/(app)/writing/page.tsx',      5],
   // writing.html's title is "an essay you wrote" — it covers the mechanic
   // AND one document, so the detail page is measured against it too.
-  ['writing',    'src/app/(app)/writing/[id]/page.tsx', 15],
-  ['screenshots','src/app/(app)/screenshots/page.tsx',  9],
-  ['messages',   'src/app/(app)/messages/page.tsx',     21],
+  ['writing',    'src/app/(app)/writing/[id]/page.tsx', 5],
+  ['screenshots','src/app/(app)/screenshots/page.tsx',  8],
+  ['messages',   'src/app/(app)/messages/page.tsx',     10],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live
   // there.
-  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 12],
-  ['walk',       'src/app/(app)/walk/[id]/page.tsx',    14],
+  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 10],
+  ['walk',       'src/app/(app)/walk/[id]/page.tsx',    13],
   ['now',        'src/app/(app)/now/page.tsx',           1],
-  ['connections','src/app/(app)/ways-in/page.tsx',      16],
+  ['connections','src/app/(app)/ways-in/page.tsx',      15],
 ]
 
 /**
@@ -110,6 +110,29 @@ const NO_DESIGN_PAGE = {
 
 const SHELL = new Set(['page','wrap','mh','lock','mk','wm','pv','back','crumb','ft','r','sep','on','logpage','grid','main','rail'])
 
+/**
+ * The design package talking about itself, on nearly every page — and never
+ * product. Counting these as drift charged twenty-odd surfaces for markup
+ * that would be a bug if it shipped.
+ *
+ * ⚠️ Two entries only, and both were read before being put here. This is not
+ * a place to send a class that is merely hard to build: a class belongs here
+ * when rendering it in the product would be WRONG, not when it is unfinished.
+ */
+const PACKAGE_FURNITURE = new Set([
+  // "A page from the spec — one mechanic, shown. The product itself is the
+  // log and the expanded entry." A banner on 25 of the 74 pages telling the
+  // reader they are looking at an illustration. Shipping it would be the
+  // product announcing it is a mock-up.
+  'specnote',
+  // The principles block at the foot of a spec page, restating the rule the
+  // page demonstrates — "Two owners, one entry", "Forwarded, never pulled".
+  // On 24 pages. The product ENFORCES those rules in code; printing them
+  // under the feature would be the log explaining itself, which is the
+  // opposite of §0 rule 2.
+  'rules',
+])
+
 function classesInMarkup(html) {
   const out = new Set()
   for (const m of html.matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) if (c) out.add(c)
@@ -135,16 +158,40 @@ const only = process.argv[2]
 const rows = []
 let over = 0
 
+// One row per DESIGN page, not per route. `messages.html` covers the list and
+// the thread, `writing.html` the shelf and the piece — SPEC §3, "one design,
+// two views: nothing is designed twice". Two rows for one page printed the
+// same number twice once the measure became the union.
+const byDesign = new Map()
 for (const [page, file, budget] of PAGES) {
+  if (!byDesign.has(page)) byDesign.set(page, { files: [], budget })
+  byDesign.get(page).files.push(file)
+  // Where two routes carried different budgets, the shared one is the lower:
+  // a budget is a debt, and the union cannot owe more than its smaller half.
+  byDesign.get(page).budget = Math.min(byDesign.get(page).budget, budget)
+}
+
+for (const [page, { files, budget }] of byDesign) {
   if (only && page !== only) continue
   const design = `design/markup/${page}.html`
   if (!existsSync(design)) { console.error(`  design/markup/${page}.html missing`); over++; continue }
-  if (!existsSync(file)) { console.error(`  ${file} missing — did a route move?`); over++; continue }
+  for (const f of files) {
+    if (!existsSync(f)) { console.error(`  ${f} missing — did a route move?`); over++ }
+  }
 
   const used = classesInMarkup(readFileSync(design, 'utf8'))
-  const mine = classesInPage(file)
-  const missing = [...used].filter(c => !mine.has(c) && !SHELL.has(c)).sort()
-  rows.push({ page, file, n: missing.length, budget, missing })
+  // ⚠️ One design page can cover TWO routes — SPEC §3, "one design, two
+  // views: nothing is designed twice". `messages.html` is the list and the
+  // thread; `writing.html` is the shelf and the piece. Measuring each route
+  // against the whole page separately charged the list for the thread's
+  // classes and the thread for the list's, so both carried debt for markup
+  // that exists in the other half. The measure is the union.
+  const mine = new Set()
+  for (const f of files) for (const c of classesInPage(f)) mine.add(c)
+  const missing = [...used]
+    .filter(c => !mine.has(c) && !SHELL.has(c) && !PACKAGE_FURNITURE.has(c))
+    .sort()
+  rows.push({ page, files, n: missing.length, budget, missing })
   if (missing.length > budget) over++
 }
 
@@ -152,7 +199,9 @@ const w = Math.max(...rows.map(r => r.page.length))
 for (const r of rows) {
   const flag = r.n > r.budget ? '  DRIFTED' : r.n < r.budget ? '  ↓ lower the budget' : ''
   console.log(`  ${r.page.padEnd(w)}  ${String(r.n).padStart(3)} / ${String(r.budget).padEnd(3)} unused${flag}`)
-  if (r.n > r.budget) console.log(`      ${r.missing.join(' ')}`)
+  // Naming the classes is the whole point when you are working a budget
+  // down: a count says a page has drifted, the list says where to start.
+  if (r.n > r.budget || only) console.log(`      ${r.missing.join(' ')}`)
 }
 console.log(`\n${rows.length} pages measured against design/. ${Object.keys(NO_DESIGN_PAGE).length} surfaces have no design page (listed in this file, with why).`)
 

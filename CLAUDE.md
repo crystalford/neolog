@@ -954,6 +954,31 @@ writing in his voice on a surface that presents itself as a record. `/public`
 keeps `mic opts or yl yrs` — the composer and the coverage bar, which SPEC §3
 says are not on the public side. Both are recorded at the budget.
 
+**Two things the checker was counting that were never drift**, found while
+working the budgets down — together they were charging the product about
+forty-seven classes it should never have owed:
+
+- **The package talking about itself.** `.specnote` is a banner on 25 of the
+  74 pages: *"A page from the spec — one mechanic, shown. The product itself
+  is the log and the expanded entry."* `.rules` is the principles block at the
+  foot of 24 of them, restating the rule the page demonstrates. Shipping the
+  first would be the product announcing it is a mock-up; shipping the second
+  would be the log explaining itself under the feature, which is the opposite
+  of §0 rule 2. They are in `PACKAGE_FURNITURE` with that reasoning beside
+  them. ⚠️ **That set is not for a class that is merely unbuilt** — a class
+  belongs there when rendering it would be WRONG.
+- **One design page measured twice.** SPEC §3: *"one design, two views:
+  nothing is designed twice."* `messages.html` is the list and the thread;
+  `writing.html` is the shelf and the piece. Measuring each route against the
+  whole page separately charged the list for the thread's classes and the
+  thread for the list's — `messages` carried 21 and 12 for markup that existed
+  in the other half. The measure is now the **union of a design page's
+  routes**, printed as one row: 10 and 5.
+
+Running the checker with a page name (`node scripts/check-design.mjs month`)
+lists the classes, not just the count — a number says a page has drifted, the
+list says where to start.
+
 ## Design system
 
 Pure black (`#000`), cool-gray foregrounds, **one signal colour: steel
