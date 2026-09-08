@@ -1,0 +1,129 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;
+  --fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;
+  --steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--terra:#e6634a;
+  --body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+.wrap{max-width:1140px;margin:0 auto;padding:0 44px}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}
+.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg);flex-shrink:0}.mk svg{width:100%;height:100%;display:block}
+.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap;flex-shrink:0}
+.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}.mh nav a:hover,.mh nav a.on{color:var(--fg)}
+.top{padding:26px 0 0;max-width:800px}
+h1{font-size:28px;font-weight:300;letter-spacing:-0.9px;color:var(--fg);line-height:1.25;text-wrap:pretty}
+h1 b{font-weight:450}
+.top p{font-size:15px;color:var(--fg-2);margin-top:12px;line-height:1.6;text-wrap:pretty}
+.top p b{color:var(--fg);font-weight:450}
+.st{display:grid;grid-template-columns:120px 1fr;gap:28px;padding:44px 0 0;align-items:baseline}
+.st .n{font-size:12px;color:var(--fg-4);white-space:nowrap}
+.st .n b{display:block;font-size:22px;font-weight:300;color:var(--fg);letter-spacing:-0.6px}
+.st h2{font-size:20px;font-weight:300;letter-spacing:-0.5px;color:var(--fg);line-height:1.35;text-wrap:pretty}
+.st h2 b{font-weight:450}
+.st p{font-size:14px;color:var(--fg-3);margin-top:8px;line-height:1.55;max-width:680px;text-wrap:pretty}
+.body{margin-left:148px;margin-top:18px}
+
+/* the entry on the log while it's working */
+.en{border:1px solid var(--line-1);border-radius:10px;background:var(--bg-1);padding:14px 18px;display:grid;grid-template-columns:64px 1fr;gap:18px}
+.en .t{font-family:var(--mono);font-size:11px;color:var(--fg-4);padding-top:3px}
+.en .x{font-size:15px;color:var(--fg-1);line-height:1.5}
+.en .x b{color:var(--fg);font-weight:450}
+.en .x i{font-style:normal;font-size:11.5px;color:var(--fg-4);margin-left:8px}
+.en .prog{margin-top:9px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--fg-3)}
+.en .prog .bar{flex:1;max-width:260px;height:3px;background:var(--bg-3);border-radius:2px;overflow:hidden}
+.en .prog .bar i{display:block;height:100%;width:58%;background:var(--steel);border-radius:2px}
+
+/* the steps */
+.steps{border:1px solid var(--line-1);border-radius:12px;overflow:hidden;background:var(--bg-1)}
+.stp{display:grid;grid-template-columns:28px 1fr auto;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);align-items:start}
+.stp:last-child{border-bottom:0}
+.stp .ic{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;margin-top:2px;font-size:10.5px;font-weight:600}
+.stp.ok .ic{background:rgba(52,193,168,.18);color:var(--teal)}
+.stp.run .ic{border:1.5px solid var(--steel);position:relative}
+.stp.run .ic::after{content:'';width:6px;height:6px;border-radius:50%;background:var(--steel);animation:p 1.4s ease-in-out infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.stp.wait .ic{border:1.5px solid var(--line-3)}
+.stp.fail .ic{background:rgba(230,99,74,.18);color:var(--terra)}
+.stp .n{font-size:14px;color:var(--fg);font-weight:450}
+.stp .n em{font-style:normal;font-weight:300;color:var(--fg-3);margin-left:8px;font-size:13px}
+.stp .d{font-size:12.5px;color:var(--fg-3);margin-top:3px;line-height:1.5}
+.stp .d b{color:var(--fg-1);font-weight:450}
+.stp .m{font-family:var(--mono);font-size:10.5px;color:var(--fg-4);white-space:nowrap;padding-top:3px;text-align:right}
+.stp.wait .n,.stp.wait .d{color:var(--fg-4)}
+.stp.fail .d{color:var(--fg-2)}
+.err{margin-top:8px;padding:9px 12px;border-radius:7px;background:var(--bg-2);border:1px solid var(--line-1);font-family:var(--mono);font-size:11px;color:var(--fg-3);line-height:1.5;word-break:break-word}
+.fix{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.fix button,.fix a{font-size:12px;font-weight:500;padding:6px 11px;border-radius:6px;border:1px solid var(--line-2);color:var(--fg-1);white-space:nowrap}
+.fix .p{background:var(--fg);color:#000;border-color:var(--fg)}
+.fix span{font-size:11.5px;color:var(--fg-4)}
+.note{margin-top:12px;font-size:12.5px;color:var(--fg-3);line-height:1.6;max-width:720px}
+.note b{color:var(--fg-1);font-weight:450}
+
+/* the tier picker — cost before you spend it */
+.tier{border:1px solid var(--line-1);border-radius:12px;background:var(--bg-1);padding:16px 20px}
+.tier .k{font-size:12px;color:var(--fg-4);margin-bottom:12px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{border:1px solid var(--line-1);border-radius:10px;padding:12px 14px;cursor:pointer}
+.opt.on{border-color:var(--line-3);background:var(--bg-2)}
+.opt .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.opt .h b{font-size:14px;font-weight:450;color:var(--fg)}
+.opt .h span{font-family:var(--mono);font-size:12px;color:var(--fg-2);white-space:nowrap}
+.opt p{font-size:12.5px;color:var(--fg-3);margin-top:5px;line-height:1.5}
+.tier .go{display:flex;align-items:center;gap:12px;margin-top:14px}
+.tier .go button{font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;background:var(--fg);color:#000}
+.tier .go span{font-size:12.5px;color:var(--fg-3)}
+.tier .go span b{color:var(--fg);font-weight:450}
+
+.rules{margin-top:44px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rules>div{background:var(--bg);padding:18px 20px}
+.rules b{font-size:14px;font-weight:450;color:var(--fg);display:block;line-height:1.4}
+.rules p{font-size:13px;color:var(--fg-2);margin-top:7px;line-height:1.55;text-wrap:pretty}
+.ft{margin-top:60px;padding:24px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-size:12px;color:var(--fg-4)}
+.ft span,.ft a{white-space:nowrap}.ft .r{display:flex;gap:18px}.ft a:hover{color:var(--fg-2)}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* the rail, same as the log's */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:48px;align-items:start;padding-top:20px}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;gap:10px}
+.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px;white-space:nowrap}
+.rc .i{padding:11px 14px;font-size:13px;color:var(--fg-2);line-height:1.5}
+.rc .i+.i{border-top:1px solid var(--line)}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+.rc .i a{color:var(--fg-1);border-bottom:1px solid var(--line-2)}
+.rc .acts{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px}
+.rc .acts a{font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--line-1);color:var(--fg-2);white-space:nowrap}
+.rc .acts a:hover{color:var(--fg);border-color:var(--line-3)}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

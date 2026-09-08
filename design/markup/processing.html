@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — a vlog, still processing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+</head>
+<body><div class="wrap">
+<header class="mh">
+  <a class="lock" href="log.html"><span class="mk"></span><span class="wm">neolog</span></a>
+  <span class="pv">private · a recording, before it's readable</span>
+  <nav><a href="log.html">home</a><a href="search.html">search</a><a href="headings.html">index</a></nav>
+</header><div class="specnote">A page from the spec — one mechanic, shown. <a href="expanded.html">The product itself is the log and the expanded entry.</a></div>
+<div class="grid">
+<main>
+<section class="top">
+  <h1>You dropped a 31-minute recording in at 09:14. <b>Here's what the log shows you for the next four minutes — and what it shows when one step breaks.</b></h1>
+  <p>A video isn't readable the moment it lands. It has to be re-encoded, its date found, its audio pulled out and transcribed, and then read. <b>Each step stands on its own</b> — if one fails, the others still finish, and the log tells you exactly which one broke and why, in words, not a spinner.</p>
+</section>
+<!-- 1 -->
+<div class="st"><div class="n"><b>1</b>on the log · 09:14</div><div><h2>The entry appears immediately, <b>before anything has been read.</b></h2><p>Dated from the file itself, not from now. You can already see it in the day; you just can't read it yet.</p></div></div>
+<div class="body">
+  <div class="en"><span class="t">09:14</span><div class="x"><b>A recording, 31:06.</b> Recorded yesterday, 17:40 — the date is from the file.<i>arrived · not readable yet</i><div class="prog"><span>Transcribing</span><div class="bar"><i></i></div><span>about 2 minutes left</span></div></div></div>
+</div>
+<!-- 2 -->
+<div class="st"><div class="n"><b>2</b>the steps</div><div><h2>Open it and every step is a line: <b>done, working, waiting.</b></h2><p>These are the real steps the recording goes through. Times are real too — a 31-minute file takes about four minutes end to end.</p></div></div>
+<div class="body">
+  <div class="steps">
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Stored<em>the original, untouched</em></div><div class="d">2.1 GB, kept whole. Nothing after this step changes the file.</div></div><span class="m">09:14 · 0:41</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Made a playable copy</div><div class="d">Re-encoded so it plays in the browser. The original is still the original.</div></div><span class="m">09:15 · 1:12</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Found the date<em>from inside the file</em></div><div class="d">Recorded <b>4 Sep 2026, 17:40</b> — read from the video's own timestamp. If it had none, the log would try the filename, then ask you.</div></div><span class="m">09:16 · 0:02</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Picked a frame</div><div class="d">The thumbnail. Also what the log looks at if there turns out to be no speech.</div></div><span class="m">09:16 · 0:03</span></div>
+    <div class="stp run"><span class="ic"></span><div><div class="n">Transcribing<em>Whisper · in 8 chunks</em></div><div class="d">Audio split into ~4-minute pieces, each transcribed with word timings, then stitched back. <b>5 of 8 done.</b></div></div><span class="m">09:16 · running</span></div>
+    <div class="stp wait"><span class="ic"></span><div><div class="n">Reading it</div><div class="d">Splitting by subject, finding the key sentences, naming what's in it — four passes, run together. Starts when the transcript exists.</div></div><span class="m">waiting</span></div>
+    <div class="stp wait"><span class="ic"></span><div><div class="n">Filing it</div><div class="d">Attaching to pages, people and places by what it says. The last step.</div></div><span class="m">waiting</span></div>
+  </div>
+</div>
+<!-- 3 -->
+<div class="st"><div class="n"><b>3</b>when one breaks</div><div><h2>A step fails. <b>The others don't.</b> You get the reason in words, and one button.</h2><p>Same recording, different morning. Transcription timed out on chunk 6. Everything before it is done and stays done; everything after it waits. The recording is safe throughout — it was stored first.</p></div></div>
+<div class="body">
+  <div class="steps">
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Stored</div></div><span class="m">09:14</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Made a playable copy</div></div><span class="m">09:15</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Found the date</div></div><span class="m">09:16</span></div>
+    <div class="stp ok"><span class="ic">✓</span><div><div class="n">Picked a frame</div></div><span class="m">09:16</span></div>
+    <div class="stp fail"><span class="ic">!</span><div><div class="n">Transcribing<em>stopped at chunk 6 of 8</em></div><div class="d"><b>The transcription service didn't answer in time for one piece of the audio.</b> Chunks 1–5 and 7–8 are done. This usually clears on a retry; the log already tried once on its own.</div>
+      <div class="err">whisper-large-v3-turbo · chunk 6 (20:00–24:00) · 504 Gateway Timeout after 60s · attempt 2 of 2 · worker v2026.09.04-1</div>
+      <div class="fix"><button class="p">Try chunk 6 again</button><button>Skip it — transcribe the rest</button><a href="#">watch it without a transcript</a><span>the video plays fine either way</span></div>
+    </div><span class="m">09:19 · failed</span></div>
+    <div class="stp wait"><span class="ic"></span><div><div class="n">Reading it</div><div class="d">Waiting on the transcript.</div></div><span class="m">waiting</span></div>
+    <div class="stp wait"><span class="ic"></span><div><div class="n">Filing it</div></div><span class="m">waiting</span></div>
+  </div>
+  <p class="note"><b>What "skip it" means:</b> four minutes of the recording would have no words, and the log says so on the transcript with a gap marker at 20:00. You can always come back and fill it. <b>What it never means:</b> losing anything. The audio for chunk 6 is still there.</p>
+</div>
+<!-- 4 -->
+<div class="st"><div class="n"><b>4</b>reading it again</div><div><h2>You can have it read more carefully. <b>It tells you the cost before you say yes.</b></h2><p>The default reading is the cheap one — about four cents a recording, and usually right. When a recording matters — when you want the wording of what came out of it to be closer to yours — you can have it read with the better model. Per recording, not a setting you forget about.</p></div></div>
+<div class="body">
+  <div class="tier">
+    <div class="k">How carefully should this one be read?</div>
+    <div class="opts">
+      <div class="opt on"><div class="h"><b>The usual way</b><span>~$0.04</span></div><p>The default. Good at finding what's in it; sometimes flattens how you said it. This recording was read this way at 09:21.</p></div>
+      <div class="opt"><div class="h"><b>More carefully</b><span>~$0.17</span></div><p>The better model reads all four passes. Keeps more of your phrasing in the key sentences. Worth it when this one's going public.</p></div>
+    </div>
+    <div class="go"><button>Read it again, more carefully</button><span>This will spend <b>about $0.17</b>. The first reading is kept; you can compare the two.</span></div>
+  </div>
+</div>
+<div class="rules">
+  <div><b>Stored first, always.</b><p>The original is written before any other step runs. Every failure after that is a failure to <em>read</em> the file, never a risk to the file.</p></div>
+  <div><b>Each step stands alone.</b><p>Transcription failing doesn't undo the date or the thumbnail. What's done stays done; what's waiting says so; what broke says why, in words, with one button.</p></div>
+  <div><b>Cost before spend.</b><p>The default reading is cheap. Reading more carefully is a per-recording choice with the price on the button — never a plan you're upsold into.</p></div>
+</div>
+</main>
+<aside class="rail"><div class="rc"><div class="h">On this page</div><div class="i">The entry appears immediately, before anything has been read.</div><div class="i">Open it and every step is a line: done, working, waiting.</div></div><div class="rc"><div class="h">Elsewhere</div><div class="acts"><a href="log.html">the log</a><a href="portal.html">every page</a></div></div></aside>
+</div>
+<footer class="ft"><span>neolog · a recording, processing</span><span class="r"><a href="vlog.html">the same vlog, finished</a><a href="batch.html">fifty at once</a><a href="index.html">everything</a></span></footer>
+</div></body></html>

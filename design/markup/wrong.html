@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — when it gets it wrong</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+</head>
+<body><div class="wrap">
+<header class="mh">
+  <a class="lock" href="log.html"><span class="mk"></span><span class="wm">neolog</span></a>
+  <span class="pv">private · correcting the log</span>
+  <nav><a href="log.html">home</a><a href="search.html">search</a><a href="headings.html">index</a></nav>
+</header><div class="specnote">A page from the spec — one mechanic, shown. <a href="expanded.html">The product itself is the log and the expanded entry.</a></div>
+<div class="grid">
+<main>
+<section class="top">
+  <h1>The log guesses about twenty times a day. <b>It will be wrong. What matters is that fixing it takes one tap.</b></h1>
+  <p>It guesses which day a photo belongs to, whether a voice note is about the job or something else, whether one recording is one thought or three, and what to call a thing you never named. <b>A system that guesses this often cannot be built on being right.</b> It has to be built on being cheap to correct — and on keeping a record of its own mistakes, so you can see whether it is getting better.</p>
+</section>
+<!-- ===== 1 ===== -->
+<div class="st"><div class="n"><b>5</b>real ways</div><div><h2>Five things the log gets wrong, and what fixing each one costs.</h2><p>Every fix is one tap. None opens a dialog, asks you to confirm, or makes you find a settings screen. The correction happens where the mistake is.</p></div></div>
+<div class="body">
+  <article class="case" style="--h:var(--ochre)">
+    <div class="hd"><b>A photo with no timestamp</b><span class="kind">wrong date</span><span>4 Sep, from the phone</span></div>
+    <div class="two">
+      <div class="said"><div class="l">What the log did</div><div class="x">Placed it on <b>4 September</b>, the day it arrived.<em>the file had no date in it, so the log used the day it was uploaded and marked the date approximate</em></div></div>
+      <div><div class="l">What was actually true</div><div class="x">A scan of a photograph from <b>2003</b>.<em>the office move — which is the only thing that dates that whole year</em></div></div>
+    </div>
+    <div class="fix"><div class="t"><b>Type a year in the date field.</b> The photo moves to 2003, and because it now sits inside the Infinite-ads page, everything on that page's page recounts.</div><div class="a"><span class="cost">one field</span><button class="b">Set the date</button></div></div>
+  </article>
+  <article class="case" style="--h:var(--steel)">
+    <div class="hd"><b>A voice note about a different job</b><span class="kind">wrong attach</span><span>2 Sep, 08:15</span></div>
+    <div class="two">
+      <div class="said"><div class="l">What the log did</div><div class="x">Attached it to <b>the job</b>, because you said "the office" and "first week".<em>attached by the words — no question asked, per the rule</em></div></div>
+      <div><div class="l">What was actually true</div><div class="x">You were talking about <b>a friend's</b> new job, not yours.<em>the log has no way to know whose office you meant</em></div></div>
+    </div>
+    <div class="fix"><div class="t"><b>Detach it.</b> It becomes a plain entry on 2 September, still there, still dated. Nothing else changes and nothing is lost.</div><div class="a"><span class="cost">one tap</span><button class="b">Detach</button><button class="b gh">Move to another</button></div></div>
+  </article>
+  <article class="case" style="--h:var(--violet)">
+    <div class="hd"><b>One thought read as three</b><span class="kind">wrong split</span><span>4 Sep, 07:50</span></div>
+    <div class="two">
+      <div class="said"><div class="l">What the log did</div><div class="x">Split the shower note into <b>three pages</b>: performers vs. writers, records over tours, old songs on social.<em>they read as three subjects because you moved between them</em></div></div>
+      <div><div class="l">What was actually true</div><div class="x">One argument with three parts. <b>Splitting it lost the argument.</b><em>the parts only mean something in that order</em></div></div>
+    </div>
+    <div class="fix"><div class="t"><b>Merge them.</b> One page, three parts, in the order you said them. The three separate pages become one and the thread keeps every turn.</div><div class="a"><span class="cost">one tap</span><button class="b">Merge into one</button><button class="b gh">Keep two, merge two</button></div></div>
+  </article>
+  <article class="case" style="--h:var(--teal)">
+    <div class="hd"><b>A name the log invented</b><span class="kind">wrong name</span><span>31 Aug</span></div>
+    <div class="two">
+      <div class="said"><div class="l">What the log did</div><div class="x">Called it <b>"the job"</b> and asked once where you work now.<em>you never named it, so the log used your own words for it</em></div></div>
+      <div><div class="l">What was actually true</div><div class="x">Not a job. <b>Freelance work</b>, three clients, no employer.<em>a different kind of thing entirely</em></div></div>
+    </div>
+    <div class="fix"><div class="t"><b>Rename it and change its kind.</b> Everything attached over three weeks follows it. The old name stays in the log, dated, because it is what the log actually called it at the time.</div><div class="a"><span class="cost">one field</span><button class="b">Rename</button></div></div>
+  </article>
+  <article class="case" style="--h:var(--rose)">
+    <div class="hd"><b>A page made from nothing</b><span class="kind">shouldn't exist</span><span>3 Sep</span></div>
+    <div class="two">
+      <div class="said"><div class="l">What the log did</div><div class="x">Made a page called <b>"the deck"</b> from one passing mention.<em>one mention makes a page — that is the rule, and this is its cost</em></div></div>
+      <div><div class="l">What was actually true</div><div class="x">You mentioned a deck once. <b>You do not think about decks.</b><em>it was a sentence about a Saturday</em></div></div>
+    </div>
+    <div class="fix"><div class="t"><b>"Not a page, just a thought."</b> The page goes; the entry stays exactly where it was. The log will not make that page again from the same phrase.</div><div class="a"><span class="cost">one tap</span><button class="b">Not a page</button></div></div>
+  </article>
+</div>
+<!-- ===== 2 ===== -->
+<div class="st"><div class="n"><b>2</b>the log of it</div><div><h2>Every correction is itself an entry. <b>So the log keeps a dated record of its own mistakes.</b></h2><p>This is the part no other tool does, and it is the only honest answer to "will it be smart enough." You do not have to trust it. <b>You can read its error rate, by kind, over time</b> — and if it is not improving, you will know that too.</p></div></div>
+<div class="body">
+  <div class="rec">
+    <div class="hd"><b>Corrections, newest first</b><span>each one dated · each one reversible</span></div>
+    <div class="r"><span class="d">4 Sep 11:20</span><span class="w">Merged three pages back into one.</span><span class="k">wrong split</span><span class="o me">me</span></div>
+    <div class="r"><span class="d">4 Sep 09:12</span><span class="w">Moved a scanned photo from 2026 to 2003.</span><span class="k">wrong date</span><span class="o me">me</span></div>
+    <div class="r"><span class="d">3 Sep 22:04</span><span class="w">Removed the page "the deck".</span><span class="k">shouldn't exist</span><span class="o me">me</span></div>
+    <div class="r"><span class="d">2 Sep 14:02</span><span class="w">Firmed an approximate date after a photo from that morning agreed.</span><span class="k">date sharpened</span><span class="o it">the log</span></div>
+    <div class="r"><span class="d">31 Aug 18:30</span><span class="w">Detached a voice note that was about someone else's job.</span><span class="k">wrong attach</span><span class="o me">me</span></div>
+  </div>
+  <div class="rate">
+    <div><b>4</b><span>corrections this week, out of about 140 guesses</span></div>
+    <div><b>97%</b><span>of guesses left alone</span></div>
+    <div><b class="up">↓ 2.1×</b><span>wrong attaches, compared with the first week</span></div>
+    <div><b>0</b><span>corrections that lost anything — every one is reversible</span></div>
+  </div>
+</div>
+<!-- ===== 3 ===== -->
+<div class="st"><div class="n"><b>3</b>the hard case</div><div><h2>Some things the log should not try to guess at all.</h2><p>Cheap correction fixes a wrong guess. It does not fix a guess that should never have been made — the ones where being wrong is worse than being silent.</p></div></div>
+<div class="body">
+  <article class="case" style="--h:var(--fg-4)">
+    <div class="hd"><b>What a recording means</b><span class="kind">never guessed</span></div>
+    <div class="two">
+      <div><div class="l">What the log does</div><div class="x">Keeps the words, the date, and where it went.<em>and, on request, points at the passage that answers a question</em></div></div>
+      <div><div class="l">What it never does</div><div class="x">Tell you what you meant, how you felt, or what it says about you.<em>a wrong guess there is not a mistake to correct — it is the tool putting words in your mouth</em></div></div>
+    </div>
+    <div class="fix"><div class="t">Three more in this category: <b>why you did something</b>, <b>whether something was good</b>, and <b>who someone is to you</b>. On all four the log asks or stays quiet. It never fills them in.</div><div class="a"><span class="cost">no undo needed</span></div></div>
+  </article>
+</div>
+<div class="rules">
+  <div><b>The correction is where the mistake is.</b><p>No settings screen, no review queue, no confirmation dialog. The wrong thing is on the page in front of you and so is the fix.</p></div>
+  <div><b>Nothing is lost when you correct it.</b><p>Detaching leaves the entry. Renaming keeps the old name, dated. Merging keeps every turn. A correction changes what things mean, never what was said.</p></div>
+  <div><b>The log records being wrong.</b><p>Every correction is a dated entry, so the error rate is a number you can read rather than a feeling you have. If it is not improving, that shows.</p></div>
+</div>
+</main>
+<aside class="rail"><div class="rc"><div class="h">On this page</div><div class="i">Five things the log gets wrong, and what fixing each one costs.</div><div class="i">Some things the log should not try to guess at all.</div></div><div class="rc"><div class="h">Elsewhere</div><div class="acts"><a href="log.html">the log</a><a href="portal.html">every page</a></div></div></aside>
+</div>
+<footer class="ft"><span>neolog · correcting the log</span><span class="r2"><a href="flow.html">input to the log</a><a href="subject.html">a page</a><a href="index.html">everything</a></span></footer>
+</div></body></html>

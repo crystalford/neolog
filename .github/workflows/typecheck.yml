@@ -103,6 +103,15 @@ jobs:
       - name: The fold
         run: node scripts/test/fold.mjs
 
+      # How far each page has drifted from the design it is supposed to be.
+      # The home page and the feed were built close to the package and every
+      # other page was written in a vocabulary that RESEMBLED it — and
+      # nothing in the repo could tell the two apart, which is how the
+      # deployed site still looked like the old product weeks later. The
+      # budgets in that file are debts; the real number is zero.
+      - name: Pages have not drifted from the design
+        run: node scripts/check-design.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
 

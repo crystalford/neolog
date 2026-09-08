@@ -1,0 +1,111 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;
+  --fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;
+  --steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--sage:#84b16f;--terra:#e6634a;
+  --body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;letter-spacing:-0.01em}
+button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+a{color:inherit;text-decoration:none}
+.page{position:relative;min-height:100vh;background:radial-gradient(ellipse 900px 500px at 50% -10%,rgba(78,161,213,.05),transparent 62%),var(--bg)}
+.page::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:299;box-shadow:inset 0 0 240px 70px rgba(0,0,0,.72)}
+.wrap{max-width:940px;margin:0 auto;padding:0 44px;position:relative}
+
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}
+.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg)}.mk svg{width:100%;height:100%;display:block}
+.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}
+.mh nav a:hover,.mh nav a.on{color:var(--fg)}
+
+.hd{padding:44px 0 30px;border-bottom:1px solid var(--line)}
+.hd .k{font-family:var(--mono);font-size:10.5px;letter-spacing:2px;color:var(--fg-4);margin-bottom:14px}
+.hd h1{font-size:38px;font-weight:250;letter-spacing:-1.7px;color:var(--fg);line-height:1.06;max-width:740px;text-wrap:pretty}
+.hd p{font-size:17px;line-height:1.6;color:var(--fg-2);margin-top:16px;max-width:640px;text-wrap:pretty}
+.hd p a{color:var(--steel);border-bottom:1px solid rgba(78,161,213,.28)}
+.hd .upd{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--fg-4);margin-top:20px}
+
+.q{border-bottom:1px solid var(--line);padding:30px 0}
+.q .ask{font-size:23px;font-weight:300;letter-spacing:-0.7px;color:var(--fg);line-height:1.3;max-width:740px;text-wrap:pretty}
+.q .short{font-size:16.5px;line-height:1.6;color:var(--fg-1);margin-top:16px;max-width:660px;text-wrap:pretty;padding:16px 20px;background:var(--bg-1);border:1px solid var(--line-1);border-radius:10px;font-weight:300}
+.q .long{font-size:15px;line-height:1.7;color:var(--fg-2);margin-top:18px;max-width:660px;text-wrap:pretty}
+.q .long+.long{margin-top:14px}
+.q .long a{color:var(--steel);border-bottom:1px solid rgba(78,161,213,.28)}
+.q .ev{margin-top:20px;border:1px solid var(--line-1);border-radius:9px;background:var(--bg-1);overflow:hidden;max-width:660px}
+.q .ev .h{padding:10px 15px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10.5px;
+  letter-spacing:1.5px;color:var(--fg-4)}
+.q .ev .r{display:grid;grid-template-columns:88px 1fr;gap:14px;padding:11px 15px;align-items:baseline}
+.q .ev .r+.r{border-top:1px solid var(--line)}
+.q .ev .r em{font-style:normal;font-family:var(--mono);font-size:10.5px;color:var(--fg-4);letter-spacing:.4px;white-space:nowrap}
+.q .ev .r span{font-size:14px;color:var(--fg-2);line-height:1.5;text-wrap:pretty}
+.q .ev .r span b{color:var(--fg-1);font-weight:450}
+.q .src{font-family:var(--mono);font-size:10.5px;letter-spacing:1.3px;color:var(--fg-4);margin-top:16px}
+.q .src a{color:var(--fg-3);border-bottom:1px solid var(--line-2)}
+.q .src a:hover{color:var(--fg-1)}
+/* question tree — the sub-questions an engine fans out to */
+.tree{margin-top:22px;max-width:660px}
+.tree .th{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;color:var(--fg-4);margin-bottom:8px}
+.sq{padding:14px 0;border-top:1px solid var(--line)}
+.sq:last-child{border-bottom:1px solid var(--line)}
+.sq h3{font-size:15.5px;font-weight:450;color:var(--fg);letter-spacing:-0.3px;line-height:1.4;text-wrap:pretty}
+.sq p{font-size:14.5px;line-height:1.65;color:var(--fg-2);margin-top:7px;text-wrap:pretty}
+.sq p a{color:var(--steel);border-bottom:1px solid rgba(78,161,213,.28)}
+
+.held{margin-top:56px;padding:22px 24px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-1)}
+.held .k{font-family:var(--mono);font-size:10.5px;letter-spacing:1.7px;color:var(--fg-4);margin-bottom:14px}
+.held p{font-size:15px;line-height:1.65;color:var(--fg-2);max-width:640px;text-wrap:pretty}
+.held ul{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.held li{font-size:15.5px;color:var(--fg-1);font-weight:300;letter-spacing:-0.25px;padding-left:16px;position:relative;text-wrap:pretty}
+.held li::before{content:'';position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:50%;background:var(--fg-4)}
+
+.ft{margin-top:74px;padding:26px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;
+  font-family:var(--mono);font-size:11px;color:var(--fg-4);letter-spacing:.8px}
+.ft span,.ft a{white-space:nowrap}
+.ft .r{display:flex;gap:18px}
+.ft a:hover{color:var(--fg-2)}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* the rail, same as the log's */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:48px;align-items:start;padding-top:20px}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;gap:10px}
+.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px;white-space:nowrap}
+.rc .i{padding:11px 14px;font-size:13px;color:var(--fg-2);line-height:1.5}
+.rc .i+.i{border-top:1px solid var(--line)}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+.rc .i a{color:var(--fg-1);border-bottom:1px solid var(--line-2)}
+.rc .acts{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px}
+.rc .acts a{font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--line-1);color:var(--fg-2);white-space:nowrap}
+.rc .acts a:hover{color:var(--fg);border-color:var(--line-3)}
+
+.stamp{display:flex;align-items:center;gap:8px;padding:9px 0 0;font-size:11.5px;color:var(--fg-4)}.stamp i{width:5px;height:5px;border-radius:50%;background:var(--teal);display:block;flex-shrink:0}.stamp time{font-family:var(--mono);font-size:10.5px;color:var(--fg-3)}.stamp a{color:var(--fg-4);margin-left:auto;white-space:nowrap}.stamp a:hover{color:var(--fg-2)}
+.owner{display:flex;align-items:center;gap:16px;padding:8px 14px;margin-top:10px;border:1px dashed var(--line-2);border-radius:8px;font-size:12px;color:var(--fg-3)}.owner a{margin-left:auto;color:var(--fg);white-space:nowrap;border-bottom:1px solid var(--line-3)}
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

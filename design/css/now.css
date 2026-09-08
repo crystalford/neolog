@@ -1,0 +1,112 @@
+.lock{display:flex;align-items:center;gap:10px}
+.tolog{font-size:13px;color:var(--fg-3);transition:color .15s}.tolog:hover{color:var(--fg)}
+.wm{font-size:16px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.waves{position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:.82;transition:opacity .6s}
+body.hot .waves{opacity:.95}
+body.drag .waves{opacity:1}
+.slab{width:min(760px,100%);position:relative;border-radius:22px;padding:1px;
+  background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.04) 40%,rgba(78,161,213,.10));
+  box-shadow:0 40px 100px -40px rgba(0,0,0,.9),0 0 0 1px rgba(0,0,0,.6);transition:transform .5s cubic-bezier(.2,.7,.3,1),opacity .5s,box-shadow .4s,background .4s;
+  animation:rise .8s cubic-bezier(.2,.7,.3,1) both}
+.slab:focus-within{background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.05) 40%,rgba(78,161,213,.22));box-shadow:0 40px 100px -40px rgba(0,0,0,.9),0 0 0 1px rgba(0,0,0,.6),0 0 80px -30px rgba(78,161,213,.35)}
+@keyframes rise{from{opacity:0;transform:translateY(16px) scale(.985)}}
+.top{animation:fade .8s .1s ease both}
+@keyframes fade{from{opacity:0}}
+.cnt{position:absolute;right:22px;top:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;color:var(--fg-4);opacity:0;transition:opacity .3s;pointer-events:none;z-index:2}
+body.hot .cnt{opacity:1}
+body.rec .way#mic{color:var(--teal);background:rgba(52,193,168,.08);box-shadow:0 0 0 1px rgba(52,193,168,.35)}
+body.rec .way#mic::before{content:'';position:absolute;inset:-6px;border-radius:14px;border:1px solid rgba(52,193,168,.3);animation:ring 1.6s ease-out infinite}
+@keyframes ring{0%{transform:scale(.85);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+body.drag .slab{transform:scale(1.012)}
+body.drag .slab .in::after{content:'';position:absolute;inset:8px;border-radius:15px;border:1px dashed rgba(78,161,213,.45);pointer-events:none}
+@media (prefers-reduced-motion:reduce){.slab,.top{animation:none}body.rec .way#mic::before{animation:none}}
+.slab .in{border-radius:21px;background:linear-gradient(180deg,rgba(18,18,20,.92),rgba(11,11,12,.96));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);position:relative;overflow:hidden}
+.slab .in::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(78,161,213,.08),transparent 70%);pointer-events:none}
+body.hot .slab{transform:translateY(-2px)}
+body.drag .slab{box-shadow:0 40px 100px -40px rgba(0,0,0,.9),0 0 0 1px rgba(78,161,213,.5),0 0 60px -10px rgba(78,161,213,.35)}
+.att{display:flex;gap:8px;flex-wrap:wrap;padding:18px 22px 0}
+.att:empty{display:none}
+.chip{display:flex;align-items:center;gap:8px;padding:7px 11px 7px 9px;border:1px solid var(--line-2);border-radius:9px;font-size:12.5px;color:var(--fg-1);background:rgba(255,255,255,.025);animation:pop .35s cubic-bezier(.2,.7,.3,1)}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.98)}}
+.chip .ico{width:13px;height:13px;stroke:var(--c);flex-shrink:0}
+.chip em{font-style:normal;font-family:var(--mono);font-size:10.5px;letter-spacing:1px;color:var(--fg-4)}
+.chip button{color:var(--fg-4);line-height:1}.chip button:hover{color:var(--fg)}
+textarea{padding:24px 26px 8px;font-size:22px;font-weight:300;line-height:1.5;letter-spacing:-0.45px;min-height:120px;caret-color:var(--steel);max-height:56vh;overflow:auto}
+textarea::-webkit-scrollbar{width:6px}textarea::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+/* caret breathes when idle in an empty field — the only "prompt" there is */
+@keyframes caret{0%,45%{caret-color:var(--steel)}50%,95%{caret-color:rgba(78,161,213,.35)}}
+body:not(.hot) textarea:focus{animation:caret 2.4s ease-in-out infinite}
+/* chips: kind-tinted edge, hover reveals remove */
+.chip{position:relative;padding-left:11px;border-color:color-mix(in srgb,var(--c) 28%,var(--line-2));background:color-mix(in srgb,var(--c) 5%,rgba(255,255,255,.02))}
+.chip button{opacity:.5;transition:opacity .15s}.chip:hover button{opacity:1}
+/* ways: subtle key-cap look, active press */
+.way:active{transform:scale(.94)}
+.bar{position:relative}
+.bar::before{content:'';position:absolute;top:0;left:16px;right:16px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+/* slab inner light follows the cursor */
+.slab .in::before{background:radial-gradient(420px 260px at var(--mx,50%) var(--my,0%),rgba(78,161,213,.10),transparent 70%);transition:background .2s}
+body.rec .slab .in::before{background:radial-gradient(420px 260px at var(--mx,50%) var(--my,0%),rgba(52,193,168,.14),transparent 70%)}
+/* sent: text collapses into the slab as it settles */
+.slab.sent textarea{opacity:0;transform:translateY(-6px);transition:opacity .25s,transform .25s}
+/* ack shows what went in */
+.ack{font-size:10.5px;letter-spacing:2px}
+/* corner: keyboard hint appears only when the field is empty and focused for a while */
+.hint{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);font-size:12.5px;color:var(--fg-4);opacity:0;transition:opacity .6s;pointer-events:none;z-index:6}
+.hint.show{opacity:1}
+.hint kbd{border:1px solid var(--line-2);border-radius:3px;padding:1px 5px;margin:0 2px;color:var(--fg-3)}
+/* waves drift very slowly */
+.waves{animation:drift 60s ease-in-out infinite alternate}
+@keyframes drift{from{transform:translate3d(-0.6%,0.3%,0) scale(1.01)}to{transform:translate3d(0.6%,-0.3%,0) scale(1.03)}}
+@media (prefers-reduced-motion:reduce){.waves{animation:none}body:not(.hot) textarea:focus{animation:none}}
+.bar{display:flex;align-items:center;gap:4px;padding:10px 12px 12px 14px;border-top:1px solid rgba(255,255,255,.05)}
+.way{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--fg-3);transition:all .16s;position:relative}
+/* talk is the front door, same as the app: filled, ringed, primary */
+#mic{width:44px;height:44px;border-radius:50%;background:var(--fg);color:#000;
+  box-shadow:0 0 0 6px rgba(255,255,255,.035),0 0 0 12px rgba(255,255,255,.016);margin-right:6px}
+#mic .ico{width:19px;height:19px;stroke:#000;stroke-width:1.7}
+#mic:hover{background:#fff;color:#000;transform:translateY(-1px)}
+#mic.on{background:var(--teal);color:#04211c;box-shadow:0 0 0 6px rgba(52,193,168,.14),0 0 0 12px rgba(52,193,168,.06)}
+#mic.on .ico{stroke:#04211c}
+.sep{width:1px;height:22px;background:rgba(255,255,255,.08);margin:0 8px 0 4px;flex-shrink:0}
+.way:hover,.way.on{color:var(--fg);background:rgba(255,255,255,.05)}
+.way.on{color:var(--teal)}
+.way::after{content:attr(data-n);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);font-size:11.5px;color:var(--fg-4);white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none}
+.way:hover::after{opacity:1}
+input[type=file]{display:none}
+.send{margin-left:auto;width:40px;height:40px;border-radius:12px;background:var(--fg);color:#000;display:grid;place-items:center;transition:all .18s cubic-bezier(.2,.7,.3,1);box-shadow:0 8px 24px -12px rgba(255,255,255,.35)}
+.send:hover{background:#fff;transform:translateY(-1px);box-shadow:0 12px 28px -12px rgba(255,255,255,.5)}
+.send:active{transform:translateY(0) scale(.96)}
+body:not(.hot):not(.has) .send{background:var(--line-3);color:var(--fg-4);box-shadow:none;cursor:default}
+.send .ico{width:15px;height:15px;stroke-width:2.1}
+.send .ico{width:14px;height:14px;stroke-width:2}
+body.rec textarea{caret-color:var(--teal)}
+body.rec .slab .in::before{background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(52,193,168,.12),transparent 70%)}
+.slab.sent{transform:translateY(-10px) scale(.99);opacity:.35}
+.slab .pulse{position:absolute;top:0;left:0;width:22%;height:1px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--teal),transparent);opacity:0;pointer-events:none;z-index:2}
+.slab.sent .pulse{animation:px .9s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes px{0%{left:-22%;opacity:1}100%{left:100%;opacity:0}}
+.ack{position:absolute;left:50%;top:calc(100% + 18px);transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;letter-spacing:2.4px;color:var(--teal);opacity:0;transition:opacity .35s;white-space:nowrap}
+.ack.show{opacity:1}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}
