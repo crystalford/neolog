@@ -74,7 +74,7 @@ const PAGES = [
   // the thread page is measured against it too; most of its classes live
   // there.
   ['messages',   'src/app/(app)/messages/[id]/page.tsx', 12],
-  ['walk',       'src/app/(app)/walk/[id]/page.tsx',    24],
+  ['walk',       'src/app/(app)/walk/[id]/page.tsx',    14],
   ['now',        'src/app/(app)/now/page.tsx',           1],
 ]
 
