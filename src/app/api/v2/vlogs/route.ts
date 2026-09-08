@@ -266,6 +266,13 @@ export async function GET(req: NextRequest) {
            recorded_at, recorded_at_source, uploaded_at, thumbnail_url, thumbnail_r2_key,
            r2_key, transcoded_r2_key,
            pipeline_status, pipeline_error, visibility, transcript_text IS NOT NULL AS has_transcript,
+           read_at,
+           -- How many entries the log has read out of this recording. The
+           -- only number about it the log knows rather than guessed, and one
+           -- correlated subquery rather than a second round trip per row.
+           (SELECT COUNT(*) FROM log_entries le
+             WHERE le.vlog_id = vlogs.id AND le.operator_id = vlogs.operator_id
+               AND le.deleted_at IS NULL AND le.buried_at IS NULL) AS entry_count,
            created_at, updated_at
     FROM vlogs
     WHERE operator_id = ? AND deleted_at IS NULL
@@ -302,6 +309,8 @@ export async function GET(req: NextRequest) {
     pipeline_error: string | null
     visibility: string
     has_transcript: number
+    read_at: string | null
+    entry_count: number
     created_at: string
     updated_at: string
   }>(db, sql, ...binds)

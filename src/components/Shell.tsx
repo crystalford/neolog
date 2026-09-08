@@ -1,18 +1,12 @@
 'use client'
 
 /**
- * Canon app shell — top-horizontal masthead + main.
+ * The shell — the masthead over the page, and nothing else.
  *
- * Replaces the older sidebar-based shell. Wraps `<Masthead/>` over the
- * page content. The `active`/`breadcrumb`/`hot`/`busy`/`rail` props are
- * preserved so existing pages still compile, but they're no-ops now —
- * masthead infers active state from pathname, and per-surface rails
- * are rendered inside each page's content (canon pattern).
- *
- * NavIcons / LogoMark / Pips / TopicDot remain exported for backward
- * compatibility with pages that imported them from here.
- *
- * Source: /tmp/neolognextlevel/design-reference/00-Sitemap.html
+ * The props are all no-ops kept so pages compile; the masthead reads the
+ * pathname and each page renders its own rail. They should go the next time
+ * every page is touched, but a signature change across every surface is not
+ * worth a commit of its own.
  */
 
 import { ReactNode } from 'react'
@@ -81,26 +75,5 @@ export const NavIcons = {
   Question:    <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M6 6 a2 2 0 1 1 2 2 v1"/><circle cx="8" cy="11.5" r="0.6" fill="currentColor"/></svg>,
 } as const
 
-export function Pips({ n = 0, max = 5, accent = false }: { n?: number; max?: number; accent?: boolean }) {
-  return (
-    <span className="pips">
-      {Array.from({ length: max }).map((_, i) => (
-        <span key={i} className={`pip ${i < n ? 'on' : ''} ${accent ? 'accent' : ''}`}/>
-      ))}
-    </span>
-  )
-}
-
-export function TopicDot({ topic }: { topic?: string }) {
-  const map: Record<string, string> = {
-    curbsider:    'var(--t-steel)',
-    memory:       'var(--t-plum)',
-    form:         'var(--t-sage)',
-    'pack rats':  'var(--t-terra)',
-    voice:        'var(--t-rose)',
-    graph:        'var(--t-teal)',
-    regulation:   'var(--t-ochre)',
-    misc:         'var(--t-violet)',
-  }
-  return <span className="topic-dot" style={{ background: map[topic?.toLowerCase() ?? ''] || 'var(--fg-3)' }}/>
-}
+/* `Pips` (cluster-strength dots) and `TopicDot` (topic territory tints) lived
+   here and went with the extraction engine — both showed a model's score. */
