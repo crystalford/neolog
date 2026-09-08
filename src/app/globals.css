@@ -3605,6 +3605,14 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-vlog .ends .nx { text-align:right; }
 .logpage.pg-vlog .ends .home { font-size:12.5px; color:var(--fg-3); padding:7px 14px; border:1px solid var(--line-1); border-radius:7px; white-space:nowrap; }
 .logpage.pg-vlog .ends .home:hover { color:var(--fg); border-color:var(--line-3); }
+/* `.pghead` is ours, not the design's — `vlog.html` puts the title directly
+   in the column. Its generic 16px padding therefore stacked on `.grid`'s
+   22px and pushed the title, the meta line and the video 16px further down
+   than the design puts them, on the page whose subject is the video. The
+   operator: "the video is very low... things just need to be tightened all
+   around." */
+.logpage.pg-vlog .pghead { padding-top: 0; }
+
 /* `vlog.css` line 62 exactly — and `padding-top:0` because the generic
    `.logpage .rail` carries 18px for the pages whose rail starts below a
    toolbar. Inheriting it here pushed the first card 18px out of line with
