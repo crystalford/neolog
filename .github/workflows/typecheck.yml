@@ -109,6 +109,14 @@ jobs:
       # nothing in the repo could tell the two apart, which is how the
       # deployed site still looked like the old product weeks later. The
       # budgets in that file are debts; the real number is zero.
+      # A CSS variable that resolves to nothing does not fail — the build is
+      # green, the page renders, and a colour or a font is silently wrong.
+      # Twenty-four installed page stylesheets were in that state for an
+      # afternoon because the design names its variables --steel and --body
+      # and this repo named the same values --t-steel and --font-body.
+      - name: Every CSS variable resolves
+        run: node scripts/check-css-vars.mjs
+
       - name: Pages have not drifted from the design
         run: node scripts/check-design.mjs
 

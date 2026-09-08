@@ -112,6 +112,39 @@
   /* JetBrains Mono, and only for dates and IDs — never on a button
    * (SPEC §1 design constants). */
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ── The design's own variable names ───────────────────────────────────
+   * `design/css/*` is installed verbatim, and it refers to --body, --mono,
+   * --steel and the territory colours. This file had named the same values
+   * --font-body, --font-mono and --t-steel, so every rule in twenty-four
+   * installed page stylesheets that used one of them was silently falling
+   * back — fonts to the browser default, colours to nothing.
+   *
+   * Aliases rather than a rename: the design's names are the ones the
+   * vendored CSS uses and must keep working, and the long names are used
+   * throughout this file and the components. */
+  --body:      var(--font-body);
+  --mono:      var(--font-mono);
+  --steel:     var(--t-steel);
+  --teal:      var(--t-teal);
+  --ochre:     var(--t-ochre);
+  --terra:     var(--t-terra);
+  --violet:    var(--t-violet);
+  --sage:      var(--t-sage);
+  --plum:      var(--t-plum);
+  --rose:      var(--t-rose);
+  --brass:     var(--t-brass);
+  --moss:      var(--t-moss);
+
+  /* `--c` and `--h` are per-element custom properties: the design sets them
+   * inline (style="--c:var(--steel)") to tint one row's marker or one
+   * heading. Where my markup does not set them the rule must still resolve
+   * to something legible rather than to nothing, so they default here. */
+  --c:         var(--fg-3);
+  --h:         var(--fg-3);
+  /* Set by a pointer handler in two of the design's pages; harmless at 0. */
+  --mx:        0px;
+  --my:        0px;
 }
 
 * { box-sizing: border-box; }
@@ -380,6 +413,11 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
  * was replaced by steel as the signal colour on 7 Sep and this rule was
  * missed, so every page in the product was still lit by the old palette.
  * That is what "it still looks like the old design" was. */
+/* The reset every page in the package opens with. Without it the browser's
+   default margins land on h1, p and ul inside pages whose CSS was written
+   assuming they were zeroed. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 /* ── The shell ──────────────────────────────────────────────────────────
    `log.html`'s own classes and values, taken rather than re-derived. They
    were `canon-*` until 8 Sep — the same numbers in most places, but a
