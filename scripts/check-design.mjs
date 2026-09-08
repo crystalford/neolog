@@ -41,7 +41,7 @@ const PAGES = [
   ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         0],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
-  ['search',     'src/app/(app)/search/page.tsx',       10],
+  ['search',     'src/app/(app)/search/page.tsx',       7],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
   ['clear',      'src/app/(app)/clear/page.tsx',        5],

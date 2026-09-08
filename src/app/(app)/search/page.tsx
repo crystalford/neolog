@@ -58,6 +58,22 @@ const EXAMPLES = [
 export default function SearchPage() {
   const [q, setQ] = useState('')
   const [result, setResult] = useState<Result | null>(null)
+
+  /**
+   * The years the returned passages are dated in, oldest first. Built from
+   * the results and nothing else — a second query would be a second claim,
+   * and this bar answers "where are THESE hits", not "where is the log".
+   * A year with no hit is not a bar; the gaps are the point of the picture.
+   */
+  const hitYears = (() => {
+    const by = new Map<number, number>()
+    for (const p of result?.passages ?? []) {
+      const y = new Date(p.happened_at).getUTCFullYear()
+      if (!isNaN(y)) by.set(y, (by.get(y) ?? 0) + 1)
+    }
+    return [...by.entries()].map(([y, n]) => ({ y, n })).sort((a, b) => a.y - b.y)
+  })()
+  const hitMax = Math.max(1, ...hitYears.map(y => y.n))
   const [asking, setAsking] = useState(false)
   const [lit, setLit] = useState<number | null>(null)
 
@@ -201,7 +217,37 @@ export default function SearchPage() {
         )}
                 </main>
 
-          <Rail goesTo={[{ href: '/', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/asks', label: 'the questions' }]} />
+          <Rail
+            /* `search.html`: "Where the hits are." Built from the passages
+               this search returned and nothing else, so it says where THESE
+               matches are dated rather than making a second claim about the
+               log. The design also puts a sentence under it — "eighteen
+               years in between with nothing, not because nothing was said,
+               because nothing was kept" — and that is the log reading his
+               life, so the bar carries the years and stops. */
+            lead={hitYears.length > 1 ? (
+              <div className="rc">
+                <div className="hd">
+                  Where the hits are{' '}
+                  <span>{hitYears[0].y} – {hitYears[hitYears.length - 1].y}</span>
+                </div>
+                <div className="yrs">
+                  {hitYears.map(y => (
+                    <i
+                      key={y.y}
+                      style={{ height: `${Math.max(8, Math.round((y.n / hitMax) * 100))}%`, background: 'var(--t-steel)' }}
+                      title={`${y.y} — ${y.n} ${y.n === 1 ? 'match' : 'matches'}`}
+                    />
+                  ))}
+                </div>
+                <div className="yl">
+                  <span>{hitYears[0].y}</span>
+                  <span>{hitYears[hitYears.length - 1].y}</span>
+                </div>
+              </div>
+            ) : null}
+            goesTo={[{ href: '/', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/asks', label: 'the questions' }]}
+          />
         </div>
       </div>
     </Shell>

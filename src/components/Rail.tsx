@@ -19,9 +19,20 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
-export function Rail({ goesTo }: { goesTo?: { href: string; label: ReactNode }[] }) {
+export function Rail(
+  { goesTo, lead }: {
+    goesTo?: { href: string; label: ReactNode }[]
+    /**
+     * A card above **Goes to**, for a page whose design puts one there —
+     * `search.html`'s "Where the hits are". It is a slot rather than a
+     * second component so the two doors below it stay identical everywhere.
+     */
+    lead?: ReactNode
+  },
+) {
   return (
     <aside className="rail">
+      {lead}
       {goesTo && goesTo.length > 0 && (
         <div className="rc">
           <div className="h">Goes to</div>
