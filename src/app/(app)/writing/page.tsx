@@ -17,6 +17,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import {
   DOC_KINDS, DOC_WORDS, MADE_BY_WORDS, asKind, asMadeBy, type DocKind,
 } from '@/lib/documents'
@@ -80,6 +81,9 @@ export default function Writing() {
     <Shell>
       <div className="logpage pg-writing">
         <div className="crumb"><Link href="/">the log</Link></div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead"><h1>Writing</h1></div>
         <div className="stamp">
@@ -166,6 +170,10 @@ export default function Writing() {
             ))}
           </div>
         )}
+                </main>
+
+          <Rail goesTo={[{ href: '/', label: 'the log' }, { href: '/export', label: 'export' }]} />
+        </div>
       </div>
     </Shell>
   )

@@ -22,6 +22,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import Stamp from '@/components/Stamp'
 import OwnerStrip from '@/components/OwnerStrip'
 
@@ -74,6 +75,9 @@ export default function Glossary() {
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead"><h1>The glossary</h1></div>
         <OwnerStrip signedIn={!loading} />
@@ -132,6 +136,10 @@ export default function Glossary() {
         {items.length > 0 && (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         )}
+                </main>
+
+          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/public', label: 'the log' }, { href: '/asks', label: 'the questions' }]} />
+        </div>
       </div>
     </Shell>
   )

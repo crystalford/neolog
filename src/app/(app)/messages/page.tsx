@@ -18,6 +18,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { CONSENT_WORDS, asConsent } from '@/lib/correspondence'
 
 interface Thread {
@@ -93,6 +94,9 @@ export default function Messages() {
       <div className="logpage pg-messages">
         <div className="back"><Link href="/">the log</Link></div>
 
+        <div className="grid">
+          <main>
+
         <div className="pghead"><h1>Messages</h1></div>
         <div className="stamp">
           <span>the one kind with someone else in it</span>
@@ -160,6 +164,10 @@ export default function Messages() {
             </div>
           )
         })}
+                </main>
+
+          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/ways-in', label: 'the ways in' }]} />
+        </div>
       </div>
     </Shell>
   )

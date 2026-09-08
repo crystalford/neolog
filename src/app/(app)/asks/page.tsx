@@ -25,6 +25,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import Stamp from '@/components/Stamp'
 import OwnerStrip from '@/components/OwnerStrip'
 
@@ -85,6 +86,9 @@ export default function Asks() {
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead"><h1>Questions</h1></div>
         <OwnerStrip signedIn={!loading} />
@@ -153,6 +157,10 @@ export default function Asks() {
         {answered.length > 0 && (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         )}
+                </main>
+
+          <Rail goesTo={[{ href: '/search', label: 'search the log' }, { href: '/public', label: 'the log' }, { href: '/glossary', label: 'the glossary' }]} />
+        </div>
       </div>
     </Shell>
   )

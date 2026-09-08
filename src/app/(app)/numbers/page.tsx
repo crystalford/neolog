@@ -23,6 +23,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import Stamp from '@/components/Stamp'
 import OwnerStrip from '@/components/OwnerStrip'
 
@@ -75,6 +76,9 @@ export default function Numbers() {
           <Link href="/everything">everything</Link>
         </div>
 
+        <div className="grid">
+          <main>
+
         <div className="pghead"><h1>Numbers</h1></div>
         <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
@@ -103,6 +107,10 @@ export default function Numbers() {
         {numbers.length > 0 && (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         )}
+                </main>
+
+          <Rail goesTo={[{ href: '/public', label: 'the log' }, { href: '/facts', label: 'the facts' }]} />
+        </div>
       </div>
     </Shell>
   )

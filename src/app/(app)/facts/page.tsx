@@ -27,6 +27,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import Stamp from '@/components/Stamp'
 import OwnerStrip from '@/components/OwnerStrip'
 
@@ -85,6 +86,9 @@ export default function Facts() {
           <Link href="/">the log</Link>
           <Link href="/everything">everything</Link>
         </div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead">
           <h1>{r?.person.name || 'The facts'}</h1>
@@ -174,6 +178,10 @@ export default function Facts() {
         )}
 
         {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
+                </main>
+
+          <Rail goesTo={[{ href: '/public', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/numbers', label: 'the numbers' }]} />
+        </div>
       </div>
     </Shell>
   )

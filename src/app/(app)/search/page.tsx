@@ -23,6 +23,7 @@ export const runtime = 'edge'
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { stampFor, type DatePrecision } from '@/lib/log-entry'
 
 interface Passage {
@@ -83,6 +84,9 @@ export default function SearchPage() {
     <Shell active="search">
       <div className="logpage pg-search">
         <div className="back"><Link href="/">the log</Link></div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead">
           <h1>Ask the log a question.</h1>
@@ -193,6 +197,10 @@ export default function SearchPage() {
             </div>
           </>
         )}
+                </main>
+
+          <Rail goesTo={[{ href: '/', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/asks', label: 'the questions' }]} />
+        </div>
       </div>
     </Shell>
   )

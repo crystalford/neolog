@@ -18,6 +18,7 @@ export const runtime = 'edge'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { PILE_WORDS, type Pile } from '@/lib/screenshots'
 
 interface Shot {
@@ -86,6 +87,9 @@ export default function Screenshots() {
           <Link href="/">the log</Link>
           <Link href="/triage">what arrived</Link>
         </div>
+
+        <div className="grid">
+          <main>
 
         <div className="pghead"><h1>Screenshots</h1></div>
         <div className="stamp">
@@ -165,6 +169,10 @@ export default function Screenshots() {
             </div>
           </div>
         ))}
+                </main>
+
+          <Rail goesTo={[{ href: '/triage', label: 'what arrived' }, { href: '/messages', label: 'the message rule' }, { href: '/clear', label: 'safe to clear' }]} />
+        </div>
       </div>
     </Shell>
   )
