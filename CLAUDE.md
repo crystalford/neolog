@@ -722,6 +722,44 @@ preserves a bookmark to a product that no longer exists.
 
 ---
 
+## ⚠️ The design is in the repo, and CI measures every page against it
+
+`design/` vendors the package — 74 pages as `css/` and `markup/`. It lived in
+a scratch directory that does not survive a session, which made every number
+in the 8 Sep audit unreproducible.
+
+Three checks, all in CI, all with **per-page budgets that are today's numbers
+rather than targets**. Lowering one is the work; raising one needs a reason
+in the commit.
+
+| Script | Asks |
+|---|---|
+| `check-design.mjs` | Does the page's MARKUP use the design's classes? Follows the components it imports — LogRow and Rail carry design classes, and counting them as missing overstated every page by twenty. |
+| `check-design-css.mjs` | For every selector the design defines, does the VALUE match? Normalises variable aliases and `!important`, without which real differences drown. |
+| `check-css-vars.mjs` | Does every `var(--x)` resolve? |
+
+**Why they exist.** Nothing in the repo could tell a page that MATCHED the
+design from one that RESEMBLED it. `tsc` cannot. A build cannot. Reading the
+CSS cannot, because a plausible class name with re-derived numbers looks
+exactly right. So the home page and the feed were built close to the package,
+every other page was written in a parallel vocabulary, and the deployed site
+still looked like the old product weeks later with nothing objecting. The
+operator had to say so.
+
+**Five files in the package are NOT product surfaces** and are listed in
+`check-design.mjs` with what they are, because three of them cost real time:
+`export.html` (a rendered export document — `/export` is `takeout.html`),
+`everything.html` and `footage.html` (entry examples, despite SPEC §3 and §2
+naming them), `portal.html` and `index.html` (maps of the package's own
+files). **A low score is not a match** — `portal.html` scored 3-unused
+against `/everything` and is a map of the design package.
+
+**Two pages cannot reach zero, on purpose.** `/asks` keeps `.long .sq .th
+.tree` — the prose answer and the fanned-out sub-questions, which are a model
+writing in his voice on a surface that presents itself as a record. `/public`
+keeps `mic opts or yl yrs` — the composer and the coverage bar, which SPEC §3
+says are not on the public side. Both are recorded at the budget.
+
 ## Design system
 
 Pure black (`#000`), cool-gray foregrounds, **one signal colour: steel
