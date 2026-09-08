@@ -842,6 +842,39 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
 | **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
 
+### ⚠️ Five routes have no `requireOperator`, and that is the whole list
+
+`/feed.xml` · `/feed.json` · `/llms.txt` · `/sitemap.xml` · `/api/debug/whoami`.
+Everything else in `src/app/api` authenticates. **Check this list before
+adding a sixth**, and check what a new one selects.
+
+The four feeds go through `loadPublicFeed`, which hard-codes
+`visibility = 'public' AND author = 'operator'` with no flag to turn it off —
+that is why the gate is in one function rather than four queries.
+⚠️ `loadAsks` DOES take a `publicOnly` flag and `/api/v2/public/asks` lets a
+query string clear it; that is safe only because the route requires the
+operator. **A `/public/` path in this product means the machine layer, not
+"unauthenticated"** — the name has already invited one wrong reading.
+
+**`/sitemap.xml` was publishing pages it should not have.** It listed
+`/page/{id}` for every page with `entry_count > 0`, and that column counts
+every entry on a page, private and held included — so a page whose entries
+are all private had its existence and address handed to crawlers on the one
+genuinely unauthenticated document here. The page's contents stayed behind
+Access, but a sitemap is a list of what a stranger can load, and "public
+addresses only" has to mean it. It now requires a public entry to EXIST on
+the page, so a page with one public entry among fifty private ones is still
+listed — that entry is public, and its page is where it is read.
+
+**`/api/debug/whoami` answers with booleans and header names, never values.**
+It is unauthenticated on purpose: it exists for the case where auth is what
+is broken, and a route that needs auth to tell you auth is failing is no use.
+The first version echoed every header back, cookies included, with a
+truncated `CF_Authorization` JWT among them. Reflecting a caller's own cookie
+to that caller is not a leak by itself — it is a shape that becomes one the
+moment anything proxies, logs or caches it. The email it does return is the
+CALLER's, from the header Access sets; a stranger gets `null`.
+
 **The feeds** — `/feed.xml` (RSS 2.0), `/feed.json` (JSON Feed 1.1, where
 `date_published` is *happened* and `date_modified` is *logged* — the two
 times map without loss, and a `_neolog` extension carries the precision and

@@ -37,12 +37,33 @@ export async function GET(req: NextRequest) {
 
   const [entries, pages] = await Promise.all([
     loadPublicFeed(db, operator.id, 500),
+    // ⚠️ A page is listed only if a STRANGER could read something on it.
+    //
+    // `entry_count` counts every entry on a page, private and held included,
+    // so filtering on it published the existence and address of a page whose
+    // entries are all private — to crawlers, on the one document in this
+    // product that is genuinely unauthenticated. The page's contents stay
+    // behind Access, but a sitemap is a list of what a stranger can load,
+    // and "public addresses only" has to mean it.
+    //
+    // The same gate `loadPublicFeed` applies, expressed as an EXISTS so a
+    // page with one public entry among fifty private ones is still listed —
+    // that entry is public, and its page is where it is read.
     findMany<{ id: string; updated_at: string | null; created_at: string }>(
       db,
-      `SELECT id, updated_at, created_at FROM pages
-        WHERE operator_id = ? AND deleted_at IS NULL AND merged_into IS NULL
-          AND entry_count > 0
-        ORDER BY COALESCE(updated_at, created_at) DESC
+      `SELECT p.id, p.updated_at, p.created_at
+         FROM pages p
+        WHERE p.operator_id = ? AND p.deleted_at IS NULL AND p.merged_into IS NULL
+          AND EXISTS (
+            SELECT 1 FROM page_entries pe
+              JOIN log_entries le ON le.id = pe.entry_id
+             WHERE pe.page_id = p.id
+               AND le.operator_id = p.operator_id
+               AND le.visibility = 'public'
+               AND le.author = 'operator'
+               AND le.deleted_at IS NULL AND le.buried_at IS NULL
+          )
+        ORDER BY COALESCE(p.updated_at, p.created_at) DESC
         LIMIT 500`,
       operator.id,
     ),
