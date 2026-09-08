@@ -114,6 +114,15 @@ jobs:
       - name: Obsolete migrations, and only those
         run: node scripts/test/migrations.mjs
 
+      # check-routes.mjs covers a fetch to a path that was never built. This
+      # is the other direction, and it hides differently: a route with no
+      # caller is not an error anywhere — it builds, it typechecks, it
+      # deploys, and the feature it was written for is on no screen. PATCH
+      # /api/v2/vlogs/[id]/transcript-words was complete for a week with
+      # nothing calling it, so half of fix.html was API-only.
+      - name: Every route has a caller
+        run: node scripts/check-unreached-routes.mjs
+
       # How far each page has drifted from the design it is supposed to be.
       # The home page and the feed were built close to the package and every
       # other page was written in a vocabulary that RESEMBLED it — and

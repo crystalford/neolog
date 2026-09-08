@@ -456,6 +456,52 @@ looking rather than by failing:
   trimming — up to 600 HMAC signings to show 200 rows. Only survivors are
   signed.
 
+### ⚠️ `scripts/check-unreached-routes.mjs` — a route nothing calls
+
+`check-routes.mjs` catches a fetch to a path that was never built: a runtime
+404 that renders as an empty list, which reads as *"nothing here yet"* rather
+than as a bug. This is the other direction, and it hides differently — **a
+route with no caller is not an error anywhere.** It builds, it typechecks, it
+deploys, and the feature it was written for is on no screen.
+
+That is how half of `fix.html` sat unfinished. `PATCH
+/api/v2/vlogs/[id]/transcript-words` was complete — one word at a time
+enforced, `transcript_text` rebuilt, what Whisper heard kept — and the
+transcript on `/vlog/[id]` rendered every word as a dead span.
+
+Two false negatives were in the first version of this scan, and both are
+worth knowing about because they made it report zero:
+
+- **a route's own header comment.** Every route documents its own path at the
+  top. That is the one occurrence that proves nothing.
+- **another route's header comment.** `/api/v2/photos` counted as live
+  because `photos/presign` mentions it, when no screen called either. The
+  corpus is now pages, components, libraries, workers, scripts and workflows
+  — a caller that matters is one that puts the feature in front of the
+  operator or runs it on a schedule.
+
+**Fifteen routes are recorded in `REACHED_ELSEWHERE` with a reason each**, and
+most of them are the same reason: the operator has no terminal, so a
+maintenance job that would be a script anywhere else is an HTTP endpoint here,
+called through `workers/admin-bridge`. No in-repo caller is the correct state
+for those. ⚠️ **The list is a record of decisions, not a way to quiet the
+check** — the first question is always whether the route should be wired to
+the surface it was written for.
+
+**Five routes were deleted rather than recorded**, all of them the old
+product's:
+
+- `/api/v2/media` — *"the unified archive, photos + vlogs + status updates
+  merged"*, which is **a second authored feed over the same three tables** and
+  exactly what §0.1 forbids. `/api/v2/log` is the feed.
+- `/api/v2/photos`, `/api/v2/photos/[id]`, `/api/v2/photos/presign` — the
+  `/photos` surface went on 8 Sep and a picture now enters through
+  `/api/v2/log/intake`. **The `photos` table stays** — the feed reads it
+  directly; it was the CRUD around it that had no caller.
+- `/api/v2/vlogs/bulk-delete` — its surface was `/uploads`, removed 8 Sep. Its
+  header still described removing R2 objects, which it had already stopped
+  doing.
+
 ### The backend pass — what the old engine left behind
 
 Four things survived the 8 Sep deletion because nothing imported them from a
