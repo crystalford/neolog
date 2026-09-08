@@ -25,6 +25,7 @@ import {
   type LogEntry, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
 } from '@/lib/log-entry'
+import { AudioNote } from '@/components/AudioNote'
 
 /**
  * A search result shows its reason: the matched term is marked. Searching
@@ -151,20 +152,13 @@ export function LogRow({ e, order, q, onImage }: {
                   : null}
               </span>
             )}
-            {/* A recording is something you play, not a picture of a
-                waveform. The player stops the row's click reaching the
-                link, so pressing play does not navigate away. */}
+            {/* `log.html`'s inline player, in `AudioNote` — a round play
+                button, a track that fills and seeks, the duration in mono.
+                No waveform bars: nothing measures amplitude, and drawing
+                them would put a picture the log never took beside a
+                duration it did. */}
             {audio && audio.url && (
-              <span
-                className="aud"
-                onClick={ev => { ev.preventDefault(); ev.stopPropagation() }}
-              >
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <audio src={audio.url} controls preload="none" />
-                {audio.duration_seconds
-                  ? <span className="tm">{clockDuration(audio.duration_seconds)}</span>
-                  : null}
-              </span>
+              <AudioNote src={audio.url} duration={audio.duration_seconds} />
             )}
             {held
               ? <span className="cap">blurred here too, until you say otherwise</span>

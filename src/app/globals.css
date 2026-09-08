@@ -759,6 +759,35 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .find .clr { font-size: 11.5px; color: var(--fg-4); cursor: pointer; white-space: nowrap; background: none; border: 0; }
 .logpage .find .clr:hover { color: var(--fg-2); }
 
+/* ── A voice note in the feed (`log.css`'s `.aud`) ──────────────────────
+   The design's chrome, rendered by `src/components/AudioNote.tsx`. The one
+   divergence is `.wv`: the design fills it with twenty-odd `<i>` bars at
+   hand-picked heights, and we draw one flat track, because nothing in this
+   product measures amplitude and bars drawn without measuring are a picture
+   of a recording the log never looked at. Everything else here is the
+   design's rule verbatim. */
+.logpage .aud { display: flex; align-items: center; gap: 11px; margin-top: 12px; max-width: 420px; }
+.logpage .aud .pb {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--fg);
+  display: grid; place-items: center; flex-shrink: 0; padding: 0;
+  border: 0; cursor: pointer;
+}
+.logpage .aud .pb .tri {
+  width: 0; height: 0; border-left: 8px solid #000;
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px;
+}
+/* Pause, which the design has no state for — its player never plays. */
+.logpage .aud .pb .pause {
+  width: 8px; height: 9px; border-left: 3px solid #000; border-right: 3px solid #000;
+}
+.logpage .aud .wv {
+  position: relative; flex: 1; display: flex; align-items: center;
+  gap: 1.5px; height: 26px; overflow: hidden; cursor: pointer;
+}
+.logpage .aud .wv i { flex: 1; height: 3px; background: var(--line-3); border-radius: .5px; min-width: 1px; }
+.logpage .aud .prog { position: absolute; inset: 0 auto 0 0; height: 3px; margin: auto 0; background: var(--t-steel); pointer-events: none; border-radius: .5px; }
+.logpage .aud .tm { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-3); flex-shrink: 0; }
+
 /* ── The toolbar ────────────────────────────────────────────────────── */
 .logpage .bar {
   position: sticky; top: 0; z-index: 20;
@@ -913,6 +942,17 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
    `.rc .i .a`. We had no rule for it, so it laid out inline with no space
    above and the card came up 40px short. */
 .logpage .rc .i .a { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+/* …and what sits in it. `log.css` styles the buttons and the link; we had
+   the row's children unstyled, so an action read as browser-default chrome
+   in the middle of a rail that has none. */
+.logpage .rc .i .a a, .logpage .rc .i .a button { white-space: nowrap; }
+.logpage .rc .i .a button {
+  font-size: 11.5px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid var(--line-2); color: var(--fg-1);
+  background: none; cursor: pointer;
+}
+.logpage .rc .i .a button.p { background: var(--fg); color: #000; border-color: var(--fg); }
+.logpage .rc .i .a a { font-size: 11.5px; color: var(--fg-4); align-self: center; }
 
 .logpage .rc .yrs { display: flex; align-items: flex-end; gap: 2px; height: 36px; padding: 12px 14px 4px; }
 .logpage .rc .yrs i { flex: 1; min-height: 2px; display: block; border-radius: 1px 1px 0 0; cursor: pointer; }
@@ -1332,6 +1372,15 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .rc .ans .opts span:hover { border-color: var(--line-3); }
 .logpage .rc .ans .opts span.p { background: var(--fg); color: #000; border-color: var(--fg); font-weight: 500; }
 .logpage .rc .ans .opts span.d { color: var(--fg-4); border-style: dashed; }
+/* The other way to answer a recall question — say it or type it, in one
+   field. `log.css`'s `.rc .ans .or`, which this stylesheet did not have, so
+   the mic and the input rendered unstyled beneath the options. */
+.logpage .rc .ans .or {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 6px;
+  border: 1px solid var(--line-1); border-radius: 8px; background: var(--bg-1);
+}
+.logpage .rc .ans .or .mic { width: 22px; height: 22px; border-radius: 50%; background: var(--fg); flex-shrink: 0; }
+.logpage .rc .ans .or input { flex: 1; background: none; border: 0; outline: none; color: var(--fg); font-size: 12px; min-width: 0; }
 .logpage .rc .ans .or {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 8px 6px 10px;

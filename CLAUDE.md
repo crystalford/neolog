@@ -1063,6 +1063,28 @@ harness plus `page.evaluate` returning `getBoundingClientRect()` is enough,
 and it is the only way to tell a rule that is wrong from one that is merely
 unfamiliar.
 
+### A voice note in the feed, and the waveform that is not drawn
+
+`src/components/AudioNote.tsx`, rendered by `LogRow`. `log.html`'s `.aud`: a
+round play button, a track that fills as it plays and seeks when clicked, and
+the duration in mono. It replaces the browser's default `<audio controls>`,
+which is 300px of Chrome-shaped furniture in the middle of a design that has
+none.
+
+⚠️ **There are no waveform bars, and that is the point.** The design fills
+`.wv` with twenty-odd `<i>` bars at hand-picked heights — `34%`, `52%`,
+`70%` — because it is a mock-up and someone chose a shape that looked like
+speech. **Nothing in this product measures amplitude** and `vlogs` has no
+column for one, so bars drawn without measuring are a picture of a recording
+the log never looked at, sitting beside a duration it did measure as though
+both were facts. That is §0 rule 3.
+
+So `.wv` is the design's track, flat, and `.prog` fills it. Every other
+measurement in that player is real: the position, the duration, the seek.
+`check-design-css.mjs`'s `log` budget is 4 rather than 3 for exactly this,
+with the reasoning beside the number. **If a waveform is wanted, FFmpeg can
+measure one on ingest — then it can be drawn, because it will be true.**
+
 ### ⚠️ The dominant CSS bug here is a class-name collision
 
 Four found in one afternoon, all the same shape, none visible in the

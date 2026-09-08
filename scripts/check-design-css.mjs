@@ -88,9 +88,18 @@ const norm = v => {
 // lines. Three rules diverge for that (`.media`, `.media > .cap`, `.rail`'s
 // padding), and each carries its reasoning in globals.css.
 //
-// Raising a budget needs a reason in the commit — this is that reason, kept
-// next to the number so the next session does not "fix" the divergence back.
-const BUDGET={"log": 3, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 3, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
+// `log` was 3 and is 4 on purpose, 8 Sep. `log.css` draws `.wv` as twenty-odd
+// <i> bars at hand-picked heights — 34%, 52%, 70% — because it is a mock-up
+// and someone chose a shape that looked like speech. Nothing in this product
+// measures amplitude, and `vlogs` has no column for one, so bars drawn
+// without measuring are a picture of a recording the log never looked at,
+// sitting beside a duration it did measure as though both were facts. §0
+// rule 3. `.wv` is the design's track, flat, and `.prog` fills it; every
+// other measurement in that player — position, duration, seek — is real.
+//
+// Raising a budget needs a reason in the commit — these are those reasons,
+// kept next to the number so the next session does not "fix" them back.
+const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
 
 // No argument: check every page against its budget and exit non-zero on drift.
 if(!process.argv[2]){
