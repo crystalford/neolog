@@ -1146,6 +1146,14 @@ Both new counts come off the entries already loaded, except the year, which
 is one grouped query rather than twelve — the lesson the fold learned when it
 ran one query per bucket.
 
+`scripts/test/month.mjs` — 153 assertions over 48 months, in CI. **A week
+that overlaps the one before it shows an entry twice; a gap between two hides
+one completely**, and neither looks like an error: the page renders, the
+counts are plausible, and an entry is simply not where he left it. So the
+assertions are about coverage, not boundaries — every day in exactly one
+week, weeks newest first, every week starting on a Monday except the month's
+own first.
+
 ### A voice note in the feed, and the waveform that is not drawn
 
 `src/components/AudioNote.tsx`, rendered by `LogRow`. `log.html`'s `.aud`: a
@@ -1164,6 +1172,13 @@ both were facts. That is §0 rule 3.
 
 So `.wv` is the design's track, flat, and `.prog` fills it. Every other
 measurement in that player is real: the position, the duration, the seek.
+
+⚠️ **`preload="none"`, not `metadata`.** This renders once per voice note in
+the FEED, and `metadata` opens every one of them on page load — up to a
+couple of hundred range requests against R2 for presigned URLs nobody has
+pressed play on. The duration is already in the API, so there is nothing to
+fetch until he plays it. Same family as the three hot-path findings above,
+and it was introduced and caught in the same afternoon.
 `check-design-css.mjs`'s `log` budget is 4 rather than 3 for exactly this,
 with the reasoning beside the number. **If a waveform is wanted, FFmpeg can
 measure one on ingest — then it can be drawn, because it will be true.**

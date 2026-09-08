@@ -114,6 +114,13 @@ jobs:
       - name: Obsolete migrations, and only those
         run: node scripts/test/migrations.mjs
 
+      # A week that overlaps the one before it shows an entry twice; a gap
+      # between two hides one completely. Neither looks like an error — the
+      # page renders and the counts are plausible — so the assertions are
+      # about coverage across 48 months, not about the boundaries.
+      - name: Every day in exactly one week
+        run: node scripts/test/month.mjs
+
       # check-routes.mjs covers a fetch to a path that was never built. This
       # is the other direction, and it hides differently: a route with no
       # caller is not an error anywhere — it builds, it typechecks, it

@@ -79,7 +79,14 @@ export function AudioNote({ src, duration }: { src: string; duration?: number | 
       <audio
         ref={el}
         src={src}
-        preload="metadata"
+        /* ⚠️ `none`, not `metadata`. This renders once per voice note in the
+           FEED, and `metadata` makes the browser open every one of them on
+           page load — up to a couple of hundred range requests against R2
+           for presigned URLs nobody has pressed play on. The duration is
+           already in the API, so there is nothing to fetch until he plays
+           it; `onLoadedMetadata` still fires then, and covers a row whose
+           duration the log does not know. */
+        preload="none"
         onLoadedMetadata={e => {
           const d = (e.target as HTMLAudioElement).duration
           if (isFinite(d) && d > 0) setLen(d)
