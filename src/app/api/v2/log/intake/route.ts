@@ -377,7 +377,18 @@ export async function POST(req: NextRequest) {
     verifies.push({ id, r2_key: f.r2_key, checksum: f.checksum || null, bytes: f.bytes ?? null })
   }
 
-  await d1Batch(db, statements)
+  // ⚠️ Chunked. One `db.batch()` carries every statement it is given, and a
+  // camera-roll import is one INSERT per file plus the batch row — a few
+  // hundred prepared statements in a single call, which D1 refuses. The
+  // split-note path below already chunks at forty; this one did not, so the
+  // larger the drop the more certainly nothing was written at all.
+  //
+  // Chunking gives up all-or-nothing across the whole import, which is the
+  // right trade: a partial import is visible on the feed and can be finished,
+  // and the alternative is not atomicity but failure.
+  for (let i = 0; i < statements.length; i += 40) {
+    await d1Batch(db, statements.slice(i, i + 40))
+  }
 
   // Kick the post-upload pipeline for anything that is a recording. It runs
   // on its own worker, so this returns immediately.

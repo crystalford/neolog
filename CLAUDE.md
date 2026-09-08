@@ -118,7 +118,16 @@ anyway, so the concurrency bought nothing; only the memory was real. Four at
 a time now — every file still shows as pending immediately, what is bounded
 is how many are being HELD.
 
-**On the server**, the intake pass ran `Promise.all` over every file in the drop —
+**Writing the rows**, `d1Batch(db, statements)` sent every statement in one
+`db.batch()` — one INSERT per file plus the batch row, so a few hundred
+prepared statements in a single call, which D1 refuses. **The larger the drop
+the more certainly nothing was written at all.** Chunked at forty, the way
+the split-note path in the same file already was. That gives up
+all-or-nothing across the import, which is the right trade: a partial import
+is visible on the feed and can be finished, and the alternative is not
+atomicity but failure.
+
+**Looking at them**, the intake pass ran `Promise.all` over every file in the drop —
 one R2 read and one model call each, unbounded, inside a single
 `waitUntil`. A Worker has a subrequest ceiling and `waitUntil` has a time
 budget, so a camera-roll import of a few hundred photos failed most of its
