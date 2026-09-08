@@ -819,7 +819,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
 | **Index** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |
-| **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), then the log filtered — **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
+| **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), **when it comes up** — a bar per year split *warm* (written from memory) and *cool* (said as it happened) — then the log filtered, **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
 | **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log. |
 | **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
 | **The facts** | `/facts` | `dossier.html`. What the log can state about him — work, projects, people, places — each with the dates it already derived, newest first, **no ranking**. His one sentence or none: the log will not draft a sentence about a person. Person schema. |
@@ -1062,6 +1062,32 @@ right for a week. Chromium is at `/opt/pw-browsers/chromium`; a throwaway
 harness plus `page.evaluate` returning `getBoundingClientRect()` is enough,
 and it is the only way to tell a rule that is wrong from one that is merely
 unfamiliar.
+
+### Warm and cool — a page's years, from the two times
+
+`person.html`'s `.span`: a bar per year with the range beside it and the key
+*"warm = from memory · cool = said as it happened."* Both halves are facts
+the log already holds, because **every entry carries two times**. A line
+logged the day it happened was said as it happened; one logged a month later
+was written from memory.
+
+**Thirty-six hours is the boundary**, generous enough that logging last
+night's note over breakfast still counts as cool. ⚠️ **An entry with no
+`logged_at` counts toward the year and toward neither half** — the log does
+not know when it was written down, and calling it "from memory" would be
+inferring it (§0 rule 3).
+
+**A year with nothing in it is not a bar.** Drawing a zero-height one there
+would imply the log looked and found none, which is the same thing said less
+clearly — the rule a gap already follows in the fold's year bands.
+
+Four of `person.html`'s classes stay unbuilt on purpose: `.a` is *"Talk it
+out"*, which is the offer and below the fence; `.acts`, `.also`, `.foot` and
+`.rule` are the design page explaining its own mechanic. The rest —
+`.d .how .auto .first .sh .pl` — are that page's own mention-row shape, and
+this page renders the feed's rows instead. **That is recorded, not
+overlooked**: SPEC §3's "one design, two views: nothing is designed twice"
+is why `LogRow` serves both.
 
 ### The month, seen as a shape
 

@@ -58,6 +58,8 @@ export default function PageView({ params }: { params: { id: string } }) {
   const [changes, setChanges] = useState<Change[]>([])
   const [loading, setLoading] = useState(true)
   const [shotAt, setShotAt] = useState<number | null>(null)
+  /** Mentions per year, split warm/cool — `person.html`'s `.span` bar. */
+  const [byYear, setByYear] = useState<Record<string, { warm: number; cool: number; n: number }>>({})
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState('')
   const [editingPara, setEditingPara] = useState(false)
@@ -70,11 +72,13 @@ export default function PageView({ params }: { params: { id: string } }) {
       const data = await res.json() as {
         page: PageDetail; items: LogEntry[]
         first_said?: FirstSaid | null; changes?: Change[]
+        by_year?: Record<string, { warm: number; cool: number; n: number }>
       }
       setPage(data.page)
       setItems(data.items || [])
       setFirstSaid(data.first_said || null)
       setChanges(data.changes || [])
+      setByYear(data.by_year || {})
     } catch { setPage(null) }
     finally { setLoading(false) }
   }, [params.id])
@@ -95,6 +99,20 @@ export default function PageView({ params }: { params: { id: string } }) {
     setShotAt(i >= 0 ? i : null)
   }, [shots])
   useRestorePlace(!loading && items.length > 0)
+
+  /**
+   * The years this page comes up in, oldest first, with the warm/cool split
+   * the API derived from each entry's two times. Years with nothing are NOT
+   * filled in — a gap in the bar is a year he did not mention it, and
+   * drawing a zero-height bar there would imply the log looked and found
+   * none, which is the same thing said less clearly.
+   */
+  const years = Object.entries(byYear)
+    .map(([y, v]) => ({ y: Number(y), ...v }))
+    .filter(y => !isNaN(y.y))
+    .sort((a, b) => a.y - b.y)
+  const yearMax = Math.max(1, ...years.map(y => y.n))
+
 
   if (loading) return <Shell><div className="logpage pg-person" /></Shell>
   if (!page) {
@@ -176,6 +194,43 @@ export default function PageView({ params }: { params: { id: string } }) {
                 </p>
               )}
         </div>
+
+        {/* ── When this page comes up ────────────────────────────────
+            `person.html`'s `.span`: a bar per year, split warm and cool.
+            Both halves are facts the log already holds — every entry
+            carries two times, so a line logged the day it happened was said
+            as it happened, and one logged later was written from memory.
+            Nothing is inferred: an entry with no logged time counts toward
+            the year and toward neither half. */}
+        {years.length > 0 && (
+          <div className="span">
+            <div className="k">
+              <span>When {page.kind === 'person' ? 'they come' : 'it comes'} up</span>
+              <span>
+                {years[0].y}{years.length > 1 ? ` – ${years[years.length - 1].y}` : ''}
+                {' · warm = from memory · cool = said as it happened'}
+              </span>
+            </div>
+            <div className="yrs">
+              {years.map(y => (
+                <i
+                  key={y.y}
+                  style={{
+                    height: `${Math.max(8, Math.round((y.n / yearMax) * 100))}%`,
+                    background: y.warm > y.cool ? 'var(--t-ochre)' : 'var(--t-steel)',
+                  }}
+                  title={`${y.y} — ${y.n} ${y.n === 1 ? 'mention' : 'mentions'}`
+                    + (y.warm ? `, ${y.warm} from memory` : '')
+                    + (y.cool ? `, ${y.cool} as it happened` : '')}
+                />
+              ))}
+            </div>
+            <div className="yl">
+              <span>{years[0].y}</span>
+              <span>{years[years.length - 1].y}</span>
+            </div>
+          </div>
+        )}
 
         <div className="grid">
           <main>

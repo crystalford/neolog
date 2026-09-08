@@ -170,9 +170,39 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const oldest = items.length ? items[items.length - 1] : null
 
+  /**
+   * When this page comes up, year by year — `person.html`'s `.span`.
+   *
+   * The design splits each year into **warm** and **cool**: *"warm = from
+   * memory · cool = said as it happened."* Both are facts the log already
+   * holds, because every entry carries two times. A line logged the same day
+   * it happened was said as it happened; one logged a month later was
+   * written from memory. **Thirty-six hours is the boundary**, which is
+   * generous enough that logging last night's note over breakfast still
+   * counts as cool.
+   *
+   * Nothing here is a guess: an entry with no `logged_at` is counted, but as
+   * neither — the log does not know when it was written down, and saying
+   * "from memory" would be inferring it.
+   */
+  const SAME_OCCASION_MS = 36 * 60 * 60 * 1000
+  const byYear: Record<number, { warm: number; cool: number; n: number }> = {}
+  for (const it of items) {
+    const y = new Date(it.happened_at || '').getUTCFullYear()
+    if (isNaN(y)) continue
+    const cell = byYear[y] || (byYear[y] = { warm: 0, cool: 0, n: 0 })
+    cell.n++
+    const h = new Date(it.happened_at || '').getTime()
+    const l = new Date(it.logged_at || '').getTime()
+    if (!isFinite(h) || !isFinite(l)) continue
+    if (l - h > SAME_OCCASION_MS) cell.warm++
+    else cell.cool++
+  }
+
   const now = new Date()
   return NextResponse.json(
     {
+      by_year: byYear,
       page: {
         ...page,
         status: statusFor(page, now),
