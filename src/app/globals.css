@@ -2014,14 +2014,19 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   white-space: pre-wrap; text-wrap: pretty; word-break: break-word;
 }
 
-/* the owner strip: the way back, and nothing else on it */
-.logpage .ownerstrip {
-  display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline;
-  margin-top: 14px; padding: 9px 0; font-size: 12.5px; color: var(--fg-4);
-  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+/* The owner strip — `dossier.html`'s `.owner`, its class and its values.
+   It carries no controls: a public page that grows an edit button has
+   stopped being what a stranger sees. */
+.logpage .owner {
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 14px; margin-top: 10px;
+  border: 1px dashed var(--line-2); border-radius: 8px;
+  font-size: 12px; color: var(--fg-3);
 }
-.logpage .ownerstrip a { color: var(--fg-2); margin-left: auto; }
-.logpage .ownerstrip a:hover { color: var(--fg); }
+.logpage .owner a {
+  margin-left: auto; color: var(--fg); white-space: nowrap;
+  border-bottom: 1px solid var(--line-3);
+}
 
 /* one recording: the video at a real size, and the words under it */
 .logpage video.rec {

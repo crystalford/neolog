@@ -79,109 +79,152 @@ export default function Facts() {
     })
   }, [r])
 
+  const roles = r?.roles ?? []
+  const names = r?.names ?? []
+  const terms = roles.filter(x => x.kind === 'term')
+
   return (
     <Shell>
       <div className="logpage pg-dossier">
-        <div className="back">
-          <Link href="/">the log</Link>
-          <Link href="/everything">everything</Link>
-        </div>
-
-        <div className="grid">
-          <main>
-
-        <div className="pghead">
-          <h1>{r?.person.name || 'The facts'}</h1>
-        </div>
         <OwnerStrip signedIn={!!r} />
         <Stamp at={r?.last_changed ?? null} />
 
-        {loading && <div className="none">Reading the log.</div>}
+        <div className="grid">
+          <main>
+            <section className="hd">
+              <div>
+                <div className="k">neolog.ai/facts</div>
+                <h1>{r?.person.name ? `The facts about ${r.person.name}` : 'The facts'}</h1>
+                <p>
+                  Everything here carries the date it was said. This page
+                  exists so that anything written about him — by a person or
+                  a machine — can be checked against it.
+                </p>
+                {r?.record.first_at && (
+                  <div className="upd">
+                    the record runs {year(r.record.first_at)}–{year(r.record.last_at)} ·{' '}
+                    {r.record.days.toLocaleString('en-GB')} separate days
+                  </div>
+                )}
+              </div>
+            </section>
 
-        {r && (
-          <>
-            {r.person.sentence ? (
-              <p className="none" style={{ fontSize: 16.5, color: 'var(--fg-1)', paddingBottom: 0 }}>
-                {r.person.sentence}
-              </p>
-            ) : (
-              <p className="none" style={{ paddingBottom: 0 }}>
-                No sentence here yet — the log will not write one about a
-                person. <Link href="/settings">Settings</Link> is where you
-                write it.
-              </p>
-            )}
-
-            {r.record.first_at && (
-              <p className="none" style={{ paddingTop: 14 }}>
-                The record runs from {year(r.record.first_at)} to {year(r.record.last_at)},
-                with something on {r.record.days.toLocaleString('en-GB')} separate days.
-                {' '}<Link href="/numbers">The rest of the counting</Link> is on its own page.
-              </p>
-            )}
-
-            {r.roles.length > 0 && (
-              <>
-                <div className="sh">
-                  <span>work and projects</span>
-                  <b>newest first</b>
+            {/* His one sentence. `dossier.html` gives it a section of its
+                own and a copy button, because it is the line that ends up
+                quoted everywhere else. The log will not draft it. */}
+            <section className="sec">
+              <div className="sh">
+                <span>How he describes himself</span>
+                <b>one sentence, written by him</b>
+              </div>
+              {r?.person.sentence ? (
+                <div className="canon">
+                  <p className="cs">{r.person.sentence}</p>
+                  <div className="csm">
+                    <span>his words · used everywhere</span>
+                    <button
+                      className="cp"
+                      onClick={() => { void navigator.clipboard?.writeText(r.person.sentence || '') }}
+                    >copy</button>
+                  </div>
                 </div>
-                {r.roles.map(x => (
-                  <div className="item" key={x.id}>
-                    <div className="x"><Link href={x.href}>{x.name}</Link></div>
-                    <div className="m">
-                      <span>{x.span}</span>
-                      <span>{x.status}</span>
-                      <span>{x.entry_count} {x.entry_count === 1 ? 'entry' : 'entries'}</span>
+              ) : (
+                <p className="csn">
+                  There isn&rsquo;t one yet. The log will not write a sentence
+                  about a person — a marked guess about a topic can be checked
+                  against what he said, and a marked guess about someone real
+                  has no such source. <Link href="/settings">Settings</Link> is
+                  where he writes it.
+                </p>
+              )}
+            </section>
+
+            {roles.filter(x => x.kind !== 'term').length > 0 && (
+              <section className="sec">
+                <div className="sh">
+                  <span>Work and projects</span>
+                  <b>newest first · no ranking</b>
+                </div>
+                {roles.filter(x => x.kind !== 'term').map(x => (
+                  <div className="role" key={x.id}>
+                    <div className="yr">
+                      {x.span}
+                      <i>{x.kind}</i>
                     </div>
-                    {x.summary && (
-                      <div className="p">
-                        {x.summary}
-                        {x.summary_author === 'log' && (
-                          <em style={{ display: 'block', fontStyle: 'normal', marginTop: 7, fontSize: 12.5, color: 'var(--fg-4)' }}>
-                            written by the log
-                          </em>
-                        )}
-                      </div>
-                    )}
+                    <div className="n">
+                      <Link href={x.href}>{x.name}</Link>
+                      {x.summary && (
+                        <em>
+                          {x.summary}
+                          {x.summary_author === 'log' && ' — written by the log'}
+                        </em>
+                      )}
+                    </div>
+                    <div className="st">{x.status}</div>
                   </div>
                 ))}
-              </>
+              </section>
             )}
 
-            {r.names.length > 0 && (
-              <>
+            {terms.length > 0 && (
+              <section className="sec">
                 <div className="sh">
-                  <span>people and places</span>
-                  <b>{r.names.length}</b>
+                  <span>Words he uses</span>
+                  <b>dated to first use</b>
                 </div>
-                {r.names.map(x => (
-                  <div className="item" key={x.id}>
-                    <div className="x"><Link href={x.href}>{x.name}</Link></div>
-                    <div className="m">
-                      <span>{x.span}</span>
-                      <span>{x.entry_count} {x.entry_count === 1 ? 'entry' : 'entries'}</span>
-                    </div>
+                {terms.map(x => (
+                  <div className="term" key={x.id}>
+                    <div className="n"><Link href={x.href}>{x.name}</Link></div>
+                    {x.summary && <p>{x.summary}</p>}
                   </div>
                 ))}
-              </>
+              </section>
             )}
 
-            {!r.roles.length && !r.names.length && (
+            {names.length > 0 && (
+              <section className="sec">
+                <div className="sh">
+                  <span>People and places</span>
+                  <b>{names.length}</b>
+                </div>
+                {names.map(x => (
+                  <div className="f" key={x.id}>
+                    <div className="k">{x.kind}</div>
+                    <div className="v"><Link href={x.href}>{x.name}</Link></div>
+                    <div className="s">{x.entry_count} {x.entry_count === 1 ? 'entry' : 'entries'}</div>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {loading && <div className="none">Reading the log.</div>}
+            {!loading && !roles.length && !names.length && (
               <div className="none">
                 Nothing has a page yet, so there are no dated facts to
-                show. <Link href="/pages">The index</Link> is where the log
-                makes them out of what you have already said.
+                show. <Link href="/pages">The index</Link> is where a page is
+                made, the first time you name something.
               </div>
             )}
-          </>
-        )}
 
-        {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
-                </main>
+            {/* `dossier.html` closes with these two, and they are the point
+                of the page rather than a footer. */}
+            <div className="note">
+              <b>How to cite this page.</b> Every fact carries the date it was
+              said. If you are quoting something from here, the date is part
+              of the fact. Nothing on this page was written to be quoted.
+            </div>
+            <div className="pos">
+              <b>It has to come out of him.</b> The log can ask, recall and
+              find. It cannot supply. Anything on this page that reads as his
+              was said by him first — the log&rsquo;s job is to find it again,
+              not to produce it.
+            </div>
+          </main>
 
           <Rail goesTo={[{ href: '/public', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/numbers', label: 'the numbers' }]} />
         </div>
+
+        {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
       </div>
     </Shell>
   )

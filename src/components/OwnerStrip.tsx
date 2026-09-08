@@ -25,7 +25,7 @@ import Link from 'next/link'
 export default function OwnerStrip({ signedIn }: { signedIn: boolean }) {
   if (!signedIn) return null
   return (
-    <div className="ownerstrip">
+    <div className="owner">
       <span>signed in</span>
       <span>this is what a stranger sees</span>
       <Link href="/">your log →</Link>
