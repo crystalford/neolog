@@ -39,7 +39,7 @@ import { readFileSync, existsSync } from 'node:fs'
 const PAGES = [
   ['log',        'src/app/(app)/page.tsx',              3],
   ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
-  ['headings',   'src/app/(app)/pages/page.tsx',         5],
+  ['headings',   'src/app/(app)/pages/page.tsx',         0],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
   ['search',     'src/app/(app)/search/page.tsx',       10],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
@@ -168,6 +168,25 @@ function classesInPage(file, seen = new Set()) {
   for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g))
     for (const c of (m[1] || m[2] || '').split(/[\s${}?:'"()]+/))
       if (c && !/^[A-Z]/.test(c) && !c.startsWith('pg-')) out.add(c)
+
+  // A class picked from a lookup — `className={KIND_CLASS[p.kind]}` — is not
+  // a literal, so the pass above cannot see it. `/pages` maps five kinds to
+  // `.job .proj .subj .per .place` that way and read as using none of them.
+  //
+  // Only maps that are actually INDEXED inside a className are read, and only
+  // their string values. That matters: `'job'` is both a design class and a
+  // value of `pages.kind`, so scanning every quoted string in the file would
+  // count a data value as a class and hide a real gap. Narrowing it to maps
+  // the markup indexes keeps the failure direction right.
+  const indexed = new Set(
+    [...src.matchAll(/className=\{[^}]*?\b([A-Z][A-Z0-9_]*)\s*\[/g)].map(m => m[1]),
+  )
+  for (const name of indexed) {
+    const decl = new RegExp(`const ${name}\\b[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}`).exec(src)
+    if (!decl) continue
+    for (const v of decl[1].matchAll(/:\s*'([a-z0-9 _-]+)'/g))
+      for (const c of v[1].split(/\s+/)) if (c) out.add(c)
+  }
   for (const m of src.matchAll(/from '@\/components\/([\w/-]+)'/g))
     for (const ext of ['.tsx', '.ts'])
       for (const c of classesInPage(`src/components/${m[1]}${ext}`, seen)) out.add(c)
