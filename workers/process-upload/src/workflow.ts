@@ -694,7 +694,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       { retries: { limit: 2, delay: '10 seconds' }, timeout: '5 minutes' },
       async () => {
         const { readRecording } = await import('../../../src/lib/read-recording')
-        const r = await readRecording(this.env.DB as any, operator_id, vlog_id)
+        const r = await readRecording(this.env.DB as any, operator_id, vlog_id, this.env)
         // Named in the outcome rather than swallowed: a recording with no
         // word timings is skipped, never dated by guess.
         return {

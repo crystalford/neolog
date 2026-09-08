@@ -1,48 +1,57 @@
 /**
  * Reading a recording onto the log.
  *
- * ── What this replaces ────────────────────────────────────────────────────
+ * ── Where one thing he said ends and the next begins ─────────────────────
  *
- * Until 8 Sep a recording reached the log through the extraction passes: a
- * model read the transcript and wrote `threads` — a `topic`, a `take`, some
- * `key_quotes` — and relog turned those into entries. The operator's verdict
- * on that, in his words: *"the problem with the old system was i didn't
- * trust its output anyway."*
+ * A 20-minute recording is 3,000 words of continuous talking. Putting it on
+ * the log means deciding where the seams are, and that decision is the whole
+ * of this file.
  *
- * He was right to distrust it, and the fix is not a better prompt. It is
- * removing the model from the path. Everything in this file is arithmetic
- * over `transcript_words`. **No model is called here and none may be added.**
- * What lands on the log is what he said, in the order he said it, at the
- * second he said it.
+ * `LLM-PIPELINE.md` §8 stage 01 specifies it: split by subject, schema
+ * `{subjects:[{label, span_range}]}`, **extractive boundaries**. `branch.html`
+ * demonstrates it — one 2:14 voice note carrying a question, a position, a
+ * theory, a preference and a phenomenon, split five ways, and the page is
+ * explicit that "you sorted none of them."
  *
- * ── Where a passage ends ─────────────────────────────────────────────────
+ * So the seams come from `splitNote` (`src/lib/split-note.ts`), which was
+ * already in this repo doing exactly this for typed and spoken notes and had
+ * simply never been pointed at the recordings.
  *
- * The one real question is where to cut, because a recording is not a list
- * of entries and 3,000 words is not one either.
+ * ── Why this is not the thing he stopped trusting ────────────────────────
  *
- * The cut is **his own silence.** `transcript_words` carries a start and an
- * end for every word, so a gap between them is a fact about the recording —
- * he stopped talking for two and a half seconds. That is where one thing he
- * was saying ends and the next begins, and it is in the data rather than in
- * anyone's judgement about what his thoughts are. A sentence end is a
- * second, weaker cut, used only when a passage has run long enough to need
- * one.
+ * The old extraction passes WROTE. A model read a recording and produced its
+ * own sentence about what he meant — a `take` — and that sentence went on the
+ * log under `author='operator'`. His verdict: *"the problem with the old
+ * system was i didn't trust its output anyway."*
  *
- * The consequence worth stating: a passage can be a false unit. He pauses
- * mid-thought; he runs two thoughts together without breathing. The log is
- * wrong about the boundary sometimes and never wrong about the words —
- * which is the right way round, and is why merge and split on an entry
- * exist. A model would be wrong about the words too.
+ * Nothing here writes. The model is asked one question and may answer it only
+ * by copying: the first six to ten words of each thread, character for
+ * character. Those anchors are located in the transcript by exact match and
+ * the entries are the slices between them. **Every entry is therefore a
+ * substring of what he actually said, always.** An anchor the model invented
+ * is not found and that seam is dropped, so the failure mode is *fewer
+ * splits*, never *words he did not say*.
+ *
+ * ── The fallback, and why it is not the default ──────────────────────────
+ *
+ * `cutIntoPassages` cuts at his own pauses — a 2.5-second gap between two
+ * words. It is honest and needs no model, and it was the default until
+ * 8 Sep, when running it against `branch.html`'s own example showed the
+ * problem: he said all five of those things without stopping, so a pause
+ * cutter makes ONE entry out of the design's flagship five-way split. It
+ * still runs when there is no model available or the split returns nothing,
+ * because a coarse entry of his words beats no entry at all.
  *
  * ── Idempotency ──────────────────────────────────────────────────────────
  *
  * Every entry carries `source_ref = 'said:<vlog_id>:<first word index>'`.
  * The word index is stable for a given transcript, so reading the same
- * recording twice writes nothing the second time, and re-transcribing it
- * and reading again adds only what changed.
+ * recording twice writes nothing the second time. Re-splitting after a
+ * re-transcribe adds only what moved.
  */
 
 import { findMany, findOne, run, batch as d1Batch } from '@/lib/d1'
+import { splitNote } from '@/lib/split-note'
 import { ulid } from '@/lib/ulid'
 import { RELATION_DEFAULT } from '@/lib/log-entry'
 import type { DatePrecision } from '@/lib/log-entry'
@@ -132,6 +141,110 @@ export function cutIntoPassages(words: Word[]): Passage[] {
   return merged
 }
 
+/**
+ * Words per window handed to the splitter.
+ *
+ * `splitNote` returns at most eight seams per call, so a whole 3,000-word
+ * recording in one call would land as eight ~375-word entries. Windowing at
+ * 700 gives roughly the density `branch.html` shows — several things out of
+ * a couple of minutes — without asking the model to hold the whole recording
+ * at once, which `LLM-PIPELINE.md` §2.1 warns against anyway.
+ */
+const WINDOW_WORDS = 700
+
+interface SplitEnv { AI?: { run: (m: any, a: any) => Promise<any> } }
+
+/**
+ * Where the seams are, per `LLM-PIPELINE.md` §8 stage 01.
+ *
+ * The model sees the transcript and answers only with the first few words of
+ * each thread, copied exactly. `splitNote` locates those anchors by exact
+ * match and returns the slices between them, so a part is always a substring
+ * of the transcript. This function's job is to turn those character offsets
+ * back into WORD ranges, because a word carries the second it was said and a
+ * character does not.
+ *
+ * Returns null when the model produced no usable seam — the caller then cuts
+ * at his pauses instead. An empty result is never an error: it means the
+ * recording is one thing, or the model invented anchors that were not found.
+ */
+async function splitByMeaning(env: SplitEnv, words: Word[]): Promise<Passage[] | null> {
+  if (!env.AI || words.length < MIN_PASSAGE_WORDS) return null
+
+  const passages: Passage[] = []
+
+  for (let base = 0; base < words.length; base += WINDOW_WORDS) {
+    const window = words.slice(base, base + WINDOW_WORDS)
+    if (window.length < MIN_PASSAGE_WORDS) {
+      // A tail too short to split is one passage, not a dropped one.
+      passages.push(passageFrom(window))
+      continue
+    }
+
+    // The exact string splitNote will cut, and the character offset of every
+    // word in it — so a returned offset resolves to a word, and therefore to
+    // a second.
+    const offsets: number[] = []
+    let text = ''
+    for (const w of window) {
+      if (text) text += ' '
+      offsets.push(text.length)
+      text += w.word
+    }
+
+    let parts: { text: string; at: number }[]
+    try {
+      parts = await splitNote(env as { AI: { run: (m: any, a: any) => Promise<any> } }, text)
+    } catch {
+      // The model is not a dependency of reading a recording. A failure here
+      // falls through to the pause cutter for the whole recording.
+      return null
+    }
+
+    // One part means the window is one thing — keep it whole rather than
+    // pretending the split found something.
+    const cuts = parts.length >= 2 ? parts.map(p => p.at) : [0]
+
+    for (let i = 0; i < cuts.length; i++) {
+      // Character offset back to a word index. Anchors land on word
+      // boundaries by construction, so this is a lookup rather than a guess;
+      // the search is defensive against an offset landing mid-word.
+      const from = wordIndexAt(offsets, cuts[i])
+      const to = i + 1 < cuts.length ? wordIndexAt(offsets, cuts[i + 1]) : window.length
+      const slice = window.slice(from, to)
+      if (slice.length < MIN_PASSAGE_WORDS) continue
+
+      // A thread longer than the ceiling is still cut at his pauses inside
+      // itself — the seam is the model's, the subdivision is his silence.
+      if (slice.length > HARD_MAX_WORDS) passages.push(...cutIntoPassages(slice))
+      else passages.push(passageFrom(slice))
+    }
+  }
+
+  return passages.length ? passages : null
+}
+
+/** The largest word index whose character offset is at or before `at`. */
+function wordIndexAt(offsets: number[], at: number): number {
+  let lo = 0, hi = offsets.length - 1, best = 0
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (offsets[mid] <= at) { best = mid; lo = mid + 1 } else hi = mid - 1
+  }
+  return best
+}
+
+/** A run of words, as a passage. The text is the words, joined — never anything else. */
+function passageFrom(words: Word[]): Passage {
+  return {
+    text: words.map(w => w.word).join(' ').replace(/\s+/g, ' ').trim(),
+    start: words[0].start_time,
+    end: words[words.length - 1].end_time,
+    first_index: words[0].word_index,
+    words: words.length,
+  }
+}
+
 /** A recording's date is only as good as the pipeline's source for it. */
 function precisionFor(recordedAt: string | null, source: string | null): DatePrecision {
   if (!recordedAt) return 'approx'
@@ -147,6 +260,12 @@ function precisionFor(recordedAt: string | null, source: string | null): DatePre
 export interface ReadResult {
   vlog_id: string
   passages: number
+  /**
+   * Which decided where one thing he said ended: the splitter, or his own
+   * pauses. Reported rather than hidden — the two produce noticeably
+   * different entries and he should be able to tell which he is looking at.
+   */
+  cut_by: 'meaning' | 'pauses'
   entries_written: number
   skipped_existing: number
   /** No word timings: nothing can be placed, so nothing is written. */
@@ -166,6 +285,13 @@ export async function readRecording(
   db: D1Database,
   operatorId: string,
   vlogId: string,
+  /**
+   * Optional. With it, the seams come from the splitter (the spec's stage
+   * 01). Without it, from his pauses. Optional rather than required so that
+   * reading never becomes something that cannot happen when the model is
+   * unavailable.
+   */
+  env?: SplitEnv | null,
 ): Promise<ReadResult> {
   const vlog = await findOne<{
     id: string; recorded_at: string | null; recorded_at_source: string | null
@@ -176,7 +302,7 @@ export async function readRecording(
        FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     vlogId, operatorId,
   )
-  if (!vlog) return { vlog_id: vlogId, passages: 0, entries_written: 0, skipped_existing: 0, no_words: true }
+  if (!vlog) return { vlog_id: vlogId, passages: 0, cut_by: 'pauses', entries_written: 0, skipped_existing: 0, no_words: true }
 
   const words = await findMany<Word>(
     db,
@@ -188,10 +314,17 @@ export async function readRecording(
     vlogId, operatorId,
   )
   if (words.length < MIN_PASSAGE_WORDS) {
-    return { vlog_id: vlogId, passages: 0, entries_written: 0, skipped_existing: 0, no_words: true }
+    return { vlog_id: vlogId, passages: 0, cut_by: 'pauses', entries_written: 0, skipped_existing: 0, no_words: true }
   }
 
-  const passages = cutIntoPassages(words)
+  // The seams: the splitter first, his pauses as the fallback.
+  let passages: Passage[] | null = null
+  let cutBy: 'meaning' | 'pauses' = 'meaning'
+  if (env?.AI) passages = await splitByMeaning(env, words)
+  if (!passages || !passages.length) {
+    passages = cutIntoPassages(words)
+    cutBy = 'pauses'
+  }
   const base = vlog.recorded_at || vlog.created_at
   const baseMs = new Date(base).getTime()
   const precision = precisionFor(vlog.recorded_at, vlog.recorded_at_source)
@@ -248,6 +381,7 @@ export async function readRecording(
   return {
     vlog_id: vlogId,
     passages: passages.length,
+    cut_by: cutBy,
     entries_written: written,
     skipped_existing: Math.max(0, passages.length - written),
     no_words: false,

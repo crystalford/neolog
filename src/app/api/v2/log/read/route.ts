@@ -22,7 +22,12 @@ import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { readRecording, readStatus } from '@/lib/read-recording'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env {
+  DB: D1Database
+  /** The splitter's model. Absent means reading falls back to his pauses. */
+  AI?: { run: (m: any, a: any) => Promise<any> }
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
 
 async function operatorOr401(req: NextRequest, env: Env) {
   try { return { operator: await requireOperator(req, env), error: null as null } }
@@ -51,7 +56,7 @@ export async function POST(req: NextRequest) {
 
   // One recording, named — the button on its own page.
   if (body.vlog_id) {
-    const r = await readRecording(db, operator!.id, body.vlog_id)
+    const r = await readRecording(db, operator!.id, body.vlog_id, env)
     return NextResponse.json({ ...r, next_cursor: null }, { headers: { 'Cache-Control': 'no-store' } })
   }
 
@@ -67,12 +72,13 @@ export async function POST(req: NextRequest) {
     ...(body.cursor ? [operator!.id, body.cursor, limit] : [operator!.id, limit]),
   )
 
-  let entries = 0, passages = 0, untranscribed = 0
+  let entries = 0, passages = 0, untranscribed = 0, byPauses = 0
   for (const r of rows) {
-    const res = await readRecording(db, operator!.id, r.id)
+    const res = await readRecording(db, operator!.id, r.id, env)
     entries += res.entries_written
     passages += res.passages
     if (res.no_words) untranscribed++
+    else if (res.cut_by === 'pauses') byPauses++
   }
 
   return NextResponse.json(
@@ -83,6 +89,9 @@ export async function POST(req: NextRequest) {
       // Named out loud: a recording with no word timings is skipped, not
       // dated by guess.
       untranscribed,
+      // And how many fell back to pause-cutting because the splitter had
+      // nothing to say — a coarser entry, still his words.
+      cut_by_pauses: byPauses,
       next_cursor: rows.length === limit ? rows[rows.length - 1].id : null,
     },
     { headers: { 'Cache-Control': 'no-store' } },

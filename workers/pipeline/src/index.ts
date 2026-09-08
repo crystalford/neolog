@@ -1069,7 +1069,7 @@ export class VlogPipelineDO {
     await this.recordEvent(vlog.id, 'extract', 'running', 'read_start', { state: 'starting' })
     try {
       const { readRecording } = await import('../../../src/lib/read-recording')
-      const r = await readRecording(this.env.DB as any, vlog.operator_id, vlog.id)
+      const r = await readRecording(this.env.DB as any, vlog.operator_id, vlog.id, this.env)
       await this.recordEvent(vlog.id, 'extract', r.no_words ? 'failed' : 'ok', 'read_done', {
         state: r.no_words ? 'error' : 'ok',
         passages: r.passages,

@@ -156,7 +156,14 @@ check('no words means no passages', cutIntoPassages([]), [])
   // comments say so; this checks the CODE does, with them stripped out.
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
   ok('and no code path reads transcript_text', !/transcript_text/.test(code))
-  ok('nor calls a model', !/callReasoning|callChat|env\.AI|\.run\(/.test(code))
+
+  // The model decides WHERE the seams are and nothing else. It reaches this
+  // file only through splitNote, which answers with verbatim anchors and is
+  // incapable of returning prose — so an entry's text can only ever come
+  // from joining words. These two assertions are that contract:
+  ok('the only model use is the splitter', !/callReasoning|callChat/.test(code))
+  ok('and every passage text is words joined, never model output',
+    !/text:\s*(?!words|clean|cur|slice)[a-z]*\.?(?:response|output|content)/i.test(code))
 }
 
 console.log(`\n  ${pass} passed, ${fail} failed`)
