@@ -39,6 +39,8 @@ interface MonthView {
   label: string
   entries: Entry[]
   days: Record<string, number>
+  by_day: Record<string, { n: number; pub: boolean; q: boolean }>
+  year: Record<string, number>
   days_with_something: number
   days_in_month: number
   public_count: number
@@ -70,6 +72,9 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
   const [v, setV] = useState<MonthView | null>(null)
   const [loading, setLoading] = useState(true)
   const [writing, setWriting] = useState(false)
+  // Which week is open. One at a time — the page is a month, not a list of
+  // every day in it.
+  const [openWeek, setOpenWeek] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -109,6 +114,61 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
   }
 
   const max = Math.max(1, ...Object.values(v.days).map(Number))
+  const yearMax = Math.max(1, ...Object.values(v.year).map(Number))
+
+  /**
+   * A cell per day of the month. Three densities against the fullest day, so
+   * "a lot" is relative to his own month rather than to a number the log
+   * picked. Public and question are marks ON a day, not densities — a day
+   * can be both.
+   */
+  const days = Array.from({ length: v.days_in_month }, (_, i) => i + 1).map(d => {
+    const cell = v.by_day[String(d)] || { n: 0, pub: false, q: false }
+    const band = cell.n === 0 ? '' : cell.n >= max * 0.66 ? 's3' : cell.n >= max * 0.33 ? 's2' : 's1'
+    const cls = [band, cell.pub ? 'pub' : '', cell.q ? 'q' : ''].filter(Boolean).join(' ')
+    const what = cell.n === 0
+      ? 'nothing'
+      : `${cell.n} ${cell.n === 1 ? 'entry' : 'entries'}`
+        + (cell.pub ? ' · something public' : '')
+        + (cell.q ? ' · a question' : '')
+    return { d, cls, title: `${d} ${v.label} — ${what}` }
+  })
+
+  /**
+   * The month cut into weeks, newest first, each carrying its own entries.
+   * Cut on the DAY, not by a rolling seven from the 1st, so a week is the
+   * calendar week he lived rather than an offset from a boundary.
+   */
+  const weeks = (() => {
+    const out: { key: string; label: string; count: number; days: number; entries: Entry[] }[] = []
+    const [yy, mm] = v.ym.split('-').map(Number)
+    const last = v.days_in_month
+    // Walk backwards in blocks that end on the last day and break on Mondays.
+    let end = last
+    while (end >= 1) {
+      const dow = new Date(Date.UTC(yy, mm - 1, end)).getUTCDay() // 0 Sun
+      // Monday starts a week; step back to it, or to the 1st.
+      const span = dow === 1 ? 1 : dow === 0 ? 7 : dow
+      const start = Math.max(1, end - span + 1)
+      const inWeek = v.entries.filter(e => {
+        const d = new Date(e.happened_at).getUTCDate()
+        return d >= start && d <= end
+      })
+      const withSomething = new Set(inWeek.map(e => new Date(e.happened_at).getUTCDate())).size
+      const month = new Date(Date.UTC(yy, mm - 1, 1))
+        .toLocaleDateString('en-GB', { month: 'short' })
+      out.push({
+        key: `${start}-${end}`,
+        label: start === end ? `${start} ${month}` : `${start} – ${end} ${month}`,
+        count: inWeek.length,
+        days: withSomething,
+        entries: inWeek,
+      })
+      end = start - 1
+    }
+    return out
+  })()
+
   const citedIndex = new Map(v.cited.map((id, i) => [i + 1, id]))
 
   return (
@@ -191,24 +251,105 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
           </div>
         </div>
 
-        {/* How much of the month is written down. */}
-        <div className="sh"><b>How much of the month is written down</b>
-          {v.days_with_something} days with something · {v.days_in_month - v.days_with_something} with nothing
+        {/* ── How much of the month is written down ─────────────────────
+            `month.html`'s strip: a cell per day, shaded by how much was
+            said, with a mark where something is public or a question was
+            asked. Three densities and nothing — the design's own four
+            states, so the strip says how much without saying what. */}
+        <div className="strip">
+          <div className="k">
+            <span>How much of the month is written down</span>
+            <span>
+              {v.days_with_something} days with something ·{' '}
+              {v.days_in_month - v.days_with_something} with nothing
+            </span>
+          </div>
+          <div className="days">
+            {days.map(d => (
+              <i key={d.d} className={d.cls} title={d.title} />
+            ))}
+          </div>
+          {/* Every fifth day numbered, the way the design numbers them —
+              enough to find a date, not so many that it becomes a ruler. */}
+          <div className="dnums">
+            {days.map(d => (
+              <span key={d.d}>{d.d === 1 || d.d % 5 === 0 || d.d === v.days_in_month ? d.d : ''}</span>
+            ))}
+          </div>
+          <div className="legend">
+            <span><i style={{ background: 'var(--t-steel)' }} />a lot said</span>
+            <span><i style={{ background: 'rgba(78,161,213,.28)' }} />a little</span>
+            <span><i style={{ background: 'var(--bg-3)' }} />nothing</span>
+            <span><i style={{ background: 'var(--t-teal)' }} />something public</span>
+            <span><i style={{ background: 'var(--t-ochre)' }} />an open question</span>
+          </div>
         </div>
-        <div className="days">
-          {Array.from({ length: v.days_in_month }, (_, i) => i + 1).map(d => {
-            const n = Number(v.days[String(d)] || 0)
-            return (
-              <i
-                key={d}
-                style={{
-                  height: `${n ? Math.max(14, Math.round((n / max) * 100)) : 4}%`,
-                  background: n ? 'var(--sig)' : 'var(--line-2)',
-                }}
-                title={`${d} ${v.label} — ${n} ${n === 1 ? 'entry' : 'entries'}`}
-              />
-            )
-          })}
+
+        {/* ── The month, week by week ────────────────────────────────────
+            Newest first, like everything else. A week opens to its days.
+            Nothing is summarised: the line under a week is a count, and the
+            rows inside it are the entries themselves. */}
+        <div className="sh">
+          <span>The month, week by week</span>
+          <b>click a week to open its days · newest first</b>
+        </div>
+        {weeks.map(w => (
+          <div className={`wk${openWeek === w.key ? ' open' : ''}`} key={w.key}>
+            <button className="h" onClick={() => setOpenWeek(openWeek === w.key ? null : w.key)}>
+              <div className="d">
+                {w.label}
+                <i>{w.count} {w.count === 1 ? 'entry' : 'entries'} · {w.days} {w.days === 1 ? 'day' : 'days'}</i>
+              </div>
+            </button>
+            {openWeek === w.key && (
+              <div className="body">
+                {w.entries.length === 0
+                  ? <div className="dy"><span className="t">nothing</span><div className="x">No entry that week.</div></div>
+                  : w.entries.map(e => (
+                    <Link className="dy" href={`/entry/${e.id}`} key={e.id}>
+                      <span className="t">{stampFor(e.happened_at, 'exact')}</span>
+                      <div className="x">
+                        {e.text}
+                        {e.visibility === 'public' && <i className="pub">public</i>}
+                        {e.author !== 'operator' && <i>written by the log</i>}
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* ── The year, the same shape ───────────────────────────────────
+            `month.html`: "zoom out one level — the year is the same shape."
+            A month with nothing is not a link, because there is nothing to
+            open. */}
+        <div className="yr">
+          <div className="k">The year, the same shape</div>
+          <div className="mos">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+              const n = Number(v.year[String(m)] || 0)
+              const mm = `${v.ym.slice(0, 4)}-${String(m).padStart(2, '0')}`
+              const label = new Date(Date.UTC(2000, m - 1, 1))
+                .toLocaleDateString('en-GB', { month: 'short' })
+              const cls = n === 0 ? '' : n >= yearMax * 0.5 ? 'some' : 'some q'
+              return n === 0
+                ? <span key={m} title={`${label} — nothing`}>{label}</span>
+                : (
+                  <Link key={m} href={`/month/${mm}`} className={cls}
+                    title={`${label} — ${n} ${n === 1 ? 'entry' : 'entries'}`}>
+                    {label}
+                  </Link>
+                )
+            })}
+          </div>
+        </div>
+
+        {/* The one line the log says about the paragraph above, and it is
+            about authorship, not about him. */}
+        <div className="rule">
+          The paragraph is the log&rsquo;s. The entries are yours. Open any week
+          to read them.
         </div>
 
         <div className="sh"><b>The month</b>{v.entries.length}</div>

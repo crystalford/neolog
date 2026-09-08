@@ -42,7 +42,7 @@ const PAGES = [
   ['headings',   'src/app/(app)/pages/page.tsx',         5],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    16],
   ['search',     'src/app/(app)/search/page.tsx',       10],
-  ['month',      'src/app/(app)/month/[ym]/page.tsx',   18],
+  ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
   ['clear',      'src/app/(app)/clear/page.tsx',        5],
   ['triage',     'src/app/(app)/triage/page.tsx',       2],
@@ -140,6 +140,14 @@ function classesInMarkup(html) {
 }
 
 /** My page's classes, plus every component it renders. */
+/**
+ * ⚠️ Only class names written as LITERALS are seen. A page that computes one
+ * — `const band = n > x ? 's3' : 's2'`, then `className={band}` — reads as
+ * not using it. `/month`'s density cells and its year strip are built that
+ * way, so `s1 s2 s3 q some` sit in its budget while rendering perfectly;
+ * `check-design-render.mjs` is what proves they do. Do not contort a page
+ * into literals to satisfy this regex.
+ */
 function classesInPage(file, seen = new Set()) {
   if (seen.has(file) || !existsSync(file)) return new Set()
   seen.add(file)

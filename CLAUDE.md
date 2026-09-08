@@ -828,7 +828,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Questions** | `/asks` | `asks.html`, minus the drafting. A question is an entry ending in `?`; an answer is an entry that `led_from` it. Both his. Open ones kept visible in their own section. FAQPage. |
 | **Numbers** | `/numbers` | `numbers.html`. Counts over dated rows, each carrying **the rule it was counted by**. No reading of what a number means — that would be the log commenting. Dataset. |
 | **Search** | `/search` | Ask the log a question. The answer is written only from passages it can point at — **every sentence's citations are checked in code against the passages actually sent**, and uncitable sentences are dropped (and counted, out loud). The abstain line — "Not answered: …" — is the only line allowed no citation. Retrieval is keyword over entries + transcripts, and the page says so. |
-| **A month** | `/month/[ym]` | Reduction as a place. The month in one paragraph, written from that month's entries only, every sentence citing one. Coverage per day. Once he edits the paragraph it is his and the log stops rewriting it — refused at the SQL level, not just hidden. |
+| **A month** | `/month/[ym]` | Reduction as a place. The month in one paragraph, written from that month's entries only, every sentence citing one. Then **the coverage strip** — a cell per day shaded by how much was said, marked where something is public or a question was asked, with the key beside it; **the month week by week**, newest first, each week opening to its own entries; and **the year in the same shape**, a month with nothing in it not being a link. Once he edits the paragraph it is his and the log stops rewriting it — refused at the SQL level, not just hidden. |
 | **On this day** | `/onthisday` | The one permitted resurfacing. Shows; never says. No "one year ago", no count, no nudge. Approximate dates are excluded — a guessed day has no business on the surface whose discipline is not saying. |
 | **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
 | **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
@@ -1062,6 +1062,38 @@ right for a week. Chromium is at `/opt/pw-browsers/chromium`; a throwaway
 harness plus `page.evaluate` returning `getBoundingClientRect()` is enough,
 and it is the only way to tell a rule that is wrong from one that is merely
 unfamiliar.
+
+### The month, seen as a shape
+
+`month.html`. `/month/[ym]` had the design's stylesheet and rendered none of
+it — one flat bar of days and nothing else. It now draws what the page
+specifies:
+
+- **the strip** — a cell per day, three densities **measured against his own
+  fullest day** rather than a number the log picked, so "a lot" means a lot
+  for that month. Public and question are marks ON a day, not densities: a
+  day can be both.
+- **week by week**, newest first, each opening to its own entries. Weeks are
+  cut on the calendar day, not by a rolling seven from the 1st — a week is
+  the one he lived, not an offset from a boundary. **Nothing is summarised**:
+  the line under a week is a count and the rows inside it are the entries.
+- **the year in the same shape.** A month with nothing in it is not a link,
+  because there is nothing to open — the same rule as a row with no page of
+  its own (SPEC §11).
+
+A question is an entry ending in `?`, the rule `/asks` uses and the only one
+that needs no model. Whether it was ANSWERED needs `/asks`'s `led_from` join;
+the month marks only that one was asked, which is what the design's swatch
+says.
+
+⚠️ **`.a` — "Talk it out later" — is deliberately not built.** It is a button
+under the month's paragraph suggesting he record something about the month,
+which is the offer, and the offer is below the fence. §0 rule 2: the log is
+quiet.
+
+Both new counts come off the entries already loaded, except the year, which
+is one grouped query rather than twelve — the lesson the fold learned when it
+ran one query per bucket.
 
 ### A voice note in the feed, and the waveform that is not drawn
 

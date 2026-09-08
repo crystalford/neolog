@@ -43,6 +43,19 @@ export interface MonthView {
   entries: MonthEntry[]
   /** Day of month -> how many entries. */
   days: Record<number, number>
+  /**
+   * Per day: how much was said, whether any of it is public, whether any of
+   * it is a question. `month.html` draws the month week by week and colours
+   * each day by these, so they are counted from the entries already loaded
+   * rather than asked for again.
+   */
+  by_day: Record<number, { n: number; pub: boolean; q: boolean }>
+  /**
+   * Entries per month across the whole year — `month.html`'s "zoom out one
+   * level: the year is the same shape". One grouped query, not twelve; the
+   * same lesson the fold learned when it ran one per bucket.
+   */
+  year: Record<number, number>
   days_with_something: number
   days_in_month: number
   public_count: number
@@ -100,9 +113,35 @@ export async function loadMonth(
   )
 
   const days: Record<number, number> = {}
+  const by_day: Record<number, { n: number; pub: boolean; q: boolean }> = {}
   for (const e of entries) {
     const d = new Date(e.happened_at).getUTCDate()
-    if (!isNaN(d)) days[d] = (days[d] || 0) + 1
+    if (isNaN(d)) continue
+    days[d] = (days[d] || 0) + 1
+    const cell = by_day[d] || (by_day[d] = { n: 0, pub: false, q: false })
+    cell.n++
+    if (e.visibility === 'public') cell.pub = true
+    // A question is an entry ending in `?` — the same rule `/asks` uses, and
+    // the only one that needs no model. Whether it was ANSWERED needs the
+    // `led_from` join `/asks` does; the month marks only that one was asked,
+    // which is what the design's swatch says.
+    if (e.text.trim().endsWith('?')) cell.q = true
+  }
+
+  const yearRows = await findMany<{ m: string; n: number }>(
+    db,
+    `SELECT substr(COALESCE(happened_at, occurred_at, created_at), 6, 2) AS m,
+            COUNT(*) AS n
+       FROM log_entries
+      WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        AND substr(COALESCE(happened_at, occurred_at, created_at), 1, 4) = ?
+      GROUP BY m`,
+    operatorId, ym.slice(0, 4),
+  )
+  const year: Record<number, number> = {}
+  for (const r of yearRows) {
+    const m = parseInt(r.m, 10)
+    if (m >= 1 && m <= 12) year[m] = r.n
   }
 
   const stored = await findOne<{
@@ -123,6 +162,8 @@ export async function loadMonth(
     label: monthLabel(ym),
     entries,
     days,
+    by_day,
+    year,
     days_with_something: Object.keys(days).length,
     days_in_month: daysInMonth,
     public_count: entries.filter(e => e.visibility === 'public').length,
