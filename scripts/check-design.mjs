@@ -55,7 +55,11 @@ const PAGES = [
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    23],
   ['writing',    'src/app/(app)/writing/page.tsx',      16],
   ['screenshots','src/app/(app)/screenshots/page.tsx',  14],
-  ['messages',   'src/app/(app)/messages/page.tsx',     22],
+  ['messages',   'src/app/(app)/messages/page.tsx',     21],
+  // messages.html covers the whole mechanic — the list AND one thread — so
+  // the thread page is measured against it too; most of its classes live
+  // there.
+  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 12],
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',    24],
   ['now',        'src/app/(app)/now/page.tsx',           1],
 ]
