@@ -1063,6 +1063,34 @@ harness plus `page.evaluate` returning `getBoundingClientRect()` is enough,
 and it is the only way to tell a rule that is wrong from one that is merely
 unfamiliar.
 
+### ⚠️ The dominant CSS bug here is a class-name collision
+
+Four found in one afternoon, all the same shape, none visible in the
+stylesheet: **a generic rule and a design rule share a class name, and the
+page-scoped rule overrides only the properties the design happens to name.**
+Everything the generic rule sets and the design does not mention survives.
+
+| class | generic rule | what it is on the page | what shipped |
+|---|---|---|---|
+| `.rail` | the sticky page rail | `/walk`'s timeline **gutter** | 227px gutter collapsed to 18px, connector short of every step |
+| `.bar` | the feed's filter toolbar | `/triage`'s 3px progress **meter** | a 31px flex container |
+| `.card` | an old-system card, 18/20 padding | `/triage`'s card, no padding | the card's interior 40px narrower |
+| `.en` / `.en .x` | the shared `LogRow` | `/page/[id]`'s plainer row | rows 24px wider, three times the height |
+
+The repo already knew the shape — `.turn` vs `.leg` on the walk is recorded
+above — but knowing it did not prevent four more, because **nothing looks at
+a rendered page.** `tsc`, the build, and all three text-level design checks
+are green through every one of these.
+
+**The rule when a design page redefines a shared class: reset what the
+generic rule SETS, not only the properties the design names.** `display`,
+`margin`, `padding`, `gap` and `align-self` are the ones that bite, and the
+comment beside each fix in `globals.css` says which generic rule it is
+undoing.
+
+`check-design-render.mjs` finds them in seconds. `/triage` and `/page/[id]`
+now render **identically** to the design; `/walk` went 18 boxes to 7.
+
 **Every detail page answers four questions** — the work itself; where it came
 from; where it sits; what it became. On a recording that is: the video, the
 provenance in words, the pages it is on, and the entries read out of it.

@@ -282,7 +282,13 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .pill.accent{ color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-bd); }
 
 /* ─── Cards & lists ─────────────────────────────────────── */
-.card { background: var(--bg-1); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+/* ⚠️ The bare `.card` that used to sit here is gone (8 Sep). It came from
+   the old design system — 8px radius, 18px/20px padding — and `/triage` is
+   the only page in the product that uses the class. `triage.css` gives
+   `.card` a 14px radius and NO padding, because the padding belongs to the
+   rows inside it (`.top2`, `.in`), so the leftover put 20px on both sides of
+   every one of them and made the card's whole interior 40px narrower than
+   the design. Nothing else referenced it. */
 
 .list {
   border: 1px solid var(--line);
@@ -2271,10 +2277,20 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-person .yl { display:flex; justify-content:space-between; font-family:var(--mono); font-size:10.5px; color:var(--fg-4); margin-top:5px; }
 .logpage.pg-person .sh { font-size:15px; font-weight:450; color:var(--fg); padding:30px 0 10px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:16px; align-items:baseline; }
 .logpage.pg-person .sh b { font-size:12px; font-weight:400; color:var(--fg-4); white-space:nowrap; }
-.logpage.pg-person .en { display:grid; grid-template-columns:96px 1fr auto; gap:18px; padding:12px 0; border-bottom:1px solid var(--line); align-items:start; }
+/* ⚠️ `.en` is the shared feed row (`LogRow`), and `.logpage .en` gives it
+   `padding:11px 12px; margin:0 -12px` so the hover highlight bleeds past the
+   column. `person.css` writes a plainer row — `padding:12px 0`, no margin —
+   and this rule set the padding but not the margin, so every row on a page
+   was 24px wider than the column it sits in. Reset what the generic rule
+   sets, not only the properties the design happens to name. */
+.logpage.pg-person .en { display:grid; grid-template-columns:96px 1fr auto; gap:18px; padding:12px 0; margin:0; border-radius:0; border-bottom:1px solid var(--line); align-items:start; }
+.logpage.pg-person .en:hover { background:none; }
 .logpage.pg-person .en .d { font-family:var(--mono); font-size:10.5px; color:var(--fg-4); text-align:right; padding-top:3px; white-space:nowrap; }
 .logpage.pg-person .en .d.fz { color:var(--ochre); }
-.logpage.pg-person .en .x { font-size:14.5px; font-weight:300; color:var(--fg-1); line-height:1.5; text-wrap:pretty; }
+/* Same again: `.logpage .en .x` is a two-column grid in the feed, and
+   `person.css` line 39 is a plain text block. Setting only the type left the
+   grid in place and made every row three times its height. */
+.logpage.pg-person .en .x { display:block; font-size:14.5px; font-weight:300; color:var(--fg-1); line-height:1.5; text-wrap:pretty; }
 .logpage.pg-person .en .x b { font-weight:450; color:var(--fg); }
 .logpage.pg-person .en .x mark { background:none; color:var(--fg); border-bottom:1.5px solid var(--violet); padding-bottom:1px; }
 .logpage.pg-person .en .x em { display:block; font-style:normal; font-size:11.5px; color:var(--fg-4); margin-top:4px; }
@@ -2847,6 +2863,15 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-triage .top p { font-size:15px; color:var(--fg-2); margin-top:12px; line-height:1.6; text-wrap:pretty; }
 .logpage.pg-triage .top p b { color:var(--fg); font-weight:450; }
 .logpage.pg-triage .grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:44px; align-items:start; padding-top:28px; }
+/* ⚠️ `.bar` on this page is a 3px progress METER; `.logpage .bar` is the
+   feed's filter toolbar — a flex row with 18px of padding. Same class name,
+   different thing, and the toolbar was winning: the meter rendered 31px tall
+   as a flex container. `triage.css` line 12, scoped so it beats the generic
+   rule, and `.prog` with it because we never had it either. */
+.logpage.pg-triage .prog { margin-top:14px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--fg-3); }
+.logpage.pg-triage .prog .bar { flex:1; display:block; height:3px; padding:0; background:var(--bg-3); border-radius:2px; overflow:hidden; }
+.logpage.pg-triage .prog .bar i { display:block; height:100%; background:var(--t-steel); }
+
 .logpage.pg-triage .card { border:1px solid var(--line-2); border-radius:14px; background:var(--bg-1); overflow:hidden; }
 .logpage.pg-triage .card .top2 { display:flex; justify-content:space-between; padding:10px 18px; border-bottom:1px solid var(--line); font-size:12px; color:var(--fg-4); }
 .logpage.pg-triage .card .top2 b { color:var(--fg-2); font-weight:450; }
