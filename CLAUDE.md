@@ -94,6 +94,23 @@ the same leak with a different sense. Both hold back now. **When a new kind
 of media reaches `LogRow`, the question is not "should it blur" — it is
 "does `held` reach it at all".**
 
+⚠️ **OPEN — an uploaded VIDEO lands public, and nothing has looked at it.**
+`const held = isImage` in `/api/v2/log/intake`, which follows §0.2 to the
+letter: *"an image lands `held` and is released only after the vision check
+has looked at it."* The composer accepts `image/*,video/*`, so this is
+reachable, and a video's first frame is exactly as revealing as a photo — a
+screen recording, a document on a desk.
+
+It is **not** changed unilaterally, because the cost is real either way.
+Holding every uploaded video means the vision check has to run on a frame,
+which means extracting one first (the FFmpeg thumbnail path exists for
+`/api/v2/vlogs` but intake does not use it) — and until that is built,
+"held" would mean "held forever". The 400-recording corpus is unaffected
+either way: it arrives through `/api/v2/vlogs`, not here.
+
+**The operator's call.** The two readings are: follow the spec's word
+(image), or follow its reason (nothing unlooked-at is public).
+
 **Burial, not deletion.** There is no delete action. Bury removes an entry
 from the feed, search and counts and keeps the file, the attachments and the
 relationships. The one exception is the receipt's **undo**, which is for
