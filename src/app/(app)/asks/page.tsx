@@ -90,7 +90,10 @@ export default function Asks() {
         <div className="grid">
           <main>
 
-        <div className="pghead"><h1>Questions</h1></div>
+        <section className="hd">
+              <div className="k">neolog.ai/asks</div>
+              <h1>Questions — what he asked, and what he said next.</h1>
+            </section>
         <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
@@ -118,11 +121,16 @@ export default function Asks() {
               <b>{answered.length}</b>
             </div>
             {answered.map(a => (
-              <div className="item" key={a.id}>
-                <div className="x"><Link href={a.href}>{a.question}</Link></div>
-                <div className="m"><time dateTime={a.asked_at}>asked {day(a.asked_at)}</time></div>
+              <section className="q" key={a.id}>
+                <div className="ask"><Link href={a.href}>{a.question}</Link></div>
+                <div className="src"><time dateTime={a.asked_at}>asked {day(a.asked_at)}</time></div>
+                {/* `asks.html` calls this "what this is based on" and puts
+                    the dated evidence under the answer. Here the evidence IS
+                    the answer — what he said next — because nothing writes
+                    a prose answer on his behalf. */}
+                <div className="ev">
                 {a.answers.map(x => (
-                  <div className="said" key={x.id}>
+                  <div className="short" key={x.id}>
                     {x.text}
                     <em>
                       {x.author === 'operator' ? 'you said this' : 'written by the log'} ·{' '}
@@ -130,7 +138,8 @@ export default function Asks() {
                     </em>
                   </div>
                 ))}
-              </div>
+                </div>
+              </section>
             ))}
           </>
         )}
@@ -145,12 +154,14 @@ export default function Asks() {
               These are open on purpose. They stay on the list until something
               said later comes from them.
             </p>
-            {open.map(a => (
-              <div className="item" key={a.id}>
-                <div className="x"><Link href={a.href}>{a.question}</Link></div>
-                <div className="m"><time dateTime={a.asked_at}>asked {day(a.asked_at)}</time></div>
-              </div>
-            ))}
+            <div className="held">
+              {open.map(a => (
+                <div className="q" key={a.id}>
+                  <div className="ask"><Link href={a.href}>{a.question}</Link></div>
+                  <div className="src"><time dateTime={a.asked_at}>asked {day(a.asked_at)}</time></div>
+                </div>
+              ))}
+            </div>
           </>
         )}
 

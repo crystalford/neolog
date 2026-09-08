@@ -41,6 +41,18 @@ export default function Glossary() {
   const [items, setItems] = useState<Item[]>([])
   const [changed, setChanged] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<string>('all')
+
+  // A filter with nothing behind it is not shown — the bar offers only the
+  // kinds that actually exist on the log (SPEC §1, kinds.html).
+  const kinds = useMemo(
+    () => Array.from(new Set(items.map(i => i.kind))).sort(),
+    [items],
+  )
+  const shown = useMemo(
+    () => (tab === 'all' ? items : items.filter(i => i.kind === tab)),
+    [items, tab],
+  )
 
   const load = useCallback(async () => {
     try {
@@ -79,15 +91,30 @@ export default function Glossary() {
         <div className="grid">
           <main>
 
-        <div className="pghead"><h1>The glossary</h1></div>
+        <section className="top">
+              <h1>The glossary — every term and subject on the log, in one list.</h1>
+            </section>
         <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
-        <p className="none" style={{ paddingBottom: 0 }}>
-          Every name that has a page of its own, with the sentence it was
-          first said in. The same names are on the log, on the day each was
-          said; this is the list version.
-        </p>
+            <p className="self">
+              This page isn&rsquo;t in the menu. The same names are on the
+              log, on the day each was said — this is the list version, for
+              reference and for machines. Every one of them has a permanent
+              address, so a line quoted from here can be traced back to the
+              day it was said.
+            </p>
+
+            {kinds.length > 1 && (
+              <div className="tabs">
+                <button className={tab === 'all' ? 'on' : undefined} onClick={() => setTab('all')}>all</button>
+                {kinds.map(k => (
+                  <button key={k} className={tab === k ? 'on' : undefined} onClick={() => setTab(k)}>
+                    {KIND_WORD[k] || k}
+                  </button>
+                ))}
+              </div>
+            )}
 
         {loading && <div className="none">Reading the log.</div>}
 
@@ -99,10 +126,10 @@ export default function Glossary() {
           </div>
         )}
 
-        {items.map(i => (
-          <div className="item" key={i.id}>
+        {shown.map(i => (
+          <div className="c" key={i.id}>
             <div className="x"><Link href={i.href}>{i.name}</Link></div>
-            <div className="m">
+            <div className="ty">
               <span>{KIND_WORD[i.kind] || i.kind}</span>
               {i.entry_count > 0 && (
                 <span>{i.entry_count} {i.entry_count === 1 ? 'entry' : 'entries'}</span>
@@ -110,7 +137,7 @@ export default function Glossary() {
               {i.named_by_system && <span>named by the log</span>}
             </div>
             {i.summary && (
-              <div className="p">
+              <div className="more">
                 {i.summary}
                 {i.summary_author === 'log' && (
                   <em style={{ display: 'block', fontStyle: 'normal', marginTop: 7, fontSize: 12.5, color: 'var(--fg-4)' }}>
@@ -120,13 +147,23 @@ export default function Glossary() {
               </div>
             )}
             {i.first_said && (
-              <div className="said">
+              <div className="open">
                 {i.first_said}
                 <em>
                   first said
                   {i.first_said_at ? ` ${new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
                   {i.first_said_id ? ' · ' : ''}
                   {i.first_said_id && <Link href={`/entry/${i.first_said_id}`}>the entry</Link>}
+                  {' · '}
+                  <button
+                    className="copy"
+                    onClick={() => {
+                      // The date is part of the fact, so it is copied with it.
+                      void navigator.clipboard?.writeText(
+                        `"${i.first_said}" — ${i.name}, ${i.first_said_at ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'undated'}`,
+                      )
+                    }}
+                  >copy with the date</button>
                 </em>
               </div>
             )}

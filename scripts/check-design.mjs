@@ -51,8 +51,16 @@ const PAGES = [
   // from the log"): what the Markdown looks like, not a route.
   ['takeout',    'src/app/(app)/export/page.tsx',       10],
   ['dossier',    'src/app/(app)/facts/page.tsx',         5],
-  ['source',     'src/app/(app)/glossary/page.tsx',     12],
-  ['asks',       'src/app/(app)/asks/page.tsx',         12],
+  // Its last five are .was (the struck previous wording of a changed
+  // claim) and .eg (an example of a machine rephrasing a line) — both need
+  // data this product does not keep.
+  ['source',     'src/app/(app)/glossary/page.tsx',      5],
+  // Its last four — .long, .sq, .th, .tree — are the prose answer and the
+  // fanned-out sub-questions. Both are a model writing in his voice on a
+  // surface that presents itself as a record, which §0 rule 3 forbids, so
+  // this page cannot and should not reach zero. /search is where a written
+  // answer lives, and it citation-checks every sentence first.
+  ['asks',       'src/app/(app)/asks/page.tsx',          4],
   ['numbers',    'src/app/(app)/numbers/page.tsx',       8],
   ['public-log', 'src/app/(app)/public/page.tsx',       10],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    23],
