@@ -22,16 +22,15 @@
  *   - **The paragraph is the log's**, rewritten as things attach, always his
  *     to edit — and never presented as his words.
  *
- * ── Where the first pages come from ──────────────────────────────────────
+ * ── Where a page comes from ──────────────────────────────────────────────
  *
- * The extraction passes have been naming entities across 320 vlogs for
- * months: `entities` carries a name, a type, a mention count and first/last
- * dates, and `entity_mentions` carries every place each one came up. The
- * librarian has been naming subjects into `clusters`. That is an index
- * already — it just had no page to live on.
+ * He names it. That is the whole of it.
  *
- * `seedPages` turns both into pages, idempotently via `source_ref`. Nothing
- * is invented: a page is made only where a pass already found something.
+ * Pages used to be seeded from `entities` and the librarian's `clusters` — a
+ * model's list of the names it thought mattered across three hundred
+ * recordings. Both tables went with the extraction engine, and nothing
+ * replaced them on purpose: a page the log invented is the log deciding what
+ * is significant in his life, which §0 rule 2 and rule 3 forbid between them.
  */
 
 import { findMany, run, batch as d1Batch } from '@/lib/d1'
@@ -152,185 +151,20 @@ export const BAND_LABELS: Record<PageBand, { title: string; sub: string }> = {
 }
 
 // ── Seeding ───────────────────────────────────────────────────────────────
-
-export interface SeedResult {
-  entities_seen: number
-  clusters_seen: number
-  pages_written: number
-  attachments_written: number
-  skipped_existing: number
-  /** True when the attach hit its cap — press again to continue. */
-  more_to_attach: boolean
-}
-
 /**
- * Make a page for everything the extraction passes have already named.
+ * ── Seeding is gone, and that is the product ─────────────────────────────
  *
- * Idempotent through `source_ref`, so this can be re-run after any new
- * extraction and will add only what is new. Nothing is invented here — a
- * page appears only where a pass already found a name.
+ * A page used to be made automatically from `entities` and the librarian's
+ * `clusters` — a model's list of the names it thought mattered in three
+ * hundred recordings. Both tables went with the extraction engine on 8 Sep,
+ * and nothing replaced them, because nothing should: a page the log invented
+ * is the log deciding what is significant in his life, which is §0 rule 2 and
+ * rule 3 at once.
+ *
+ * A page is made when he names something. `POST /api/v2/pages` takes a name;
+ * everything after attaches by that name appearing in an entry.
  */
-export async function seedPages(
-  db: D1Database,
-  operatorId: string,
-  opts: { limit?: number; minMentions?: number } = {},
-): Promise<SeedResult> {
-  const limit = Math.min(500, Math.max(1, opts.limit ?? 300))
-  // One mention makes a page. The option exists so the operator can raise
-  // the bar himself; it is never raised for him.
-  const minMentions = Math.max(1, opts.minMentions ?? 1)
 
-  const [entities, clusters] = await Promise.all([
-    findMany<{
-      id: string; name: string; entity_type: string | null
-      notes: string | null; mention_count: number | null
-      first_mentioned_at: string | null; last_mentioned_at: string | null
-    }>(
-      db,
-      `SELECT id, name, entity_type, notes, mention_count,
-              first_mentioned_at, last_mentioned_at
-         FROM entities
-        WHERE operator_id = ? AND deleted_at IS NULL
-          AND COALESCE(mention_count, 1) >= ?
-          AND TRIM(COALESCE(name,'')) <> ''
-        ORDER BY COALESCE(mention_count, 1) DESC
-        LIMIT ?`,
-      operatorId, minMentions, limit,
-    ),
-    findMany<{
-      id: string; topic: string | null; take: string | null
-      framing: string | null; representative_quote: string | null
-      created_at: string; updated_at: string
-    }>(
-      db,
-      `SELECT id, topic, take, framing, representative_quote, created_at, updated_at
-         FROM clusters
-        WHERE operator_id = ? AND deleted_at IS NULL
-          AND subject_source = 'librarian'
-          AND TRIM(COALESCE(topic,'')) <> ''
-        LIMIT ?`,
-      operatorId, limit,
-    ),
-  ])
-
-  const INSERT = `INSERT OR IGNORE INTO pages
-    (id, operator_id, name, kind, summary, summary_author, span_start,
-     span_end, entry_count, visibility, named_by_system, source_ref)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
-
-  const statements: { sql: string; binds: unknown[] }[] = []
-
-  for (const e of entities) {
-    statements.push({
-      sql: INSERT,
-      binds: [
-        ulid(), operatorId, e.name.trim(), kindForEntityType(e.entity_type),
-        // `notes` is the pass's own description. It is the log's, and the
-        // column says so.
-        e.notes || null, 'log',
-        e.first_mentioned_at, e.last_mentioned_at,
-        e.mention_count ?? 1, 'public', 1, `entity:${e.id}`,
-      ],
-    })
-  }
-
-  for (const c of clusters) {
-    statements.push({
-      sql: INSERT,
-      binds: [
-        ulid(), operatorId, (c.topic || '').trim(), 'subject',
-        c.framing || c.take || null, 'log',
-        c.created_at, c.updated_at,
-        0, 'public', 1, `cluster:${c.id}`,
-      ],
-    })
-  }
-
-  let written = 0
-  for (let i = 0; i < statements.length; i += 40) {
-    const res = await d1Batch(db, statements.slice(i, i + 40))
-    for (const r of res) written += (r as any)?.meta?.changes ?? 0
-  }
-
-  // Attach what each entity was mentioned in. `entity_mentions.source_id`
-  // points at a thread or a vlog; a relogged entry carries its thread in
-  // `source_ref`, so the two join up without a new column.
-  const ATTACH_CAP = 4000
-  const attachments = await attachFromMentions(db, operatorId, ATTACH_CAP)
-
-  return {
-    entities_seen: entities.length,
-    clusters_seen: clusters.length,
-    pages_written: written,
-    attachments_written: attachments,
-    skipped_existing: Math.max(0, statements.length - written),
-    // INSERT OR IGNORE means a re-run only does what is left, so "press
-    // again" is a complete answer rather than a workaround.
-    more_to_attach: attachments >= ATTACH_CAP,
-  }
-}
-
-/**
- * Attach entries to pages using the mentions the extraction pass already
- * recorded. A mention names a thread or a vlog; relog put each thread on
- * the log as an entry carrying `source_ref = 'thread:<id>'`, so a mention
- * resolves to a real row on the feed.
- */
-async function attachFromMentions(
-  db: D1Database,
-  operatorId: string,
-  limit = 4000,
-): Promise<number> {
-  // Bounded. `entity_mentions` across 320 vlogs is tens of thousands of rows,
-  // and this join can multiply them — an unbounded version built one INSERT
-  // per row and then tried to run them all inside one Worker invocation.
-  // Seeding is idempotent and re-runnable, so a cap costs a second press and
-  // nothing else; running out of time or memory costs the whole seed.
-  const rows = await findMany<{
-    page_id: string; entry_kind: string; entry_id: string
-  }>(
-    db,
-    `SELECT p.id AS page_id, 'entry' AS entry_kind, le.id AS entry_id
-       FROM entity_mentions em
-       JOIN pages p
-         ON p.operator_id = em.operator_id
-        AND p.source_ref = 'entity:' || em.entity_id
-       JOIN log_entries le
-         ON le.operator_id = em.operator_id
-        AND le.source_ref = 'thread:' || em.source_id
-      WHERE em.operator_id = ? AND em.source_kind = 'thread'
-        AND p.deleted_at IS NULL AND le.deleted_at IS NULL
-
-      UNION
-
-     SELECT p.id AS page_id, 'vlog' AS entry_kind, v.id AS entry_id
-       FROM entity_mentions em
-       JOIN pages p
-         ON p.operator_id = em.operator_id
-        AND p.source_ref = 'entity:' || em.entity_id
-       JOIN vlogs v
-         ON v.operator_id = em.operator_id AND v.id = em.source_id
-      WHERE em.operator_id = ? AND em.source_kind = 'vlog'
-        AND p.deleted_at IS NULL AND v.deleted_at IS NULL
-
-      LIMIT ?`,
-    operatorId, operatorId, limit,
-  )
-
-  if (!rows.length) return 0
-  const statements = rows.map(r => ({
-    sql: `INSERT OR IGNORE INTO page_entries (page_id, entry_kind, entry_id, attached_by)
-          VALUES (?,?,?,'word')`,
-    binds: [r.page_id, r.entry_kind, r.entry_id],
-  }))
-
-  let written = 0
-  for (let i = 0; i < statements.length; i += 40) {
-    const res = await d1Batch(db, statements.slice(i, i + 40))
-    for (const r of res) written += (r as any)?.meta?.changes ?? 0
-  }
-  return written
-}
 
 /**
  * Recompute each page's count and span from what is actually attached.

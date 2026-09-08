@@ -1634,6 +1634,10 @@ export const MIGRATIONS: Migration[] = [
   // his and the log's original stays in vision_description — the same
   // both-versions-kept rule as everywhere else.
   { name: '2026-09-07_vlogs_frame_note', sql: `ALTER TABLE vlogs ADD COLUMN frame_note TEXT` },
+
+  // When the log last read this recording's transcript onto the log.
+  // `src/lib/read-recording.ts` — no model in that path.
+  { name: '2026-09-08_vlogs_read_at', sql: `ALTER TABLE vlogs ADD COLUMN read_at TEXT` },
 ]
 
 const BENIGN_PATTERNS = [

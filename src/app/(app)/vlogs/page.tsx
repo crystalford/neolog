@@ -287,11 +287,11 @@ export default function VlogsPage() {
           </h2>
           <p style={{ color: 'var(--fg-2)', maxWidth: 480, margin: '0 auto 22px', lineHeight: 1.55 }}>
             {vlogs.length === 0
-              ? 'Drop your first vlog. The system threads, clusters, and ships it back.'
+              ? 'Nothing here yet. Drop a recording in and the log will read it.'
               : 'Switch tabs or clear the search.'}
           </p>
           {vlogs.length === 0 && (
-            <Link href="/capture" className="canon-btn primary">Capture</Link>
+            <Link href="/" className="canon-btn primary">The log</Link>
           )}
         </div>
       )}

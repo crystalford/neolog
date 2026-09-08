@@ -100,12 +100,15 @@ export async function GET(req: NextRequest) {
             v.vision_description, v.vision_tags, v.frame_note,
             substr(COALESCE(v.transcript_text, ''), 1, 400) AS transcript_text,
             v.usable, v.usable_note,
-            (SELECT COUNT(*) FROM productions pr
-              WHERE pr.operator_id = v.operator_id AND pr.deleted_at IS NULL
-                AND pr.source_kind = 'thread'
-                AND pr.source_id IN (
-                  SELECT t.id FROM threads t WHERE t.vlog_id = v.id AND t.deleted_at IS NULL
-                )) AS used_in
+            -- Where this recording has been used. It used to count
+            -- productions built from its threads; both tables went with the
+            -- essay engine. What "used" means now is that the log has read
+            -- words out of it, and that is a real answer rather than a
+            -- placeholder: an entry citing this recording is the only thing
+            -- in the product that uses one.
+            (SELECT COUNT(*) FROM log_entries le
+              WHERE le.operator_id = v.operator_id AND le.vlog_id = v.id
+                AND le.deleted_at IS NULL AND le.buried_at IS NULL) AS used_in
        FROM vlogs v
       WHERE ${where.join(' AND ')}
       ORDER BY COALESCE(v.recorded_at, v.created_at) DESC

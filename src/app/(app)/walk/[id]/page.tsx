@@ -6,12 +6,14 @@
  * `walk.html`: "A thought isn't a point... The route is the thing worth
  * keeping, not just where it ended up."
  *
- * ── Why `/walk/[id]` and not `/thread/[id]` ──────────────────────────────
+ * ── Why `/walk/[id]` ─────────────────────────────────────────────────────
  *
- * `/thread/[id]` already serves the extraction `threads` table — a different
- * thing with the same word, linked from five places. This repo paid once for
- * a naming collision (`/productions` vs `/production`) and is not paying
- * again. The design's own page is called `walk.html`, which settles it.
+ * The design's own page is called `walk.html`. It was also, until the
+ * extraction engine was removed on 8 Sep, the only name available: `/thread`
+ * served the `threads` table, a different thing with the same word. That
+ * table is gone and the name is free, and the page keeps the design's word
+ * rather than taking it — a route that moves costs more than one that reads
+ * slightly oddly.
  *
  * The id in the path is an ENTRY's, not a thread's, because there is no
  * thread row — a thread is `led_from` followed either way. Any turn opens

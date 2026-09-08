@@ -1,49 +1,36 @@
 'use client'
 
 /**
- * Canon masthead — top-horizontal nav.
+ * The masthead.
  *
- * Source: /tmp/neolognextlevel/design-reference/00-Sitemap.html (lines 49-67).
- * Three-column grid: lockup | 5-entry nav | search + health + avatar.
+ * `log.html`, verbatim: the mark, the wordmark, the private badge, and
+ * **three** entries — home · search · index. That is the whole nav in the
+ * design package, on every page of it, and it is the nav here.
  *
- * The 5 surfaces in the masthead are the canon's primary destinations:
- *   Timeline · Studio · Graph · Productions · About
+ * ── What used to be here, and why it is gone ─────────────────────────────
  *
- * Chat, Capture, Settings, Signout live in the avatar dropdown.
- * Capture also has a floating fab + ⌘N for one-click access.
+ * This carried Log · Archive · Drafts · Published, a health pill, and a
+ * dropdown with Chat, Inbox, Studio and a podcast feed. All of that was the
+ * video-essay studio — a different product that happened to share a
+ * database. The operator, 8 Sep: *"i'm seeing a sort of hybrid of the old
+ * site and the new site... i don't want to see evidence of the old site."*
+ *
+ * So the rule for this file from here on: **an entry goes in the nav only
+ * if a page in the design package puts it there.** The package puts three.
+ * Everything else in the product is reached from the page it belongs to —
+ * the footer, the rail, a row — which is what `everything.html` means by "a
+ * stranger chooses between two things" and what keeps the log from
+ * accumulating a dashboard again.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-// Four-entry masthead — the site-consolidation pass. Two ends were always
-// covered (Log: drop something in · Published: what shipped); this adds
-// real doors for the two things in between that never had one:
-//   Archive — the owned, dated photo/video/vlog timeline (was
-//             dropdown-only as "Storage").
-//   Drafts  — Subjects + Topics + Clips as one tabbed page (were fully
-//             orphaned: no nav entry, no dropdown entry, reachable only
-//             by luck via a home-page card or typing the URL).
 const NAV: { label: string; href: string; matchPaths: RegExp[] }[] = [
-  { label: 'Log',       href: '/',          matchPaths: [
-    /^\/$/, /^\/vlogs/, /^\/uploads/, /^\/vlog\//, /^\/capture/, /^\/transcript/,
-  ] },
-  { label: 'Search',    href: '/search',    matchPaths: [
-    /^\/search/,
-  ] },
-  { label: 'Index',     href: '/pages',     matchPaths: [
-    /^\/pages/, /^\/page\//,
-  ] },
-  { label: 'Archive',   href: '/photos',    matchPaths: [
-    /^\/photos/, /^\/photo\//,
-  ] },
-  { label: 'Drafts',    href: '/drafts',    matchPaths: [
-    /^\/drafts/, /^\/subjects/, /^\/subject\//, /^\/topics/, /^\/topic\//, /^\/clips/,
-  ] },
-  { label: 'Published', href: '/published', matchPaths: [
-    /^\/published/, /^\/production\//, /^\/projects/, /^\/library/,
-  ] },
+  { label: 'home',   href: '/',       matchPaths: [/^\/$/, /^\/now/, /^\/entry\//, /^\/walk\//] },
+  { label: 'search', href: '/search', matchPaths: [/^\/search/] },
+  { label: 'index',  href: '/pages',  matchPaths: [/^\/pages/, /^\/page\//] },
 ]
 
 export function Masthead() {
@@ -75,69 +62,18 @@ export function Masthead() {
       </nav>
 
       <div className="canon-meta">
-        <HealthPill/>
         <AvatarMenu/>
       </div>
     </header>
   )
 }
 
-/** Health pill — polls /api/v2/system/status. Cobalt = healthy, ochre = degraded, terra = down. */
-function HealthPill() {
-  const [state, setState] = useState<'ok' | 'warn' | 'err' | 'unknown'>('unknown')
-
-  useEffect(() => {
-    let cancelled = false
-    const check = async () => {
-      try {
-        const r = await fetch('/api/v2/system/status', { cache: 'no-store' })
-        if (cancelled) return
-        if (r.ok) {
-          const d = await r.json().catch(() => null) as { services?: { state?: string }[] } | null
-          if (d && Array.isArray(d.services)) {
-            const hasErr = d.services.some(s => s.state === 'err' || s.state === 'down')
-            const hasWarn = d.services.some(s => s.state === 'warn' || s.state === 'degraded')
-            setState(hasErr ? 'err' : hasWarn ? 'warn' : 'ok')
-          } else {
-            setState('ok')
-          }
-        } else {
-          setState('warn')
-        }
-      } catch {
-        if (!cancelled) setState('warn')
-      }
-    }
-    // Poll at 5 min (was 60s) and ONLY when the tab is visible. The status
-    // check is cheap now that the FFmpeg probe is passive, but there's no
-    // reason to hammer it from a backgrounded tab. visibilitychange resumes
-    // an immediate check when the operator returns to the tab.
-    let id: ReturnType<typeof setInterval> | null = null
-    const start = () => {
-      if (id != null) return
-      check()
-      id = setInterval(check, 300_000)
-    }
-    const stop = () => { if (id != null) { clearInterval(id); id = null } }
-    const onVis = () => {
-      if (document.visibilityState === 'visible') start()
-      else stop()
-    }
-    if (document.visibilityState === 'visible') start()
-    document.addEventListener('visibilitychange', onVis)
-    return () => {
-      cancelled = true
-      stop()
-      document.removeEventListener('visibilitychange', onVis)
-    }
-  }, [])
-
-  const label = state === 'err' ? 'degraded' : state === 'warn' ? 'checking' : 'all healthy'
-  const cls = state === 'err' ? 'canon-health err' : state === 'warn' ? 'canon-health warn' : 'canon-health'
-  return <span className={cls}>{label}</span>
-}
-
-/** Avatar + dropdown menu. Chat / Capture / Settings / Signout live here. */
+/**
+ * The way out, and the two things that are neither the log nor a page of it.
+ *
+ * Deliberately short. Everything that is a real surface of the log has a
+ * door on the log; a dropdown of destinations is how the old nav grew.
+ */
 function AvatarMenu() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -147,9 +83,7 @@ function AvatarMenu() {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onClick)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -165,36 +99,12 @@ function AvatarMenu() {
       </button>
       {open && (
         <div className="canon-dropdown" role="menu">
-          <Link href="/vlogs?capture=open" onClick={() => setOpen(false)}>
-            <span>Upload a vlog</span>
-            <span className="kbd">⌘N</span>
+          <Link href="/vlogs" onClick={() => setOpen(false)}>
+            <span>Recordings</span>
+            <span className="dropdown-sub">the files themselves, and what has been read out of them</span>
           </Link>
-          <Link href="/chat" onClick={() => setOpen(false)}>
-            <span>Chat with your vlogs</span>
-            <span className="kbd">G C</span>
-          </Link>
-          <div className="sep"/>
-          {/* Utility/admin surfaces — everything that's a real content
-              surface got promoted into the top nav during the site
-              consolidation pass. This stays admin-only. */}
-          <Link href="/inbox" onClick={() => setOpen(false)}>
-            <span>Inbox</span>
-            <span className="dropdown-sub">failed vlogs, unfinished projects, what needs your attention</span>
-          </Link>
-          <Link href="/studio" onClick={() => setOpen(false)}>
-            <span>Studio (clusters)</span>
-            <span className="dropdown-sub">the deeper cluster view — score, threads, refine</span>
-          </Link>
-          <a href="/podcast.xml" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
-            <span>Your podcast feed</span>
-            <span className="dropdown-sub">RSS · paste into Apple/Overcast/Spotify</span>
-          </a>
-          <div className="sep"/>
           <Link href="/settings" onClick={() => setOpen(false)}>
             <span>Settings</span>
-          </Link>
-          <Link href="/about" onClick={() => setOpen(false)}>
-            <span>About neolog</span>
           </Link>
           <div className="sep"/>
           <a href="/cdn-cgi/access/logout">

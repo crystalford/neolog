@@ -36,7 +36,6 @@ interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 const RATES = {
   r2_storage_per_gb_month: 0.015,   // R2 standard storage
   whisper_per_20min_vlog: 0.005,    // CLAUDE.md, Workers AI Whisper
-  extract_free_per_vlog: 0.04,      // CLAUDE.md, free tier, all four passes
 }
 
 export async function GET(req: NextRequest) {
@@ -86,7 +85,10 @@ export async function GET(req: NextRequest) {
   // monthly charge, and labelled as such.
   const vlogCount = vlogRows[0]?.n || 0
   const transcribeOnce = vlogCount * RATES.whisper_per_20min_vlog
-  const extractOnce = vlogCount * RATES.extract_free_per_vlog
+  // Reading a recording ONTO the log costs nothing. It used to be the
+  // extraction passes at four cents a recording; it is now arithmetic over
+  // `transcript_words` with no model in it, so there is no line for it and
+  // the absence is the point (`src/lib/read-recording.ts`).
 
   return NextResponse.json(
     {
@@ -117,13 +119,13 @@ export async function GET(req: NextRequest) {
           usd: Math.round(transcribeOnce * 100) / 100,
         },
         {
-          what: 'Reading them for what was said',
-          rate: `$${RATES.extract_free_per_vlog} per recording, free tier`,
-          how: `${vlogCount} recordings`,
-          usd: Math.round(extractOnce * 100) / 100,
+          what: 'Reading them onto the log',
+          rate: 'nothing — no model is called',
+          how: `${vlogCount} recordings, cut at your own pauses`,
+          usd: 0,
         },
       ],
-      one_off_total: Math.round((transcribeOnce + extractOnce) * 100) / 100,
+      one_off_total: Math.round(transcribeOnce * 100) / 100,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )

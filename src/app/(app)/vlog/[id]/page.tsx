@@ -1,1026 +1,245 @@
 'use client'
 
 /**
- * Vlog detail — canon rebuild per
- * /tmp/neolognextlevel/design-reference/04-Vlog.html
+ * One recording, whole.
  *
- * Was /timeline/[id]; moved to /vlog/[id] in Phase 5 to match canon
- * naming. Old path redirects here.
+ * `vlog.html`: "the whole video (kept untouched), the word-timestamped
+ * transcript with used lines marked and linked to what they became,
+ * provenance (date from the MP4 `mvhd`, Whisper transcription)."
  *
- * Sections (top to bottom):
- *   1. Crumbs              — Timeline / Vlogs / filename
- *   2. Hero                — status pill + filename h1 + meta strip
- *                            (recorded date / duration / size / words)
- *                            + actions column (Re-extract / Mark broll /
- *                            Delete / Open original)
- *   3. Anchor take         — pull-quote with the strongest thread (if any)
- *   4. Session digest      — 4-cell strip (threads / clips / entities / clusters)
- *   5. Player + timeline   — 16:9 video + MultiTrackTimeline (audio /
- *                            threads / clips / entities)
- *   6. Transcript editor   — VlogTranscriptEditor (src/components), the
- *                            whole-vlog click-to-cut editor. Sits right
- *                            after the player so it's not buried below
- *                            Threads/Clips/Creative. Falls back to a
- *                            read-only transcript block when the vlog
- *                            has no word-level timestamps.
- *   7. Body grid           — main: Threads / Clips / Creative /
- *                            System actions disclosure
- *                            rail: re-extract panel, diagnosis if pipeline
- *                            failure, raw extraction_outcomes
- *   8. Provenance grid     — 8 cells
- *   9. Footer              — colophon + j/k hints
+ * ── What this page used to be ────────────────────────────────────────────
  *
- * Data: /api/v2/vlogs/[id]. Same payload as before; reused as-is.
- * Reuses: MultiTrackTimeline, LivePipeline (pipeline status realtime).
+ * A thousand lines of extraction dashboard: a session digest, an anchor
+ * take, threads and clips and entities in tabs, a tier picker, cost
+ * estimates, re-extract and mark-as-broll buttons, a podcast toggle. The
+ * operator's verdict on all of it: *"i didn't trust its output anyway."*
+ *
+ * What is left is the recording and the evidence. The video, played from R2
+ * untouched. The words with the second each was said. The provenance —
+ * which of the four tiers dated it, who transcribed it — in words rather
+ * than as column values. And the entries the log read out of it, each one a
+ * contiguous run of the transcript above, linked to the second it starts at.
+ *
+ * The one action is **read it onto the log**, and it calls a path with no
+ * model in it.
  */
 
 export const runtime = 'edge'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
-import { topicColor } from '@/lib/topic-color'
-import {
-  MultiTrackTimeline, truncate, formatMmSs, formatDate, formatFullDate,
-  type MultiTrackBand, type MultiTrackMark,
-} from '@/components/threadkit'
-import LivePipeline from '../../timeline/[id]/live-pipeline'
-import VlogTranscriptEditor from '@/components/VlogTranscriptEditor'
 
-interface VlogDetail {
-  id: string
-  title: string | null
-  original_filename: string | null
+interface Vlog {
+  id: string; title: string | null; original_filename: string | null
+  play_url: string | null; poster_url: string | null
+  duration_seconds: number | null; file_size_bytes: number | null
   mime_type: string | null
-  file_size_bytes: number | null
-  duration_seconds: number | null
-  recorded_at: string | null
-  recorded_at_source: string | null
-  thumbnail_url: string | null
-  transcript_text: string | null
-  summary: string | null
-  pipeline_status: string
-  pipeline_error: string | null
-  is_podcast?: number | boolean | null
-  auto_publish_clips?: number | boolean | null
-  auto_publish_vertical?: number | boolean | null
-  auto_publish_pending?: number | boolean | null
-  playback_url: string | null
-  audio_url?: string | null
-  audio_chunk_urls?: string[] | null
-  slideshow_frames?: Array<{ url: string; time_sec: number }> | null
-  is_audio_only?: boolean
-  has_transcoded?: boolean
-  has_word_timestamps?: boolean
-  extraction_outcomes: string | null
-  updated_at: string | null
-  visibility?: string
-  created_at?: string
+  recorded_at: string | null; created_at: string
+  date_from: string; transcribed_by: string | null
+  transcript_completed_at: string | null
+  pipeline_status: string | null
+  read_at: string | null
+  word_count: number
+  vision_description: string | null; frame_note: string | null
 }
-interface ThreadRow {
-  id: string
-  topic: string
-  take: string | null
-  key_quotes: string | null
-  strength: number | null
-  abstracted_topic: string | null
-  register?: string | null
-  transcript_span_start?: number | null
-  transcript_span_end?: number | null
+interface Word { word: string; start_time: number; end_time: number; word_index: number }
+interface Entry { id: string; text: string; happened_at: string; span_start: number | null; span_end: number | null }
+interface Result {
+  vlog: Vlog; words: Word[]; entries: Entry[]
+  navigation: { prev_id: string | null; next_id: string | null }
 }
-interface ClipRow {
-  id: string
-  start_time: number | null
-  end_time: number | null
-  headline: string
-  quote: string | null
-  why_clippable: string | null
-  status: string | null
-  validated: number | null
-}
-interface CreativeRow { id: string; element_type: string; content: string; register: string | null; validated: number | null }
-interface EntityRow { id: string; name: string; entity_type: string; aliases: string | null; mention_count: number | null; vlog_quotes?: string[] }
-interface EntityMention { entity_id: string; mention_time: number | null; entity_name: string; entity_type: string }
 
-export default function VlogDetailPage({ params }: { params: { id: string } }) {
+const clock = (s: number | null) => {
+  if (s == null || s < 0) return ''
+  const m = Math.floor(s / 60)
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+}
+const day = (s: string | null) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+const mb = (b: number | null) => (b ? `${(b / 1048576).toFixed(0)} MB` : '')
+
+export default function Recording() {
+  const params = useParams<{ id: string }>()
   const router = useRouter()
-  const [vlog, setVlog] = useState<VlogDetail | null>(null)
-  const [threads, setThreads] = useState<ThreadRow[]>([])
-  const [clips, setClips] = useState<ClipRow[]>([])
-  const [creative, setCreative] = useState<CreativeRow[]>([])
-  const [entities, setEntities] = useState<EntityRow[]>([])
-  const [mentions, setMentions] = useState<EntityMention[]>([])
-  const [anchorThread, setAnchorThread] = useState<{ id: string; topic: string; take: string | null; strength: number | null } | null>(null)
-  const [navigation, setNavigation] = useState<{ prev_vlog_id: string | null; next_vlog_id: string | null }>({ prev_vlog_id: null, next_vlog_id: null })
-  const [error, setError] = useState<string | null>(null)
-  const [currentT, setCurrentT] = useState(0)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const [systemOpen, setSystemOpen] = useState(false)
-  const [actionNote, setActionNote] = useState<string | null>(null)
+  const [r, setR] = useState<Result | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [at, setAt] = useState(0)
 
-  const load = () => {
-    fetch(`/api/v2/vlogs/${params.id}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((d: any) => {
-        setVlog(d.vlog)
-        setThreads(d.threads ?? [])
-        setClips(d.clips ?? [])
-        setCreative(d.creative_elements ?? [])
-        setEntities(d.entities ?? [])
-        setMentions(d.entity_mention_times ?? [])
-        setAnchorThread(d.anchor_thread ?? null)
-        setNavigation(d.navigation ?? { prev_vlog_id: null, next_vlog_id: null })
-      })
-      .catch(e => setError(String(e?.message || e)))
-  }
-  useEffect(() => { load() }, [params.id])
-
-  useEffect(() => {
-    if (!navigation) return
-    const h = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === 'j' && navigation.next_vlog_id) router.push(`/vlog/${navigation.next_vlog_id}`)
-      else if (e.key === 'k' && navigation.prev_vlog_id) router.push(`/vlog/${navigation.prev_vlog_id}`)
-    }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [navigation, router])
-
-  const seek = (t: number) => {
-    setCurrentT(t)
-    if (videoRef.current) videoRef.current.currentTime = t
-  }
-
-  const reExtract = async (passes?: string[]) => {
-    setActionNote('Starting re-extraction…')
+  const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/process`, {
-        method: 'POST', credentials: 'include',
+      const res = await fetch(`/api/v2/vlogs/${params.id}`, { cache: 'no-store' })
+      if (res.ok) setR(await res.json() as Result)
+    } catch { setR(null) }
+    finally { setLoading(false) }
+  }, [params.id])
+  useEffect(() => { void load() }, [load])
+
+  const read = useCallback(async () => {
+    setBusy(true); setMsg(null)
+    try {
+      const res = await fetch('/api/v2/log/read', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Always pass mode so the API doesn't short-circuit with
-        // { already_complete: true } when pipeline_status='complete'.
-        // Without this, "Re-extract" silently no-ops for any vlog that
-        // already finished once — and we never re-run transcode even
-        // when transcoded_r2_key is null.
-        body: JSON.stringify(passes ? { passes, mode: 'cheap' } : { mode: 'cheap' }),
+        body: JSON.stringify({ vlog_id: params.id }),
       })
-      const d: any = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-      setActionNote(`Re-extraction queued. Pipeline running.`)
-      setTimeout(load, 2000)
-    } catch (e: any) {
-      setActionNote(`Failed: ${e?.message || String(e)}`)
+      const j = await res.json() as { entries_written: number; passages: number; no_words: boolean }
+      if (j.no_words) setMsg('No word timings on this one yet, so nothing was placed. Nothing is dated by guess.')
+      else setMsg(`${j.entries_written} of ${j.passages} on the log. Each is a run of the words below, at the second you said it.`)
+      await load()
+    } catch { setMsg('that did not run') }
+    finally { setBusy(false) }
+  }, [params.id, load])
+
+  const v = r?.vlog
+  // The word under the playhead, so the transcript follows the video.
+  const activeIndex = useMemo(() => {
+    if (!r?.words.length) return -1
+    let lo = 0, hi = r.words.length - 1, best = -1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (r.words[mid].start_time <= at) { best = mid; lo = mid + 1 } else hi = mid - 1
     }
-  }
-
-  const markBroll = async () => {
-    if (!confirm('Mark as B-roll? Silent footage, no extraction.')) return
-    try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/mark-broll`, { method: 'POST', credentials: 'include' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      setActionNote('Marked as B-roll.')
-      load()
-    } catch (e: any) {
-      setActionNote(`Failed: ${e?.message || String(e)}`)
-    }
-  }
-
-  const toggleAutoPublish = async (next: boolean, vertical?: boolean) => {
-    if (!vlog) return
-    setActionNote(next ? 'Turning auto-publish on…' : 'Turning auto-publish off…')
-    try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-toggle`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auto_publish_clips: next,
-          ...(vertical !== undefined ? { auto_publish_vertical: vertical } : {}),
-        }),
-      })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      setActionNote(next
-        ? 'Auto-publish on. Top scored clips from this vlog will ship next sweep.'
-        : 'Auto-publish off.')
-      load()
-    } catch (e: any) {
-      setActionNote(`Failed: ${e?.message || String(e)}`)
-    }
-  }
-
-  const runAutoPublishNow = async () => {
-    if (!vlog) return
-    setActionNote('Auto-publishing now — judging clips, slicing, firing webhook…')
-    try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/auto-publish-now`, {
-        method: 'POST', credentials: 'include',
-      })
-      const d: any = await r.json()
-      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`)
-      const parts = [
-        `${d.considered ?? 0} candidates · ${d.selected ?? 0} selected`,
-        `${d.shipped ?? 0} shipped`,
-        d.webhook_fired ? `posted to fanout` : 'no fanout webhook set',
-      ]
-      setActionNote(parts.join(' · '))
-      load()
-    } catch (e: any) {
-      setActionNote(`Failed: ${e?.message || String(e)}`)
-    }
-  }
-
-  const togglePodcast = async () => {
-    if (!vlog) return
-    const next = !vlog.is_podcast
-    setActionNote(next ? 'Adding to podcast feed…' : 'Removing from podcast feed…')
-    try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}/podcast`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ include: next }),
-      })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const data: any = await r.json().catch(() => ({}))
-      const feedUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/podcast.xml`
-      if (next) {
-        setActionNote(
-          data.stitch_triggered
-            ? `Added — stitching MP3 now (refresh in ~30s). Feed URL: ${feedUrl}`
-            : `In podcast feed. Feed URL: ${feedUrl}`
-        )
-      } else {
-        setActionNote('Removed from podcast feed.')
-      }
-      load()
-    } catch (e: any) {
-      setActionNote(`Failed: ${e?.message || String(e)}`)
-    }
-  }
-
-  const deleteVlog = async () => {
-    if (!confirm('Delete this vlog? This removes the R2 bytes too. Cannot be undone.')) return
-    try {
-      const r = await fetch(`/api/v2/vlogs/${params.id}`, { method: 'DELETE', credentials: 'include' })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      router.push('/')
-    } catch (e: any) {
-      setActionNote(`Delete failed: ${e?.message || String(e)}`)
-    }
-  }
-
-  // Multi-track timeline bands/marks
-  const threadBands: MultiTrackBand[] = useMemo(() => threads
-    .filter(t => t.transcript_span_start != null && t.transcript_span_end != null)
-    .map(t => ({
-      start: t.transcript_span_start!,
-      end: t.transcript_span_end!,
-      color: topicColor(t.abstracted_topic ?? t.topic),
-      label: truncate(t.topic, 40),
-    })), [threads])
-  const clipBands: MultiTrackBand[] = useMemo(() => clips
-    .filter(c => c.start_time != null && c.end_time != null)
-    .map(c => ({
-      start: c.start_time!,
-      end: c.end_time!,
-      color: 'var(--sig)',
-      label: c.headline,
-    })), [clips])
-  const entityMarks: MultiTrackMark[] = useMemo(() => mentions
-    .filter(m => m.mention_time != null)
-    .map(m => ({ time: m.mention_time!, color: 'var(--fg-3)', label: m.entity_name })), [mentions])
-
-  if (error) return (
-    <Shell>
-      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, 'Vlog · error']}/>
-      <div style={{ padding: 40, color: 'var(--t-terra)' }}>Error: {error}</div>
-    </Shell>
-  )
-  if (!vlog) return (
-    <Shell>
-      <CanonCrumbs trail={[{ label: 'Timeline', href: '/' }, 'Vlog · loading…']}/>
-      <div style={{ padding: 40, color: 'var(--fg-3)' }}>Loading…</div>
-    </Shell>
-  )
-
-  // Prefer the AI-derived title from extraction. Falls back to the
-  // de-uglified DJI filename only when extraction hasn't run yet.
-  const title = (vlog.title && vlog.title.trim()) || deriveVlogTitle(vlog.original_filename)
-  const status = vlog.pipeline_status
-  const isBroll = status === 'archived'
-  const isProcessing = ['uploaded', 'transcoding', 'thumbnail_pending', 'transcribing', 'extracting'].includes(status)
-  const isFailed = status === 'failed'
-  const isComplete = status === 'complete'
-  const wordCount = vlog.transcript_text ? vlog.transcript_text.trim().split(/\s+/).filter(Boolean).length : 0
+    return best
+  }, [r, at])
 
   return (
     <Shell>
-      <div>
-        <CanonCrumbs
-          trail={[
-            { label: 'Timeline', href: '/' },
-            { label: 'Vlogs', href: '/?filter=vlog' },
-            { label: truncate(title, 50) },
-          ]}
-          prev={navigation.prev_vlog_id ? `/vlog/${navigation.prev_vlog_id}` : null}
-          next={navigation.next_vlog_id ? `/vlog/${navigation.next_vlog_id}` : null}
-          vlogId={vlog.id}
-        />
-
-        {/* Hero */}
-        <section className="canon-detail-hero canon-reveal d2">
-          <div>
-            <div className="pills-row">
-              <StatusPill status={status}/>
-              {vlog.recorded_at_source && (
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: 1.4,
-                  textTransform: 'uppercase', color: 'var(--fg-4)',
-                }}>
-                  date · {vlog.recorded_at_source}
-                </span>
-              )}
-            </div>
-            <h1>{title}</h1>
-            <div className="meta-strip">
-              {vlog.recorded_at && <span>Recorded <strong>{formatFullDate(vlog.recorded_at)}</strong></span>}
-              {vlog.duration_seconds != null && <span><strong>{formatMmSs(vlog.duration_seconds)}</strong> duration</span>}
-              {vlog.file_size_bytes != null && <span><strong>{fmtSize(vlog.file_size_bytes)}</strong></span>}
-              {vlog.mime_type && <span>{vlog.mime_type.replace('video/', '').toUpperCase()}</span>}
-              {wordCount > 0 && <span><strong>{wordCount.toLocaleString()}</strong> words</span>}
-            </div>
-          </div>
-          <div className="actions">
-            {isComplete && (
-              <button className="action primary" onClick={() => reExtract()}>
-                Re-extract
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'rgba(6,23,53,0.5)' }}>R</span>
-              </button>
-            )}
-            {isBroll && (
-              <button className="action primary" onClick={() => reExtract()}>
-                Process
-              </button>
-            )}
-            {!isBroll && (
-              <button className="action" onClick={markBroll}>
-                Mark as B-roll
-              </button>
-            )}
-            <button
-              className="action"
-              onClick={togglePodcast}
-              style={vlog.is_podcast ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
-              title={vlog.is_podcast ? 'In /podcast.xml — click to remove' : 'Add to /podcast.xml feed'}
-            >
-              {vlog.is_podcast ? 'In podcast ✓' : 'Add to podcast'}
-            </button>
-            <button
-              className="action"
-              onClick={() => toggleAutoPublish(!vlog.auto_publish_clips)}
-              style={vlog.auto_publish_clips ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
-              title={vlog.auto_publish_clips
-                ? 'Auto-publish on — the sweep will ship top-scored clips and fire your fanout webhook'
-                : 'Turn on to auto-publish top clips from this vlog without approval'}
-            >
-              {vlog.auto_publish_clips ? 'Auto-publish ✓' : 'Auto-publish'}
-              {vlog.auto_publish_pending ? <span style={{ marginLeft: 6, color: 'var(--t-ochre)' }}>· pending</span> : null}
-            </button>
-            {vlog.auto_publish_clips ? (
-              <button
-                className="action"
-                onClick={() => toggleAutoPublish(true, !vlog.auto_publish_vertical)}
-                style={vlog.auto_publish_vertical ? { color: 'var(--sig)', borderColor: 'var(--sig)' } : undefined}
-                title="Also output a 9:16 vertical copy of each shipped clip (FFmpeg crop)"
-              >
-                {vlog.auto_publish_vertical ? 'Vertical too ✓' : 'Source aspect only'}
-              </button>
-            ) : null}
-            {vlog.auto_publish_clips ? (
-              <button
-                className="action"
-                onClick={runAutoPublishNow}
-                title="Run the auto-publish sweep on this vlog now"
-              >
-                Auto-publish now →
-              </button>
-            ) : null}
-            {vlog.playback_url && (
-              <a className="action" href={vlog.playback_url} target="_blank" rel="noreferrer">
-                Open original
-              </a>
-            )}
-            <button className="action" onClick={deleteVlog} style={{ color: 'var(--t-terra)' }}>
-              Delete
-            </button>
-          </div>
-        </section>
-
-        {actionNote && (
-          <div style={{
-            margin: '0 0 24px', padding: '12px 16px',
-            background: 'var(--bg-2)', border: '1px solid var(--line-1)',
-            borderRadius: 8, fontSize: 13, color: 'var(--fg-2)',
-          }}>{actionNote}</div>
-        )}
-
-        {/* Anchor take pull-quote */}
-        {anchorThread && (anchorThread.take || anchorThread.topic) && (
-          <Link href={`/thread/${anchorThread.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
-            <section className="canon-pull canon-reveal d3" style={{ ['--topic' as any]: topicColor(anchorThread.topic) } as React.CSSProperties}>
-              <div className="label">Anchor take · strongest thread</div>
-              <div className="quote">{anchorThread.take || anchorThread.topic}</div>
-            </section>
-          </Link>
-        )}
-
-        {/* Session digest */}
-        <section className="canon-digest canon-reveal d3" style={{ marginBottom: 32 }}>
-          <div className="canon-digest-cell">
-            <span className="n">{threads.length}</span>
-            <span className="l">Threads</span>
-          </div>
-          <div className="canon-digest-cell">
-            <span className="n">{clips.length}</span>
-            <span className="l">Clip candidates</span>
-          </div>
-          <div className="canon-digest-cell">
-            <span className="n">{entities.length}</span>
-            <span className="l">Entities</span>
-          </div>
-          <div className="canon-digest-cell">
-            <span className="n">{creative.length}</span>
-            <span className="l">Creative</span>
-          </div>
-        </section>
-
-        {/* Player + multi-track timeline. Audio-only uploads render an
-            <audio> element instead of <video> — the operator uploaded the
-            audio track only (bad-wifi mode) and there's no video to show. */}
-        {(vlog.playback_url || vlog.audio_url) && (
-          <section className="canon-reveal d4" style={{ marginBottom: 32 }}>
-            {vlog.is_audio_only ? (
-              <div style={{
-                width: '100%', maxWidth: 720, margin: '0 auto 14px',
-                padding: '24px 20px',
-                background: 'var(--bg-1)',
-                border: '1px solid var(--line-1)',
-                borderRadius: 12,
-                display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch',
-              }}>
-                <div style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.8,
-                  textTransform: 'uppercase', color: 'var(--fg-3)',
-                }}>
-                  Audio-only upload · drop the original file in later to attach the video
-                </div>
-                {vlog.slideshow_frames && vlog.slideshow_frames.length > 0 && (
-                  <SlideshowStage frames={vlog.slideshow_frames} currentT={currentT}/>
-                )}
-                {vlog.audio_url ? (
-                  <AudioOnlyPlayer
-                    audioUrl={vlog.audio_url}
-                    chunkUrls={vlog.audio_chunk_urls ?? null}
-                    onTime={t => setCurrentT(t)}
-                  />
-                ) : (
-                  <div style={{ fontSize: 13, color: 'var(--fg-3)' }}>
-                    Audio still processing — refresh in a moment.
-                  </div>
-                )}
-              </div>
-            ) : (
-            <div style={{
-              width: '100%',
-              maxWidth: 720,
-              aspectRatio: '16 / 9',
-              maxHeight: '55vh',
-              margin: '0 auto 14px',
-              background: '#050505',
-              border: '1px solid var(--line-1)',
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}>
-              <video
-                ref={videoRef}
-                src={vlog.playback_url ?? undefined}
-                controls
-                preload="metadata"
-                poster={vlog.thumbnail_url ?? undefined}
-                onTimeUpdate={(e) => setCurrentT((e.target as HTMLVideoElement).currentTime)}
-                style={{ width: '100%', height: '100%', display: 'block', background: 'black', objectFit: 'contain' }}
-              />
-            </div>
-            )}
-            <MultiTrackTimeline
-              durationSec={vlog.duration_seconds ?? 0}
-              threadBands={threadBands}
-              clipBands={clipBands}
-              entityMarks={entityMarks}
-              currentT={currentT}
-              onSeek={seek}
-              accentColor="var(--sig)"
-            />
-          </section>
-        )}
-
-        {/* Whole-vlog click-to-cut editor — sits right after the player,
-            ahead of Threads/Clips/Creative, so it's not buried below the
-            fold. Falls back to a read-only transcript block when this
-            vlog has no word-level timestamps. */}
-        <VlogTranscriptEditor
-          vlogId={vlog.id}
-          hasWordTimestamps={!!vlog.has_word_timestamps}
-          fallbackText={vlog.transcript_text}
-          currentT={currentT}
-          seek={seek}
-        />
-
-        {/* Body grid: main + rail */}
-        <div className="canon-detail-body">
-          <div className="canon-detail-main">
-
-            {threads.length > 0 && (
-              <section className="canon-section">
-                <div className="canon-section-head">
-                  <h2>Extracted threads <span className="meta">· {threads.length}</span></h2>
-                  <div className="meta">extracted</div>
-                </div>
-                <div className="canon-siblings">
-                  {threads.map(t => {
-                    const c = topicColor(t.abstracted_topic ?? t.topic)
-                    return (
-                      <Link key={t.id} href={`/thread/${t.id}`} className="canon-sibling" style={{ '--c': c } as any}>
-                        <span className="dot"/>
-                        {t.transcript_span_start != null && (
-                          <button onClick={(e) => { e.preventDefault(); seek(t.transcript_span_start!) }} style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)',
-                            padding: 0, flexShrink: 0,
-                          }} title="Jump to timecode">
-                            ▶ {formatMmSs(t.transcript_span_start)}
-                          </button>
-                        )}
-                        <span className="name">{truncate(t.take || t.topic, 90)}</span>
-                        <span style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
-                          {t.abstracted_topic && truncate(t.abstracted_topic, 18)}
-                        </span>
-                        <span className="strength">
-                          {[1,2,3,4,5].map(i => <span key={i} className={`pip ${i <= (t.strength ?? 0) ? 'on' : ''}`}/>)}
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            {clips.length > 0 && (
-              <section className="canon-section">
-                <div className="canon-section-head">
-                  <h2>Clip candidates <span className="meta">· {clips.length}</span></h2>
-                  <div className="meta">delivery moments</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {clips.map(c => {
-                    // Span is missing when extraction didn't compute
-                    // start/end (older runs) or when start===end===0.
-                    const hasSpan = c.start_time != null && c.end_time != null
-                      && (c.end_time - c.start_time) >= 1
-                    // why_clippable sometimes lands as JSON-stringified
-                    // {"reason":"…"} instead of plain text. Parse
-                    // defensively so the operator doesn't see raw JSON.
-                    const reason = extractReason(c.why_clippable)
-                    return (
-                      <div key={c.id} style={{
-                        padding: '14px 18px',
-                        background: 'var(--bg-1)',
-                        border: '1px solid var(--line-1)',
-                        borderLeft: '2px solid var(--sig)',
-                        borderRadius: '0 10px 10px 0',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-                          {hasSpan ? (
-                            <button onClick={() => seek(c.start_time!)} style={{
-                              background: 'var(--sig-soft)',
-                              border: '1px solid color-mix(in srgb, var(--sig) 40%, transparent)',
-                              color: 'var(--sig)',
-                              padding: '3px 9px', borderRadius: 100,
-                              fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-                              cursor: 'pointer',
-                            }}>
-                              ▶ {formatMmSs(c.start_time!)} → {formatMmSs(c.end_time!)}
-                            </button>
-                          ) : (
-                            <span style={{
-                              padding: '3px 9px', borderRadius: 100,
-                              border: '1px dashed var(--line-2)',
-                              color: 'var(--fg-4)',
-                              fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-                            }}>no timecode · re-extract</span>
-                          )}
-                          <span style={{ fontSize: 14, color: 'var(--fg-1)', fontWeight: 500 }}>{c.headline}</span>
-                        </div>
-                        {c.quote && (
-                          <div style={{ fontSize: 13.5, color: 'var(--fg-2)', lineHeight: 1.5, fontStyle: 'italic' }}>
-                            “{c.quote}”
-                          </div>
-                        )}
-                        {reason && (
-                          <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
-                            {reason}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            {creative.length > 0 && (
-              <section className="canon-section">
-                <div className="canon-section-head">
-                  <h2>Creative elements <span className="meta">· {creative.length}</span></h2>
-                  <div className="meta">scene fragments + dialogue captures</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {creative.map(ce => (
-                    <div key={ce.id} style={{
-                      padding: '14px 18px',
-                      background: 'var(--bg-1)',
-                      border: '1px solid var(--line-1)',
-                      borderLeft: '2px solid var(--t-plum)',
-                      borderRadius: '0 10px 10px 0',
-                    }}>
-                      <div style={{
-                        fontSize: 9.5, color: 'var(--t-plum)', letterSpacing: 1.5,
-                        textTransform: 'uppercase', fontFamily: 'var(--font-mono)',
-                        fontWeight: 500, marginBottom: 8,
-                      }}>{ce.element_type.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: 14, color: 'var(--fg-1)', lineHeight: 1.55 }}>{ce.content}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* System actions disclosure */}
-            <section className="canon-section">
-              <button
-                onClick={() => setSystemOpen(o => !o)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 16px',
-                  background: 'var(--bg-1)',
-                  border: '1px solid var(--line-1)',
-                  borderRadius: 8,
-                  fontFamily: 'var(--font-mono)', fontSize: 11,
-                  letterSpacing: 1.6, textTransform: 'uppercase',
-                  color: 'var(--fg-2)', cursor: 'pointer',
-                  width: '100%', textAlign: 'left',
-                }}
-              >
-                <span>{systemOpen ? '▾' : '▸'}</span>
-                System actions · pipeline status · per-pass re-extract
-              </button>
-              {systemOpen && (
-                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <LivePipeline vlogId={vlog.id}/>
-                  <div style={{
-                    padding: 16, background: 'var(--bg-1)',
-                    border: '1px solid var(--line-1)', borderRadius: 8,
-                  }}>
-                    <div style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
-                      textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 10,
-                    }}>Per-pass re-extract</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {(['threads', 'entities'] as const).map(p => (
-                        <button key={p} onClick={() => reExtract([p])} className="canon-btn ghost" style={{ fontSize: 11 }}>
-                          {p}
-                        </button>
-                      ))}
-                      <button onClick={() => reExtract()} className="canon-btn primary" style={{ fontSize: 11 }}>
-                        All passes
-                      </button>
-                    </div>
-                  </div>
-                  {vlog.extraction_outcomes && (
-                    <div style={{
-                      padding: 16, background: 'var(--bg-1)',
-                      border: '1px solid var(--line-1)', borderRadius: 8,
-                    }}>
-                      <div style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
-                        textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 10,
-                      }}>Extraction outcomes</div>
-                      <pre style={{
-                        fontSize: 11, color: 'var(--fg-2)', overflow: 'auto',
-                        fontFamily: 'var(--font-mono)', margin: 0,
-                      }}>{tryPrettyJson(vlog.extraction_outcomes)}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Rail */}
-          <aside className="canon-detail-rail">
-            {entities.length > 0 && (
-              <div className="rail-card">
-                <div className="rc-head">
-                  <h3>Entities · in this vlog</h3>
-                  <Link href="/graph" className="more">graph →</Link>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {entities.slice(0, 12).map(e => (
-                    <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <Link href={`/entity/${e.id}`} className="canon-entity-chip" style={{ alignSelf: 'flex-start' }}>
-                        <span className="glyph">{e.name.slice(0, 2).toUpperCase()}</span>
-                        {truncate(e.name, 22)}
-                        {e.mention_count != null && <span className="n">·{e.mention_count}</span>}
-                      </Link>
-                      {(e.vlog_quotes ?? []).slice(0, 3).map((q, i) => (
-                        <blockquote key={i} style={{
-                          margin: 0, padding: '4px 0 4px 10px',
-                          borderLeft: '2px solid var(--line-2)',
-                          fontSize: 12, lineHeight: 1.45,
-                          color: 'var(--fg-2)', fontStyle: 'italic',
-                        }}>"{q}"</blockquote>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isProcessing && (
-              <div className="rail-card" style={{ borderLeft: '2px solid var(--sig)' }}>
-                <div className="rc-head">
-                  <h3>Pipeline running</h3>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-                  <strong style={{ color: 'var(--sig)' }}>{status}</strong> — open System actions below to watch progress live.
-                </div>
-              </div>
-            )}
-
-            {isFailed && vlog.pipeline_error && (
-              <div className="rail-card" style={{ borderLeft: '2px solid var(--t-terra)', minWidth: 0, overflow: 'hidden' }}>
-                <div className="rc-head">
-                  <h3>Pipeline failed</h3>
-                </div>
-                <div style={{
-                  fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.55, fontFamily: 'var(--font-mono)',
-                  overflowWrap: 'anywhere', wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                  maxHeight: 240, overflowY: 'auto',
-                }}>
-                  {vlog.pipeline_error}
-                </div>
-                <button onClick={() => reExtract()} className="canon-btn primary" style={{ marginTop: 12, width: '100%', fontSize: 12 }}>
-                  Retry
-                </button>
-              </div>
-            )}
-          </aside>
+      <div className="logpage">
+        <div className="crumb">
+          <Link href="/">the log</Link>
+          <Link href="/vlogs">recordings</Link>
+          {r?.navigation.prev_id && <Link href={`/vlog/${r.navigation.prev_id}`}>earlier</Link>}
+          {r?.navigation.next_id && <Link href={`/vlog/${r.navigation.next_id}`}>later</Link>}
         </div>
 
-        {/* Provenance */}
-        <section className="canon-prov-grid" style={{ marginTop: 32 }}>
-          <ProvCell label="Recorded" value={vlog.recorded_at ? formatFullDate(vlog.recorded_at) : '—'}/>
-          <ProvCell label="Date source" value={vlog.recorded_at_source ?? '—'} mono/>
-          <ProvCell label="Status" value={status}/>
-          <ProvCell label="Visibility" value={vlog.visibility ?? 'private'}/>
-          <ProvCell label="Duration" value={vlog.duration_seconds != null ? formatMmSs(vlog.duration_seconds) : '—'} mono/>
-          <ProvCell label="Size" value={vlog.file_size_bytes != null ? fmtSize(vlog.file_size_bytes) : '—'}/>
-          <ProvCell label="Vlog id" value={truncate(vlog.id, 22)} mono/>
-          <ProvCell label="Updated" value={vlog.updated_at ? formatFullDate(vlog.updated_at) : '—'}/>
-        </section>
+        {loading && <div className="none">Getting it.</div>}
+        {!loading && !v && <div className="none">No such recording.</div>}
 
-        {/* Footer */}
-        <footer className="canon-detail-footer">
-          <span>neolog · vlog {truncate(vlog.id, 22)}</span>
-          <span className="kbd-row">
-            <span className="kbd">J</span> next
-            <span className="kbd">K</span> prev
-            <span className="kbd">R</span> re-extract
-          </span>
-        </footer>
+        {v && r && (
+          <>
+            <div className="pghead">
+              <h1>{v.title || v.original_filename || 'A recording'}</h1>
+            </div>
+            <div className="stamp">
+              <time dateTime={v.recorded_at || v.created_at}>{day(v.recorded_at || v.created_at)}</time>
+              {v.duration_seconds && <span>{clock(v.duration_seconds)}</span>}
+              {v.file_size_bytes && <span>{mb(v.file_size_bytes)}</span>}
+              {v.word_count > 0 && <span>{v.word_count.toLocaleString('en-GB')} words</span>}
+            </div>
+
+            {v.play_url ? (
+              <video
+                className="rec"
+                src={v.play_url}
+                poster={v.poster_url || undefined}
+                controls
+                playsInline
+                onTimeUpdate={e => setAt((e.target as HTMLVideoElement).currentTime)}
+              />
+            ) : (
+              <div className="none">
+                The file is in R2 and this page could not sign a link for it
+                just now. Nothing is lost; reload.
+              </div>
+            )}
+
+            {/* Provenance, in words. Two facts, and the log says how it knows
+                each — a recording that cannot be checked is not evidence. */}
+            <div className="lsec"><span>where this came from</span></div>
+            <div className="doors">
+              <span className="d">
+                <span className="n">the date</span>
+                <span className="w">{v.date_from}</span>
+                <span className="c">{day(v.recorded_at || v.created_at)}</span>
+              </span>
+              <span className="d">
+                <span className="n">the words</span>
+                <span className="w">
+                  {v.transcribed_by
+                    ? `Transcribed by ${v.transcribed_by}. Every word carries the second it was said.`
+                    : 'Not transcribed yet. Until it is, nothing can be placed from it.'}
+                </span>
+                <span className="c">{v.transcript_completed_at ? day(v.transcript_completed_at) : ''}</span>
+              </span>
+              <span className="d">
+                <span className="n">the file</span>
+                <span className="w">Cloudflare R2, untouched. Nothing on this page changes it.</span>
+                <span className="c">{v.mime_type || ''}</span>
+              </span>
+            </div>
+
+            <div className="lsec">
+              <span>what the log read out of it</span>
+              <b>{r.entries.length}</b>
+            </div>
+            <div className="paste" style={{ marginTop: 14 }}>
+              <div className="bar">
+                <button className="p" onClick={() => void read()} disabled={busy || v.word_count === 0}>
+                  {busy ? 'Reading it' : r.entries.length ? 'Read it again' : 'Read it onto the log'}
+                </button>
+                {msg && <span className="say">{msg}</span>}
+                {!msg && (
+                  <span className="say">
+                    Your sentences, cut where you paused, at the second you
+                    said them. No model touches this.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {r.entries.map(e => (
+              <div className="item" key={e.id}>
+                <div className="x"><Link href={`/entry/${e.id}`}>{e.text}</Link></div>
+                <div className="m">
+                  {e.span_start != null && <time>{clock(e.span_start)}</time>}
+                  <span>on the log</span>
+                </div>
+              </div>
+            ))}
+
+            {r.words.length > 0 && (
+              <>
+                <div className="lsec">
+                  <span>the transcript</span>
+                  <b>as it was heard</b>
+                </div>
+                <p className="tw">
+                  {r.words.map((w, i) => (
+                    <span
+                      key={w.word_index}
+                      className={i === activeIndex ? 'on' : undefined}
+                      title={clock(w.start_time)}
+                    >{w.word} </span>
+                  ))}
+                </p>
+              </>
+            )}
+
+            <div className="lsec"><span>do something</span></div>
+            <div className="paste" style={{ marginTop: 14 }}>
+              <div className="bar">
+                <button
+                  onClick={async () => {
+                    if (!confirm('Bury this recording? The file stays in R2 — nothing is deleted.')) return
+                    const res = await fetch(`/api/v2/vlogs/${params.id}`, { method: 'DELETE' })
+                    if (res.ok) router.push('/vlogs')
+                  }}
+                >Bury it</button>
+                <span className="say">
+                  It comes off the feed and out of the counts. The file stays.
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Shell>
   )
-}
-
-// ─── Subcomponents ───────────────────────────────────────────────────────
-
-type CrumbItem = { label: string; href?: string } | string
-
-function CanonCrumbs({ trail, prev, next, vlogId }: {
-  trail: CrumbItem[]
-  prev?: string | null
-  next?: string | null
-  vlogId?: string
-}) {
-  return (
-    <div className="canon-crumbs">
-      {trail.map((c, i) => {
-        const isLast = i === trail.length - 1
-        const item = typeof c === 'string' ? { label: c } : c
-        return (
-          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 14 }}>
-            {item.href && !isLast ? (
-              <Link href={item.href}>{item.label}</Link>
-            ) : (
-              <span className={isLast ? 'here' : ''}>{item.label}</span>
-            )}
-            {!isLast && <span className="sep">/</span>}
-          </span>
-        )
-      })}
-      <div className="spacer"/>
-      {(prev || next || vlogId) && (
-        <div className="navbtns">
-          <Link href={prev ?? '#'} className="navbtn" aria-disabled={!prev}>
-            ◂ Prev <span className="kbd">K</span>
-          </Link>
-          <Link href={next ?? '#'} className="navbtn" aria-disabled={!next}>
-            Next ▸ <span className="kbd">J</span>
-          </Link>
-          {vlogId && (
-            <button className="navbtn" onClick={() => {
-              navigator.clipboard?.writeText(`${location.origin}/vlog/${vlogId}`).catch(() => {})
-            }} title="Copy link">⎘</button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StatusPill({ status }: { status: string }) {
-  const isComplete = status === 'complete'
-  const isFailed = status === 'failed'
-  const isBroll = status === 'archived'
-  const isProcessing = !isComplete && !isFailed && !isBroll
-  const color = isComplete ? 'var(--sig)'
-    : isFailed ? 'var(--t-terra)'
-    : isBroll ? 'var(--fg-3)'
-    : 'var(--t-ochre)'
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '4px 11px',
-      background: `color-mix(in srgb, ${color} 10%, var(--bg-2))`,
-      border: `1px solid color-mix(in srgb, ${color} 35%, var(--line-1))`,
-      borderRadius: 100,
-      fontFamily: 'var(--font-mono)',
-      fontSize: 10, letterSpacing: 1.6,
-      textTransform: 'uppercase', fontWeight: 500,
-      color,
-    }}>
-      <span style={{
-        width: 5, height: 5, borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 6px color-mix(in srgb, ${color} 60%, transparent)`,
-        animation: isProcessing ? 'canon-pulse 2s ease-in-out infinite' : undefined,
-      }}/>
-      {isBroll ? 'B-roll · silent' : status.replace(/_/g, ' ')}
-    </span>
-  )
-}
-
-function ProvCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="canon-prov-cell">
-      <span className="l">{label}</span>
-      <span className={`v ${mono ? 'mono' : ''}`}>{value}</span>
-    </div>
-  )
-}
-
-function deriveVlogTitle(filename: string | null): string {
-  if (!filename) return 'Untitled vlog'
-  return filename
-    .replace(/\.[^.]+$/, '')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, ch => ch.toUpperCase()) || 'Untitled vlog'
-}
-
-/**
- * AudioOnlyPlayer — wraps <audio> and auto-advances through chunk URLs
- * when the upload was browser-chunked into N pieces (audio-only mode
- * with bad-wifi multi-chunk extraction). Single-chunk uploads behave
- * exactly like a plain <audio> tag.
- *
- * Scrubbing inside the current chunk works natively. Scrubbing across
- * chunks isn't supported — chunk boundaries advance only by `ended`.
- * In practice audio-only chunks are ~5min each, so this rarely bites
- * for normal listening; the next polish pass can stitch server-side
- * into a single mp3.full and retire this wrapper.
- */
-function AudioOnlyPlayer({
-  audioUrl, chunkUrls, onTime,
-}: {
-  audioUrl: string
-  chunkUrls: string[] | null
-  onTime: (t: number) => void
-}) {
-  const list = chunkUrls && chunkUrls.length > 0 ? chunkUrls : [audioUrl]
-  const [idx, setIdx] = useState(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  useEffect(() => { setIdx(0) }, [chunkUrls?.length])
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <audio
-        ref={audioRef}
-        src={list[idx]}
-        controls
-        autoPlay={idx > 0}
-        preload="metadata"
-        onTimeUpdate={e => onTime((e.target as HTMLAudioElement).currentTime)}
-        onEnded={() => {
-          if (idx + 1 < list.length) setIdx(idx + 1)
-        }}
-        style={{ width: '100%' }}
-      />
-      {list.length > 1 && (
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
-          letterSpacing: 1.2, textTransform: 'uppercase',
-        }}>
-          Part {idx + 1} of {list.length}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * SlideshowStage — picks the latest frame whose time_sec ≤ currentT and
- * renders it. Frames must already be sorted by time_sec asc (the API
- * builds them in that order).
- */
-function SlideshowStage({
-  frames, currentT,
-}: {
-  frames: Array<{ url: string; time_sec: number }>
-  currentT: number
-}) {
-  const active = useMemo(() => {
-    let pick = frames[0]
-    for (const f of frames) {
-      if (f.time_sec <= currentT) pick = f
-      else break
-    }
-    return pick
-  }, [frames, currentT])
-  return (
-    <div style={{
-      width: '100%', aspectRatio: '16 / 9',
-      background: '#050505', borderRadius: 10, overflow: 'hidden',
-      border: '1px solid var(--line-1)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {active && (
-        <img
-          src={active.url}
-          alt=""
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
-        />
-      )}
-    </div>
-  )
-}
-
-function fmtSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
-
-/**
- * extractReason — pull plain-text rationale from a why_clippable
- * field. Some extraction runs wrote JSON like {"reason":"…"} instead
- * of a plain sentence; parse defensively so the operator doesn't
- * see raw JSON braces.
- */
-function extractReason(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const t = String(raw).trim()
-  if (!t.startsWith('{')) return t
-  try {
-    const parsed = JSON.parse(t)
-    if (parsed && typeof parsed === 'object') {
-      if (typeof parsed.reason === 'string') return parsed.reason
-      if (typeof parsed.body === 'string') return parsed.body
-    }
-  } catch {}
-  return t  // fall through — show the raw string rather than nothing
-}
-
-function tryPrettyJson(s: string): string {
-  try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
 }

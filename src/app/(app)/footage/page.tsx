@@ -159,7 +159,7 @@ export default function Footage() {
                   <time dateTime={c.recorded_at}>{day(c.recorded_at)}</time>
                   {c.duration_seconds && <span>{mins(c.duration_seconds)}</span>}
                   {!c.has_speech && <span>no speech</span>}
-                  {c.used_in > 0 && <span>used in {c.used_in}</span>}
+                  {c.used_in > 0 && <span>{c.used_in} on the log from it</span>}
                   {c.matched.map(m => <span key={m}>found {m}</span>)}
                 </div>
 

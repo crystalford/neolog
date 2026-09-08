@@ -1,15 +1,20 @@
 /**
- * GET /api/v2/vlogs/[id]
+ * GET /api/v2/vlogs/[id] — one recording, whole.
  *
- * Fetch one vlog with a fresh presigned playback URL. Used by the vlog
- * detail page in Timeline v2.
+ * `vlog.html`: "one recording in full: the whole video (kept untouched), the
+ * word-timestamped transcript, provenance (date from the MP4 `mvhd`, Whisper
+ * transcription)."
  *
- * Returns:
- *   {
- *     vlog: { id, ..., transcript_text, key_quotes_count, threads_count },
- *     video_url: presigned R2 URL (transcoded_r2_key if present else r2_key),
- *     threads: [{ id, topic, take, strength, transcript_span_start, ... }],
- *   }
+ * This route used to return `threads`, `clips`, `creative_elements`,
+ * `entities`, an anchor take and a session digest — the extraction engine's
+ * whole output, none of which the operator trusted. All of it is gone. What
+ * a recording has now is: the file, when it happened and how the log knows,
+ * the words with their timings, and the entries the log read out of it.
+ *
+ * Provenance is not decoration here. `recorded_at_source` says which of the
+ * four tiers dated it, and `transcript_provider` says who wrote the words
+ * down. Both travel to the page so the recording can be checked rather than
+ * believed.
  */
 
 export const runtime = 'edge'
@@ -17,477 +22,182 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findOne, findMany } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env extends R2Env {
-  DB: D1Database
-  NEOLOG_DEV_OPERATOR_EMAIL?: string
+interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+
+/** In words, how the log came to believe this recording's date. */
+const DATE_SOURCE: Record<string, string> = {
+  pre_extracted: 'read out of the filename before it uploaded',
+  mvhd: "from the file's own clock",
+  filename: 'from the filename',
+  upload_time_default: 'the time it uploaded — the file carried no clock',
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const env = getRequestContext().env as unknown as Env
-
-  let operator
-  try {
-    operator = await requireOperator(req, env)
-  } catch (e) {
-    if (e instanceof UnauthenticatedError) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
-    }
-    throw e
-  }
-
-  const db = getDb(env)
-  const vlog = await findOne<{
-    id: string
-    operator_id: string
-    r2_key: string
-    transcoded_r2_key: string | null
-    thumbnail_r2_key: string | null
-    original_filename: string
-    file_size_bytes: number
-    mime_type: string
-    duration_seconds: number | null
-    recorded_at: string | null
-    recorded_at_source: string | null
-    uploaded_at: string
-    thumbnail_url: string | null
-    transcript_text: string | null
-    transcript_provider: string | null
-    summary: string | null
-    pipeline_status: string
-    pipeline_error: string | null
-    extraction_outcomes: string | null
-    visibility: string
-    is_podcast: number | null
-    audio_chunks_json: string | null
-    slideshow_frames_json: string | null
-    created_at: string
-    updated_at: string
-  }>(
-    db,
-    `SELECT * FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
-    params.id, operator.id,
-  )
-  if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-  // Presign playback URL. Three cases:
-  //   1. Audio-only upload (mime_type 'audio/*'): no video file ever uploaded
-  //      — return the stitched MP3 the pipeline produces (or null if it
-  //      hasn't run yet). Client renders an <audio> player.
-  //   2. Video with a transcoded H.264 copy: prefer that (always browser-decodable).
-  //   3. Video without transcode: presign the original.
-  const isAudioOnly = (vlog.mime_type ?? '').startsWith('audio/')
-  let videoUrl: string | null = null
-  let audioUrl: string | null = null
-  let audioChunkUrls: string[] | null = null
-  let audioBytesTotal: number | null = null
-  let slideshowFrames: Array<{ url: string; time_sec: number }> | null = null
-  if (isAudioOnly) {
-    // Try the stitched MP3 written by the transcribe step.
-    const mp3Key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
-    try {
-      const head = await env.VIDEOS.head(mp3Key)
-      if (head) audioUrl = await presignGetUrl(env, mp3Key, 3600)
-    } catch (err: any) {
-      console.warn(`[vlogs/[id]] audio-only mp3 presign failed: ${err?.message}`)
-    }
-
-    // Fallback: serve the browser-uploaded WAV chunks. Single chunk plays
-    // straight from <audio>; multi-chunk needs the client to advance.
-    // (Future: pipeline writes a stitched mp3.full so this path stops
-    // mattering — but keep it as a belt for any vlog that didn't get
-    // stitched.)
-    if (!audioUrl && vlog.audio_chunks_json) {
-      try {
-        const manifest = JSON.parse(vlog.audio_chunks_json) as Array<{ r2_key: string; bytes?: number }>
-        if (Array.isArray(manifest) && manifest.length > 0) {
-          const urls: string[] = []
-          let total = 0
-          for (const c of manifest) {
-            try {
-              const head = await env.VIDEOS.head(c.r2_key)
-              if (head) {
-                urls.push(await presignGetUrl(env, c.r2_key, 3600))
-                total += typeof c.bytes === 'number' ? c.bytes : (head.size ?? 0)
-              }
-            } catch {}
-          }
-          if (urls.length > 0) {
-            audioChunkUrls = urls
-            audioUrl = urls[0]
-            audioBytesTotal = total > 0 ? total : null
-          }
-        }
-      } catch (err: any) {
-        console.warn(`[vlogs/[id]] audio chunks fallback failed: ${err?.message}`)
-      }
-    }
-  } else {
-    const playbackKey = vlog.transcoded_r2_key || vlog.r2_key
-    try {
-      videoUrl = await presignGetUrl(env, playbackKey, 3600)
-    } catch (err: any) {
-      console.warn(`[vlogs/[id]] presign failed for ${playbackKey}: ${err?.message}`)
-    }
-  }
-
-  // Slideshow mode: presign each stored frame for the in-page renderer.
-  if (vlog.slideshow_frames_json) {
-    try {
-      const manifest = JSON.parse(vlog.slideshow_frames_json) as Array<{ r2_key: string; time_sec: number }>
-      if (Array.isArray(manifest) && manifest.length > 0) {
-        const arr: Array<{ url: string; time_sec: number }> = []
-        for (const f of manifest) {
-          try {
-            const url = await presignGetUrl(env, f.r2_key, 3600)
-            arr.push({ url, time_sec: f.time_sec })
-          } catch {}
-        }
-        if (arr.length > 0) slideshowFrames = arr
-      }
-    } catch (err: any) {
-      console.warn(`[vlogs/[id]] slideshow presign failed: ${err?.message}`)
-    }
-  }
-
-  // Resolve thumbnail — same three-state contract as the list endpoint
-  // (src/app/api/v2/vlogs/route.ts): R2 key > legacy data URI > null.
-  let thumbnailUrl: string | null = null
-  if (vlog.thumbnail_r2_key) {
-    try {
-      thumbnailUrl = await presignGetUrl(env, vlog.thumbnail_r2_key, 24 * 3600)
-    } catch (err: any) {
-      console.warn(`[vlogs/[id]] thumbnail presign failed: ${err?.message}`)
-    }
-  } else if (vlog.thumbnail_url) {
-    thumbnailUrl = vlog.thumbnail_url
-  }
-
-  // Fetch every kind of extracted artifact. Each query is wrapped so a
-  // schema drift on one table (e.g. an old DB where entities.vlog_id
-  // hasn't been migrated yet) can't 500 the whole detail page — the
-  // missing section just comes back empty.
-  const safe = async <T,>(label: string, q: () => Promise<T[]>): Promise<T[]> => {
-    try { return await q() } catch (err: any) {
-      console.warn(`[vlogs/[id]] ${label} failed: ${err?.message || err}`)
-      return []
-    }
-  }
-
-  // Filter all extraction outputs to the currently-active extraction
-  // run for this vlog. Without this, re-extracted vlogs show duplicate
-  // threads/clips/creative/entities from both old and new runs (the
-  // pipeline marks old extraction_runs.is_active=0 on re-extract but
-  // doesn't physically remove the older rows).
-  //
-  // INNER JOIN with er.is_active=1 means: only return rows whose run_id
-  // matches the operator's current active run. Old run rows simply
-  // disappear from the API response.
-  const [threads, clips, creative_elements, entities, wordTimestampRows] = await Promise.all([
-    safe('threads', () => findMany<{
-      id: string
-      topic: string
-      take: string | null
-      register: string | null
-      strength: number | null
-      transcript_span_start: number | null
-      transcript_span_end: number | null
-      extracted_at: string
-      key_quotes: string | null
-      abstracted_topic: string | null
-      run_id: string | null
-      validated: number | null
-    }>(
-      db,
-      `SELECT t.id, t.topic, t.take, t.register, t.strength,
-              t.transcript_span_start, t.transcript_span_end, t.extracted_at,
-              t.key_quotes, t.abstracted_topic, t.run_id, t.validated
-         FROM threads t
-         JOIN extraction_runs er ON er.id = t.run_id
-        WHERE t.vlog_id = ? AND t.operator_id = ?
-          AND t.deleted_at IS NULL
-          AND er.is_active = 1
-        ORDER BY t.transcript_span_start ASC, t.extracted_at ASC`,
-      params.id, operator.id,
-    )),
-    safe('clips', () => findMany<{
-      id: string
-      start_time: number | null
-      end_time: number | null
-      headline: string
-      quote: string | null
-      why_clippable: string | null
-      status: string | null
-      run_id: string | null
-      validated: number | null
-    }>(
-      db,
-      `SELECT c.id, c.start_time, c.end_time, c.headline, c.quote, c.why_clippable, c.status,
-              c.run_id, c.validated
-         FROM clip_candidates c
-         JOIN extraction_runs er ON er.id = c.run_id
-        WHERE c.vlog_id = ? AND c.operator_id = ?
-          AND c.deleted_at IS NULL
-          AND er.is_active = 1
-        ORDER BY c.start_time ASC, c.id ASC`,
-      params.id, operator.id,
-    )),
-    safe('creative_elements', () => findMany<{
-      id: string
-      element_type: string
-      content: string
-      register: string | null
-      transcript_span_start: number | null
-      transcript_span_end: number | null
-      run_id: string | null
-      validated: number | null
-      extracted_at: string
-    }>(
-      db,
-      `SELECT ce.id, ce.element_type, ce.content, ce.register,
-              ce.transcript_span_start, ce.transcript_span_end, ce.run_id, ce.validated,
-              ce.extracted_at
-         FROM creative_elements ce
-         JOIN extraction_runs er ON er.id = ce.run_id
-        WHERE ce.vlog_id = ? AND ce.operator_id = ?
-          AND ce.deleted_at IS NULL
-          AND er.is_active = 1
-        ORDER BY ce.element_type ASC, ce.extracted_at DESC`,
-      params.id, operator.id,
-    )),
-    safe('entities', async () => {
-      const rows = await findMany<{
-        id: string
-        name: string
-        entity_type: string
-        aliases: string | null
-        mention_count: number | null
-      }>(
-        db,
-        `SELECT e.id, e.name, e.entity_type, e.aliases, e.mention_count
-           FROM entities e
-           JOIN extraction_runs er ON er.id = e.run_id
-          WHERE e.vlog_id = ? AND e.operator_id = ?
-            AND e.deleted_at IS NULL
-            AND er.is_active = 1
-          ORDER BY e.mention_count DESC, e.name ASC`,
-        params.id, operator.id,
-      )
-      if (rows.length === 0) return rows
-      // Attach the verbatim quotes from this vlog for each entity so the
-      // rail can render "what you said about Canopticon in this vlog" —
-      // entities become a record of the operator's evolving thinking
-      // instead of dumb tags.
-      const quotesByEntity = new Map<string, string[]>()
-      const quoteRows = await findMany<{ entity_id: string; mention_text: string | null }>(
-        db,
-        `SELECT em.entity_id, em.mention_text
-           FROM entity_mentions em
-          WHERE em.operator_id = ?
-            AND em.source_kind = 'vlog'
-            AND em.source_id = ?
-            AND em.entity_id IN (${rows.map(() => '?').join(',')})`,
-        operator.id, params.id, ...rows.map(r => r.id),
-      )
-      for (const q of quoteRows) {
-        if (!q.mention_text) continue
-        const arr = quotesByEntity.get(q.entity_id) ?? []
-        arr.push(q.mention_text)
-        quotesByEntity.set(q.entity_id, arr)
-      }
-      return rows.map(r => ({ ...r, vlog_quotes: quotesByEntity.get(r.id) ?? [] }))
-    }),
-    // Existence check only (not the full word array — the transcript
-    // editor lazy-fetches that itself from the dedicated
-    // /transcript-words route) — gates whether VlogTranscriptEditor
-    // mounts or falls back to the old read-only transcript_text block.
-    safe('word_timestamps', () => findMany<{ present: number }>(
-      db,
-      `SELECT 1 AS present FROM transcript_words WHERE vlog_id = ? LIMIT 1`,
-      params.id,
-    )),
-  ])
-  const hasWordTimestamps = wordTimestampRows.length > 0
-
-  // Strip internal R2 keys before sending to the client, but expose a
-  // boolean so the vlog page can show a "Transcode missing — playback
-  // may be audio-only" banner. Chrome on Windows can't decode HEVC
-  // without the OS extension, so when the H.264 transcode never landed
-  // we have to nudge the operator to re-trigger it.
-  const hasTranscoded = !!vlog.transcoded_r2_key
-  const {
-    r2_key: _r2,
-    transcoded_r2_key: _tr2,
-    thumbnail_r2_key: _thumbr2,
-    audio_chunks_json: _acj,
-    slideshow_frames_json: _sfj,
-    ...safeVlog
-  } = vlog
-  // For audio-only uploads, file_size_bytes on the row is the source video
-  // size (we never uploaded the video, just keep the original for dedup).
-  // Display the actual extracted audio size so the operator doesn't see
-  // "1.92 GB" on a 1-minute audio clip.
-  if (isAudioOnly && audioBytesTotal != null) {
-    safeVlog.file_size_bytes = audioBytesTotal
-  }
-  // ── Extra fields for the comprehensive Vlog detail page ──────────
-  // navigation: prev/next vlog by recorded_at; anchor thread = the
-  // strongest thread for this vlog; entity_mention_times = timestamps
-  // for the multi-track timeline's "entities" track.
-  const [navigation, anchorThread, entityMentionTimes] = await Promise.all([
-    (async () => {
-      try {
-        const [prev, next] = await Promise.all([
-          findOne<{ id: string }>(
-            db,
-            `SELECT id FROM vlogs
-              WHERE operator_id = ? AND deleted_at IS NULL
-                AND (recorded_at < ? OR (recorded_at = ? AND id < ?))
-              ORDER BY recorded_at DESC, id DESC LIMIT 1`,
-            operator.id, vlog.recorded_at, vlog.recorded_at, params.id,
-          ),
-          findOne<{ id: string }>(
-            db,
-            `SELECT id FROM vlogs
-              WHERE operator_id = ? AND deleted_at IS NULL
-                AND (recorded_at > ? OR (recorded_at = ? AND id > ?))
-              ORDER BY recorded_at ASC, id ASC LIMIT 1`,
-            operator.id, vlog.recorded_at, vlog.recorded_at, params.id,
-          ),
-        ])
-        return { prev_vlog_id: prev?.id ?? null, next_vlog_id: next?.id ?? null }
-      } catch { return { prev_vlog_id: null, next_vlog_id: null } }
-    })(),
-    (async () => {
-      try {
-        return await findOne<{ id: string; topic: string; take: string | null; strength: number | null }>(
-          db,
-          `SELECT t.id, t.topic, t.take, t.strength
-             FROM threads t
-             JOIN extraction_runs er ON er.id = t.run_id
-            WHERE t.vlog_id = ? AND t.operator_id = ?
-              AND t.deleted_at IS NULL
-              AND er.is_active = 1
-            ORDER BY COALESCE(t.strength, 0) DESC, t.extracted_at ASC
-            LIMIT 1`,
-          params.id, operator.id,
-        )
-      } catch { return null }
-    })(),
-    (async () => {
-      try {
-        // Get entity_mentions with timestamps for the multi-track
-        // "Entities" track on the Vlog detail timeline.
-        return await findMany<{ entity_id: string; mention_time: number | null; entity_name: string; entity_type: string }>(
-          db,
-          `SELECT em.entity_id, em.mention_time,
-                  e.name AS entity_name, e.entity_type
-             FROM entity_mentions em
-             JOIN entities e ON e.id = em.entity_id
-            WHERE em.source_kind = 'vlog' AND em.source_id = ?
-              AND em.operator_id = ?
-              AND em.mention_time IS NOT NULL
-            ORDER BY em.mention_time ASC
-            LIMIT 100`,
-          params.id, operator.id,
-        )
-      } catch { return [] }
-    })(),
-  ])
-
-  return NextResponse.json({
-    vlog: {
-      ...safeVlog,
-      thumbnail_url: thumbnailUrl,
-      playback_url: videoUrl,
-      audio_url: audioUrl,
-      audio_chunk_urls: audioChunkUrls,
-      slideshow_frames: slideshowFrames,
-      is_audio_only: isAudioOnly,
-      has_transcoded: hasTranscoded,
-      has_word_timestamps: hasWordTimestamps,
-    },
-    video_url: videoUrl,
-    audio_url: audioUrl,
-    audio_chunk_urls: audioChunkUrls,
-    slideshow_frames: slideshowFrames,
-    threads,
-    clips,
-    creative_elements,
-    entities,
-    navigation,
-    anchor_thread: anchorThread,
-    entity_mention_times: entityMentionTimes,
-  })
-}
-
-/**
- * DELETE /api/v2/vlogs/[id]
- *
- * Soft-deletes the vlog row (sets deleted_at) AND removes the underlying
- * R2 objects (original, transcoded, thumbnail). All derived rows that
- * reference the vlog (threads, clips, creative_elements, entity_mentions,
- * extraction_runs, pipeline_events, transcript_words) are removed by
- * ON DELETE CASCADE on the foreign keys.
- *
- * Soft-delete on the vlog row preserves the ID so any cross-references
- * left dangling fail loudly instead of returning silent nulls. The R2
- * bytes are gone — only the recorded_at + filename remain in the DB.
- *
- * Best-effort: if R2 deletes fail (transient network), the DB row is
- * still soft-deleted and we return ok; orphan R2 bytes can be cleaned
- * later. This matches the operator's expectation that "delete should
- * not leave a vlog visible just because R2 had a hiccup."
- */
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const env = getRequestContext().env as unknown as Env
-
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
+  const db = await readyDb(getDb(env), 'vlog')
 
-  const { id: vlog_id } = params
-  if (!vlog_id) return NextResponse.json({ error: 'vlog id required' }, { status: 400 })
-
-  const db = getDb(env)
-  const row = await findOne<{
-    id: string
-    r2_key: string | null
-    transcoded_r2_key: string | null
-    thumbnail_r2_key: string | null
+  const vlog = await findOne<{
+    id: string; title: string | null; original_filename: string | null
+    r2_key: string | null; transcoded_r2_key: string | null
+    thumbnail_r2_key: string | null; thumbnail_url: string | null
+    duration_seconds: number | null; file_size_bytes: number | null
+    mime_type: string | null
+    recorded_at: string | null; recorded_at_source: string | null; created_at: string
+    transcript_text: string | null; transcript_provider: string | null
+    transcript_completed_at: string | null
+    pipeline_status: string | null; extraction_outcomes: string | null
+    read_at: string | null
+    vision_description: string | null; frame_note: string | null
+    usable: number | null
   }>(
     db,
-    `SELECT id, r2_key, transcoded_r2_key, thumbnail_r2_key
+    `SELECT id, title, original_filename, r2_key, transcoded_r2_key,
+            thumbnail_r2_key, thumbnail_url, duration_seconds, file_size_bytes,
+            mime_type, recorded_at, recorded_at_source, created_at,
+            transcript_text, transcript_provider, transcript_completed_at,
+            pipeline_status, extraction_outcomes, read_at,
+            vision_description, frame_note, usable
        FROM vlogs
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
-    vlog_id, operator.id,
+    params.id, operator.id,
+  )
+  if (!vlog) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  const [words, entries, nav] = await Promise.all([
+    // The transcript as it was heard, with the second on every word. This is
+    // the primary material; everything on the log from this recording is a
+    // contiguous run of it.
+    findMany<{ word: string; start_time: number; end_time: number; word_index: number }>(
+      db,
+      `SELECT word, start_time, end_time, word_index
+         FROM transcript_words
+        WHERE vlog_id = ? AND operator_id = ?
+        ORDER BY word_index ASC LIMIT 20000`,
+      params.id, operator.id,
+    ),
+    // What the log read out of it. Each one links back to its own second.
+    findMany<{
+      id: string; text: string; happened_at: string
+      span_start: number | null; span_end: number | null
+    }>(
+      db,
+      `SELECT id, text, COALESCE(happened_at, occurred_at, created_at) AS happened_at,
+              span_start, span_end
+         FROM log_entries
+        WHERE vlog_id = ? AND operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        ORDER BY COALESCE(span_start, 0) ASC LIMIT 500`,
+      params.id, operator.id,
+    ),
+    findOne<{ prev_id: string | null; next_id: string | null }>(
+      db,
+      `SELECT
+         (SELECT id FROM vlogs WHERE operator_id = ?1 AND deleted_at IS NULL
+            AND COALESCE(recorded_at, created_at) < COALESCE(?2, ?3)
+          ORDER BY COALESCE(recorded_at, created_at) DESC LIMIT 1) AS prev_id,
+         (SELECT id FROM vlogs WHERE operator_id = ?1 AND deleted_at IS NULL
+            AND COALESCE(recorded_at, created_at) > COALESCE(?2, ?3)
+          ORDER BY COALESCE(recorded_at, created_at) ASC LIMIT 1) AS next_id`,
+      operator.id, vlog.recorded_at, vlog.created_at,
+    ),
+  ])
+
+  // Only what is actually shown gets signed.
+  const [playUrl, posterUrl] = await Promise.all([
+    (async () => {
+      const key = vlog.transcoded_r2_key || vlog.r2_key
+      if (!key) return null
+      try { return await presignGetUrl(env, key, 6 * 3600) } catch { return null }
+    })(),
+    (async () => {
+      if (!vlog.thumbnail_r2_key) return vlog.thumbnail_url || null
+      try { return await presignGetUrl(env, vlog.thumbnail_r2_key, 24 * 3600) } catch { return vlog.thumbnail_url || null }
+    })(),
+  ])
+
+  return NextResponse.json(
+    {
+      vlog: {
+        ...vlog,
+        play_url: playUrl,
+        poster_url: posterUrl,
+        // Said plainly, not as a column value the page has to decode.
+        date_from: DATE_SOURCE[(vlog.recorded_at_source || '').toLowerCase()] || 'unknown',
+        transcribed_by: vlog.transcript_provider === 'workers_ai_whisper' ? 'Whisper' : vlog.transcript_provider,
+        word_count: words.length,
+      },
+      words,
+      entries,
+      navigation: nav || { prev_id: null, next_id: null },
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
+}
+
+/**
+ * DELETE /api/v2/vlogs/[id] — bury a recording. The file stays.
+ *
+ * The handler this replaces deleted the R2 objects along with the row. That
+ * is the one thing this product must never do: the recordings in R2 are the
+ * only data preserved across every rebuild, and by 8 Sep they are the only
+ * data preserved at all. A hand slipping on this button used to be
+ * unrecoverable.
+ *
+ * So it buries. SPEC §1: "There is no delete action. Bury removes an entry
+ * from the feed, search and counts and keeps the file, the attachments and
+ * the relationships." The entries the log read out of the recording are
+ * buried with it — they are its words, and leaving them on the feed pointing
+ * at a recording that is gone from it would be a worse state than either.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const env = getRequestContext().env as unknown as Env
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
+  const db = await readyDb(getDb(env), 'vlog')
+
+  const row = await findOne<{ id: string }>(
+    db,
+    `SELECT id FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
+    params.id, operator.id,
   )
   if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-  // Best-effort R2 deletes (we still soft-delete the row even if any fail).
-  const r2Errors: string[] = []
-  const { deleteObject } = await import('@/lib/r2')
-  for (const key of [row.r2_key, row.transcoded_r2_key, row.thumbnail_r2_key]) {
-    if (!key) continue
-    try { await deleteObject(env, key) }
-    catch (e: any) { r2Errors.push(`${key}: ${e?.message || String(e)}`) }
-  }
-
-  // Soft-delete the vlog row. CASCADE handles the derived tables.
-  await db.prepare(
+  const { run } = await import('@/lib/d1')
+  await run(
+    db,
     `UPDATE vlogs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND operator_id = ?`,
-  ).bind(vlog_id, operator.id).run()
+    params.id, operator.id,
+  )
+  const buried: any = await run(
+    db,
+    `UPDATE log_entries SET buried_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE vlog_id = ? AND operator_id = ? AND buried_at IS NULL`,
+    params.id, operator.id,
+  )
 
-  return NextResponse.json({
-    ok: true,
-    vlog_id,
-    r2_errors: r2Errors.length ? r2Errors : undefined,
-  }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json(
+    {
+      ok: true,
+      vlog_id: params.id,
+      entries_buried: buried?.meta?.changes ?? 0,
+      // Said out loud, because the button used to mean the opposite.
+      file_kept: true,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

@@ -460,21 +460,12 @@ export default function LogHome() {
             <WhatArrived />
             <OnThisDay />
             <SafeToClear />
-            <Relog onDone={() => { void loadFeed() }} />
+            <ReadRecordings onDone={() => { void loadFeed() }} />
             {/* day-one.html: "The rail has nothing to show, so it says so in
                 one line rather than showing empty boxes." Every card above
                 hides itself when it is empty; this one would not, so on an
                 empty log the whole rail becomes the one line. */}
-            {items.length > 0 ? (
-              <div className="rc">
-                <div className="h"><Link href="/ready">Ready to send</Link></div>
-                <div className="i">
-                  What the machine has drawn out of the record — drafts,
-                  clips, candidates.
-                  <em>suggestions, not the record</em>
-                </div>
-              </div>
-            ) : !loading && (
+            {items.length === 0 && !loading && (
               <div className="quiet">Nothing to show until there is something in the log.</div>
             )}
           </aside>
@@ -677,25 +668,26 @@ function SafeToClear() {
   )
 }
 
-// ── Relog ─────────────────────────────────────────────────────────────────
-// The recordings are already here, already transcribed, already extracted.
-// What was SAID in them is not on the log until this runs. It pages through
-// the corpus, so a long run is a series of short requests rather than one
-// that times out, and it is idempotent — stopping halfway and starting again
-// loses nothing.
+// ── Reading the recordings ────────────────────────────────────────────────
+// The recordings are already here. What was SAID in them is not on the log
+// until this runs: it reads each transcript and cuts it at his own pauses,
+// so every entry is a contiguous run of his words at the second he said it.
+//
+// This replaced Relog, which turned the extraction model's `threads` into
+// entries. The operator's verdict on that output was that he did not trust
+// it, and the fix was to take the model out of the path rather than to
+// prompt it better. See `src/lib/read-recording.ts`.
 
-function Relog({ onDone }: { onDone: () => void }) {
-  const [status, setStatus] = useState<{ vlogs: number; threads: number; relogged: number; remaining: number } | null>(null)
+function ReadRecordings({ onDone }: { onDone: () => void }) {
+  const [status, setStatus] = useState<{ recordings: number; transcribed: number; read: number; entries: number } | null>(null)
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(0)
-  // Whose words landed. `take` is the only tier that is not his, so it is the
-  // only number the card has to own up to.
-  const [tiers, setTiers] = useState({ mine: 0, take: 0 })
+  const [skipped, setSkipped] = useState(0)
   const stop = useRef(false)
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v2/log/relog', { cache: 'no-store' })
+      const res = await fetch('/api/v2/log/read', { cache: 'no-store' })
       if (res.ok) setStatus(await res.json())
     } catch { /* the card just doesn't show */ }
   }, [])
@@ -706,26 +698,23 @@ function Relog({ onDone }: { onDone: () => void }) {
     stop.current = false
     let cursor: string | null = null
     let written = 0
-    const seen = { mine: 0, take: 0 }
+    let noWords = 0
     try {
       for (;;) {
         if (stop.current) break
-        const res: Response = await fetch('/api/v2/log/relog', {
+        const res: Response = await fetch('/api/v2/log/read', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cursor, limit: 20 }),
+          body: JSON.stringify({ cursor, limit: 5 }),
         })
         if (!res.ok) break
         const r = await res.json() as {
-          entries_written: number
-          lines?: { from_quote: number; from_span: number; from_take: number }
-          next_cursor: string | null
+          entries_written: number; untranscribed: number; next_cursor: string | null
         }
         written += r.entries_written
-        seen.mine += (r.lines?.from_quote ?? 0) + (r.lines?.from_span ?? 0)
-        seen.take += r.lines?.from_take ?? 0
+        noWords += r.untranscribed
         setDone(written)
-        setTiers({ ...seen })
+        setSkipped(noWords)
         cursor = r.next_cursor
         if (!cursor) break
       }
@@ -737,37 +726,35 @@ function Relog({ onDone }: { onDone: () => void }) {
   }, [load, onDone])
 
   if (!status) return null
-  if (status.remaining <= 0 && !running && done === 0) return null
+  const left = Math.max(0, status.transcribed - status.read)
+  if (left <= 0 && !running && done === 0) return null
 
   return (
     <div className="rc">
       <div className="h">
-        Recordings not on the log <span>{status.relogged} of {status.threads}</span>
+        Recordings not read <span>{status.read} of {status.transcribed}</span>
       </div>
       <div className="i">
         {running ? (
           <>
-            <b>Putting them on the log.</b>
+            <b>Reading them.</b>
             <em>{done} {done === 1 ? 'entry' : 'entries'} so far — you can leave this page.</em>
           </>
         ) : done > 0 ? (
           <>
             <b>Done. {done} {done === 1 ? 'entry' : 'entries'} added.</b>
             <em>
-              Each one sits at the second it was said.
-              {tiers.mine > 0 && ` ${tiers.mine} in your own words`}
-              {tiers.take > 0 && `, ${tiers.take} written by the log because the recording had no word timings`}
-              {tiers.mine > 0 && '.'}
+              Each one sits at the second you said it.
+              {skipped > 0 && ` ${skipped} had no word timings, so nothing was placed from them — nothing is dated by guess.`}
             </em>
           </>
         ) : (
           <>
-            <b>{status.remaining} things you said are not on the log.</b>
+            <b>{left} {left === 1 ? 'recording has' : 'recordings have'} not been read.</b>
             <em>
-              They are in {status.vlogs} recordings that were already
-              transcribed. This puts each one on the day and the minute it was
-              said. Nothing is written or rephrased — your words, where a
-              recording has them.
+              This takes what you actually said and puts it on the day and the
+              minute you said it, cut where you paused. Nothing is written,
+              summarised or rephrased, and no model is involved.
             </em>
           </>
         )}
@@ -776,7 +763,7 @@ function Relog({ onDone }: { onDone: () => void }) {
             <button onClick={() => { stop.current = true }}>Stop</button>
           ) : (
             <button className="p" onClick={() => void run()}>
-              {done > 0 ? 'Check for more' : 'Put them on the log'}
+              {done > 0 ? 'Check for more' : 'Read them onto the log'}
             </button>
           )}
         </div>

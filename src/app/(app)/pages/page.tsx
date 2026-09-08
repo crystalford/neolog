@@ -45,6 +45,7 @@ export default function PagesIndex() {
   const [q, setQ] = useState('')
   const [seeding, setSeeding] = useState(false)
   const [seedNote, setSeedNote] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -57,29 +58,26 @@ export default function PagesIndex() {
   }, [])
   useEffect(() => { void load() }, [load])
 
-  const seed = useCallback(async () => {
+  const make = useCallback(async () => {
+    const name = newName.trim()
+    if (!name || seeding) return
     setSeeding(true)
     setSeedNote(null)
     try {
-      const res = await fetch('/api/v2/pages/seed', {
+      const res = await fetch('/api/v2/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 500 }),
+        body: JSON.stringify({ name }),
       })
-      if (!res.ok) return
-      const r = await res.json() as {
-        pages_written: number; attachments_written: number; more_to_attach?: boolean
-      }
-      setSeedNote(
-        r.more_to_attach
-          ? `${r.pages_written} pages made, ${r.attachments_written} entries attached — there are more. Press again to carry on.`
-          : r.pages_written > 0 || r.attachments_written > 0
-            ? `${r.pages_written} pages made, ${r.attachments_written} entries attached.`
-            : 'Nothing new to make — every name already has a page.',
-      )
+      if (!res.ok) { setSeedNote('that did not go in'); return }
+      const r = await res.json() as { name: string; existed: boolean }
+      setSeedNote(r.existed
+        ? `${r.name} already has a page.`
+        : `${r.name} has a page. Anything that names it attaches on its own.`)
+      setNewName('')
       await load()
     } finally { setSeeding(false) }
-  }, [load])
+  }, [newName, seeding, load])
 
   const bands = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -160,23 +158,34 @@ export default function PagesIndex() {
           </div>
         )}
 
+        {/* A page is made because he named something. Seeding from what a
+            model thought mattered is gone, and its absence is the feature. */}
         <div className="asview">
-          <span>
-            {seedNote
-              ? seedNote
-              : 'A page is made the first time you name something. Everything after attaches on its own.'}
-          </span>
-          <button
-            onClick={() => void seed()}
-            disabled={seeding}
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void make() }}
+            placeholder="Name something — a person, a place, a project, an idea"
             style={{
-              marginLeft: 'auto', fontSize: 12.5, color: 'var(--fg-2)',
+              flex: 1, minWidth: 220, background: '#0a0a0b', color: 'var(--fg)',
+              border: '1px solid var(--line-1)', borderRadius: 8,
+              padding: '8px 12px', font: 'inherit', fontSize: 14, outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => void make()}
+            disabled={seeding || !newName.trim()}
+            style={{
+              fontSize: 12.5, color: 'var(--fg-2)',
               borderBottom: '1px solid var(--line-2)', background: 'none',
               border: 0, cursor: seeding ? 'default' : 'pointer', whiteSpace: 'nowrap',
             }}
           >
-            {seeding ? 'making pages…' : 'Make pages from what the log already named'}
+            {seeding ? 'making it…' : 'Make the page'}
           </button>
+          <span style={{ flexBasis: '100%', fontSize: 12.5, color: 'var(--fg-4)' }}>
+            {seedNote || 'A page is made the first time you name something. Everything after attaches on its own.'}
+          </span>
         </div>
       </div>
     </Shell>

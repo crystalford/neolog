@@ -74,11 +74,11 @@ jobs:
       - name: Note splitting
         run: node --experimental-strip-types scripts/test/split-note.mjs
 
-      # Relog reads three hundred recordings back onto the log. The strict
-      # grounding check is the only thing between a span slice and words in
-      # his mouth, and the loose check would pass a half-invented sentence.
-      - name: Relog attribution
-        run: node scripts/test/relog-line.mjs
+      # Reading a recording onto the log is now the whole path from a file
+      # to his words on a page, with no model in it. A dropped or invented
+      # word here is not recoverable; a boundary in the wrong place is.
+      - name: Reading a recording
+        run: node scripts/test/read-recording.mjs
 
       # The one kind with someone else in it. A wrong split files another
       # person's sentence as something HE said; a wrong public view

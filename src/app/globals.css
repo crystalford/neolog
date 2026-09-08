@@ -3922,3 +3922,15 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .logpage .ownerstrip a { color: var(--fg-2); margin-left: auto; }
 .logpage .ownerstrip a:hover { color: var(--fg); }
+
+/* one recording: the video at a real size, and the words under it */
+.logpage video.rec {
+  width: 100%; max-width: 708px; margin-top: 24px; display: block;
+  border-radius: 12px; background: #000; border: 1px solid var(--line);
+}
+.logpage .tw {
+  margin-top: 18px; max-width: 660px;
+  font-size: 15.5px; line-height: 1.85; color: var(--fg-2); text-wrap: pretty;
+}
+/* the word under the playhead — the transcript follows the video */
+.logpage .tw span.on { color: var(--fg); background: rgba(78,161,213,.16); border-radius: 3px; }
