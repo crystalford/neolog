@@ -79,30 +79,42 @@ export default function Numbers() {
         <div className="grid">
           <main>
 
-        <div className="pghead"><h1>Numbers</h1></div>
+        <section className="top">
+              <h1>Numbers counted from the log.</h1>
+              <p>
+                This page isn&rsquo;t in the menu. It&rsquo;s here for anyone
+                — or anything — that wants a figure with the rule it was
+                counted by attached.
+              </p>
+            </section>
         <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
-        <p className="none" style={{ paddingBottom: 0 }}>
-          Counted from the log, not stated about it. Under each number is the
-          rule it was counted by, so you can check it rather than take it.
-          Nothing here says what a number means.
-        </p>
+
 
         {loading && <div className="none">Counting.</div>}
 
         {numbers.map(n => (
-          <div className="num" key={n.key}>
-            <div className={`big${n.value === 0 ? ' zero' : ''}`}>
+          <div className={`num${n.value === 0 ? ' soon' : ''}`} key={n.key}>
+            <div className="n">
               {n.value.toLocaleString('en-GB')}
               {n.unit && <small>{n.unit}</small>}
             </div>
             <div>
               <div className="x">{n.label}</div>
               <div className="how">{n.counted}</div>
+              <div className="meta"><span className="mn">counted on read</span></div>
             </div>
           </div>
         ))}
+
+        <div className="why">
+          <b>Why this page exists.</b> Counting is the one thing a log can do
+          that nothing else can, because it is the only thing here that
+          isn&rsquo;t a judgement. Every figure carries the rule it was
+          counted by, so it can be checked rather than believed — and nothing
+          on this page says what a number means.
+        </div>
 
         {numbers.length > 0 && (
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />

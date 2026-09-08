@@ -68,14 +68,10 @@ export default function OnThisDay() {
       <div className="logpage pg-onthisday">
         <div className="back"><Link href="/">the log</Link></div>
 
-        <div className="pghead">
+        <section className="top">
           <h1>{title}</h1>
-          <div className="pgmeta">
-            <span>
-              Every year this date had something on it, shown as it was.
-            </span>
-          </div>
-        </div>
+          <p>Every year this date had something on it, shown as it was.</p>
+        </section>
 
         {r?.years.map(y => (
           <div key={y.year}>
@@ -116,6 +112,14 @@ export default function OnThisDay() {
         {!loading && (!r || r.years.length === 0) && (
           <div className="none">Nothing on this date in any year yet.</div>
         )}
+        {/* `onthisday.html`: the one permitted resurfacing, and the page
+            says what it will not do rather than leaving it to be noticed. */}
+        <div className="rules">
+          <b>It shows; it never says.</b> No &ldquo;one year ago today&rdquo;,
+          no count, no nudge. The entry appears as it was written. Dates the
+          log had to guess are left out — a guessed day has no business on the
+          surface whose whole discipline is not saying.
+        </div>
       </div>
     </Shell>
   )

@@ -43,7 +43,7 @@ const PAGES = [
   ['person',     'src/app/(app)/page/[id]/page.tsx',    16],
   ['search',     'src/app/(app)/search/page.tsx',       10],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   19],
-  ['onthisday',  'src/app/(app)/onthisday/page.tsx',     6],
+  ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
   ['clear',      'src/app/(app)/clear/page.tsx',        7],
   ['triage',     'src/app/(app)/triage/page.tsx',       3],
   // takeout.html — "everything out, and the bill" — is this page.
@@ -61,7 +61,7 @@ const PAGES = [
   // this page cannot and should not reach zero. /search is where a written
   // answer lives, and it citation-checks every sentence first.
   ['asks',       'src/app/(app)/asks/page.tsx',          4],
-  ['numbers',    'src/app/(app)/numbers/page.tsx',       8],
+  ['numbers',    'src/app/(app)/numbers/page.tsx',       3],
   ['public-log', 'src/app/(app)/public/page.tsx',       10],
   ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    10],
   ['writing',    'src/app/(app)/writing/page.tsx',      6],
