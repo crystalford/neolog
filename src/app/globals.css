@@ -4414,6 +4414,13 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-connections .ways .w p { font-size:13px; color:var(--fg-2); margin-top:8px; line-height:1.5; text-wrap:pretty; }
 .logpage.pg-connections .ways .w p a { color:var(--fg-1); border-bottom:1px solid var(--line-2); }
 .logpage.pg-connections .ways .w p em { font-style:normal; color:var(--fg-1); }
+/* A door that is not built. `connections.html` has no state for one because
+   its own seven are all switchable; ours are declined, and the page says so
+   rather than implying otherwise. Dimmed, not hidden — "a door that isn't
+   there is worse than one that was never listed". */
+.logpage.pg-connections .ways .w.off b { color:var(--fg-3); }
+.logpage.pg-connections .ways .w.off i { color:var(--fg-4); }
+.logpage.pg-connections .ways .w.off p { color:var(--fg-3); }
 .logpage.pg-connections .note2 { margin-top:12px; font-size:13.5px; color:var(--fg-2); line-height:1.6; max-width:760px; text-wrap:pretty; }
 .logpage.pg-connections .note2 b { color:var(--fg); font-weight:450; }
 .logpage.pg-connections .grid { grid-template-columns:minmax(0,1fr) 296px!important; gap:48px!important; }

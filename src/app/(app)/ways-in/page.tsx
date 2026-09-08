@@ -48,79 +48,100 @@ export default function WaysIn() {
         <div className="grid">
           <main>
 
-        <div className="sh"><b>Built</b></div>
+        <div className="sh">
+          <span>By hand, from wherever you are</span>
+          <b>the same box, reached six ways · every one ends in the same one-line receipt</b>
+        </div>
+
+        {/* `connections.html`'s `.ways` is the CONTAINER and `.w` is a door —
+            a name, where it lives, and what it does. One grid, not a wrapper
+            per row. */}
+        <div className="ways">
+          <div className="w">
+            <b>The box</b>
+            <i>on <Link href="/">the log</Link></i>
+            <p>Type or paste. One line or a whole chapter — the same box, the same action.</p>
+          </div>
+          <div className="w">
+            <b>Full screen</b>
+            <i>on <Link href="/now">now</Link></i>
+            <p>Nothing on the screen but the box. Talk, type, or drop something in.</p>
+          </div>
+          <div className="w">
+            <b>Talk</b>
+            <i>the microphone in either composer</i>
+            <p>
+              It records, uploads and transcribes on arrival. The words become
+              the entry and the audio is kept.
+            </p>
+          </div>
+          <div className="w">
+            <b>Files, photos, video</b>
+            <i>drag in, paste, or pick</i>
+            <p>
+              Each is placed by its own clock and checked against what your
+              device sent — see <Link href="/clear">what&rsquo;s safe to clear</Link>.
+            </p>
+          </div>
+          <div className="w">
+            <b>On your phone</b>
+            <i>added to the home screen</i>
+            <p>
+              Open neolog in the phone&rsquo;s browser and add it. It opens
+              straight into <Link href="/now">now</Link>.
+              {installed && ' You are using it that way now.'}
+            </p>
+          </div>
+          <div className="w">
+            <b>The share sheet</b>
+            <i>Android and desktop Chrome · iOS not yet</i>
+            <p>
+              Once it is on the home screen, neolog appears in any app&rsquo;s
+              Share. What you share lands in the box, ready to go in.
+            </p>
+          </div>
+        </div>
+
+        {/* The other half of `connections.html` is seven sources that bring
+            things in on their own, each a switch. None is built, and the page
+            says which and why rather than leaving a reader to assume. */}
+        <div className="sh">
+          <span>On their own</span>
+          <b>nothing is connected, and nothing listens</b>
+        </div>
 
         <div className="ways">
-          <div className="wk">The box</div>
-          <div className="wv">
-            Type or paste into the composer on <Link href="/">the log</Link>.
-            One line or a whole chapter — the same box, the same action.
+          <div className="w off">
+            <b>Hands-free from earbuds</b>
+            <i>not built</i>
+            <p>Nothing listens. There is no always-on capture and no wake word.</p>
+          </div>
+          <div className="w off">
+            <b>Forwarding by email</b>
+            <i>not built</i>
+            <p>There is no inbox address to forward to.</p>
+          </div>
+          <div className="w off">
+            <b>Camera roll, calendar, messages</b>
+            <i>not built</i>
+            <p>
+              No automatic source is connected. When one is, SPEC §1 governs
+              it: explicit, per-source, revocable, and turned on only after
+              showing the first ten real things it would take. Nothing records
+              silently.
+            </p>
           </div>
         </div>
 
-        <div className="ways">
-          <div className="wk">Full screen</div>
-          <div className="wv">
-            <Link href="/now">/now</Link> — nothing on the screen but the box.
-            Talk, type, or drop something in.
-          </div>
+        <div className="off2">
+          Off means nothing new arrives from that door. It never means
+          &ldquo;remove what already came&rdquo; — nothing on the log is
+          removed by turning a way in off.
         </div>
 
-        <div className="ways">
-          <div className="wk">Talk</div>
-          <div className="wv">
-            The microphone in either composer. It records, uploads, and
-            transcribes on arrival; the words become the entry and the audio
-            is kept.
-          </div>
-        </div>
-
-        <div className="ways">
-          <div className="wk">Files, photos, video</div>
-          <div className="wv">
-            Drag in, paste, or pick. Each is placed by its own clock and
-            checked against what your device sent — see{' '}
-            <Link href="/clear">what&rsquo;s safe to clear</Link>.
-          </div>
-        </div>
-
-        <div className="ways">
-          <div className="wk">On your phone</div>
-          <div className="wv">
-            Open neolog in the phone&rsquo;s browser and add it to the home
-            screen. It opens straight into <Link href="/now">/now</Link>.
-            {installed && ' You are using it that way now.'}
-          </div>
-        </div>
-
-        <div className="ways">
-          <div className="wk">The share sheet</div>
-          <div className="wv">
-            Once it is on the home screen, neolog appears in any app&rsquo;s
-            Share. What you share lands in the box, ready to go in.
-            <em>Android and desktop Chrome support this; iOS does not yet.</em>
-          </div>
-        </div>
-
-        <div className="sh"><b>Not built</b>and the page says so rather than implying otherwise</div>
-
-        <div className="way-row off">
-          <div className="wk">Hands-free from earbuds</div>
-          <div className="wv">Nothing listens. There is no always-on capture and no wake word.</div>
-        </div>
-
-        <div className="way-row off">
-          <div className="wk">Forwarding by email</div>
-          <div className="wv">There is no inbox address to forward to.</div>
-        </div>
-
-        <div className="way-row off">
-          <div className="wk">Camera roll, calendar, messages</div>
-          <div className="wv">
-            No automatic source is connected. When one is, SPEC §1 governs it:
-            explicit, per-source, revocable, and turned on only after showing
-            the first ten real things it would take. Nothing records silently.
-          </div>
+        <div className="note2">
+          None of these is a different product. They are doors to one box, and
+          every one of them ends in the same one-line receipt.
         </div>
 
         <div className="quiet" style={{ marginTop: 22 }}>

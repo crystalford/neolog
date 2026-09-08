@@ -967,6 +967,25 @@ naming them), `portal.html` and `index.html` (maps of the package's own
 files). **A low score is not a match** — `portal.html` scored 3-unused
 against `/everything` and is a map of the design package.
 
+**`/ways-in` cannot reach zero either, and for the strongest reason on this
+list.** `connections.html` is two halves: eight doors you use BY HAND, and
+seven sources that bring things in ON THEIR OWN — a camera roll, an email
+account, a calendar — each with a switch, a count, and a preview of "the
+first ten it would take". That second half is twelve of its classes
+(`.src .nm .ln .st .lst .sw .p .a .ex .how .x .r2`) and it is **the ingest
+connector this product refuses**: *"Forwarded, never pulled. There is no
+ingest connector and there will not be one — the absence IS the
+enforcement."* The vendor list is Cloudflare only, and every one of those
+seven needs a third party.
+
+So the page builds the by-hand half in the design's own markup — `.ways` as
+the grid, `.w` as a door with its name, where it lives and what it does — and
+then **lists the seven as doors that are not built, with why**, because "a
+door that isn't there is worse than one that was never listed". SPEC §1's
+rule for the day one IS connected is quoted on the page: explicit,
+per-source, revocable, and turned on only after showing the first ten real
+things it would take.
+
 **Two pages cannot reach zero, on purpose.** `/asks` keeps `.long .sq .th
 .tree` — the prose answer and the fanned-out sub-questions, which are a model
 writing in his voice on a surface that presents itself as a record. `/public`
