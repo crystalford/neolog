@@ -3752,6 +3752,19 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 
 /* ── a made thing (`writing.html`) ─────────────────────────────────────── */
 
+/* ⚠️ `.fold` on `/writing` is the strip under a document — a border-top and
+   a line of text (`writing.css`). `.logpage .fold` is the HOME page's folded
+   period row: a three-column grid with a hover highlight and negative
+   margins. Same name, different thing, and the grid was winning — the strip
+   rendered 154px tall where the design gives it 50. Reset what the generic
+   rule sets, not only what the design names. */
+.logpage.pg-writing .fold {
+  display:block; grid-template-columns:none; gap:0;
+  padding:12px 28px 16px; margin:0; border-radius:0;
+  border-top:1px solid var(--line); font-size:13px; color:var(--fg-4);
+}
+.logpage.pg-writing .fold:hover { background:none; }
+.logpage.pg-writing .fold a { color:var(--fg-2); border-bottom:1px solid var(--line-2); }
 .logpage.pg-writing .crumb { padding:22px 0 0; font-size:12px; color:var(--fg-4); }
 .logpage.pg-writing .crumb a { color:var(--fg-3); }
 .logpage.pg-writing h1 { font-size:28px; font-weight:300; letter-spacing:-0.9px; color:var(--fg); line-height:1.25; margin-top:10px; text-wrap:pretty; }

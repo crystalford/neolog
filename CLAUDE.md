@@ -931,7 +931,7 @@ in the commit.
 | `check-design.mjs` | Does the page's MARKUP use the design's classes? Follows the components it imports — LogRow and Rail carry design classes, and counting them as missing overstated every page by twenty. |
 | `check-design-css.mjs` | For every selector the design defines, does the VALUE match? Normalises variable aliases and `!important`, without which real differences drown. |
 | `check-css-vars.mjs` | Does every `var(--x)` resolve? |
-| `check-design-render.mjs` | Does the page LOOK like it? Renders the design's own markup under both stylesheets in headless Chromium and compares every box. **Not in CI** — it needs Playwright and about ten seconds a page. |
+| `check-design-render.mjs` | Does the page LOOK like it? Renders the design's own markup under both stylesheets in headless Chromium and compares every box, **per page, against a budget with a reason beside it**. **Not in CI** — it needs Playwright and about ten seconds a page. |
 
 ⚠️ **The first three read text, and all three are blind to the same thing: a
 rule the design has and we never wrote at all.** There is no value to compare
@@ -1101,6 +1101,7 @@ Everything the generic rule sets and the design does not mention survives.
 | `.en` | the same, on `/public` | `public-log.css`'s row | every public row 24px wider |
 | `.sh` | `padding:30px 0 10px` | `/facts`'s mono section head | a 30px heading rendering at 78px |
 | `.msg` | the earlier chat bubble, `max-width:82%` | `/messages`'s two-column row | every message 100px narrow, 40px tall |
+| `.fold` | the home page's folded-period row | `/writing`'s footer strip | a 50px strip rendering at 154px |
 
 The repo already knew the shape — `.turn` vs `.leg` on the walk is recorded
 above — but knowing it did not prevent four more, because **nothing looks at
@@ -1113,11 +1114,13 @@ generic rule SETS, not only the properties the design names.** `display`,
 comment beside each fix in `globals.css` says which generic rule it is
 undoing.
 
-`check-design-render.mjs` finds them in seconds. **Sixteen of the 22 product
-surfaces now render identically to the design** — `/`(feed rows), `/triage`,
-`/page/[id]`, `/public`, `/messages`, `/pages`, `/search`, `/month`,
-`/onthisday`, `/clear`, `/export`, `/glossary`, `/numbers`, `/screenshots`,
-`/ways-in` and `/facts` at 2. `/walk` went 18 boxes to 7.
+`check-design-render.mjs` finds them in seconds. **Fifteen of the 22 product
+surfaces render pixel-identically to the design, and the other seven each
+carry a recorded reason.** The seven: `/` (the toolbar wrap), `/vlog/[id]`
+(the caption, and `vlog.css` having no frame rule), `/entry/[id]` (the same),
+`/facts`, `/asks` (the drafted answer it refuses to build), `/now` (its own
+`.nowpage` scope and atmosphere layers) and `/walk` (two blocks below the
+route, not converted). 
 
 ⚠️ **The checker measures the 22 surfaces, read from `check-design.mjs` so
 there is one list.** Pointing it at all 74 design pages buries the real

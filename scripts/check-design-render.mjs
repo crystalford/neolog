@@ -98,6 +98,37 @@ if (!PAGES.length) {
 const SCOPE = { now: 'nowpage' }
 
 /**
+ * Differences that are decided, not drift — the same convention the other
+ * three checks use. A number here needs a reason beside it, and the reason
+ * is the point: without one this becomes a place to hide a bug.
+ */
+const BUDGET = {
+  // The eight filters measure 754px against a 708 column, so `.bar .f`
+  // wraps here and does not in `log.css`. Rule 4 is one frame everywhere;
+  // spilling past it is worse than 37px of toolbar. `.bar` and `.grid`
+  // report the same wrap cascading upward.
+  log: 3,
+  // `vlog.css` has no frame rule (23 of the 74 pages do not), so `.back`
+  // spans 1052 there and 708 here — a row of left-aligned links either way.
+  // `.cap` is the caption the operator asked to sit under the video rather
+  // than beside it. `.player` is the design's 420px mock, not a real one.
+  vlog: 3,
+  entry: 1,
+  // `/facts` renders its own section bodies; `.sec` runs 27px longer.
+  dossier: 2,
+  // `/asks` deliberately drops the drafted prose answer and its fanned
+  // sub-questions — a model writing in his voice on a surface that presents
+  // itself as a record (§0 rule 3).
+  asks: 2,
+  // `/now` is the intake with nothing else on the screen and is built from
+  // its own `.nowpage` scope rather than page-by-page from `now.css`. Its
+  // atmosphere layers (`.atm`, `.grain`, `.vig`, `.stage`) are ours.
+  now: 11,
+  // The two blocks below the route on `/walk` are not converted yet.
+  walk: 7,
+}
+
+/**
  * Put our scope class where the page's rules expect it.
  *
  * Most design pages hang their content off `.wrap`, and our equivalent adds
@@ -194,11 +225,22 @@ for (const page of PAGES) {
 await browser.close()
 
 rows.sort((x, y) => y.moved - x.moved)
+let over = 0
 for (const r of rows) {
-  console.log(`  ${r.page.padEnd(13)} ${String(r.moved).padStart(3)} / ${r.n} boxes differ`)
-  if (PAGES.length <= 4) {
+  const budget = BUDGET[r.page] ?? 0
+  const flag = r.moved > budget ? '  DRIFTED' : r.moved < budget ? '  \u2193 lower the budget' : ''
+  console.log(`  ${r.page.padEnd(13)} ${String(r.moved).padStart(3)} / ${String(budget).padEnd(3)} boxes differ${flag}`)
+  if (r.moved > budget) over++
+  if (PAGES.length <= 4 || r.moved > budget) {
     for (const o of r.off.slice(0, 12)) {
       console.log(`      .${o.c.padEnd(14)} design ${o.their.padEnd(11)} ours ${o.our}`)
     }
   }
 }
+
+if (over) {
+  console.error(`\n${over} page(s) render further from the design than the budget allows.`)
+  console.error('Every budget is a debt, not a target — the real number is zero.')
+  process.exit(1)
+}
+console.log('\nNo page renders further from the design than its budget.')
