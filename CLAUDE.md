@@ -550,8 +550,13 @@ ElevenLabs, fal.ai, AssemblyAI, Brave Search. Do not reintroduce.
   because the old system's output was not trusted. Every other row is
   rebuildable from the files.
 - The old Supabase user_id prefix (`b2df4f26-6dd8-421d-bb3d-db777086079b/`) in R2 stays in place. Code reads videos from wherever they exist in the bucket — no migration, no renaming.
-- **No code path may delete an R2 object.** `DELETE /api/v2/vlogs/[id]`
-  buries the row and keeps the bytes; the handler it replaced deleted them.
+- **No code path may delete an R2 object**, and `scripts/check-r2-safety.mjs`
+  enforces it in CI: `deleteObject` may appear in `src/lib/r2.ts`, which
+  defines it, and nowhere else. Three handlers had one on the morning of
+  8 Sep — the per-recording DELETE, the bulk delete offering it for a whole
+  selection at once, and the reset route's ancestor. All three bury the row
+  and keep the bytes now. A confirmation dialog is not a defence against a
+  code path that should not exist.
 
 ### Operator product decisions
 

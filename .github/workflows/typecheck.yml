@@ -45,6 +45,12 @@ jobs:
       - name: SQL columns exist
         run: node scripts/check-sql-columns.mjs
 
+      # The recordings in R2 are the only data this product preserves, so an
+      # R2 delete is the one unrecoverable action in the codebase. Three
+      # handlers had one on the morning of 8 Sep, including a bulk one.
+      - name: Nothing can delete a recording
+        run: node scripts/check-r2-safety.mjs
+
       # Same class of blind spot: a fetch to a renamed or never-built path is
       # a runtime 404 that renders as "no data yet" rather than as an error.
       - name: Fetched API paths have routes

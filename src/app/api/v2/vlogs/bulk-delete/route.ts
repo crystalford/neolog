@@ -20,7 +20,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb } from '@/lib/d1'
-import { deleteObject, type R2Env } from '@/lib/r2'
+import { type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -65,19 +65,12 @@ export async function POST(req: NextRequest) {
   }>()
   const owned = rows.results ?? []
 
-  // Best-effort R2 deletes for each vlog. Failures recorded but don't
-  // block the DB soft-delete (orphan R2 bytes can be cleaned later).
+  // The R2 objects are NOT touched. This used to delete all three keys per
+  // recording before soft-deleting the row — the one unrecoverable action in
+  // the product, offered in bulk. Since 8 Sep the files are the only data
+  // preserved at all, so burying in bulk buries rows and nothing else.
   let deletedCount = 0
   const r2Errors: Record<string, string[]> = {}
-  for (const r of owned) {
-    const errs: string[] = []
-    for (const key of [r.r2_key, r.transcoded_r2_key, r.thumbnail_r2_key]) {
-      if (!key) continue
-      try { await deleteObject(env, key) }
-      catch (e: any) { errs.push(`${key}: ${e?.message || String(e)}`) }
-    }
-    if (errs.length) r2Errors[r.id] = errs
-  }
 
   // Single batched soft-delete for everything the operator owns from
   // the requested set.

@@ -23,7 +23,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
-import { deleteObject, presignGetUrl, putObject, type R2Env } from '@/lib/r2'
+import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { deriveRecordedAt } from '@/lib/recorded-at'
 import { ulid } from '@/lib/ulid'
@@ -375,14 +375,35 @@ export async function DELETE(req: NextRequest) {
   )
   if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Cascade-delete dependent rows via FK ON DELETE CASCADE
-  await run(db, 'DELETE FROM vlogs WHERE id = ? AND operator_id = ?', id, operator.id)
+  // Buried, not deleted, and the FILE IS NOT TOUCHED.
+  //
+  // This used to `DELETE FROM vlogs` (cascading the derived rows away) and
+  // then delete the R2 objects. Since 8 Sep the recordings in R2 are the only
+  // data this product preserves, which makes that handler the one
+  // unrecoverable action in it — a hand slipping on a button.
+  //
+  // SPEC §1: "There is no delete action. Bury removes an entry from the feed,
+  // search and counts and keeps the file." The entries the log read out of
+  // the recording are buried with it: they are its words, and leaving them on
+  // the feed pointing at a recording that is off it is worse than either.
+  await run(
+    db,
+    `UPDATE vlogs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND operator_id = ?`,
+    id, operator.id,
+  )
+  const buried: any = await run(
+    db,
+    `UPDATE log_entries SET buried_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE vlog_id = ? AND operator_id = ? AND buried_at IS NULL`,
+    id, operator.id,
+  )
 
-  // Best-effort R2 cleanup (don't fail the delete if R2 cleanup fails)
-  const keysToDelete = [vlog.r2_key, vlog.transcoded_r2_key].filter(Boolean) as string[]
-  await Promise.all(keysToDelete.map(k => deleteObject(env, k).catch(() => null)))
-
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    entries_buried: buried?.meta?.changes ?? 0,
+    file_kept: true,
+  })
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
