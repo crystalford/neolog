@@ -654,10 +654,20 @@ loud when it is showing 500 of more.
   the file always stays.
 
 **Settings** (`/settings`) — his one sentence (which `/facts` shows and will
-not draft), where the files are kept, and the two maintenance jobs for a
-recording the pipeline dropped. No model picker, no voice cloning, no API
-keys, no auto-publishing: the log does not choose a model on his behalf and
-does not publish anything anywhere.
+not draft), where the files are kept, the recordings panel (**transcribe the
+untranscribed · read them onto the log**, with the running counts), the two
+maintenance jobs for a recording the pipeline dropped, and last, **Start
+again**.
+
+**Start again** is the one irreversible act in the product and it is a button
+because the operator has no terminal — this session is his runtime, so a
+`curl` is not an option and a migration that runs itself on the next deploy
+is not acceptable. It drops every table the old system wrote into, removes
+the entries that came out of recordings, and clears the derived columns. It
+**does not touch R2**: `/api/v2/admin/reset-to-recordings` contains no
+`deleteObject` and never may. The confirmation phrase is **"keep the
+recordings"** — the thing being promised, not the thing being destroyed, so
+typing it means reading the promise.
 
 **Removed 8 Sep — every surface of the video-essay studio.** `/drafts`
 `/published` `/studio` `/inbox` `/chat` `/ready` `/photos` `/about` `/system`

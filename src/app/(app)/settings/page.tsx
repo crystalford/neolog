@@ -26,6 +26,8 @@ import Shell from '@/components/Shell'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
 import { OperatorSentence } from './OperatorSentence'
+import { Retranscribe } from './Retranscribe'
+import { StartAgain } from './StartAgain'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -75,6 +77,9 @@ export default async function SettingsPage() {
           before you delete it locally is <Link href="/clear">safe to clear</Link>.
         </p>
 
+        <div className="lsec"><span>the recordings, and what the log has read</span></div>
+        <Retranscribe/>
+
         <div className="lsec"><span>when a recording gets stuck</span></div>
         <div className="doors">
           <span className="d">
@@ -88,6 +93,16 @@ export default async function SettingsPage() {
             <span className="c"><FixTranscodesButton/></span>
           </span>
         </div>
+
+        {/* Last, and behind a phrase he has to type. The operator has no
+            terminal — this session is his runtime — so the one irreversible
+            act in the product has to be a button, and it has to say what it
+            keeps before it says what it destroys. */}
+        <div className="lsec">
+          <span>start again</span>
+          <b>irreversible</b>
+        </div>
+        <StartAgain/>
       </div>
     </Shell>
   )
