@@ -4,8 +4,6 @@
  *
  * These are the functions with no UI to notice them going wrong:
  *
- *   the grounding check   decides whether a line is attributed to the
- *                         operator. Wrong here = words in his mouth.
  *   file placement        decides a date. Wrong here = a confident date the
  *                         log was never told.
  *   the citation checker  decides which model sentences the operator sees.
@@ -24,32 +22,12 @@ function check(name, got, want) {
 }
 function ok(name, cond) { check(name, !!cond, true) }
 
-// ── The 4-gram grounding check (src/lib/validator.ts, inlined) ───────────
-const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
-function fourGrams(t) {
-  const w = norm(t).split(' ').filter(Boolean)
-  const set = new Set()
-  for (let i = 0; i <= w.length - 4; i++) set.add(w.slice(i, i + 4).join(' '))
-  return set
-}
-function isGrounded(field, grams) {
-  const w = norm(field).split(' ').filter(Boolean)
-  if (w.length < 4) return false
-  for (let i = 0; i <= w.length - 4; i++) if (grams.has(w.slice(i, i + 4).join(' '))) return true
-  return false
-}
-
-console.log('grounding')
-const transcript = "so I was thinking about the mushroom farm today and honestly it is the first real job in years"
-const g = fourGrams(transcript)
-ok('a real quote is grounded', isGrounded('the mushroom farm today and honestly', g))
-ok('an invented quote is not', !isGrounded('I have always loved working with fungi', g))
-ok('a paraphrase is not grounded', !isGrounded('he reflected on his new agricultural employment', g))
-ok('punctuation and case do not matter', isGrounded('The Mushroom Farm, today — and honestly!', g))
-ok('a 3-word fragment cannot ground', !isGrounded('mushroom farm today', g))
-// The failure that matters most: a quote that SHARES words but was never said.
-ok('shared words in a different order do not ground',
-   !isGrounded('today the honestly farm mushroom about', g))
+// The 4-gram grounding check was tested here. It is gone, and so is the
+// thing it guarded: it existed to catch an extraction model's paraphrase
+// being attributed to the operator, and nothing paraphrases him any more.
+// `read-recording.ts` copies contiguous runs of `transcript_words`, so a
+// line on the log IS the transcript rather than something checked against
+// it. A checker kept alive with no caller would suggest otherwise.
 
 // ── File placement (src/lib/log-intake.ts) ───────────────────────────────
 console.log('placement')

@@ -134,6 +134,13 @@ without breathing. **The log is wrong about the boundary sometimes and never
 wrong about the words** — which is the right way round, and is why merge and
 split exist on an entry. A model would be wrong about the words too.
 
+**The 4-gram grounding checker is gone too**, and its absence is the same
+point: it existed to catch an extraction model's paraphrase being attributed
+to him, and nothing paraphrases him any more. A line on the log IS the
+transcript, not something checked against it. Do not reintroduce one — if a
+new path needs a grounding check, that path is a generator and should not
+exist.
+
 `scripts/test/read-recording.mjs` — 20 assertions, in CI. Every word in
 exactly one passage, the passages joined equal to the transcript, the same
 recording always cut the same way, and — checked against the source with
@@ -772,7 +779,6 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | `models.ts` | **The unified LLM abstraction.** Model registry (`MODELS.HARD = gpt-oss-120b`, `MODELS.IMAGE = flux-1-schnell`, etc.); `callReasoning()` for hard tasks (with Llama 70B auto-fallback). Every new generator routes through here. |
 | `read-recording.ts` | **How a recording reaches the log, and there is no model in it.** Reads `transcript_words` and cuts at his own pauses. Never add a model call to this file. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
-| `validator.ts` | 4-gram verbatim grounding. `isGrounded` — did this text touch the recording at all. `isFullyGrounded` — is EVERY 4-gram in it, the check for a passage about to be attributed word-for-word. |
 | `transcribe.ts` | Whisper, with word-level timestamps — which `read-recording.ts` needs and without which a recording is not read at all. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
 | `d1.ts` | D1 query helpers (`getDb`, `findOne`, `findMany`, `run`, `batch`). |
