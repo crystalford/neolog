@@ -359,7 +359,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
    pages and rendered the way back in mono UPPERCASE with letter-spacing —
    which plain.css bans twice over (labels are words; mono is for dates and
    IDs). The log's own `.crumb` is in the log block below. */
-.canon-main .crumb:not(.logpage .crumb) { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px; color: var(--fg-3); text-transform: uppercase; }
+
 .hero { padding: 24px 0; }
 
   
@@ -380,7 +380,14 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
  * was replaced by steel as the signal colour on 7 Sep and this rule was
  * missed, so every page in the product was still lit by the old palette.
  * That is what "it still looks like the old design" was. */
-.canon-page {
+/* ── The shell ──────────────────────────────────────────────────────────
+   `log.html`'s own classes and values, taken rather than re-derived. They
+   were `canon-*` until 8 Sep — the same numbers in most places, but a
+   parallel vocabulary that made it impossible to tell by reading whether a
+   page matched the design or merely resembled it. Now a diff of this file
+   against the package's stylesheet is meaningful. */
+
+.page {
   position: relative;
   min-height: 100vh;
   background:
@@ -388,195 +395,60 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
     var(--bg);
   overflow-x: hidden;
 }
+.wrap { max-width: 1140px; margin: 0 auto; padding: 0 44px; position: relative; }
 
-/* One frame, every page (design package, `plain.css`). Pages had drifted to
- * six column widths and four rail widths; 1140/44 is the single answer.
- * Inner width is 1052 — a page with a rail spends it as 708 + 48 + 296, and a
- * page without one caps its content at the same 708. Nothing reframes when
- * you click. */
-.canon-wrap {
-  max-width: 1140px;
-  margin: 0 auto;
-  padding: 0 44px;
-  position: relative;
+.mh { padding: 18px 0 16px; display: flex; align-items: center; gap: 22px; border-bottom: 1px solid var(--line); }
+.lock { display: flex; align-items: center; gap: 10px; }
+.mk { width: 22px; height: 22px; color: var(--fg); }
+.mk svg { width: 100%; height: 100%; display: block; }
+.wm { font-size: 15.5px; font-weight: 500; letter-spacing: -0.5px; color: var(--fg); }
+.mh .pv {
+  font-size: 11.5px; color: var(--fg-4); padding: 3px 9px;
+  border: 1px solid var(--line-1); border-radius: 100px;
+  white-space: nowrap; flex-shrink: 0;
 }
+.mh nav { margin-left: auto; display: flex; gap: 20px; font-size: 13px; color: var(--fg-3); }
+.mh nav a:hover, .mh nav a.on { color: var(--fg); }
+
+/* One obvious way back, always at the top of a detail page. */
+.back { display: flex; align-items: baseline; gap: 14px; padding: 16px 0 0; font-size: 12.5px; color: var(--fg-4); }
+.back a { color: var(--fg-2); border-bottom: 1px solid var(--line-2); }
+.back a:hover { color: var(--fg); border-color: var(--line-3); }
+.back .sep { color: var(--fg-4); }
+
+/* The footer carries the secondary doors — there is no dropdown of
+   destinations in the design, and there is not one here now either. */
+.ft {
+  margin-top: 70px; padding: 26px 0 56px; border-top: 1px solid var(--line);
+  display: flex; justify-content: space-between; gap: 20px;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-4);
+}
+.ft .r { display: flex; gap: 18px; flex-wrap: wrap; }
+.ft a:hover { color: var(--fg-2); }
+
 /* The masthead is a row, not a three-column grid: lockup, then the state
  * pill, then the nav pushed to the right edge. Text links, no pill
  * backgrounds — a nav entry is a word, not a button. */
-.canon-masthead {
-  padding: 18px 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  border-bottom: 1px solid var(--line);
-}
+
 /* "private · only you see this" — the log says whose it is, always. */
-.canon-masthead .pv {
-  font-size: 11.5px;
-  color: var(--fg-4);
-  padding: 3px 9px;
-  border: 1px solid var(--line-1);
-  border-radius: 100px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.canon-lockup {
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-}
-.canon-lockup .mark {
-  width: 26px;
-  height: 26px;
-  color: var(--fg);
-  display: inline-flex;
-}
-.canon-lockup .mark svg { width: 100%; height: 100%; display: block; }
-.canon-lockup .wordmark {
-  font-weight: 500;
-  font-size: 19px;
-  letter-spacing: -0.5px;
-  color: var(--fg);
-  line-height: 1;
-}
+
 /* Pushed to the right edge, and the entries are words rather than buttons —
  * `plain.css` rule 2: a control is a word. `justify-self` was a leftover
  * from the grid masthead and does nothing in a flex row. */
-.canon-nav {
-  margin-left: auto;
-  display: flex;
-  gap: 20px;
-  font-size: 13px;
-  color: var(--fg-3);
-  flex-wrap: nowrap;
-}
-.canon-nav a {
-  padding: 0;
-  border-radius: 0;
-  transition: color .15s;
-  white-space: nowrap;
-}
-
-.canon-nav a:hover { color: var(--fg); }
-.canon-nav a.current { color: var(--fg); }
-.canon-meta {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 10px;
-}
 
 @keyframes canon-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-.canon-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--t-violet), var(--t-teal));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--bg);
-  cursor: pointer;
-  border: none;
-  transition: filter .15s;
-}
-.canon-avatar:hover { filter: brightness(1.1); }
-.canon-main {
-  position: relative;
-  z-index: 1;
-  padding: 8px 0 80px;
-}
 
 /* Avatar dropdown menu */
-.canon-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 240px;
-  background: var(--bg-1);
-  border: 1px solid var(--line-1);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.6);
-  z-index: 220;
-}
-.canon-dropdown a, .canon-dropdown button {
-  display: flex;
-  width: 100%;
-  text-align: left;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--fg-1);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  transition: background .12s, color .12s;
-}
-.canon-dropdown a:hover, .canon-dropdown button:hover { background: var(--bg-3); color: var(--fg); }
-.canon-dropdown .sep { height: 1px; background: var(--line); margin: 4px 0; }
-.canon-dropdown .kbd {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-4);
-  padding: 1px 5px;
-  border: 1px solid var(--line-2);
-  border-radius: 4px;
-  background: var(--bg-2);
-}
+
 /* Subtitle line below a dropdown-item label — used to surface
    lost-but-good destinations (Inbox, Studio, Podcast) with a one-liner
    explanation so the operator knows what they are. */
-.canon-dropdown .dropdown-sub {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--fg-4);
-  font-style: italic;
-  text-align: right;
-  max-width: 50%;
-}
-
-@media (max-width: 960px) {
-  .canon-wrap { padding: 0 24px; }
-  
-  
-}
-@media (max-width: 720px) {
-  .canon-nav { display: none; }
-  
-}
 
 /* ============================================================
  * CANON — Timeline (/) per 01-Landing.html
  * ============================================================ */
 
 /* Hero ----------------------------------------------------- */
-
-.canon-btn {
-  display: inline-flex; align-items: center; gap: 9px;
-  padding: 11px 18px;
-  border-radius: 8px;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 500;
-  transition: all .15s;
-  border: 1px solid transparent;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.canon-btn.primary { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.canon-btn.primary:hover { background: var(--fg-1); border-color: var(--fg-1); }
-.canon-btn.ghost { border-color: var(--line-2); color: var(--fg-1); background: var(--bg-1); }
-.canon-btn.ghost:hover { color: var(--fg); border-color: var(--line-3); background: var(--bg-2); }
-.canon-btn.accent { background: var(--sig); color: #061735; border-color: var(--sig); box-shadow: 0 0 30px var(--sig-glow); }
-.canon-btn.accent:hover { background: #7ba3f8; }
-.canon-btn .ico { width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; }
-.canon-btn .ico svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.7; }
 
 /* Stats strip ---------------------------------------------- */
 
@@ -2151,3 +2023,19 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 /* the word under the playhead — the transcript follows the video */
 .logpage .tw span.on { color: var(--fg); background: rgba(78,161,213,.16); border-radius: 3px; }
+
+/* A button outside the log's own panels — the four places that are not a
+   surface of the log (the error page, not-found, sign-in, the uploader).
+   Same treatment the design gives a button everywhere it has one: bone on
+   ink for the primary, a hairline border for the quiet one. `canon-btn`
+   went with the rest of the old design system; this is what it should have
+   been all along. */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid var(--line-1); color: var(--fg-2); background: none;
+  cursor: pointer; transition: all .16s; white-space: nowrap;
+}
+.btn:hover { color: var(--fg); border-color: var(--line-3); }
+.btn.primary { background: var(--fg); color: #000; border-color: var(--fg); font-weight: 500; }
+.btn.primary:hover { filter: brightness(1.08); }

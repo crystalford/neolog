@@ -60,7 +60,7 @@ export default function NotFound() {
           The URL doesn't resolve to a vlog, thread, cluster, or production. Old bookmark from a
           previous routing? Try heading back to Timeline.
         </p>
-        <Link href="/" className="canon-btn primary">
+        <Link href="/" className="btn primary">
           Back to Timeline
           <span className="ico"><svg viewBox="0 0 14 14"><path d="M3 7 L11 7 M8 4 L11 7 L8 10"/></svg></span>
         </Link>

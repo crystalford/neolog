@@ -90,10 +90,10 @@ export default function ErrorBoundary({
           )}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => reset()} className="canon-btn primary">
+          <button onClick={() => reset()} className="btn primary">
             Reset
           </button>
-          <Link href="/" className="canon-btn ghost">
+          <Link href="/" className="btn">
             Back to Timeline
           </Link>
         </div>

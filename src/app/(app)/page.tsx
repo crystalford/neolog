@@ -487,6 +487,9 @@ export default function LogHome() {
             {/* SPEC §3: the machine layer is "linked from about and the
                 log's footer, never the nav." */}
             <Link href="/everything">everything</Link>
+            <Link href="/vlogs">recordings</Link>
+            <Link href="/settings">settings</Link>
+            <a href="/cdn-cgi/access/logout">sign out</a>
           </span>
         </footer>
 

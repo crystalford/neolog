@@ -24,10 +24,10 @@ export interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   return (
-    <div className="canon-page">
-      <div className="canon-wrap">
+    <div className="page">
+      <div className="wrap">
         <Masthead/>
-        <main className="canon-main">
+        <main>
           {children}
         </main>
       </div>
