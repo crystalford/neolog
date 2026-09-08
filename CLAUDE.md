@@ -476,6 +476,35 @@ second one, not improving it. The REST fallback needs
 `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, and the bootstrap already
 pushes both to the Pages project.
 
+### ⚠️ `MIGRATIONS` is append-only, so fifty-three of them can never apply
+
+An entry in `src/lib/migration-runner.ts` is never edited or removed — its
+name is the key in `schema_migrations`, and renaming one re-runs SQL that
+already applied. So the migrations that built `threads`, `clusters`,
+`productions` and the rest of the extraction engine are **still in the
+array**, and on a database where those tables are gone every one of them
+fails with `no such table`.
+
+A failed migration is not recorded as applied. That is right for a real
+failure and wrong for this one: **fifty-three statements failed on the first
+request of every cold Worker isolate, forever**, and any health report over
+`runMigrations` could never come back clean. The chain does not abort — the
+loop catches per migration — so nothing was broken, which is why it went
+unnoticed.
+
+`src/lib/dropped-tables.ts` is the fix and the single source of truth. The
+reset route drops what it lists; the runner uses `isDroppedTableError()` to
+record an obsolete migration once and stop asking. **`no such table` is still
+NOT in `BENIGN_PATTERNS`** — that is how a table which failed to create gets
+caught. It is benign only for a name on that list, matched whole rather than
+by prefix.
+
+⚠️ **Adding a name to `DROPPED_TABLES` is not a way to quiet a failing
+migration.** A name belongs there only if the table was dropped deliberately
+and nothing reads it. `scripts/test/migrations.mjs` — 21 assertions, in CI —
+holds both halves: every dropped table is recognised, and `log_entries`,
+`entry_revisions` and an unknown table are all still real failures.
+
 ### ⚠️ Framework debt — Next 14.2.5 under a deprecated adapter
 
 `package.json` pins `next@14.2.5`. `@cloudflare/next-on-pages@1.13.16`
@@ -803,7 +832,7 @@ preserves a bookmark to a product that no longer exists.
 | Writing a search answer | `callReasoning()` in `src/lib/models.ts` — the one place a model writes prose, and every sentence's citations are checked in code before it is shown. |
 | Video processing | Cloudflare Container Worker running FFmpeg (`workers/ffmpeg`) — transcode, thumbnail, audio extract |
 | Auth | Cloudflare Access (one-time PIN to operator email). No public bypass apps — nothing is served publicly yet, and adding one is the operator's act. |
-| Styling | Inline styles importing tokens from `src/lib/design.ts` |
+| Styling | The design package's own CSS, vendored under `design/` and scoped per page in `src/app/globals.css`. Tokens are CSS custom properties. |
 
 ---
 
@@ -851,12 +880,17 @@ Pure black (`#000`), cool-gray foregrounds, **one signal colour: steel
 `#4ea1d5`** (`SPEC.md` §1). Geist for everything; JetBrains Mono for dates and
 IDs only — **never on a button or a control.**
 
-**Tokens live in `src/lib/design.ts`.** Import from there; do not redefine
-inline.
+⚠️ **Tokens live in `src/app/globals.css`, as CSS custom properties.** Use
+`var(--fg-3)`, `var(--t-steel)`, `var(--font-body)`. There is no TypeScript
+token module and there should not be one.
 
-```typescript
-import { INK, BONE, TOPIC, STATE, FONT_BODY, FONT_MONO } from '@/lib/design'
-```
+`src/lib/design.ts` used to be that module and was deleted on 8 Sep. Nothing
+had imported it since the design package was vendored and every page moved to
+the package's own classes — and by then it had **drifted**: it declared
+`--fg-3: #71717a` where `globals.css` renders `#9a9aa4`. A second definition
+of a token is a second source of truth, and the losing one is the one the
+screen does not use. `check-css-vars.mjs` proves every `var(--x)` resolves;
+nothing could have proved a TS constant matched.
 
 **Four rules from the design package's `plain.css`, binding:**
 

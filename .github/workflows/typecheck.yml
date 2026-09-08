@@ -103,6 +103,17 @@ jobs:
       - name: The fold
         run: node scripts/test/fold.mjs
 
+      # MIGRATIONS is append-only, so the fifty-three that built the
+      # extraction engine's tables are still in the array after those tables
+      # were dropped — and each one fails with `no such table`. A failure is
+      # not recorded as applied, so before this was fixed every cold Worker
+      # isolate re-ran all fifty-three on its first request, forever. The
+      # line that must hold: `no such table` is benign for a table dropped
+      # on purpose and for nothing else, or a table that failed to create
+      # gets silently marked done.
+      - name: Obsolete migrations, and only those
+        run: node scripts/test/migrations.mjs
+
       # How far each page has drifted from the design it is supposed to be.
       # The home page and the feed were built close to the package and every
       # other page was written in a vocabulary that RESEMBLED it — and

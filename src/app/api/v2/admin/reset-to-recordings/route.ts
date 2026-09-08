@@ -42,6 +42,7 @@ import { getDb, run, findOne } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
+import { DROPPED_TABLES } from '@/lib/dropped-tables'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
@@ -49,22 +50,12 @@ interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
  * Everything the old system wrote. Dropped, not emptied: an empty table of a
  * shape nothing reads is the "evidence of the old site" this is removing.
  */
-const OLD_TABLES = [
-  // The extraction passes and what fed on them
-  'threads', 'creative_elements', 'clip_candidates', 'entities', 'entity_mentions',
-  'thread_connections', 'extraction_runs', 'prompts',
-  // Subjects
-  'clusters', 'cluster_threads', 'cluster_insights', 'bounce_runs',
-  'macro_clusters', 'macro_cluster_members', 'motifs', 'production_motifs',
-  // Topics + research
-  'topics', 'topic_sources',
-  // The production engine
-  'productions', 'production_beats', 'production_visual_assets',
-  'projects', 'posts', 'surfaced_cards', 'broll_assets',
-  // Chat, and voices for narration
-  'chat_threads', 'chat_messages', 'chat_attachments',
-  'voice_profiles', 'characters',
-]
+/**
+ * The tables to drop. Shared with the migration runner via
+ * `src/lib/dropped-tables.ts` — the runner needs the same list to recognise
+ * a migration that can never apply again, and two copies would drift.
+ */
+const OLD_TABLES = DROPPED_TABLES
 
 /** Derived on `vlogs`: cleared so each recording is read again from the file. */
 const VLOG_DERIVED = [

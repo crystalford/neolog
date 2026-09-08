@@ -18,6 +18,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types'
+import { isDroppedTableError } from '@/lib/dropped-tables'
 
 export interface Migration {
   name: string
@@ -1640,6 +1641,9 @@ export const MIGRATIONS: Migration[] = [
   { name: '2026-09-08_vlogs_read_at', sql: `ALTER TABLE vlogs ADD COLUMN read_at TEXT` },
 ]
 
+// `no such table` is deliberately NOT here. That is how a table which failed
+// to create gets caught. The one table it is allowed to name is a table this
+// product dropped on purpose — see `isDroppedTableError`.
 const BENIGN_PATTERNS = [
   /duplicate column name/i,
   /already exists/i,
@@ -1648,7 +1652,8 @@ const BENIGN_PATTERNS = [
 
 export interface MigrationResult {
   name: string
-  status: 'applied' | 'skipped_already_recorded' | 'skipped_already_present' | 'failed'
+  status: 'applied' | 'skipped_already_recorded' | 'skipped_already_present'
+        | 'skipped_table_dropped' | 'failed'
   error?: string
 }
 
@@ -1697,6 +1702,16 @@ export async function runMigrations(db: D1Database): Promise<MigrationResult[]> 
           `INSERT INTO schema_migrations (name) VALUES (?) ON CONFLICT(name) DO NOTHING`,
         ).bind(m.name).run()
         results.push({ name: m.name, status: 'skipped_already_present', error: msg })
+      } else if (isDroppedTableError(msg)) {
+        // The table this migration alters was dropped on purpose (8 Sep).
+        // MIGRATIONS is append-only, so the entry stays in the array — but
+        // it can never apply again, and leaving it unrecorded made every
+        // cold isolate re-run fifty-three failing statements on its first
+        // request. Record it and stop asking.
+        await db.prepare(
+          `INSERT INTO schema_migrations (name) VALUES (?) ON CONFLICT(name) DO NOTHING`,
+        ).bind(m.name).run()
+        results.push({ name: m.name, status: 'skipped_table_dropped', error: msg })
       } else {
         results.push({ name: m.name, status: 'failed', error: msg })
       }
