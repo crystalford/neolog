@@ -42,7 +42,7 @@ const PAGES = [
   ['headings',   'src/app/(app)/pages/page.tsx',         5],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    16],
   ['search',     'src/app/(app)/search/page.tsx',       10],
-  ['month',      'src/app/(app)/month/[ym]/page.tsx',   28],
+  ['month',      'src/app/(app)/month/[ym]/page.tsx',   19],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     6],
   ['clear',      'src/app/(app)/clear/page.tsx',        7],
   ['triage',     'src/app/(app)/triage/page.tsx',       3],
@@ -63,7 +63,7 @@ const PAGES = [
   ['asks',       'src/app/(app)/asks/page.tsx',          4],
   ['numbers',    'src/app/(app)/numbers/page.tsx',       8],
   ['public-log', 'src/app/(app)/public/page.tsx',       10],
-  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    23],
+  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    10],
   ['writing',    'src/app/(app)/writing/page.tsx',      6],
   // writing.html's title is "an essay you wrote" — it covers the mechanic
   // AND one document, so the detail page is measured against it too.

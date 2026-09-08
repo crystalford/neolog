@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 import { stampFor } from '@/lib/log-entry'
 
 interface Entry {
@@ -53,6 +54,17 @@ function shift(ym: string, by: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
+/** The month either side, so the page is a place you can walk along. */
+function shiftYm(ym: string, by: number): string {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(Date.UTC(y, (m - 1) + by, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+function ymLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
 export default function MonthPage({ params }: { params: { ym: string } }) {
   const router = useRouter()
   const [v, setV] = useState<MonthView | null>(null)
@@ -69,6 +81,11 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
     } catch { setV(null) }
     finally { setLoading(false) }
   }, [params.ym])
+
+  const prevYm = shiftYm(params.ym, -1)
+  const nextYm = shiftYm(params.ym, 1)
+  const prevLabel = ymLabel(prevYm)
+  const nextLabel = ymLabel(nextYm)
   useEffect(() => { void load() }, [load])
 
   const write = useCallback(async () => {
@@ -104,17 +121,24 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
           <Link href={`/month/${shift(v.ym, 1)}`}>{shift(v.ym, 1)} →</Link>
         </div>
 
-        <div className="pghead">
-          <h1>{v.label}</h1>
-          <div className="pgmeta">
-            <span>{v.entries.length} {v.entries.length === 1 ? 'entry' : 'entries'}</span>
-            <span>{v.days_with_something} of {v.days_in_month} days</span>
-            {v.public_count > 0 && <span>{v.public_count} public</span>}
-          </div>
+        {/* `month.html`: the month either side, then the month itself. */}
+        <div className="nav2">
+          <Link href={`/month/${prevYm}`}>← {prevLabel}</Link>
+          <Link href={`/month/${nextYm}`}>{nextLabel} →</Link>
         </div>
 
+        <h1>{v.label}</h1>
+        <div className="strip">
+          <span>{v.entries.length} {v.entries.length === 1 ? 'entry' : 'entries'}</span>
+          <span>{v.days_with_something} of {v.days_in_month} days</span>
+          {v.public_count > 0 && <span>{v.public_count} public</span>}
+        </div>
+
+        <div className="grid">
+          <main>
+
         {/* The month in one paragraph. */}
-        <div className="pgpara" style={{ marginTop: 22 }}>
+        <div className="para" style={{ marginTop: 22 }}>
           {editing ? (
             <>
               <textarea value={draft} onChange={e => setDraft(e.target.value)} autoFocus />
@@ -168,10 +192,10 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
         </div>
 
         {/* How much of the month is written down. */}
-        <div className="idxband"><b>How much of the month is written down</b>
+        <div className="sh"><b>How much of the month is written down</b>
           {v.days_with_something} days with something · {v.days_in_month - v.days_with_something} with nothing
         </div>
-        <div className="monthdays">
+        <div className="days">
           {Array.from({ length: v.days_in_month }, (_, i) => i + 1).map(d => {
             const n = Number(v.days[String(d)] || 0)
             return (
@@ -187,7 +211,7 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
           })}
         </div>
 
-        <div className="idxband"><b>The month</b>{v.entries.length}</div>
+        <div className="sh"><b>The month</b>{v.entries.length}</div>
         {v.entries.map(e => (
           <Link className="en" href={`/entry/${e.id}`} key={e.id} id={`e-${e.id}`}>
             <div className="t">{stampFor(e.happened_at, 'exact')}</div>
@@ -207,6 +231,17 @@ export default function MonthPage({ params }: { params: { ym: string } }) {
         {v.entries.length === 0 && (
           <div className="none">Nothing on the log for {v.label}.</div>
         )}
+            <div className="foot">
+              Every sentence above points at an entry below. Nothing in it is
+              from outside the month.
+            </div>
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'the log' },
+            { href: '/onthisday', label: 'on this day' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )

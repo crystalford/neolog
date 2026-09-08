@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
 
 interface Vlog {
   id: string; title: string | null; original_filename: string | null
@@ -115,9 +116,11 @@ export default function Recording() {
         <div className="back">
           <Link href="/">the log</Link>
           <Link href="/vlogs">recordings</Link>
-          {r?.navigation.prev_id && <Link href={`/vlog/${r.navigation.prev_id}`}>earlier</Link>}
-          {r?.navigation.next_id && <Link href={`/vlog/${r.navigation.next_id}`}>later</Link>}
+
         </div>
+
+        <div className="grid">
+          <main>
 
         {loading && <div className="none">Getting it.</div>}
         {!loading && !v && <div className="none">No such recording.</div>}
@@ -135,6 +138,7 @@ export default function Recording() {
             </div>
 
             {v.play_url ? (
+              <div className="media">
               <video
                 className="rec"
                 src={v.play_url}
@@ -143,6 +147,8 @@ export default function Recording() {
                 playsInline
                 onTimeUpdate={e => setAt((e.target as HTMLVideoElement).currentTime)}
               />
+              <div className="cap">the whole thing, kept — nothing on this page changes the file</div>
+              </div>
             ) : (
               <div className="none">
                 The file is in R2 and this page could not sign a link for it
@@ -152,27 +158,35 @@ export default function Recording() {
 
             {/* Provenance, in words. Two facts, and the log says how it knows
                 each — a recording that cannot be checked is not evidence. */}
-            <div className="sh"><span>where this came from</span></div>
-            <div className="doors">
-              <span className="d">
-                <span className="n">the date</span>
-                <span className="w">{v.date_from}</span>
-                <span className="c">{day(v.recorded_at || v.created_at)}</span>
-              </span>
-              <span className="d">
-                <span className="n">the words</span>
-                <span className="w">
+            <div className="sh"><span>Where this came from</span><b>provenance</b></div>
+            <div className="facts">
+              <div className="row">
+                <div className="k">the date</div>
+                <div className="v">
+                  {day(v.recorded_at || v.created_at)}
+                  <em>{v.date_from}</em>
+                </div>
+              </div>
+              <div className="row">
+                <div className="k">the words</div>
+                <div className="v">
                   {v.transcribed_by
-                    ? `Transcribed by ${v.transcribed_by}. Every word carries the second it was said.`
-                    : 'Not transcribed yet. Until it is, nothing can be placed from it.'}
-                </span>
-                <span className="c">{v.transcript_completed_at ? day(v.transcript_completed_at) : ''}</span>
-              </span>
-              <span className="d">
-                <span className="n">the file</span>
-                <span className="w">Cloudflare R2, untouched. Nothing on this page changes it.</span>
-                <span className="c">{v.mime_type || ''}</span>
-              </span>
+                    ? `Transcribed by ${v.transcribed_by}.`
+                    : 'Not transcribed yet.'}
+                  <em>
+                    {v.transcribed_by
+                      ? 'Word by word with timings, so a line on the log points at the second it was said.'
+                      : 'Until it is, nothing can be placed from it — and nothing is dated by guess.'}
+                  </em>
+                </div>
+              </div>
+              <div className="row">
+                <div className="k">the file</div>
+                <div className="v">
+                  {v.mime_type || 'the original'}
+                  <em>Cloudflare R2, untouched. Burying this recording keeps it.</em>
+                </div>
+              </div>
             </div>
 
             <div className="sh">
@@ -239,6 +253,25 @@ export default function Recording() {
             </div>
           </>
         )}
+            {(r?.navigation.prev_id || r?.navigation.next_id) && (
+              <div className="ends">
+                {r.navigation.prev_id
+                  ? <Link href={`/vlog/${r.navigation.prev_id}`}>← earlier</Link>
+                  : <span />}
+                <Link className="home" href="/vlogs">every recording</Link>
+                {r.navigation.next_id
+                  ? <Link className="nx" href={`/vlog/${r.navigation.next_id}`}>later →</Link>
+                  : <span />}
+              </div>
+            )}
+          </main>
+
+          <Rail goesTo={[
+            { href: '/vlogs', label: 'every recording' },
+            { href: '/footage', label: 'the record as material' },
+            { href: '/', label: 'the log' },
+          ]} />
+        </div>
       </div>
     </Shell>
   )
