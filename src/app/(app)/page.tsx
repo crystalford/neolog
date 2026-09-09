@@ -484,6 +484,10 @@ export default function LogHome() {
             <Link href="/screenshots">screenshots</Link>
             <Link href="/writing">writing</Link>
             <Link href="/footage">footage</Link>
+            {/* wrong.html §2 — the log's record of its own mistakes. Reached
+                from here rather than the nav, like everything else that is
+                not home, search or the index. */}
+            <Link href="/corrections">corrections</Link>
             {/* SPEC §3: the machine layer is "linked from about and the
                 log's footer, never the nav." */}
             <Link href="/everything">everything</Link>

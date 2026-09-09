@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
 import { type DatePrecision, stampFor, isFuzzy, clockDuration } from '@/lib/log-entry'
 import { entrySchema } from '@/lib/entry-schema'
+import { asCorrectedBy, describeCorrection } from '@/lib/corrections'
 
 interface Entry {
   id: string
@@ -75,6 +76,9 @@ interface Revision {
   old_value: string | null
   new_value: string | null
   created_at: string
+  /** Some of these the log made. A line the log wrote is marked as the
+      log's, always — including here (§0 rule 3). */
+  by_whom: string | null
 }
 
 const AUTHOR_LINE: Record<string, string> = {
@@ -383,16 +387,24 @@ export default function EntryPage({ params }: { params: { id: string } }) {
             {e.revisions && e.revisions.length > 0 && (
               <div className="revs">
                 <div className="who">What this used to say</div>
-                {e.revisions.map((r, i) => (
-                  <div className="rev" key={i}>
-                    <span className="rt">{shortDate(r.created_at)}</span>
-                    <span className="rb">
-                      <b>{REV_LABEL[r.field] || r.field}</b>
-                      {r.old_value && <span className="was">{r.old_value}</span>}
-                      <em>revised by you</em>
-                    </span>
-                  </div>
-                ))}
+                {e.revisions.map((r, i) => {
+                  // ⚠️ "revised by you" was hard-coded here, and the log makes
+                  // some of these: it rebuilds an entry from the transcript
+                  // after he fixes a misheard word in its span. Signing the
+                  // log's change with his name is the one thing this product
+                  // does not do.
+                  const by = asCorrectedBy(r.by_whom)
+                  return (
+                    <div className="rev" key={i}>
+                      <span className="rt">{shortDate(r.created_at)}</span>
+                      <span className="rb">
+                        <b>{describeCorrection(r.field, by).line}</b>
+                        {r.old_value && <span className="was">{r.old_value}</span>}
+                        <em>{by === 'operator' ? 'revised by you' : 'changed by the log'}</em>
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             )}
 
@@ -460,6 +472,8 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                   <div className="k">Corrections</div>
                   <div className="v">
                     {e.revisions.length} kept, dated, with what each replaced.
+                    {' '}
+                    <Link href="/corrections">every correction on the log</Link>
                   </div>
                 </div>
               )}
@@ -885,14 +899,6 @@ function trim(s: string): string {
   return t.length > 64 ? `${t.slice(0, 62)}…` : t
 }
 
-const REV_LABEL: Record<string, string> = {
-  merge:      'You said this and another entry were one thing.',
-  author:     'You said these were your words.',
-  text:       'You rewrote this line.',
-  date:       'You changed the date.',
-  visibility: 'You changed who can see it.',
-  bury:       'Buried, then dug up.',
-}
 
 function shortDate(iso: string): string {
   const d = new Date(iso)

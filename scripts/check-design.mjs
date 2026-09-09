@@ -81,7 +81,23 @@ const PAGES = [
   ['messages',   'src/app/(app)/messages/[id]/page.tsx', 9],
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',    10],
   ['now',        'src/app/(app)/now/page.tsx',           1],
-  ['connections','src/app/(app)/ways-in/page.tsx',      11],
+  ['connections','src/app/(app)/ways-in/page.tsx',      10],
+  // wrong.html is three sections and only the middle one is product. §1's
+  // five worked cases and §3's hard case are `.case` articles with invented
+  // dates, invented entries and live-looking buttons — the design teaching
+  // the mechanic. Rendering them would put fabricated records on the one
+  // surface whose whole point is that its records are real. §2, "the log of
+  // it", is the page: `.rec .r .d .w .k .o .me .it .rate .rules`.
+  //
+  // The 15: twelve are that `.case` family (case two said l x fix t a b gh
+  // cost kind); `.body` is the 148px indent under a `.st` header this page
+  // does not render; `.n` is that header's step number, counted because it
+  // is a link or a dash on other pages and this check matches by class; and
+  // `.up` is the trend colour on `.rate` — "↓ 2.1× wrong attaches, compared
+  // with the first week", which is the log reading its own numbers out loud
+  // (§0 rule 2). None of the fifteen can go down without building something
+  // the product refuses.
+  ['wrong',      'src/app/(app)/corrections/page.tsx',  15],
 ]
 
 /**
@@ -108,7 +124,18 @@ const NO_DESIGN_PAGE = {
   '/settings': 'no page in the package', '/vlogs': 'vlog.html is one recording, not the list',
 }
 
-const SHELL = new Set(['page','wrap','mh','lock','mk','wm','pv','back','crumb','ft','r','sep','on','logpage','grid','main','rail'])
+/**
+ * The frame every page carries — masthead, footer, crumb, the grid. Not
+ * drift: `Shell` renders it once for all of them.
+ *
+ * ⚠️ `r2` is here because it IS `r`. Nine pages in the package — the ones
+ * where `.r` already means a ROW — call the footer's right-hand link group
+ * `.r2` instead, and `plain.css` gives the two the same rule
+ * (`.ft .r2{display:flex;gap:18px}`). Shell renders `.r`, which is correct
+ * on every page; charging those nine for a class that is the same element
+ * under a second name is the checker being wrong about what it measured.
+ */
+const SHELL = new Set(['page','wrap','mh','lock','mk','wm','pv','back','crumb','ft','r','r2','sep','on','logpage','grid','main','rail'])
 
 /**
  * The design package talking about itself, on nearly every page — and never

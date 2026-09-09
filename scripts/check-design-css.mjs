@@ -99,7 +99,7 @@ const norm = v => {
 //
 // Raising a budget needs a reason in the commit — these are those reasons,
 // kept next to the number so the next session does not "fix" them back.
-const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2}
+const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2, "wrong": 2}
 
 // No argument: check every page against its budget and exit non-zero on drift.
 if(!process.argv[2]){

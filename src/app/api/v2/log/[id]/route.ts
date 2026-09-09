@@ -84,11 +84,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   // Both versions kept, dated, marked revised by you (SPEC §1). An entry
   // that has been corrected carries its own history.
+  // ⚠️ `by_whom` travels with the row. Some of these the log made — it
+  // rebuilds an entry from the transcript after he fixes a misheard word —
+  // and a line the log wrote is marked as the log's, always (§0 rule 3).
   const revisions = await findMany<{
-    field: string; old_value: string | null; new_value: string | null; created_at: string
+    field: string; old_value: string | null; new_value: string | null
+    created_at: string; by_whom: string | null
   }>(
     db,
-    `SELECT field, old_value, new_value, created_at FROM entry_revisions
+    `SELECT field, old_value, new_value, created_at, by_whom FROM entry_revisions
       WHERE entry_id = ? AND operator_id = ?
       ORDER BY created_at DESC LIMIT 50`,
     params.id, operator.id,

@@ -1639,6 +1639,17 @@ export const MIGRATIONS: Migration[] = [
   // When the log last read this recording's transcript onto the log.
   // `src/lib/read-recording.ts` — no model in that path.
   { name: '2026-09-08_vlogs_read_at', sql: `ALTER TABLE vlogs ADD COLUMN read_at TEXT` },
+
+  // The corrections record reads every revision the operator has, newest
+  // first, across all entries. The existing indexes are (entry_id, …) for an
+  // entry's own history and (operator_id, field, …) for one kind — neither
+  // orders the whole set, so the log-wide list was a scan that grows with
+  // every correction ever made.
+  {
+    name: '2026-09-09_idx_entry_revisions_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_operator
+            ON entry_revisions(operator_id, created_at DESC)`,
+  },
 ]
 
 // `no such table` is deliberately NOT here. That is how a table which failed

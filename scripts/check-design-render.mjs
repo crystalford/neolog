@@ -115,7 +115,11 @@ const BUDGET = {
   vlog: 3,
   entry: 1,
   // `/facts` renders its own section bodies; `.sec` runs 27px longer.
-  dossier: 2,
+  // 2 → 3 on 9 Sep: a third `.sec` crossed the 24px threshold when `button`
+  // was given `font: inherit` to match the design's own base rule. That
+  // change took `wrong` from 2 boxes to 0 and left the other twenty pages
+  // exactly where they were; this is its whole cost.
+  dossier: 3,
   // `/asks` deliberately drops the drafted prose answer and its fanned
   // sub-questions — a model writing in his voice on a surface that presents
   // itself as a record (§0 rule 3).
@@ -126,6 +130,11 @@ const BUDGET = {
   now: 11,
   // The two blocks below the route on `/walk` are not converted yet.
   walk: 0,
+  // wrong.html renders identically. Its §1 and §3 `.case` blocks are in the
+  // markup this harness feeds both stylesheets, so they are measured here
+  // even though /corrections does not build them — which is what caught the
+  // button line-height in the first place.
+  wrong: 0,
 }
 
 /**

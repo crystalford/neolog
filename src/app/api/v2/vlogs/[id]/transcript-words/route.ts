@@ -236,8 +236,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // value being written down.
       await run(
         db,
-        `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value)
-         VALUES (?,?,?,'text',?,?)`,
+        // ⚠️ `by_whom = 'log'`, and it is the whole difference between the
+        // two kinds of changed text. He rewriting his own line and the log
+        // rebuilding an entry after he fixed a word are both a new `text`,
+        // and the corrections record would otherwise put this one behind
+        // his name — a change the log made, signed by him.
+        `INSERT INTO entry_revisions (id, operator_id, entry_id, field, old_value, new_value, by_whom)
+         VALUES (?,?,?,'text',?,?,'log')`,
         ulid(), operator.id, e.id, e.text, rebuilt,
       )
       await run(

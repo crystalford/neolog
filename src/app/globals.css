@@ -165,7 +165,14 @@ html, body {
 body { display: flex; flex-direction: column; min-height: 100vh; }
 .mono { font-family: var(--font-mono); font-feature-settings: "zero" on; }
 a { color: inherit; text-decoration: none; cursor: pointer; }
-button { font-family: inherit; cursor: pointer; background: none; border: none; color: inherit; padding: 0; }
+/* ⚠️ `font: inherit`, not `font-family: inherit`. The design's base rule is
+   `button{font:inherit;…}`, which also inherits the body's line-height of
+   1.6; ours inherited only the family, so a button fell back to the UA's
+   `normal` (~1.2) and rendered about five pixels shorter than the design
+   everywhere it did not set its own line-height. Invisible in the
+   stylesheet, invisible to every text-level check, and found by rendering
+   the design's own markup under both. */
+button { font: inherit; cursor: pointer; background: none; border: none; color: inherit; padding: 0; }
 input, textarea { font-family: inherit; outline: none; border: none; background: transparent; color: inherit; }
 
 /* ─── App frame ─────────────────────────────────────────── */
@@ -3104,6 +3111,15 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-wrong .rec .hd { padding:13px 20px; border-bottom:1px solid var(--line); background:var(--bg-1); display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
 .logpage.pg-wrong .rec .hd b { font-size:14px; font-weight:450; color:var(--fg); }
 .logpage.pg-wrong .rec .hd span { font-size:11.5px; color:var(--fg-4); white-space:nowrap; }
+/* ⚠️ `.r` is a ROW here — the tenth class collision in this file, caught
+   before it shipped rather than after. `.logpage .ft .r` is the footer's
+   link group and ties this rule on specificity, so this one wins on order
+   and would lay those links out as a four-column grid with a 130px column
+   in it. wrong.html avoids it by calling its own footer group `.r2`; the
+   product's Shell footer says `.r` on every page.
+   /corrections renders no footer today, which is why nothing is broken —
+   not a defence. The reset below is the defence, and it undoes exactly what
+   the rule above SETS, which is the rule this file learned the hard way. */
 .logpage.pg-wrong .r { display:grid; grid-template-columns:88px 1fr 130px 96px; gap:18px; padding:11px 20px; align-items:center; border-bottom:1px solid var(--line); }
 .logpage.pg-wrong .r:last-child { border-bottom:0; }
 .logpage.pg-wrong .r .d { font-family:var(--mono); font-size:10.5px; color:var(--fg-4); white-space:nowrap; }
@@ -3112,6 +3128,7 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-wrong .r .o { font-size:11.5px; white-space:nowrap; text-align:right; }
 .logpage.pg-wrong .r .o.me { color:var(--steel); }
 .logpage.pg-wrong .r .o.it { color:var(--fg-4); }
+.logpage.pg-wrong .ft .r { display:flex; grid-template-columns:none; gap:18px; padding:0; border-bottom:0; align-items:baseline; }
 .logpage.pg-wrong .rate { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:12px; }
 .logpage.pg-wrong .rate>div { background:var(--bg); padding:15px 18px; }
 .logpage.pg-wrong .rate b { display:block; font-family:var(--mono); font-size:22px; font-weight:300; color:var(--fg); letter-spacing:-0.8px; }
