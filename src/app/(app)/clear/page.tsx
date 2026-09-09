@@ -83,6 +83,11 @@ export default function ClearPage() {
     } finally { setChecking(false) }
   }, [load])
 
+  // Everything the log cannot yet vouch for. `clear.html`'s warn line counts
+  // exactly these three: a file still going up, one being checked, and one
+  // whose bytes did not match. None of them may leave the phone.
+  const unverified = s ? s.checking + s.pending + s.mismatch : 0
+
   const STATE_CLASS: Record<string, string> = {
     checked: 'ok', checking: 'chk', pending: 'wait', mismatch: 'warn',
   }
@@ -192,11 +197,67 @@ export default function ClearPage() {
             )}
           </main>
 
-          <Rail goesTo={[
-            { href: '/', label: 'the log' },
-            { href: '/export', label: 'take it all out' },
-            { href: '/triage', label: 'what arrived' },
-          ]} />
+          {/* `clear.html`'s phone, in the rail — `.ph` holding a `.scr`.
+              Every rule for it has been in globals.css since the page was
+              built and nothing rendered one: the page put a `.big` line in
+              the main column instead, so the surface whose whole job is to
+              say "these are safe to delete" said it in prose beside a list.
+
+              Every figure here is one `clearSummary` already returns. None
+              is computed twice and none is estimated. */}
+          <aside className="ph">
+            <div className="scr">
+              {s ? (
+                <>
+                  <div className="big">
+                    <b>{s.clearable}</b> {s.clearable === 1 ? 'file is' : 'files are'}
+                    <br />safely in the log.
+                  </div>
+                  <div className="sub">
+                    Each one stored, checked against the original, and in your
+                    export.
+                    {s.clearable_bytes > 0 && (
+                      <> Clearing them from this phone frees{' '}
+                        <b style={{ color: 'var(--fg)' }}>{size(s.clearable_bytes)}</b>.</>
+                    )}
+                  </div>
+
+                  <div className="row">
+                    <span>Safe to clear</span>
+                    <b>{s.clearable}{s.clearable_bytes > 0 ? ` · ${size(s.clearable_bytes)}` : ''}</b>
+                  </div>
+                  <div className="row"><span>Still checking</span><b>{s.checking}</b></div>
+                  <div className="row"><span>Still uploading</span><b>{s.pending}</b></div>
+                  <div className="row"><span>Didn&rsquo;t match · re-sending</span><b>{s.mismatch}</b></div>
+
+                  {unverified > 0 && (
+                    <div className="warn">
+                      The {unverified} that {unverified === 1 ? 'is' : 'are'} not
+                      verified stay on the phone. They&rsquo;ll show here when
+                      they are.
+                    </div>
+                  )}
+
+                  {/* ⚠️ A verdict, not a control, and the wording says so.
+                      The design reads "Clear the 312 from this phone", which
+                      is an imperative — and the log cannot touch his phone.
+                      A bone-on-ink block that looks pressable and does
+                      nothing is an affordance with no destination, on the
+                      one page that exists to be trusted. "Safe to clear" is
+                      the same sentence as a verdict, which is what the log
+                      actually has to offer. */}
+                  <div className="btn">
+                    {s.clearable > 0
+                      ? <>Safe to clear {s.clearable} from this phone</>
+                      : <>Nothing is safe to clear yet</>}
+                  </div>
+                  <div className="no">Nothing is removed from the log.</div>
+                </>
+              ) : (
+                <div className="sub">Checking what is kept.</div>
+              )}
+            </div>
+          </aside>
         </div>
 
         <footer className="ft">

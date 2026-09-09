@@ -210,6 +210,14 @@ export default function Thread() {
               </div>
             ) : (
               <div className="pubv">
+                {/* `messages.html`'s `.k` — the preview says whose consent
+                    state it is previewing, and what that state is. Without
+                    it the block is a second copy of the thread with some
+                    lines missing, and nothing on screen says why. */}
+                <div className="k">
+                  What a stranger sees if you publish this thread today, with{' '}
+                  {t.person_name || 'them'} at <b>{CONSENT_WORDS[consent].name}</b>.
+                </div>
                 {r.public_view.map(m => (
                   <div className={`msg ${m.side === 'operator' ? 'you' : 'them'}${m.text === null ? ' veil' : ''}`} key={m.id}>
                     {m.text === null ? (
@@ -222,15 +230,20 @@ export default function Thread() {
                     )}
                   </div>
                 ))}
+                {/* `.f` — inside the preview, not after it. The line is
+                    about what is in the box above; as a `.none` paragraph
+                    outside it, it read as a note about the page. */}
+                {consent !== 'quotable' && r.public_view.length > 0 && (
+                  <div className="f">
+                    Your words, their absences. The shape of a conversation
+                    with none of their content. It reads a little strange —{' '}
+                    <b>that is correct.</b> The strangeness is their privacy,
+                    made visible instead of quietly overridden.
+                  </div>
+                )}
               </div>
             )}
-            {consent !== 'quotable' && r.public_view.length > 0 && (
-              <p className="none">
-                Your words, their absences. It reads strangely, and that is
-                correct — the strangeness is their privacy, visible instead of
-                quietly overridden.
-              </p>
-            )}
+
           </>
         )}
                 </main>

@@ -44,7 +44,12 @@ const PAGES = [
   ['search',     'src/app/(app)/search/page.tsx',       7],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
-  ['clear',      'src/app/(app)/clear/page.tsx',        5],
+  // 5 → 0 on 9 Sep. `clear.html`'s phone (`.ph` holding a `.scr`) had every
+  // rule in globals.css since the page was built and was rendered by
+  // nothing — the page put a `.big` line in the main column instead, so the
+  // surface whose whole job is to say "these are safe to delete" said it in
+  // prose beside a list.
+  ['clear',      'src/app/(app)/clear/page.tsx',        0],
   ['triage',     'src/app/(app)/triage/page.tsx',       2],
   // takeout.html — "everything out, and the bill" — is this page.
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
@@ -74,11 +79,15 @@ const PAGES = [
   // AND one document, so the detail page is measured against it too.
   ['writing',    'src/app/(app)/writing/[id]/page.tsx', 5],
   ['screenshots','src/app/(app)/screenshots/page.tsx',  7],
-  ['messages',   'src/app/(app)/messages/page.tsx',     9],
+  ['messages',   'src/app/(app)/messages/page.tsx',     7],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live
   // there.
-  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 9],
+  // 9 → 7 on 9 Sep: the publish preview gained `.k` (whose consent state is
+  // being previewed, and what it is) and `.f` (why it reads strangely). The
+  // preview was a second copy of the thread with lines missing and nothing
+  // on screen saying why — on the one surface that is half somebody else's.
+  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 7],
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',    10],
   ['now',        'src/app/(app)/now/page.tsx',           1],
   ['connections','src/app/(app)/ways-in/page.tsx',      10],
