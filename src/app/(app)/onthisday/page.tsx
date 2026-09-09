@@ -32,6 +32,7 @@ interface Row {
   date_precision: DatePrecision
   author: string
   visibility: string
+  media_url: string | null
 }
 
 interface Result {
@@ -73,9 +74,17 @@ export default function OnThisDay() {
           <p>Every year this date had something on it, shown as it was.</p>
         </section>
 
+        {/* ⚠️ `.idxband` is `/pages`' index band, borrowed here for a year
+            heading. `onthisday.html` has its own: `.yr` is the block, `.y`
+            is the year. A different thing gets a different class rather than
+            a page taking another page's furniture. */}
         {r?.years.map(y => (
-          <div key={y.year}>
-            <div className="idxband"><b>{y.year}</b></div>
+          <div className="yr" key={y.year}>
+            <div className="y"><b>{y.year}</b></div>
+            {/* ⚠️ One wrapper, because `.yr` is a two-column grid (110px +
+                1fr). With the rows as direct children, a year with two
+                entries put the second one back in the year column. */}
+            <div>
             {y.entries.map(e => (
               <Link className="en" href={`/entry/${e.id}`} key={e.id}>
                 <div className={`t${isFuzzy(e.date_precision) ? ' fz' : ''}`}>
@@ -90,9 +99,18 @@ export default function OnThisDay() {
                     </span>
                   </div>
                   {e.detail && <div className="more">{e.detail}</div>}
+                  {/* The pictures from that day, beside the line rather than
+                      described in it. A held row is sent no URL at all. */}
+                  {e.media_url && (
+                    <div className="ph">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={e.media_url} alt="" loading="lazy" />
+                    </div>
+                  )}
                 </div>
               </Link>
             ))}
+            </div>
           </div>
         ))}
 

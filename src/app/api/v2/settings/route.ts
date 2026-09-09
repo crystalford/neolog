@@ -39,9 +39,15 @@ export async function GET(req: NextRequest) {
     const db = await readyDb(getDb(env), 'settings')
     const [settings, who] = await Promise.all([
       getAllSettings(db, operator.id),
-      findOne<{ bio: string | null }>(db, `SELECT bio FROM operator WHERE id = ?`, operator.id),
+      findOne<{ bio: string | null; same_as_json: string | null }>(
+        db, `SELECT bio, same_as_json FROM operator WHERE id = ?`, operator.id,
+      ),
     ])
-    return NextResponse.json({ settings, bio: who?.bio ?? null })
+    return NextResponse.json({
+      settings,
+      bio: who?.bio ?? null,
+      same_as: who?.same_as_json ?? null,
+    })
   } catch (err: any) {
     // operator_settings table might not exist yet on live D1 if migrations
     // haven't fully run. Return empty settings + a hint instead of 500 so
@@ -91,11 +97,35 @@ export async function PATCH(req: NextRequest) {
     if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     throw e
   }
-  const body = await req.json().catch(() => ({})) as { bio?: string }
+  const body = await req.json().catch(() => ({})) as {
+    bio?: string
+    same_as?: { kind?: string; url?: string }[]
+  }
+  const db = await readyDb(getDb(env), 'settings')
+
+  // Where else to find him. `/facts` emits these as `sameAs` in a Person
+  // block, so a url that is not a url is worse than none: it says a stranger's
+  // account is his, in a format built to be trusted. Only http(s) survives,
+  // and the kind is a word he types beside it.
+  if (Array.isArray(body.same_as)) {
+    const clean = body.same_as
+      .filter(x => x && typeof x.url === 'string' && /^https?:\/\//.test(x.url.trim()))
+      .map(x => ({
+        kind: String(x.kind || '').trim().slice(0, 40) || 'elsewhere',
+        url: x.url!.trim().slice(0, 500),
+      }))
+      .slice(0, 20)
+    await run(
+      db,
+      `UPDATE operator SET same_as_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      clean.length ? JSON.stringify(clean) : null, operator.id,
+    )
+    if (typeof body.bio !== 'string') return NextResponse.json({ ok: true, same_as: clean })
+  }
+
   if (typeof body.bio !== 'string') {
     return NextResponse.json({ error: 'bio must be a string' }, { status: 400 })
   }
-  const db = await readyDb(getDb(env), 'settings')
   await run(
     db,
     `UPDATE operator SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,

@@ -34,6 +34,24 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
+/**
+ * The `same_as_json` column, read defensively: a bad parse, a non-array, a
+ * row without a url — all resolve to nothing rather than to a half-built
+ * link. This ends up in a Person schema block, where a wrong `sameAs` says
+ * a stranger's account is his.
+ */
+function sameAs(raw: string | null): { kind: string; url: string }[] {
+  if (!raw) return []
+  try {
+    const v = JSON.parse(raw)
+    if (!Array.isArray(v)) return []
+    return v
+      .filter(x => x && typeof x.url === 'string' && /^https?:\/\//.test(x.url))
+      .map(x => ({ kind: String(x.kind || '').trim() || 'elsewhere', url: String(x.url) }))
+      .slice(0, 20)
+  } catch { return [] }
+}
+
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
   let operator
@@ -45,8 +63,11 @@ export async function GET(req: NextRequest) {
   const db = await readyDb(getDb(env), 'facts')
 
   const [who, pages, span, changed] = await Promise.all([
-    findOne<{ display_name: string | null; handle: string | null; bio: string | null }>(
-      db, `SELECT display_name, handle, bio FROM operator WHERE id = ?`, operator.id,
+    findOne<{
+      display_name: string | null; handle: string | null; bio: string | null
+      same_as_json: string | null
+    }>(
+      db, `SELECT display_name, handle, bio, same_as_json FROM operator WHERE id = ?`, operator.id,
     ),
     findMany<PageRow & { first_at: string | null }>(
       db,
@@ -97,6 +118,10 @@ export async function GET(req: NextRequest) {
         handle: who?.handle || null,
         // His sentence, or none. Never the log's.
         sentence: (who?.bio || '').trim() || null,
+        // Where else to find him. `dossier.html`: "so a machine knows these
+        // are all one person." He typed every one of these; nothing here is
+        // looked up, and there is no connector to look one up with.
+        same_as: sameAs(who?.same_as_json ?? null),
       },
       roles: withDerived.filter(p => p.kind === 'job' || p.kind === 'project'),
       names: withDerived.filter(p => p.kind === 'person' || p.kind === 'place'),

@@ -22,9 +22,10 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { presignGetUrl, type R2Env } from '@/lib/r2'
 import type { D1Database } from '@cloudflare/workers-types'
 
-interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
+interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -48,11 +49,12 @@ export async function GET(req: NextRequest) {
     id: string; text: string; detail: string | null
     happened_at: string; date_precision: string; author: string
     visibility: string; source_kind: string
+    r: string | null; mime: string | null
   }>(
     db,
     `SELECT id, text, detail,
             COALESCE(happened_at, occurred_at, created_at) AS happened_at,
-            date_precision, author, visibility, source_kind
+            date_precision, author, visibility, source_kind, r, mime
        FROM log_entries
       WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         AND substr(COALESCE(happened_at, occurred_at, created_at), 6, 5) = ?
@@ -83,10 +85,23 @@ export async function GET(req: NextRequest) {
   )
   const firstYear = parseInt(firstRow[0]?.y || String(thisYear), 10)
 
-  const years = Array.from(byYear.keys()).sort((a, b) => b - a).map(y => ({
-    year: y,
-    entries: byYear.get(y)!,
-  }))
+  // `onthisday.html`'s `.ph` — the pictures from that day, beside the line
+  // rather than described in it. Only the rows that survived the grouping
+  // are signed, the lesson the feed learned; and a HELD row is never signed
+  // at all, because the log has not looked at it and every failure path
+  // holds back (SPEC §0.2).
+  const years = await Promise.all(
+    Array.from(byYear.keys()).sort((a, b) => b - a).map(async y => ({
+      year: y,
+      entries: await Promise.all(byYear.get(y)!.map(async r => {
+        let media_url: string | null = null
+        if (r.r && (r.mime || '').startsWith('image/') && r.visibility !== 'held') {
+          try { media_url = await presignGetUrl(env, r.r, 24 * 3600) } catch { media_url = null }
+        }
+        return { ...r, media_url }
+      })),
+    })),
+  )
 
   // How many years in the log's own span have nothing on this date.
   const span = Math.max(0, thisYear - firstYear + 1)

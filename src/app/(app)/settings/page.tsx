@@ -27,6 +27,7 @@ import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
 import { FreeStuckButton } from './FreeStuckButton'
 import { OperatorSentence } from './OperatorSentence'
+import { SameAs } from './SameAs'
 import { Retranscribe } from './Retranscribe'
 import { StartAgain } from './StartAgain'
 
@@ -65,6 +66,16 @@ export default async function SettingsPage() {
 
         <div className="sh"><span>you</span></div>
         <OperatorSentence/>
+
+        {/* `dossier.html`'s "where else to find me". /facts emits these as
+            `sameAs`, which is what makes its Person block a claim a machine
+            can check somewhere else rather than a page vouching for itself.
+            Typed, never looked up: there is no connector. */}
+        <div className="sh">
+          <span>where else to find you</span>
+          <b>the facts page publishes these as yours</b>
+        </div>
+        <SameAs/>
 
         <div className="sh"><span>where it is kept</span></div>
         <div className="doors">

@@ -35,6 +35,7 @@ export default function Numbers() {
   const [numbers, setNumbers] = useState<LogNumber[]>([])
   const [span, setSpan] = useState<{ first: string | null; last: string | null }>({ first: null, last: null })
   const [changed, setChanged] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -87,6 +88,15 @@ export default function Numbers() {
                 counted by attached.
               </p>
             </section>
+            {/* `numbers.html` puts a freshness pill under the opener. Its
+                own says "recounts nightly"; these are counted on read, which
+                is a stronger claim and a different one, so it says that. */}
+            {!loading && (
+              <div className="fresh">
+                <i />
+                counted just now, on this request · <time>every load</time>
+              </div>
+            )}
         <OwnerStrip signedIn={!loading} />
         <Stamp at={changed} unlisted />
 
@@ -94,16 +104,41 @@ export default function Numbers() {
 
         {loading && <div className="none">Counting.</div>}
 
+        {/* ⚠️ `.n` is the ROW — a two-column grid, 200px for the figure and
+            the rest for what it was counted by. It was on the figure itself,
+            under a `.num` wrapper no stylesheet defines, so the row had no
+            grid and the number carried the row's padding. `.big` is the
+            figure, which is where the mono 44px lives. */}
         {numbers.map(n => (
-          <div className={`num${n.value === 0 ? ' soon' : ''}`} key={n.key}>
-            <div className="n">
+          <div className={`n${n.value === 0 ? ' soon' : ''}`} key={n.key} id={n.key}>
+            <div className="big">
               {n.value.toLocaleString('en-GB')}
               {n.unit && <small>{n.unit}</small>}
             </div>
             <div>
               <div className="x">{n.label}</div>
               <div className="how">{n.counted}</div>
-              <div className="meta"><span className="mn">counted on read</span></div>
+              <div className="meta">
+                <span className="mn">counted on read</span>
+                {/* `numbers.html`'s "quote with source". It puts the figure,
+                    the rule it was counted by and the address on the
+                    clipboard — the whole point of this page is that a number
+                    never travels without the rule, and copying just the
+                    number is how that gets lost. Nothing is written: every
+                    part of the line is already on screen. */}
+                <button
+                  className="q"
+                  onClick={() => {
+                    const line = `${n.value.toLocaleString('en-GB')}${n.unit ? ` ${n.unit}` : ''} — ${n.label} ${n.counted} (neolog, /numbers#${n.key})`
+                    void navigator.clipboard?.writeText(line).then(
+                      () => setCopied(n.key),
+                      () => setCopied(null),
+                    )
+                  }}
+                >
+                  {copied === n.key ? 'copied, with the rule' : 'quote with source'}
+                </button>
+              </div>
             </div>
           </div>
         ))}

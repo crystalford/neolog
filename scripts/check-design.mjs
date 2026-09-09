@@ -72,7 +72,17 @@ const PAGES = [
   // the log having an opinion about which of his own words matter most.
   ['search',     'src/app/(app)/search/page.tsx',       1],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
-  ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
+  // 4 → 1 on 9 Sep. ⚠️ The year headings were `.idxband`, which is /pages'
+  // index band — a page taking another page's furniture. onthisday.html has
+  // its own: `.yr` is the block and `.y` the year, and `.yr` is a two-column
+  // grid, so with the rows as direct children a year with two entries put
+  // the second one back in the year column. `.ph` is the day's pictures,
+  // beside the line rather than described in it; a held row is sent no URL.
+  // ⚠️ `.m` — "from memory · ±3 months" — is structurally impossible here
+  // and stays. This page selects `date_precision IN ('exact','day')`,
+  // because a guessed day has no business on the one surface whose whole
+  // discipline is not saying.
+  ['onthisday',  'src/app/(app)/onthisday/page.tsx',     1],
   // 5 → 0 on 9 Sep. `clear.html`'s phone (`.ph` holding a `.scr`) had every
   // rule in globals.css since the page was built and was rendered by
   // nothing — the page put a `.big` line in the main column instead, so the
@@ -108,7 +118,19 @@ const PAGES = [
   // and a purpose — being found by machines — that sits badly against §0
   // rule 7, "you never write something down because it would look good in
   // public".
-  ['dossier',    'src/app/(app)/facts/page.tsx',         3],
+  // 3 → 1 on 9 Sep. `.same`/`.sa` is "where else to find me — so a machine
+  // knows these are all one person", and it is `sameAs` in this page's
+  // Person block, the one field that turns a page about a person into a
+  // claim checkable somewhere else. `operator.same_as_json`, typed in
+  // Settings: nothing is looked up and there is no connector.
+  // ⚠️ The design also lists the places he has NOT linked as gaps to fill,
+  // which is the log telling him to go and make accounts — an offer. What is
+  // missing is said once, as a state, not as a to-do list.
+  // ⚠️ `.meta` stays. It is the dated provenance under a "What I think"
+  // quote, and deciding which of his sentences are his POSITIONS is the log
+  // deciding what is significant in his life — the refusal that removed page
+  // seeding from `entities`. This page shows what the log can STATE.
+  ['dossier',    'src/app/(app)/facts/page.tsx',         1],
   // Its last five are .was (the struck previous wording of a changed
   // claim) and .eg (an example of a machine rephrasing a line) — both need
   // data this product does not keep.
@@ -124,7 +146,16 @@ const PAGES = [
   // this page cannot and should not reach zero. /search is where a written
   // answer lives, and it citation-checks every sentence first.
   ['asks',       'src/app/(app)/asks/page.tsx',          4],
-  ['numbers',    'src/app/(app)/numbers/page.tsx',       3],
+  // 3 → 0 on 9 Sep. ⚠️ `.n` is the ROW — a 200px + 1fr grid — and it was on
+  // the figure, under a `.num` wrapper no stylesheet defines. So the row had
+  // no grid and the number carried the row's padding. `.big` is the figure.
+  // `.fresh` says when these were counted, and says the true thing rather
+  // than the design's: counted on this request, not recounted nightly.
+  // `.q` — "quote with source" — puts the figure AND the rule it was counted
+  // by on the clipboard. The whole point of this page is that a number never
+  // travels without its rule, and copying the number alone is how that is
+  // lost.
+  ['numbers',    'src/app/(app)/numbers/page.tsx',       0],
   // Five of its remaining eight must STAY missing: mic, opts and or are
   // the composer, and yl/yrs are the coverage bar. SPEC §3 — "Not on the
   // public side: the coverage bar (the operator's instrument; it advertises

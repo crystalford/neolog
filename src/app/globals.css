@@ -2684,6 +2684,9 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-onthisday .yr .x em a { color:var(--fg-3); border-bottom:1px solid var(--line-2); }
 .logpage.pg-onthisday .yr .ph { display:flex; gap:5px; margin-top:10px; }
 .logpage.pg-onthisday .yr .ph i { display:block; width:72px; height:72px; border-radius:6px; border:1px solid var(--line-1); background:linear-gradient(150deg,#1a1a1a,#0a0a0a); }
+/* The design's `.ph i` is an empty placeholder — it is a mock. Here there is
+   a real picture, at the same size. An addition, not a changed rule. */
+.logpage.pg-onthisday .yr .ph img { display:block; width:72px; height:72px; border-radius:6px; border:1px solid var(--line-1); object-fit:cover; }
 .logpage.pg-onthisday .yr.none .x { color:var(--fg-4); font-size:15px; }
 .logpage.pg-onthisday .yr.none .y b { color:var(--fg-4); }
 .logpage.pg-onthisday .rail { margin-top:28px; padding:14px 18px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1); display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; }
@@ -3288,6 +3291,9 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-numbers .n .meta span { white-space:nowrap; }
 .logpage.pg-numbers .n .meta time, .logpage.pg-numbers .n .meta .mn { font-family:var(--mono); font-size:11px; color:var(--fg-3); font-weight:400; }
 .logpage.pg-numbers .n .meta .q { color:var(--fg-3); border-bottom:1px solid var(--line-2); }
+/* The design's `.q` is a link; here it copies, so it is a button. Undoing
+   what the UA sets on one — nothing else about it changes. */
+.logpage.pg-numbers .n .meta .q { background:none; border-top:0; border-left:0; border-right:0; border-radius:0; padding:0; cursor:pointer; }
 .logpage.pg-numbers .n .meta .q:hover { color:var(--fg); }
 .logpage.pg-numbers .n.soon .big { color:var(--fg-4); }
 .logpage.pg-numbers .n.soon .x { color:var(--fg-2); }

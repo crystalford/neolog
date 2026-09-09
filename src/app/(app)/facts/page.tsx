@@ -39,7 +39,10 @@ interface Row {
   href: string
 }
 interface Result {
-  person: { name: string | null; handle: string | null; sentence: string | null }
+  person: {
+    name: string | null; handle: string | null; sentence: string | null
+    same_as: { kind: string; url: string }[]
+  }
   roles: Row[]
   names: Row[]
   record: { first_at: string | null; last_at: string | null; days: number }
@@ -81,6 +84,10 @@ export default function Facts() {
       '@type': 'Person',
       name: r.person.name,
       ...(r.person.sentence ? { description: r.person.sentence } : {}),
+      // The one field this schema block exists for. Every url here was typed
+      // by him; a `sameAs` the log guessed would attach a stranger's account
+      // to his name in a format built to be trusted.
+      ...(r.person.same_as?.length ? { sameAs: r.person.same_as.map(x => x.url) } : {}),
       // Only what has a row behind it. No inferred affiliations.
       ...(r.roles.length
         ? { knowsAbout: r.roles.map(x => x.name) }
@@ -144,6 +151,38 @@ export default function Facts() {
                   against what he said, and a marked guess about someone real
                   has no such source. <Link href="/settings">Settings</Link> is
                   where he writes it.
+                </p>
+              )}
+            </section>
+
+            {/* `dossier.html`: "Where else to find me — so a machine knows
+                these are all one person." It is `sameAs` in the block above,
+                and the section is where it comes from. Nothing is looked up
+                and there is no connector: he types them in Settings.
+                ⚠️ The design also lists the places he has NOT linked —
+                wikidata, linkedin — as gaps. That is the log telling him to
+                go and make accounts, which is an offer. What is missing is
+                said as a count, not as a to-do list. */}
+            <section className="sec">
+              <div className="sh">
+                <span>Where else to find him</span>
+                <b>so a machine knows these are all one person</b>
+              </div>
+              {(r?.person.same_as.length ?? 0) > 0 ? (
+                <div className="same">
+                  {r!.person.same_as.map(x => (
+                    <a className="sa" key={x.url} href={x.url} rel="me noopener" target="_blank">
+                      <span className="k">{x.kind}</span>
+                      <span className="v">{x.url.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                      <span className="s">linked</span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="csn">
+                  Nowhere yet. A person who appears only on their own site is,
+                  to a machine reading it, one unverified claim.{' '}
+                  <Link href="/settings">Settings</Link> is where he adds them.
                 </p>
               )}
             </section>

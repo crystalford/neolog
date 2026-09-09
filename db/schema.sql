@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS operator (
   -- is append-only and still runs, so an existing database keeps the column;
   -- this file is what a FRESH one is built from, and it should not name a
   -- feature that does not exist.
+  -- Where else to find him, as a JSON array of { kind, url }. `sameAs` in
+  -- the Person schema on /facts. He types them; nothing is looked up.
+  same_as_json              TEXT,
   public_share_enabled      INTEGER NOT NULL DEFAULT 0,
   created_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -1650,6 +1650,14 @@ export const MIGRATIONS: Migration[] = [
     sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_operator
             ON entry_revisions(operator_id, created_at DESC)`,
   },
+
+  // Where else to find him. `dossier.html`: "so a machine knows these are
+  // all one person" — it is `sameAs` in the Person schema, and /facts had no
+  // source for it. He types them; nothing is looked up, and there is no
+  // connector. A JSON array of { kind, url }, on the operator row, because
+  // it is one fact about one person and a table for it would be schema
+  // before necessity.
+  { name: '2026-09-09_operator_same_as', sql: `ALTER TABLE operator ADD COLUMN same_as_json TEXT` },
 ]
 
 // `no such table` is deliberately NOT here. That is how a table which failed
