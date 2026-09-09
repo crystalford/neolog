@@ -36,7 +36,11 @@ CREATE TABLE IF NOT EXISTS operator (
   background                TEXT,
   current_focus             TEXT,
   tz                        TEXT DEFAULT 'America/Toronto',
-  default_voice_profile_id  TEXT,
+  -- default_voice_profile_id removed 9 Sep: it pointed at `voice_profiles`,
+  -- dropped on 8 Sep with voice cloning. The 2026-xx migration that added it
+  -- is append-only and still runs, so an existing database keeps the column;
+  -- this file is what a FRESH one is built from, and it should not name a
+  -- feature that does not exist.
   public_share_enabled      INTEGER NOT NULL DEFAULT 0,
   created_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
