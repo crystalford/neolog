@@ -476,6 +476,59 @@ knows because it called an operator-only endpoint; when one of these is
 served on a public path, that flag becomes false for a stranger with no
 change here.
 
+### ⚠️ `/search` said nothing about the four hundred it could not see
+
+Retrieval is keyword over `log_entries` and `transcript_words`. A recording
+with no word timings is in neither, so it is **not searched** — that is not
+"no match", it is *not looked at*. With four hundred untranscribed
+recordings that is nearly the whole corpus, and the page returned an answer
+that read as an answer about the log.
+
+`search()` counts them and the page says so. ⚠️ **It is a COUNT, and that is
+the whole distinction.** `search.html`'s `.h thin` row names a particular
+untranscribed file under the query — *"this file might be relevant… the batch
+page guessed it could mention it"* — and to name one the log has to decide
+which unread recording bears on this question. It cannot: it has not read any
+of them. That is the fence `/footage` draws in the same words. **How many it
+could not see is a fact; which one matters is a guess.**
+
+`search.html` also offers three orders — *by date · by relevance · said
+only*. **Two are built.** A relevance order is the log having an opinion
+about which of his own words matter most.
+
+### A mark on the feed for an entry that is on a route
+
+`/walk/[id]` shipped and nothing on the log pointed at it. `log.css` has the
+mark — `.en .x .tags i.ch`, *"in a chain"*, in steel — and it was the only
+one of the tag tones never written.
+
+`/api/v2/log` sets it in **one query over the window's ids**, not one per
+row: an entry is on a route if it led from something, or if something led
+from it. ⚠️ **A reflection's `led_from` does not count.** SPEC §1 says a later
+thought about an earlier event never becomes a second event — it is a layer
+under its target, not a turn — and the walk follows turns.
+
+It is a tag, not a link. SPEC §11: two gestures on a row, and only two.
+
+### Where else to find him — the field `/facts`' Person block was missing
+
+`dossier.html` §"Where else to find me": *"so a machine knows these are all
+one person."* That is `sameAs`, the one field that turns a page about a
+person into a claim checkable somewhere else rather than a page vouching for
+itself — and there was no source for it.
+
+`operator.same_as_json` is that source: a JSON array of `{ kind, url }`, on
+the operator row rather than in a table, because it is one fact about one
+person and a table would be schema before necessity (§0 rule 5). Typed in
+Settings. ⚠️ **Nothing is looked up and there is no connector** — the same
+rule correspondence follows, for the same reason: a url the log guessed would
+attach a stranger's account to his name in a format built to be trusted. Both
+ends validate `http(s)` and drop the rest.
+
+⚠️ The design also lists the places he has NOT linked — wikidata, linkedin —
+as gaps to fill. That is the log telling him to go and make accounts, which
+is the offer. What is missing is said once, as a state.
+
 ### Fixing what the machine misheard
 
 `fix.html`. `PATCH /api/v2/vlogs/[id]/transcript-words`, the transcript on
@@ -1736,6 +1789,24 @@ Everything the generic rule sets and the design does not mention survives.
 | `.msg` | the earlier chat bubble, `max-width:82%` | `/messages`'s two-column row | every message 100px narrow, 40px tall |
 | `.fold` | the home page's folded-period row | `/writing`'s footer strip | a 50px strip rendering at 154px |
 | `.turn` | the entry page's came-out-of card | `/walk`'s "came from the log" step | **the one this file already warned about** — one step boxed, 30px narrow, 26px tall |
+| `.route` | — | `/walk`'s BOX around the header and every step | it was on the little label line inside `.hd`, so the walk had no frame and a caption had one |
+| `.own` | — | `/walk`'s steel-bordered "the log's own making" SECTION | it was on a `.prov` comparison column, so one column rendered inside a gradient box |
+| `.n` | — | `/numbers`' ROW, a 200px + 1fr grid | it was on the FIGURE, under a `.num` wrapper no stylesheet defines: every row had no grid and every number carried the row's padding |
+| `.body` | `/messages`' section wrapper | a message's own text | nested inside itself — a message took a container's styling |
+| `.paper` | `/screenshots`' paperwork ROW | used as the container, with `.im` as the card | the design's two shapes inverted |
+| `.idxband` | `/pages`' index band | `/onthisday`'s year heading | a page wearing another page's furniture; `.yr`/`.y` are its own |
+
+⚠️ **One of those is not a collision but its mirror: a class that was BUILT
+and unreadable.** `/walk`'s step set its className as three template literals
+joined with `+`, and `check-design.mjs`'s regex wants the backtick right
+after `className={` — so `.turn`, the one class this file had warned about
+since 8 Sep, reported as *unbuilt* while rendering correctly. `.priv` on the
+feed was the same shape for a different reason: `LogRow` set the tag's class
+from `t.tone`, a variable. Both are literals or an indexed map now — the same
+string, formatted so the check can read it. **A check that is wrong about
+what it measured teaches the next reader to skim its output**, which is the
+failure this file records for `check-unreached-lib` and
+`check-dropped-tables` too.
 
 ⚠️ **The last row is the point.** This file has warned since 8 Sep that
 `.logpage .turn` "would box every step" of the walk, and named `.leg` as the
