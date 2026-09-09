@@ -808,6 +808,55 @@ again**. `operator.profile_digest` and `operator.spark_seeds_json` are on the
 list too: a model's description of HIM, read by nothing, which is the state
 to keep.
 
+### ⚠️ The healer could not see a recording stuck in its last step
+
+Five files each declared their own copy of "what counts as in flight", and
+two were short by the same value: `workers/healer` and
+`/api/v2/admin/reset-stuck` both omitted **`reading`** — the pipeline's last
+step since the read path replaced extraction on 8 Sep.
+
+**The healer is the only thing that makes a four-hundred-recording run
+self-recover.** It sweeps every five minutes and re-dispatches anything that
+has been in a step too long, and it could not see a recording wedged in the
+step that puts the words on the log. One that hung there stayed hung, and
+nothing anywhere reported it: `tsc` is happy with a string array,
+`check-sql-columns.mjs` sees a legal column, `check-enum-values.mjs` sees
+legal values. **Every copy was internally valid and one of them was short.**
+
+`src/lib/pipeline-status.ts` is the one list now, imported by all five, the
+way `RELATIONS` is in `log-entry.ts` and for the same reason.
+`scripts/test/pipeline-status.mjs` — 15 assertions, in CI — fails on a sixth
+copy in any form, an array literal or a SQL `IN` list.
+
+⚠️ **Two lists, and the difference is load-bearing.** `IN_FLIGHT_STATUSES` is
+for a job that RE-DISPATCHES; `OCCUPIED_STATUSES` adds `uploaded` and is for
+one that REPORTS or KILLS. A row sits at `uploaded` while the browser is
+still pushing a gigabyte to R2, so re-dispatching there turns a slow upload
+into a broken one. The healer takes the narrow one, and the test says so.
+
+**`reset-stuck-transcoding` keeps its own, wider list** — every label a
+wedged dispatch could have left behind, `processing` and `archived` included.
+That is a different question and it is recorded in the test rather than
+folded in.
+
+Two more found by the same pass:
+
+- **Start again wrote `pipeline_status = 'pending'`**, which is not a value
+  anything recognises. `pipelineLine` in the feed switches over every real
+  status and falls through on that one, so after a reset all four hundred
+  recordings showed **no state line at all** — not "just arrived", not
+  anything. It writes `uploaded` now, which is what they are.
+- **The healer's give-up message said "Click Re-extract on the vlog page"**,
+  and that button went with the extraction dashboard on 8 Sep. A failure
+  message naming a control that does not exist is worse than one naming
+  none; it points at Settings → *transcribe the untranscribed*, which does
+  pick the row up.
+
+`check-enum-values.mjs` now covers `pipeline_status`. ⚠️ It had to learn to
+skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
+read as a literal value, so the shared constant reported as an illegal one,
+which is the opposite of the point.
+
 ### The backend pass — what the old engine left behind
 
 Four things survived the 8 Sep deletion because nothing imported them from a

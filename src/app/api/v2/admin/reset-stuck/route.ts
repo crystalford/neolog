@@ -31,6 +31,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { IN_FLIGHT_STATUSES } from '@/lib/pipeline-status'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -38,7 +39,7 @@ interface Env {
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'uploaded']
+
 
 export async function POST(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env

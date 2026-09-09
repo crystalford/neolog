@@ -52,6 +52,14 @@ const ENUMS = {
   // correspondence_messages
   side:           ['operator', 'other'],
   sent_at_source: ['paste', 'order'],
+  // src/lib/pipeline-status.ts — vlogs.pipeline_status. ⚠️ `processing` is
+  // in this set and is not in IN_FLIGHT_STATUSES: it is a label the legacy
+  // Workflow could leave behind, which reset-stuck-transcoding still has to
+  // recognise, and which nothing writes any more.
+  pipeline_status: [
+    'uploaded', 'transcoding', 'transcribing', 'extracting', 'reading',
+    'processing', 'complete', 'failed', 'archived',
+  ],
 }
 
 /**
@@ -64,6 +72,8 @@ const ENUMS = {
 const SKIP_FILES = new Set([
   // The migration runner declares the defaults; it is the source, not a use.
   'src/lib/migration-runner.ts',
+  // The same, for pipeline_status: this file IS the list.
+  'src/lib/pipeline-status.ts',
 ])
 
 function walk(dir, out = []) {
@@ -98,6 +108,12 @@ for (const file of walk(SRC)) {
         checked++
         const value = m[1]
         if (allowed.includes(value)) continue
+        // ⚠️ An interpolated list is not a literal value. `pipeline_status
+        // IN ('${IN_FLIGHT_STATUSES.join("','")}')` is the one list, built
+        // from `src/lib/pipeline-status.ts` — reading the first fragment of
+        // it as a value reports the shared constant as an illegal one, which
+        // is the opposite of what this check is for.
+        if (/\$\{|\\`/.test(value) || value.includes('${')) continue
         // `typeof body.consent === 'string'` is a type test, not a value
         // comparison — what is being compared there is a JS type name.
         if (kind === 'ts' && /typeof\s+[\w.]*$/.test(text.slice(Math.max(0, m.index - 40), m.index + 1))) continue
@@ -114,6 +130,9 @@ for (const file of walk(SRC)) {
     while ((m = inList.exec(text))) {
       const values = [...m[1].matchAll(/'([^']*)'/g)].map(x => x[1])
       const line = text.slice(0, m.index).split('\n').length
+      // Same guard as above: an interpolated list is the shared constant,
+      // not a literal value.
+      if (m[1].includes('${')) continue
       for (const value of values) {
         checked++
         if (allowed.includes(value)) continue

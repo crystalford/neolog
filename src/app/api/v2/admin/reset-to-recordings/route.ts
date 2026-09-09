@@ -132,8 +132,15 @@ export async function POST(req: NextRequest) {
   for (const col of VLOG_DERIVED) {
     try { await run(db, `UPDATE vlogs SET ${col} = NULL WHERE operator_id = ?`, operator.id) } catch { /* column may not exist */ }
   }
+  // ⚠️ This wrote `'pending'`, which is not a status anything recognises.
+  // `pipelineLine` in the feed switches over every real value and falls
+  // through to null on that one, so after Start again all four hundred
+  // recordings showed no state at all — not "just arrived", not anything.
+  // `uploaded` is what they actually are: the file is in R2 and nothing has
+  // been read out of it, which is the state that says "Just arrived. Nothing
+  // read yet." `scripts/check-enum-values.mjs` now holds this column.
   try {
-    await run(db, `UPDATE vlogs SET pipeline_status = 'pending' WHERE operator_id = ?`, operator.id)
+    await run(db, `UPDATE vlogs SET pipeline_status = 'uploaded' WHERE operator_id = ?`, operator.id)
   } catch { /* fine */ }
   for (const col of OPERATOR_DERIVED) {
     try { await run(db, `UPDATE operator SET ${col} = NULL WHERE id = ?`, operator.id) } catch { /* fine */ }

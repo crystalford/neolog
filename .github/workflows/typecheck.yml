@@ -131,6 +131,15 @@ jobs:
       - name: A cut loses no words, and nothing rebuilds over one
         run: node scripts/test/split-entry.mjs
 
+      # Five files each held their own copy of "what counts as in flight",
+      # and two were short by `reading` — the pipeline's last step. The healer
+      # is the only thing that makes a four-hundred-recording run
+      # self-recover, and it could not see a recording wedged in that step.
+      # Every copy was internally valid and one was short, which is why the
+      # only defence is that there be one copy.
+      - name: One list of pipeline statuses, imported everywhere
+        run: node scripts/test/pipeline-status.mjs
+
       # The same shape as check-unreached-routes.mjs, one level down.
       # src/lib/vision.ts had NO importer: both functions written, tested
       # against the schema, reached by nothing — so vision_status stayed

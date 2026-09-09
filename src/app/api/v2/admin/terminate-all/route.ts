@@ -36,6 +36,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { OCCUPIED_STATUSES as IN_FLIGHT_STATUSES } from '@/lib/pipeline-status'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -48,7 +49,7 @@ interface Env {
 }
 
 const WORKFLOW_NAME = 'process-upload'
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading', 'uploaded']
+
 const PAGE_SIZE = 100  // Cloudflare API pagination
 const MAX_PAGES = 20   // hard cap so we never spin forever
 

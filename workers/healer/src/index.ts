@@ -22,6 +22,8 @@ import type {
   ScheduledController,
 } from '@cloudflare/workers-types'
 
+import { IN_FLIGHT_STATUSES } from '../../../src/lib/pipeline-status'
+
 interface Env {
   DB: D1Database
   PROCESS_UPLOAD: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
@@ -29,7 +31,20 @@ interface Env {
   HEARTBEAT_TOKEN?: string
 }
 
-const STUCK_STATUSES = ['transcoding', 'transcribing', 'extracting'] as const
+/**
+ * ⚠️ Imported, never re-declared. This list was one of five copies and it was
+ * short: `reading` — the pipeline's last step since the read path replaced
+ * extraction on 8 Sep — was missing, and the healer is the only thing that
+ * makes a four-hundred-recording run self-recover. A recording that hung on
+ * the way onto the log stayed hung, forever, with nothing re-dispatching it,
+ * and nothing anywhere reported it: every copy was internally valid and one
+ * was short. `src/lib/pipeline-status.ts` is the one list now.
+ *
+ * ⚠️ `IN_FLIGHT_STATUSES`, not `OCCUPIED_STATUSES`. This job RE-DISPATCHES,
+ * and `uploaded` covers a row the browser is still pushing bytes into —
+ * re-dispatching there turns a slow upload into a broken one.
+ */
+const STUCK_STATUSES = IN_FLIGHT_STATUSES
 // Base stuck threshold. Large files (>500 MB) get a longer grace window
 // since their FFmpeg audio extract + Whisper transcribe can legitimately
 // take 15-20 min on a 1+ GB vlog.
@@ -118,9 +133,15 @@ async function sweep(env: Env): Promise<{
                   updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
         ).bind(
+          // ⚠️ This used to say "Click Re-extract on the vlog page", and
+          // that button went with the extraction dashboard on 8 Sep. A
+          // failure message naming a control that does not exist is worse
+          // than one naming none. What DOES retry this row is Settings →
+          // transcribe the untranscribed: a failed row is not 'complete',
+          // so the dry run picks it up.
           `Auto-restart limit reached (${MAX_RESTARTS} attempts). ` +
           `Was stuck in '${row.pipeline_status}' since ${row.updated_at}. ` +
-          `Click Re-extract on the vlog page to retry manually.`,
+          `Settings → "transcribe the untranscribed" will send it again.`,
           row.id,
         ).run()
         result.marked_failed.push(row.id)

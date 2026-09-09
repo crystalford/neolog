@@ -42,6 +42,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { OCCUPIED_STATUSES as IN_FLIGHT_STATUSES } from '@/lib/pipeline-status'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -50,7 +51,7 @@ interface Env {
 }
 
 const STUCK_MIN_MINUTES = 5
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading', 'uploaded']
+
 
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
