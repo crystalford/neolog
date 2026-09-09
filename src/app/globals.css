@@ -857,6 +857,10 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .en .x .tags i.pub  { color: var(--t-teal); }
 .logpage .en .x .tags i.priv { color: var(--t-ochre); }
 .logpage .en .x .tags i.held { color: var(--t-terra); }
+/* log.css `.en .x .tags i.ch` — "in a chain", in steel. Not a state of the
+   entry the way private and held are: it says this one came out of another
+   and has a route to be read on. */
+.logpage .en .x .tags i.ch { color: var(--t-steel); }
 .logpage .en .more {
   margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: var(--fg-3);
   max-width: 640px; text-wrap: pretty;
@@ -1268,6 +1272,19 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 @keyframes nowfade { from { opacity: 0; } }
 /* The slab settles, and one line says what went in. */
 .nowpage .slab.sent { transform: translateY(-10px) scale(.99); opacity: .35; }
+/* now.css `.slab .pulse` — a teal line that crosses the slab once when the
+   note goes in. The receipt at its quietest: this screen has no feed to show
+   the new row on, so this is the one line saying what happened.
+   ⚠️ The keyframes are `nowpx`, not `px`: one stylesheet serves 23 pages and
+   cannot hold four `@keyframes` of the same name — the same rename the other
+   four on this page carry, recorded in check-design-css.mjs's budget. */
+.nowpage .slab .pulse {
+  position: absolute; top: 0; left: 0; width: 22%; height: 1px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--t-teal), transparent);
+  opacity: 0; pointer-events: none; z-index: 2;
+}
+.nowpage .slab.sent .pulse { animation: nowpx .9s cubic-bezier(.4, 0, .2, 1) forwards; }
+@keyframes nowpx { 0% { left: -22%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
 .nowpage .slab.sent textarea { opacity: 0; transform: translateY(-6px); transition: opacity .25s, transform .25s; }
 .nowpage .ack {
   position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%);

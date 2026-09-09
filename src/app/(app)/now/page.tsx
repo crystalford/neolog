@@ -204,6 +204,12 @@ export default function NowPage() {
           ref={slabRef}
           onPointerMove={onPointerMove}
         >
+          {/* `now.html`'s `.pulse` — a teal line that crosses the slab once
+              when a note goes in. `.slab.sent .pulse` runs it; nothing here
+              decides when. It is the receipt at its quietest: §0 rule 6 is
+              one line saying what happened and then silence, and on the
+              screen with no feed to show the new row, this is that line. */}
+          <i className="pulse" />
           <span className={`ack${ack ? ' show' : ''}`}>{ack || 'in'}</span>
           <div className="in">
             {pending.length > 0 && (

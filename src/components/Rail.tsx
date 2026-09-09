@@ -20,7 +20,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 export function Rail(
-  { goesTo, lead }: {
+  { goesTo, lead, foot }: {
     goesTo?: { href: string; label: ReactNode }[]
     /**
      * A card above **Goes to**, for a page whose design puts one there —
@@ -28,6 +28,12 @@ export function Rail(
      * second component so the two doors below it stay identical everywhere.
      */
     lead?: ReactNode
+    /**
+     * A note UNDER the cards, for a page whose design puts one there —
+     * `triage.html`'s "Nothing waits on this." It sits outside the card
+     * stack because it is about the page, not a door off it.
+     */
+    foot?: ReactNode
   },
 ) {
   return (
@@ -50,6 +56,7 @@ export function Rail(
           <Link href="/everything">every page</Link>
         </div>
       </div>
+      {foot}
     </aside>
   )
 }

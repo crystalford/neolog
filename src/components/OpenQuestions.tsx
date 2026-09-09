@@ -122,10 +122,29 @@ export function OpenQuestions({ onAnswered }: { onAnswered?: () => void }) {
         </div>
       </div>
 
+      {/* `log.html` gives every open question its own two answers, not
+          just the one at the top: `.a` is that row. "Don't remember" is a
+          complete answer and closes the question for good — the rest were
+          listed with no way to say it, so the only way to clear one was to
+          answer it. ⚠️ The design's third button is "Talk it out", which is
+          the offer and stays below the fence. */}
       {rest.map(q => (
         <div className="i" key={q.id}>
           <b>{q.question}</b>
           {q.because && <em>{q.because}</em>}
+          <div className="a">
+            <button
+              className="p"
+              disabled={busy}
+              onClick={() => void answer(q.id, { dont_remember: true })}
+            >
+              Don&rsquo;t remember
+            </button>
+            <a
+              href="#"
+              onClick={e => { e.preventDefault(); if (!busy) void answer(q.id, { dismiss: true }) }}
+            >leave it</a>
+          </div>
         </div>
       ))}
     </div>

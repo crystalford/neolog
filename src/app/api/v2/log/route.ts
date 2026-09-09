@@ -235,6 +235,33 @@ export async function GET(req: NextRequest) {
 
   const items: LogEntry[] = []
 
+  // ── Which of these are on a route ────────────────────────────────────────
+  // `log.html` marks a row "in a chain" in steel. An entry is on one if it
+  // led from something, or if something led from it. The first half is on
+  // the row already; the second is one query over the ids in this window,
+  // not one per row — the lesson the fold learned when it ran a query per
+  // bucket.
+  //
+  // ⚠️ A REFLECTION's led_from is not a chain. SPEC §1: a later thought
+  // about an earlier event "never becomes a second event", so it is a layer
+  // under its target, not a turn on a route. The walk follows turns.
+  const onRoute = new Set<string>()
+  for (const r of entryRows) {
+    if (r.led_from && r.relation !== REFLECTS) onRoute.add(r.id)
+  }
+  if (entryRows.length) {
+    const ids = entryRows.map(r => r.id)
+    const ph = ids.map(() => '?').join(',')
+    const leads = await findMany<{ led_from: string }>(
+      db,
+      `SELECT DISTINCT led_from FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND relation <> ? AND led_from IN (${ph})`,
+      operator.id, REFLECTS, ...ids,
+    )
+    for (const l of leads) if (l.led_from) onRoute.add(l.led_from)
+  }
+
   // A reflection never becomes a second event, so it is lifted out of the
   // list and attached to what it is about. One whose target is not in this
   // window falls back to being its own row — better a row out of place than
@@ -284,6 +311,7 @@ export async function GET(req: NextRequest) {
       vlog_id: r.vlog_id,
       source_ref: r.source_ref,
       layers: layersFor.get(r.id),
+      on_route: onRoute.has(r.id),
       searchable: [r.text, r.detail, r.transcript, r.link_url, r.original_filename]
         .filter(Boolean).join(' ').toLowerCase(),
     })

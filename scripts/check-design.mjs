@@ -37,7 +37,22 @@ import { readFileSync, existsSync } from 'node:fs'
 
 /** page in design/ → the route file that must match it → today's ceiling. */
 const PAGES = [
-  ['log',        'src/app/(app)/page.tsx',              3],
+  // 3 → 0 on 9 Sep.
+  // ⚠️ `.priv` was RENDERING and reported as unbuilt: `LogRow` set the tag's
+  // class from `t.tone`, a variable, and this check reads only literals. It
+  // goes through a map indexed inside the className now — the idiom /pages
+  // already uses for its five kinds.
+  // ⚠️ `.ch` — "in a chain" — was genuinely missing, and with it the only
+  // sign on the feed that an entry is a turn on a route. `/api/v2/log` marks
+  // a row that led from something or that something led from, in ONE query
+  // over the window's ids rather than one per row. A REFLECTION's led_from
+  // does not count: SPEC §1 says a later thought never becomes a second
+  // event, so it is a layer, not a turn.
+  // `.a` gives every open question its two answers, not just the one at the
+  // top — "don't remember" is a complete answer and the rest were listed
+  // with no way to say it. The design's third button is "Talk it out",
+  // which is the offer and stays below the fence.
+  ['log',        'src/app/(app)/page.tsx',              0],
   ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         0],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
@@ -64,7 +79,13 @@ const PAGES = [
   // surface whose whole job is to say "these are safe to delete" said it in
   // prose beside a list.
   ['clear',      'src/app/(app)/clear/page.tsx',        0],
-  ['triage',     'src/app/(app)/triage/page.tsx',       2],
+  // 2 → 0 on 9 Sep. ⚠️ `.in` is where triage.html puts the card's padding
+  // (`.card .in{padding:16px 20px}`) so the picture can run to the card's
+  // edge while the words do not — without it the words sat against the
+  // border. `.rule` is the closing note in the rail, and it is the page's
+  // whole disposition: nothing is blocked on this, there is no badge, and
+  // skipping it costs nothing.
+  ['triage',     'src/app/(app)/triage/page.tsx',       0],
   // takeout.html — "everything out, and the bill" — is this page.
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
   // from the log"): what the Markdown looks like, not a route.
@@ -183,7 +204,10 @@ const PAGES = [
   // warned about since 8 Sep reported as unbuilt while rendering correctly.
   // One literal now: the same string, formatted so the check can read it.
   ['walk',       'src/app/(app)/walk/[id]/page.tsx',     0],
-  ['now',        'src/app/(app)/now/page.tsx',           1],
+  // 1 → 0 on 9 Sep: `.pulse`, the teal line that crosses the slab once when
+  // a note goes in. On the one screen with no feed to show the new row, that
+  // is the receipt — §0 rule 6, one line saying what happened, then silence.
+  ['now',        'src/app/(app)/now/page.tsx',           0],
   ['connections','src/app/(app)/ways-in/page.tsx',      10],
   // wrong.html is three sections and only the middle one is product. §1's
   // five worked cases and §3's hard case are `.case` articles with invented

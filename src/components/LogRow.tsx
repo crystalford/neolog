@@ -39,6 +39,20 @@ export function highlight(s: string, q: string): ReactNode {
   return <>{s.slice(0, i)}<mark>{s.slice(i, i + term.length)}</mark>{s.slice(i + term.length)}</>
 }
 
+/**
+ * A tag's tone → the class `log.css` gives it. A map rather than the tone
+ * used directly, because `check-design.mjs` reads only literals and a map it
+ * sees indexed inside a `className` — the idiom `/pages` uses for its five
+ * kinds. `priv` and `ch` were rendering and reported as unbuilt.
+ */
+const TONE_CLASS: Record<string, string | undefined> = {
+  plain: undefined,
+  pub: 'pub',
+  priv: 'priv',
+  held: 'held',
+  ch: 'ch',
+}
+
 export function LogRow({ e, order, q, onImage }: {
   e: LogEntry
   order?: 'happened' | 'logged'
@@ -64,7 +78,7 @@ export function LogRow({ e, order, q, onImage }: {
           <span className="s">{highlight(e.sentence, term)}</span>
           <span className="tags">
             {tags.map((t, i) => (
-              <i key={i} className={t.tone === 'plain' ? undefined : t.tone}>{t.text}</i>
+              <i key={i} className={TONE_CLASS[t.tone]}>{t.text}</i>
             ))}
             {(e.layers?.length || 0) > 0 && (
               <i className="lay">

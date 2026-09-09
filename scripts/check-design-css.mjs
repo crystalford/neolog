@@ -123,8 +123,10 @@ const norm = v => {
 // carries no `.logpage` at all. The dead block is deleted and `.nowpage` is
 // tried first above; what is left is nine items and none of them is drift:
 //
-//   four keyframe RENAMES — nowdrift / nowrise / nowfade / nowpop. One
-//     stylesheet serves 23 pages and cannot hold four `@keyframes fade`.
+//   five keyframe RENAMES — nowdrift / nowrise / nowfade / nowpop / nowpx.
+//     One stylesheet serves 23 pages and cannot hold four `@keyframes fade`.
+//     `nowpx` arrived with `.pulse` on 9 Sep, the line that crosses the slab
+//     when a note goes in — the receipt on the one screen with no feed.
 //   four keyframe STEPS — `from`, `0%`, `50%`, `100%` are compared as bare
 //     selectors, so the first @keyframes block in either file wins and the
 //     two are almost never the same animation.
@@ -135,7 +137,7 @@ const norm = v => {
 //
 // Raising a budget needs a reason in the commit — these are those reasons,
 // kept next to the number so the next session does not "fix" them back.
-const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 9, "takeout": 2, "onthisday": 2, "connections": 2, "wrong": 2}
+const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 10, "takeout": 2, "onthisday": 2, "connections": 2, "wrong": 2}
 
 // No argument: check every page against its budget and exit non-zero on drift.
 if(!process.argv[2]){

@@ -135,6 +135,12 @@ export interface LogEntry {
    * feed — it sits under the thing it is about.
    */
   layers?: { id: string; text: string; at: string }[]
+  /**
+   * This entry is a turn on a route — it led from something, or something
+   * led from it. `log.html` marks the row "in a chain" and the mark is a
+   * door: the walk is where the route is read.
+   */
+  on_route?: boolean
   /** Free-text the search filter reads — includes transcripts the row doesn't show. */
   searchable: string
 }
@@ -279,13 +285,16 @@ export function matchesFilter(e: LogEntry, f: FeedFilter): boolean {
 }
 
 /** The words shown on a row's right edge. Public is deliberately unmarked. */
-export function tagsFor(e: LogEntry): { text: string; tone: 'plain' | 'pub' | 'priv' | 'held' }[] {
-  const out: { text: string; tone: 'plain' | 'pub' | 'priv' | 'held' }[] = []
+export function tagsFor(e: LogEntry): { text: string; tone: 'plain' | 'pub' | 'priv' | 'held' | 'ch' }[] {
+  const out: { text: string; tone: 'plain' | 'pub' | 'priv' | 'held' | 'ch' }[] = []
   if (e.author === 'log') out.push({ text: 'arrived', tone: 'plain' })
   else if (e.kind === 'said' || e.kind === 'ideas') out.push({ text: 'said', tone: 'plain' })
   else out.push({ text: 'did', tone: 'plain' })
   if (isFuzzy(e.date_precision)) out.push({ text: 'from memory', tone: 'plain' })
   if (e.visibility === 'private') out.push({ text: 'private', tone: 'priv' })
   if (e.visibility === 'held') out.push({ text: 'held back', tone: 'held' })
+  // Last, and in steel. It is not a state of the entry the way private and
+  // held are — it says this one came out of another and has somewhere to go.
+  if (e.on_route) out.push({ text: 'in a chain', tone: 'ch' })
   return out
 }

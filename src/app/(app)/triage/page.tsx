@@ -140,18 +140,24 @@ export default function TriagePage() {
                 <audio src={current.media_url} controls preload="none" />
               )}
 
-              <div className="what">{current.text}</div>
-              {current.detail && <div className="med">{current.detail}</div>}
-              <div className="cap">
-                the log&rsquo;s line, from the file · filed on{' '}
-                {stampFor(current.happened_at, current.date_precision)}
-              </div>
+              {/* ⚠️ `.in` is where `triage.html` puts the card's padding —
+                  `.card .in{padding:16px 20px}` — so the picture can run to
+                  the card's edge while the words do not. Without it the
+                  words sat against the border. */}
+              <div className="in">
+                <div className="what">{current.text}</div>
+                {current.detail && <div className="med">{current.detail}</div>}
+                <div className="cap">
+                  the log&rsquo;s line, from the file · filed on{' '}
+                  {stampFor(current.happened_at, current.date_precision)}
+                </div>
 
-              <textarea
-                value={words}
-                onChange={e => setWords(e.target.value)}
-                placeholder="or say what it actually was — your words replace the log's"
-              />
+                <textarea
+                  value={words}
+                  onChange={e => setWords(e.target.value)}
+                  placeholder="or say what it actually was — your words replace the log's"
+                />
+              </div>
 
               <div className="acts">
                 <button onClick={() => void decide('keep')}>
@@ -203,11 +209,24 @@ export default function TriagePage() {
         </div>
           </main>
 
-          <Rail goesTo={[
-            { href: '/', label: 'the log' },
-            { href: '/screenshots', label: 'screenshots' },
-            { href: '/clear', label: 'safe to clear' },
-          ]} />
+          <Rail
+            goesTo={[
+              { href: '/', label: 'the log' },
+              { href: '/screenshots', label: 'screenshots' },
+              { href: '/clear', label: 'safe to clear' },
+            ]}
+            /* `triage.html`'s closing note, in the rail where it puts it.
+               It is the page's whole disposition: nothing is blocked on
+               this, there is no badge, and skipping it costs nothing. */
+            foot={
+              <p className="rule">
+                <b>Nothing waits on this.</b> The pile is a convenience, not
+                an inbox you owe. Ignore it for a year and the log is exactly
+                as complete — just with the log&rsquo;s lines instead of
+                yours.
+              </p>
+            }
+          />
         </div>
       </div>
     </Shell>
