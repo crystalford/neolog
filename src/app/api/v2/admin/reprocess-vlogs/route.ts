@@ -27,7 +27,6 @@
  *     scope?: 'incomplete' | 'all'  // only used when dry_run + no vlog_ids
  *                                   // incomplete = no word timings, or the
  *                                   // pipeline never finished
- *     mode: 'cheap' | 'premium'
  *     dry_run?: boolean             // resolve list only, don't dispatch
  *     skip_in_flight?: boolean      // default true
  *   }
@@ -91,7 +90,6 @@ export async function POST(req: NextRequest) {
     return noStore({ error: 'Invalid JSON body' }, 400)
   }
 
-  const mode: 'cheap' | 'premium' = body?.mode === 'premium' ? 'premium' : 'cheap'
   const scope: 'incomplete' | 'all' = body?.scope === 'all' ? 'all' : 'incomplete'
   const dryRun = body?.dry_run === true
   const skipInFlight = body?.skip_in_flight !== false
@@ -238,12 +236,14 @@ export async function POST(req: NextRequest) {
       return noStore({
         total: ids.length,
         ids,
-        // Split for cost-aware UI: transcribed → /reextract (~$0.02/vlog),
-        // untranscribed → /start (~$0.10/vlog, full pipeline incl. FFmpeg).
+        // A recording with a transcript jumps to the last step; one without
+        // takes the full run through FFmpeg and Whisper. Counted, not
+        // priced — see /api/v2/admin/pipeline-state for why there is no
+        // dollar figure left to quote.
         transcribed_count: transcribed_ids.length,
         untranscribed_count: untranscribed_ids.length,
         skipped_in_flight: inFlightCount,
-        mode, scope,
+        scope,
       })
     } catch (err: any) {
       return noStore(
@@ -354,7 +354,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const res = await dispatchPipeline(env, {
-          vlog_id, operator_id: operator.id, mode,
+          vlog_id, operator_id: operator.id,
           reset: false, // already done above in the batch
           useStart,
         })

@@ -4,11 +4,13 @@
  * Kicks off post-upload processing for a vlog that was either uploaded in
  * archive mode (status='archived') or hit an error and needs a retry.
  *
- * Resets the row to pipeline_status='uploaded' and dispatches the
- * process-upload Cloudflare Workflow. The Workflow is the long-running
- * orchestration that transcodes, extracts thumbnail, transcribes via
- * Workers AI Whisper, and (in a later commit) fans out to the three
- * extraction passes.
+ * Resets the row to pipeline_status='uploaded' and dispatches the pipeline:
+ * transcode, thumbnail, recorded_at, Whisper, and then reading the words
+ * onto the log. There is no extraction fan-out — that went on 8 Sep.
+ *
+ * Body: `{ again: true }` to re-run a recording the pipeline has already
+ * finished. Without it a completed recording is a no-op, so pressing a bulk
+ * button twice costs nothing.
  */
 
 export const runtime = 'edge'
@@ -46,18 +48,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       throw e
     }
 
-    // mode picks the LLM stack: `cheap` = Workers AI (Llama/Kimi),
-    // `premium` = Anthropic Sonnet 5. Two modes only — operator collapsed
-    // the prior free/auto/max picker into this. `tier` is accepted as a
-    // legacy alias so cached client bundles don't break.
+    // ⚠️ `mode`, `tier` and `passes` used to be read here. `mode` picked
+    // between Workers AI and "Anthropic Sonnet 5" — a path nothing reaches,
+    // on a vendor the operator has not opted into — and `passes` named the
+    // four deleted extraction passes. Both are gone; `mode` and `tier` are
+    // still ACCEPTED and ignored, because a cached client bundle sends one.
     const body = await req.json().catch(() => null) as {
-      mode?: 'cheap' | 'premium';
-      tier?: 'free' | 'premium' | 'max' | 'cheap' | 'auto';
-      passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
+      again?: boolean
+      mode?: string
+      tier?: string
     } | null
-    const rawMode = body?.mode ?? body?.tier ?? 'cheap'
-    const mode: 'cheap' | 'premium' = rawMode === 'premium' || rawMode === 'max' ? 'premium' : 'cheap'
-    const passes = body?.passes
+    const again = body?.again === true || body?.mode != null || body?.tier != null
 
     const db = getDb(env)
     const vlog = await findOne<{ id: string; pipeline_status: string }>(
@@ -67,16 +68,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     )
     if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    if (vlog.pipeline_status === 'complete' && !body?.mode && !body?.tier) {
-      // No-op only when caller didn't ask for a specific re-run.
+    if (vlog.pipeline_status === 'complete' && !again) {
+      // No-op unless the caller asked for a re-run, so pressing a bulk
+      // button twice costs nothing.
       return NextResponse.json({ ok: true, already_complete: true })
     }
 
     const result = await dispatchPipeline(env, {
       vlog_id: params.id,
       operator_id: operator.id,
-      mode,
-      passes,
     })
     if (!result.ok) {
       return NextResponse.json(

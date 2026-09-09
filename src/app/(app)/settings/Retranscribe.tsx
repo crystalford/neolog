@@ -56,7 +56,7 @@ export function Retranscribe() {
       const dry = await fetch('/api/v2/admin/reprocess-vlogs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: true, scope: 'incomplete', mode: 'cheap' }),
+        body: JSON.stringify({ dry_run: true, scope: 'incomplete' }),
       })
       if (!dry.ok) { setNote('could not work out which need it'); return }
       const { ids = [] } = await dry.json() as { ids?: string[] }
@@ -67,7 +67,7 @@ export function Retranscribe() {
         const res = await fetch('/api/v2/admin/reprocess-vlogs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vlog_ids: ids.slice(i, i + 10), mode: 'cheap' }),
+          body: JSON.stringify({ vlog_ids: ids.slice(i, i + 10) }),
         })
         if (!res.ok) break
         const j = await res.json() as { dispatched?: number }

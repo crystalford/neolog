@@ -22,9 +22,9 @@
  * byte/chunk/token-level progress on /timeline/[id].
  *
  * Entry points (host worker /fetch handler routes by path prefix):
- *   POST /start/:vlog_id         Kick a new pipeline. Body: { operator_id, mode? }
- *   POST /reextract/:vlog_id     Skip to extract step (override the prior run).
- *                                Body: { operator_id, mode? }
+ *   POST /start/:vlog_id         Kick a new pipeline. Body: { operator_id }
+ *   POST /reextract/:vlog_id     Skip to the last step — reading the words
+ *                                onto the log. Body: { operator_id }
  *   POST /heal/:vlog_id          Healer cron re-kicks a stuck pipeline.
  *   POST /event/:vlog_id         Heartbeat ingest (container, internal use).
  *                                Authed via X-Heartbeat-Token.
@@ -376,8 +376,7 @@ interface VlogRow {
 
 interface StartParams {
   operator_id?: string
-  /** Vestigial: there are no extraction modes left. */
-  mode?: string
+
 }
 
 interface ReextractParams extends StartParams {
@@ -428,7 +427,6 @@ export class VlogPipelineDO {
       const body = await req.json() as { vlog_id: string } & StartParams
       await this.state.storage.put('vlog_id', body.vlog_id)
       await this.state.storage.put('operator_id', body.operator_id ?? null)
-      if (body.mode) await this.state.storage.put('mode', body.mode)
       await this.state.storage.put('pointer', STEPS[0])
       await this.state.storage.put('force_audio_extract', false)
       await this.state.storage.put('force_transcribe', false)
@@ -443,7 +441,6 @@ export class VlogPipelineDO {
       const body = await req.json() as { vlog_id: string } & ReextractParams
       await this.state.storage.put('vlog_id', body.vlog_id)
       await this.state.storage.put('operator_id', body.operator_id ?? null)
-      if (body.mode) await this.state.storage.put('mode', body.mode)
       const from = (body.pointer && STEPS.includes(body.pointer)) ? body.pointer : 'extract'
       await this.state.storage.put('pointer', from)
       if (body.force) await this.state.storage.put(`force_${from}`, true)
@@ -513,7 +510,6 @@ export class VlogPipelineDO {
     const operator_id = vlog.operator_id
     const attempt = ((await this.state.storage.get<number>(`attempts:${pointer}`)) ?? 0) + 1
     const force = (await this.state.storage.get<boolean>(`force_${pointer}`)) === true
-    const mode = (await this.state.storage.get<string>('mode')) ?? 'auto'
 
     try {
       // Skip-if-exists

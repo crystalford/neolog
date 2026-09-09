@@ -68,7 +68,14 @@ interface Env {
 interface Params {
   vlog_id: string
   operator_id: string
-  passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[]  // when set, re-run only these passes
+  /**
+   * ⚠️ This was `passes` — a subset of the four extraction passes to re-run
+   * — and the four passes went on 8 Sep. What the flag actually DID, and
+   * still does, is skip the setup steps (transcode, thumbnail, recorded_at),
+   * which is only ever right on a re-run of a recording that already has
+   * them. It is named for that now.
+   */
+  skip_setup?: boolean
   thumbnail_only?: boolean  // when true, runs transcode+thumbnail only, skips transcribe + all extractions
   extract_thumb_only?: boolean  // when true, JUST extracts a thumbnail. Skips transcode for H.264 sources (1-2 sec). Falls through to locked transcode-then-thumb for HEVC. No transcribe, no extractions.
 }
@@ -79,13 +86,14 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
     const { vlog_id, operator_id } = event.payload
     const thumbnailOnly = event.payload.thumbnail_only === true
-    const passesToRun = new Set(event.payload.passes ?? ['threads', 'clip_candidates', 'creative_elements', 'entities'])
-    // Re-extract dispatch (from /api/v2/vlogs/[id]/process) explicitly sets
-    // `passes`. Fresh uploads from /api/v2/vlogs POST do not. When this is a
-    // re-extract, skip the setup steps (transcode / thumbnail / recorded_at)
-    // entirely — they're only useful for first-time processing. The LLM
-    // passes read transcript_text, not the video file.
-    const isReExtract = event.payload.passes != null && event.payload.passes.length > 0
+    // A re-run skips the setup steps — transcode, thumbnail, recorded_at —
+    // because they are only useful the first time. Reading the words onto
+    // the log needs `transcript_words`, not the video file.
+    //
+    // ⚠️ `passesToRun` was computed here from four pass names and used by
+    // nothing after the passes were deleted; it stayed as a Set of four
+    // strings naming a dead engine.
+    const isReExtract = event.payload.skip_setup === true
 
     // ── Step 1: load context ─────────────────────────────────────────────────
     const vlog = await step.do('fetch-context', async () => {
@@ -733,10 +741,15 @@ export default {
     if (req.method === 'POST' && url.pathname === '/dispatch') {
       const body = await req.json().catch(() => null) as {
         vlog_id?: string; operator_id?: string;
-        tier?: 'free' | 'premium' | 'max';
-        passes?: ('threads' | 'clip_candidates' | 'creative_elements' | 'entities')[];
+        skip_setup?: boolean;
         thumbnail_only?: boolean;
         extract_thumb_only?: boolean;
+        // ⚠️ Accepted and ignored. `tier` chose an extraction tier and
+        // `passes` a subset of the four passes; both went on 8 Sep, and a
+        // deploy of this worker can land before the caller that stopped
+        // sending them.
+        tier?: string;
+        passes?: string[];
       } | null
       if (!body?.vlog_id || !body?.operator_id) {
         return new Response(JSON.stringify({ error: 'vlog_id and operator_id required' }), {
@@ -749,8 +762,7 @@ export default {
           params: {
             vlog_id: body.vlog_id,
             operator_id: body.operator_id,
-            tier: body.tier ?? 'free',
-            passes: body.passes,
+            skip_setup: body.skip_setup === true,
             thumbnail_only: body.thumbnail_only === true,
             extract_thumb_only: body.extract_thumb_only === true,
           },

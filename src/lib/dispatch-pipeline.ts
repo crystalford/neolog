@@ -11,10 +11,16 @@
  * Fire-and-forget: it returns once the dispatch call returns OK; the run
  * happens asynchronously.
  *
- * `mode` and `passes` used to choose an extraction tier and a subset of the
- * four passes. There are no passes now — the last step reads the transcript
- * with no model in it — so they survive only as the shape the DO and the
- * Workflow still accept, and neither changes what is produced.
+ * ⚠️ `mode` and `passes` are gone. They chose an extraction tier and a subset
+ * of the four passes; the passes went on 8 Sep and the tier with them, so
+ * both were inert — except for one effect that was not. `wantsLegacyPasses`
+ * was `passes.length > 0 && passes.length < 4`, and it routed AWAY from the
+ * PIPELINE DO to the legacy Workflow. `/api/v2/dev/replay` sent
+ * `passes: ['unified']` — the name of a library deleted on 8 Sep — so
+ * replaying a recording took the wrong backend, silently.
+ *
+ * What is left is the two things that decide anything: `useStart` picks the
+ * full run over the jump-to-last-step, and `reset` clears the row first.
  */
 
 import { run } from './d1'
@@ -30,9 +36,6 @@ export interface DispatchEnv {
 export interface DispatchInput {
   vlog_id: string
   operator_id: string
-  /** Vestigial: the pipeline has no tiers left. Kept for the DO's payload. */
-  mode?: 'cheap' | 'premium'
-  passes?: string[]
   reset?: boolean
   // When true, dispatch /start (full pipeline from audio_extract). When
   // false/undefined, dispatch /reextract (jumps straight to the LLM
@@ -50,9 +53,7 @@ export interface DispatchResult {
 }
 
 export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): Promise<DispatchResult> {
-  const { vlog_id, operator_id, mode, passes } = input
-  const wantsLegacyPasses = Array.isArray(passes) && passes.length > 0 && passes.length < 4
-  const tier: 'free' | 'premium' = mode === 'premium' ? 'premium' : 'free'
+  const { vlog_id, operator_id } = input
 
   if (input.reset !== false) {
     try {
@@ -68,11 +69,10 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
     }
   }
 
-  if (env.PIPELINE && env.HEARTBEAT_TOKEN && !wantsLegacyPasses) {
-    // Untranscribed vlogs need the full pipeline (audio_extract →
-    // transcribe → extract). Transcribed vlogs can skip straight to
-    // the extract step via /reextract. Both go through the new gated
-    // DO pipeline; neither hits the legacy process-upload Workflow.
+  if (env.PIPELINE && env.HEARTBEAT_TOKEN) {
+    // A recording with no transcript needs the full run (audio_extract →
+    // transcribe → read). One that has a transcript can jump straight to the
+    // last step via /reextract, which is `stepRead` and calls no model.
     const route = input.useStart ? 'start' : 'reextract'
     try {
       const res = await env.PIPELINE.fetch(`https://internal/${route}/${vlog_id}`, {
@@ -81,7 +81,7 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
           'Content-Type': 'application/json',
           'X-Heartbeat-Token': env.HEARTBEAT_TOKEN,
         },
-        body: JSON.stringify({ operator_id, mode, force: true }),
+        body: JSON.stringify({ operator_id, force: true }),
       })
       if (!res.ok) {
         const errBody = await res.text()
@@ -110,7 +110,7 @@ export async function dispatchPipeline(env: DispatchEnv, input: DispatchInput): 
       const res = await env.PROCESS_UPLOAD.fetch('https://internal/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_id, operator_id, tier, passes }),
+        body: JSON.stringify({ vlog_id, operator_id }),
       })
       if (!res.ok) {
         const errBody = await res.text()

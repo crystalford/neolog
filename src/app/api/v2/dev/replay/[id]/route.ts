@@ -132,7 +132,12 @@ export async function POST(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vlog_id, operator_id: operator.id,
-          passes: from === 'extract' ? ['unified'] : undefined,
+          // ⚠️ This sent `passes: ['unified']` — the name of a library
+          // deleted on 8 Sep — and `dispatchPipeline` read a non-empty
+          // `passes` shorter than four as "use the legacy Workflow", so
+          // replaying from the last step silently took the wrong backend.
+          // What it means is skip the setup steps, which is what it says.
+          skip_setup: from === 'extract' || undefined,
           force: force || undefined,
         }),
       })

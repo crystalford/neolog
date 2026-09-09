@@ -397,7 +397,6 @@ export async function POST(req: NextRequest) {
       const dispatched = await dispatchPipeline(env as any, {
         vlog_id: vlogId,
         operator_id: operator.id,
-        mode: 'cheap',
       })
       if (!dispatched.ok) {
         await run(

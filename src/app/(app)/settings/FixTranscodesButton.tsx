@@ -45,7 +45,7 @@ export function FixTranscodesButton() {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'cheap' }),
+            body: JSON.stringify({ again: true }),
           })
           if (!resp.ok) {
             const txt = await resp.text()
