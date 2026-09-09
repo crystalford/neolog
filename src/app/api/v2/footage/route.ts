@@ -79,10 +79,9 @@ export async function GET(req: NextRequest) {
       OR lower(COALESCE(v.vision_tags, '')) LIKE ?
       OR lower(COALESCE(v.frame_note, '')) LIKE ?
       OR lower(COALESCE(v.transcript_text, '')) LIKE ?
-      OR lower(COALESCE(v.title, '')) LIKE ?
       OR lower(COALESCE(v.original_filename, '')) LIKE ?
     )`)
-    binds.push(like, like, like, like, like, like)
+    binds.push(like, like, like, like, like)
   }
   if (mark === 'usable') where.push('v.usable = 1')
   else if (mark === 'no') where.push('v.usable = 0')
@@ -101,7 +100,7 @@ export async function GET(req: NextRequest) {
     used_in: number
   }>(
     db,
-    `SELECT v.id, v.title, v.original_filename, v.thumbnail_r2_key, v.thumbnail_url,
+    `SELECT v.id, v.original_filename, v.thumbnail_r2_key, v.thumbnail_url,
             v.duration_seconds, v.recorded_at, v.created_at,
             v.vision_description, v.vision_tags, v.frame_note,
             substr(COALESCE(v.transcript_text, ''), 1, 400) AS transcript_text,
@@ -131,7 +130,6 @@ export async function GET(req: NextRequest) {
     const hay = (s: string | null) => (s || '').toLowerCase()
     return {
       id: r.id,
-      title: r.title,
       original_filename: r.original_filename,
       poster,
       duration_seconds: r.duration_seconds,

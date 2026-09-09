@@ -81,15 +81,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       params.id, operator.id,
     ),
     findMany<{
-      id: string; title: string | null; original_filename: string | null
+      id: string; original_filename: string | null
       thumbnail_r2_key: string | null; thumbnail_url: string | null
       duration_seconds: number | null; recorded_at: string | null
-      created_at: string; summary: string | null
+      created_at: string; vision_description: string | null
     }>(
       db,
-      `SELECT v.id, v.title, v.original_filename, v.thumbnail_r2_key,
+      `SELECT v.id, v.original_filename, v.thumbnail_r2_key,
               v.thumbnail_url, v.duration_seconds, v.recorded_at, v.created_at,
-              v.summary
+              v.vision_description
          FROM page_entries pe
          JOIN vlogs v ON v.id = pe.entry_id
         WHERE pe.page_id = ? AND pe.entry_kind = 'vlog'
@@ -131,7 +131,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       source: 'vlog',
       kind: 'made',
       sentence: vlogSentence(v.duration_seconds),
-      detail: (v.title && v.title !== v.original_filename ? v.title : null) || v.summary || null,
+      // The log's description of the frame, never the extraction engine's
+      // title or summary — nothing has written those since 8 Sep, so any
+      // non-filename value in them is the deleted generator's prose.
+      detail: v.vision_description || null,
       happened_at: v.recorded_at || v.created_at,
       logged_at: v.created_at,
       date_precision: v.recorded_at ? 'exact' : 'approx',

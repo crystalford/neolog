@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     usable: number | null; usable_note: string | null
   }>(
     db,
-    `SELECT v.id, v.title, v.original_filename, v.r2_key, v.transcoded_r2_key,
+    `SELECT v.id, v.original_filename, v.r2_key, v.transcoded_r2_key,
             v.duration_seconds, v.recorded_at, v.created_at,
             v.vision_description, v.frame_note, v.usable, v.usable_note
        FROM vlogs v
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     }
     lines.push([
       r.id,
-      r.original_filename || r.title || '',
+      r.original_filename || '',
       (r.recorded_at || r.created_at || '').slice(0, 10),
       r.duration_seconds ?? '',
       // His mark, in words. A blank means he has not said, which is not "no".

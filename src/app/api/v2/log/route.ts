@@ -153,18 +153,18 @@ export async function GET(req: NextRequest) {
       operator.id, ...rangeBinds, limit,
     ),
     wantBuried ? Promise.resolve([]) : findMany<{
-      id: string; title: string | null; original_filename: string | null
+      id: string; original_filename: string | null
       thumbnail_r2_key: string | null; thumbnail_url: string | null
       duration_seconds: number | null; recorded_at: string | null
       recorded_at_source: string | null; created_at: string
-      summary: string | null; vision_description: string | null
+      vision_description: string | null
       transcript_text: string | null; visibility: string | null
       pipeline_status: string | null; pipeline_error: string | null
     }>(
       db,
-      `SELECT id, title, original_filename, thumbnail_r2_key, thumbnail_url,
+      `SELECT id, original_filename, thumbnail_r2_key, thumbnail_url,
               duration_seconds, recorded_at, recorded_at_source, created_at,
-              summary, vision_description, transcript_text, visibility,
+              vision_description, transcript_text, visibility,
               pipeline_status, pipeline_error
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL${
@@ -291,8 +291,9 @@ export async function GET(req: NextRequest) {
   })
 
   // ── Recordings ──────────────────────────────────────────────────────────
-  // The sentence is the log's, composed from the file's own facts. The
-  // operator's title, if there is one, sits underneath — never invented.
+  // The sentence is the log's, composed from the file's own facts, and what
+  // sits underneath is the log's description of the FRAME — nothing the
+  // extraction engine wrote about it.
   vlogRows.forEach(v => {
     // A legacy data-URI thumbnail needs no signing; a key does.
     const thumb = v.thumbnail_url || null
@@ -303,7 +304,6 @@ export async function GET(req: NextRequest) {
       : src === 'upload_time' ? 'approx'
       : src === 'filename' || src === 'filename_date_only' ? 'day'
       : 'exact'
-    const titled = v.title && v.title !== v.original_filename ? v.title : null
     items.push({
       id: v.id,
       source: 'vlog',
@@ -313,8 +313,15 @@ export async function GET(req: NextRequest) {
       // then says where it has got to, in words rather than a spinner. A
       // recording mid-transcription and one whose pipeline died looked
       // identical to a finished one, which is the worst of the three.
+      // ⚠️ `vlogs.title` and `vlogs.summary` used to sit here, ahead of the
+      // frame description. Both were written by the extraction engine's last
+      // pass — "an AI-written title and summary written back onto the
+      // recording" — and nothing has written either since 8 Sep, so every
+      // non-filename value in them is the deleted generator's prose about
+      // his life, rendering as the recording's line on the home page. The
+      // marking rule was satisfied (`author: 'log'`), and that is not the
+      // point: the engine went because he did not trust its output.
       detail: pipelineLine(v.pipeline_status, v.pipeline_error)
-        || titled || v.summary
         // A recording with no words in it is not a broken recording. If the
         // log has only a description of the frames, it says so — "nobody
         // spoke" is a fact about the recording, and leaving it unsaid makes
@@ -344,7 +351,10 @@ export async function GET(req: NextRequest) {
       vlog_id: v.id,
       source_ref: null,
       // The transcript is searchable even though the row never shows it.
-      searchable: [v.title, v.summary, v.vision_description, v.original_filename, v.transcript_text]
+      // Same reason they are not in `detail`: a row surfacing because a
+      // deleted model's summary matched is the log deciding relevance out of
+      // words he never said, with nothing on screen saying why it matched.
+      searchable: [v.vision_description, v.original_filename, v.transcript_text]
         .filter(Boolean).join(' ').toLowerCase(),
     })
     if (v.thumbnail_r2_key) {

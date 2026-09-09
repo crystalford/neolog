@@ -69,9 +69,12 @@ export default function Recordings() {
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase()
     if (!n) return vlogs
+    // ⚠️ `v.title` was matched here too. Nothing has written that column
+    // since 8 Sep — the pass that did was the extraction engine's — so a
+    // recording surfacing on a search of a deleted model's title is the log
+    // deciding relevance out of words he never said.
     return vlogs.filter(v =>
-      (v.title || '').toLowerCase().includes(n)
-      || (v.original_filename || '').toLowerCase().includes(n))
+      (v.original_filename || '').toLowerCase().includes(n))
   }, [vlogs, q])
 
   // Said out loud rather than shown as a tab: a recording with no transcript
@@ -122,7 +125,7 @@ export default function Recordings() {
             <Link className="d" key={v.id} href={`/vlog/${v.id}`}>
               <span className="n">{day(v.recorded_at || v.uploaded_at)}</span>
               <span className="w">
-                {v.title || v.original_filename || 'a recording'}
+                {v.original_filename || 'a recording'}
                 <em style={{
                   display: 'block', fontStyle: 'normal', marginTop: 5,
                   fontSize: 12.5, color: 'var(--fg-4)',

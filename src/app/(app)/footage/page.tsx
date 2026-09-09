@@ -153,7 +153,7 @@ export default function Footage() {
                 : <div style={{ width: 108, height: 108, borderRadius: 8, background: 'var(--bg-2)' }} />}
               <div className="body">
                 <Link className="x" href={`/vlog/${c.id}`}>
-                  {c.title || c.original_filename || 'a recording'}
+                  {c.original_filename || 'a recording'}
                 </Link>
                 <div className="m">
                   <time dateTime={c.recorded_at}>{day(c.recorded_at)}</time>

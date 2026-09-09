@@ -48,6 +48,32 @@ export const DROPPED_TABLES = [
   'voice_profiles', 'characters',
 ] as const
 
+/**
+ * Columns on tables that SURVIVED, holding output the deleted engine wrote.
+ *
+ * A dropped table announces itself — the query throws. These do not: the
+ * column is still there, still typed, still full of a model's prose about
+ * his life, and reading it renders perfectly. Both of these were written by
+ * the extraction engine's last pass ("an AI-written title and summary
+ * written back onto the recording"), nothing has written either since 8 Sep,
+ * and on 9 Sep they were still the largest text on `/vlog/[id]`, the line
+ * under a recording on the home feed, part of what `/footage` and `/vlogs`
+ * searched, and a column in the footage CSV.
+ *
+ * The marking rule was satisfied throughout — the feed sets `author: 'log'`.
+ * That is not the point. The engine went because he did not trust what it
+ * wrote, and a sentence it wrote is still a sentence it wrote.
+ *
+ * The columns are not dropped: an ALTER cannot be undone, and the operator's
+ * own act for clearing them is **Start again**, where `title` and `summary`
+ * are both in `VLOG_DERIVED`. What is enforced is that nothing READS them.
+ * `scripts/check-dropped-tables.mjs` fails CI on a select of one.
+ */
+export const MODEL_WRITTEN_COLUMNS = [
+  'vlogs.title',
+  'vlogs.summary',
+] as const
+
 const DROPPED = new Set<string>(DROPPED_TABLES)
 
 /**

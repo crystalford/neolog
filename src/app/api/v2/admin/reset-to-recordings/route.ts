@@ -60,7 +60,13 @@ const OLD_TABLES = DROPPED_TABLES
 /** Derived on `vlogs`: cleared so each recording is read again from the file. */
 const VLOG_DERIVED = [
   'transcript_text', 'transcript_provider', 'transcript_completed_at',
-  'summary', 'extraction_outcomes', 'vision_description', 'vision_tags',
+  // ⚠️ `title` and `summary` are here for the same reason: the extraction
+  // engine's last pass wrote "an AI-written title and summary back onto the
+  // recording", and nothing has written either since 8 Sep. They are listed
+  // in `MODEL_WRITTEN_COLUMNS` and nothing reads them any more; this is
+  // where they are actually emptied, by his own act.
+  'title', 'summary',
+  'extraction_outcomes', 'vision_description', 'vision_tags',
   'vision_model', 'vision_status', 'read_at',
 ]
 

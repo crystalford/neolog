@@ -155,7 +155,12 @@ jobs:
       # against one passes the column checker and throws `no such table` on
       # every request. Nine of them were live on 9 Sep, including the dry run
       # behind the button that transcribes four hundred recordings.
-      - name: No live SQL against a dropped table
+      # Also: columns on tables that SURVIVED, holding the deleted engine's
+      # output. A dropped table announces itself; `vlogs.title` and
+      # `vlogs.summary` did not — they rendered perfectly, marked as the
+      # log's, as the largest text on /vlog/[id] and the line under every
+      # recording on the home feed. Nothing has written either since 8 Sep.
+      - name: No live SQL against a dropped table, or a column the engine wrote
         run: node scripts/check-dropped-tables.mjs
 
       # Five routes answer without signing in. A sixth is not an error

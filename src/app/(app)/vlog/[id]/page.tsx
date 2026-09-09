@@ -169,7 +169,13 @@ export default function Recording() {
         {v && r && (
           <>
             <div className="pghead">
-              <h1>{v.title || v.original_filename || 'A recording'}</h1>
+              {/* ⚠️ `v.title` was first here, so the largest text on this
+                  page was the extraction engine's title for his recording.
+                  Nothing has written that column since 8 Sep — the pass that
+                  did was "an AI-written title and summary written back onto
+                  the recording", and it went with the rest of the engine. A
+                  recording is named by its own file, or not at all. */}
+              <h1>{v.original_filename || 'A recording'}</h1>
             </div>
             {/* `vlog.css` calls this `.meta` and styles it in nine rules,
                 none of which were reaching anything — the page rendered

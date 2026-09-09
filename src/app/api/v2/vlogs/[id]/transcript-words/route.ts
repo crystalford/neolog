@@ -57,11 +57,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const db = getDb(env)
 
   const vlog = await findOne<{
-    id: string; title: string | null; duration_seconds: number | null
+    id: string; duration_seconds: number | null
     cut_ranges_json: string | null; cut_ranges_updated_at: string | null
   }>(
     db,
-    `SELECT id, title, duration_seconds, cut_ranges_json, cut_ranges_updated_at
+    `SELECT id, duration_seconds, cut_ranges_json, cut_ranges_updated_at
        FROM vlogs WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,
   )
@@ -86,7 +86,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   return NextResponse.json({
     vlog_id: vlog.id,
-    vlog_title: vlog.title,
     duration_seconds: vlog.duration_seconds,
     words,
     cut_ranges: cutRanges,

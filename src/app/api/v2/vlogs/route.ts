@@ -262,7 +262,7 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(searchParams.get('offset') || '0', 10)
 
   let sql = `
-    SELECT id, title, original_filename, file_size_bytes, mime_type, duration_seconds,
+    SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
            recorded_at, recorded_at_source, uploaded_at, thumbnail_url, thumbnail_r2_key,
            r2_key, transcoded_r2_key,
            pipeline_status, pipeline_error, visibility, transcript_text IS NOT NULL AS has_transcript,
@@ -293,7 +293,6 @@ export async function GET(req: NextRequest) {
   const db = getDb(env)
   const rows = await findMany<{
     id: string
-    title: string | null
     original_filename: string
     file_size_bytes: number
     mime_type: string

@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const db = await readyDb(getDb(env), 'vlog')
 
   const vlog = await findOne<{
-    id: string; title: string | null; original_filename: string | null
+    id: string; original_filename: string | null
     r2_key: string | null; transcoded_r2_key: string | null
     thumbnail_r2_key: string | null; thumbnail_url: string | null
     duration_seconds: number | null; file_size_bytes: number | null
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     usable: number | null
   }>(
     db,
-    `SELECT id, title, original_filename, r2_key, transcoded_r2_key,
+    `SELECT id, original_filename, r2_key, transcoded_r2_key,
             thumbnail_r2_key, thumbnail_url, duration_seconds, file_size_bytes,
             mime_type, recorded_at, recorded_at_source, created_at,
             transcript_text, transcript_provider, transcript_completed_at,
