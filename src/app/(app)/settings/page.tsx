@@ -2,7 +2,7 @@
  * Settings.
  *
  * What is here is what the LOG needs: who he is, where the files live, and
- * the two maintenance jobs that fix a recording the pipeline dropped.
+ * the three maintenance jobs that fix a recording the pipeline dropped.
  *
  * What used to be here was the essay engine's: a model picker, voice
  * cloning, a Brave Search key, a podcast feed, auto-publishing to a fanout
@@ -25,6 +25,7 @@ import { headers } from 'next/headers'
 import Shell from '@/components/Shell'
 import { FixThumbnailsButton } from './FixThumbnailsButton'
 import { FixTranscodesButton } from './FixTranscodesButton'
+import { FreeStuckButton } from './FreeStuckButton'
 import { OperatorSentence } from './OperatorSentence'
 import { Retranscribe } from './Retranscribe'
 import { StartAgain } from './StartAgain'
@@ -91,6 +92,16 @@ export default async function SettingsPage() {
             <span className="n">won&rsquo;t play</span>
             <span className="w">Re-dispatch the H.264 transcode for every recording without one. HEVC from a phone will not play in the browser without it.</span>
             <span className="c"><FixTranscodesButton/></span>
+          </span>
+          {/* The healer worker was written to do this on a five-minute cron
+              and its cron is off — deliberately, as ambient cost on a quiet
+              log. That is the wrong trade for the one event this product is
+              built around, so the job is a button until he decides
+              otherwise. It counts before it changes anything. */}
+          <span className="d">
+            <span className="n">wedged half-way</span>
+            <span className="w">A recording can stop mid-transcode, mid-Whisper or mid-read and sit there. This frees the ones that have not moved in twenty minutes so you can send them again. Nothing is deleted and the file is untouched.</span>
+            <span className="c"><FreeStuckButton/></span>
           </span>
         </div>
 

@@ -1,15 +1,16 @@
-# Cloudflare Cron Trigger: healer
+# Cloudflare Worker: healer
 #
-# Sweeps stuck pipeline rows every 5 minutes. When a vlog has been in
-# transcoding / transcribing / extracting for > 10 minutes (workflows
-# checkpoint inside that window when healthy), we re-dispatch the
-# process-upload workflow. After 3 auto-restarts on the same row we mark
-# it failed instead of looping forever — gives the operator a clear
-# "Needs attention" signal on /uploads.
+# Sweeps stuck pipeline rows. When a vlog has been in transcoding /
+# transcribing / extracting / reading for > 10 minutes (a healthy pipeline
+# checkpoints inside that window), it re-dispatches. After MAX_RESTARTS on
+# the same row it marks the row failed instead of looping forever.
 #
-# Replaces the "Restart pipeline" + "Reset stuck transcoding rows" buttons
-# that used to ride on /uploads. Eliminates a class of "is it stuck?"
-# guessing.
+# ⚠️ The cron is OFF (below), so this only runs when its fetch handler is
+# called. The operator-facing form of the same job is the "wedged half-way"
+# button on /settings, which calls POST /api/v2/admin/reset-stuck.
+#
+# `/uploads` — which this file used to point at for the "Needs attention"
+# signal — was removed on 8 Sep.
 #
 # Bindings:
 #   DB              — D1 database 'neolog'
@@ -23,9 +24,13 @@ account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 
 [triggers]
 # Cron DISABLED. Was */5 = 8,640 invocations/month — pure ambient cost on a
-# single-operator app where genuinely-stuck workflows are rare. The healer
-# worker stays deployed so it can still be invoked manually via HTTP for the
-# rare case where something's wedged — but it no longer auto-fires.
+# single-operator app where genuinely-stuck workflows are rare.
+#
+# ⚠️ That trade is right for a quiet log and wrong for the one event this
+# product is built around: four hundred recordings through FFmpeg and
+# Whisper, where a stuck row is not rare. Turning it back on for the duration
+# of that run is one line here and the operator's call — it is his bill.
+# Until then the job is the "wedged half-way" button on /settings.
 crons = []
 
 [[d1_databases]]

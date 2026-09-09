@@ -3,27 +3,33 @@
 # Hosts VlogPipelineDO — one Durable Object per vlog.
 #
 # Responsibilities:
-#   1. Drive the 3-step pipeline (audio_extract → transcribe → extract) via
+#   1. Drive the 3-step pipeline (audio_extract → transcribe → read) via
 #      alarm-scheduled execution. Each step is durably checkpointed in DO
 #      storage; the DO hibernates between events to avoid billing while idle.
 #   2. Skip-if-exists guards on every step keyed on R2 artifacts + D1 state.
 #      Replay a single step (force=true) without re-running upstream work.
 #   3. Per-step retry with exponential backoff. After max attempts the row
 #      transitions to state='failed' with full untruncated error text.
+#      ⚠️ Nothing re-dispatches it after that on a schedule — the healer's
+#      cron is off. The button is /settings → "wedged half-way".
 #   4. Receive container heartbeats (POST /event) and broadcast to any
 #      connected browser WebSocket on /ws/:vlog_id so the operator sees
 #      byte-level progress in real time.
 #
 # Bindings:
-#   DB              — D1 (vlogs, pipeline_events, extraction_runs, threads, etc)
-#   VIDEOS          — R2 (source video, audio chunks/mp3, transcripts, extractions)
-#   AI              — Workers AI (Whisper + Llama 3.3 70B fp8-fast)
+#   DB              — D1 (vlogs, transcript_words, log_entries, pipeline_events)
+#   VIDEOS          — R2 (source video, audio chunks/mp3)
+#   AI              — Workers AI (Whisper). Nothing else: the last step calls
+#                     no model.
 #   FFMPEG          — service binding to neolog-ffmpeg
 #
 # Secrets:
 #   HEARTBEAT_TOKEN — shared with workflow + container; gates POST /event
-#   ANTHROPIC_API_KEY — Sonnet 4.6 escalation path
 #   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY — for presigning R2 GET URLs
+#
+# ⚠️ ANTHROPIC_API_KEY was listed here as "the Sonnet escalation path". There
+# is no escalation path and nothing on this worker reads that key. Anthropic
+# is a paid opt-in the operator has not taken.
 #
 # Vars:
 #   CLOUDFLARE_ACCOUNT_ID, R2_BUCKET_NAME, PIPELINE_URL

@@ -47,7 +47,10 @@ interface Env {
   // Service binding to neolog-pipeline (DO worker). Workflow uses this to
   // emit per-step events that the live UI's WebSocket sees in real time.
   PIPELINE?: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
-  ANTHROPIC_API_KEY: string
+  // ⚠️ `ANTHROPIC_API_KEY` was declared here and read by nothing — same as
+  // on the pipeline worker. Anthropic is a paid opt-in the operator has not
+  // taken, and a secret on a deployed worker's env for a vendor nothing
+  // calls is an invitation to wire it.
   CLOUDFLARE_ACCOUNT_ID: string
   R2_BUCKET_NAME: string
   // Heartbeat shared secret + public pipeline URL — handed to the FFmpeg

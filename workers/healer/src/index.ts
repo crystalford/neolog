@@ -1,19 +1,31 @@
 /**
- * Cron-triggered auto-healing sweep for the post-upload pipeline.
+ * Auto-healing sweep for the post-upload pipeline.
  *
- * Runs every 5 minutes. Finds vlogs that have been "in a step" for longer
- * than the step's healthy checkpoint window, then either:
- *   - re-dispatches the workflow if pipeline_restart_count < MAX_RESTARTS
+ * Finds vlogs that have been "in a step" for longer than the step's healthy
+ * checkpoint window, then either:
+ *   - re-dispatches if pipeline_restart_count < MAX_RESTARTS
  *   - marks the row failed with a clear message otherwise
  *
- * This replaces the manual "Restart pipeline" / "Reset stuck transcoding
- * rows" buttons that used to ride on /uploads. Stuck workflows now
- * self-recover; the operator only sees failures that genuinely need
- * attention.
+ * ⚠️ **IT DOES NOT RUN ON A SCHEDULE.** `crons = []` in this worker's
+ * wrangler.toml, disabled deliberately: a five-minute sweep is 8,640
+ * invocations a month of ambient cost on a single-operator app. This header
+ * said "Runs every 5 minutes… stuck workflows now self-recover" until
+ * 9 Sep, and four other files described it the same way. It was not true,
+ * and the sentence being in five places is why nobody noticed.
  *
- * Concurrency: cron handlers are single-instance per minute boundary,
- * so two healer runs can't race on the same row. Each row is processed
- * sequentially within a single invocation.
+ * The equivalent from the app side is `POST /api/v2/admin/reset-stuck` — a
+ * pure D1 UPDATE, no model calls, no container starts — and it is a button
+ * on `/settings` ("wedged half-way"), which is the shape every maintenance
+ * job takes here because the operator has no terminal. This worker stays
+ * deployed for the case where the DO itself needs re-arming, and its `fetch`
+ * handler runs the same sweep on demand.
+ *
+ * If a four-hundred-recording run is coming, turning the cron back on for
+ * the duration is the operator's call and one line in the toml.
+ *
+ * Concurrency: cron handlers are single-instance per minute boundary, so two
+ * healer runs can't race on the same row. Each row is processed sequentially
+ * within a single invocation.
  */
 
 import type {

@@ -815,10 +815,10 @@ two were short by the same value: `workers/healer` and
 `/api/v2/admin/reset-stuck` both omitted **`reading`** — the pipeline's last
 step since the read path replaced extraction on 8 Sep.
 
-**The healer is the only thing that makes a four-hundred-recording run
-self-recover.** It sweeps every five minutes and re-dispatches anything that
-has been in a step too long, and it could not see a recording wedged in the
-step that puts the words on the log. One that hung there stayed hung, and
+**The healer is what was written to make a four-hundred-recording run
+self-recover.** It sweeps and re-dispatches anything that has been in a step
+too long, and it could not see a recording wedged in the step that puts the
+words on the log. (⚠️ It is also not running — see below.) One that hung there stayed hung, and
 nothing anywhere reported it: `tsc` is happy with a string array,
 `check-sql-columns.mjs` sees a legal column, `check-enum-values.mjs` sees
 legal values. **Every copy was internally valid and one of them was short.**
@@ -851,6 +851,41 @@ Two more found by the same pass:
   message naming a control that does not exist is worse than one naming
   none; it points at Settings → *transcribe the untranscribed*, which does
   pick the row up.
+
+### ⚠️ The healer does not run, and five files said it did
+
+`workers/healer/wrangler.toml` has **`crons = []`** — disabled deliberately,
+because a five-minute sweep is 8,640 invocations a month of ambient cost on a
+single-operator app where a stuck row is rare. Its own module header said
+*"Runs every 5 minutes… Stuck workflows now self-recover; the operator only
+sees failures that genuinely need attention"*, and four other files described
+it the same way. **Nothing in the repo calls its fetch handler either**, so
+the sentence was in five places and true in none.
+
+That trade is right for a quiet log and exactly wrong for the one event this
+product is built around, where a stuck row is not rare at all. Turning the
+cron back on for the duration of that run is one line in the toml and **the
+operator's call — it is his bill** — so the code does not decide it for him.
+
+What it does instead is give him the job in the shape every maintenance job
+takes here, because he has no terminal: **`/settings` → "wedged half-way"**,
+a third door beside *missing a still* and *won't play*. It calls
+`POST /api/v2/admin/reset-stuck`, which is a pure D1 UPDATE — no model calls,
+no container starts, safe to re-run — and it **counts before it changes
+anything**: a dry run first, so the line says how many are wedged and he
+presses again knowing the number.
+
+That route was recorded in `REACHED_ELSEWHERE` rather than wired to a
+surface. ⚠️ **That list is a record of decisions, not a way to quiet the
+check**, and the first question is always whether the route should be wired
+to the surface it was written for. This one should have been; it is, and the
+entry is gone.
+
+**`ANTHROPIC_API_KEY` was declared on both workers' env and read by neither**
+— documented in each wrangler.toml as "the Sonnet escalation path", which
+does not exist. Anthropic is a paid opt-in the operator has not taken, and *no
+branch reaches it* has to mean the secret is not sitting on a deployed
+worker's env inviting someone to wire it.
 
 `check-enum-values.mjs` now covers `pipeline_status`. ⚠️ It had to learn to
 skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
@@ -1294,9 +1329,10 @@ picks up where it left off" is true rather than hopeful.
 
 **Settings** (`/settings`) — his one sentence (which `/facts` shows and will
 not draft), where the files are kept, the recordings panel (**transcribe the
-untranscribed · read them onto the log**, with the running counts), the two
-maintenance jobs for a recording the pipeline dropped, and last, **Start
-again**.
+untranscribed · read them onto the log**, with the running counts), the
+**three** maintenance jobs for a recording the pipeline dropped — *missing a
+still*, *won't play*, and ***wedged half-way*** (the healer's job, as a
+button, because its cron is off) — and last, **Start again**.
 
 **Start again** is the one irreversible act in the product and it is a button
 because the operator has no terminal — this session is his runtime, so a

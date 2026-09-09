@@ -5,7 +5,11 @@
  * 13-step Workflow worker (neolog-process-upload) with a 3-step DO-driven
  * pipeline:
  *
- *   audio_extract  →  transcribe  →  extract
+ *   audio_extract  →  transcribe  →  read
+ *
+ * The last step keeps the pointer name `extract` for continuity with DO
+ * storage written before 8 Sep; what runs there is `stepRead`, which cuts
+ * the word timings into entries and calls no model.
  *
  * One DO instance per vlog (id derived from vlog_id). DO storage holds the
  * pointer + per-step attempts + force flags. Alarm-driven execution: each
@@ -14,12 +18,12 @@
  * billing only during active JS.
  *
  * Skip-if-exists guards run before each step. Re-running a step costs
- * nothing if its artifact already exists — operator can iterate on
- * extraction prompts 50× without re-running ffmpeg or Whisper once.
+ * nothing if its artifact already exists, and the last step is idempotent
+ * through `source_ref`, so a re-read writes nothing the second time.
  *
  * Pipeline events flow into D1 (pipeline_events table) AND fan out to any
  * browser WebSocket subscribed at /ws/:vlog_id so the operator sees real-time
- * byte/chunk/token-level progress on /timeline/[id].
+ * byte/chunk progress on /vlog/[id]. (/timeline/[id] went on 8 Sep.)
  *
  * Entry points (host worker /fetch handler routes by path prefix):
  *   POST /start/:vlog_id         Kick a new pipeline. Body: { operator_id }
@@ -59,7 +63,10 @@ export interface Env {
   FFMPEG_GATE: DurableObjectNamespace
   FFMPEG_GATE_CONCURRENCY?: string
   HEARTBEAT_TOKEN: string
-  ANTHROPIC_API_KEY: string
+  // ⚠️ `ANTHROPIC_API_KEY` was declared here and read by nothing. Anthropic
+  // is a paid opt-in the operator has not taken, and "no branch reaches it"
+  // is what that has to mean — a secret sitting on a deployed worker's env
+  // for a vendor nothing calls is an invitation to wire it.
   CLOUDFLARE_ACCOUNT_ID: string
   R2_BUCKET_NAME: string
   R2_ACCESS_KEY_ID?: string

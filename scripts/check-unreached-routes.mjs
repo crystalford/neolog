@@ -47,7 +47,6 @@ const REACHED_ELSEWHERE = {
   '/api/v2/admin/backfill-recorded-at': 'redates archived imports whose four-tier pass was skipped',
   '/api/v2/admin/import-r2': 'registers recordings already in the bucket but not in D1',
   '/api/v2/admin/regenerate-thumbnails': 'the bulk form of the /settings button',
-  '/api/v2/admin/reset-stuck': 'clears a row wedged mid-pipeline',
   '/api/v2/admin/reset-stuck-transcoding': 'the same, for the transcode step alone',
   '/api/v2/admin/thumb-broker': 'drives the thumbnail cascade over a selection',
   '/api/v2/admin/transcode-broker': 'the same, for transcode',
