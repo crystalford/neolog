@@ -71,14 +71,48 @@ function firstJsonObject(text: string): any | null {
   return null
 }
 
-/** Loose match: whitespace and case vary, the words do not. */
-function findAnchor(haystack: string, anchor: string, from: number): number {
-  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ')
-  const h = norm(haystack)
-  const a = norm(anchor).trim()
-  if (a.length < 8) return -1
-  const idx = h.indexOf(a, from)
-  return idx
+/**
+ * The transcript flattened for matching, and the way back.
+ *
+ * ⚠️ The way back is the whole point. This used to be one expression —
+ * `haystack.toLowerCase().replace(/\s+/g, ' ').indexOf(anchor)` — and the
+ * caller sliced the ORIGINAL transcript with the index it returned. Those
+ * are two different strings: every run of two or more whitespace characters
+ * makes the flattened one shorter, so after the first paragraph break the
+ * index pointed somewhere else in the original. A cut landed mid-word, and
+ * the part before it kept words the part after it also had.
+ *
+ * `read-recording.ts` never saw it, because it joins `transcript_words` with
+ * single spaces and there is nothing to collapse. The composer's *talk*
+ * button hands over a raw Whisper transcript, and those are full of
+ * newlines.
+ *
+ * `map[i]` is the index in the original of the character `flat[i]` came
+ * from — one entry per output character, so a `toLowerCase()` that changes
+ * length cannot shift it either.
+ */
+function flatten(s: string): { flat: string; map: number[] } {
+  let flat = ''
+  const map: number[] = []
+  let i = 0
+  while (i < s.length) {
+    if (/\s/.test(s[i])) {
+      const at = i
+      while (i < s.length && /\s/.test(s[i])) i++
+      flat += ' '
+      map.push(at)
+      continue
+    }
+    const lower = s[i].toLowerCase()
+    for (const ch of lower) { flat += ch; map.push(i) }
+    i++
+  }
+  return { flat, map }
+}
+
+/** An anchor, flattened the same way, so the two can be compared. */
+function flattenAnchor(anchor: string): string {
+  return anchor.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -114,26 +148,60 @@ export async function splitNote(
     : []
   if (anchors.length < 2) return whole
 
-  // Locate each anchor in order. One that cannot be found is not a seam.
+  // Locate each anchor in order. One that cannot be found is not a seam —
+  // the failure mode is fewer splits, never words he did not say.
+  //
+  // The search runs in flattened space and the cut is recorded in the
+  // ORIGINAL, through `map`. Both are needed: matching has to survive a
+  // newline the model did not reproduce, and slicing has to land on the
+  // character the anchor actually starts at.
+  const { flat, map } = flatten(transcript)
   const cuts: number[] = [0]
-  let from = 0
+  let fromFlat = 0
   for (const a of anchors.slice(1)) {
-    const idx = findAnchor(transcript, a, from + 1)
-    if (idx < 0) continue
+    const needle = flattenAnchor(a)
+    // Too short to be a seam rather than a coincidence.
+    if (needle.length < 8) continue
+    const idxFlat = flat.indexOf(needle, fromFlat + 1)
+    if (idxFlat < 0) continue
+    const idx = map[idxFlat]
+    // Monotonic by construction, but a cut that did not advance would make
+    // an empty part.
+    if (idx <= cuts[cuts.length - 1]) continue
     cuts.push(idx)
-    from = idx
+    fromFlat = idxFlat
   }
   if (cuts.length < 2) return whole
 
-  const parts: NotePart[] = []
+  // ⚠️ A sliver is a bad seam, not a thought — and it is DROPPED into its
+  // neighbour, not dropped. Skipping it lost those words from the log
+  // entirely: the whole take survives on the recording, but the entries no
+  // longer held everything he said, and nothing on any screen said so. The
+  // seam is what the log is allowed to be wrong about; the words are not.
+  const MIN_PART_WORDS = 12
+  const wordCount = (t: string) => t.split(/\s+/).filter(Boolean).length
+
+  // Spans over the ORIGINAL, kept as [start, end) so a merge is arithmetic
+  // rather than string surgery on already-trimmed text.
+  const spans: { at: number; end: number }[] = []
   for (let i = 0; i < cuts.length; i++) {
-    const start = cuts[i]
-    const end = i + 1 < cuts.length ? cuts[i + 1] : transcript.length
-    const text = transcript.slice(start, end).trim()
-    // A sliver is a bad seam, not a thought.
-    if (text.split(/\s+/).filter(Boolean).length < 12) continue
-    parts.push({ text, at: start })
+    spans.push({ at: cuts[i], end: i + 1 < cuts.length ? cuts[i + 1] : transcript.length })
   }
+  // Merge every sliver BACKWARD into the span before it…
+  for (let i = spans.length - 1; i > 0; i--) {
+    if (wordCount(transcript.slice(spans[i].at, spans[i].end)) < MIN_PART_WORDS) {
+      spans[i - 1].end = spans[i].end
+      spans.splice(i, 1)
+    }
+  }
+  // …and a short FIRST span forward, since it has nothing before it.
+  while (spans.length >= 2
+    && wordCount(transcript.slice(spans[0].at, spans[0].end)) < MIN_PART_WORDS) {
+    spans[1].at = spans[0].at
+    spans.shift()
+  }
+
+  const parts: NotePart[] = spans.map(s => ({ text: transcript.slice(s.at, s.end).trim(), at: s.at }))
 
   return parts.length >= 2 ? parts : whole
 }

@@ -193,6 +193,35 @@ not say*. Each passage becomes one entry at `recorded_at + start`,
 `author='operator'`, `grounded=1`, idempotent via
 `source_ref='said:<vlog>:<first word index>'`.
 
+⚠️ **`splitNote` cut the transcript at an index into a different string,
+and it did it on the composer's *talk* button.** `findAnchor` searched a
+FLATTENED copy — lowercased, whitespace runs collapsed — and returned
+`indexOf` on that; `splitNote` then sliced the ORIGINAL with it. Every run of
+two or more whitespace characters makes the flattened copy shorter, so after
+the first paragraph break the cut landed somewhere else: **mid-word, with the
+part before it keeping words the part after it also had.**
+
+`read-recording.ts` never saw it, because it joins `transcript_words` with
+single spaces and there is nothing to collapse. The composer hands over a raw
+Whisper transcript, which is full of newlines. The flatten now carries an
+index map, so matching survives a newline the model did not reproduce and the
+cut still lands on the character the anchor starts at.
+
+⚠️ **And a sliver was dropped, not merged.** A part under twelve words was
+skipped — and skipped means those words were in NO entry. The whole take
+survives on the recording, so nothing looked broken and no count was wrong. A
+sliver merges into its neighbour now: **the seam is what the log may be wrong
+about; the words are not.**
+
+`scripts/test/split-note.mjs` — 24 assertions, in CI, up from 7. ⚠️ The old
+version could not have caught either: it inlined the implementation as it
+stood, so it tested the bug faithfully, and its fixture was one line of
+single spaces with nothing to collapse. The new one runs the same note again
+with newlines and tabs in it, asserts **every word in exactly one part, in
+order**, and puts the sliver in the MIDDLE — where dropping it still leaves
+two parts, so the loss does not show up in the count. All three regressions
+were re-introduced and watched to fail.
+
 **`cutIntoPassages` is the fallback**, cutting at his own pauses — a
 2.5-second gap between two words, a sentence end past 90, a ceiling at 140.
 It needs no model and was the default until 8 Sep, when running it against
