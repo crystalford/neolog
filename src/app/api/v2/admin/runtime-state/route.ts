@@ -140,17 +140,40 @@ export async function GET(req: NextRequest) {
     operator.id,
   )
 
-  // ── FFmpeg container health: cheap probe ───────────────────────────────
-  let ffmpegHealth: { ok: boolean; status?: number; latency_ms?: number; error?: string } = { ok: false }
+  // ── FFmpeg container: PASSIVE probe ────────────────────────────────────
+  //
+  // ⚠️ This asked the container for `/health`, and `/health` is served by the
+  // container itself — so reaching it BOOTS the container. This route
+  // documents itself as something to poll for progress, and every poll woke a
+  // sleeping container and started the five-minute idle clock again. Memory
+  // and disk are billed for every second an instance is alive, working or
+  // not, so a monitor that wakes what it is monitoring bills for itself.
+  //
+  // `/__alive` exists for exactly this: `workers/ffmpeg/src/worker.ts` answers
+  // it from the Durable Object without calling `startAndWaitForPorts()`, so it
+  // reports the current state and boots nothing. Its own comment records the
+  // last time this cost real money — a 60-second health pill in the masthead,
+  // about $0.70 a day to answer "are you alive?".
+  //
+  // The trade is that a sleeping container now reports `running: false`
+  // instead of `ok: true`, which is the truth rather than a side effect.
+  let ffmpegHealth: {
+    ok: boolean; running?: boolean; state?: string
+    status?: number; latency_ms?: number; error?: string
+  } = { ok: false }
   if (env.FFMPEG && typeof env.FFMPEG.fetch === 'function') {
     const t0 = Date.now()
     try {
-      const r = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/health', { method: 'GET' }) as unknown as Response
-      ffmpegHealth = { ok: r.ok, status: r.status, latency_ms: Date.now() - t0 }
-      if (!r.ok) {
-        const body = await r.text().catch(() => '<unreadable>')
-        ffmpegHealth.error = body.slice(0, 500)
+      const r = await env.FFMPEG.fetch('https://ffmpeg.neolog.internal/__alive', { method: 'GET' }) as unknown as Response
+      const body = await r.json().catch(() => ({})) as { running?: boolean; state?: string }
+      ffmpegHealth = {
+        ok: r.ok,
+        running: body.running === true,
+        state: body.state || (r.ok ? 'unknown' : 'unreachable'),
+        status: r.status,
+        latency_ms: Date.now() - t0,
       }
+      if (!r.ok) ffmpegHealth.error = `probe returned ${r.status}`
     } catch (err: any) {
       ffmpegHealth = { ok: false, error: err?.message || String(err), latency_ms: Date.now() - t0 }
     }

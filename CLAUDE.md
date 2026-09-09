@@ -1822,6 +1822,56 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 - **`workers/ffmpeg`** — Container Worker. **Five endpoints, and that is all of them**: `/transcode-h264`, `/extract-thumb`, `/extract-thumb-mini-transcode`, `/extract-audio`, `/concat-audio`. ⚠️ Seven more were deployed until 9 Sep with no caller anywhere — `/trim`, `/concat`, `/extract-audio-segment`, `/extract-video-segment`, `/render-video-essay`, `/ken-burns`, `/images-to-video` — the production engine, **520 of that file's 1,240 lines**, running in a container for a product deleted on 8 Sep. `server.js` is plain JS outside every typecheck here, so nothing objected. `check-unreached-routes.mjs` now reads its endpoint map and fails CI on a sixth.
 - **`workers/healer`** — cron worker (disabled by default; manually invocable) that detects stuck rows and re-dispatches.
 
+### ⚠️ Container cost is billed for being AWAKE, not for working
+
+`@cloudflare/containers` will not sleep an instance while **any request is in
+flight**, and Cloudflare bills container memory and disk for every second an
+instance is alive — vCPU is the only line billed on use. So the tell for
+waste is a bill where vCPU is pennies against tens of dollars of memory: that
+is an instance switched on and doing nothing.
+
+Two things produced it, and both are fixed:
+
+- ⚠️ **Only `/extract-thumb` killed a stalled ffmpeg.** `/transcode-h264`,
+  `/extract-audio` and `/concat-audio` had no timeout, so one hung process
+  held its request open forever and **kept a container awake indefinitely**.
+  Every spawn now goes through `runFfmpeg`, `runFfmpegWithProgress` or
+  `streamingExtract`, and all three arm a kill — twenty minutes for ffmpeg,
+  one for ffprobe. Generous on purpose: the job is catching a process that
+  will never finish, not cutting short a slow one.
+- ⚠️ **`/api/v2/admin/runtime-state` woke the container to health-check it.**
+  It fetched the container's own `/health`, which boots it, and that route
+  documents itself as something to POLL. `/__alive` exists for exactly this —
+  answered from the Durable Object without `startAndWaitForPorts()` — and its
+  comment already recorded the last time this cost money (a 60-second health
+  pill in the masthead, ~$0.70/day). A monitor that wakes what it monitors
+  bills for itself.
+
+**`sleepAfter = '5m'` is unchanged and is the operator's call.** Shortening it
+cuts idle billing after a stray wake, and costs a container cold start in the
+thumbnail cascade, whose ~2–5 second total is a documented lock above.
+
+### ⚠️ `scripts/check-container-server.mjs` — the file no typecheck covers
+
+`workers/ffmpeg/server.js` is plain JS and excluded from
+`tsconfig.workers.json` (that package depends on `@cloudflare/containers` in
+its own node_modules and shares no code with `src/`). `wrangler deploy`
+transpiles the WORKER, not the container image, and **`node --check` only
+parses** — a call to an undefined function is a runtime error, not a syntax
+one.
+
+On 9 Sep the seven dead production-engine endpoints were removed from that
+file by a script that counted braces **without skipping the ones inside
+strings and template literals**. Cutting `trim` and `concat` overran into
+their neighbours and took three LIVE helpers with them — `downloadToTmp`,
+`sweepStaleTmpDirs` and `runFfmpeg`. `/transcode-h264` and `/extract-audio`
+would each have thrown on their first call, which is the whole recording
+pipeline, and **every check in this repo was green**.
+
+The checker resolves every called name against what the file defines,
+imports, or gets from the runtime, and it strips comments and string bodies
+first — the same distinction the deletion script failed to make.
+
 > The "Inngest" name is a relic — Inngest was removed long ago. Everything async is Cloudflare Workflows + the DO pipeline.
 
 ---

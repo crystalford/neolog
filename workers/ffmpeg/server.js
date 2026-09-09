@@ -72,6 +72,136 @@ async function readJsonBody(req) {
   try { return JSON.parse(raw) } catch { throw new Error('Body must be JSON') }
 }
 
+/* ⚠️ RESTORED 9 Sep — `downloadToTmp`, `sweepStaleTmpDirs` and `runFfmpeg`.
+   They were deleted by accident hours earlier, when the seven dead
+   production-engine endpoints came out. The script that removed those counted
+   braces without skipping the ones inside strings and template literals, so
+   cutting `trim` and `concat` overran into their neighbours and took three
+   live helpers with them.
+
+   `node --check` passed, because a call to an undefined function is a runtime
+   error and not a syntax one — and this file is plain JS, excluded from every
+   typecheck in the repo. `/transcode-h264` and `/extract-audio` would each
+   have thrown on their first call, which is the whole recording pipeline.
+
+   `scripts/check-container-server.mjs` now fails CI on a called-but-undefined
+   name in this file. */
+
+/**
+ * Stream a URL to a temp file on disk. Returns the temp file path.
+ *
+ * For thumbnail use: a `rangeBytes` argument tells us to fetch ONLY the first
+ * N bytes via HTTP Range. Most camera-recorded MP4s are fast-start (moov at
+ * the front), so the first 200 MB has the header + plenty of frames for a
+ * thumbnail at t=1. Avoids downloading 9 GB just to grab one frame.
+ *
+ * If the upstream throws (file too large, network error, etc.) the temp dir
+ * we created is cleaned up before re-throwing — leaks here are what
+ * eventually fill /tmp and trigger ENOSPC across all subsequent requests.
+ *
+ * Previously used Buffer.from(await resp.arrayBuffer()) which loaded the
+ * entire file into RAM — fatal on the standard-1 container (256 MB) for big
+ * files. Streaming via pipeline() keeps peak memory at a small constant
+ * regardless of file size.
+ */
+async function downloadToTmp(url, label, opts = {}) {
+  const maxBytes = opts.maxBytes ?? 4 * 1024 * 1024 * 1024
+  const rangeBytes = opts.rangeBytes ?? null
+  const tmp = mkdtempSync(join(tmpdir(), `neolog-ffmpeg-${label}-`))
+  try {
+    const tmpFile = join(tmp, 'input')
+    const headers = rangeBytes ? { Range: `bytes=0-${rangeBytes - 1}` } : undefined
+    const resp = await fetch(url, headers ? { headers } : undefined)
+    if (!resp.ok && resp.status !== 206) {
+      throw new Error(`Fetch ${label} failed: HTTP ${resp.status}`)
+    }
+    const len = parseInt(resp.headers.get('content-length') || '0', 10)
+    if (!rangeBytes && len && len > maxBytes) {
+      throw new Error(`Input too large: ${len} > ${maxBytes} (use rangeBytes for partial fetch)`)
+    }
+    if (!resp.body) throw new Error(`Fetch ${label} returned empty body`)
+    const nodeReadable = Readable.fromWeb(resp.body)
+    await pipeline(nodeReadable, createWriteStream(tmpFile))
+    return { dir: tmp, file: tmpFile }
+  } catch (err) {
+    // Don't leak the temp dir on failure — that's what fills /tmp and
+    // turns the next request into ENOSPC.
+    cleanup(tmp)
+    throw err
+  }
+}
+
+// One-shot sweep on container start: drop any neolog-ffmpeg-* dirs left over
+// from a prior crash / OOM. Without this, restart inherits the leak.
+function sweepStaleTmpDirs() {
+  try {
+    for (const name of readdirSync(tmpdir())) {
+      if (name.startsWith('neolog-ffmpeg-')) {
+        try { rmSync(join(tmpdir(), name), { recursive: true, force: true }) } catch {}
+      }
+    }
+  } catch {}
+}
+sweepStaleTmpDirs()
+
+/**
+ * A hard ceiling on every ffmpeg run, and the reason it exists.
+ *
+ * ⚠️ Until 9 Sep only `/extract-thumb` killed a stalled process.
+ * `/transcode-h264`, `/extract-audio` and `/concat-audio` had no timeout at
+ * all, so an ffmpeg that hung — a stalled R2 read, a file it could not parse,
+ * a pipe nobody drained — left the HTTP request open forever.
+ *
+ * That is not just a wedged job. `@cloudflare/containers` will not put an
+ * instance to sleep while any request is in flight, so ONE hung call keeps a
+ * container awake indefinitely, and container memory and disk are billed for
+ * every second an instance is alive whether it is working or not. The
+ * operator's bill showed containers running with essentially no CPU against
+ * them.
+ *
+ * The ceiling is generous — twenty minutes covers a full transcode of a long
+ * recording on a half-vCPU instance — because the job here is to catch a
+ * process that will never finish, not to cut short one that is slow.
+ */
+const FFMPEG_TIMEOUT_MS = 20 * 60 * 1000
+const FFPROBE_TIMEOUT_MS = 60 * 1000
+
+function armKill(proc, timeoutMs, reject, label) {
+  const killer = { timedOut: false, clear: () => {} }
+  if (!timeoutMs || timeoutMs <= 0) return killer
+  const t = setTimeout(() => {
+    killer.timedOut = true
+    // SIGKILL after SIGTERM: a wedged ffmpeg can ignore the polite one, and
+    // a process that survives is the whole problem.
+    try { proc.kill('SIGTERM') } catch {}
+    setTimeout(() => { try { proc.kill('SIGKILL') } catch {} }, 5000).unref?.()
+    reject(new Error(`${label}: killed after ${Math.round(timeoutMs / 1000)}s — no exit`))
+  }, timeoutMs)
+  t.unref?.()
+  killer.clear = () => clearTimeout(t)
+  return killer
+}
+
+/**
+ * Spawn ffmpeg with the given args. Resolves with the output file path
+ * once ffmpeg exits 0. Rejects with stderr text on non-zero exit.
+ */
+function runFfmpeg(args, outFile, timeoutMs = FFMPEG_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+    const killer = armKill(proc, timeoutMs, reject, 'runFfmpeg')
+    proc.stderr.on('data', d => { stderr += d.toString() })
+    proc.on('error', err => { killer.clear(); reject(err) })
+    proc.on('exit', code => {
+      killer.clear()
+      if (killer.timedOut) return
+      if (code === 0) resolve(outFile)
+      else reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(-2000)}`))
+    })
+  })
+}
+
 /**
  * Run ffprobe and return parsed JSON, or throw with stderr.
  *
@@ -93,12 +223,19 @@ function ffprobeJson(inputFile) {
       '-show_format',
       inputFile,
     ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    // ffprobe reads a file already on local disk, so a minute is far past
+    // slow and squarely into wedged. Armed for the same reason as the two
+    // ffmpeg runners: a process that never exits holds the request open, and
+    // an open request stops the container ever going to sleep.
+    const killer = armKill(proc, FFPROBE_TIMEOUT_MS, reject, 'ffprobe')
     let stdout = ''
     let stderr = ''
     proc.stdout.on('data', d => { stdout += d.toString() })
     proc.stderr.on('data', d => { stderr += d.toString() })
-    proc.on('error', err => reject(err))
+    proc.on('error', err => { killer.clear(); reject(err) })
     proc.on('exit', code => {
+      killer.clear()
+      if (killer.timedOut) return
       if (code !== 0) return reject(new Error(`ffprobe exit ${code}: ${stderr.slice(-1500)}`))
       try { resolve(JSON.parse(stdout)) }
       catch (e) { reject(new Error(`ffprobe returned non-JSON: ${e.message}`)) }
@@ -508,9 +645,10 @@ function makeHeartbeat({ url, token, vlog_id, operator_id, step }) {
  * We parse, emit at ~1s cadence, and keep stderr accumulated for the
  * non-zero-exit error message.
  */
-function runFfmpegWithProgress(args, beat) {
+function runFfmpegWithProgress(args, beat, timeoutMs = FFMPEG_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const killer = armKill(proc, timeoutMs, reject, 'runFfmpegWithProgress')
     let stderr = ''
     let buf = ''
     let pending = {}
@@ -549,8 +687,10 @@ function runFfmpegWithProgress(args, beat) {
       }
     })
     proc.stderr.on('data', d => { stderr += d.toString() })
-    proc.on('error', err => reject(err))
+    proc.on('error', err => { killer.clear(); reject(err) })
     proc.on('exit', code => {
+      killer.clear()
+      if (killer.timedOut) return
       if (code === 0) resolve()
       // Show the LAST 4000 chars of stderr. FFmpeg prints its build
       // banner FIRST (~1500 chars), then any actual errors LAST. The

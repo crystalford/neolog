@@ -172,6 +172,15 @@ jobs:
       - name: No live SQL against a dropped table, or a column the engine wrote
         run: node scripts/check-dropped-tables.mjs
 
+      # workers/ffmpeg/server.js is plain JS and excluded from
+      # tsconfig.workers.json, so nothing here typechecks it, and `node
+      # --check` only parses — a call to an undefined function is a runtime
+      # error, not a syntax one. Removing seven dead endpoints from that file
+      # took three LIVE helpers with them (downloadToTmp, runFfmpeg,
+      # sweepStaleTmpDirs) and every check in this repo stayed green.
+      - name: Every function the container server calls is defined
+        run: node scripts/check-container-server.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:
