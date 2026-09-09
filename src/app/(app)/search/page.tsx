@@ -24,7 +24,7 @@ import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { Rail } from '@/components/Rail'
-import { stampFor, type DatePrecision } from '@/lib/log-entry'
+import { stampFor, isFuzzy, type DatePrecision } from '@/lib/log-entry'
 
 interface Passage {
   n: number
@@ -47,6 +47,7 @@ interface Result {
   passages: Passage[]
   counts: { said: number; recalled: number; from_file: number }
   dropped: number
+  unsearchable: number
 }
 
 const EXAMPLES = [
@@ -75,6 +76,11 @@ export default function SearchPage() {
   })()
   const hitMax = Math.max(1, ...hitYears.map(y => y.n))
   const [asking, setAsking] = useState(false)
+  /**
+   * Narrow the passages to the ones he SAID out loud, rather than everything
+   * the log holds. A fact about the passage, not a judgement of it.
+   */
+  const [onlySaid, setOnlySaid] = useState(false)
   const [lit, setLit] = useState<number | null>(null)
 
   const ask = useCallback(async (question: string) => {
@@ -117,7 +123,13 @@ export default function SearchPage() {
             aria-label="Ask the log a question"
             autoFocus
           />
-          <button onClick={() => void ask(q)}>{asking ? 'reading…' : 'ask ↵'}</button>
+          {/* `.go` is `search.html`'s ask button — `<span class="go">ask<kbd>↵</kbd></span>`.
+              It had been borrowed for the link under a hit, where the design
+              uses `.more`, so the one control on the page was styled as a
+              navigation affordance and the affordance as a control. */}
+          <button className="go" onClick={() => void ask(q)}>
+            {asking ? 'reading…' : <>ask<kbd>↵</kbd></>}
+          </button>
         </div>
 
         {!result && !asking && (
@@ -188,21 +200,53 @@ export default function SearchPage() {
                 numbered, so every citation above lands on one. */}
             <div className="hits">
               <div className="sh"><span>The passages</span><b>{result.passages.length}</b></div>
-              {result.passages.map(p => (
-                <div className={`pt${lit === p.n ? ' lit' : ''}`} id={`p-${p.n}`} key={p.n}>
-                  <span className="n">{p.n}</span>
+              {/* ⚠️ `search.html` offers three tabs: by date · by relevance ·
+                  said only. TWO are built. A relevance order is the log
+                  having an opinion about which of his own words matter most,
+                  which is the fence `/footage` draws in the same words — "no
+                  relevance ranking… a relevance score is the log having an
+                  opinion about which of his footage is good". Date is a
+                  fact; whose words they are is a fact. */}
+              {result.passages.length > 1 && (
+                <div className="tabs">
+                  <button className={onlySaid ? '' : 'on'} onClick={() => setOnlySaid(false)}>
+                    everything
+                  </button>
+                  <button className={onlySaid ? 'on' : ''} onClick={() => setOnlySaid(true)}>
+                    said only
+                  </button>
+                </div>
+              )}
+              {/* ⚠️ `search.html` builds a hit as `.h > .t > (.d .w .n)` and
+                  then the quote. This had `.pt` as the OUTER wrapper with
+                  the meta inside it — the design's shape inverted, so the
+                  date, the provenance and the passage number all took the
+                  styling of quoted text.
+
+                  `.d fz` is the one that matters. A date the log had to
+                  guess renders differently from one it knows, on the surface
+                  whose whole discipline is pointing at things: "2008" from a
+                  recall session and "19 Aug 2026" from a recording are not
+                  the same kind of fact and must not look alike. */}
+              {result.passages.filter(p => !onlySaid || p.kind === 'recording').map(p => (
+                <div className={`h${lit === p.n ? ' lit' : ''}`} id={`p-${p.n}`} key={p.n}>
+                  <div className="t">
+                    <span className={`d${isFuzzy(p.date_precision) ? ' fz' : ''}`}>
+                      {stampFor(p.happened_at, p.date_precision)}
+                    </span>
+                    <span className="w">{p.source}</span>
+                    <span className="n">{p.n}</span>
+                  </div>
                   <div>
+                    <div className="pt"><q>{p.quote}</q><em>{p.whose}</em></div>
                     <div className="ps">
-                      <span>{stampFor(p.happened_at, p.date_precision)}</span>
-                      <span>{p.source}</span>
-                      <span>{p.whose}</span>
+                      {p.kind === 'recording'
+                        ? 'from the transcript — the whole recording is kept'
+                        : 'the entry, whole'}
                     </div>
-                    <q>{p.quote}</q>
-                    <div className="go">
-                      <Link href={p.href}>
-                        {p.kind === 'recording' ? 'the whole recording' : 'the entry'}
-                      </Link>
-                    </div>
+                    <Link className="more" href={p.href}>
+                      {p.kind === 'recording' ? 'the whole recording' : 'the whole passage'}
+                    </Link>
                   </div>
                 </div>
               ))}
@@ -210,6 +254,33 @@ export default function SearchPage() {
                 <div className="none">
                   Nothing matched. That is a gap in what you have written down,
                   or in the words used — not proof it never happened.
+                </div>
+              )}
+
+              {/* ⚠️ `search.html`'s `.h thin` row is a NAMED untranscribed
+                  file, listed under the query as one that "might be
+                  relevant — the batch page guessed it could mention it".
+                  To name one the log would have to decide which unread
+                  recording bears on this question, and it cannot: it has
+                  not read any of them. That is the fence `/footage` draws
+                  in the same words — "no relevance ranking… a relevance
+                  score is the log having an opinion about which of his
+                  footage is good".
+
+                  The half of that row that IS a fact is kept, as a count.
+                  Retrieval reads entries and transcripts, so a recording
+                  with no words was never looked at — that is not "no
+                  match", and a search silently missing most of the corpus
+                  reads as an answer about the whole log. */}
+              {result.unsearchable > 0 && (
+                <div className="none">
+                  {result.unsearchable}{' '}
+                  {result.unsearchable === 1 ? 'recording has' : 'recordings have'}{' '}
+                  not been transcribed, so this search did not look inside{' '}
+                  {result.unsearchable === 1 ? 'it' : 'them'}. Which of them bear
+                  on this is not something the log can know before it has read
+                  them.{' '}
+                  <Link className="more" href="/settings">transcribe them</Link>
                 </div>
               )}
             </div>

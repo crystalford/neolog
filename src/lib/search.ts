@@ -39,7 +39,7 @@
  * decided.
  */
 
-import { findMany } from '@/lib/d1'
+import { findMany, findOne } from '@/lib/d1'
 import { callReasoning } from '@/lib/models'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -72,6 +72,21 @@ export interface SearchAnswer {
   model: string | null
   /** Sentences the model produced that were dropped, and why. */
   dropped: number
+  /**
+   * Recordings with no word timings. Retrieval reads `log_entries` and
+   * `transcript_words`, so a recording that has never been transcribed is
+   * not searched — it is not "no match", it is not looked at. The page says
+   * so, because a search that silently misses most of the corpus reads as
+   * an answer about the whole log.
+   *
+   * ⚠️ This is a COUNT, not a list. `search.html`'s `.h thin` row names a
+   * particular untranscribed file as one that "might be relevant" — to do
+   * that the log would have to decide which unread file bears on this
+   * question, which it cannot know, because it has not read it. That is
+   * the fence `/footage` draws in the same words. How many it could not
+   * see is a fact; which one matters is a guess.
+   */
+  unsearchable: number
 }
 
 interface SearchEnv {
@@ -319,6 +334,14 @@ export async function search(
 ): Promise<SearchAnswer> {
   const passages = await findPassages(db, operatorId, question)
   const { answer, not_answered, model, dropped } = await answerFromPassages(env, question, passages)
+  const unread = await findOne<{ n: number }>(
+    db,
+    `SELECT COUNT(*) AS n
+       FROM vlogs v
+      WHERE v.operator_id = ? AND v.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)`,
+    operatorId,
+  )
   return {
     question,
     answer,
@@ -331,5 +354,6 @@ export async function search(
     },
     model,
     dropped,
+    unsearchable: Number(unread?.n || 0),
   }
 }

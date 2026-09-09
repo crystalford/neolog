@@ -41,7 +41,21 @@ const PAGES = [
   ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         0],
   ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
-  ['search',     'src/app/(app)/search/page.tsx',       7],
+  // 7 → 1 on 9 Sep. The hit was `.pt` wrapping the meta — the design's shape
+  // inverted, so the date, the provenance and the passage number all took
+  // quoted-text styling. `.d fz` is the one that mattered: a date the log had
+  // to guess must not look like one it knows, on the surface whose whole
+  // discipline is pointing at things.
+  // ⚠️ `.thin` is the one that stays, and it is a refusal. It is a NAMED
+  // untranscribed file listed under the query as one that "might be relevant
+  // — the batch page guessed it could mention it". To name one, the log has
+  // to decide which unread recording bears on this question, and it cannot:
+  // it has not read any of them. That is the fence /footage draws in the same
+  // words. The half of that row that IS a fact — how many recordings the
+  // search could not look inside — is built, as a count.
+  // ⚠️ `.tabs` is built with TWO of the design's three. "By relevance" is
+  // the log having an opinion about which of his own words matter most.
+  ['search',     'src/app/(app)/search/page.tsx',       1],
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
   ['onthisday',  'src/app/(app)/onthisday/page.tsx',     4],
   // 5 → 0 on 9 Sep. `clear.html`'s phone (`.ph` holding a `.scr`) had every
@@ -54,7 +68,14 @@ const PAGES = [
   // takeout.html — "everything out, and the bill" — is this page.
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
   // from the log"): what the Markdown looks like, not a route.
-  ['takeout',    'src/app/(app)/export/page.tsx',       6],
+  // 6 → 0 on 9 Sep. ⚠️ The bill rendered the quantity and the rate as one
+  // run-on span, and then borrowed /pages' index row (`.idxrow .nm .kd .sp
+  // .ct`) for its total — a different table on a different page. Every line
+  // says which rate it used so the arithmetic can be checked by hand, and a
+  // quantity in its own column is what makes that possible at a glance.
+  // The download block gained `.out`, without which `.big`, `.sub` and `.go`
+  // matched no rule at all: every one of them is scoped under it.
+  ['takeout',    'src/app/(app)/export/page.tsx',       0],
   // 5 → 3 on 9 Sep: a term now carries `.t` (its name with the date beside
   // it) and `.c` (first said … · where it was said). This page stated its
   // facts and gave no way to check one, on a product where every other
@@ -107,7 +128,20 @@ const PAGES = [
   // writing.html's title is "an essay you wrote" — it covers the mechanic
   // AND one document, so the detail page is measured against it too.
   ['writing',    'src/app/(app)/writing/[id]/page.tsx', 0],
-  ['screenshots','src/app/(app)/screenshots/page.tsx',  7],
+  // 7 → 1 on 9 Sep. ⚠️ The page had a SECOND `.grid > main` nested inside the
+  // first, so it rendered two rails and put the three piles inside a
+  // two-column grid that was already the 708 column. And `.paper` was being
+  // used as a container with `.im` as the card — the design's shapes
+  // inverted. It now renders `screenshots.html`'s own card (`.shot` / `.im` /
+  // `.txt` / `.k` / `<q>` / `.v` / `.go`, with `.junk` on the offered pile)
+  // and §2's paperwork rows off `kind = 'paperwork'`, which is where `.d fz`
+  // earns its keep: a scanned invoice dated "Mar 2005" must not look like a
+  // screenshot dated to the day.
+  // ⚠️ `.n` is the one that stays, and it cannot be built alone: on this page
+  // it appears ONLY inside `.st`, the numbered walkthrough section that is in
+  // PACKAGE_FURNITURE because rendering it would be the log explaining itself
+  // under the feature. The badge without the step is nothing.
+  ['screenshots','src/app/(app)/screenshots/page.tsx',  1],
   ['messages',   'src/app/(app)/messages/page.tsx',     7],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live

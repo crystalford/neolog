@@ -20,23 +20,48 @@ import Link from 'next/link'
 import Shell from '@/components/Shell'
 import { Rail } from '@/components/Rail'
 import { PILE_WORDS, type Pile } from '@/lib/screenshots'
+import { stampFor, isFuzzy, type DatePrecision } from '@/lib/log-entry'
 
 interface Shot {
   id: string; text: string; detail: string | null; reads: string | null
-  happened_at: string; entry_kind_now: string
+  happened_at: string; date_precision: string; entry_kind_now: string
   url: string | null; pile: Pile; kind: string; why: string
   facts: { what?: string; who?: string; when?: string; amount?: string }
 }
 
-const day = (s: string) => {
+/** A paperwork row: what · who · when · how much · the original kept. */
+interface Paper {
+  id: string; text: string; detail: string | null
+  happened_at: string; date_precision: string
+  what: string; who: string | null; amount: string | null
+  mime: string | null
+}
+
+/** Day and time, the way the design's `.k` meta line reads it. */
+const stamp = (s: string) => {
   const d = new Date(s)
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  if (isNaN(d.getTime())) return ''
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ${
+    d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+/**
+ * What the picture really is, in the words the design uses. It is the sort's
+ * own answer restated — never a new claim about the picture.
+ */
+const REALLY: Record<string, string> = {
+  receipt: 'really a receipt',
+  message: 'a message from someone',
+  directions: "a moment's convenience",
+  code: 'a code, for a second',
+  unknown: 'not recognised',
 }
 
 const ORDER: Pile[] = ['something', 'keep', 'convenience']
 
 export default function Screenshots() {
   const [piles, setPiles] = useState<Record<Pile, Shot[]> | null>(null)
+  const [paperwork, setPaperwork] = useState<Paper[]>([])
   const [loading, setLoading] = useState(true)
   const [keeping, setKeeping] = useState<Set<string>>(new Set())
   const [msg, setMsg] = useState<string | null>(null)
@@ -45,7 +70,11 @@ export default function Screenshots() {
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/v2/log/screenshots', { cache: 'no-store' })
-      if (res.ok) setPiles(((await res.json()) as { piles: Record<Pile, Shot[]> }).piles)
+      if (res.ok) {
+        const j = await res.json() as { piles: Record<Pile, Shot[]>; paperwork?: Paper[] }
+        setPiles(j.piles)
+        setPaperwork(j.paperwork || [])
+      }
     } catch { setPiles(null) }
     finally { setLoading(false) }
   }, [])
@@ -105,9 +134,6 @@ export default function Screenshots() {
           </p>
         </section>
 
-        <div className="grid">
-          <main>
-
         {loading && <div className="none">Reading them.</div>}
         {!loading && total === 0 && (
           <div className="none">
@@ -140,44 +166,86 @@ export default function Screenshots() {
               </div>
             )}
 
-            <div className="paper">
+            {/* `screenshots.html`'s card: the picture, then what the log READ
+                out of it as a quote, then why it is in this pile, in words
+                that can be checked against the picture. `.junk` is the third
+                pile's modifier — it dims the card, and it is a mark on an
+                OFFER, not on a decision. */}
+            <div className="body">
               {piles[p].map(s => (
-                <div className={`im${keeping.has(s.id) ? ' kept' : ''}`} key={s.id}>
-                  {s.url && (
+                <div
+                  className={`shot${p === 'convenience' && !keeping.has(s.id) ? ' junk' : ''}`}
+                  key={s.id}
+                >
+                  {s.url
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.url} alt="" loading="lazy" />
-                  )}
-                  <div className="body">
-                    <Link className="x" href={`/entry/${s.id}`}>{s.text}</Link>
-                    <div className="m">
-                      <time dateTime={s.happened_at}>{day(s.happened_at)}</time>
-                      {s.facts.amount && <span>{s.facts.amount}</span>}
-                      {s.facts.who && <span>{s.facts.who}</span>}
-                      <span>on the log as {s.entry_kind_now}</span>
+                    ? <img className="im" src={s.url} alt="" loading="lazy" />
+                    : <div className="im" />}
+                  <div className="txt">
+                    <div className="k">
+                      <span>{stamp(s.happened_at)} · a screenshot</span>
+                      <b>{REALLY[s.kind] || REALLY.unknown}</b>
                     </div>
-                    <div className="txt">{s.why}</div>
-                    {s.kind === 'message' && (
-                      <div className="txt">
-                        Someone else&rsquo;s words, so they get{' '}
-                        <Link href="/messages">the message rule</Link> — kept,
-                        attached to them, private by default.
-                      </div>
-                    )}
-                    {p === 'convenience' && (
-                      <button className="go" onClick={() => toggleKeep(s.id)}>
-                        {keeping.has(s.id) ? 'in the pile again' : 'keep this one'}
-                      </button>
-                    )}
+                    {/* What the vision pass read, verbatim. It is the reason
+                        the row is where it is, so it is shown rather than
+                        described. */}
+                    {s.reads && <q>{s.reads.length > 240 ? `${s.reads.slice(0, 240)}…` : s.reads}</q>}
+                    <div className="v">
+                      {s.why}{' '}
+                      {s.kind === 'message' && (
+                        <>
+                          Another person&rsquo;s words, so they get{' '}
+                          <Link href="/messages">the message rule</Link> —
+                          kept, attached to them, private by default.{' '}
+                        </>
+                      )}
+                      On the log as <b>{s.entry_kind_now}</b>. The picture is
+                      kept either way.
+                    </div>
+                    <div className="go">
+                      <Link className="p" href={`/entry/${s.id}`}>the entry</Link>
+                      {p === 'convenience' && (
+                        <button onClick={() => toggleKeep(s.id)}>
+                          {keeping.has(s.id) ? 'in the pile again' : 'keep this one'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ))}
-                </main>
 
-          <Rail goesTo={[{ href: '/triage', label: 'what arrived' }, { href: '/messages', label: 'the message rule' }, { href: '/clear', label: 'safe to clear' }]} />
-        </div>
+        {/* §2: "Receipts, contracts, statements, the letter from the clinic.
+            The boring half of a life record, and it's a kind." Read off
+            `kind = 'paperwork'`, so a PDF of a contract sits beside a photo
+            of a receipt — the kind is the thing they share, not the mime.
+            A date the log had to guess renders `.d fz`, the same distinction
+            /search draws: "Mar 2005" from a scan and "2 Sep 2026" from a
+            screenshot are not the same kind of fact. */}
+        {paperwork.length > 0 && (
+          <div className="body">
+            <div className="sh">
+              <span>Paperwork on the log</span>
+              <b>what · who · when · how much · the original kept</b>
+            </div>
+            {paperwork.map(r => (
+              <Link className="paper" key={r.id} href={`/entry/${r.id}`}>
+                <span className="k">{r.what}</span>
+                <span className="x">
+                  {r.text}
+                  <i>
+                    {[r.amount, r.who, r.detail].filter(Boolean).join(' · ') || 'the original kept'}
+                  </i>
+                </span>
+                <span className={`d${isFuzzy(r.date_precision as DatePrecision) ? ' fz' : ''}`}>
+                  {stampFor(r.happened_at, r.date_precision as DatePrecision)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
         {/* `screenshots.html` closes on these two, and both are the design
             rather than reassurance about it. */}
         <div className="rules">

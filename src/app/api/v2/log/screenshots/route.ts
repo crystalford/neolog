@@ -96,7 +96,46 @@ export async function GET(req: NextRequest) {
     convenience: items.filter(i => i.pile === 'convenience' && !i.held),
   }
 
-  return NextResponse.json({ piles, total: items.length }, { headers: { 'Cache-Control': 'no-store' } })
+  // `screenshots.html` §2: "Receipts, contracts, statements, the letter from
+  // the clinic. The boring half of a life record, and it's a kind." Not only
+  // screenshots — a PDF of a contract and a photo of a receipt are the same
+  // kind, so this reads the kind rather than the mime. What, who, when, how
+  // much: the first three are columns; the amount is pulled from the words
+  // the vision pass read, and is absent when there are none.
+  const paper = await findMany<{
+    id: string; text: string; detail: string | null; transcript: string | null
+    happened_at: string; date_precision: string; mime: string | null
+  }>(
+    db,
+    `SELECT id, text, detail, transcript,
+            COALESCE(happened_at, occurred_at, created_at) AS happened_at,
+            COALESCE(date_precision, 'exact') AS date_precision, mime
+       FROM log_entries
+      WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        AND kind = 'paperwork'
+      ORDER BY COALESCE(happened_at, occurred_at, created_at) DESC
+      LIMIT 200`,
+    operator!.id,
+  )
+  const paperwork = paper.map(r => {
+    const sorted = sortScreenshot(r.transcript)
+    return {
+      id: r.id,
+      text: r.text,
+      detail: r.detail,
+      happened_at: r.happened_at,
+      date_precision: r.date_precision,
+      what: sorted.facts.what || 'paperwork',
+      who: sorted.facts.who || null,
+      amount: sorted.facts.amount || null,
+      mime: r.mime,
+    }
+  })
+
+  return NextResponse.json(
+    { piles, paperwork, total: items.length },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }
 
 export async function POST(req: NextRequest) {

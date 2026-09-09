@@ -200,13 +200,46 @@ export default function ExportPage() {
                 of the file.
               </p>
             )}
-            <div className="fixrow">
+            {/* `takeout.html`'s `.big` and `.sub` — how much, and in what
+                shape, before he presses. ⚠️ The size is the size of what is
+                STORED, not of the file: the export is Markdown plus a
+                manifest and the originals stay in R2, so quoting 19 GB
+                against a download button would be a promise the file does
+                not keep. The line says which is which. */}
+            {/* `.out` is the two-column frame `takeout.css` gives this:
+                what you get on the left, the buttons on the right. Without
+                it `.big`, `.sub` and `.go` match no rule at all — every one
+                of them is scoped under `.out`. */}
+            <div className="out">
+            {bill && (
+              <>
+                <div className="big">
+                  <b>{bill.stored.gb} GB</b> — every entry, every original
+                  file, every version.
+                </div>
+                <div className="sub">
+                  Plain text for the words (Markdown, one file per entry,
+                  dated) and a manifest that says what everything is and
+                  where it came from. The originals stay in storage and the
+                  manifest points at each one.{' '}
+                  <b>Nothing in a format that needs this software to open.</b>
+                </div>
+              </>
+            )}
+
+            {/* `.go` — the two downloads and what to expect of them. */}
+            <div className="go">
               <a href={`/api/v2/export?${params('md')}`} download>
                 <button className="p" disabled={count === 0}>Download the document</button>
               </a>
               <a href={`/api/v2/export?${params('json')}`} download>
                 <button disabled={count === 0}>Download the manifest</button>
               </a>
+              <em>
+                built here and now, from the range above — no link to expire
+                and nothing queued
+              </em>
+            </div>
             </div>
           </div>
         </div>
@@ -264,31 +297,40 @@ export default function ExportPage() {
             </div>
 
 
+            {/* ⚠️ `takeout.css` gives a bill row three cells — `.n` the line
+                with its rate under it, `.q` the QUANTITY, `.c` the money.
+                This rendered the quantity and the rate as one run-on span
+                and then borrowed `/pages`' index row (`.idxrow .nm .kd .sp
+                .ct`) for the total, which is a different table on a
+                different page. Every line says which rate it used so the
+                arithmetic can be checked by hand — and a quantity in its own
+                column is what makes that possible at a glance. */}
             {bill.monthly.map((l, i) => (
               <div className="row" key={i}>
-                <div>
-                  <b>{l.what}</b>
-                  <span>{l.how} · {l.rate}</span>
-                </div>
+                <div className="n">{l.what}<em>{l.rate}</em></div>
+                <span className="q">{l.how}</span>
                 <span className="c">${l.usd.toFixed(2)}</span>
               </div>
             ))}
-            <div className="idxrow" style={{ gridTemplateColumns: 'minmax(0,1fr) 200px 120px 80px' }}>
-              <span className="nm"><b>Every month, to keep all of it</b></span>
-              <span className="kd" /><span className="sp" />
-              <span className="ct"><b>${bill.monthly_total.toFixed(2)}</b></span>
+            <div className="row tot">
+              <div className="n">Every month, to keep all of it</div>
+              <span className="q" />
+              <span className="c">${bill.monthly_total.toFixed(2)}</span>
             </div>
 
             <div className="idxband"><b>Already paid, once</b>reading it, not keeping it</div>
             {bill.one_off.map((l, i) => (
               <div className="row" key={i}>
-                <div>
-                  <b>{l.what}</b>
-                  <span>{l.how} · {l.rate}</span>
-                </div>
+                <div className="n">{l.what}<em>{l.rate}</em></div>
+                <span className="q">{l.how}</span>
                 <span className="c">${l.usd.toFixed(2)}</span>
               </div>
             ))}
+            <div className="row tot">
+              <div className="n">Paid once, for reading it</div>
+              <span className="q" />
+              <span className="c">${bill.one_off_total.toFixed(2)}</span>
+            </div>
             </div>
             <div className="note">
               Every line says which rate it used, so the arithmetic can be
