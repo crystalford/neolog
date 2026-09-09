@@ -25,6 +25,8 @@
  *   {
  *     vlog_ids?: string[]           // explicit list (client provides per-chunk)
  *     scope?: 'incomplete' | 'all'  // only used when dry_run + no vlog_ids
+ *                                   // incomplete = no word timings, or the
+ *                                   // pipeline never finished
  *     mode: 'cheap' | 'premium'
  *     dry_run?: boolean             // resolve list only, don't dispatch
  *     skip_in_flight?: boolean      // default true
@@ -181,28 +183,32 @@ export async function POST(req: NextRequest) {
                   ${inFlightWhere}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
-            // "Incomplete" includes three failure modes:
-            //   1. Pipeline never finished (status != 'complete')
-            //   2. No active extraction_runs row at all
-            //   3. Active extraction_runs row exists but total_items=0
-            //      AND the transcript is substantial (>= 200 chars).
-            //      A short transcript means nothing was said — those
-            //      are terminal, NOT eligible for re-dispatch.
-            //   4. extraction_runs.model = 'short-transcript-skip' is
-            //      are silent recordings; never re-dispatch.
+            // ⚠️ "Incomplete" used to mean "the extraction engine did not
+            // finish", resolved by LEFT JOINing `extraction_runs` — a table
+            // dropped on 8 Sep. Every dry run threw `no such table`, and
+            // this is the endpoint behind the button that transcribes four
+            // hundred recordings. `check-sql-columns.mjs` could not see it:
+            // MIGRATIONS is append-only, so that table's columns are still
+            // "known" long after the table is gone.
+            //
+            // What incomplete MEANS now is one thing, and it is the only
+            // thing `read-recording.ts` needs: **no word timings**. A
+            // recording with none writes nothing at all rather than dating
+            // its passages by guess, so it is exactly the set that has to go
+            // back through Whisper. `transcript_text` is not the test — an
+            // older run could leave prose with no timings, and that
+            // recording can never be read.
+            //
+            // A recording the pipeline never finished is included too, since
+            // its words may be missing for a reason upstream of Whisper.
             : `SELECT v.id AS id,
                       CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
                            THEN 1 ELSE 0 END AS has_transcript
                   FROM vlogs v
-                  LEFT JOIN extraction_runs r
-                    ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
                   AND (v.pipeline_status != 'complete'
-                       OR r.id IS NULL
-                       OR (
-                         COALESCE(r.total_items, 0) = 0
-                         AND COALESCE(r.model, '') != 'short-transcript-skip'
-                         AND LENGTH(COALESCE(v.transcript_text, '')) >= 200
+                       OR NOT EXISTS (
+                         SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id
                        ))
                   ${inFlightWhere}
                 ORDER BY v.id

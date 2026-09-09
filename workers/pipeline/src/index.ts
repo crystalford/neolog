@@ -1359,58 +1359,8 @@ function mapStateToLegacyPipelineStatus(state: string): string {
    `transcript_words`, so it carries its own seconds. */
 
 
-/**
- * For each thread, write entity_mentions rows with source_kind='thread'
- * for any entity whose name appears (case-insensitive) in any of the
- * thread's key_quotes.
- *
- * Resolves entity ids by name within the vlog scope — extraction wrote
- * one entity row per unique name per vlog, so a SELECT by (vlog_id,
- * lower(name)) finds the persisted entity id.
- */
-async function writeThreadEntityMentions(
-  db: D1Database,
-  operator_id: string,
-  vlog_id: string,
-  threads: { id: string; quotes: string[] }[],
-  entities: { name?: string; aliases?: string[] }[],
-): Promise<void> {
-  if (threads.length === 0 || entities.length === 0) return
-
-  // Fetch the persisted entity ids for this vlog so we can write mentions
-  // with the right entity_id. Don't trust the run-time payload; entities
-  // are inserted earlier in the pipeline and might have been deduped.
-  const persisted = (await db.prepare(
-    `SELECT id, name FROM entities
-      WHERE operator_id = ? AND vlog_id = ? AND deleted_at IS NULL`,
-  ).bind(operator_id, vlog_id).all<{ id: string; name: string }>()).results ?? []
-
-  const byLowerName: Record<string, string> = {}
-  for (const e of persisted) {
-    if (e.name) byLowerName[e.name.toLowerCase()] = e.id
-  }
-  if (Object.keys(byLowerName).length === 0) return
-
-  for (const t of threads) {
-    const haystack = (t.quotes ?? []).join(' ').toLowerCase()
-    if (!haystack) continue
-    const seen = new Set<string>()
-    for (const [lowerName, entity_id] of Object.entries(byLowerName)) {
-      // Require a word-boundary-ish match so "AI" doesn't match every "aim".
-      if (lowerName.length < 2) continue
-      const pattern = new RegExp('(^|[^a-z0-9])' + lowerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)')
-      if (pattern.test(haystack) && !seen.has(entity_id)) {
-        seen.add(entity_id)
-        try {
-          await db.prepare(
-            `INSERT INTO entity_mentions
-               (id, entity_id, operator_id, source_kind, source_id, mention_text)
-             VALUES (?, ?, ?, 'thread', ?, ?)`,
-          ).bind(ulid(), entity_id, operator_id, t.id, lowerName).run()
-        } catch (e: any) {
-          // Silent — usually a unique-constraint dupe on retry
-        }
-      }
-    }
-  }
-}
+/* `writeThreadEntityMentions` lived here. It read `entities` and wrote
+   `entity_mentions` for every thread whose quotes named one — both tables
+   dropped on 8 Sep with the extraction engine, and no caller left in this
+   file since the passes went. It is gone rather than guarded: an entity the
+   log decided mattered is exactly what the rebuild threw away. */

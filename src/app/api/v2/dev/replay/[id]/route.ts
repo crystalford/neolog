@@ -12,9 +12,11 @@
  * steps are NOT auto-deleted — `force=true` bypasses skip-if-exists checks
  * but leaves the data so a failed re-run can roll back.
  *
- * 50 prompt iterations on the same vlog cost ~$2 instead of ~50 minutes of
- * ffmpeg time × 50, because audio_extract + transcribe are skipped by
- * artifact existence.
+ * `from=extract` is the pipeline's own name for its last step, which is now
+ * `stepRead` — no model, no prompt, no run row. Re-running it is free and
+ * writes nothing the second time; audio_extract and transcribe are still
+ * skipped by artifact existence, which is the point of replaying from a
+ * later step at all.
  */
 
 export const runtime = 'edge'
@@ -98,14 +100,14 @@ export async function POST(
            WHERE id = ?`,
         vlog_id,
       )
-    } else if (from === 'extract') {
-      // Mark old extraction_runs inactive so the new run is the only is_active=1
-      await run(
-        db,
-        `UPDATE extraction_runs SET is_active = 0 WHERE vlog_id = ? AND is_active = 1`,
-        vlog_id,
-      )
     }
+    // ⚠️ `from === 'extract'` used to deactivate the previous
+    // `extraction_runs` row so the new run was the only live one. That table
+    // was dropped on 8 Sep and there is no run to deactivate: the step it
+    // names is `stepRead`, which cuts the word timings into entries and is
+    // idempotent through `source_ref`. Running it twice writes nothing the
+    // second time, which is why nothing replaces the deactivate rather than
+    // it merely being absent.
   }
 
   let dispatched = false

@@ -148,6 +148,16 @@ jobs:
       - name: Every page scope is rendered by a page
         run: node scripts/check-unreached-css.mjs
 
+      # The blind spot `check-sql-columns.mjs` structurally cannot cover.
+      # MIGRATIONS is append-only, so the statements that BUILT the
+      # extraction engine's tables are still in the array and their columns
+      # are still "known" long after the tables were dropped — a query
+      # against one passes the column checker and throws `no such table` on
+      # every request. Nine of them were live on 9 Sep, including the dry run
+      # behind the button that transcribes four hundred recordings.
+      - name: No live SQL against a dropped table
+        run: node scripts/check-dropped-tables.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:

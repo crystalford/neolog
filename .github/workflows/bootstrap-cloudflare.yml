@@ -3,7 +3,6 @@ name: Bootstrap Cloudflare
 # Provisions every Cloudflare resource Neolog needs:
 #  - D1 database 'neolog' (created if absent)
 #  - Schema applied (db/schema.sql)
-#  - Initial prompt rows seeded (db/seed.sql)
 #  - R2 bucket binding (neolog-videos — already exists, just confirms access)
 #  - Workers AI binding
 #  - Cloudflare Access application + One-time PIN identity provider
@@ -194,14 +193,6 @@ jobs:
           print(f"\nMigrations: applied={applied} skipped={skipped} failed={failed}")
           sys.exit(1 if failed else 0)
           PY
-          fi
-
-      - name: Seed initial prompts (if seed file exists)
-        run: |
-          if [ -f db/seed.sql ]; then
-            wrangler d1 execute "$D1_NAME" --remote --file db/seed.sql
-          else
-            echo "(no db/seed.sql yet — skipping)"
           fi
 
       - name: Confirm R2 bucket exists

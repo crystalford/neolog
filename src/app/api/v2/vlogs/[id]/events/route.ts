@@ -37,20 +37,25 @@ export async function GET(
   if (!vlog_id) return NextResponse.json({ error: 'vlog id required' }, { status: 400 })
 
   const db = getDb(env)
-  // Pull pipeline_status + extraction_runs.total_items so the synthesizer
-  // can produce a real diagnosis (not just raw event text).
+  // What the synthesizer needs to say something true: whether Whisper left
+  // word timings, and how many entries have been read out of this recording.
+  // ⚠️ It used to read `extraction_runs.total_items`, and that table was
+  // dropped on 8 Sep — so this query threw `no such table` and the banner at
+  // the top of the recording's page never rendered a diagnosis at all.
   const owned = await findOne<{
     id: string
     pipeline_status: string
     transcript_len: number
-    total_items: number | null
+    has_words: number
+    entries_read: number
   }>(
     db,
     `SELECT v.id, v.pipeline_status,
             COALESCE(LENGTH(v.transcript_text), 0) AS transcript_len,
-            (SELECT total_items FROM extraction_runs r
-              WHERE r.vlog_id = v.id AND r.is_active = 1
-              LIMIT 1) AS total_items
+            EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id) AS has_words,
+            (SELECT COUNT(*) FROM log_entries e
+              WHERE e.vlog_id = v.id AND e.operator_id = v.operator_id
+                AND e.deleted_at IS NULL) AS entries_read
        FROM vlogs v
       WHERE v.id = ? AND v.operator_id = ? AND v.deleted_at IS NULL`,
     vlog_id, operator.id,
@@ -66,8 +71,8 @@ export async function GET(
   const diagnosis = diagnoseFromEvents(
     events as any,
     owned.pipeline_status,
-    owned.total_items !== null,
-    owned.total_items ?? 0,
+    !!owned.has_words,
+    owned.entries_read ?? 0,
     owned.transcript_len ?? 0,
   )
 

@@ -25,7 +25,8 @@ export type DiagnosisStatus =
   | 'queued'            // waiting at a gate / not started yet
   | 'in_flight'         // actively processing
   | 'complete'          // done, has data
-  | 'b_roll'            // done, empty extraction (silent / no-dialogue footage)
+  | 'b_roll'            // done, nothing said in it (silent / no-dialogue footage)
+  | 'words_missing'     // a transcript, but no word timings — cannot be read
   | 'broken_input'      // FFmpeg can't read this file across all strategies
   | 'whisper_stuck'     // Whisper retrying many times, no progress
   | 'whisper_timeout'   // single Whisper call timed out
@@ -60,22 +61,39 @@ interface EventRow {
  * pipeline_status. Caller passes both because pipeline_status is the
  * authoritative terminal state (complete / failed / archived).
  */
+/**
+ * ⚠️ The two middle arguments used to be `hasActiveExtraction` and
+ * `totalExtractedItems`, read out of `extraction_runs` — a table dropped on
+ * 8 Sep, so both callers threw `no such table` before reaching this. They
+ * are now the two facts that decide what a recording IS on this log: whether
+ * Whisper left WORD TIMINGS on it, and how many entries have been read out
+ * of it. A recording with no timings writes nothing at all rather than
+ * dating its passages by guess, so "transcribed" without them is the state
+ * worth naming out loud.
+ */
 export function diagnoseFromEvents(
   events: EventRow[],
   pipelineStatus: string,
-  hasActiveExtraction: boolean,
-  totalExtractedItems: number,
+  hasWordTimings: boolean,
+  entriesRead: number,
   transcriptLen: number,
 ): Diagnosis {
   // Terminal happy states first
-  if (pipelineStatus === 'complete' && hasActiveExtraction && totalExtractedItems > 0) {
-    return { status: 'complete', label: `Extracted ${totalExtractedItems} item${totalExtractedItems === 1 ? '' : 's'}` }
+  if (pipelineStatus === 'complete' && entriesRead > 0) {
+    return { status: 'complete', label: `${entriesRead} entr${entriesRead === 1 ? 'y' : 'ies'} read onto the log` }
   }
-  if (pipelineStatus === 'complete' && (transcriptLen < 200) && totalExtractedItems === 0) {
+  if (pipelineStatus === 'complete' && transcriptLen >= 20 && !hasWordTimings) {
+    return {
+      status: 'words_missing',
+      label: 'Transcribed, but with no word timings',
+      recommendation: 'Nothing can be read out of it until Whisper runs again with timestamps — the log will not date a passage it cannot place.',
+    }
+  }
+  if (pipelineStatus === 'complete' && transcriptLen < 200 && !entriesRead) {
     return {
       status: 'b_roll',
       label: 'Nothing said in it',
-      recommendation: 'Treat as cinematic footage. Nothing to extract.',
+      recommendation: 'Footage with no words. There is nothing to read onto the log.',
     }
   }
   if (pipelineStatus === 'complete') {
@@ -223,22 +241,24 @@ export async function diagnoseVlog(
   const events = await getEventsForVlog(db, vlog_id, operator_id, 200)
   const row = await db.prepare(
     `SELECT v.pipeline_status, COALESCE(LENGTH(v.transcript_text), 0) AS transcript_len,
-            (SELECT total_items FROM extraction_runs r
-              WHERE r.vlog_id = v.id AND r.is_active = 1
-              LIMIT 1) AS total_items
+            EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id) AS has_words,
+            (SELECT COUNT(*) FROM log_entries e
+              WHERE e.vlog_id = v.id AND e.operator_id = v.operator_id
+                AND e.deleted_at IS NULL) AS entries_read
        FROM vlogs v
       WHERE v.id = ? AND v.operator_id = ?`,
   ).bind(vlog_id, operator_id).first<{
     pipeline_status: string
     transcript_len: number
-    total_items: number | null
+    has_words: number
+    entries_read: number
   }>()
   if (!row) return null
   return diagnoseFromEvents(
     events as any,
     row.pipeline_status,
-    row.total_items !== null,
-    row.total_items ?? 0,
+    !!row.has_words,
+    row.entries_read ?? 0,
     row.transcript_len ?? 0,
   )
 }

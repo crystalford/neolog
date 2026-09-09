@@ -1,29 +1,38 @@
 /**
  * GET /api/v2/admin/pipeline-state
  *
- * Read-only diagnostic. Returns aggregate counts of vlogs by transcript /
- * extraction / pipeline_status state. ZERO dispatch, ZERO LLM calls, ZERO
- * container starts — costs nothing to run. Used by the bulk reprocess
- * modal to show the operator what's there before committing money.
+ * Read-only diagnostic. Aggregate counts of the recordings by what state
+ * they are actually in. ZERO dispatch, ZERO model calls, ZERO container
+ * starts — costs nothing to run. Called through the admin bridge before a
+ * bulk run, so the operator can see what is there before starting one.
+ *
+ * ⚠️ Its buckets used to be the extraction engine's — `complete_with_data`,
+ * `complete_no_data` and `b_roll` were all decided by joining
+ * `extraction_runs`, a table dropped on 8 Sep, so the query threw
+ * `no such table` on every call. `check-sql-columns.mjs` could not see it:
+ * MIGRATIONS is append-only, so that table's columns are still known.
+ *
+ * The buckets are now the two questions this product actually asks of a
+ * recording — **does it have word timings**, and **has it been read onto
+ * the log** — because those are what decide whether it is one line saying
+ * he recorded, or the things he said.
  *
  * Response shape:
  *   {
  *     total: number,
  *     by_status: {
- *       complete_with_data: number,    // pipeline_status='complete' AND active extraction with items
- *       complete_no_data: number,      // pipeline_status='complete' BUT no items (silent-empty bug victims)
- *       transcribed_only: number,      // transcript exists, no extraction
- *       untranscribed: number,         // no transcript yet — needs full pipeline
- *       stuck_in_flight: number,       // pipeline_status in (transcoding/transcribing/extracting) for > 5 min
- *       archived: number,              // pipeline_status='archived' (operator opt-in processing)
- *       failed: number,                // pipeline_status='failed'
+ *       read: number,                  // read onto the log; entries exist
+ *       transcribed_only: number,      // has word timings, not read yet
+ *       words_missing: number,         // a transcript, but no word timings —
+ *                                      //   these can never be read, and are
+ *                                      //   exactly what needs Whisper again
+ *       untranscribed: number,         // nothing at all yet
+ *       stuck_in_flight: number,       // in flight for > 5 min
+ *       in_flight_recent: number,
+ *       archived: number,              // uploaded with auto-processing off
+ *       failed: number,
  *     },
  *     stuck_examples: [{ id, status, stuck_minutes }, ...]   // first 5
- *     estimated_costs: {
- *       extract_only_per_vlog_usd: 0.02,
- *       full_pipeline_per_vlog_usd: 0.10,
- *       to_complete_corpus_usd: number,
- *     }
  *   }
  */
 
@@ -42,11 +51,6 @@ interface Env {
 
 const STUCK_MIN_MINUTES = 5
 const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting', 'reading', 'uploaded']
-
-// Rough per-vlog costs. Numbers mirror the costs documented in src/lib/llm.ts
-// and the FFmpeg container billing assumption (cold-start + ~60s compute).
-const COST_EXTRACT_ONLY = 0.02
-const COST_FULL_PIPELINE = 0.10
 
 export async function GET(req: NextRequest) {
   const env = getRequestContext().env as unknown as Env
@@ -70,13 +74,13 @@ export async function GET(req: NextRequest) {
       n: number
     }>(
       db,
-      // Silent: a recording that completed with nothing said in it —
-      // successfully but has either no transcript or very short
-      // (< 200 chars) transcript content AND zero extracted items.
-      // These are silent / dialogue-less recordings — still valid
-      // footage, just nothing to extract. They shouldn't visually
-      // group with "failed" or even "complete + no data" (which
-      // implies the LLM tried and rejected the content).
+      // ⚠️ `words_missing` is the bucket worth having. A recording can
+      // carry prose in `transcript_text` and no `transcript_words` — an
+      // older Whisper call, or one that lost its timings — and
+      // `read-recording.ts` writes NOTHING from one of those rather than
+      // dating its passages by guess. Counting it as "transcribed" is how
+      // four hundred recordings sit at "transcribed" and produce no entries
+      // with nothing on any screen saying why.
       `WITH classified AS (
          SELECT v.id,
                 CASE
@@ -85,32 +89,16 @@ export async function GET(req: NextRequest) {
                     THEN 'stuck_in_flight'
                   WHEN v.pipeline_status IN (${inFlightSet})
                     THEN 'in_flight_recent'
-                  WHEN v.pipeline_status = 'complete'
-                       AND EXISTS (
-                         SELECT 1 FROM extraction_runs r
-                          WHERE r.vlog_id = v.id AND r.is_active = 1
-                            AND COALESCE(r.total_items, 0) > 0
-                       )
-                    THEN 'complete_with_data'
-                  WHEN v.pipeline_status = 'complete'
-                       AND LENGTH(COALESCE(v.transcript_text, '')) < 200
-                       AND EXISTS (
-                         SELECT 1 FROM extraction_runs r
-                          WHERE r.vlog_id = v.id AND r.is_active = 1
-                            AND COALESCE(r.total_items, 0) = 0
-                       )
-                    THEN 'b_roll'
-                  WHEN v.pipeline_status = 'complete'
-                    THEN 'complete_no_data'
                   WHEN v.pipeline_status = 'failed'
                     THEN 'failed'
-                  WHEN v.pipeline_status = 'archived'
-                       AND LENGTH(COALESCE(v.transcript_text, '')) >= 20
+                  WHEN v.read_at IS NOT NULL
+                    THEN 'read'
+                  WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
                     THEN 'transcribed_only'
+                  WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
+                    THEN 'words_missing'
                   WHEN v.pipeline_status = 'archived'
                     THEN 'archived'
-                  WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
-                    THEN 'transcribed_only'
                   ELSE 'untranscribed'
                 END AS bucket
            FROM vlogs v
@@ -120,11 +108,12 @@ export async function GET(req: NextRequest) {
       operator.id,
     )
 
+    // A zero is shown as a zero: the set of buckets must not change shape
+    // depending on the answer, or a missing one reads as "not measured".
     const by_status: Record<string, number> = {
-      complete_with_data: 0,
-      complete_no_data: 0,
-      b_roll: 0,
+      read: 0,
       transcribed_only: 0,
+      words_missing: 0,
       untranscribed: 0,
       stuck_in_flight: 0,
       in_flight_recent: 0,
@@ -199,20 +188,21 @@ export async function GET(req: NextRequest) {
       operator.id,
     )
 
-    // Cost estimate: untranscribed + complete_no_data + transcribed_only +
-    // failed + stuck would all need work. Untranscribed/archived/stuck need
-    // full pipeline; transcribed_only + complete_no_data need extract only.
-    const needsFullPipeline =
+    // What a run would touch. ⚠️ The dollar estimate that used to be here
+    // ($0.02 an extract, $0.10 a full pipeline) was priced off the cost
+    // table in `src/lib/llm.ts`, and both the table and the extraction
+    // passes it priced are gone. There is no per-recording model cost left
+    // to quote — Whisper and FFmpeg are Cloudflare's own billing, which this
+    // route cannot see. A made-up figure on a page the operator uses to
+    // decide whether to start a four-hundred-recording run is worse than no
+    // figure, so it is a count of recordings and nothing else.
+    const needsWhisper =
       (by_status.untranscribed ?? 0) +
+      (by_status.words_missing ?? 0) +
       (by_status.archived ?? 0) +
       (by_status.stuck_in_flight ?? 0) +
       (by_status.failed ?? 0)
-    const needsExtractOnly =
-      (by_status.transcribed_only ?? 0) +
-      (by_status.complete_no_data ?? 0)
-    const to_complete_corpus_usd =
-      needsFullPipeline * COST_FULL_PIPELINE +
-      needsExtractOnly * COST_EXTRACT_ONLY
+    const readyToRead = by_status.transcribed_only ?? 0
 
     return NextResponse.json({
       total,
@@ -220,13 +210,10 @@ export async function GET(req: NextRequest) {
       failure_breakdown,
       stuck_examples,
       counts_for_run: {
-        needs_full_pipeline: needsFullPipeline,
-        needs_extract_only: needsExtractOnly,
-      },
-      estimated_costs: {
-        extract_only_per_vlog_usd: COST_EXTRACT_ONLY,
-        full_pipeline_per_vlog_usd: COST_FULL_PIPELINE,
-        to_complete_corpus_usd: Math.round(to_complete_corpus_usd * 100) / 100,
+        // Needs Whisper again before anything can be read out of it.
+        needs_transcribing: needsWhisper,
+        // Has word timings and has not been read onto the log yet.
+        ready_to_read: readyToRead,
       },
     }, {
       headers: { 'Cache-Control': 'no-store' },
