@@ -58,15 +58,24 @@ function walk(dir) {
     if (name === 'node_modules' || name === '.next') continue
     const p = join(dir, name)
     if (statSync(p).isDirectory()) out.push(...walk(p))
-    else if (/\.(ts|tsx|mjs)$/.test(name)) out.push(p)
+    else if (/\.(ts|tsx|mjs|sql)$/.test(name)) out.push(p)
   }
   return out
 }
 
-const files = [...walk('src'), ...walk('workers')].filter(f => !EXEMPT.has(f))
+/**
+ * ⚠️ `db/` is scanned too, and it is the half that bites hardest. The
+ * bootstrap workflow applies `db/schema.sql` and `db/migrations.sql` on
+ * EVERY push to main, so a CREATE for a dropped table there does not merely
+ * throw — it brings the table BACK, empty, one deploy after the reset route
+ * dropped it. That reasoning was already recorded for schema.sql and
+ * `db/migrations.sql` was missed: it re-created `chat_threads`,
+ * `chat_messages` and `chat_attachments` every time.
+ */
+const files = [...walk('src'), ...walk('workers'), ...walk('db')].filter(f => !EXEMPT.has(f))
 
 // A dropped table named in prose is a record of a decision; only SQL breaks.
-const clauses = /\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+([a-z0-9_]+)/gi
+const clauses = /\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z0-9_]+)/gi
 
 let bad = 0
 for (const f of files) {
@@ -77,14 +86,20 @@ for (const f of files) {
     const t = m[2].toLowerCase()
     if (!DROPPED.includes(t) || seen.has(t)) continue
     seen.add(t)
-    console.error(`  ${f}\n      ${m[1].toUpperCase()} ${t} — dropped on 8 Sep; this throws "no such table"`)
+    // A CREATE in db/ does not throw — it is worse than that. The bootstrap
+    // applies those files on every push to main, so it brings the table
+    // BACK, empty, one deploy after the reset route dropped it.
+    const why = f.startsWith('db/') && m[1].toUpperCase() === 'TABLE'
+      ? 'dropped on 8 Sep, and the bootstrap re-applies this file on every push — this brings it back, empty'
+      : 'dropped on 8 Sep; this throws "no such table"'
+    console.error(`  ${f}\n      ${m[1].toUpperCase()} ${t} — ${why}`)
     bad++
   }
 }
 
 console.log(`\n${files.length} files checked against ${DROPPED.length} dropped tables.`)
 if (bad) {
-  console.error(`\n${bad} live quer${bad === 1 ? 'y' : 'ies'} against a table that does not exist.`)
+  console.error(`\n${bad} live reference${bad === 1 ? '' : 's'} to a table that was dropped on purpose.`)
   console.error('A dropped table coming back means a generator came back with it, so the')
   console.error('fix is to remove the query — never to re-create the table.')
   process.exit(1)
