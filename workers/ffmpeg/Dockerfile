@@ -4,12 +4,20 @@
 # Same vendor as everything else (Cloudflare), so no extra API key, no extra
 # dashboard, no extra billing relationship.
 #
-# Exposed endpoints (HTTP, called from the main Worker):
-#   POST /transcode-h264  { input_url }     -> mp4 H.264 + AAC, browser-friendly
-#   POST /extract-thumb   { input_url, t }  -> jpg (base64 data URI in response)
-#   POST /extract-audio   { input_url }     -> mp3
-#   POST /trim            { input_url, start_s, end_s }  -> trimmed mp4
-#   POST /concat          { input_urls[] }  -> concatenated mp4
+# Exposed endpoints (HTTP, called from the main Worker). Five, and that is
+# all of them — every one has a caller:
+#   POST /transcode-h264   { input_url }     -> mp4 H.264 + AAC, for playback
+#   POST /extract-thumb    { input_url, t }  -> jpg (base64 data URI)
+#   POST /extract-thumb-mini-transcode       -> the cascade's second tier
+#   POST /extract-audio    { input_url }     -> mp3, for Whisper
+#   POST /concat-audio     { input_urls[] }  -> one mp3 out of the chunks
+#
+# Seven more were removed on 9 Sep — /trim, /concat, /extract-audio-segment,
+# /extract-video-segment, /render-video-essay, /ken-burns, /images-to-video.
+# They were the production engine: cut a clip, stitch a video essay, pan a
+# photo into a motion shot. That product went on 8 Sep and nothing has called
+# them since, but they were 520 of this file's 1,240 lines and they were
+# DEPLOYED — running code for a product that does not exist.
 #
 # The container reads input from a presigned R2 GET URL (no body upload).
 # It returns the output as the HTTP response body (the main Worker streams

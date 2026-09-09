@@ -776,6 +776,16 @@ that is not the point: the engine went because he did not trust what it
 wrote, and a sentence it wrote is still a sentence it wrote. The frame
 description stays — that pass is live and describes what is visibly there.
 
+**And `mode` / `tier` / `passes` were still threaded through six files.**
+`mode: 'cheap' | 'premium'` chose the LLM stack — *"`cheap` = Workers AI,
+`premium` = Anthropic Sonnet 5"* — on a vendor he has not opted into and a
+path no branch reaches; `passes` named the four deleted extraction passes.
+Both inert, except one that was not: `dispatchPipeline` treated a non-empty
+`passes` shorter than four as *"use the legacy Workflow"*, and
+`/api/v2/dev/replay` sent `passes: ['unified']` — a library deleted on 8 Sep
+— so replaying a recording took the wrong backend. What the flag does is skip
+the setup steps, and it is called `skip_setup` now.
+
 `scripts/check-dropped-tables.mjs` holds all of it, in CI. It reads
 `DROPPED_TABLES` and `MODEL_WRITTEN_COLUMNS` from `src/lib/dropped-tables.ts`
 and scans `src/`, `workers/` **and `db/`** — the last because a CREATE there
@@ -1014,10 +1024,12 @@ picture of a note**. An undated picture asks when it was taken. An idea's page
 carries **first said** and how it has changed.
 
 **The build order is void.** The operator lifted it on 7 Sep: *"go through
-the whole thing and build the full system."* What remains unbuilt: **the fold rules past twenty**
-(`log-2028.html`), the per-kind bodies, and everything below the drafting fence — letters, cuts,
-the offer, anything that drafts in his voice. That last group stays below the
-fence regardless.
+the whole thing and build the full system."* What remains unbuilt: the
+per-kind bodies, and everything below the drafting fence — letters, cuts, the
+offer, anything that drafts in his voice. That last group stays below the
+fence regardless. (**The fold past twenty is built** — `bandYears()` in
+`src/lib/fold.ts`, tested in `scripts/test/fold.mjs`; this line claimed
+otherwise until 9 Sep.)
 
 ---
 
@@ -1099,9 +1111,9 @@ Filename regex must cover at minimum these patterns (server-side, in order):
 
 ## ⚠️ DO NOT CHANGE — Workflow resilience
 
-Each post-upload step (transcode, thumbnail, recorded_at, transcribe, the four extraction passes) runs inside a `softStep()` wrapper in `workers/process-upload/src/workflow.ts`. The wrapper:
+Each post-upload step (transcode, thumbnail, recorded_at, transcribe, and reading the words onto the log) runs inside a `softStep()` wrapper in `workers/process-upload/src/workflow.ts`. The wrapper:
 - Catches retry-exhausted failures and records them in `vlogs.extraction_outcomes` JSON instead of aborting the workflow.
-- Lets every feature stand on its own — a flaky transcode no longer takes thumbnail + recorded_at + transcribe + extract down with it.
+- Lets every feature stand on its own — a flaky transcode no longer takes thumbnail + recorded_at + transcribe + read down with it.
 - Keeps the existing `step.do` retry behaviour intact (each step still gets 2-3 retries before giving up).
 
 The `extraction_outcomes` column is the source of truth for "what worked, what failed" — read it from D1 instead of scrolling the Cloudflare dashboard.
@@ -1664,7 +1676,9 @@ CLOUDFLARE_ACCOUNT_ID="eda2e9bbd9acc42699027cfdcb50f998"
 CLOUDFLARE_ACCESS_TEAM="neolog"
 CLOUDFLARE_R2_BUCKET="neolog-videos"
 
-# Anthropic — the only third-party API key the running app needs
+# Anthropic — a paid opt-in the operator has not taken. NOTHING CALLS IT;
+# `src/lib/anthropic.ts` has no caller and no branch reaches it. The running
+# app needs no third-party key at all.
 ANTHROPIC_API_KEY
 
 # Set as Worker secrets via `wrangler secret put` at deploy time, not in .env.local at runtime
@@ -1678,7 +1692,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 
 | File | Purpose |
 |---|---|
-| `models.ts` | **The unified LLM abstraction.** Model registry (`MODELS.HARD = gpt-oss-120b`, `MODELS.IMAGE = flux-1-schnell`, etc.); `callReasoning()` for hard tasks (with Llama 70B auto-fallback). Every new generator routes through here. |
+| `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are four places a model runs and a fifth needs a reason written next to it. |
 | `read-recording.ts` | **How a recording reaches the log.** Reads `transcript_words`, gets the seams from `splitNote`, and falls back to cutting at his own pauses. The model says WHERE only, by quoting. Never let anything here write a word. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
 | `transcribe.ts` | Whisper, with word-level timestamps — which `read-recording.ts` needs and without which a recording is not read at all. |
@@ -1689,9 +1703,9 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 
 ## Cloudflare Workflows / Workers
 
-- **`workers/process-upload`** — post-upload pipeline (transcode → thumb → audio → transcribe → fan-out extraction). Each step `softStep()`-wrapped for resilience; failures recorded in `vlogs.extraction_outcomes`.
-- **`workers/pipeline`** — Durable Object that broadcasts pipeline events over WebSocket to the live vlog detail UI.
-- **`workers/ffmpeg`** — Container Worker. Endpoints: `/transcode-h264`, `/extract-thumb`, `/extract-audio`, `/extract-audio-segment`, `/extract-video-segment`, `/concat-audio`, `/render-video-essay` (accepts `aspect: '16:9' | '9:16'`), `/ken-burns` (image → motion clip).
+- **`workers/process-upload`** — post-upload pipeline (transcode → thumb → recorded_at → audio → transcribe → **read**). There is no extraction fan-out; the last step is `readRecording`, which calls no model. Each step `softStep()`-wrapped for resilience; failures recorded in `vlogs.extraction_outcomes`.
+- **`workers/pipeline`** — the Durable Object that runs that pipeline and broadcasts its events over WebSocket to the live vlog detail UI.
+- **`workers/ffmpeg`** — Container Worker. **Five endpoints, and that is all of them**: `/transcode-h264`, `/extract-thumb`, `/extract-thumb-mini-transcode`, `/extract-audio`, `/concat-audio`. ⚠️ Seven more were deployed until 9 Sep with no caller anywhere — `/trim`, `/concat`, `/extract-audio-segment`, `/extract-video-segment`, `/render-video-essay`, `/ken-burns`, `/images-to-video` — the production engine, **520 of that file's 1,240 lines**, running in a container for a product deleted on 8 Sep. `server.js` is plain JS outside every typecheck here, so nothing objected. `check-unreached-routes.mjs` now reads its endpoint map and fails CI on a sixth.
 - **`workers/healer`** — cron worker (disabled by default; manually invocable) that detects stuck rows and re-dispatches.
 
 > The "Inngest" name is a relic — Inngest was removed long ago. Everything async is Cloudflare Workflows + the DO pipeline.

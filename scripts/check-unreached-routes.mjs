@@ -107,6 +107,42 @@ for (const file of routeFiles) {
   if (hits === 0 && !(route in REACHED_ELSEWHERE)) unreached.push(route)
 }
 
+// ── The FFmpeg container's endpoints ────────────────────────────────────
+//
+// Same question, on the one surface that is not a Next route. The container
+// is DEPLOYED, so an endpoint nothing calls is running code for a feature
+// that does not exist — and it hides better than a dead route does, because
+// `server.js` is plain JS outside every typecheck in this repo.
+//
+// Seven were found on 9 Sep: /trim, /concat, /extract-audio-segment,
+// /extract-video-segment, /render-video-essay, /ken-burns and
+// /images-to-video — 520 of that file's 1,240 lines, all of them the
+// production engine deleted on 8 Sep.
+//
+// ⚠️ The first version looked for `const ROUTES` and the map is `const
+// routes`, so it parsed nothing, found nothing, and passed — the exact
+// failure this check exists to catch, in the check itself. An empty parse is
+// a hard error now, not a pass.
+const FFMPEG_SERVER = 'workers/ffmpeg/server.js'
+let containerDead = []
+try {
+  const server = readFileSync(FFMPEG_SERVER, 'utf8')
+  const map = /const routes\s*=\s*\{([\s\S]*?)\n\}/i.exec(server)?.[1] ?? ''
+  const endpoints = [...map.matchAll(/'(\/[a-z0-9-]+)'/g)].map(m => m[1])
+  if (!endpoints.length) {
+    console.error(`Could not read the endpoint map out of ${FFMPEG_SERVER}.`)
+    process.exit(1)
+  }
+  for (const ep of endpoints) {
+    const called = corpusFiles.some(f =>
+      f !== FFMPEG_SERVER
+      && !f.endsWith('check-unreached-routes.mjs')
+      && !f.startsWith('workers/ffmpeg/')     // its own Dockerfile and worker list them
+      && readFileSync(f, 'utf8').includes(ep))
+    if (!called) containerDead.push(ep)
+  }
+} catch { /* no container in this checkout */ }
+
 console.log(`${routeFiles.length} API routes checked against every caller in the repo.`)
 if (unreached.length) {
   console.error(`\n${unreached.length} route(s) nothing calls:\n`)
@@ -117,4 +153,14 @@ if (unreached.length) {
   )
   process.exit(1)
 }
+if (containerDead.length) {
+  console.error(`\n${containerDead.length} FFmpeg container endpoint(s) nothing calls:\n`)
+  for (const e of containerDead) console.error('  ' + e)
+  console.error(
+    '\nThe container is deployed, so these are running. Wire one to the'
+    + '\nfeature it was written for, or take it out of server.js.\n',
+  )
+  process.exit(1)
+}
+
 console.log(`Every route has a caller. ${Object.keys(REACHED_ELSEWHERE).length} are recorded as reached from outside.`)
