@@ -44,6 +44,7 @@ interface Vlog {
   read_at: string | null
   word_count: number
   vision_description: string | null; frame_note: string | null
+  visibility: string | null
 }
 interface Word { word: string; start_time: number; end_time: number; word_index: number }
 interface Entry { id: string; text: string; happened_at: string; span_start: number | null; span_end: number | null }
@@ -185,7 +186,39 @@ export default function Recording() {
               {v.duration_seconds && <span>{clock(v.duration_seconds)}</span>}
               {v.file_size_bytes && <span>{mb(v.file_size_bytes)}</span>}
               {v.word_count > 0 && <span>{v.word_count.toLocaleString('en-GB')} words</span>}
+              {/* `vlog.css`'s `.state` — who can see this recording. Read,
+                  never asserted: `vlogs.visibility` defaults to private, and
+                  the feed learned that the hard way when claiming otherwise
+                  marked three hundred recordings for a public log that had
+                  not been asked about one of them. */}
+              <span className="state" style={{
+                color: v.visibility === 'public' ? 'var(--t-teal)' : 'var(--fg-4)',
+              }}>{v.visibility === 'public' ? 'public' : 'private'}</span>
             </div>
+
+            {/* ⚠️ `.lede` — what was in front of the camera. This page has
+                been FETCHING `vision_description` and `frame_note` and
+                rendering neither, so the second index CLAUDE.md describes as
+                live — "find a clip by what was in front of the camera" — was
+                invisible on the recording's own page. `/footage` showed it;
+                the recording did not.
+
+                Both are kept and both are marked, because they are different
+                claims: the log's description of the frame, and his
+                correction of it. One does not replace the other. */}
+            {(v.frame_note || v.vision_description) && (
+              <p className="lede">
+                {v.frame_note || v.vision_description}
+                <em style={{
+                  display: 'block', fontStyle: 'normal', marginTop: 6,
+                  fontSize: 12.5, color: 'var(--fg-4)',
+                }}>
+                  {v.frame_note
+                    ? 'your words, about what is in the frame'
+                    : 'the log’s description of the frame, not of what you said'}
+                </em>
+              </p>
+            )}
 
             {v.play_url ? (
               <div className="media">

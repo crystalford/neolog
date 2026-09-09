@@ -34,6 +34,14 @@ const day = (s: string) => {
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+/** `writing.css` colours the made-by tag: you · ai · log. */
+const MADE_BY_CLASS: Record<string, string> = {
+  operator: 'you',
+  operator_with_log: 'ai',
+  log_drafted_kept: 'ai',
+  log: 'log',
+}
+
 export default function Writing() {
   const [docs, setDocs] = useState<Doc[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,10 +176,20 @@ export default function Writing() {
                       {d.page_name && ` · under ${d.page_name}`}
                     </i>
                   </span>
-                  <span className={`w${asMadeBy(d.made_by) === 'operator' ? ' you' : ' ai'}`}>
+                  {/* ⚠️ Three variants, not two. `writing.css` colours `.w`
+                      by who made it — `you` teal, `ai` violet, `log` grey —
+                      and this collapsed `log` into `ai`, so a thing the LOG
+                      made and a thing he made WITH a model looked identical.
+                      `made_by` has four values for a reason: the entry's
+                      author comes from it, so the log never signs his essay
+                      and he never signs the log's report. */}
+                  <span className={`w ${MADE_BY_CLASS[asMadeBy(d.made_by)]}`}>
                     {MADE_BY_WORDS[asMadeBy(d.made_by)]}
                   </span>
-                  <span className="c">
+                  {/* `.b` is what the body points at — "the text", "the
+                      README", "the file". This was `.c`, which is the
+                      design's class for something else on this row. */}
+                  <span className="b">
                     {DOC_WORDS[asKind(d.kind)].body}
                     <i>{d.visibility === 'public' ? 'public' : 'private'}</i>
                   </span>

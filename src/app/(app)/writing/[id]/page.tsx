@@ -91,13 +91,21 @@ export default function DocumentPage() {
         {d && r && (
           <>
             <div className="pghead"><h1>{d.title}</h1></div>
-            <div className="stamp">
-              <span>{DOC_WORDS[kind].name}</span>
-              <span>made by {MADE_BY_WORDS[madeBy]}</span>
+            {/* `writing.css` calls this row `.meta` and styles it in ten
+                rules — the mono `<time>`, the teal `you` variant, the
+                visibility tag. It was rendering as `.stamp`, a different
+                page's class, so none of those rules reached it. */}
+            <div className="meta">
+              <span>a <b>document</b> · {DOC_WORDS[kind].name}</span>
+              <span className={madeBy === 'operator' ? 'you' : undefined}>
+                made by <b>{MADE_BY_WORDS[madeBy]}</b>
+              </span>
               {d.word_count > 0 && <span>{d.word_count.toLocaleString('en-GB')} words</span>}
               {d.draft_count > 1 && <span>{d.draft_count} drafts, all kept</span>}
               <time dateTime={d.finished_at || d.created_at}>{day(d.finished_at || d.created_at)}</time>
-              <span>{d.visibility === 'public' ? 'public' : 'private'}</span>
+              <i className={d.visibility === 'public' ? 'pub' : 'priv'}>
+                {d.visibility === 'public' ? 'public' : 'private'}
+              </i>
             </div>
 
             {madeBy === 'operator' && (
@@ -130,7 +138,29 @@ export default function DocumentPage() {
             ) : (
               <>
                 {shown ? (
-                  <div className="doc">{shown}</div>
+                  // `.doc .in` — the reading column inside the document
+                  // frame. `writing.css` gives `.in` the padding and the
+                  // 720px measure; without it the body ran the full width of
+                  // the frame it sits in.
+                  <>
+                    <div className="doc"><div className="in">{shown}</div></div>
+                    {/* ⚠️ `writing.html`'s `.fold` reads "Showing the first
+                        three paragraphs. Read all 2,140 words". This page
+                        shows the whole thing and says so instead — "Whole.
+                        Never split" is the rule that separates a document
+                        from a paste, and a fold that hides two thirds of a
+                        finished piece is the same cut by another means. What
+                        the line keeps from the design is the other half: how
+                        long it is, and the way to every draft. */}
+                    <div className="fold">
+                      {d.word_count > 0 && <>{d.word_count.toLocaleString('en-GB')} words, shown whole. </>}
+                      {r.drafts.length > 1
+                        ? <>{r.drafts.length} drafts, all kept — {showing === null
+                            ? 'this is the current one.'
+                            : `showing draft ${showing}.`}</>
+                        : <>One draft so far.</>}
+                    </div>
+                  </>
                 ) : d.body_url ? (
                   <p className="none">
                     <a href={d.body_url} target="_blank" rel="noreferrer">{DOC_WORDS[kind].body}</a>

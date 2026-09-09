@@ -129,15 +129,30 @@ export default function Glossary() {
         {shown.map(i => (
           <div className="c" key={i.id}>
             <div className="x"><Link href={i.href}>{i.name}</Link></div>
-            <div className="ty">
-              <span>{KIND_WORD[i.kind] || i.kind}</span>
-              {i.entry_count > 0 && (
-                <span>{i.entry_count} {i.entry_count === 1 ? 'entry' : 'entries'}</span>
+
+            {/* `source.html`'s `.m` — the meta line: when, what kind, and the
+                way through to its page. This page rendered `.ty` on its own
+                and put the date inside the provenance line below, so the two
+                facts that identify a term were in different places. */}
+            <div className="m">
+              {i.first_said_at && (
+                <time dateTime={i.first_said_at}>
+                  {new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </time>
               )}
-              {i.named_by_system && <span>named by the log</span>}
+              <span className="ty">
+                {KIND_WORD[i.kind] || i.kind}
+                {i.entry_count > 0 && ` · ${i.entry_count} ${i.entry_count === 1 ? 'use' : 'uses'}`}
+                {i.named_by_system && ' · named by the log'}
+              </span>
+              <Link className="more" href={i.href}>its page →</Link>
             </div>
+
+            {/* `.n` is the note body. This was rendered as `.more`, which in
+                the design is the LINK at the end of `.m` — so the paragraph
+                took the styling of a navigation affordance. */}
             {i.summary && (
-              <div className="more">
+              <div className="n">
                 {i.summary}
                 {i.summary_author === 'log' && (
                   <em style={{ display: 'block', fontStyle: 'normal', marginTop: 7, fontSize: 12.5, color: 'var(--fg-4)' }}>
@@ -146,25 +161,36 @@ export default function Glossary() {
                 )}
               </div>
             )}
+
             {i.first_said && (
               <div className="open">
                 {i.first_said}
-                <em>
-                  first said
-                  {i.first_said_at ? ` ${new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                  {i.first_said_id ? ' · ' : ''}
-                  {i.first_said_id && <Link href={`/entry/${i.first_said_id}`}>the entry</Link>}
-                  {' · '}
-                  <button
-                    className="copy"
-                    onClick={() => {
-                      // The date is part of the fact, so it is copied with it.
-                      void navigator.clipboard?.writeText(
-                        `"${i.first_said}" — ${i.name}, ${i.first_said_at ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'undated'}`,
-                      )
-                    }}
-                  >copy with the date</button>
-                </em>
+                {/* `.w` — where the sentence came from, and whether it has
+                    been quoted. A term's first use is only a fact if you can
+                    get back to the moment it was said. */}
+                <div className="w">
+                  {i.first_said_id
+                    ? <Link href={`/entry/${i.first_said_id}`}>
+                        {i.first_said_at
+                          ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : 'the entry'}
+                      </Link>
+                    : <span>undated</span>}
+                  <span>
+                    {i.entry_count > 1
+                      ? `said ${i.entry_count} times since`
+                      : 'said once so far'}
+                  </span>
+                </div>
+                <button
+                  className="copy"
+                  onClick={() => {
+                    // The date is part of the fact, so it is copied with it.
+                    void navigator.clipboard?.writeText(
+                      `"${i.first_said}" — ${i.name}, ${i.first_said_at ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'undated'}`,
+                    )
+                  }}
+                >Copy with the date</button>
               </div>
             )}
           </div>

@@ -46,6 +46,15 @@ interface Result {
   last_changed: string | null
 }
 
+/** "1 September 2026" — the form `dossier.html` uses under a term. */
+const shortDate = (s: string | null) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return isNaN(d.getTime())
+    ? ''
+    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 const year = (s: string | null) => {
   if (!s) return ''
   const d = new Date(s)
@@ -174,8 +183,23 @@ export default function Facts() {
                 </div>
                 {terms.map(x => (
                   <div className="term" key={x.id}>
-                    <div className="n"><Link href={x.href}>{x.name}</Link></div>
+                    {/* `dossier.html`'s `.t` — the name with when it entered
+                        the record beside it, because a term without a date
+                        is an assertion and a term with one is a fact. */}
+                    <div className="t">
+                      <Link href={x.href}>{x.name}</Link>
+                      {x.span_start && <span>{shortDate(x.span_start)}</span>}
+                    </div>
                     {x.summary && <p>{x.summary}</p>}
+                    {/* `.c` — where it came from. Every other surface in this
+                        product can be walked back to the moment; this page
+                        stated its facts and gave no way to check one. */}
+                    {x.span_start && (
+                      <div className="c">
+                        first said {shortDate(x.span_start)} ·{' '}
+                        <Link href={x.href}>where it was said</Link>
+                      </div>
+                    )}
                   </div>
                 ))}
               </section>

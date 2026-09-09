@@ -55,11 +55,27 @@ const PAGES = [
   // export.html is a RENDERED EXPORT DOCUMENT ("Building neolog — exported
   // from the log"): what the Markdown looks like, not a route.
   ['takeout',    'src/app/(app)/export/page.tsx',       6],
-  ['dossier',    'src/app/(app)/facts/page.tsx',         5],
+  // 5 → 3 on 9 Sep: a term now carries `.t` (its name with the date beside
+  // it) and `.c` (first said … · where it was said). This page stated its
+  // facts and gave no way to check one, on a product where every other
+  // surface walks back to the moment.
+  // ⚠️ The last three need data this product does not keep. `.meta` is the
+  // provenance line on a stated POSITION, and there is no position kind —
+  // `PAGE_KINDS` has eight and none is one. `.sa`/`.same` are external
+  // identity links (github · wikidata · linkedin) with no column, no input,
+  // and a purpose — being found by machines — that sits badly against §0
+  // rule 7, "you never write something down because it would look good in
+  // public".
+  ['dossier',    'src/app/(app)/facts/page.tsx',         3],
   // Its last five are .was (the struck previous wording of a changed
   // claim) and .eg (an example of a machine rephrasing a line) — both need
   // data this product does not keep.
-  ['source',     'src/app/(app)/glossary/page.tsx',      5],
+  // 5 → 2 on 9 Sep. The card rendered the summary as `.more`, which in the
+  // design is the LINK at the end of `.m` — so the paragraph took the
+  // styling of a navigation affordance. It is `.n` now, with `.m` carrying
+  // the date and kind and `.w` carrying where the sentence came from.
+  // The last two are the recorded pair below.
+  ['source',     'src/app/(app)/glossary/page.tsx',      2],
   // Its last four — .long, .sq, .th, .tree — are the prose answer and the
   // fanned-out sub-questions. Both are a model writing in his voice on a
   // surface that presents itself as a record, which §0 rule 3 forbids, so
@@ -73,11 +89,24 @@ const PAGES = [
   // the gaps), questions, the composer." public-log.html draws them; §0
   // wins over a page.
   ['public-log', 'src/app/(app)/public/page.tsx',       8],
-  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    9],
-  ['writing',    'src/app/(app)/writing/page.tsx',      5],
+  // 9 → 7 on 9 Sep: the page was FETCHING `vision_description` and
+  // `frame_note` and rendering neither, so the frame index — "find a clip by
+  // what was in front of the camera" — was invisible on the recording's own
+  // page. It now shows both, marked, plus `.state` (who can see it).
+  // ⚠️ The remaining 7 (`player frame big go bar2 line2 tm2`) are the
+  // design's 420px MOCK player and its transport chrome. This page plays the
+  // real recording in a `<video>`; there is nothing to build.
+  ['vlog',       'src/app/(app)/vlog/[id]/page.tsx',    7],
+  // 5 → 0 on 9 Sep. ⚠️ The shelf collapsed `made_by`'s four values into two
+  // colours, so a thing the LOG made and a thing he made WITH a model looked
+  // identical — on the page whose whole point is who made each thing. The
+  // detail page's meta row rendered as `.stamp`, another page's class, so
+  // ten `writing.css` rules never reached it, and the body had no `.in`, so
+  // it ran the full width of the frame instead of a 720px measure.
+  ['writing',    'src/app/(app)/writing/page.tsx',      0],
   // writing.html's title is "an essay you wrote" — it covers the mechanic
   // AND one document, so the detail page is measured against it too.
-  ['writing',    'src/app/(app)/writing/[id]/page.tsx', 5],
+  ['writing',    'src/app/(app)/writing/[id]/page.tsx', 0],
   ['screenshots','src/app/(app)/screenshots/page.tsx',  7],
   ['messages',   'src/app/(app)/messages/page.tsx',     7],
   // messages.html covers the whole mechanic — the list AND one thread — so
