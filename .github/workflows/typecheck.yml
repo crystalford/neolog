@@ -139,6 +139,15 @@ jobs:
       - name: Every library has an importer
         run: node scripts/check-unreached-lib.mjs
 
+      # The third of these, one level further out. A `.logpage.pg-<page>`
+      # block with no page that renders it parses, resolves every var, and
+      # is read by check-design-css.mjs as though it were the live page — so
+      # /now reported 4 rules out of the design when the stylesheet that
+      # actually renders it was 9 out, and wrong.html's 84 rules sat complete
+      # behind a page that had never been built. 350 rules over four scopes.
+      - name: Every page scope is rendered by a page
+        run: node scripts/check-unreached-css.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:

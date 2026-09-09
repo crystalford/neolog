@@ -72,6 +72,26 @@ const ALIAS = {
   '--t-plum': '--plum', '--t-rose': '--rose', '--t-brass': '--brass',
   '--t-moss': '--moss', '--sig': '--steel',
 }
+/**
+ * Where our copy of a design selector could live, most specific first.
+ *
+ * ⚠️ `.nowpage` is tried before `.logpage` for /now ONLY, and the "only"
+ * matters in both directions. /now renders `.nowpage` as its root and
+ * carries no `.logpage` at all, so measuring it against `.logpage .way`
+ * compares the feed's copy of the same control at a different size and
+ * reports a page that renders correctly as broken. Doing it for every page
+ * makes the mirror-image mistake: `log.css`'s composer then resolves to
+ * `.nowpage`'s copy and `/` reads eleven rules out.
+ */
+const candidates = (s, pg) => [
+  s,
+  `.logpage.pg-${pg} ${s}`,
+  `.logpage.pg-${pg}${s}`,
+  `.pg-${pg} ${s}`,
+  ...(pg === 'now' ? [`.nowpage ${s}`, `.nowpage${s}`] : []),
+  `.logpage ${s}`,
+]
+
 const norm = v => {
   let out = v.replace(/!important/g, '').replace(/\s+/g, '')
     .replace(/0\./g, '.').replace(/;$/, '').toLowerCase()
@@ -97,9 +117,25 @@ const norm = v => {
 // rule 3. `.wv` is the design's track, flat, and `.prog` fills it; every
 // other measurement in that player — position, duration, seek — is real.
 //
+// ⚠️ `now` read 4 for weeks and the real number is 9. It was being measured
+// against `.logpage.pg-now` — 77 rules transcribed faithfully out of now.css
+// and matched by nothing, because /now renders `.nowpage` as its root and
+// carries no `.logpage` at all. The dead block is deleted and `.nowpage` is
+// tried first above; what is left is nine items and none of them is drift:
+//
+//   four keyframe RENAMES — nowdrift / nowrise / nowfade / nowpop. One
+//     stylesheet serves 23 pages and cannot hold four `@keyframes fade`.
+//   four keyframe STEPS — `from`, `0%`, `50%`, `100%` are compared as bare
+//     selectors, so the first @keyframes block in either file wins and the
+//     two are almost never the same animation.
+//   `.wm` — the global masthead wordmark is 15.5px, which is what the other
+//     73 design pages say; `.nowpage .top .wm` is now.css's 16px.
+//   `.way.on` — /now marks the mic `way mic on`, which
+//     `.nowpage .way.mic.on` already carries.
+//
 // Raising a budget needs a reason in the commit — these are those reasons,
 // kept next to the number so the next session does not "fix" them back.
-const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 4, "takeout": 2, "onthisday": 2, "connections": 2, "wrong": 2}
+const BUDGET={"log": 4, "entry": 2, "headings": 2, "person": 2, "search": 2, "month": 2, "clear": 2, "triage": 2, "dossier": 3, "source": 3, "asks": 3, "numbers": 2, "public-log": 0, "vlog": 5, "writing": 2, "screenshots": 2, "messages": 2, "walk": 1, "now": 9, "takeout": 2, "onthisday": 2, "connections": 2, "wrong": 2}
 
 // No argument: check every page against its budget and exit non-zero on drift.
 if(!process.argv[2]){
@@ -109,7 +145,12 @@ if(!process.argv[2]){
     let diff=0
     for(const [sel,decls] of P){
       if(sel.startsWith('@')||sel.startsWith(':')||/^(html|body|\*|a|button|input|textarea|svg)\b/.test(sel)) continue
-      const ms=[sel,`.logpage.pg-${pg} ${sel}`,`.logpage.pg-${pg}${sel}`,`.pg-${pg} ${sel}`,`.logpage ${sel}`,`.nowpage ${sel}`].find(c=>M.has(c))
+      // ⚠️ `.nowpage` is tried BEFORE `.logpage`. /now renders `.nowpage` as
+      // its root and carries no `.logpage` at all, so a composer class like
+      // `.way` resolves to `.logpage .way` — the feed's copy of the same
+      // control at a different size — and every value comes back wrong for a
+      // page that renders correctly.
+      const ms=candidates(sel,pg).find(c=>M.has(c))
       if(!ms) continue
       const md=M.get(ms)
       for(const [k,v] of decls){ if(md.has(k)&&norm(md.get(k))!==norm(v)){ diff++; break } }
@@ -130,14 +171,7 @@ const P=rules(pcss), M=rules(mine)
 // Map a prototype selector onto the one I'd have written for it.
 // Every shape I might have written the same rule as.
 const PG = process.argv[3] || page
-const cands=s=>[
-  s,
-  `.logpage.pg-${PG} ${s}`,
-  `.logpage.pg-${PG}${s}`,
-  `.pg-${PG} ${s}`,
-  `.logpage ${s}`,
-  `.nowpage ${s}`,
-]
+const cands=s=>candidates(s, PG)
 
 let miss=0, diff=0, ok=0
 const report=[]
