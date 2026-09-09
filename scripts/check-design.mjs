@@ -55,7 +55,18 @@ const PAGES = [
   ['log',        'src/app/(app)/page.tsx',              0],
   ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         0],
-  ['person',     'src/app/(app)/page/[id]/page.tsx',    12],
+  // 12 → 10 on 9 Sep. `person.html` puts the page's own open question at the
+  // top of its rail in a warm-bordered card (`.rc warm` + `.a`), and it is
+  // the one recall question that is ABOUT this page: the log named it, and
+  // this is where he can see what is under the name before answering.
+  // Nothing new is asked because a page was opened — recall's ceiling of
+  // three open questions governs. The design's third button is "Talk it
+  // out", which is the offer and stays below the fence.
+  // The remaining ten are recorded: `.acts .also .foot .rule` are the design
+  // page explaining its own mechanic, and `.d .how .auto .first .sh .pl` are
+  // that page's own mention-row shape — this page renders the feed's rows,
+  // because SPEC §3 says nothing is designed twice.
+  ['person',     'src/app/(app)/page/[id]/page.tsx',    10],
   // 7 → 1 on 9 Sep. The hit was `.pt` wrapping the meta — the design's shape
   // inverted, so the date, the provenance and the passage number all took
   // quoted-text styling. `.d fz` is the one that mattered: a date the log had
@@ -71,6 +82,15 @@ const PAGES = [
   // ⚠️ `.tabs` is built with TWO of the design's three. "By relevance" is
   // the log having an opinion about which of his own words matter most.
   ['search',     'src/app/(app)/search/page.tsx',       1],
+  // ⚠️ Five of its six are this CHECKER being wrong, not the page. `s1 s2
+  // s3 q some` are the coverage strip's density and mark classes, and they
+  // are COMPUTED — `const cls = n > hi ? 's3' : …` — so the regex above
+  // cannot see them. They render, and check-design-render.mjs proves it:
+  // /month is pixel-identical to the design. Do not contort the page into
+  // literals to satisfy this number.
+  // `.a` — "Talk it out later", a button under the month's paragraph
+  // suggesting he record something about the month — is the offer, and the
+  // offer is below the fence. §0 rule 2: the log is quiet.
   ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
   // 4 → 1 on 9 Sep. ⚠️ The year headings were `.idxband`, which is /pages'
   // index band — a page taking another page's furniture. onthisday.html has
@@ -160,6 +180,13 @@ const PAGES = [
   // the composer, and yl/yrs are the coverage bar. SPEC §3 — "Not on the
   // public side: the coverage bar (the operator's instrument; it advertises
   // the gaps), questions, the composer." public-log.html draws them; §0
+  // wins over a page.
+  // ⚠️ All eight are SPEC §3, and it is one refusal rather than three. "Not
+  // on the public side: the coverage bar (the operator's instrument; it
+  // advertises the gaps), questions, the composer." `mic opts or` are the
+  // composer and the answering control, `yl yrs` the coverage bar, and
+  // `a d p` are the open-questions rail's own actions — the questions
+  // block, which is the same clause. public-log.html draws all of it; §0
   // wins over a page.
   ['public-log', 'src/app/(app)/public/page.tsx',       8],
   // 9 → 7 on 9 Sep: the page was FETCHING `vision_description` and

@@ -64,6 +64,12 @@ export default function PageView({ params }: { params: { id: string } }) {
   const [name, setName] = useState('')
   const [editingPara, setEditingPara] = useState(false)
   const [para, setPara] = useState('')
+  /**
+   * The one open recall question about THIS page, if there is one. Read from
+   * the same endpoint the log's rail reads — nothing is generated here, and
+   * a page with no question shows no card.
+   */
+  const [ask, setAsk] = useState<{ id: string; question: string; because: string | null } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +89,33 @@ export default function PageView({ params }: { params: { id: string } }) {
     finally { setLoading(false) }
   }, [params.id])
   useEffect(() => { void load() }, [load])
+
+  const loadAsk = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v2/recall', { cache: 'no-store' })
+      if (!res.ok) return
+      const j = await res.json() as {
+        questions: { id: string; question: string; because: string | null; target_kind: string | null; target_id: string | null }[]
+      }
+      const mine = (j.questions || []).find(
+        q => q.target_kind === 'page' && q.target_id === params.id,
+      )
+      setAsk(mine ? { id: mine.id, question: mine.question, because: mine.because } : null)
+    } catch { setAsk(null) }
+  }, [params.id])
+  useEffect(() => { void loadAsk() }, [loadAsk])
+
+  const closeAsk = useCallback(async (body: Record<string, unknown>) => {
+    if (!ask) return
+    setAsk(null)
+    try {
+      await fetch('/api/v2/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ask.id, ...body }),
+      })
+    } catch { /* the card is already gone; the next load says the truth */ }
+  }, [ask])
 
   const patch = useCallback(async (body: Record<string, unknown>) => {
     await fetch(`/api/v2/pages/${params.id}`, {
@@ -312,6 +345,39 @@ export default function PageView({ params }: { params: { id: string } }) {
           </main>
 
           <aside className="rail">
+            {/* `person.html` puts the page's own open question at the top of
+                its rail, in a warm-bordered card. It is the one recall
+                question that is ABOUT this page — the log named it, and this
+                is where he can see what is under the name before answering.
+                Recall's own ceiling of three open questions governs; nothing
+                new is asked because this page was opened.
+                ⚠️ The design's third button is "Talk it out", which is the
+                offer and stays below the fence. "Don't remember" is a
+                complete answer and closes the question for good. */}
+            {ask && (
+              <div className="rc warm">
+                <div className="h">One question <span>from what you wrote</span></div>
+                <div className="i">
+                  <b>{ask.question}</b>
+                  {ask.because && <em>{ask.because}</em>}
+                  <div className="a">
+                    <button
+                      className="p"
+                      onClick={() => { setName(page.name); setRenaming(true) }}
+                    >Name it</button>
+                    <a
+                      href="#"
+                      onClick={e => { e.preventDefault(); void closeAsk({ dont_remember: true }) }}
+                    >don&rsquo;t remember</a>
+                    <a
+                      href="#"
+                      onClick={e => { e.preventDefault(); void closeAsk({ dismiss: true }) }}
+                    >leave it</a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="rc">
               <div className="h">Fix it</div>
 
