@@ -173,6 +173,36 @@ from the feed, search and counts and keeps the file, the attachments and the
 relationships. The one exception is the receipt's **undo**, which is for
 something that should never have gone in at all.
 
+### ⚠️ A kind in the schema that no entry could ever be
+
+§0 rule 5 is *"necessity before schema — seven kinds, and nothing else until
+a real entry needs one."* Its mirror is a kind nothing can create, and
+`ideas` was exactly that: in `ENTRY_KINDS`, in the feed's eight-way filter,
+in the entry page's `KIND_WORD` and in `entry-schema.ts`'s `TYPE_FOR_KIND`,
+with **no INSERT or UPDATE anywhere setting it**. The log offered a filter
+for a kind it could not hold, and every check was green — the column exists,
+the type is TEXT, the value is legal.
+
+`wrong.html` case 4 is the answer, and it was never built: **"Rename it and
+change its kind."** The log files an entry by the shape of what arrived — a
+pasted link is `read`, an upload is `seen`, anything typed is `said` — and
+that is a guess. `PATCH /api/v2/log/[id]` takes `{ kind }`, validated against
+`ENTRY_KINDS` rather than taken on trust, and the entry rail offers every
+other kind beside *wrong date* and *wrong words*. It records a revision like
+every other correction, so what it used to be filed as is kept and it reads
+on `/corrections`.
+
+⚠️ **A batch entry's own page showed one file link.** `batch.html` draws the
+tile grid with a `+N` more tile and *"2 of 9 shown · all nine kept"* — a
+pattern that existed only in `LogRow`, so a nine-photo drop showed nine tiles
+on the FEED and a single link on the one screen that exists to show an entry
+whole. Only the tiles shown are presigned (the feed learned that the
+expensive way), a held member is a tile with no URL, and the count is
+rendered because a manifest that shows four of nine without saying so is a
+manifest that lost five.
+
+`scripts/test/kinds.mjs` — 22 assertions, in CI.
+
 **Two gestures on a row, and only two** (`SPEC.md` §11). Click the image → a
 lightbox over the feed. Click anywhere else → the entry's own page. There is
 no third expand-in-place gesture. A row links to its content, never to the

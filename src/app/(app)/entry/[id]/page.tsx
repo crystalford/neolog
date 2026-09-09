@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Shell from '@/components/Shell'
-import { type DatePrecision, stampFor, isFuzzy, clockDuration } from '@/lib/log-entry'
+import { ENTRY_KINDS, type DatePrecision, stampFor, isFuzzy, clockDuration } from '@/lib/log-entry'
 import { entrySchema } from '@/lib/entry-schema'
 import { asCorrectedBy, describeCorrection } from '@/lib/corrections'
 
@@ -43,6 +43,7 @@ interface Entry {
   buried_at: string | null
   r2_key: string | null
   bytes: number | null
+  batch?: { total: number; tiles: { id: string; held: boolean; url: string | null }[] } | null
   mime: string | null
   duration_seconds: number | null
   transcript: string | null
@@ -347,6 +348,27 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                 the entry examples months ago and rendered by NOTHING — dead
                 CSS scoped to a live page, which `check-unreached-css.mjs`
                 cannot see because the page itself is real. */}
+            {/* `batch.html`: the tiles, then "2 of 9 shown · all nine kept".
+                The count is the point — a manifest that shows four of nine
+                without saying so is a manifest that lost five. */}
+            {e.batch && e.batch.total > 0 && (
+              <div className="media">
+                {e.batch.tiles.map(t => (
+                  t.url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img className="tile" src={t.url} alt="" key={t.id} />
+                    : <span className="tile" key={t.id} />
+                ))}
+                <span className="cap">
+                  <b>
+                    {Math.min(e.batch!.tiles.length, e.batch!.total)} of {e.batch!.total} shown
+                  </b>
+                  All {e.batch!.total} kept, each on its own line below.
+                  {e.batch!.tiles.some(t => t.held) && ' One the log held back is not shown.'}
+                </span>
+              </div>
+            )}
+
             {(held ? e.r2_key : e.media_url) && (
               <div className="media">
                 {held ? (
@@ -555,6 +577,32 @@ export default function EntryPage({ params }: { params: { id: string } }) {
           <aside className="rail">
             <div className="rc">
               <div className="h">Fix it</div>
+
+              {/* "Rename it and change its kind" — `wrong.html`, case 4. The
+                  log files every entry by the shape of what arrived: a
+                  pasted link is `read`, an upload is `seen`, anything typed
+                  is `said`. That is a guess, and this is where he says
+                  otherwise. It is recorded like every other correction, so
+                  what it used to be filed as is kept.
+
+                  ⚠️ It is also the only way `ideas` is reachable. Nothing
+                  writes that kind — it sat in `ENTRY_KINDS`, in the filter,
+                  in the map below and in the schema, with no INSERT anywhere
+                  setting it. */}
+              <div className="i">
+                <b>Wrong kind?</b>
+                <em>
+                  Filed as <b>{KIND_WORD[e.kind] || e.kind}</b>, from the shape
+                  of what arrived. Say what it actually is.
+                </em>
+                <div className="fixrow">
+                  {ENTRY_KINDS.filter(k => k !== e.kind).map(k => (
+                    <button key={k} onClick={() => void patch({ kind: k })}>
+                      {KIND_WORD[k] || k}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="i">
                 <b>Wrong date?</b>

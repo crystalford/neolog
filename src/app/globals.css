@@ -2275,6 +2275,10 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-entry .media .still { width:420px; max-width:100%; aspect-ratio:3/2; flex-shrink:0; border:1px solid var(--line-1); border-radius:10px; position:relative; overflow:hidden; background:repeating-linear-gradient(135deg,#131313 0 10px,#181818 10px 20px); }
 .logpage.pg-entry .media .still .lbl2 { position:absolute; inset:0; display:grid; place-items:center; font-size:12px; color:var(--fg-4); letter-spacing:.2px; }
 .logpage.pg-entry .media .tile { width:150px; aspect-ratio:4/3; display:block; flex-shrink:0; border:1px solid var(--line-1); border-radius:8px; }
+/* A tile with no picture behind it — a member the log held back, or a file
+   that is not an image. The hatch is `.still`'s, because it means the same
+   thing: there is something here and you are not being shown it. */
+.logpage.pg-entry .media span.tile { background: repeating-linear-gradient(135deg, #131313 0 10px, #181818 10px 20px); }
 .logpage.pg-entry .media img { max-width:min(420px,100%); height:auto; border:1px solid var(--line-1); border-radius:10px; display:block; }
 .logpage.pg-entry .media .cap { font-size:12.5px; color:var(--fg-4); line-height:1.55; flex:1 1 160px; min-width:160px; max-width:230px; padding-top:4px; }
 .logpage.pg-entry .media .cap b { display:block; color:var(--fg-2); font-weight:450; margin-bottom:3px; }

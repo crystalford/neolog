@@ -107,6 +107,11 @@ const WHAT: Record<string, { kind: string; operator: string; log: string }> = {
     operator: 'You cut one entry into two.',
     log: 'The log cut one entry into two.',
   },
+  kind: {
+    kind: 'wrong kind',
+    operator: 'You said what kind of thing it is.',
+    log: 'The log refiled it.',
+  },
   transcript_word: {
     kind: 'misheard',
     operator: 'You fixed a word the machine misheard.',

@@ -11,6 +11,8 @@
  *   { happened_at, date_precision }   wrong date; a year alone is a valid fix
  *   { visibility }                    publish something held, or hold one back
  *   { buried }                        bury / dig up
+ *   { kind }                          wrong kind — the log filed it by the
+ *                                     shape of what arrived; this is him
  *
  * Nothing here deletes. Burial keeps the row, the file and the relationships,
  * and removes it from the feed, from search and from the counts. Digging up
@@ -30,7 +32,7 @@ import { readyDb } from '@/lib/ready-db'
 import { ulid } from '@/lib/ulid'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import type { DatePrecision, Visibility } from '@/lib/log-entry'
+import { ENTRY_KINDS, type DatePrecision, type EntryKind, type Visibility } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
@@ -150,7 +152,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // (`expanded.html` — "one shape"): where it came from, what it is
   // connected to, and what came out of it. The third had no data path at
   // all, and the second none on this page.
-  const [onPages, copies] = await Promise.all([
+  // The files that came in together, for a batch entry's own page.
+  //
+  // `batch.html` shows the tile grid with a `+N` more tile and "2 of 9 shown
+  // · all nine kept". That pattern existed only in `LogRow`, so a nine-photo
+  // drop showed nine tiles on the FEED and a single file link on its own
+  // page — the one screen that exists to show an entry whole.
+  //
+  // ⚠️ Only the tiles that will be shown are presigned. The feed learned
+  // this the expensive way: it signed every row from three tables before
+  // merging and trimming, up to 600 HMAC signings to display 200 rows.
+  const [onPages, copies, batchRows] = await Promise.all([
     findMany<{ id: string; name: string; kind: string }>(
       db,
       `SELECT p.id, p.name, p.kind
@@ -170,6 +182,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         WHERE copy_of = ? AND operator_id = ? AND deleted_at IS NULL`,
       params.id, operator.id,
     ),
+    // Only for the batch entry itself; a member row is not a manifest of its
+    // siblings. `LIMIT` is the count + 1 so the page can say how many more
+    // there are without loading a camera roll's worth of rows.
+    row.source_kind === 'batch' && row.batch_id
+      ? findMany<{ id: string; r2_key: string | null; mime: string | null; visibility: string }>(
+          db,
+          `SELECT id, r2_key, mime, visibility
+             FROM log_entries
+            WHERE batch_id = ? AND operator_id = ? AND deleted_at IS NULL
+              AND source_kind <> 'batch' AND r2_key IS NOT NULL
+            ORDER BY created_at ASC
+            LIMIT 200`,
+          row.batch_id, operator.id,
+        )
+      : Promise.resolve([]),
   ])
 
   // ⚠️ A HELD entry is not presigned at all.
@@ -185,6 +212,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // the feed was built. This is the same rule, one surface later, and it is
   // enforced HERE rather than in the page — a client cannot show what it was
   // never sent.
+  /** How many tiles the design shows before it counts the rest. */
+  const BATCH_TILES = 4
+  const batch = batchRows.length
+    ? {
+        total: batchRows.length,
+        // ⚠️ A held member is a tile with no URL, exactly like a held entry:
+        // the picture is not shown, and the fact that it is THERE still is.
+        tiles: await Promise.all(
+          batchRows.slice(0, BATCH_TILES).map(async b => ({
+            id: b.id,
+            held: b.visibility === 'held',
+            url: b.visibility === 'held' || !(b.mime || '').startsWith('image/')
+              ? null
+              : await presignGetUrl(env, b.r2_key!, 24 * 3600).catch(() => null),
+          })),
+        ),
+      }
+    : null
+
   let media_url: string | null = null
   if (row.r2_key && row.visibility !== 'held') {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
@@ -203,6 +249,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       later: later[0] || null,
       on_pages: onPages,
       copies,
+      batch,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )
@@ -226,11 +273,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     id: string; text: string; happened_at: string | null; occurred_at: string
     date_precision: string; visibility: string; buried_at: string | null
     transcript: string | null; source_kind: string; author: string
-    detail: string | null
+    detail: string | null; kind: string
   }>(
     db,
     `SELECT id, text, happened_at, occurred_at, date_precision, visibility,
-            buried_at, transcript, source_kind, author, detail
+            buried_at, transcript, source_kind, author, detail, kind
        FROM log_entries WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     id, operator.id,
   )
@@ -264,6 +311,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     buried?: boolean
     /** 'operator' when he says a line the log wrote is actually his. */
     author?: string
+    /**
+     * "Rename it and change its kind" (`wrong.html`, case 4). The log files
+     * every entry by what it can see — a pasted link is `read`, an upload is
+     * `seen`, anything typed is `said` — and it is guessing. This is where
+     * he says otherwise.
+     *
+     * ⚠️ It is also the only way `ideas` is reachable. Nothing writes that
+     * kind: it sat in `ENTRY_KINDS`, in the filter, in `KIND_WORD` and in
+     * the schema map with no INSERT anywhere setting it, which is the mirror
+     * of §0 rule 5 — a schema entry with no real entry behind it.
+     */
+    kind?: string
     /**
      * "Wrong split → merge, thread intact" (`wrong.html`). This entry's
      * words join the target's and this one is buried, so nothing is lost and
@@ -339,6 +398,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     sets.push('visibility = ?')
     binds.push(v)
     if (v !== 'held') sets.push('held_reason = NULL')
+  }
+
+  // Wrong kind. The log's filing is a guess made from the shape of what
+  // arrived; his answer is a fact. Recorded like every other correction, so
+  // what it used to be filed as is kept.
+  if (typeof body.kind === 'string' && body.kind !== existing.kind) {
+    if (!ENTRY_KINDS.includes(body.kind as EntryKind)) {
+      return NextResponse.json(
+        { error: 'unknown kind', allowed: ENTRY_KINDS }, { status: 400 },
+      )
+    }
+    note('kind', existing.kind, body.kind)
+    sets.push('kind = ?')
+    binds.push(body.kind)
   }
 
   // Who wrote it. A pasted document and a pasted conversation land as the
