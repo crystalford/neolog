@@ -63,9 +63,18 @@ export async function GET(req: NextRequest) {
     operator.id,
   )
 
+  // ⚠️ A held row is not presigned. Same rule as `/api/v2/log/[id]`, and the
+  // same bug: this page put `class="blur"` on a live `<img src>` and gave a
+  // held audio note a working `<audio src>`. A CSS filter over bytes the
+  // browser already has is not withholding anything.
+  //
+  // SPEC §0.2 — being wrong towards private is the only safe direction. The
+  // page can still say a file is THERE, from `r2_key`; what it cannot do is
+  // show one the log has not looked at. Enforced here rather than in the
+  // page, because a client cannot reveal what it was never sent.
   const items = await Promise.all(rows.map(async r => {
     let media_url: string | null = null
-    if (r.r2_key) {
+    if (r.r2_key && r.visibility !== 'held') {
       try { media_url = await presignGetUrl(env, r.r2_key, 24 * 3600) } catch {}
     }
     return { ...r, media_url }

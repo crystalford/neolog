@@ -36,6 +36,7 @@ interface Item {
   mime: string | null
   original_filename: string | null
   source_kind: string
+  r2_key: string | null
   media_url: string | null
 }
 
@@ -123,13 +124,17 @@ export default function TriagePage() {
             </div>
 
             <div className="card">
+              {/* ⚠️ A held file is not shown here either — the same
+                  placeholder the feed and the entry page use. The API sends
+                  no URL for one, so `media_url` is null and these branches
+                  cannot fire; the `.still` below is what a held row looks
+                  like while it waits to be looked at. */}
+              {current.visibility === 'held' && current.r2_key && (
+                <span className="still"><span className="lbl2">not shown</span></span>
+              )}
               {current.media_url && (current.mime || '').startsWith('image/') && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={current.media_url}
-                  alt=""
-                  className={current.visibility === 'held' ? 'blur' : undefined}
-                />
+                <img src={current.media_url} alt="" />
               )}
               {current.media_url && (current.mime || '').startsWith('audio/') && (
                 <audio src={current.media_url} controls preload="none" />

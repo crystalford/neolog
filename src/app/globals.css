@@ -893,7 +893,12 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 /* A held-back image is blurred in the operator's own log, so it isn't
  * sitting on screen in front of someone else (SPEC §0.2). */
-.logpage .en.isheld .pics img { filter: blur(14px); }
+/* ⚠️ `.en.isheld .pics img` had a 14px blur, and it could never match:
+   `LogRow` substitutes `.still` for a held picture rather than rendering an
+   `<img>` at all. It is removed because a blur rule sitting in the sheet is
+   an invitation to render the image and let CSS "handle" it — which is
+   exactly what /entry/[id] and /triage were doing. `log.css` draws the blur;
+   this product withholds instead, and §0.2 is why. */
 .logpage .en .pics .still .lbl2, .logpage .en.isheld .pics .still .lbl2,
 /* A held RECORDING shows no frame either. Its poster is a still out of the
    file, and the log has not looked at it — the image branch has always held
@@ -1070,10 +1075,22 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .logpage .twodates b { font-family: var(--font-mono); font-weight: 400; color: var(--fg-2); font-size: 11.5px; }
 .logpage .entry-body { margin-top: 22px; font-size: 15px; line-height: 1.65; color: var(--fg-1); max-width: 640px; }
-.logpage .entry-media { margin-top: 22px; }
-.logpage .entry-media img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line-1); display: block; }
-.logpage .entry-media img.blur { filter: blur(26px); }
-.logpage .entry-media audio, .logpage .entry-media video { width: 100%; max-width: 560px; border-radius: 10px; display: block; }
+/* ⚠️ `.entry-media` is gone — it was this page's own invented wrapper, and
+   `.logpage.pg-entry .media` (with `.still .lbl2 .tile img .cap .side`) had
+   been sitting in this file transcribed from the design's entry examples,
+   rendered by nothing. Dead CSS scoped to a LIVE page, which is why
+   `check-unreached-css.mjs` could not see it: that check asks whether a page
+   scope has a page, not whether a rule inside one has markup.
+
+   `.entry-media img.blur` went with it, and that is the point of the change:
+   a blur is a CSS filter over bytes the browser already has. The API stopped
+   presigning a held row, so there is nothing left to blur.
+
+   The design's `.media` has no audio or video rule — its own examples are a
+   still and a mock player — so those two carry over here. */
+.logpage.pg-entry .media audio, .logpage.pg-entry .media video {
+  width: 100%; max-width: 560px; border-radius: 10px; display: block;
+}
 .logpage .transcript {
   margin-top: 22px; padding: 16px 18px; border: 1px solid var(--line);
   border-radius: 10px; background: var(--bg-1);
@@ -1788,7 +1805,12 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   max-width: 100%; max-height: 320px; border-radius: 8px;
   border: 1px solid var(--line-1); display: block; margin-bottom: 16px;
 }
-.logpage .tri-card img.blur { filter: blur(26px); }
+/* ⚠️ `.tri-card img.blur` retired 9 Sep with the entry page's copy. /triage
+   put it on a live `<img src>` for a held row and gave a held audio note a
+   working `<audio src>`; the API sends no URL for a held row now, so there
+   is nothing left to blur. `.still` is what a held row shows. */
+.logpage .tri-card .still { width: 100%; aspect-ratio: 3/2; display: block; border: 1px solid var(--line-1); border-radius: 10px; position: relative; overflow: hidden; background: repeating-linear-gradient(135deg, #131313 0 10px, #181818 10px 20px); }
+.logpage .tri-card .still .lbl2 { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: var(--fg-4); }
 .logpage .tri-card audio { width: 100%; margin-bottom: 16px; }
 .logpage .tri-line {
   font-size: 18px; font-weight: 300; line-height: 1.45; color: var(--fg);

@@ -172,8 +172,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     ),
   ])
 
+  // ⚠️ A HELD entry is not presigned at all.
+  //
+  // The page used to receive the URL and put `class="blur"` on the image —
+  // so the bytes were in the response, the browser fetched them, and the
+  // only thing between the operator and a file the log has NOT LOOKED AT was
+  // a CSS filter. The audio and video branches did not even blur; they
+  // rendered a live `src`.
+  //
+  // SPEC §0.2: being wrong towards private is the only safe direction, and
+  // every failure path holds back. `LogRow` has withheld the picture since
+  // the feed was built. This is the same rule, one surface later, and it is
+  // enforced HERE rather than in the page — a client cannot show what it was
+  // never sent.
   let media_url: string | null = null
-  if (row.r2_key) {
+  if (row.r2_key && row.visibility !== 'held') {
     try { media_url = await presignGetUrl(env, row.r2_key, 24 * 3600) } catch {}
   }
 

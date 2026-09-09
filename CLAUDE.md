@@ -85,6 +85,24 @@ has looked at it. The log **says what it saw** — "a name, a date of birth and
 a number laid out like a card" — never an unnamed reason. Being wrong towards
 private is the only safe direction, so every failure path holds back.
 
+⚠️ **The rule is enforced at the API, and it was two-thirds kept.** `LogRow`
+has withheld a held picture since the feed was built. `/entry/[id]` put
+`class="blur"` on a live `<img src>` — and rendered `<audio>` and `<video>`
+with a working `src`, not even blurred. `/triage` did exactly the same. **A
+CSS filter over bytes the browser has already fetched is not withholding
+anything**; the URL was in the response and the file was one devtools panel
+away.
+
+Both routes now refuse to presign a held row at all, so `media_url` is null
+and **a client cannot show what it was never sent**. The page says the file
+EXISTS from `r2_key` and shows `held.html`'s `.still` / *"not shown"* — two
+different questions, and a surface may answer only the first. Every
+`filter: blur` on an image is gone from the stylesheet, including one on the
+feed that could never match: a blur rule sitting in the sheet is an
+invitation to render the picture and let CSS handle it, which is precisely
+what the two surfaces were doing. `scripts/test/held.mjs` — 18 assertions, in
+CI, each proved by putting the leak back.
+
 ⚠️ **"Held" means every sense, not just the picture.** In the feed a held row
 blurred its image and then showed the video's poster frame and played its
 audio on a tap — while the caption beside it said *"blurred here too, until

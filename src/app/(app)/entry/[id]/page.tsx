@@ -42,6 +42,7 @@ interface Entry {
   source_kind: string
   buried_at: string | null
   r2_key: string | null
+  bytes: number | null
   mime: string | null
   duration_seconds: number | null
   transcript: string | null
@@ -327,19 +328,65 @@ export default function EntryPage({ params }: { params: { id: string } }) {
               </div>
             )}
 
-            {e.media_url && (
-              <div className="entry-media">
-                {isImage && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={e.media_url} alt="" className={held ? 'blur' : undefined} />
-                )}
-                {isAudio && <audio src={e.media_url} controls preload="metadata" />}
-                {isVideo && <video src={e.media_url} controls preload="metadata" />}
-                {!isImage && !isAudio && !isVideo && (
-                  <a href={e.media_url} target="_blank" rel="noopener noreferrer"
-                     style={{ color: 'var(--sig)', fontSize: 14 }}>
-                    {e.original_filename || 'the file'}
-                  </a>
+            {/* ⚠️ A HELD entry shows the placeholder, never the file.
+                `held.html`: `<span class="still"><span class="lbl2">not
+                shown</span></span>`. This used to be `class="blur"` on a
+                live `<img src>`, with `<audio>` and `<video>` not even
+                blurred — a CSS filter over bytes the browser had already
+                fetched. The API no longer presigns a held row at all
+                (`/api/v2/log/[id]`), so `media_url` is null here and there
+                is nothing for a future edit to accidentally reveal.
+
+                `r2_key` is what says a file EXISTS; `media_url` is what says
+                the log is willing to show it. Two different questions, and
+                the page is allowed to answer only the first.
+
+                ⚠️ The wrapper is `.media`, the design's own class, not the
+                `.entry-media` this page invented. `.pg-entry .media` and its
+                `.still .lbl2 .tile img .cap .side` were transcribed out of
+                the entry examples months ago and rendered by NOTHING — dead
+                CSS scoped to a live page, which `check-unreached-css.mjs`
+                cannot see because the page itself is real. */}
+            {(held ? e.r2_key : e.media_url) && (
+              <div className="media">
+                {held ? (
+                  <>
+                    <span className="still"><span className="lbl2">not shown</span></span>
+                    <span className="side">
+                      <b>Kept whole, kept back.</b>
+                      Not shown here either, until you say otherwise. The file
+                      is stored exactly as it arrived.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    {isImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={e.media_url!} alt="" />
+                    )}
+                    {isAudio && <audio src={e.media_url!} controls preload="metadata" />}
+                    {isVideo && <video src={e.media_url!} controls preload="metadata" />}
+                    {!isImage && !isAudio && !isVideo && (
+                      <a href={e.media_url!} target="_blank" rel="noopener noreferrer"
+                         style={{ color: 'var(--sig)', fontSize: 14 }}>
+                        {e.original_filename || 'the file'}
+                      </a>
+                    )}
+                    {/* `photo.html`, `image.html`, `batch.html` and
+                        `recording.html` all carry a caption beside the file.
+                        `LogRow` has rendered one since the feed was built;
+                        this page never did, though it holds the same two
+                        facts. What the file is CALLED is the log's, and it
+                        says so — the operator's own words about a picture
+                        live in `detail` above. */}
+                    {e.original_filename && (
+                      <span className="cap">
+                        <b>{e.original_filename}</b>
+                        {e.bytes ? `${(e.bytes / (1024 * 1024)).toFixed(1)} MB · ` : ''}
+                        kept exactly as it arrived.
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -424,7 +471,7 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                     className="tline"
                     key={i}
                     onClick={() => {
-                      const el = document.querySelector<HTMLAudioElement>('.entry-media audio, .entry-media video')
+                      const el = document.querySelector<HTMLAudioElement>('.media audio, .media video')
                       if (el) { el.currentTime = sg.s; void el.play() }
                     }}
                   >

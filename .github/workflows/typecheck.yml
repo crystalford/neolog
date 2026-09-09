@@ -181,6 +181,15 @@ jobs:
       - name: Every function the container server calls is defined
         run: node scripts/check-container-server.mjs
 
+      # SPEC §0.2 — a held entry gives up nothing, in any sense, on any
+      # surface. /entry/[id] and /triage both put `class="blur"` on a live
+      # `<img src>` and gave a held audio note a working `<audio src>`: a CSS
+      # filter over bytes the browser had already fetched. The feed had
+      # withheld properly since it was built, so the rule was two-thirds
+      # kept and nothing said which third was missing.
+      - name: A held entry gives up nothing
+        run: node scripts/test/held.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:
