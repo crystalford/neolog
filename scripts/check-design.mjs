@@ -33,7 +33,7 @@
  * Run: node scripts/check-design.mjs [page]
  */
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 
 /** page in design/ → the route file that must match it → today's ceiling. */
 const PAGES = [
@@ -176,11 +176,6 @@ const PAGES = [
   // travels without its rule, and copying the number alone is how that is
   // lost.
   ['numbers',    'src/app/(app)/numbers/page.tsx',       0],
-  // Five of its remaining eight must STAY missing: mic, opts and or are
-  // the composer, and yl/yrs are the coverage bar. SPEC §3 — "Not on the
-  // public side: the coverage bar (the operator's instrument; it advertises
-  // the gaps), questions, the composer." public-log.html draws them; §0
-  // wins over a page.
   // ⚠️ All eight are SPEC §3, and it is one refusal rather than three. "Not
   // on the public side: the coverage bar (the operator's instrument; it
   // advertises the gaps), questions, the composer." `mic opts or` are the
@@ -225,11 +220,10 @@ const PAGES = [
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live
   // there.
-  // 9 → 7 on 9 Sep: the publish preview gained `.k` (whose consent state is
-  // being previewed, and what it is) and `.f` (why it reads strangely). The
-  // preview was a second copy of the thread with lines missing and nothing
-  // on screen saying why — on the one surface that is half somebody else's.
-  // 7 → 2 on 9 Sep. The list page opens on `messages.html`'s own `.top`,
+  // 9 → 7 → 2 on 9 Sep. The preview gained `.k` (whose consent state is
+  // being previewed) and `.f` (why it reads strangely) — it had been a
+  // second copy of the thread with lines missing and nothing saying why, on
+  // the one surface that is half somebody else's. The list page opens on `messages.html`'s own `.top`,
   // which says why this kind works differently before it shows a thread. The
   // sides pair took `.a`/`.b` — steel for his half, ochre for theirs, which
   // is the page's whole argument in two colours. The consent rows took the
@@ -307,6 +301,91 @@ const NO_DESIGN_PAGE = {
   '/footage':    'built from SPEC §2 prose — footage.html is an entry example',
   '/ready': 'no page in the package', '/share': 'no page in the package',
   '/settings': 'no page in the package', '/vlogs': 'vlog.html is one recording, not the list',
+}
+
+
+/**
+ * ── The package, all 74 pages, with what each one is ─────────────────────
+ *
+ * ⚠️ This exists because the inventory lived in CLAUDE.md prose and drifted
+ * three times in one day: it claimed `wrong` unbuilt after it shipped, the
+ * fold-past-twenty unbuilt after it shipped, and split BUILT when it did not
+ * exist. A sentence a human retypes is not a record; this is read off the
+ * directory and fails when a file has no entry.
+ *
+ * The 23 pages in PAGES above are `route` and are not repeated here. Every
+ * other file in design/markup gets one line saying which it is:
+ *
+ *   served          — a mechanic that ships, on a route designed elsewhere.
+ *                     SPEC §3: "one design, two views: nothing is designed
+ *                     twice."
+ *   entry-example   — one entry, drawn. `/entry/[id]` renders it.
+ *   below-the-fence — it drafts in his voice. Not built, and not a gap.
+ *   declined        — decided against, with the reason.
+ *   package-meta    — the package describing itself, or a rendered artefact.
+ *   partial         — shipped, with a named part still missing.
+ */
+const INVENTORY = {
+  // ── Served: the mechanic ships, on a route drawn by a different page ────
+  anchors:     ['served', 'the recall questions — the log rail and a page rail'],
+  audio:       ['partial', 'a recording is /vlog/[id]; the two-voice split is BLOCKED, not declined — transcript_words.speaker exists and Whisper is not asked for diarization'],
+  away:        ['served', 'a gap in the log, which the feed and the coverage bar already show'],
+  branch:      ['served', '/walk/[id] — a split take\'s parts each led_from it, so the take\'s walk is this fan. Its trace levels are the offer.'],
+  buried:      ['served', 'burial — the dim day row in LogRow and the bury control on an entry'],
+  'day-one':   ['served', 'the empty log, which / renders when there is nothing in it'],
+  dupes:       ['served', 'exact duplicates attach to the first arrival — src/lib/keep.ts, shown on /clear'],
+  expanded:    ['served', '/entry/[id]. entry.html is the same page and is the one measured.'],
+  fix:         ['served', 'the transcript correction on /vlog/[id]'],
+  heading:     ['served', '/page/[id] as a stranger sees it — SPEC §3, one design, two views'],
+  'heading-private': ['served', '/page/[id] signed in'],
+  'log-2028':  ['served', 'the fold, on / itself — bandYears() in src/lib/fold.ts'],
+  processing:  ['served', 'the pipeline state line on /vlog/[id] and on the feed'],
+  proof:       ['served', '/corrections and the record of origin in the export — the argument, made by those two'],
+  'public-log-2029': ['served', '/public, later. The same page with more in it.'],
+  publish:     ['served', 'the visibility control on /entry/[id]'],
+  'report-academic': ['served', 'a document of kind `report` — /writing'],
+  'report-creative': ['served', 'a document of kind `essay` — /writing'],
+  session:     ['served', 'a pasted conversation — src/lib/conversation.ts, kept whole, only his turns become entries'],
+  silent:      ['served', '/vlog/[id] for a recording with no words: it stays one line saying he recorded, because a recording with no timings writes nothing'],
+  subject:     ['served', '/page/[id]'],
+
+  // ── One entry, drawn. /entry/[id] renders every one of these ────────────
+  answer:      ['entry-example', 'a recall answer becoming an entry'],
+  batch:       ['entry-example', 'a drop of files as one entry, with the tile grid'],
+  blurry:      ['entry-example', 'an approximate date, marked'],
+  document:    ['entry-example', 'a kept document'],
+  dump:        ['entry-example', 'a long note split into entries'],
+  held:        ['entry-example', 'a picture the log held back, and what it says it saw'],
+  idea:        ['entry-example', 'an idea, with first-said and how it has changed'],
+  image:       ['entry-example', 'a screenshot the vision pass read'],
+  'image-filter': ['entry-example', 'the same, with the log\'s wording marked as the log\'s'],
+  metricool:   ['entry-example', 'a plain did-this entry'],
+  photo:       ['entry-example', 'a photo entry'],
+  question:    ['entry-example', 'an entry ending in ?'],
+  read:        ['entry-example', 'a book, read'],
+  recording:   ['entry-example', 'a published recording'],
+  said:        ['entry-example', 'a line he said'],
+  term:        ['entry-example', 'a term, which /glossary lists and /entry/[id] renders'],
+
+  // ── Below the drafting fence, and staying there ─────────────────────────
+  letters:     ['below-the-fence', 'the log drafts a letter in his voice'],
+  thinkit:     ['below-the-fence', 'the log thinks a thought through for him'],
+  sayit:       ['below-the-fence', 'the log says it properly on his behalf'],
+  cut:         ['below-the-fence', 'the log cuts a clip — it decides which of his words are good'],
+
+  // ── Declined, each with the reason ──────────────────────────────────────
+  app:         ['declined', 'a native phone app. The vendor list is Cloudflare; this is a website, and the composer takes a drop from a phone already.'],
+  elsewhere:   ['declined', 'its three moves all draft a reply in his voice for someone else\'s site. What is left is an essay about which sites AI engines cite, and §0 rule 7 — you never write something down because it would look good in public.'],
+  flow:        ['declined', 'a walkthrough of input reaching the log — a .specnote banner and five .st sections, both already PACKAGE_FURNITURE as the package talking about itself'],
+  kinds:       ['declined', 'an essay about what a log publishes. /everything is the door to the machine layer; a page explaining the kinds is the log explaining itself (§0 rule 2).'],
+  repo:        ['declined', 'commits folded by week needs a GitHub connector, and the vendor list is locked. A repository is already a `code` document whose body is the README.'],
+
+  // ── The package describing itself, or an artefact of it ─────────────────
+  export:      ['package-meta', 'a RENDERED export document — /export is takeout.html and the export is Markdown plus a JSON manifest'],
+  everything:  ['package-meta', 'an entry example, despite SPEC §3 naming it the machine-layer door. /everything is built from the prose.'],
+  footage:     ['package-meta', 'an entry example, despite SPEC §2 describing footage. /footage is built from the prose.'],
+  portal:      ['package-meta', 'a flat map of the package\'s own HTML files'],
+  index:       ['package-meta', 'the package\'s designed hub, same'],
 }
 
 /**
@@ -454,7 +533,37 @@ for (const r of rows) {
   // down: a count says a page has drifted, the list says where to start.
   if (r.n > r.budget || only) console.log(`      ${r.missing.join(' ')}`)
 }
-console.log(`\n${rows.length} pages measured against design/. ${Object.keys(NO_DESIGN_PAGE).length} surfaces have no design page (listed in this file, with why).`)
+console.log(`\n${rows.length} routes measured against design/. ${Object.keys(NO_DESIGN_PAGE).length} surfaces have no design page (listed in this file, with why).`)
+
+// ── The inventory, counted rather than claimed ────────────────────────────
+const onDisk = readdirSync('design/markup')
+  .filter(f => f.endsWith('.html'))
+  .map(f => f.replace(/\.html$/, ''))
+const routed = new Set(PAGES.map(p => p[0]))
+const unlisted = onDisk.filter(n => !routed.has(n) && !INVENTORY[n])
+const phantom = Object.keys(INVENTORY).filter(n => !onDisk.includes(n))
+
+const counts = { route: routed.size }
+for (const n of onDisk) {
+  if (routed.has(n)) continue
+  const cat = INVENTORY[n]?.[0]
+  if (cat) counts[cat] = (counts[cat] || 0) + 1
+}
+console.log(`\n${onDisk.length} pages in the package:`)
+for (const [k, v] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+  console.log(`  ${String(v).padStart(3)}  ${k}`)
+}
+
+if (unlisted.length || phantom.length) {
+  if (unlisted.length) {
+    console.error(`\n${unlisted.length} design page(s) with no entry in INVENTORY: ${unlisted.join(' ')}`)
+    console.error('Every page in the package is a route, or is recorded as something else with a reason.')
+  }
+  if (phantom.length) {
+    console.error(`\n${phantom.length} INVENTORY entr(ies) with no file: ${phantom.join(' ')}`)
+  }
+  process.exit(1)
+}
 
 if (over) {
   console.error(`\n${over} page${over === 1 ? '' : 's'} drifted further from the design than its budget allows.`)

@@ -1118,63 +1118,56 @@ Adding a value means adding it to the list on purpose, which is the point.
 Also update `src/lib/log-entry.ts` — `RELATIONS`, `RELATION_DEFAULT`,
 `REFLECTS` — rather than typing a string.
 
-**Package inventory, 9 Sep 2026** — 74 distinct pages (excluding the 37
-`e-*` entry examples): **44 built · 5 partial · 15 not built · 4 below the
-fence · 5 meta**.
+### ⚠️ The package inventory is COUNTED, not claimed
 
-Partial: `audio` (no two-voice split — `transcript_words.speaker` exists but
-nothing populates it; Whisper is not asked for diarization, so the split
-cannot be built honestly yet), `flow` (a walkthrough page). `walk`,
-`screenshots`, `fix` and — 9 Sep — `wrong` (as `/corrections`) are built.
-`branch`'s buildable half is **split on an entry**, which now exists; the
-rest of that page is the trace essay and the offer, both below the fence.
+`node scripts/check-design.mjs` prints it, and **it fails CI on a design page
+with no entry**. The prose that used to live here drifted three times in one
+day — it said `wrong` was unbuilt after it shipped, said the fold past twenty
+was unbuilt after it shipped, and said split existed when it did not. A
+sentence a human retypes is not a record.
 
-**Not built, and each for a stated reason:**
+The counts, 9 Sep 2026 — **74 pages: 23 route · 20 served · 16 entry-example
+· 5 declined · 5 package-meta · 4 below-the-fence · 1 partial**. Read the
+reason for any one of them in `INVENTORY` in that file; the categories mean:
 
-- `elsewhere` — **declined.** Its three "moves" all draft a reply in his voice
-  for posting on someone else's site, which is below the drafting fence with
-  `letters`. What is left once those are removed is a static essay about
-  which sites AI engines cite, which belongs in the design package rather
-  than in the product — and a page whose subject is getting cited sits badly
-  against §0 rule 7, *you never write something down because it would look
-  good in public*.
-- `repo`'s commits-folded-by-week — **declined.** It needs a GitHub
-  connector, and the vendor list is locked to Cloudflare + Anthropic. A
-  repository is already a `code` document whose body is the README.
-- `audio`'s two-voice split — **blocked, not declined.**
+- **route** — a page in `PAGES`, measured against the design every run.
+- **served** — the mechanic ships, on a route drawn by a different page.
+  SPEC §3: *"one design, two views: nothing is designed twice."* `branch` is
+  `/walk/[id]`; `fix` is the transcript correction on `/vlog/[id]`;
+  `log-2028` is the fold on `/`; `heading` and `heading-private` are the two
+  views of `/page/[id]`.
+- **entry-example** — one entry, drawn. `/entry/[id]` renders it. Sixteen of
+  the 74 are these.
+- **below-the-fence** — `letters` · `thinkit` · `sayit` · `cut`. Each drafts
+  in his voice. Not built, and not a gap.
+- **declined** — `app` (a native app; this is a website, and the composer
+  already takes a drop from a phone) · `elsewhere` (drafts a reply for
+  someone else's site, and what is left is an essay about getting cited,
+  which sits badly against §0 rule 7) · `flow` (a walkthrough, which is
+  `.specnote` and `.st` — the package talking about itself) · `kinds` (an
+  essay about what a log publishes, which is the log explaining itself, §0
+  rule 2) · `repo` (commits by week needs a GitHub connector; a repository is
+  already a `code` document whose body is the README).
+- **package-meta** — `portal` and `index` map the package's own files;
+  `export` is a RENDERED export document (`/export` is `takeout.html`);
+  `everything` and `footage` are entry examples despite SPEC §3 and §2 naming
+  them, so those two routes are built from the prose.
+- **partial** — `audio`, and it is **blocked, not declined**.
   `transcript_words.speaker` exists and nothing populates it; Whisper is not
-  asked for diarization. Building the split without it would mean guessing
-  who said what, and the consent rule then attributes another person's
-  sentence to him. The mechanism it needs already exists in
+  asked for diarization. Building the two-voice split without it means
+  guessing who said what, and the consent rule then attributes another
+  person's sentence to him. The mechanism it would need already exists in
   `src/lib/correspondence.ts`.
-- `photo` · `recording` · `question` — **served.** SPEC §3's "one design, two
-  views: nothing is designed twice" makes these `/entry/[id]` plus the
-  schema block, not new pages.
-- `branch` — **served by `/walk/[id]`.** A split take's parts each `led_from`
-  it, so the take's walk is branch.html's fan. The trace levels that page
-  also shows (*a fact · a term · a position · a piece*) are the offer, which
-  is below the fence.
-- `image` · `image-filter` — the entry page renders an image entry whole, and
-  the description is now correctable: **the log's wording is marked as the
-  log's until he replaces it**, at which point the revision record makes it
-  his. No second author column — that is derived from `entry_revisions`. `messages` and `writing` shipped — see
-**Correspondence**, **Documents** and **Footage** above. `repo` is a `code`
-document whose body is the README; the commits-folded-by-week view is not
-built. **The
-machine layer shipped** — `dossier` → `/facts`, `everything`, `source` →
-`/glossary`, `asks`, `numbers`, plus the four feeds.
 
-Two halves of that layer were deliberately left out, and both are the same
-refusal. `asks.html` writes prose answers with sub-questions fanned beneath
-them; `numbers.html` writes a reading under each figure. A model writing an
-answer in his voice on a surface that presents itself as a record is what §0
-rule 3 forbids, and a sentence about what a count MEANS is the log commenting
-(§0 rule 2). So the question and the answer are both his, joined by
-`led_from` and nothing else; and the slot under a number holds the rule it
-was counted by instead. `/search` remains the one place a written answer
-lives, and it checks its citations first.
-
-Below the fence and **staying there**: `letters`, `thinkit`, `sayit`, `cut`.
+Two halves of the machine layer were deliberately left out, and both are the
+same refusal. `asks.html` writes prose answers with sub-questions fanned
+beneath them; `numbers.html` writes a reading under each figure. A model
+writing an answer in his voice on a surface that presents itself as a record
+is what §0 rule 3 forbids, and a sentence about what a count MEANS is the log
+commenting (§0 rule 2). So the question and the answer are both his, joined by
+`led_from` and nothing else; and the slot under a number holds the rule it was
+counted by instead. `/search` remains the one place a written answer lives,
+and it checks its citations first.
 
 **Later additions this session:** a pasted **conversation** is kept whole and
 split, and only HIS turns become entries (`src/lib/conversation.ts`) — the
@@ -1185,12 +1178,9 @@ picture of a note**. An undated picture asks when it was taken. An idea's page
 carries **first said** and how it has changed.
 
 **The build order is void.** The operator lifted it on 7 Sep: *"go through
-the whole thing and build the full system."* What remains unbuilt: the
-per-kind bodies, and everything below the drafting fence — letters, cuts, the
-offer, anything that drafts in his voice. That last group stays below the
-fence regardless. (**The fold past twenty is built** — `bandYears()` in
-`src/lib/fold.ts`, tested in `scripts/test/fold.mjs`; this line claimed
-otherwise until 9 Sep.)
+the whole thing and build the full system."* What remains unbuilt is the
+`declined` and `below-the-fence` rows above, and `audio`'s blocked half.
+That is the whole list, and it is generated.
 
 ---
 
